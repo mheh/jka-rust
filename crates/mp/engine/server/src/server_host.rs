@@ -5,6 +5,18 @@ use core::ffi::c_int;
 
 use crate::server::server_static_t::serverStatic_t;
 use crate::server::server_t::server_t;
+use crate::server::world_sector_s::{worldSector_t, AREA_NODES};
+
+/// Raven `sv_worldSectors[AREA_NODES]` + `sv_numworldSectors` — the master
+/// table's `Server.world_sectors` row, grouped under Raven names (Savegame
+/// precedent: a Rust-side grouping colocated with its sole owner).
+///
+/// Source: `oracle/oracle/codemp/server/sv_world.cpp:58-59`
+#[allow(non_snake_case)]
+pub struct WorldSectors {
+    pub sv_worldSectors: [worldSector_t; AREA_NODES],
+    pub sv_numworldSectors: c_int,
+}
 
 /// Raven `MAX_MASTER_SERVERS` — master-server slot count (`#ifndef _XBOX`).
 ///
@@ -35,9 +47,11 @@ pub struct Server {
     ///
     /// Source: `oracle/oracle/codemp/server/sv_main.cpp:10`
     pub svs: serverStatic_t,
-    //TODO: Port worldSector_t (`sv_worldSectors[AREA_NODES]`) + sv_numworldSectors
-    // Source: oracle/oracle/codemp/server/sv_world.cpp:58-59
-    pub world_sectors: (),
+    /// Raven `sv_worldSectors[AREA_NODES]` + `sv_numworldSectors` — the
+    /// Chain-A disjoint field.
+    ///
+    /// Source: `oracle/oracle/codemp/server/sv_world.cpp:58-59`
+    pub world_sectors: WorldSectors,
     //TODO: Port bot_debugpoly_t (`debugpolygons`) + gWPArray[MAX_WPARRAY_SIZE]
     // (wpobject_t, already ported in mp_qshared, but the containing
     // bot_debugpoly_t is not) + gWPNum

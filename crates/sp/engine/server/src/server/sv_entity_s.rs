@@ -1,7 +1,8 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::c_void;
 use sp_qshared::common::sp::qcommon::entity_state::entityState_t;
+
+use super::world_sector_s::worldSector_t;
 
 /// Raven `MAX_ENT_CLUSTERS`.
 ///
@@ -15,9 +16,7 @@ pub const MAX_ENT_CLUSTERS: usize = 16;
 /// Type definition source: `oracle/oracle/code/server/server.h:22-40`
 #[repr(C)]
 pub struct svEntity_t {
-    //TODO: Port worldSector_s
-    // Source: oracle/oracle/code/server/sv_world.c (worldSector_t)
-    pub worldSector: *mut c_void,
+    pub worldSector: *mut worldSector_t,
     pub nextEntityInWorldSector: *mut svEntity_t,
 
     /// for delta compression of initial sighting
