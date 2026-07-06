@@ -22,6 +22,8 @@ use mp_bg::public::bg_loaded_anim::bgLoadedAnim_t;
 use mp_bg::public::bg_loaded_events::bgLoadedEvents_t;
 use mp_bg::public::saber_move_data::saberMoveData_t;
 use mp_bg::public::saber_move_data_table::saberMoveData;
+use mp_bg::vehicles::vehicle_s::MAX_VEHICLES;
+use mp_qshared::shared::limits::MAX_VEH_WEAPONS;
 
 /// The bg tier's session-lifetime state, owned by `GameWorld`.
 ///
@@ -181,10 +183,20 @@ impl BgState {
             SaberParms: Vec::new(),
             bgSaberParseTBuffer: Vec::new(),
             saberMoveData: &saberMoveData,
-            g_vehWeaponInfo: Vec::new(),
+            // Sized like Raven's fixed `vehWeaponInfo_t g_vehWeaponInfo[MAX_VEH_WEAPONS]`
+            // / `vehicleInfo_t g_vehicleInfo[MAX_VEHICLES]` zeroed statics: the
+            // loaders index them directly at fixed slots (e.g. `g_vehicleInfo[
+            // VEHICLE_BASE]`, `bg_vehicleLoad.rs:856`) rather than push/grow, so
+            // an empty `Vec` would panic on the first index. Same fixed-array
+            // pre-size convention as `bgAllAnims`/`VehicleParms` above.
+            g_vehWeaponInfo: (0..MAX_VEH_WEAPONS)
+                .map(|_| unsafe { core::mem::zeroed() })
+                .collect(),
             // Raven initialises to 1 (first entry is the null/default).
             numVehicleWeapons: 1,
-            g_vehicleInfo: Vec::new(),
+            g_vehicleInfo: (0..MAX_VEHICLES)
+                .map(|_| unsafe { core::mem::zeroed() })
+                .collect(),
             numVehicles: 0,
             // Sized like Raven's fixed `char[MAX_VEH_WEAPON_DATA_SIZE/
             // MAX_VEHICLE_DATA_SIZE]` scratch buffers (loaders index them

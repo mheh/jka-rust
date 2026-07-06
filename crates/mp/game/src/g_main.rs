@@ -1102,9 +1102,14 @@ pub fn CalculateRanks(ctx: GameContext<'_>) {
         world.level.numNonSpectatorClients = 0;
         world.level.numPlayingClients = 0;
         world.level.numVotingClients = 0;
-        let mut i: c_int = 0;
-        while (i as usize) < TEAM_NUM_TEAMS as usize {
-            world.level.numteamVotingClients[i as usize] = 0;
+        // Raven UB (porting-rules §19): `for (i=0; i<TEAM_NUM_TEAMS; i++)` (=4,
+        // g_main.c:1768) zeroes a `numteamVotingClients[2]` array (g_local.h:879)
+        // — a 2-int overrun that silently clobbers neighbours in C but panics in
+        // safe Rust. Only [0]/[1] are ever read/incremented, so clamp to the
+        // array's real length.
+        let mut i: usize = 0;
+        while i < world.level.numteamVotingClients.len() {
+            world.level.numteamVotingClients[i] = 0;
             i += 1;
         }
 

@@ -12,3 +12,14 @@ crate-type = ["cdylib"]
 # SEAM-D10: the thin cdylib shell depends on abi_transport AND its logic crate.
 abi_transport = { path = "../abi-transport" }
 mp_game = { path = "../mp/game" }
+
+[dev-dependencies]
+# ABI smoke test (tests/abi_smoke.rs): drive the BUILT cdylib through the real
+# engine contract. `mp_engine_qcommon` supplies the inbound C-variadic syscall
+# trampoline + `arm_game_slot`; `native_platform` the libloading-based module
+# loader (its first live exercise); `mp_abi` the import/export wire numbers;
+# `mp_qshared` the `vmCvar_t` layout the mock engine writes back.
+mp_engine_qcommon = { path = "../mp/engine/qcommon" }
+native_platform = { path = "../native/platform" }
+mp_abi = { path = "../mp/abi" }
+mp_qshared = { path = "../mp/qshared" }
