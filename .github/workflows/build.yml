@@ -1,0 +1,196 @@
+name: Build modules
+
+# Builds the MP server game module (`jampgame`) as a shared library for every
+# arch the engine loads, in BOTH the release and debug profiles, and packages
+# each as a zip. Adapted from the oracle port's proven pipeline
+# (oracle/.github/workflows/build.yml).
+#
+# The file *inside* each zip keeps the exact arch-suffixed name the engine
+# expects at load time (`"jampgame" ARCH_STRING DLL_EXT`; the engine refuses to
+# load a renamed module). Profile/arch live in the zip name, never in the
+# module filename:
+#
+#   Windows 32-bit  x86      jampgamex86.dll      (allowed failure, see below)
+#   Windows 64-bit  x86_64   jampgamex86_64.dll
+#   Linux   32-bit  i386     jampgamei386.so      (allowed failure, see below)
+#   Linux   64-bit  x86_64   jampgamex86_64.so
+#
+# 32-bit lanes are `continue-on-error`: the workspace's layout static-asserts
+# are computed for LP64, and on ILP32 they fail by design (~52 errors in
+# mp_qshared alone — pointer-bearing structs shrink). They flip to enforced
+# once the ILP32 assert pass lands. Debug builds are a real link gate — the
+# cdylib's release link catches undefined symbols a local debug `cargo build`
+# tolerates on Linux/macOS.
+#
+# Zip names are STABLE (no version segment) so the rolling `latest` release
+# keeps stable download URLs; the built commit is recorded in the release body.
+#
+# The build matrix is gated behind a full-workspace compile — this repo's
+# truth bar: every ABI struct carries size/offset static-asserts, so a green
+# build IS the layout test. `cargo test` becomes the gate once the oracle
+# differential harness (referee swap) lands; today the parked pmove-parity WIP
+# test target does not compile, so it cannot gate.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write # the release job attaches assets to the rolling release
+
+concurrency:
+  group: build-master
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Workspace compile gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: test-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: test-cargo-
+
+      - name: Full workspace build (layout asserts are compile-time)
+        run: cargo build --workspace
+
+  build:
+    name: ${{ matrix.target.module }} (${{ matrix.profile }})
+    needs: test
+    runs-on: ${{ matrix.target.runner }}
+    continue-on-error: ${{ matrix.target.allow_failure }}
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [release, debug]
+        target:
+          - module: jampgamex86.dll
+            runner: windows-latest
+            triple: i686-pc-windows-msvc
+            cargo_artifact: jampgame.dll
+            arch: x86
+            platform: windows
+            allow_failure: true # ILP32 layout-assert pass not done yet
+          - module: jampgamex86_64.dll
+            runner: windows-latest
+            triple: x86_64-pc-windows-msvc
+            cargo_artifact: jampgame.dll
+            arch: x86_64
+            platform: windows
+            allow_failure: false
+          - module: jampgamei386.so
+            runner: ubuntu-latest
+            triple: i686-unknown-linux-gnu
+            cargo_artifact: libjampgame.so
+            arch: i386
+            platform: linux
+            allow_failure: true # ILP32 layout-assert pass not done yet
+          - module: jampgamex86_64.so
+            runner: ubuntu-latest
+            triple: x86_64-unknown-linux-gnu
+            cargo_artifact: libjampgame.so
+            arch: x86_64
+            platform: linux
+            allow_failure: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target.triple }}
+
+      - name: Install 32-bit Linux cross deps
+        if: matrix.target.triple == 'i686-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target.triple }}-${{ matrix.profile }}-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: ${{ matrix.target.triple }}-${{ matrix.profile }}-cargo-
+
+      - name: Build (${{ matrix.profile }} cdylib)
+        shell: bash
+        run: |
+          if [ "${{ matrix.profile }}" = "release" ]; then
+            cargo build -p jampgame --release --target ${{ matrix.target.triple }}
+            echo "PROFILE_DIR=release" >> "$GITHUB_ENV"
+          else
+            cargo build -p jampgame --target ${{ matrix.target.triple }}
+            echo "PROFILE_DIR=debug" >> "$GITHUB_ENV"
+          fi
+
+      - name: Package zip
+        shell: bash
+        run: |
+          src="target/${{ matrix.target.triple }}/${PROFILE_DIR}/${{ matrix.target.cargo_artifact }}"
+          test -f "$src" || { echo "::error::built module not found at $src"; exit 1; }
+          zip_name="jampgame-${{ matrix.target.arch }}-${{ matrix.target.platform }}-${{ matrix.profile }}.zip"
+          rm -rf package dist
+          mkdir -p package dist
+          # rename to the engine-required load name *inside* the archive
+          cp "$src" "package/${{ matrix.target.module }}"
+          ( cd package && 7z a -tzip tmp.zip "${{ matrix.target.module }}" >/dev/null )
+          mv package/tmp.zip "dist/${zip_name}"
+          echo "ZIP_NAME=${zip_name}" >> "$GITHUB_ENV"
+          ls -l dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: dist/${{ env.ZIP_NAME }}
+          if-no-files-found: error
+
+  release:
+    name: Update rolling release
+    needs: build
+    # `needs.build` is satisfied even when only the allowed-failure 32-bit
+    # lanes failed; publish whatever built.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List collected zips
+        run: ls -lR dist
+
+      - name: Publish rolling `latest` release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Rolling build (master)
+          prerelease: true
+          body: |
+            Automated build of `master` @ ${{ github.sha }}.
+
+            Each zip contains the module under the exact filename the engine
+            loads (`jampgamex86_64.dll`, `jampgamex86_64.so`, …). Asset URLs
+            are stable across builds. 32-bit zips appear once the ILP32
+            layout-assert pass lands.
+          files: dist/*.zip
+          fail_on_unmatched_files: false
