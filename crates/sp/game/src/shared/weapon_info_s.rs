@@ -1,7 +1,8 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::{c_int, c_void};
+use core::ffi::c_void;
 
+use sp_qshared::common::sp::ff::ff_handle_t::ffHandle_t;
 use sp_qshared::common::sp::qcommon::game_item::gitem_t;
 use sp_qshared::shared::{qboolean, qhandle_t, sfxHandle_t, vec3_t};
 
@@ -61,16 +62,15 @@ pub struct weaponInfo_t {
 	/// sound played when weapon is selected
 	pub selectSound: sfxHandle_t,
 
-	//TODO: Port ffHandle_t
-	// Source: oracle/oracle/code/ff/ff_public.h:8
-	// `typedef int ffHandle_t`; only present under Raven's `_IMMERSION` build,
-	// which this SP layout has enabled (per the packet's verbatim offsets).
-	pub firingForce: c_int,
-	pub altFiringForce: c_int,
-	pub stopForce: c_int,
-	pub chargeForce: c_int,
-	pub altChargeForce: c_int,
-	pub selectForce: c_int,
+	// Raven: `#ifdef _IMMERSION` — force-feedback handles; only present under
+	// Raven's `_IMMERSION` build, which this SP layout has enabled (per the
+	// packet's verbatim offsets).
+	pub firingForce: ffHandle_t,
+	pub altFiringForce: ffHandle_t,
+	pub stopForce: ffHandle_t,
+	pub chargeForce: ffHandle_t,
+	pub altChargeForce: ffHandle_t,
+	pub selectForce: ffHandle_t,
 }
 
 const _: () = assert!(core::mem::size_of::<weaponInfo_t>() == 160);

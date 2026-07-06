@@ -2,6 +2,7 @@
 
 pub mod bg;
 pub mod cgame;
+pub mod ff;
 pub mod game;
 pub mod gentity;
 pub mod ghoul2;

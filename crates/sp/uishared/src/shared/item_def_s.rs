@@ -2,6 +2,7 @@
 
 use core::ffi::{c_char, c_float, c_int, c_void};
 
+use sp_qshared::common::sp::ff::ff_handle_t::ffHandle_t;
 use sp_qshared::common::sp::ghoul2::cghoul2_info_v::CGhoul2Info_v;
 use sp_qshared::shared::{qhandle_t, sfxHandle_t};
 
@@ -83,11 +84,10 @@ pub struct itemDef_s {
     /// what type of action to take on cvarenables
     pub cvarFlags: c_int,
     pub focusSound: sfxHandle_t,
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    // `typedef int ffHandle_t`; only present under Raven's `_IMMERSION` build,
-    // which this SP layout has enabled (per the packet's verbatim offsets).
-    pub focusForce: c_int,
+    // Raven: `#ifdef _IMMERSION` — force-feedback handle; only present under
+    // Raven's `_IMMERSION` build, which this SP layout has enabled (per the
+    // packet's verbatim offsets).
+    pub focusForce: ffHandle_t,
     /// number of color ranges
     pub numColors: c_int,
     pub colorRanges: [colorRangeDef_t; MAX_COLOR_RANGES],

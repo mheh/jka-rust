@@ -2,6 +2,7 @@
 
 use core::ffi::{c_char, c_int};
 
+use sp_qshared::common::sp::ff::ff_handle_t::ffHandle_t;
 use sp_qshared::common::sp::renderer::glconfig_t::glconfig_t;
 use sp_qshared::shared::{gameState_t, qhandle_t, sfxHandle_t, vec3_t, MAX_CLIENTS, MAX_QPATH};
 
@@ -82,9 +83,7 @@ pub struct cgs_t {
     // Raven: `#ifdef _IMMERSION` — force-feedback registration; layout
     // reflects the `_IMMERSION`-enabled build the packet's offsets were
     // captured against.
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub force_precache: [c_int; MAX_FORCES],
+    pub force_precache: [ffHandle_t; MAX_FORCES],
 
     // Ghoul2 start
     pub skins: [qhandle_t; MAX_CHARSKINS],

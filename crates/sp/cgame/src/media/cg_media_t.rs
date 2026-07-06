@@ -2,6 +2,7 @@
 
 use core::ffi::c_int;
 
+use sp_qshared::common::sp::ff::ff_handle_t::ffHandle_t;
 use sp_qshared::shared::{qhandle_t, sfxHandle_t};
 
 use super::footstep_t::footstep_t;
@@ -206,54 +207,26 @@ pub struct cgMedia_t {
     // Raven: `#ifdef _IMMERSION` — force-feedback registration; layout
     // reflects the `_IMMERSION`-enabled build the packet's offsets were
     // captured against.
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub grenadeBounce1Force: c_int,
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub grenadeBounce2Force: c_int,
+    pub grenadeBounce1Force: ffHandle_t,
+    pub grenadeBounce2Force: ffHandle_t,
 
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub selectForce: c_int,
+    pub selectForce: ffHandle_t,
 
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub footstepForces: [[c_int; 4]; footstep_t::FOOTSTEP_TOTAL as usize],
+    pub footstepForces: [[ffHandle_t; 4]; footstep_t::FOOTSTEP_TOTAL as usize],
 
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub noAmmoForce: c_int,
+    pub noAmmoForce: ffHandle_t,
 
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub landForce: c_int,
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub messageLitForce: c_int,
+    pub landForce: ffHandle_t,
+    pub messageLitForce: ffHandle_t,
 
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub watrInForce: c_int,
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub watrOutForce: c_int,
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub watrUnForce: c_int,
+    pub watrInForce: ffHandle_t,
+    pub watrOutForce: ffHandle_t,
+    pub watrUnForce: ffHandle_t,
 
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub zoomStartForce: c_int,
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub zoomLoopForce: c_int,
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub zoomEndForce: c_int,
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub disruptorZoomLoopForce: c_int,
+    pub zoomStartForce: ffHandle_t,
+    pub zoomLoopForce: ffHandle_t,
+    pub zoomEndForce: ffHandle_t,
+    pub disruptorZoomLoopForce: ffHandle_t,
 }
 
 const _: () = assert!(core::mem::size_of::<cgMedia_t>() == 1640);
