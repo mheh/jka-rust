@@ -1,12 +1,12 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 720 markers — 120 `TODO: Port`,
+Totals: 708 markers — 108 `TODO: Port`,
 546 `PORT-NOTE`, 54 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
 judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 
-- **LEGIT** — subject genuinely unported; marker accurate. (103)
+- **LEGIT** — subject genuinely unported; marker accurate. (91)
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
@@ -34,7 +34,7 @@ PORT-NOTE section is a plain re-grep (not audited).
   - Same tiering blocker as gentity.rs: Vehicle_t is ported at crates/mp/bg/src/vehicles/vehicle_s.rs but sharedEntity_t lives in mp_qshared, which cannot depend on mp_bg. Requires an abi-seam/tier refactor, not a file-local mechanical fix.
 
 ### crates/sp/abi/src/game/public/game_import_t.rs
-- L435: CMiniHeap
+- L431: CMiniHeap
   - CMiniHeap IS ported (crates/sp/engine/qcommon/src/miniheap/cmini_heap.rs) but sp_abi cannot depend on the engine tier — same cross-tier-naming class as Vehicle_t/gNPC_t; pointer param stays opaque pending a DEC ruling.
 
 ### crates/sp/cgame/src/media/cgs_t.rs
@@ -73,7 +73,7 @@ PORT-NOTE section is a plain re-grep (not audited).
   - Validator claim does not match the file. Actual line 1 is `//! `mp_engine_server` crate. //TODO: Port module mp_engine_server` — subject is already `mp_engine_server` (not `server` as claimed), and there is no `// Source:` line to normalize. This exact one-line, no-Source-line form is the established house convention for crate-root module docs, verified identical across all 22 sibling crate lib.rs files (e.g. crates/mp/engine/qcommon/src/lib.rs, crates/mp/engine/client/src/lib.rs, crates/sp/engine/server/src/lib.rs, crates/mp/bg/src/lib.rs). Git history (git log -p --follow on this file) shows the line unchanged since crate creation in 71ec41c7. Fixing/normalizing it as described would actually break consistency with the rest of the codebase, so no edit was made.
 
 
-## TODO: Port — LEGIT (103)
+## TODO: Port — LEGIT (91)
 
 ### crates/abi-transport/src/generic/engine.rs
 - L78: RunStatic per-call handler surface
@@ -144,10 +144,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/engine/ghoul2/src/lib.rs
 - L1: module mp_engine_ghoul2
-- L3: SSkinGoreData
-
-### crates/mp/engine/icarus/src/blockstream/cblock_stream.rs
-- L16: FILE
 
 ### crates/mp/engine/icarus/src/interface/interface_export_s.rs
 - L157: CSequencer
@@ -171,9 +167,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/engine/qcommon/src/common/common.rs
 - L41: Common cvars/cmd/cbuf/fs/net sub-structs + com_printf print state
 - L54: Com_Printf rd_buffer redirect + logfile + console routing
-
-### crates/mp/engine/qcommon/src/files/pack_t.rs
-- L17: unzFile
 
 ### crates/mp/engine/qcommon/src/timing/timing_c.rs
 - L12: timing_c::start, timing_c::end, timing_c::reset
@@ -212,14 +205,12 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L14: ModuleNaming macOS suffix
 
 ### crates/sp/abi/src/game/public/game_import_t.rs
-- L31: Printf variadic args
-- L40: Error variadic args
-- L50: cvar_t
-- L124: SendServerCommand variadic args
-- L229: CGhoul2Info
-- L458: IGhoul2InfoArray
-- L501: CRagDollUpdateParams
-- L563: SSkinGoreData
+- L32: Printf variadic args
+- L41: Error variadic args
+- L120: SendServerCommand variadic args
+- L225: CGhoul2Info
+- L454: IGhoul2InfoArray
+- L497: CRagDollUpdateParams
 
 ### crates/sp/abi/src/ui/public/uiimport_t.rs
 - L26: Printf variadic args
@@ -239,19 +230,12 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/sp/engine/ghoul2/src/lib.rs
 - L1: module sp_engine_ghoul2
-- L3: SSkinGoreData
-
-### crates/sp/engine/icarus/src/blockstream/cblock_stream.rs
-- L15: FILE
 
 ### crates/sp/engine/icarus/src/lib.rs
 - L1: module sp_engine_icarus
 
 ### crates/sp/engine/qcommon/src/cm/clip_map_t.rs
 - L73: CCMLandScape
-
-### crates/sp/engine/qcommon/src/files/pack_t.rs
-- L13: unzFile
 
 ### crates/sp/engine/qcommon/src/lib.rs
 - L1: module sp_engine_qcommon
@@ -271,23 +255,11 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/sp/game/src/lib.rs
 - L3: module sp_game (dependency types ported first; SP places
 
-### crates/sp/game/src/local/anim_file_set_t.rs
-- L18: animNumber_t
-
-### crates/sp/game/src/npc/g_npc_t.rs
-- L75: rank_t
-
 ### crates/sp/game/src/world/game_context.rs
 - L37: SP export logic fns taking GameContext (per-export, logic-port)
 
 ### crates/sp/game/src/world/game_world.rs
 - L28: GameWorld::zeroed (SP) — native_platform::zeroed_box for entities/level
-
-### crates/sp/qshared/src/common/sp/qcommon/saber/saber_info.rs
-- L15: saberInfoRetail_t
-
-### crates/sp/qshared/src/shared/cvar.rs
-- L16: cvar_t
 
 ### crates/sp/renderer/src/lib.rs
 - L1: module sp_renderer
