@@ -69,7 +69,7 @@ pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         //FIXME: match my pitch and roll for the slope of my groundPlane
-        if (*self_).s.groundEntityNum != ENTITYNUM_NONE
+        if (*client).ps.groundEntityNum != ENTITYNUM_NONE
             && ((*self_).s.eFlags & EF_DISINTEGRATION) == 0
         {
             //on the ground
@@ -449,7 +449,10 @@ pub fn pitch_roll_for_slope(
             (*client).ps.viewangles[PITCH] = dot * pitch;
             (*client).ps.viewangles[ROLL] = (1.0 - Q_fabs(dot)) * pitch * mod_;
             let oldmins2 = (*forwhom).r.mins[2];
-            (*forwhom).r.mins[2] = -24.0 + 12.0 * (*client).ps.viewangles[PITCH].abs() / 180.0;
+            // C promotes through `double`: `fabs()` is double libm and `/180.0f`
+            // widens the quotient, so the whole expr is f64, narrowed on store.
+            (*forwhom).r.mins[2] =
+                (-24.0_f64 + 12.0 * ((*client).ps.viewangles[PITCH] as f64).abs() / 180.0) as f32;
             //FIXME: if it gets bigger, move up
             if oldmins2 > (*forwhom).r.mins[2] {
                 //our mins is now lower, need to move up

@@ -27,7 +27,7 @@ C UB needing §19 decisions. Status: `pending` / `in-review` / `audited`
 | ai_wpnav.rs | 3658 | audited (wave 2) — batch nav: 1 confirmed / 2 findings, 2 fixes |
 | g_misc.rs | 3624 | audited (wave 2) — batch misc_target: 4 confirmed / 7 findings, 7 fixes |
 | NPC_AI_Stormtrooper.rs | 3372 | audited (wave 2) — batch npc_troopers: 13 confirmed / 13 findings, 11 fixes |
-| NPC_spawn.rs | 3193 | in-review (wave 2 — audit agent failed, re-run pending) |
+| NPC_spawn.rs | 3193 | audited (wave 2 re-run) — 5 confirmed fixed |
 | NPC_combat.rs | 3104 | audited (wave 2) — batch npc_combat: 4 confirmed / 10 findings, 9 fixes |
 | bg_saber.rs | 2962 | audited (wave 2) — batch bg_saber_anim: 4 confirmed / 4 findings, 4 fixes |
 | g_vehicles.rs | 2802 | audited (wave 2) — batch vehicles: 6 confirmed / 9 findings, 8 fixes |
@@ -37,11 +37,11 @@ C UB needing §19 decisions. Status: `pending` / `in-review` / `audited`
 | g_utils.rs | 2441 | audited (wave 2) — batch items_utils: 7 confirmed / 8 findings, 8 fixes |
 | g_trigger.rs | 2394 | audited (wave 2) — batch mover_trigger: 5 confirmed / 10 findings, 11 fixes |
 | g_nav.rs | 2360 | audited (wave 2) — batch nav: 1 confirmed / 2 findings, 2 fixes |
-| NPC_stats.rs | 2201 | in-review (wave 2 — audit agent failed, re-run pending) |
+| NPC_stats.rs | 2201 | audited (wave 2 re-run) — 1 deferred (vehicle-info-shape park) |
 | trap.rs | 1963 | audited (wave 2) — batch trap_infra: 0 confirmed / 0 findings, 0 fixes |
 | bg_saga.rs | 1911 | audited (wave 2) — batch siege: 2 confirmed / 3 findings, 3 fixes |
 | bg_misc.rs | 1907 | audited (wave 2) — batch qshared_bg: 5 confirmed / 8 findings, 8 fixes |
-| npc_c.rs | 1885 | in-review (wave 2 — audit agent failed, re-run pending) |
+| npc_c.rs | 1885 | audited (wave 2 re-run) — 2 confirmed fixed |
 | NPC_utils.rs | 1772 | audited (wave 2) — batch npc_combat: 4 confirmed / 10 findings, 9 fixes |
 | NPC_behavior.rs | 1759 | audited (wave 2) — batch npc_behavior: 5 confirmed / 6 findings, 7 fixes |
 | NPC_AI_GalakMech.rs | 1686 | audited (wave 2) — batch npc_creatures: 6 confirmed / 7 findings, 8 fixes |
@@ -230,3 +230,18 @@ list in the JSON): ai_wpnav.rs bulk (16 functions read Rust-side only),
 g_vehicles.rs (~42 functions lightly compared), g_main.rs G_RunFrame middle
 section, g_client.rs SetupGameGhoul2Model/G_UpdateClientAnims, bg_misc.rs
 table-heavy functions, NPC_AI_Default.rs NPC_BSDefault.
+
+### npc_spawn batch re-run (2026-07-06, after workflow agent API failure)
+7 confirmed fixed + 1 consistency note: npc_c.rs groundEntityNum read from
+entityState instead of playerState (NPC.c:59); npc_c.rs f64 fabs chain
+(NPC.c:455); NPC_WeaponsForTeam strncmp was case-insensitive vs Q_strncmp
+case-sensitive (q_shared.c:881); NPC_Kill_f wrote stats[4]=STAT_WEAPONS
+instead of STAT_HEALTH=0 (NPC_spawn.c:4154) — `npc kill` zeroed the weapons
+bitfield; NPC_PrintScore read persistant[12] instead of PERS_SCORE=0
+(NPC_spawn.c:4174); two loop bounds 2048 vs ENTITYNUM_MAX_NORMAL/WORLD.
+Deferred: NPC_ParseParms standheight int-truncation chain — parked behind the
+existing PORT-NOTE(vehicle-info-shape) missing-symbol gate (fix belongs with
+m_pVehicle resolution). Reported gaps: PORT-NOTE(fn-ptr) player->die calls in
+NPC_Kill_f still commented out (NPCs not killed via that path). Coverage:
+npc_c 43/43, NPC_stats 8/8 live (NPC_ParseParms end-to-end), NPC_spawn all
+substantive fns (the ~55 trivial SP_NPC_* setters spot-verified).

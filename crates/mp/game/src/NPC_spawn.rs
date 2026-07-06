@@ -304,10 +304,11 @@ pub fn NPC_WeaponsForTeam(team: team_t, spawnflags: c_int, NPC_type: *const c_ch
     let name = name.as_ref();
 
     let stricmp = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
+    // Q_strncmp is case-SENSITIVE (unlike Q_stricmp); compare prefixes exactly.
     let strncmp = |a: &str, b: &str, n: usize| {
         let a_pre: String = a.chars().take(n).collect();
         let b_pre: String = b.chars().take(n).collect();
-        a_pre.eq_ignore_ascii_case(&b_pre) && a.chars().count() >= n && b.chars().count() >= n
+        a_pre == b_pre && a.chars().count() >= n && b.chars().count() >= n
     };
 
     match team {
@@ -675,8 +676,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
             {
                 match (*ctx.world).cvars.g_spskill.integer {
                     0 => {
-                        (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed =
-                            ((*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed as f64 * 0.75) as f32;
+                        (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 0.75f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
                             (*((*ent).NPC as *mut gNPC_t)).stats.aim -=
                                 (*ctx.world).bg_state.rng.Q_irand(3, 6);
@@ -2998,7 +2998,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
         }
     }
 
-    for n in 1..2048 {
+    for n in 1..ENTITYNUM_MAX_NORMAL {
         let player = unsafe { (*ctx.world).g_entities.get_mut(n as usize) };
         if player.is_none() {
             continue;
@@ -3078,7 +3078,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                 );
                 player.health = 0;
                 unsafe {
-                    (*(player.client as *mut gclient_t)).ps.stats[4] = 0; // STAT_HEALTH
+                    (*(player.client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] = 0;
                 }
                 if !player.die.is_none() {
                     // PORT-NOTE(fn-ptr): die function pointer call
@@ -3097,7 +3097,7 @@ pub fn NPC_PrintScore(ctx: GameContext<'_>, ent: *mut gentity_t) {
             cstr(&format!(
                 "{}: {}\n",
                 cstr_to_str((*ent).targetname as *const c_char),
-                (*((*ent).client as *mut gclient_t)).ps.persistant[12] // PERS_SCORE
+                (*((*ent).client as *mut gclient_t)).ps.persistant[PERS_SCORE as usize]
             ))
             .as_ptr(),
         );
@@ -3168,7 +3168,7 @@ pub fn Cmd_NPC_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if cmd2[0] == b'\0' as u8 {
             // Show the score for all NPCs
             Com_Printf(c"SCORE LIST:\n".as_ptr() as *const c_char);
-            for i in 0..2048 {
+            for i in 0..ENTITYNUM_WORLD as usize {
                 let player = unsafe { (*ctx.world).g_entities.get(i) };
                 if player.is_none() || unsafe { player.unwrap().client.is_null() } {
                     continue;
