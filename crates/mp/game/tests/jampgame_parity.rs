@@ -48,14 +48,45 @@ fn compare(name: &str, got: &str) {
 }
 
 // --- bit-exact print helpers (mirror dumpcommon.h) ---
+
+/// `dumpcommon.h` `f2b` — NaN sign/payload is platform-defined (ARM default
+/// qNaN 0x7fc00000, x86 SSE 0xffc00000), so any NaN canonicalizes to the
+/// positive quiet NaN (§19 normalization), identically on both sides.
+trait CBits {
+    type Bits;
+    fn cbits(self) -> Self::Bits;
+}
+impl CBits for f32 {
+    type Bits = u32;
+    fn cbits(self) -> u32 {
+        let b = self.to_bits();
+        if (b & 0x7f80_0000) == 0x7f80_0000 && (b & 0x007f_ffff) != 0 {
+            return 0x7fc0_0000;
+        }
+        b
+    }
+}
+/// `dumpcommon.h` `d2b` — same canonicalization for f64.
+impl CBits for f64 {
+    type Bits = u64;
+    fn cbits(self) -> u64 {
+        let b = self.to_bits();
+        if (b & 0x7ff0_0000_0000_0000) == 0x7ff0_0000_0000_0000 && (b & 0x000f_ffff_ffff_ffff) != 0
+        {
+            return 0x7ff8_0000_0000_0000;
+        }
+        b
+    }
+}
+
 fn v3(o: &mut String, v: &[f32; 3]) {
-    let _ = writeln!(o, "{:08x} {:08x} {:08x}", v[0].to_bits(), v[1].to_bits(), v[2].to_bits());
+    let _ = writeln!(o, "{:08x} {:08x} {:08x}", v[0].cbits(), v[1].cbits(), v[2].cbits());
 }
 fn v4(o: &mut String, v: &[f32; 4]) {
     let _ = writeln!(
         o,
         "{:08x} {:08x} {:08x} {:08x}",
-        v[0].to_bits(), v[1].to_bits(), v[2].to_bits(), v[3].to_bits()
+        v[0].cbits(), v[1].cbits(), v[2].cbits(), v[3].cbits()
     );
 }
 fn dot_nz(v: &[f32; 3]) -> bool {
@@ -88,10 +119,10 @@ fn dump_rng(o: &mut String) {
         let _ = writeln!(o, "seed {:08x}", s as u32);
         rng.Rand_Init(s);
         for _ in 0..100 {
-            let _ = writeln!(o, "fl {:08x}", rng.flrand(0.0, 1.0).to_bits());
-            let _ = writeln!(o, "fl {:08x}", rng.flrand(-1.0, 1.0).to_bits());
-            let _ = writeln!(o, "fl {:08x}", rng.flrand(-100.0, 100.0).to_bits());
-            let _ = writeln!(o, "qf {:08x}", rng.Q_flrand(0.0, 1000.0).to_bits());
+            let _ = writeln!(o, "fl {:08x}", rng.flrand(0.0, 1.0).cbits());
+            let _ = writeln!(o, "fl {:08x}", rng.flrand(-1.0, 1.0).cbits());
+            let _ = writeln!(o, "fl {:08x}", rng.flrand(-100.0, 100.0).cbits());
+            let _ = writeln!(o, "qf {:08x}", rng.Q_flrand(0.0, 1000.0).cbits());
             let _ = writeln!(o, "ir {}", rng.irand(0, 1));
             let _ = writeln!(o, "ir {}", rng.irand(0, 100));
             let _ = writeln!(o, "ir {}", rng.irand(-50, 50));
@@ -108,11 +139,11 @@ fn dump_qrand(o: &mut String) {
     }
     seed = 12345;
     for _ in 0..30 {
-        let _ = writeln!(o, "qrn {:08x}", Q_random(&mut seed as *mut c_int).to_bits());
+        let _ = writeln!(o, "qrn {:08x}", Q_random(&mut seed as *mut c_int).cbits());
     }
     seed = 12345;
     for _ in 0..30 {
-        let _ = writeln!(o, "qcr {:08x}", Q_crandom(&mut seed as *mut c_int).to_bits());
+        let _ = writeln!(o, "qcr {:08x}", Q_crandom(&mut seed as *mut c_int).cbits());
     }
     seed = -1;
     for _ in 0..20 {
@@ -137,10 +168,10 @@ fn dump_scalars(o: &mut String) {
     for u in cf {
         let v = f32::from_bits(u);
         let a = if v < 0.0 { -v } else { v };
-        let _ = writeln!(o, "rsqrt {:08x} fabs {:08x}", Q_rsqrt(a).to_bits(), Q_fabs(v).to_bits());
+        let _ = writeln!(o, "rsqrt {:08x} fabs {:08x}", Q_rsqrt(a).cbits(), Q_fabs(v).cbits());
     }
     for y in 1..=6 {
-        let _ = writeln!(o, "powf {:08x}", powf(1.5, y).to_bits());
+        let _ = writeln!(o, "powf {:08x}", powf(1.5, y).cbits());
     }
     let mut b = 0;
     while b < 162 {
@@ -174,7 +205,7 @@ fn dump_scalars(o: &mut String) {
         let inv = [r, g, bl];
         let mut out = [0.0; 3];
         let m = NormalizeColor(inv, &mut out);
-        let _ = write!(o, "ncol {:08x} ", m.to_bits());
+        let _ = write!(o, "ncol {:08x} ", m.cbits());
         v3(o, &out);
     }
 }
@@ -234,9 +265,9 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = writeln!(
                 o,
                 "av {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x}",
-                f[0].to_bits(), f[1].to_bits(), f[2].to_bits(),
-                r[0].to_bits(), r[1].to_bits(), r[2].to_bits(),
-                up[0].to_bits(), up[1].to_bits(), up[2].to_bits()
+                f[0].cbits(), f[1].cbits(), f[2].cbits(),
+                r[0].cbits(), r[1].cbits(), r[2].cbits(),
+                up[0].cbits(), up[1].cbits(), up[2].cbits()
             );
         }
         {
@@ -248,18 +279,18 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
         {
             let mut t = a;
             let len = VectorNormalize(&mut t);
-            let _ = write!(o, "vn {:08x} ", len.to_bits());
+            let _ = write!(o, "vn {:08x} ", len.cbits());
             v3(o, &t);
         }
         {
             let mut t = [0.0; 3];
             let len = VectorNormalize2(a, &mut t);
-            let _ = write!(o, "vn2 {:08x} ", len.to_bits());
+            let _ = write!(o, "vn2 {:08x} ", len.cbits());
             v3(o, &t);
         }
-        let _ = writeln!(o, "vl {:08x} vls {:08x}", VectorLength(a).to_bits(), VectorLengthSquared(a).to_bits());
-        let _ = writeln!(o, "dist {:08x} dsq {:08x}", Distance(a, b).to_bits(), DistanceSquared(a, b).to_bits());
-        let _ = writeln!(o, "dh {:08x} dhs {:08x}", DistanceHorizontal(a, b).to_bits(), DistanceHorizontalSquared(a, b).to_bits());
+        let _ = writeln!(o, "vl {:08x} vls {:08x}", VectorLength(a).cbits(), VectorLengthSquared(a).cbits());
+        let _ = writeln!(o, "dist {:08x} dsq {:08x}", Distance(a, b).cbits(), DistanceSquared(a, b).cbits());
+        let _ = writeln!(o, "dh {:08x} dhs {:08x}", DistanceHorizontal(a, b).cbits(), DistanceHorizontalSquared(a, b).cbits());
         let _ = writeln!(o, "vcmp {} {}", VectorCompare(a, b), VectorCompare(a, a));
         {
             let mut t = [0.0; 3];
@@ -267,8 +298,8 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = write!(o, "cross ");
             v3(o, &t);
         }
-        let _ = writeln!(o, "dot {:08x} _dot {:08x}", _DotProduct(a, b).to_bits(), _DotProduct(a, b).to_bits());
-        let _ = writeln!(o, "dpn {:08x}", DotProductNormalize(a, b).to_bits());
+        let _ = writeln!(o, "dot {:08x} _dot {:08x}", _DotProduct(a, b).cbits(), _DotProduct(a, b).cbits());
+        let _ = writeln!(o, "dpn {:08x}", DotProductNormalize(a, b).cbits());
         {
             let mut t = a;
             VectorInverse(&mut t);
@@ -320,8 +351,8 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = writeln!(
                 o,
                 "mnv {:08x} {:08x} {:08x} {:08x} {:08x} {:08x}",
-                t[0].to_bits(), t[1].to_bits(), t[2].to_bits(),
-                u[0].to_bits(), u[1].to_bits(), u[2].to_bits()
+                t[0].cbits(), t[1].cbits(), t[2].cbits(),
+                u[0].cbits(), u[1].cbits(), u[2].cbits()
             );
         }
         if dot_nz(&a) {
@@ -346,23 +377,23 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = write!(o, "pfp {} ", ok);
             v4(o, &pl);
         }
-        let _ = writeln!(o, "angsub {:08x}", AngleSubtract(a[0], a[1]).to_bits());
+        let _ = writeln!(o, "angsub {:08x}", AngleSubtract(a[0], a[1]).cbits());
         {
             let mut t = [0.0; 3];
             AnglesSubtract(a, b, &mut t);
             let _ = write!(o, "angssub ");
             v3(o, &t);
         }
-        let _ = writeln!(o, "lerp {:08x}", LerpAngle(a[0], a[1], a[2]).to_bits());
+        let _ = writeln!(o, "lerp {:08x}", LerpAngle(a[0], a[1], a[2]).cbits());
         let _ = writeln!(
             o,
             "an360 {:08x} an180 {:08x} amod {:08x} adel {:08x}",
-            AngleNormalize360(a[0]).to_bits(),
-            AngleNormalize180(a[0]).to_bits(),
-            AngleMod(a[0]).to_bits(),
-            AngleDelta(a[0], a[1]).to_bits()
+            AngleNormalize360(a[0]).cbits(),
+            AngleNormalize180(a[0]).cbits(),
+            AngleMod(a[0]).cbits(),
+            AngleDelta(a[0], a[1]).cbits()
         );
-        let _ = writeln!(o, "rfb {:08x}", RadiusFromBounds(a, b).to_bits());
+        let _ = writeln!(o, "rfb {:08x}", RadiusFromBounds(a, b).cbits());
         let _ = writeln!(o, "d2b {}", DirToByte(a));
         {
             let mut res = [0.0; 3];
@@ -370,16 +401,16 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = write!(o, "gclose {} ", ok);
             v3(o, &res);
         }
-        let _ = writeln!(o, "gdist {:08x}", G_PointDistFromLineSegment(a, b, c).to_bits());
+        let _ = writeln!(o, "gdist {:08x}", G_PointDistFromLineSegment(a, b, c).cbits());
         {
             let mut axis: [[f32; 3]; 3] = [[0.0; 3]; 3];
             AnglesToAxis(a, axis.as_mut_ptr());
             let _ = writeln!(
                 o,
                 "a2a {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x}",
-                axis[0][0].to_bits(), axis[0][1].to_bits(), axis[0][2].to_bits(),
-                axis[1][0].to_bits(), axis[1][1].to_bits(), axis[1][2].to_bits(),
-                axis[2][0].to_bits(), axis[2][1].to_bits(), axis[2][2].to_bits()
+                axis[0][0].cbits(), axis[0][1].cbits(), axis[0][2].cbits(),
+                axis[1][0].cbits(), axis[1][1].cbits(), axis[1][2].cbits(),
+                axis[2][0].cbits(), axis[2][1].cbits(), axis[2][2].cbits()
             );
             let mut t = [0.0; 3];
             VectorRotate(b, axis.as_mut_ptr(), &mut t);
@@ -390,19 +421,19 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = write!(o, "acopy ");
             v3(o, &cp[1]);
             RotateAroundDirection(axis.as_mut_ptr(), a[1]);
-            let _ = writeln!(o, "rad {:08x} {:08x} {:08x}", axis[1][0].to_bits(), axis[1][1].to_bits(), axis[1][2].to_bits());
+            let _ = writeln!(o, "rad {:08x} {:08x} {:08x}", axis[1][0].cbits(), axis[1][1].cbits(), axis[1][2].cbits());
         }
         {
             let mut ax: [[f32; 3]; 3] = [[0.0; 3]; 3];
             AxisClear(ax.as_mut_ptr());
-            let _ = writeln!(o, "aclear {:08x} {:08x} {:08x}", ax[0][0].to_bits(), ax[1][1].to_bits(), ax[2][2].to_bits());
+            let _ = writeln!(o, "aclear {:08x} {:08x} {:08x}", ax[0][0].cbits(), ax[1][1].cbits(), ax[2][2].cbits());
         }
         {
             let m1 = [[a[0], a[1], a[2]], [b[0], b[1], b[2]], [c[0], c[1], c[2]]];
             let m2 = [[c[0], b[1], a[2]], [a[0], c[1], b[2]], [b[0], a[1], c[2]]];
             let mut ou = [[0.0; 3]; 3];
             MatrixMultiply(&m1, &m2, &mut ou);
-            let _ = writeln!(o, "mm {:08x} {:08x} {:08x}", ou[0][0].to_bits(), ou[1][1].to_bits(), ou[2][2].to_bits());
+            let _ = writeln!(o, "mm {:08x} {:08x} {:08x}", ou[0][0].cbits(), ou[1][1].cbits(), ou[2][2].cbits());
         }
         {
             let (mut mn, mut mx) = ([0.0; 3], [0.0; 3]);
@@ -412,8 +443,8 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = writeln!(
                 o,
                 "bounds {:08x} {:08x} {:08x} {:08x} {:08x} {:08x}",
-                mn[0].to_bits(), mn[1].to_bits(), mn[2].to_bits(),
-                mx[0].to_bits(), mx[1].to_bits(), mx[2].to_bits()
+                mn[0].cbits(), mn[1].cbits(), mn[2].cbits(),
+                mx[0].cbits(), mx[1].cbits(), mx[2].cbits()
             );
         }
     }
@@ -458,11 +489,11 @@ fn dump_atox(o: &mut String) {
         cbuf.push(0);
         let p0 = cbuf.as_ptr() as *const c_char;
         let _ = writeln!(o, "a {} atoi {}", idx, atoi(p0));
-        let _ = writeln!(o, "a {} atof {:016x}", idx, atof(p0).to_bits());
+        let _ = writeln!(o, "a {} atof {:016x}", idx, atof(p0).cbits());
         let mut sp: *const c_char = cbuf.as_ptr() as *const c_char;
         let v = _atof(&mut sp as *mut *const c_char);
         let adv = (sp as usize) - (cbuf.as_ptr() as usize);
-        let _ = writeln!(o, "a {} _atof {:016x} adv {}", idx, v.to_bits(), adv);
+        let _ = writeln!(o, "a {} _atof {:016x} adv {}", idx, v.cbits(), adv);
         idx += 1;
     }
     let _ = writeln!(o, "atox count {}", idx);
@@ -568,7 +599,7 @@ fn bglib_parity() {
 // context-free sound-registration order is observed through the port's
 // `saber_snd_tape_*` seam. See `tools/jampgame-oracle/README.md`.
 mod saberload {
-    use super::{compare, oracle_dir};
+    use super::{compare, oracle_dir, CBits};
     use core::ffi::{c_char, c_int, c_void};
     use std::cell::{Cell, RefCell};
     use std::fmt::Write as _;
@@ -937,7 +968,7 @@ mod saberload {
                 let _ = writeln!(o, "{tag} {v}");
             };
             let pfh = |o: &mut String, tag: &str, v: f32| {
-                let _ = writeln!(o, "{tag} {:08x}", v.to_bits());
+                let _ = writeln!(o, "{tag} {:08x}", v.cbits());
             };
             let qstr = |o: &mut String, tag: &str, s: &str| {
                 let _ = writeln!(o, "{tag} \"{s}\"");
@@ -960,8 +991,8 @@ mod saberload {
                     o,
                     "blade{i} color {} radius {:08x} lengthMax {:08x}",
                     b.color as c_int,
-                    b.radius.to_bits(),
-                    b.lengthMax.to_bits()
+                    b.radius.cbits(),
+                    b.lengthMax.cbits()
                 );
             }
             pi(&mut o, "stylesLearned", saber.stylesLearned);
