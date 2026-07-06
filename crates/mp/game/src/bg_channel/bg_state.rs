@@ -203,7 +203,13 @@ impl BgState {
             // directly rather than push/grow).
             VehWeaponParms: vec![0; crate::bg_vehicleLoad_tables::MAX_VEH_WEAPON_DATA_SIZE],
             VehicleParms: vec![0; crate::bg_vehicleLoad_tables::MAX_VEHICLE_DATA_SIZE],
-            bgSiegeClasses: Vec::new(),
+            // Sized like Raven's fixed `siegeClass_t bgSiegeClasses[MAX_SIEGE_CLASSES]`
+            // zeroed static: consumers index it directly (still-parked loader leaves
+            // it unpopulated), so an empty `Vec` would panic where C reads zeros.
+            // Same fixed-array pre-size convention as `g_vehicleInfo`/`bgAllAnims`.
+            bgSiegeClasses: (0..MAX_SIEGE_CLASSES)
+                .map(|_| unsafe { core::mem::zeroed() })
+                .collect(),
             bgNumSiegeClasses: 0,
             bgSiegeTeams: Vec::new(),
             bgNumSiegeTeams: 0,

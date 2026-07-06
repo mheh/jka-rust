@@ -112,7 +112,8 @@ use crate::g_utils::{
 use crate::g_weapon::FireWeapon;
 use crate::npc_c::NPC_SetAnim;
 use crate::q_math::{
-    vectoangles, AngleVectors, VectorCompare, VectorLength, VectorLengthSquared, VectorNormalize,
+    vectoangles, AngleDelta, AngleVectors, VectorCompare, VectorLength, VectorLengthSquared,
+    VectorNormalize,
 };
 use crate::w_force::G_PreDefSound;
 use crate::w_force::{
@@ -2466,13 +2467,12 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     let mut turndelta = 0.0f32;
                     // rwwFIXMEFIXME: locked-yaw RF_LOCKEDANGLE path is unreachable
                     // (Raven guards it with `if (0)`) — port the always-taken branch.
-                    turndelta = (180.0
-                        - crate::q_math::AngleDelta(
-                            (*ent).r.currentAngles[YAW],
-                            (*npc).desiredYaw,
-                        )
-                        .abs())
-                        / 180.0;
+                    // Raven: `(180 - fabs(AngleDelta(...)))/180`. `fabs` is libm's
+                    // `double fabs`, so the subtract and divide run in f64 before
+                    // narrowing to the f32 `turndelta`.
+                    turndelta = ((180.0
+                        - (AngleDelta((*ent).r.currentAngles[YAW], (*npc).desiredYaw) as f64).abs())
+                        / 180.0) as f32;
 
                     if turndelta < 0.75 {
                         (*client).ps.speed = 0.0;

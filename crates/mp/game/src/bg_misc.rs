@@ -584,7 +584,10 @@ pub fn vectoyaw(vec: vec3_t) -> f32 {
         yaw = 0.0;
     } else {
         if vec[PITCH] != 0.0 {
-            yaw = vec[YAW].atan2(vec[PITCH]) * 180.0 / std::f32::consts::PI;
+            // Raven's atan2 is the double libm call and M_PI is math.h's double;
+            // the `*180/M_PI` chain evaluates in f64 then rounds to the float result.
+            yaw = ((vec[YAW] as f64).atan2(vec[PITCH] as f64) * 180.0 / std::f64::consts::PI)
+                as f32;
         } else if vec[YAW] > 0.0 {
             yaw = 90.0;
         } else {

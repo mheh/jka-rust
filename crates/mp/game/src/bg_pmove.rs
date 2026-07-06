@@ -847,7 +847,9 @@ impl PmoveContext<'_> {
             }
 
             // speed = VectorLength(vec);
-            let speed = (vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]).sqrt();
+            // sqrt is the double libm call rounded back to float; an f32 sqrt
+            // double-rounds and diverges from the oracle.
+            let speed = VectorLength(vec);
             if speed < 1.0 {
                 (*ps).velocity[0] = 0.0;
                 (*ps).velocity[1] = 0.0; // allow sinking underwater
@@ -1945,11 +1947,14 @@ impl PmoveContext<'_> {
                 return 0.0;
             }
 
-            let total = ((((*cmd).forwardmove as c_int) * ((*cmd).forwardmove as c_int)
+            let sum: c_int = ((*cmd).forwardmove as c_int) * ((*cmd).forwardmove as c_int)
                 + ((*cmd).rightmove as c_int) * ((*cmd).rightmove as c_int)
-                + umove * umove) as f32)
-                .sqrt();
-            let scale = (*(*self.pm).ps).speed * max as f32 / (127.0 * total);
+                + umove * umove;
+            // C: `(float)(int sum)` then `sqrt` promotes to double, result truncated to float.
+            let total = ((sum as f32) as f64).sqrt() as f32;
+            // C divides through `double` (the `127.0` literal); replicate to stay bit-exact.
+            let a: f32 = (*(*self.pm).ps).speed * max as f32;
+            let scale = (a as f64 / (127.0_f64 * total as f64)) as f32;
 
             scale
         }
@@ -5736,9 +5741,11 @@ impl PmoveContext<'_> {
             }
 
             // calculate speed and cycle
-            (*pm).xyspeed = ((*ps).velocity[0] * (*ps).velocity[0]
-                + (*ps).velocity[1] * (*ps).velocity[1])
-                .sqrt();
+            // sqrt is the double libm call rounded back to float; an f32 sqrt
+            // double-rounds and diverges from the oracle.
+            (*pm).xyspeed = (((*ps).velocity[0] * (*ps).velocity[0]
+                + (*ps).velocity[1] * (*ps).velocity[1]) as f64)
+                .sqrt() as f32;
 
             if (*ps).saberMove == LS_SPINATTACK as c_int {
                 self.PM_ContinueLegsAnim((*ps).torsoAnim);
@@ -8584,7 +8591,10 @@ pub fn BG_IK_MoveArm(
             lHand[2] = lHandMatrix.matrix[2][3];
 
             _VectorSubtract(lHand, desiredPos, &mut torg);
-            distToDest = (torg[0] * torg[0] + torg[1] * torg[1] + torg[2] * torg[2]).sqrt();
+            // distToDest = VectorLength(torg);
+            // sqrt is the double libm call rounded back to float; an f32 sqrt
+            // double-rounds and diverges from the oracle.
+            distToDest = VectorLength(torg);
 
             // closer we are, more we want to keep updated.
             if distToDest < 2.0 {
