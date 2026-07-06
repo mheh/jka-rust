@@ -949,6 +949,42 @@ pub fn AdjustTournamentScores(ctx: GameContext<'_>) {
     }
 }
 
+// DESIGN NOTE (reviewed 2026-07-06) — why `bg_lib::qsort` over `slice::sort_by`
+// or libc `qsort_r`, and why widening the element is permutation-safe:
+//
+// 1. The oracle sorts with Raven's OWN qsort, not libc's. `bg_lib.c:105` is the
+//    Bentley-McIlroy "Engineering a Sort Function" qsort, OUTSIDE every `Q3_VM`
+//    guard, so it compiles into native builds and shadows libc within the module
+//    (verified in the referee oracle dylib: `_qsort` defined `T`, no undefined
+//    import). Any "match libc qsort" strategy would match the wrong algorithm.
+//
+// 2. Element-size invariance: every position in that algorithm is an index
+//    scaled by `es` (`(n/2)*es`, the `n>40` ninther offsets `(n/8)*es`,
+//    partition walks, `vecswap` byte counts, recursion sizes `r/es`), and every
+//    DECISION — `n < 7`, pivot selection, `swap_cnt`, `pb > pc`, `r > es` (i.e.
+//    ">= 2 elements") — depends only on `n` and comparator returns. `swaptype`
+//    picks the byte-copy strategy, never which elements move. Widening `int` ->
+//    `{int, world}` provably cannot change the permutation.
+//
+// 3. Ties are the FIRST FRAME, not hypothetical: the comparator's final
+//    fallback returns 0 for connected non-spectator clients with equal
+//    `PERS_SCORE` — every pair of clients at match start.
+//
+// 4. The trap the alternatives plant: for `n < 7` Bentley-McIlroy takes its
+//    insertion-sort path, which is STABLE, so a stable `slice::sort_by` agrees
+//    for 2-6 clients and every small referee scenario passes. The divergence
+//    only appears at 7+ connected clients, when the real (unstable) quicksort
+//    path first runs — a latent, scenario-dependent parity bug surfacing in
+//    some 8-player replay long after the sort call stopped being suspect.
+//    (`sort_unstable_by` is worse: pdqsort's tie permutation differs sooner.)
+//    Using the same algorithm as the oracle is identical at ALL n.
+//
+// Known costs, accepted: a per-call scratch Vec (n <= MAX_CLIENTS, negligible;
+// Stage 4's watched class is string allocs) and 8 redundant bytes per element.
+// Dormant non-bug: C keys `swaptype` off `sizeof(long)`, Rust off `usize` —
+// these differ on LLP64 Windows, but that only changes copy strategy, never the
+// permutation.
+
 /// One `level.sortedClients` element paired with its owning world.
 ///
 /// Raven sorts a bare `int[]` and reaches `level` through the C global; §B3
