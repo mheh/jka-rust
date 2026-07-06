@@ -24,9 +24,6 @@ const CROUCH_MAXS_2: f32 = 16.0;
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:236`
 const MAX_NPC_DATA_SIZE: c_int = 0x20000;
 
-// Unported types referenced in this file (need porting before this compiles):
-// rank_t
-
 /// Raven `BSTable` — `bState_t` name/id lookup table (internal-only bStates
 /// past `BS_CINEMATIC` are not name-lookupable, per the oracle table).
 ///
@@ -357,36 +354,34 @@ pub fn NPC_ReactionTime(ctx: GameContext<'_>) -> c_int {
 /// Raven: `Should be used to determine pip bolt-ons` (see the commented-out
 /// `TranslateRankName` doc block above the live definition).
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:287-330`
-pub fn TranslateRankName(name: *const c_char) -> c_int {
-    //TODO: Port rank_t (unported return enum; C int-width)
-    // Source: oracle/oracle/codemp/game/NPC_stats.c:287-330
+pub fn TranslateRankName(name: *const c_char) -> rank_t {
     unsafe {
         if qstricmp_eq(name, c"civilian") {
-            return 0; // RANK_CIVILIAN
+            return RANK_CIVILIAN;
         }
         if qstricmp_eq(name, c"crewman") {
-            return 1; // RANK_CREWMAN
+            return RANK_CREWMAN;
         }
         if qstricmp_eq(name, c"ensign") {
-            return 2; // RANK_ENSIGN
+            return RANK_ENSIGN;
         }
         if qstricmp_eq(name, c"ltjg") {
-            return 3; // RANK_LT_JG
+            return RANK_LT_JG;
         }
         if qstricmp_eq(name, c"lt") {
-            return 4; // RANK_LT
+            return RANK_LT;
         }
         if qstricmp_eq(name, c"ltcomm") {
-            return 5; // RANK_LT_COMM
+            return RANK_LT_COMM;
         }
         if qstricmp_eq(name, c"commander") {
-            return 6; // RANK_COMMANDER
+            return RANK_COMMANDER;
         }
         if qstricmp_eq(name, c"captain") {
-            return 7; // RANK_CAPTAIN
+            return RANK_CAPTAIN;
         }
     }
-    0 // RANK_CIVILIAN (default)
+    RANK_CIVILIAN
 }
 
 // Local helper: mirrors `!Q_stricmp(name, lit)` (Q_stricmp returns 0 on

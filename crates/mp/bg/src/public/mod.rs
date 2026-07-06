@@ -24,6 +24,7 @@ pub mod entity_type;
 pub mod fieldtype;
 pub mod footstep_type;
 pub mod force_hand_anims;
+pub mod fx_state;
 pub mod g2_model_parts;
 pub mod gametype;
 pub mod gender;

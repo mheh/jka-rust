@@ -80,6 +80,55 @@ use mp_abi::game::vmcalls::GAME_SHUTDOWN::{GameShutdown, GameShutdownArgs};
 use mp_abi::game::vmcalls::GAME_SPAWN_RMG_ENTITY::GameSpawnRmgEntity;
 use mp_abi::Dispatch;
 
+// The 17 `GAME_ICARUS_*` inbound commands (`g_main.c:558-668`). Each carries an
+// `Args = ()` marker (the payload arrives out-of-band in the module's
+// `gSharedBuffer` shared-memory region — see below), so the impls read their
+// `T_G_ICARUS_*` struct by overlay-casting that buffer.
+use mp_abi::game::vmcalls::GAME_ICARUS_GETFLOAT::GameIcarusGetfloat;
+use mp_abi::game::vmcalls::GAME_ICARUS_GETSETIDFORSTRING::GameIcarusGetsetidforstring;
+use mp_abi::game::vmcalls::GAME_ICARUS_GETSTRING::GameIcarusGetstring;
+use mp_abi::game::vmcalls::GAME_ICARUS_GETTAG::GameIcarusGettag;
+use mp_abi::game::vmcalls::GAME_ICARUS_GETVECTOR::GameIcarusGetvector;
+use mp_abi::game::vmcalls::GAME_ICARUS_KILL::GameIcarusKill;
+use mp_abi::game::vmcalls::GAME_ICARUS_LERP2ANGLES::GameIcarusLerp2Angles;
+use mp_abi::game::vmcalls::GAME_ICARUS_LERP2END::GameIcarusLerp2End;
+use mp_abi::game::vmcalls::GAME_ICARUS_LERP2ORIGIN::GameIcarusLerp2Origin;
+use mp_abi::game::vmcalls::GAME_ICARUS_LERP2POS::GameIcarusLerp2Pos;
+use mp_abi::game::vmcalls::GAME_ICARUS_LERP2START::GameIcarusLerp2Start;
+use mp_abi::game::vmcalls::GAME_ICARUS_PLAY::GameIcarusPlay;
+use mp_abi::game::vmcalls::GAME_ICARUS_PLAYSOUND::GameIcarusPlaysound;
+use mp_abi::game::vmcalls::GAME_ICARUS_REMOVE::GameIcarusRemove;
+use mp_abi::game::vmcalls::GAME_ICARUS_SET::GameIcarusSet;
+use mp_abi::game::vmcalls::GAME_ICARUS_SOUNDINDEX::GameIcarusSoundindex;
+use mp_abi::game::vmcalls::GAME_ICARUS_USE::GameIcarusUse;
+
+use mp_qshared::common::mp::qcommon::t_g_icarus_getfloat::T_G_ICARUS_GETFLOAT;
+use mp_qshared::common::mp::qcommon::t_g_icarus_getsetidforstring::T_G_ICARUS_GETSETIDFORSTRING;
+use mp_qshared::common::mp::qcommon::t_g_icarus_getstring::T_G_ICARUS_GETSTRING;
+use mp_qshared::common::mp::qcommon::t_g_icarus_gettag::T_G_ICARUS_GETTAG;
+use mp_qshared::common::mp::qcommon::t_g_icarus_getvector::T_G_ICARUS_GETVECTOR;
+use mp_qshared::common::mp::qcommon::t_g_icarus_kill::T_G_ICARUS_KILL;
+use mp_qshared::common::mp::qcommon::t_g_icarus_lerp2_angles::T_G_ICARUS_LERP2ANGLES;
+use mp_qshared::common::mp::qcommon::t_g_icarus_lerp2_end::T_G_ICARUS_LERP2END;
+use mp_qshared::common::mp::qcommon::t_g_icarus_lerp2_origin::T_G_ICARUS_LERP2ORIGIN;
+use mp_qshared::common::mp::qcommon::t_g_icarus_lerp2_pos::T_G_ICARUS_LERP2POS;
+use mp_qshared::common::mp::qcommon::t_g_icarus_lerp2_start::T_G_ICARUS_LERP2START;
+use mp_qshared::common::mp::qcommon::t_g_icarus_play::T_G_ICARUS_PLAY;
+use mp_qshared::common::mp::qcommon::t_g_icarus_playsound::T_G_ICARUS_PLAYSOUND;
+use mp_qshared::common::mp::qcommon::t_g_icarus_remove::T_G_ICARUS_REMOVE;
+use mp_qshared::common::mp::qcommon::t_g_icarus_set::T_G_ICARUS_SET;
+use mp_qshared::common::mp::qcommon::t_g_icarus_soundindex::T_G_ICARUS_SOUNDINDEX;
+use mp_qshared::common::mp::qcommon::t_g_icarus_use::T_G_ICARUS_USE;
+use mp_qshared::shared::string_id_table::stringID_table_t;
+
+use crate::g_icarus_set_type::setTable;
+use crate::g_utils::G_SoundIndex;
+use crate::g_ICARUScb::{
+    Q3_GetFloat, Q3_GetString, Q3_GetTag, Q3_GetVector, Q3_Kill, Q3_Lerp2Angles, Q3_Lerp2End,
+    Q3_Lerp2Origin, Q3_Lerp2Pos, Q3_Lerp2Start, Q3_Play, Q3_PlaySound, Q3_Remove, Q3_Set, Q3_Use,
+};
+use crate::q_shared::GetIDForString;
+
 /// `GAME_INIT` → `G_InitGame( arg0, arg1, arg2 )` (`g_main.c:517-519`).
 impl Dispatch<GameInit> for GameContext<'_> {
     fn dispatch(&self, args: GameInitArgs) {
@@ -301,9 +350,287 @@ impl Dispatch<GameGetitemindexbytag> for GameContext<'_> {
     }
 }
 
-//TODO: Port Dispatch<C> for GameContext (GAME_ICARUS_* commands)
-// The 17 ICARUS arms read `T_G_ICARUS_*` structs out of the module's
-// `gSharedBuffer` shared-memory region, which is not yet modeled in `GameWorld`
-// (a design decision — where the registered buffer lives and how it is typed).
-// Source: docs/architecture/engine-seam.md § inbound dual (SEAM-D8);
-// oracle/oracle/codemp/game/g_main.c:558-668
+// --- ICARUS callbacks (`g_main.c:557-670`) -----------------------------------
+//
+// The engine writes each command's `T_G_ICARUS_*` payload into the shared-memory
+// region it registered via `trap_SV_RegisterSharedMemory` — the module's
+// `GameWorld.gSharedBuffer` (`G_InitGame`). Raven's switch overlay-casts that raw
+// `gSharedBuffer` to the command's struct (`(T_G_ICARUS_X *)gSharedBuffer`) and
+// reads/writes fields in place; the module and engine address the SAME bytes, so
+// out-params (e.g. `GETFLOAT.value`) land back in the engine's view. Each arm
+// reproduces that cast: `&mut gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_X`.
+// Source: `oracle/oracle/codemp/game/g_main.c:557-670`.
+
+/// libc `strcpy` mirror for the `GAME_ICARUS_GETSTRING` write-back
+/// (`g_main.c:654`, `strcpy(sharedMem->value, crap)`); copies through the NUL.
+unsafe fn c_strcpy(dst: *mut c_char, src: *const c_char) {
+    let mut i = 0isize;
+    loop {
+        let ch = *src.offset(i);
+        *dst.offset(i) = ch;
+        if ch == 0 {
+            break;
+        }
+        i += 1;
+    }
+}
+
+/// `GAME_ICARUS_PLAYSOUND` →
+/// `return Q3_PlaySound( m->taskID, m->entID, m->name, m->channel )`
+/// (`g_main.c:558-562`).
+impl Dispatch<GameIcarusPlaysound> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) -> c_int {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_PLAYSOUND)
+        };
+        Q3_PlaySound(
+            *self,
+            m.taskID,
+            m.entID,
+            m.name.as_ptr() as *const c_char,
+            m.channel.as_ptr() as *const c_char,
+        )
+    }
+}
+
+/// `GAME_ICARUS_SET` →
+/// `return Q3_Set( m->taskID, m->entID, m->type_name, m->data )`
+/// (`g_main.c:563-567`).
+impl Dispatch<GameIcarusSet> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) -> qboolean {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m =
+            unsafe { &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_SET) };
+        Q3_Set(
+            *self,
+            m.taskID,
+            m.entID,
+            m.type_name.as_ptr() as *const c_char,
+            m.data.as_ptr() as *const c_char,
+        )
+    }
+}
+
+/// `GAME_ICARUS_LERP2POS` →
+/// `if (m->nullAngles) Q3_Lerp2Pos( m->taskID, m->entID, m->origin, NULL, m->duration );`
+/// `else Q3_Lerp2Pos( m->taskID, m->entID, m->origin, m->angles, m->duration );`
+/// (`g_main.c:568-580`).
+impl Dispatch<GameIcarusLerp2Pos> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2POS)
+        };
+        let (task_id, ent_id, duration) = (m.taskID, m.entID, m.duration);
+        if m.nullAngles != QFALSE {
+            Q3_Lerp2Pos(*self, task_id, ent_id, &mut m.origin, None, duration);
+        } else {
+            Q3_Lerp2Pos(
+                *self,
+                task_id,
+                ent_id,
+                &mut m.origin,
+                Some(&mut m.angles),
+                duration,
+            );
+        }
+    }
+}
+
+/// `GAME_ICARUS_LERP2ORIGIN` →
+/// `Q3_Lerp2Origin( m->taskID, m->entID, m->origin, m->duration )`
+/// (`g_main.c:581-586`).
+impl Dispatch<GameIcarusLerp2Origin> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2ORIGIN)
+        };
+        Q3_Lerp2Origin(*self, m.taskID, m.entID, m.origin, m.duration);
+    }
+}
+
+/// `GAME_ICARUS_LERP2ANGLES` →
+/// `Q3_Lerp2Angles( m->taskID, m->entID, m->angles, m->duration )`
+/// (`g_main.c:587-592`).
+impl Dispatch<GameIcarusLerp2Angles> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2ANGLES)
+        };
+        Q3_Lerp2Angles(*self, m.taskID, m.entID, m.angles, m.duration);
+    }
+}
+
+/// `GAME_ICARUS_GETTAG` →
+/// `return Q3_GetTag( m->entID, m->name, m->lookup, m->info )`
+/// (`g_main.c:593-597`).
+impl Dispatch<GameIcarusGettag> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) -> c_int {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_GETTAG)
+        };
+        let (ent_id, lookup) = (m.entID, m.lookup);
+        let name = m.name.as_ptr() as *const c_char;
+        Q3_GetTag(*self, ent_id, name, lookup, &mut m.info)
+    }
+}
+
+/// `GAME_ICARUS_LERP2START` →
+/// `Q3_Lerp2Start( m->entID, m->taskID, m->duration )` (`g_main.c:598-603`).
+impl Dispatch<GameIcarusLerp2Start> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2START)
+        };
+        Q3_Lerp2Start(*self, m.entID, m.taskID, m.duration);
+    }
+}
+
+/// `GAME_ICARUS_LERP2END` →
+/// `Q3_Lerp2End( m->entID, m->taskID, m->duration )` (`g_main.c:604-609`).
+impl Dispatch<GameIcarusLerp2End> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2END)
+        };
+        Q3_Lerp2End(*self, m.entID, m.taskID, m.duration);
+    }
+}
+
+/// `GAME_ICARUS_USE` → `Q3_Use( m->entID, m->target )` (`g_main.c:610-615`).
+impl Dispatch<GameIcarusUse> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m =
+            unsafe { &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_USE) };
+        Q3_Use(*self, m.entID, m.target.as_ptr() as *const c_char);
+    }
+}
+
+/// `GAME_ICARUS_KILL` → `Q3_Kill( m->entID, m->name )` (`g_main.c:616-621`).
+impl Dispatch<GameIcarusKill> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_KILL)
+        };
+        Q3_Kill(*self, m.entID, m.name.as_ptr() as *const c_char);
+    }
+}
+
+/// `GAME_ICARUS_REMOVE` → `Q3_Remove( m->entID, m->name )` (`g_main.c:622-627`).
+impl Dispatch<GameIcarusRemove> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_REMOVE)
+        };
+        Q3_Remove(*self, m.entID, m.name.as_ptr() as *const c_char);
+    }
+}
+
+/// `GAME_ICARUS_PLAY` →
+/// `Q3_Play( m->taskID, m->entID, m->type, m->name )` (`g_main.c:628-633`).
+impl Dispatch<GameIcarusPlay> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_PLAY)
+        };
+        Q3_Play(
+            *self,
+            m.taskID,
+            m.entID,
+            m.r#type.as_ptr() as *const c_char,
+            m.name.as_ptr() as *const c_char,
+        );
+    }
+}
+
+/// `GAME_ICARUS_GETFLOAT` →
+/// `return Q3_GetFloat( m->entID, m->type, m->name, &m->value )`
+/// (`g_main.c:634-638`).
+impl Dispatch<GameIcarusGetfloat> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) -> c_int {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_GETFLOAT)
+        };
+        let (ent_id, ty) = (m.entID, m.r#type);
+        let name = m.name.as_ptr() as *const c_char;
+        Q3_GetFloat(*self, ent_id, ty, name, &mut m.value as *mut f32)
+    }
+}
+
+/// `GAME_ICARUS_GETVECTOR` →
+/// `return Q3_GetVector( m->entID, m->type, m->name, m->value )`
+/// (`g_main.c:639-643`).
+impl Dispatch<GameIcarusGetvector> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) -> c_int {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_GETVECTOR)
+        };
+        let (ent_id, ty) = (m.entID, m.r#type);
+        let name = m.name.as_ptr() as *const c_char;
+        Q3_GetVector(*self, ent_id, ty, name, &mut m.value)
+    }
+}
+
+/// `GAME_ICARUS_GETSTRING` → `Q3_GetString( m->entID, m->type, m->name, &crap )`
+/// then `if (crap) strcpy( m->value, crap )`; returns the `Q3_GetString` result
+/// (`g_main.c:644-658`).
+impl Dispatch<GameIcarusGetstring> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) -> c_int {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_GETSTRING)
+        };
+        let (ent_id, ty) = (m.entID, m.r#type);
+        let name = m.name.as_ptr() as *const c_char;
+        // Raven's `char *crap = NULL; char **morecrap = &crap;` out-pointer dance.
+        let mut crap: *mut c_char = core::ptr::null_mut();
+        let morecrap = &mut crap as *mut *mut c_char;
+        let r = Q3_GetString(*self, ent_id, ty, name, morecrap);
+        if !crap.is_null() {
+            // SAFETY: on success `crap` points at a valid NUL-terminated string;
+            // `m->value` is a 2048-byte buffer (`g_public.h`).
+            unsafe { c_strcpy(m.value.as_mut_ptr() as *mut c_char, crap) };
+        }
+        r
+    }
+}
+
+/// `GAME_ICARUS_SOUNDINDEX` → `G_SoundIndex( m->filename )` (`g_main.c:659-664`).
+impl Dispatch<GameIcarusSoundindex> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_SOUNDINDEX)
+        };
+        // Raven discards `G_SoundIndex`'s handle here (registration side effect).
+        G_SoundIndex(m.filename.as_ptr() as *const c_char);
+    }
+}
+
+/// `GAME_ICARUS_GETSETIDFORSTRING` →
+/// `return GetIDForString( setTable, m->string )` (`g_main.c:665-669`).
+impl Dispatch<GameIcarusGetsetidforstring> for GameContext<'_> {
+    fn dispatch(&self, _args: ()) -> c_int {
+        // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8
+                as *mut T_G_ICARUS_GETSETIDFORSTRING)
+        };
+        GetIDForString(
+            setTable.as_ptr() as *mut stringID_table_t,
+            m.string.as_ptr() as *const c_char,
+        )
+    }
+}

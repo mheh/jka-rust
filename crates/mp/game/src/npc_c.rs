@@ -1702,9 +1702,6 @@ pub fn NPC_Think(ctx: GameContext<'_>, self_: *mut gentity_t) {
     // Raven `w_force.rs:98` precedent — `playerState_t::pm_flags` bit, not yet
     // centrally ported.
     const PMF_FOLLOW: c_int = 4096;
-    // Raven `ai.h:36` `rank_e`: CIVILIAN=0, CREWMAN=1, ENSIGN=2, LT_JG=3
-    // (`NPC_stats.rs:51` precedent comment).
-    pub const RANK_LT_JG: c_int = 3;
     use mp_bg::vehicles::vehicle_s::Vehicle_t;
 
     unsafe {

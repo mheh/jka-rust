@@ -5,12 +5,13 @@ use core::ffi::{c_char, c_int, c_ulong, c_void};
 use sp_qshared::common::sp::gentity::gentity_t;
 use sp_qshared::common::sp::ghoul2::crag_doll_params::CRagDollParams;
 use sp_qshared::common::sp::ghoul2::eg2_collision::EG2_Collision;
+use sp_qshared::common::sp::ghoul2::sskin_gore_data::SSkinGoreData;
 use sp_qshared::common::sp::qcommon::collision_record::CCollisionRecord;
 use sp_qshared::common::sp::qcommon::shared_set_bone_ik_state_params::sharedSetBoneIKStateParams_t;
 use sp_qshared::common::sp::qcommon::tags::memtag_t;
 use sp_qshared::common::sp::trace_t::trace_t;
 use sp_qshared::shared::{
-    fileHandle_t, fsMode_t, mdxaBone_t, qboolean, qhandle_t, sharedIKMoveParams_t, vec3_t,
+    cvar_t, fileHandle_t, fsMode_t, mdxaBone_t, qboolean, qhandle_t, sharedIKMoveParams_t, vec3_t,
     Eorientations,
 };
 
@@ -47,13 +48,8 @@ pub struct game_import_t {
     pub Milliseconds: Option<unsafe extern "C" fn() -> c_int>,
 
     // console variable interaction
-    //TODO: Port cvar_t
-    // Source: oracle/oracle/code/game/q_shared.h:1310
-    // The engine-side `cvar_s` registry node is deferred to the engine/qcommon tier
-    // (see `sp_qshared::shared::cvar`); kept opaque here since only the pointer
-    // crosses this ABI seam.
     pub cvar: Option<
-        unsafe extern "C" fn(var_name: *const c_char, value: *const c_char, flags: c_int) -> *mut c_void,
+        unsafe extern "C" fn(var_name: *const c_char, value: *const c_char, flags: c_int) -> *mut cvar_t,
     >,
     pub cvar_set: Option<unsafe extern "C" fn(var_name: *const c_char, value: *const c_char)>,
     pub Cvar_VariableIntegerValue: Option<unsafe extern "C" fn(var_name: *const c_char) -> c_int>,
@@ -560,10 +556,8 @@ pub struct game_import_t {
         ) -> qboolean,
     >,
 
-    //TODO: Port SSkinGoreData
-    // Source: oracle/oracle/code/game/q_shared.h:2530
     pub G2API_AddSkinGore:
-        Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, gore: *mut c_void)>,
+        Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, gore: *mut SSkinGoreData)>,
     pub G2API_ClearSkinGore: Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v)>,
 
     pub RMG_Init: Option<unsafe extern "C" fn(terrainID: c_int)>,

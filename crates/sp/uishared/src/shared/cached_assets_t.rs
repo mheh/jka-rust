@@ -1,7 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::c_int;
-
+use sp_qshared::common::sp::ff::ff_handle_t::ffHandle_t;
 use sp_qshared::shared::{qboolean, qhandle_t, sfxHandle_t, vec4_t};
 
 /// Number of crosshair shaders cached in `cachedAssets_t::crosshairShader`.
@@ -49,12 +48,10 @@ pub struct cachedAssets_t {
 
     // Raven: `#ifdef _IMMERSION` — force-feedback handles; layout reflects the
     // `_IMMERSION`-enabled build the offsets were captured against.
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub menuEnterForce: c_int,
-    pub menuExitForce: c_int,
-    pub menuBuzzForce: c_int,
-    pub itemFocusForce: c_int,
+    pub menuEnterForce: ffHandle_t,
+    pub menuExitForce: ffHandle_t,
+    pub menuBuzzForce: ffHandle_t,
+    pub itemFocusForce: ffHandle_t,
 
     pub fadeClamp: f32,
     pub fadeCycle: i32,

@@ -7,6 +7,7 @@ use sp_qshared::common::sp::qcommon::usercmd::usercmd_t;
 use sp_qshared::shared::{qboolean, vec3_t};
 
 use crate::ai::AIGroupInfo_t;
+use crate::ai::rank_t;
 use crate::bstate::b_state_t::bState_t;
 
 use super::g_npcstats_e::gNPCstats_t;
@@ -72,10 +73,8 @@ pub struct gNPC_t {
 	pub shootAngles: vec3_t,
 
 	//extra character info
-	//TODO: Port rank_t
-	// Source: oracle/oracle/code/game/ai.h
 	/// for pips
-	pub rank: i32,
+	pub rank: rank_t,
 
 	//Behavior state info
 	/// determines what actions he should be doing

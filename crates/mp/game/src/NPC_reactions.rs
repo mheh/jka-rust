@@ -24,9 +24,8 @@
 //! `ai-context`, matching the `NPC_combat.rs`/`NPC_utils.rs` precedent in
 //! this same mega-pass). `NPC_ChoosePainAnimation` also indexes the
 //! runtime-populated `bgAllAnims`/`bgHumanoidAnimations` animation tables
-//! (topic `raw-ptr-skeleton-no-world-handle`, matching `g_combat.rs`) and
-//! needs the unported `rank_t` enum's `RANK_CAPTAIN` value. `NPC_Respond`'s
-//! droid-class branches call `va(fmt, args…)` with real variadic arguments
+//! (topic `raw-ptr-skeleton-no-world-handle`, matching `g_combat.rs`).
+//! `NPC_Respond`'s droid-class branches call `va(fmt, args…)` with real variadic arguments
 //! (topic `va-varargs`; the resolved `va` signature drops the C varargs, same
 //! as the `g_client.rs`/`w_force.rs`/`NPC_utils.rs` precedent) — cannot be
 //! transcribed faithfully without inventing behavior.
@@ -222,7 +221,6 @@ pub fn NPC_ChoosePainAnimation(
         const CLASS_GALAKMECH: c_int = 13;
         const CLASS_PROTOCOL: c_int = 5;
         const CLASS_DESANN: c_int = 8;
-        const RANK_CAPTAIN: c_int = 5;
         const SETANIM_BOTH: c_int = 3;
         const SETANIM_LEGS: c_int = 2;
         const SETANIM_FLAG_OVERRIDE: c_int = 1;
@@ -275,8 +273,9 @@ pub fn NPC_ChoosePainAnimation(
                 // Higher in rank (skill) we are, less likely we are to be fazed by a punch
                 let npc = (*self_).NPC as *mut gNPC_t;
                 if !npc.is_null() {
-                    pain_chance =
-                        1.0f32 - ((RANK_CAPTAIN - (*npc).rank) as f32 / RANK_CAPTAIN as f32);
+                    pain_chance = 1.0f32
+                        - ((RANK_CAPTAIN as c_int - (*npc).rank as c_int) as f32
+                            / RANK_CAPTAIN as c_int as f32);
                 } else {
                     pain_chance = 1.0f32;
                 }

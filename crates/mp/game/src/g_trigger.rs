@@ -48,13 +48,6 @@ use mp_qshared::shared::trajectory::trType_t::TR_LINEAR;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// Raven `bSet_e` (`g_public.h:641-646`); only `BSET_USE` (index 1) is needed
-// in this file. Not yet ported as an enum (ICARUS/behavior-set territory);
-// cited by value rather than guessed.
-//TODO: Port bSet_e
-// Source: oracle/oracle/codemp/game/g_public.h:641-661
-const BSET_USE: c_int = 1;
-
 // Raven `MASK_PLAYERSOLID` (`g_local.h`, module-private everywhere it's been
 // ported so far — mirrors `g_items.rs`'s local recipe).
 // Source: `oracle/oracle/codemp/game/g_local.h`
@@ -153,7 +146,7 @@ pub fn multi_trigger_run(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).think = None;
 
-        G_ActivateBehavior(ctx, ent, BSET_USE);
+        G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
 
         if !(*ent).soundSet.is_null() && *(*ent).soundSet != 0 {
             trap::SetConfigstring(
@@ -1293,7 +1286,7 @@ pub fn Use_target_push(
             return;
         }
 
-        G_ActivateBehavior(ctx, self_, BSET_USE);
+        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
 
         (*client).ps.velocity = (*self_).s.origin2;
 
@@ -1416,7 +1409,7 @@ pub fn hurt_use(
             (*self_).activator = None;
         }
 
-        G_ActivateBehavior(ctx, self_, BSET_USE);
+        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
 
         if (*self_).r.linked != 0 {
             trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(self_));
@@ -2095,7 +2088,7 @@ pub fn func_timer_use(
     unsafe {
         (*self_).activator = ent_id_opt(ent_base(ctx), activator);
 
-        G_ActivateBehavior(ctx, self_, BSET_USE);
+        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
 
         // if on, turn it off
         if (*self_).nextthink != 0 {

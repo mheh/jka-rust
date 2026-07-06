@@ -6,6 +6,7 @@
 
 use core::ffi::c_char;
 
+use sp_bg::public::anim_number::animNumber_t;
 use sp_bg::public::animation::animation_t;
 use sp_bg::public::animevent::animevent_t;
 use sp_qshared::shared::MAX_QPATH;
@@ -15,12 +16,12 @@ use sp_qshared::shared::MAX_QPATH;
 /// Source: `oracle/oracle/code/game/bg_public.h:484`
 pub const MAX_ANIM_EVENTS: usize = 300;
 
-//TODO: Port animNumber_t
-// Source: oracle/oracle/code/game/anims.h:1789
-// `MAX_ANIMATIONS` is the sentinel of the (unported, ~1500-entry) `animNumber_t`
-// enum; the array length below is taken from the packet's verified offsets
-// (12344 bytes / size_of::<animation_t>() == 8) rather than the enum itself.
+/// Raven `MAX_ANIMATIONS` — sentinel of the `animNumber_t` enum.
+///
+/// Source: `oracle/oracle/code/game/anims.h:1789`
 pub const MAX_ANIMATIONS: usize = 1543;
+
+const _: () = assert!(animNumber_t::MAX_ANIMATIONS as usize == MAX_ANIMATIONS);
 
 /// Raven `animFileSet_t`.
 ///

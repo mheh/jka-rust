@@ -1,7 +1,8 @@
 #![allow(non_camel_case_types, non_snake_case)]
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{c_char, c_int};
 
 use super::file_in_pack_s::fileInPack_t;
+use super::unz_file::unzFile;
 
 /// Raven `pack_t` — an open `.pk3` archive tracked by the filesystem.
 ///
@@ -10,9 +11,7 @@ use super::file_in_pack_s::fileInPack_t;
 pub struct pack_t {
     /// c:\quake3\base\asset0.pk3
     pub pakFilename: [c_char; 260],
-    //TODO: Port unzFile
-    // Source: oracle/oracle/code/qcommon/files.h:36
-    pub handle: *mut c_void,
+    pub handle: unzFile,
     pub checksum: c_int,
     pub numfiles: c_int,
     /// hash table size (power of 2)

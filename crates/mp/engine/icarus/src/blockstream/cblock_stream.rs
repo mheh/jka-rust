@@ -1,6 +1,8 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::{c_char, c_long, c_void};
+use core::ffi::{c_char, c_long};
+
+use super::file::FILE;
 
 /// Raven `CBlockStream` — buffered reader/writer for an Icarus `.ibi` block stream file.
 ///
@@ -13,10 +15,8 @@ use core::ffi::{c_char, c_long, c_void};
 pub struct CBlockStream {
 	/// Size of the file
 	pub m_fileSize: c_long,
-	//TODO: Port FILE
-	// Source: oracle/oracle/codemp/game/../icarus/blockstream.h:191
 	/// Global file handle of current I/O source
-	pub m_fileHandle: *mut c_void,
+	pub m_fileHandle: *mut FILE,
 	/// Name of the current file
 	pub m_fileName: [c_char; 1024],
 	/// Stream of data to be parsed

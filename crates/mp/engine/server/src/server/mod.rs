@@ -1,5 +1,6 @@
 //! `server` types.
 
+pub mod bot_debugpoly_t;
 pub mod challenge_t;
 pub mod client_s;
 pub mod client_snapshot_t;

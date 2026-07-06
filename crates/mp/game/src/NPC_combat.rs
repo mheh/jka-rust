@@ -81,12 +81,6 @@ unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t 
     }
 }
 
-// Raven `RANK_CREWMAN` (from the anonymous `rank_t` enum) — value pinned by
-// `NPC_stats.rs`'s `TranslateRankName` comment ("crewman" -> 1), precedent
-// `NPC_AI_Utils.rs`'s `RANK_ENSIGN`.
-// Source: `oracle/oracle/codemp/game/NPC_stats.c:287-330`
-pub const RANK_CREWMAN: c_int = 1;
-
 // Unported types referenced in this file (need porting before this compiles):
 // combatPt_t
 
@@ -208,12 +202,6 @@ pub fn G_TeamEnemy(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
         0
     }
 }
-
-// Raven `RANK_LT` (from the anonymous `rank_t` enum) — value pinned by
-// `NPC_stats.rs`'s `TranslateRankName` comment ("lt" -> 4), precedent
-// `NPC_AI_Utils.rs`'s `RANK_ENSIGN`.
-// Source: `oracle/oracle/codemp/game/NPC_stats.c:287-330`
-const RANK_LT: c_int = 4;
 
 /// Raven `G_AttackDelay`.
 ///

@@ -40,10 +40,6 @@ unsafe fn VALIDSTRING(a: *const c_char) -> bool {
     !a.is_null() && *a != 0
 }
 
-// Unported constants with TODO markers
-//TODO: Port CLASS_VEHICLE
-// Source: oracle/oracle/codemp/game/teams.h
-const CLASS_VEHICLE: c_int = 10;
 
 /// Raven `TurretPain`.
 ///
@@ -423,7 +419,7 @@ pub fn turret_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
             // Check for walker vehicle
             if (*enemy).s.eType == ET_NPC as c_int
-                && (*enemy).s.NPC_class == CLASS_VEHICLE
+                && (*enemy).s.NPC_class == class_t::CLASS_VEHICLE as c_int
                 && !(*enemy).m_pVehicle.is_null()
             {
                 let enemy_veh = (*enemy).m_pVehicle as *mut Vehicle_t;

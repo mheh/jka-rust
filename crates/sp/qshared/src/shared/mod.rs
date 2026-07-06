@@ -45,7 +45,7 @@ pub use cinematic_status::e_status;
 pub use collision::{cplane_t, CollisionRecord_t};
 pub use connstate::connstate_t;
 pub use ct_table::ct_table_t;
-pub use cvar::{cvarHandle_t, vmCvar_t, MAX_CVAR_VALUE_STRING};
+pub use cvar::{cvarHandle_t, cvar_s, cvar_t, vmCvar_t, MAX_CVAR_VALUE_STRING};
 pub use entity_shared::entityShared_t;
 pub use error_parm::errorParm_t;
 pub use file_mode::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};

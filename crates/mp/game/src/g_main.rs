@@ -10,9 +10,10 @@
 //! Pass-3 status: every previously-parked fn now has a real body. Remaining
 //! open items are called out inline as `// PORT-NOTE(<topic>): …` (never
 //! `PORT-NOTE`/`todo!()`) — notably: the `GAME_CVAR_TABLE` per-row
-//! register/update loops (`G_RegisterCvars`/`G_UpdateCvars`) need field
-//! reflection Rust has none of and are left untranscribed with a `//TODO:
-//! Port` marker; `CalculateRanks`' `qsort(..., SortRanks)`
+//! register/update loops (`G_RegisterCvars`/`G_UpdateCvars`) use a mechanical
+//! `field_mut` dispatch + `resolve_cvar_flags` string-to-int folding standing
+//! in for the field reflection Rust has none of; `CalculateRanks`'
+//! `qsort(..., SortRanks)`
 //! registration is a real ctx/no-ctx ABI shape mismatch (see
 //! shape_mismatches); a handful of ctx-free fn-ptr boundary fns
 //! (`Com_Error`/`Com_Printf`/`BG_GetTime`) approximate their missing
@@ -24,6 +25,7 @@ use crate::prelude::*;
 use std::ffi::CString;
 
 use crate::bg_lib::qsort;
+use crate::game_cvars::{GameCvars, GAME_CVAR_TABLE};
 use crate::client::client_connected::{CON_CONNECTED, CON_CONNECTING};
 use crate::client::spectator_state::spectatorState_t::{SPECTATOR_FOLLOW, SPECTATOR_SCOREBOARD};
 use crate::g_active::{ClientEndFrame, G_CheckClientTimeouts, G_RunClient};
@@ -166,28 +168,225 @@ pub fn G_FindTeams(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/g_main.c:783-795`
 pub fn G_RemapTeamShaders() {}
 
-// PORT-NOTE(unresolved-cvar-flags): `GAME_CVAR_TABLE` (game_cvars.rs)
-// carries each row's `CVAR_*` registration flags as a symbolic expression
-// string ("CVAR_SERVERINFO | CVAR_LATCH", …) — the `CVAR_*` bit constants
-// themselves are not yet ported anywhere in the crate graph, so the
-// per-field `vmCvar_t` pointer + numeric-flags call this loop needs to make
-// to `trap::Cvar_Register` cannot be built without inventing flag values.
+/// Maps one `GAME_CVAR_TABLE` row's `field` name to its `vmCvar_t` storage in
+/// `GameCvars` — mechanical field dispatch standing in for the `cv->vmCvar`
+/// pointer Raven's `cvarTable_t` carries directly (Rust has no runtime field
+/// reflection to derive this from the row's `&'static str` name).
+impl GameCvars {
+    fn field_mut(&mut self, name: &str) -> &mut vmCvar_t {
+        let cvars = self;
+        match name {
+            "g_cheats" => &mut cvars.g_cheats,
+            "g_debugMelee" => &mut cvars.g_debugMelee,
+            "g_stepSlideFix" => &mut cvars.g_stepSlideFix,
+            "g_noSpecMove" => &mut cvars.g_noSpecMove,
+            "g_restarted" => &mut cvars.g_restarted,
+            "g_gametype" => &mut cvars.g_gametype,
+            "g_MaxHolocronCarry" => &mut cvars.g_MaxHolocronCarry,
+            "g_maxclients" => &mut cvars.g_maxclients,
+            "g_maxGameClients" => &mut cvars.g_maxGameClients,
+            "g_trueJedi" => &mut cvars.g_trueJedi,
+            "g_ff_objectives" => &mut cvars.g_ff_objectives,
+            "g_autoMapCycle" => &mut cvars.g_autoMapCycle,
+            "g_dmflags" => &mut cvars.g_dmflags,
+            "g_maxForceRank" => &mut cvars.g_maxForceRank,
+            "g_forceBasedTeams" => &mut cvars.g_forceBasedTeams,
+            "g_privateDuel" => &mut cvars.g_privateDuel,
+            "g_allowNPC" => &mut cvars.g_allowNPC,
+            "g_armBreakage" => &mut cvars.g_armBreakage,
+            "g_saberLocking" => &mut cvars.g_saberLocking,
+            "g_saberLockFactor" => &mut cvars.g_saberLockFactor,
+            "g_saberTraceSaberFirst" => &mut cvars.g_saberTraceSaberFirst,
+            "d_saberKickTweak" => &mut cvars.d_saberKickTweak,
+            "d_powerDuelPrint" => &mut cvars.d_powerDuelPrint,
+            "d_saberGhoul2Collision" => &mut cvars.d_saberGhoul2Collision,
+            "g_saberBladeFaces" => &mut cvars.g_saberBladeFaces,
+            "d_saberAlwaysBoxTrace" => &mut cvars.d_saberAlwaysBoxTrace,
+            "d_saberBoxTraceSize" => &mut cvars.d_saberBoxTraceSize,
+            "d_siegeSeekerNPC" => &mut cvars.d_siegeSeekerNPC,
+            "d_perPlayerGhoul2" => &mut cvars.d_perPlayerGhoul2,
+            "d_projectileGhoul2Collision" => &mut cvars.d_projectileGhoul2Collision,
+            "g_g2TraceLod" => &mut cvars.g_g2TraceLod,
+            "g_optvehtrace" => &mut cvars.g_optvehtrace,
+            "g_locationBasedDamage" => &mut cvars.g_locationBasedDamage,
+            "g_allowHighPingDuelist" => &mut cvars.g_allowHighPingDuelist,
+            "g_logClientInfo" => &mut cvars.g_logClientInfo,
+            "g_slowmoDuelEnd" => &mut cvars.g_slowmoDuelEnd,
+            "g_saberDamageScale" => &mut cvars.g_saberDamageScale,
+            "g_useWhileThrowing" => &mut cvars.g_useWhileThrowing,
+            "g_RMG" => &mut cvars.g_RMG,
+            "g_svfps" => &mut cvars.g_svfps,
+            "g_forceRegenTime" => &mut cvars.g_forceRegenTime,
+            "g_spawnInvulnerability" => &mut cvars.g_spawnInvulnerability,
+            "g_forcePowerDisable" => &mut cvars.g_forcePowerDisable,
+            "g_weaponDisable" => &mut cvars.g_weaponDisable,
+            "g_duelWeaponDisable" => &mut cvars.g_duelWeaponDisable,
+            "g_allowDuelSuicide" => &mut cvars.g_allowDuelSuicide,
+            "g_fraglimitVoteCorrection" => &mut cvars.g_fraglimitVoteCorrection,
+            "g_fraglimit" => &mut cvars.g_fraglimit,
+            "g_duel_fraglimit" => &mut cvars.g_duel_fraglimit,
+            "g_timelimit" => &mut cvars.g_timelimit,
+            "g_capturelimit" => &mut cvars.g_capturelimit,
+            "g_synchronousClients" => &mut cvars.g_synchronousClients,
+            "d_saberInterpolate" => &mut cvars.d_saberInterpolate,
+            "g_friendlyFire" => &mut cvars.g_friendlyFire,
+            "g_friendlySaber" => &mut cvars.g_friendlySaber,
+            "g_teamAutoJoin" => &mut cvars.g_teamAutoJoin,
+            "g_teamForceBalance" => &mut cvars.g_teamForceBalance,
+            "g_warmup" => &mut cvars.g_warmup,
+            "g_doWarmup" => &mut cvars.g_doWarmup,
+            "g_log" => &mut cvars.g_log,
+            "g_logSync" => &mut cvars.g_logSync,
+            "g_statLog" => &mut cvars.g_statLog,
+            "g_statLogFile" => &mut cvars.g_statLogFile,
+            "g_password" => &mut cvars.g_password,
+            "g_banIPs" => &mut cvars.g_banIPs,
+            "g_filterBan" => &mut cvars.g_filterBan,
+            "g_needpass" => &mut cvars.g_needpass,
+            "g_dedicated" => &mut cvars.g_dedicated,
+            "g_developer" => &mut cvars.g_developer,
+            "g_speed" => &mut cvars.g_speed,
+            "g_gravity" => &mut cvars.g_gravity,
+            "g_knockback" => &mut cvars.g_knockback,
+            "g_quadfactor" => &mut cvars.g_quadfactor,
+            "g_weaponRespawn" => &mut cvars.g_weaponRespawn,
+            "g_weaponTeamRespawn" => &mut cvars.g_weaponTeamRespawn,
+            "g_adaptRespawn" => &mut cvars.g_adaptRespawn,
+            "g_forcerespawn" => &mut cvars.g_forcerespawn,
+            "g_siegeRespawn" => &mut cvars.g_siegeRespawn,
+            "g_inactivity" => &mut cvars.g_inactivity,
+            "g_debugMove" => &mut cvars.g_debugMove,
+            "g_debugDamage" => &mut cvars.g_debugDamage,
+            "g_debugAlloc" => &mut cvars.g_debugAlloc,
+            "g_debugServerSkel" => &mut cvars.g_debugServerSkel,
+            "g_motd" => &mut cvars.g_motd,
+            "g_blood" => &mut cvars.g_blood,
+            "g_podiumDist" => &mut cvars.g_podiumDist,
+            "g_podiumDrop" => &mut cvars.g_podiumDrop,
+            "g_allowVote" => &mut cvars.g_allowVote,
+            "g_allowTeamVote" => &mut cvars.g_allowTeamVote,
+            "g_listEntity" => &mut cvars.g_listEntity,
+            "g_singlePlayer" => &mut cvars.g_singlePlayer,
+            "g_enableBreath" => &mut cvars.g_enableBreath,
+            "g_smoothClients" => &mut cvars.g_smoothClients,
+            "pmove_fixed" => &mut cvars.pmove_fixed,
+            "pmove_msec" => &mut cvars.pmove_msec,
+            "g_dismember" => &mut cvars.g_dismember,
+            "g_forceDodge" => &mut cvars.g_forceDodge,
+            "g_timeouttospec" => &mut cvars.g_timeouttospec,
+            "g_saberDmgVelocityScale" => &mut cvars.g_saberDmgVelocityScale,
+            "g_saberDmgDelay_Idle" => &mut cvars.g_saberDmgDelay_Idle,
+            "g_saberDmgDelay_Wound" => &mut cvars.g_saberDmgDelay_Wound,
+            "g_saberDebugPrint" => &mut cvars.g_saberDebugPrint,
+            "g_debugSaberLocks" => &mut cvars.g_debugSaberLocks,
+            "g_saberLockRandomNess" => &mut cvars.g_saberLockRandomNess,
+            "g_saberWallDamageScale" => &mut cvars.g_saberWallDamageScale,
+            "d_saberStanceDebug" => &mut cvars.d_saberStanceDebug,
+            "g_siegeTeamSwitch" => &mut cvars.g_siegeTeamSwitch,
+            "bg_fighterAltControl" => &mut cvars.bg_fighterAltControl,
+            "g_vehAutoAimLead" => &mut cvars.g_vehAutoAimLead,
+            "g_autoKickKillSpammers" => &mut cvars.g_autoKickKillSpammers,
+            "g_autoBanKillSpammers" => &mut cvars.g_autoBanKillSpammers,
+            "g_autoKickTKSpammers" => &mut cvars.g_autoKickTKSpammers,
+            "g_autoBanTKSpammers" => &mut cvars.g_autoBanTKSpammers,
+            "d_altRoutes" => &mut cvars.d_altRoutes,
+            "d_patched" => &mut cvars.d_patched,
+            "g_saberRealisticCombat" => &mut cvars.g_saberRealisticCombat,
+            "g_saberRestrictForce" => &mut cvars.g_saberRestrictForce,
+            "d_saberSPStyleDamage" => &mut cvars.d_saberSPStyleDamage,
+            "debugNoRoam" => &mut cvars.debugNoRoam,
+            "debugNPCAimingBeam" => &mut cvars.debugNPCAimingBeam,
+            "debugBreak" => &mut cvars.debugBreak,
+            "debugNPCAI" => &mut cvars.debugNPCAI,
+            "debugNPCFreeze" => &mut cvars.debugNPCFreeze,
+            "d_JediAI" => &mut cvars.d_JediAI,
+            "d_noGroupAI" => &mut cvars.d_noGroupAI,
+            "d_asynchronousGroupAI" => &mut cvars.d_asynchronousGroupAI,
+            "d_slowmodeath" => &mut cvars.d_slowmodeath,
+            "d_saberCombat" => &mut cvars.d_saberCombat,
+            "g_spskill" => &mut cvars.g_spskill,
+            "g_siegeTeam1" => &mut cvars.g_siegeTeam1,
+            "g_siegeTeam2" => &mut cvars.g_siegeTeam2,
+            "d_noIntermissionWait" => &mut cvars.d_noIntermissionWait,
+            "g_austrian" => &mut cvars.g_austrian,
+            "g_showDuelHealths" => &mut cvars.g_showDuelHealths,
+            "g_powerDuelStartHealth" => &mut cvars.g_powerDuelStartHealth,
+            "g_powerDuelEndHealth" => &mut cvars.g_powerDuelEndHealth,
+            other => unreachable!("GAME_CVAR_TABLE row field {other:?} has no GameCvars member"),
+        }
+    }
+}
+
+/// Resolves one `GAME_CVAR_TABLE` row's symbolic `flags` expression (e.g.
+/// `"CVAR_SERVERINFO | CVAR_LATCH"`, verbatim from `g_main.c:230-475`) to the
+/// numeric `trap_Cvar_Register` flags argument. The `CVAR_*` bit consts
+/// themselves are real (`q_shared_cvar_flags`); only the
+/// OR-of-named-tokens shape needs mechanical parsing since the table stores
+/// the expression as written rather than a pre-folded int.
+fn resolve_cvar_flags(expr: &str) -> c_int {
+    // `CVAR_INTERNAL` (`q_shared.h:1800`) has no crate-wide const yet — only
+    // this one `gameCvarTable` row (`g_npcspskill`) uses it. Defined locally
+    // rather than adding it to `q_shared_cvar_flags.rs` under the
+    // concurrent-edit boundary for this file.
+    const CVAR_INTERNAL: c_int = 0x0000_0800;
+
+    expr.split('|').fold(0, |acc, tok| {
+        acc | match tok.trim() {
+            "0" => 0,
+            "CVAR_ARCHIVE" => CVAR_ARCHIVE,
+            "CVAR_USERINFO" => CVAR_USERINFO,
+            "CVAR_SERVERINFO" => CVAR_SERVERINFO,
+            "CVAR_SYSTEMINFO" => CVAR_SYSTEMINFO,
+            "CVAR_INIT" => CVAR_INIT,
+            "CVAR_LATCH" => CVAR_LATCH,
+            "CVAR_ROM" => CVAR_ROM,
+            "CVAR_USER_CREATED" => CVAR_USER_CREATED,
+            "CVAR_TEMP" => CVAR_TEMP,
+            "CVAR_CHEAT" => CVAR_CHEAT,
+            "CVAR_NORESTART" => CVAR_NORESTART,
+            "CVAR_INTERNAL" => CVAR_INTERNAL,
+            other => panic!("resolve_cvar_flags: unknown CVAR_* token {other:?}"),
+        }
+    })
+}
+
 /// Raven `G_RegisterCvars`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:803-845`
 pub fn G_RegisterCvars(ctx: GameContext<'_>) {
     unsafe {
-        // PORT-NOTE(no-field-reflection): the per-row `trap_Cvar_Register(cv->
-        // vmCvar, cv->cvarName, …)` loop over all 136 `GAME_CVAR_TABLE` rows
-        // needs `field: &str` -> `&mut vmCvar_t` reflection (Rust has none)
-        // plus each row's `flags` lowered from a symbolic expression string
-        // ("CVAR_SERVERINFO | CVAR_LATCH") to an integer — a real
-        // architecture gap, not a missing symbol. Left untranscribed; the
-        // digest-listed state-affecting tail below (g_gametype validation +
-        // warmupModificationCount) is ported faithfully.
-        let remapped = qfalse;
-        //TODO: Port G_RegisterCvars per-row trap_Cvar_Register loop
-        // Source: oracle/oracle/codemp/game/g_main.c:808-817
+        let mut remapped = qfalse;
+
+        // `for (i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++) {
+        // trap_Cvar_Register(cv->vmCvar, cv->cvarName, cv->defaultString,
+        // cv->cvarFlags); if (cv->vmCvar) cv->modificationCount =
+        // cv->vmCvar->modificationCount; if (cv->teamShader) remapped = qtrue;
+        // }` (g_main.c:808-816). `cv->modificationCount` lives in
+        // `GameGlobals::gameCvarModCounts`, indexed the same as
+        // `GAME_CVAR_TABLE` (Raven stores it inline on the row).
+        for (i, entry) in GAME_CVAR_TABLE.iter().enumerate() {
+            let cvar_ptr: *mut vmCvar_t = match entry.field {
+                Some(name) => (*ctx.world).cvars.field_mut(name) as *mut vmCvar_t,
+                None => std::ptr::null_mut(),
+            };
+            trap::Cvar_Register(
+                ctx.engine,
+                mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs::new(
+                    cvar_ptr,
+                    cstr(entry.name),
+                    cstr(entry.default),
+                    resolve_cvar_flags(entry.flags),
+                ),
+            );
+
+            if !cvar_ptr.is_null() {
+                (*ctx.world).globals.gameCvarModCounts.0[i] = (*cvar_ptr).modificationCount;
+            }
+
+            if entry.team_shader {
+                remapped = qtrue;
+            }
+        }
 
         // bg-tier cvar mirror: bg code reads this from BgState (Raven read the
         // vmCvar_t global directly).
@@ -242,23 +441,53 @@ pub fn G_RegisterCvars(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-NOTE(unresolved-cvar-flags): same table dependency as
-// `G_RegisterCvars` — `cv->vmCvar` field dispatch needs a per-row typed
-// accessor into `GameCvars` (the table's `field: Option<&'static str>` is a
-// name, not a `&mut vmCvar_t` — no reflection in Rust) plus the unported
-// `CVAR_*` flags for the `teamShader`/`trackChange` branches' downstream use.
 /// Raven `G_UpdateCvars`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:852-879`
 pub fn G_UpdateCvars(ctx: GameContext<'_>) {
     unsafe {
-        // PORT-NOTE(no-field-reflection): same reflection gap as
-        // G_RegisterCvars — the per-row `trap_Cvar_Update(cv->vmCvar)` +
-        // `modificationCount` diff loop over `GAME_CVAR_TABLE` cannot be
-        // transcribed without per-field reflection.
-        let remapped = qfalse;
-        //TODO: Port G_UpdateCvars per-row trap_Cvar_Update loop
-        // Source: oracle/oracle/codemp/game/g_main.c:857-872
+        let mut remapped = qfalse;
+
+        // `for (i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++) {
+        // if (cv->vmCvar) { trap_Cvar_Update(cv->vmCvar); if
+        // (cv->modificationCount != cv->vmCvar->modificationCount) {
+        // cv->modificationCount = cv->vmCvar->modificationCount; if
+        // (cv->trackChange) trap_SendServerCommand(-1, va("print \"Server: %s
+        // changed to %s\n\"", cv->cvarName, cv->vmCvar->string)); if
+        // (cv->teamShader) remapped = qtrue; } } }` (g_main.c:857-872).
+        for (i, entry) in GAME_CVAR_TABLE.iter().enumerate() {
+            if let Some(name) = entry.field {
+                let cvar_ptr: *mut vmCvar_t = (*ctx.world).cvars.field_mut(name) as *mut vmCvar_t;
+                trap::Cvar_Update(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_CVAR_UPDATE::GCvarUpdateArgs::new(cvar_ptr),
+                );
+
+                let new_mod_count = (*cvar_ptr).modificationCount;
+                let cached = &mut (*ctx.world).globals.gameCvarModCounts.0[i];
+                if *cached != new_mod_count {
+                    *cached = new_mod_count;
+
+                    if entry.track_change {
+                        let value = cstr_to_str((*cvar_ptr).string.as_ptr());
+                        trap::SendServerCommand(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                                -1,
+                                cstr(&format!(
+                                    "print \"Server: {} changed to {}\n\"",
+                                    entry.name, value
+                                )),
+                            ),
+                        );
+                    }
+
+                    if entry.team_shader {
+                        remapped = qtrue;
+                    }
+                }
+            }
+        }
 
         // bg-tier cvar mirror (see G_RegisterCvars).
         (*ctx.world).bg_state.bg_fighterAltControl =
@@ -3120,36 +3349,20 @@ pub fn NAV_CheckCalcPaths(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): returns `level.time`; the
-// zero-param skeleton signature has no world handle to reach `level` through.
-/// Raven `BG_GetTime`.
+/// Raven `BG_GetTime` — "so shared code can get the local time depending on
+/// the side it's executed on."
 ///
-/// Source: `oracle/oracle/codemp/game/g_main.c:3559-3562`
-pub fn BG_GetTime() -> c_int {
-    // PORT-NOTE(ctx-free-boundary): this ctx-free fn-ptr/upcall boundary has no
-    // `GameContext` to reach `level.time` through (digest: "match its existing
-    // worktree signature exactly"). `GameCallbacks`/`BgState` is
-    // the eventual channel; until wired, return 0 rather than reaching for a
-    // forbidden global.
-    //TODO: Port BG_GetTime level.time reach-through
-    // Source: oracle/oracle/codemp/game/g_main.c:3559-3562 (needs GameCallbacks/BgState wiring)
-    0
+/// Source: `oracle/oracle/codemp/game/g_main.c:3556-3562`
+pub fn BG_GetTime(ctx: GameContext<'_>) -> c_int {
+    unsafe { (*ctx.world).level.time }
 }
 
-// PORT-NOTE(ctx-free-boundary): same shape as `BG_GetTime` above — callers
-// (vehicle/NPC think code) reach `level.time` from a ctx-free fn-pointer
-// boundary with no `GameContext`/`BgState` handle threaded through yet.
-// Returns 0 until GameCallbacks/BgState wiring reaches this call
-// site; matches `BG_GetTime`'s placeholder behavior rather than inventing a
-// different fallback.
 /// Raven `level.time` accessor (no standalone Raven symbol; mirrors the many
 /// `level.time` reads inlined at call sites).
 ///
 /// Source: `oracle/oracle/codemp/game/g_local.h` (`level_locals_t::time`)
-pub fn level_time() -> c_int {
-    //TODO: Port level.time reach-through
-    // Source: oracle/oracle/codemp/game/g_local.h (needs GameCallbacks/BgState wiring)
-    0
+pub fn level_time(ctx: GameContext<'_>) -> c_int {
+    unsafe { (*ctx.world).level.time }
 }
 
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): the whole-frame driver —

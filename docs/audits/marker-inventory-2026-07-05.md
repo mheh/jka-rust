@@ -1,12 +1,12 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 773 markers — 164 `TODO: Port`,
-553 `PORT-NOTE`, 56 other TODO forms.
+Totals: 708 markers — 108 `TODO: Port`,
+546 `PORT-NOTE`, 54 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
 judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 
-- **LEGIT** — subject genuinely unported; marker accurate. (147)
+- **LEGIT** — subject genuinely unported; marker accurate. (91)
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
@@ -34,17 +34,17 @@ PORT-NOTE section is a plain re-grep (not audited).
   - Same tiering blocker as gentity.rs: Vehicle_t is ported at crates/mp/bg/src/vehicles/vehicle_s.rs but sharedEntity_t lives in mp_qshared, which cannot depend on mp_bg. Requires an abi-seam/tier refactor, not a file-local mechanical fix.
 
 ### crates/sp/abi/src/game/public/game_import_t.rs
-- L435: CMiniHeap
+- L431: CMiniHeap
   - CMiniHeap IS ported (crates/sp/engine/qcommon/src/miniheap/cmini_heap.rs) but sp_abi cannot depend on the engine tier — same cross-tier-naming class as Vehicle_t/gNPC_t; pointer param stays opaque pending a DEC ruling.
 
 ### crates/sp/cgame/src/media/cgs_t.rs
-- L47: clientInfo_t (cross-crate, sp_game -> sp_cgame not wired)
+- L48: clientInfo_t (cross-crate, sp_game -> sp_cgame not wired)
   - clientInfo_t is fully ported at sp_game::shared::client_info_t::clientInfo_t (confirmed: `pub struct clientInfo_t` at that path), exactly as the marker itself states. But resolving this in cgs_t.rs would mean replacing `OpaqueClientInfo_t = [u64; 62]` (a #[repr(C)] field inside cgs_t, size/offset-asserted at line 259+) with the real cross-crate type, which requires adding a new sp_cgame -> sp_game dependency edge (confirmed absent in crates/sp/cgame/Cargo.toml) — an architecture-layering change with effects beyond this file, not a mechanical local fix.
 
 ### crates/sp/game/src/shared/weapon_info_s.rs
-- L40: centity_t
+- L41: centity_t
   - centity_t IS ported (crates/sp/cgame/src/local/centity_s.rs, pub struct centity_t). But sp_game and sp_cgame are sibling tier-3 module crates with no dependency edge between them (docs/workspace-architecture.md); retyping this callback param to the real type would require adding an sp_game -> sp_cgame crate dependency, which the architecture forbids. The comment already documents this as a deliberate cross-tier opaque-pointer design, not an oversight.
-- L46: centity_t
+- L47: centity_t
   - Same as line 40 — centity_t exists in sp_cgame but sp_game cannot depend on sp_cgame (same tier, no edge), so the opaque *mut c_void callback param is architecturally required, not a stale mechanical leftover.
 
 ### crates/sp/qshared/src/common/sp/gentity.rs
@@ -73,7 +73,7 @@ PORT-NOTE section is a plain re-grep (not audited).
   - Validator claim does not match the file. Actual line 1 is `//! `mp_engine_server` crate. //TODO: Port module mp_engine_server` — subject is already `mp_engine_server` (not `server` as claimed), and there is no `// Source:` line to normalize. This exact one-line, no-Source-line form is the established house convention for crate-root module docs, verified identical across all 22 sibling crate lib.rs files (e.g. crates/mp/engine/qcommon/src/lib.rs, crates/mp/engine/client/src/lib.rs, crates/sp/engine/server/src/lib.rs, crates/mp/bg/src/lib.rs). Git history (git log -p --follow on this file) shows the line unchanged since crate creation in 71ec41c7. Fixing/normalizing it as described would actually break consistency with the rest of the codebase, so no edit was made.
 
 
-## TODO: Port — LEGIT (147)
+## TODO: Port — LEGIT (91)
 
 ### crates/abi-transport/src/generic/engine.rs
 - L78: RunStatic per-call handler surface
@@ -144,10 +144,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/engine/ghoul2/src/lib.rs
 - L1: module mp_engine_ghoul2
-- L3: SSkinGoreData
-
-### crates/mp/engine/icarus/src/blockstream/cblock_stream.rs
-- L16: FILE
 
 ### crates/mp/engine/icarus/src/interface/interface_export_s.rs
 - L157: CSequencer
@@ -172,9 +168,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L41: Common cvars/cmd/cbuf/fs/net sub-structs + com_printf print state
 - L54: Com_Printf rd_buffer redirect + logfile + console routing
 
-### crates/mp/engine/qcommon/src/files/pack_t.rs
-- L17: unzFile
-
 ### crates/mp/engine/qcommon/src/timing/timing_c.rs
 - L12: timing_c::start, timing_c::end, timing_c::reset
 
@@ -182,57 +175,11 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L7: CRMManager (C++ track)
 
 ### crates/mp/engine/server/src/server_host.rs
-- L55: bot_debugpoly_t (`debugpolygons`) + gWPArray[MAX_WPARRAY_SIZE]
-- L95: SV_GameSystemCalls exhaustive dispatch
-- L147: SV_InitGameProgs ctx injection (&mut Engine.sv)
-
-### crates/mp/game/src/FighterNPC.rs
-- L103: BG_FighterUpdate traceFunc callback signature
-
-### crates/mp/game/src/NPC_AI_Sniper.rs
-- L744: Sniper_FireDecide miss loop body (VectorMA flrand(1.5,4)
-
-### crates/mp/game/src/NPC_stats.rs
-- L361: rank_t (unported return enum; C int-width)
+- L132: SV_GameSystemCalls exhaustive dispatch
+- L184: SV_InitGameProgs ctx injection (&mut Engine.sv)
 
 ### crates/mp/game/src/bg_vehicleLoad.rs
 - L300: BG_SetSharedVehicleFunctions
-
-### crates/mp/game/src/g_main.rs
-- L189: G_RegisterCvars per-row trap_Cvar_Register loop
-- L260: G_UpdateCvars per-row trap_Cvar_Update loop
-- L3134: BG_GetTime level.time reach-through
-- L3150: level.time reach-through
-
-### crates/mp/game/src/g_misc.rs
-- L94: bSet_e
-- L2250: FX_STATE_OFF
-- L2253: FX_STATE_ONE_SHOT
-- L2256: FX_STATE_ONE_SHOT_LIMIT
-- L2259: FX_STATE_CONTINUOUS
-
-### crates/mp/game/src/g_trigger.rs
-- L54: bSet_e
-
-### crates/mp/game/src/g_turret.rs
-- L44: CLASS_VEHICLE
-
-### crates/mp/game/src/npc/g_npc_t.rs
-- L75: rank_t
-
-### crates/mp/game/src/q_shared.rs
-- L1306: MAX_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_RemoveKey: oversize infostring")) once the const is ported.
-- L1368: BIG_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_RemoveKey_Big: oversize infostring")) once the const is ported.
-- L1445: MAX_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_SetValueForKey: oversize infostring")) once the const is ported.
-- L1475: MAX_INFO_STRING (currently hardcoded 1024 — not yet a
-- L1496: BIG_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_SetValueForKey: oversize infostring")) once the const is ported.
-- L1526: BIG_INFO_STRING (currently hardcoded 8192 — not yet a
-
-### crates/mp/game/src/world/game_context.rs
-- L304: Dispatch<C> for GameContext (GAME_ICARUS_* commands)
-
-### crates/mp/qshared/src/shared/cvar.rs
-- L16: cvar_t
 
 ### crates/mp/renderer/src/lib.rs
 - L2: renderer subsystem (rd-vanilla logic; types already ported)
@@ -258,14 +205,12 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L14: ModuleNaming macOS suffix
 
 ### crates/sp/abi/src/game/public/game_import_t.rs
-- L31: Printf variadic args
-- L40: Error variadic args
-- L50: cvar_t
-- L124: SendServerCommand variadic args
-- L229: CGhoul2Info
-- L458: IGhoul2InfoArray
-- L501: CRagDollUpdateParams
-- L563: SSkinGoreData
+- L32: Printf variadic args
+- L41: Error variadic args
+- L120: SendServerCommand variadic args
+- L225: CGhoul2Info
+- L454: IGhoul2InfoArray
+- L497: CRagDollUpdateParams
 
 ### crates/sp/abi/src/ui/public/uiimport_t.rs
 - L26: Printf variadic args
@@ -280,43 +225,17 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/sp/cgame/src/lib.rs
 - L1: module sp_cgame
 
-### crates/sp/cgame/src/media/cg_media_t.rs
-- L209: ffHandle_t
-- L212: ffHandle_t
-- L216: ffHandle_t
-- L220: ffHandle_t
-- L224: ffHandle_t
-- L228: ffHandle_t
-- L231: ffHandle_t
-- L235: ffHandle_t
-- L238: ffHandle_t
-- L241: ffHandle_t
-- L245: ffHandle_t
-- L248: ffHandle_t
-- L251: ffHandle_t
-- L254: ffHandle_t
-
-### crates/sp/cgame/src/media/cgs_t.rs
-- L85: ffHandle_t
-
 ### crates/sp/engine/client/src/lib.rs
 - L1: module sp_engine_client
 
 ### crates/sp/engine/ghoul2/src/lib.rs
 - L1: module sp_engine_ghoul2
-- L3: SSkinGoreData
-
-### crates/sp/engine/icarus/src/blockstream/cblock_stream.rs
-- L15: FILE
 
 ### crates/sp/engine/icarus/src/lib.rs
 - L1: module sp_engine_icarus
 
 ### crates/sp/engine/qcommon/src/cm/clip_map_t.rs
 - L73: CCMLandScape
-
-### crates/sp/engine/qcommon/src/files/pack_t.rs
-- L13: unzFile
 
 ### crates/sp/engine/qcommon/src/lib.rs
 - L1: module sp_engine_qcommon
@@ -336,26 +255,11 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/sp/game/src/lib.rs
 - L3: module sp_game (dependency types ported first; SP places
 
-### crates/sp/game/src/local/anim_file_set_t.rs
-- L18: animNumber_t
-
-### crates/sp/game/src/npc/g_npc_t.rs
-- L75: rank_t
-
-### crates/sp/game/src/shared/weapon_info_s.rs
-- L64: ffHandle_t
-
 ### crates/sp/game/src/world/game_context.rs
 - L37: SP export logic fns taking GameContext (per-export, logic-port)
 
 ### crates/sp/game/src/world/game_world.rs
 - L28: GameWorld::zeroed (SP) — native_platform::zeroed_box for entities/level
-
-### crates/sp/qshared/src/common/sp/qcommon/saber/saber_info.rs
-- L15: saberInfoRetail_t
-
-### crates/sp/qshared/src/shared/cvar.rs
-- L16: cvar_t
 
 ### crates/sp/renderer/src/lib.rs
 - L1: module sp_renderer
@@ -379,25 +283,17 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/sp/uishared/src/lib.rs
 - L1: module sp_uishared
 
-### crates/sp/uishared/src/shared/cached_assets_t.rs
-- L52: ffHandle_t
-
 ### crates/sp/uishared/src/shared/display_context_def_t.rs
-- L137: CGhoul2Info
-- L146: CGhoul2Info
-- L176: CGhoul2Info
-- L198: CGhoul2Info
-- L211: ffHandle_t
-- L214: ffHandle_t
-
-### crates/sp/uishared/src/shared/item_def_s.rs
-- L86: ffHandle_t
+- L138: CGhoul2Info
+- L147: CGhoul2Info
+- L177: CGhoul2Info
+- L199: CGhoul2Info
 
 ### crates/ui/src/lib.rs
 - L8: ui live entrypoint exports (vmMain match, SEAM-D10)
 
 
-## TODO-other (56)
+## TODO-other (54)
 
 ### crates/mp/engine/core/src/lifecycle.rs
 - L33 [LEGIT]: /// carry `//TODO: Port` markers in step order so the transcript diff (DEC-09.2)
@@ -421,8 +317,8 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L7 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 
 ### crates/mp/game/src/NPC_AI_Stormtrooper.rs
-- L668 [LEGIT]: // TODO: Play sleeping shuffle animation (Raven comment).
-- L969 [LEGIT]: // TODO: Play a sound along the lines of, "Huh? What was that?" (Raven comment).
+- L662 [LEGIT]: // TODO: Play sleeping shuffle animation (Raven comment).
+- L963 [LEGIT]: // TODO: Play a sound along the lines of, "Huh? What was that?" (Raven comment).
 
 ### crates/mp/game/src/NPC_combat.rs
 - L7 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
@@ -466,14 +362,11 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/game/src/g_log.rs
 - L7 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 
-### crates/mp/game/src/g_main.rs
-- L14 [STALE]: //! reflection Rust has none of and are left untranscribed with a `//TODO:
-
 ### crates/mp/game/src/g_mem.rs
 - L7 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 
 ### crates/mp/game/src/g_misc.rs
-- L3391 [LEGIT]: //TODO: Find the target and set our angles to that direction
+- L3374 [LEGIT]: //TODO: Find the target and set our angles to that direction
 
 ### crates/mp/game/src/g_nav.rs
 - L950 [LEGIT]: // TODO: Handle all ents
@@ -489,7 +382,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/g_turret.rs
 - L7 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
-- L43 [?]: // Unported constants with TODO markers
 
 ### crates/mp/game/src/g_vehicleTurret.rs
 - L8 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
@@ -504,7 +396,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/game_globals.rs
 - L7 [LEGIT]: //! `//TODO: Port <type>` marker — the porter fills the real type when
-- L873 [?]: // it"); shapes are exactly what the `g_log.md` packet's TODO comments
+- L889 [?]: // it"); shapes are exactly what the `g_log.md` packet's TODO comments
 
 ### crates/mp/game/src/npc_c.rs
 - L1416 [LEGIT]: // TODO: Add vehicle behaviors here.
@@ -558,11 +450,11 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L15 [LEGIT]: /// TODO: SP transport path does not provide a direct `UI_S_STARTLOCALSOUND` case in `oracle/oracle/code/client/cl_ui.cpp`.
 
 
-## NOTE (553)
+## NOTE (546)
 
 ### crates/mp/game/src/FighterNPC.rs
-- L1309: (untopiced)
-- L1364: bg-anim-dispatch
+- L1310: (untopiced)
+- L1365: bg-anim-dispatch
 
 ### crates/mp/game/src/NPC_AI_Atst.rs
 - L118: ai-context
@@ -580,11 +472,11 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/NPC_AI_Jedi.rs
 - L6: (untopiced)
-- L1211: jediSpeechDebounceTime
-- L1948: jediSpeechDebounceTime
-- L2345: BG_AnimLength
-- L4639: jediSpeechDebounceTime
-- L5733: jediSpeechDebounceTime
+- L1199: jediSpeechDebounceTime
+- L1936: jediSpeechDebounceTime
+- L2333: BG_AnimLength
+- L4627: jediSpeechDebounceTime
+- L5721: jediSpeechDebounceTime
 
 ### crates/mp/game/src/NPC_AI_Mark1.rs
 - L6: (untopiced)
@@ -615,7 +507,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L6: (untopiced)
 
 ### crates/mp/game/src/NPC_AI_Stormtrooper.rs
-- L1296: vec3-out-param
+- L1290: vec3-out-param
 
 ### crates/mp/game/src/NPC_AI_Wampa.rs
 - L13: (untopiced)
@@ -624,9 +516,9 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L1128: goal-invariant
 
 ### crates/mp/game/src/NPC_combat.rs
-- L1407: varargs-seam
-- L1779: SVF_IGNORE_ENEMIES
-- L2039: vec3-out-param-reshape
+- L1395: varargs-seam
+- L1767: SVF_IGNORE_ENEMIES
+- L2027: vec3-out-param-reshape
 
 ### crates/mp/game/src/NPC_misc.rs
 - L32: varargs
@@ -634,9 +526,9 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/NPC_reactions.rs
 - L20: (untopiced)
-- L394: bgAllAnims-access
-- L955: va-formatting
-- L1088: vehicle-vtable
+- L393: bgAllAnims-access
+- L954: va-formatting
+- L1087: vehicle-vtable
 
 ### crates/mp/game/src/NPC_spawn.rs
 - L50: packet-contract
@@ -648,9 +540,9 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L3084: fn-ptr
 
 ### crates/mp/game/src/NPC_stats.rs
-- L1470: vehicle-info-shape
-- L2075: unported-fn
-- L2128: unported-global
+- L1465: vehicle-info-shape
+- L2070: unported-fn
+- L2123: unported-global
 
 ### crates/mp/game/src/NPC_utils.rs
 - L31: (untopiced)
@@ -932,73 +824,66 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/game/src/g_main.rs
 - L11: <topic>
 - L12: (untopiced)
-- L68: variadic-c-abi
-- L81: variadic-c-abi
-- L93: variadic-c-abi
-- L103: variadic-c-abi
-- L169: unresolved-cvar-flags
-- L180: no-field-reflection
-- L245: unresolved-cvar-flags
-- L255: no-field-reflection
-- L273: variadic-c-abi
-- L283: ctx-free-boundary
-- L293: variadic-c-abi
-- L302: ctx-free-boundary
-- L631: unported-dep
-- L724: qsort-fn-pointer-registration
-- L830: unported-dep
-- L924: qsort-ctx-mismatch
-- L1152: unported-dep
-- L1230: unported-const
-- L1347: unported-dep
-- L1436: variadic-c-abi
-- L1446: variadic-c-abi
-- L1478: unported-const
-- L1551: unported-const
-- L1925: unported-dep
-- L2534: raw-ptr-skeleton-no-world-handle
-- L2569: raw-ptr-skeleton-no-world-handle
-- L2732: raw-ptr-skeleton-no-world-handle
-- L2759: raw-ptr-skeleton-no-world-handle
-- L2819: raw-ptr-skeleton-no-world-handle
-- L2864: raw-ptr-skeleton-no-world-handle
-- L2960: raw-ptr-skeleton-no-world-handle
-- L2971: cross-frame-static
-- L3012: raw-ptr-skeleton-no-world-handle
-- L3049: raw-ptr-skeleton-no-world-handle
-- L3123: raw-ptr-skeleton-no-world-handle
-- L3129: ctx-free-boundary
-- L3139: ctx-free-boundary
-- L3155: raw-ptr-skeleton-no-world-handle
-- L3692: raw-ptr-skeleton-no-world-handle
-- L3711: static-scratch-buffer
+- L70: variadic-c-abi
+- L83: variadic-c-abi
+- L95: variadic-c-abi
+- L105: variadic-c-abi
+- L502: variadic-c-abi
+- L512: ctx-free-boundary
+- L522: variadic-c-abi
+- L531: ctx-free-boundary
+- L860: unported-dep
+- L953: qsort-fn-pointer-registration
+- L1059: unported-dep
+- L1153: qsort-ctx-mismatch
+- L1381: unported-dep
+- L1459: unported-const
+- L1576: unported-dep
+- L1665: variadic-c-abi
+- L1675: variadic-c-abi
+- L1707: unported-const
+- L1780: unported-const
+- L2154: unported-dep
+- L2763: raw-ptr-skeleton-no-world-handle
+- L2798: raw-ptr-skeleton-no-world-handle
+- L2961: raw-ptr-skeleton-no-world-handle
+- L2988: raw-ptr-skeleton-no-world-handle
+- L3048: raw-ptr-skeleton-no-world-handle
+- L3093: raw-ptr-skeleton-no-world-handle
+- L3189: raw-ptr-skeleton-no-world-handle
+- L3200: cross-frame-static
+- L3241: raw-ptr-skeleton-no-world-handle
+- L3278: raw-ptr-skeleton-no-world-handle
+- L3368: raw-ptr-skeleton-no-world-handle
+- L3905: raw-ptr-skeleton-no-world-handle
+- L3924: static-scratch-buffer
 
 ### crates/mp/game/src/g_mem.rs
 - L33: state-threading-g-alloc
 
 ### crates/mp/game/src/g_misc.rs
-- L467: raw-ptr-skeleton-no-world-handle
-- L581: unported-const
-- L785: raw-ptr-skeleton-no-world-handle
-- L930: unported-const
-- L1063: control-flow
-- L1425: raw-ptr-skeleton-no-world-handle
-- L1472: unported-const
-- L2002: seam-threading
-- L2133: seam-threading
-- L2147: raw-ptr-skeleton-no-world-handle
-- L2621: raw-ptr-skeleton-no-world-handle
-- L2653: unported-const
-- L2700: raw-ptr-skeleton-no-world-handle
-- L2757: unported-const
-- L2873: raw-ptr-skeleton-no-world-handle
-- L2905: raw-ptr-skeleton-no-world-handle
-- L3001: raw-ptr-skeleton-no-world-handle
-- L3014: raw-ptr-skeleton-no-world-handle
-- L3356: bg-dep
-- L3370: bg-dep
-- L3435: unported-const
-- L3498: raw-ptr-skeleton-no-world-handle
+- L463: raw-ptr-skeleton-no-world-handle
+- L577: unported-const
+- L781: raw-ptr-skeleton-no-world-handle
+- L926: unported-const
+- L1059: control-flow
+- L1421: raw-ptr-skeleton-no-world-handle
+- L1468: unported-const
+- L1998: seam-threading
+- L2129: seam-threading
+- L2143: raw-ptr-skeleton-no-world-handle
+- L2604: raw-ptr-skeleton-no-world-handle
+- L2636: unported-const
+- L2683: raw-ptr-skeleton-no-world-handle
+- L2740: unported-const
+- L2856: raw-ptr-skeleton-no-world-handle
+- L2888: raw-ptr-skeleton-no-world-handle
+- L2984: raw-ptr-skeleton-no-world-handle
+- L2997: raw-ptr-skeleton-no-world-handle
+- L3339: bg-dep
+- L3353: bg-dep
+- L3418: unported-const
+- L3481: raw-ptr-skeleton-no-world-handle
 
 ### crates/mp/game/src/g_missile.rs
 - L1216: gclient_t
@@ -1069,7 +954,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L42: level-global-access
 
 ### crates/mp/game/src/g_trigger.rs
-- L2129: variadic-c-abi
+- L2122: variadic-c-abi
 
 ### crates/mp/game/src/g_turret_G2.rs
 - L11: (untopiced)
@@ -1105,10 +990,10 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L927: bg-channel
 - L942: bg-boundary
 - L1229: PM_BGEntForNum
-- L1856: bg-boundary
-- L2011: bg-boundary
-- L2051: G_Damage-null-dir/point
-- L2175: bg-boundary
+- L1857: bg-boundary
+- L2012: bg-boundary
+- L2052: G_Damage-null-dir/point
+- L2176: bg-boundary
 
 ### crates/mp/game/src/g_weapon.rs
 - L200: seam-threading

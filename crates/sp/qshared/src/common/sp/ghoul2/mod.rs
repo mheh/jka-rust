@@ -4,3 +4,4 @@ pub mod ccollision_record;
 pub mod cghoul2_info_v;
 pub mod crag_doll_params;
 pub mod eg2_collision;
+pub mod sskin_gore_data;

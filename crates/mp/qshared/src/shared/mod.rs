@@ -71,7 +71,7 @@ pub use effect_trail_vert::effectTrailVertStruct_t;
 pub use game_state::{gameState_t, MAX_CONFIGSTRINGS, MAX_GAMESTATE_CHARS};
 pub use connstate::connstate_t;
 pub use ct_table::ct_table_t;
-pub use cvar::{cvarHandle_t, vmCvar_t, MAX_CVAR_VALUE_STRING};
+pub use cvar::{cvar_s, cvar_t, cvarHandle_t, vmCvar_t, MAX_CVAR_VALUE_STRING};
 pub use cinematic_status::{
     e_status, FMV_EOF, FMV_IDLE, FMV_ID_BLT, FMV_ID_IDLE, FMV_ID_WAIT, FMV_LOOPED, FMV_PLAY,
 };
@@ -92,8 +92,8 @@ pub use gen_cmds::genCmds_t;
 pub use hunk_pref::ha_pref;
 pub use item_use_fail::itemUseFail_t;
 pub use limits::{
-    ENTITYNUM_MAX_NORMAL, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_CLIENTS_I32,
-    MAX_GENTITIES, MAX_STRING_CHARS,
+    BIG_INFO_STRING, ENTITYNUM_MAX_NORMAL, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS,
+    MAX_CLIENTS_I32, MAX_GENTITIES, MAX_INFO_STRING, MAX_STRING_CHARS,
 };
 pub use mark_fragment::markFragment_t;
 pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};

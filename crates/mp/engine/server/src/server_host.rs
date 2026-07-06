@@ -3,9 +3,46 @@
 
 use core::ffi::c_int;
 
+use mp_qshared::shared::wpobject_t;
+
+use crate::server::bot_debugpoly_t::bot_debugpoly_t;
 use crate::server::server_static_t::serverStatic_t;
 use crate::server::server_t::server_t;
 use crate::server::world_sector_s::{worldSector_t, AREA_NODES};
+
+/// Raven `MAX_WPARRAY_SIZE` — bot waypoint pointer-table capacity
+/// (`gWPArray[MAX_WPARRAY_SIZE]`).
+///
+/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:993`
+pub const MAX_WPARRAY_SIZE: usize = 4096;
+
+/// Raven `sv_bot.cpp` file-scope globals: `debugpolygons`/`bot_maxdebugpolys`
+/// (the bot-debug-polygon pool) + `gWPArray`/`gWPNum` (the bot waypoint
+/// table), grouped under Raven names (WorldSectors precedent: a Rust-side
+/// grouping colocated with its sole owner).
+///
+/// Source: `oracle/oracle/codemp/server/sv_bot.cpp:16-23`
+#[allow(non_snake_case)]
+pub struct Bot {
+    /// Raven `debugpolygons` — heap array of `bot_debugpoly_t`, allocated by
+    /// `SV_BotInitBotLib` (`Z_Malloc(sizeof(bot_debugpoly_t) *
+    /// bot_maxdebugpolys, ...)`); null until then.
+    ///
+    /// Source: `oracle/oracle/codemp/server/sv_bot.cpp:16,689`
+    pub debugpolygons: *mut bot_debugpoly_t,
+    /// Raven `bot_maxdebugpolys`.
+    ///
+    /// Source: `oracle/oracle/codemp/server/sv_bot.cpp:17`
+    pub bot_maxdebugpolys: c_int,
+    /// Raven `gWPArray[MAX_WPARRAY_SIZE]` — bot waypoint pointer table.
+    ///
+    /// Source: `oracle/oracle/codemp/server/sv_bot.cpp:23`
+    pub gWPArray: [*mut wpobject_t; MAX_WPARRAY_SIZE],
+    /// Raven `gWPNum`.
+    ///
+    /// Source: `oracle/oracle/codemp/server/sv_bot.cpp:22`
+    pub gWPNum: c_int,
+}
 
 /// Raven `sv_worldSectors[AREA_NODES]` + `sv_numworldSectors` — the master
 /// table's `Server.world_sectors` row, grouped under Raven names (Savegame
@@ -52,11 +89,11 @@ pub struct Server {
     ///
     /// Source: `oracle/oracle/codemp/server/sv_world.cpp:58-59`
     pub world_sectors: WorldSectors,
-    //TODO: Port bot_debugpoly_t (`debugpolygons`) + gWPArray[MAX_WPARRAY_SIZE]
-    // (wpobject_t, already ported in mp_qshared, but the containing
-    // bot_debugpoly_t is not) + gWPNum
-    // Source: oracle/oracle/codemp/server/sv_bot.cpp:16-23
-    pub bot: (),
+    /// Raven `debugpolygons`/`bot_maxdebugpolys`/`gWPArray`/`gWPNum` —
+    /// `sv_bot.cpp`'s file-scope bot state.
+    ///
+    /// Source: `oracle/oracle/codemp/server/sv_bot.cpp:16-23`
+    pub bot: Bot,
     /// Raven `g_lastResolveTime[MAX_MASTER_SERVERS]` — master-server
     /// DNS-resolve throttle timestamps (`#ifndef _XBOX`, MP only).
     ///

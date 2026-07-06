@@ -954,7 +954,12 @@ pub fn BG_GetVehicleSkinName(skinname: *mut c_char, bg: &mut BgState, traps: &dy
 // MISSING-SYMBOL: `BgTraps::g2api_add_bolt` (`trap_G2API_AddBolt`) is not on
 // the `BgTraps` trait (only `g2api_get_bolt_matrix*` variants are); see
 // missing_symbols.
-pub fn AttachRidersGeneric(pVeh: *mut Vehicle_t, bg: &BgState, traps: &dyn BgTraps) {
+pub fn AttachRidersGeneric(
+    pVeh: *mut Vehicle_t,
+    bg: &BgState,
+    traps: &dyn BgTraps,
+    levelTime: c_int,
+) {
     unsafe {
         if !(*pVeh).m_pPilot.is_null() {
             let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -979,7 +984,7 @@ pub fn AttachRidersGeneric(pVeh: *mut Vehicle_t, bg: &BgState, traps: &dyn BgTra
                 &mut boltMatrix as *mut mdxaBone_t,
                 &yawOnlyAngles as *const vec3_t,
                 &(*(*parent).playerState).origin as *const vec3_t,
-                crate::g_main::BG_GetTime(),
+                levelTime,
                 core::ptr::null_mut(),
                 &(*parent).modelScale as *const vec3_t,
             );

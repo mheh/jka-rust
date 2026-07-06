@@ -2,6 +2,7 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+use sp_qshared::common::sp::ff::ff_handle_t::ffHandle_t;
 use sp_qshared::common::sp::ghoul2::cghoul2_info_v::CGhoul2Info_v;
 use sp_qshared::common::sp::renderer::glconfig_t::glconfig_t;
 use sp_qshared::common::sp::renderer::ref_entity_t::refEntity_t;
@@ -208,12 +209,9 @@ pub struct displayContextDef_t {
 
     // Raven: `#ifdef _IMMERSION` — force-feedback registration; layout reflects
     // the `_IMMERSION`-enabled build the offsets were captured against.
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub registerForce: Option<unsafe extern "C" fn(name: *const c_char, channel: c_int) -> c_int>,
-    //TODO: Port ffHandle_t
-    // Source: oracle/oracle/code/ff/ff_public.h:8
-    pub startForce: Option<unsafe extern "C" fn(ff: c_int)>,
+    pub registerForce:
+        Option<unsafe extern "C" fn(name: *const c_char, channel: c_int) -> ffHandle_t>,
+    pub startForce: Option<unsafe extern "C" fn(ff: ffHandle_t)>,
 
     pub yscale: f32,
     pub xscale: f32,
