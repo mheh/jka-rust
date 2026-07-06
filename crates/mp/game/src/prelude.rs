@@ -356,6 +356,7 @@ pub use crate::NPC_utils::{
 // preflight.py: file-level symbol re-exports (aggregate re-export plan)
 pub use crate::ai::consts::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai/consts.rs
 pub use crate::ai::distance::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai/distance.rs
+pub use crate::ai::rank::*;
 pub use crate::ai_wpnav::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai_wpnav.rs
 pub use crate::bg_misc::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_misc.rs
 pub use crate::bg_pmove::MIN_WALK_NORMAL; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_pmove.rs

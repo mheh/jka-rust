@@ -44,11 +44,6 @@ pub const MAX_RADIUS_ENTS: usize = 128;
 // Source: `oracle/oracle/codemp/game/b_public.h:44`
 const SCF_NO_GROUPS: c_int = 0x00020000;
 
-// Raven `RANK_ENSIGN` (from the anonymous `rank_t` enum) — value pinned by
-// the already-ported `TranslateRankName` (`NPC_stats.rs`, `"ensign" -> 2`).
-// Source: `oracle/oracle/codemp/game/NPC_stats.c:287-330`
-const RANK_ENSIGN: c_int = 2;
-
 // `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
 // via the prelude glob (no per-file copy).
 
@@ -324,7 +319,7 @@ pub fn AI_InsertGroupMember(group: *mut AIGroupInfo_t, member: *mut gentity_t) {
         }
         let npc = (*member).NPC as *mut gNPC_t;
         let commanderRank = if (*group).commander.is_null() {
-            0
+            RANK_CIVILIAN
         } else {
             let cnpc = (*(*group).commander).NPC as *mut gNPC_t;
             (*cnpc).rank
@@ -767,7 +762,7 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
             return;
         }
         //temporarily drop group morale for a few seconds
-        (*group).moraleAdjust -= (*selfNpc).rank;
+        (*group).moraleAdjust -= (*selfNpc).rank as c_int;
         //go through and drop aggression on my teammates (more cover, worse aim)
         let mut noflee = false;
         for i in 0..(*group).numGroup as usize {
@@ -833,7 +828,8 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         );
                     } else {
                         //else, maybe just a random chance
-                        if (*ctx.world).bg_state.rng.Q_irand(0, (*selfNpc).rank) > (*memberNpc).rank
+                        if (*ctx.world).bg_state.rng.Q_irand(0, (*selfNpc).rank as c_int)
+                            > (*memberNpc).rank as c_int
                         {
                             //lower rank they are, higher rank I am, more likely they are to flee
                             ST_StartFlee(
@@ -983,7 +979,7 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
                 let npc = (*member).NPC as *mut gNPC_t;
                 (*group).numState[(*npc).squadState as usize] += 1;
                 let commanderRank = if (*group).commander.is_null() {
-                    0
+                    RANK_CIVILIAN
                 } else {
                     let cnpc = (*(*group).commander).NPC as *mut gNPC_t;
                     (*cnpc).rank
@@ -1010,7 +1006,7 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
                 //grunts
                 (*group).morale += 1;
             } else {
-                (*group).morale += (*npc).rank;
+                (*group).morale += (*npc).rank as c_int;
             }
             if !(*group).commander.is_null() && (*ctx.world).cvars.debugNPCAI.integer != 0 {
                 G_TestLine(

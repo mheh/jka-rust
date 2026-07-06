@@ -84,12 +84,6 @@ const CP_HORZ_DIST_COLL: c_int = 0x0000_8000;
 pub const CP_RETREAT: c_int = 0x0002_0000;
 pub const CPF_DUCK: c_int = 0x0000_0001;
 
-// Raven `rank_t` (anonymous enum) — value pinned per file, matching the
-// `NPC_AI_Utils.rs`/`NPC_combat.rs` precedent copies.
-// Source: `oracle/oracle/codemp/game/b_local.h`
-pub const RANK_ENSIGN: c_int = 2;
-pub const RANK_LT: c_int = 4;
-
 // File-scope constants (`#define`).
 // Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:19-34`
 pub const MAX_VIEW_DIST: f32 = 1024.0;
