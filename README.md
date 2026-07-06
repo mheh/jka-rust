@@ -1,28 +1,53 @@
 # jka-rust
 
-An idiomatic, opinionated, per-module Rust reimplementation of Star Wars Jedi
-Knight: Jedi Academy (MP).
+An idiomatic, opinionated Rust reimplementation of Star Wars Jedi Knight:
+Jedi Academy — MP first (game module, then cgame/ui/engine), SP behind it —
+built toward drop-in replacements for Raven's shipped binaries.
 
-## Relationship to `jedi-academy-rust`
+## Relationship to `jedi-academy-rust` (the oracle)
 
-`jedi-academy-rust` is a faithful, 1:1 C-mirror port of Raven's source. **This
-project treats it as an oracle**, not a dependency — exactly as `jedi-academy-rust`
-treats Raven's original C. It is vendored under [`oracle/`](oracle) (git submodule).
+`jedi-academy-rust` is a faithful, 1:1 C-mirror Rust port of Raven's source.
+**This project treats it as an oracle**, not a dependency. It is vendored under
+[`oracle/`](oracle) (git submodule), which also carries Raven's original C/C++
+under `oracle/oracle/` (SP `code/`, MP `codemp/`) — never edited. Every port is
+verified against it: clang-verified layout static-asserts for types,
+differential parity tests (`--features oracle`) for behavior. No FFI, no
+extracted C.
 
-Because the port is pure Rust, parity is checked by **differential testing**:
-compile both implementations and run them against identical inputs, comparing
-outputs (gated behind `--features oracle`). No FFI, no extracted C.
+This repo does not reuse the mirror port's layout — it takes its own structure:
+per-module logic crates (`crates/mp/*`, `crates/sp/*`) under thin cdylib shells
+(`crates/jampgame`, `crates/cgame`, `crates/ui`, `crates/jagame`) that export
+the exact symbols the engines load. See
+[`docs/workspace-architecture.md`](docs/workspace-architecture.md) for the
+crate graph and [`docs/porting-rules.md`](docs/porting-rules.md) for how code
+is ported.
 
-This repo does NOT reuse the port's module layout or internals — it takes its own
-opinionated structure per module.
+## Status (2026-07-06)
 
-## Status
+- **Type port: complete** (Waves 0–7, both trees). Every ABI-crossing struct
+  carries `size_of`/`offset_of!` static-asserts — a green build is the layout
+  test.
+- **MP game module (`jampgame`): transcribed and integrated.** `mp_game`
+  compiles green with zero `todo!()` stubs and zero open `TODO: Port` markers;
+  all `vmMain` dispatch arms are wired. The built cdylib exports
+  `dllEntry`/`vmMain`/`GetModuleAPI`.
+- **CI**: every push to `master` runs a full-workspace compile gate, then
+  builds `jampgame` for Windows/Linux × release/debug and publishes the zips to
+  the rolling [`latest` release](../../releases/tag/latest) under the exact
+  filenames the engine loads (`jampgamex86_64.dll`, `jampgamex86_64.so`, …).
+  32-bit lanes are allowed failures pending an ILP32 layout-assert pass.
+- **Not yet verified**: compiling green is not parity. The next phase is the
+  referee swap — oracle differential tests (single-threaded, replay-based)
+  become the ground truth, followed by the safe-state migration that retires
+  the transcription's raw-pointer scaffolding.
+- Remaining port surface is tracked in
+  [`docs/audits/marker-inventory-2026-07-05.md`](docs/audits/marker-inventory-2026-07-05.md);
+  architectural decisions live in [`docs/decisions.md`](docs/decisions.md).
 
-Scaffold. The ABI definitions prototyped in the port (typed
-`OutboundSysCall` / `EncodeSysCall` / `DecodeSysCallReturn` defs for all ~329
-game→engine syscalls, plus the transport traits) are imported under
-[`src/abi/`](src/abi) as starting material. They currently reference the
-port's types (`crate::codemp::game::*`) and so do **not** compile here yet — the
-next step is to source those types under this crate's own layout (re-port
-opinionatedly, or via a thin shared ABI-types crate) and wire the modules into
-`src/lib.rs`. The ABI catalog is in `src/abi/TRAPS.md`.
+## Ship targets
+
+- **MP** (`jamp` engine): 3 loadable modules — `jampgame`, `cgame`, `ui`.
+- **SP** (`jasp` engine): `jagame` only (SP cgame/ui are statically linked into
+  the engine).
+- Eventually the engines themselves; the renderer is deferred by decision
+  (DEC ledger).
