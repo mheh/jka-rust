@@ -544,6 +544,34 @@ impl Default for VehiclePoolOccupied {
     }
 }
 
+/// `gtimer_t g_timerPool[MAX_GTIMERS]` (`g_timer.c:17`) — the fixed timer pool,
+/// intrusively linked into a free list. Newtype because a 16384-element array
+/// has no library `Default` impl (only arrays up to 32 elements do in stable
+/// Rust).
+pub struct GTimerPool(pub [crate::g_timer::gtimer_t; crate::g_timer::MAX_GTIMERS]);
+
+impl Default for GTimerPool {
+    fn default() -> Self {
+        GTimerPool(
+            [crate::g_timer::gtimer_t {
+                name: core::ptr::null(),
+                time: 0,
+                next: core::ptr::null_mut(),
+            }; crate::g_timer::MAX_GTIMERS],
+        )
+    }
+}
+
+/// `gtimer_t *g_timers[MAX_GENTITIES]` (`g_timer.c:18`) — per-entity timer
+/// list heads, indexed by entity number.
+pub struct GTimers(pub [*mut crate::g_timer::gtimer_t; mp_qshared::shared::MAX_GENTITIES]);
+
+impl Default for GTimers {
+    fn default() -> Self {
+        GTimers([core::ptr::null_mut(); mp_qshared::shared::MAX_GENTITIES])
+    }
+}
+
 /// `teamgame_t` — CTF flag-state file global (`g_team.c:18`).
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:18`
@@ -1024,15 +1052,15 @@ pub struct GameGlobals {
     /// Source: oracle/oracle/codemp/game/g_team.c:18
     pub teamgame: teamgame_t,
     // --- `g_timer.c` file-scope globals ---
-    //TODO: Port gtimer_t **
-    // Source: oracle/oracle/codemp/game/g_timer.c:19
-    pub g_timerFreeList: (),
-    //TODO: Port gtimer_t[ MAX_GTIMERS ]
-    // Source: oracle/oracle/codemp/game/g_timer.c:17
-    pub g_timerPool: (),
-    //TODO: Port gtimer_t *[ MAX_GENTITIES ]*
-    // Source: oracle/oracle/codemp/game/g_timer.c:18
-    pub g_timers: (),
+    /// `gtimer_t *g_timerFreeList` — head of the free-list of unused pool slots.
+    /// Source: `oracle/oracle/codemp/game/g_timer.c:19`
+    pub g_timerFreeList: *mut crate::g_timer::gtimer_t,
+    /// `gtimer_t g_timerPool[MAX_GTIMERS]` — the fixed timer pool.
+    /// Source: `oracle/oracle/codemp/game/g_timer.c:17`
+    pub g_timerPool: GTimerPool,
+    /// `gtimer_t *g_timers[MAX_GENTITIES]` — per-entity timer list heads.
+    /// Source: `oracle/oracle/codemp/game/g_timer.c:18`
+    pub g_timers: GTimers,
     // --- `g_trigger.c` file-scope globals ---
     /// `gTrigFallSound`. Source: `oracle/oracle/codemp/game/g_trigger.c:6`
     pub gTrigFallSound: c_int,
