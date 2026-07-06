@@ -1,25 +1,21 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 785 markers — 177 `TODO: Port`,
+Totals: 786 markers — 178 `TODO: Port`,
 552 `PORT-NOTE`, 56 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
 judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 
-- **LEGIT** — subject genuinely unported; marker accurate. (158)
+- **LEGIT** — subject genuinely unported; marker accurate. (160)
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
-  the actionable findings. (16)
+  the actionable findings. (15)
 - **STALE-escalated** — mechanical fix known but crosses files; left in place. (3)
 
 PORT-NOTE section is a plain re-grep (not audited).
 
-## TODO: Port — COMPLEX (16)
-
-### crates/mp/engine/server/src/server_host.rs
-- L16: Server fields (sv: server_t incl. the SS_DEAD liveness state,
-  - server_t and serverStatic_t are already ported (crates/mp/engine/server/src/server/server_t.rs, server_static_t.rs) but the marker also covers bot/master/savegame state that is not ported, and Server has no constructors anywhere yet — wiring this in is a design decision (how sv/svs/bot compose, whether Server stays a plain aggregate) plus multiple unported sub-fields, not a single mechanical retype.
+## TODO: Port — COMPLEX (15)
 
 ### crates/mp/game/src/g_init_game.rs
 - L38: G_InitGame body (G_RegisterCvars, level wiring, back-pointers,
@@ -83,7 +79,7 @@ PORT-NOTE section is a plain re-grep (not audited).
   - Validator claim is false: CMiniHeap IS used by a field in this struct — G2API_CollisionDetect's G2VertSpace parameter (line 448, currently `*mut c_void`) is Raven's `CMiniHeap *G2VertSpace` (oracle/oracle/code/game/g_public.h:403-404). The marker correctly documents that placeholder. Retyping it to `*mut CMiniHeap` (ported at crates/sp/engine/qcommon/src/miniheap/cmini_heap.rs) requires adding sp_engine_qcommon as a dependency in crates/sp/abi/Cargo.toml, which is outside my assigned file — so I left the marker and field untouched rather than deleting it.
 
 
-## TODO: Port — LEGIT (158)
+## TODO: Port — LEGIT (160)
 
 ### crates/abi-transport/src/generic/engine.rs
 - L78: RunStatic per-call handler surface
@@ -199,8 +195,10 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L18: worldSector_s
 
 ### crates/mp/engine/server/src/server_host.rs
-- L30: ServerGame concrete shape (alias vs wrapper — STATE-Q7)
-- L49: SV_GameSystemCalls exhaustive dispatch
+- L38: worldSector_t (`sv_worldSectors[AREA_NODES]`) + sv_numworldSectors
+- L41: bot_debugpoly_t (`debugpolygons`) + gWPArray[MAX_WPARRAY_SIZE]
+- L81: SV_GameSystemCalls exhaustive dispatch
+- L133: SV_InitGameProgs ctx injection (&mut Engine.sv)
 
 ### crates/mp/game/src/FighterNPC.rs
 - L103: BG_FighterUpdate traceFunc callback signature
