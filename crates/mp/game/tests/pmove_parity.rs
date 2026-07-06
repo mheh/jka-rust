@@ -334,7 +334,9 @@ impl BgTraps for TestTraps {
             }
             return -1;
         }
-        let vpath = cstr_to_string(qpath);
+        // Safety: `qpath` is the NUL-terminated vpath literal the animation.cfg
+        // load path passes through `BG_ParseAnimationFile` / the `trap_FS_*` seam.
+        let vpath = unsafe { cstr_to_string(qpath) };
         let base = vpath.rsplit('/').next().unwrap_or(&vpath);
         let real = self.fixdir.join(base);
         match std::fs::read(&real) {
@@ -916,7 +918,7 @@ fn run_scenario(name: &str) -> String {
     pm.animations = bg.bgHumanoidAnimations.as_mut_ptr();
     pm.gametype = 0;
 
-    let mut arena: Vec<bgEntity_t> = vec![unsafe { core::mem::zeroed() }; 8];
+    let mut arena: Vec<bgEntity_t> = (0..8).map(|_| unsafe { core::mem::zeroed() }).collect();
     pm.entSize = core::mem::size_of::<bgEntity_t>() as c_int;
 
     let mut o = String::new();
@@ -954,7 +956,7 @@ fn run_scenario(name: &str) -> String {
                     pm.cmd.rightmove = c.right as i8 as c_schar;
                     pm.cmd.upmove = c.up as i8 as c_schar;
                     pm.cmd.buttons = c.buttons;
-                    pm.cmd.weapon = WP_MELEE as BYTE;
+                    pm.cmd.weapon = WP_MELEE as byte;
                     pm.cmd.angles[0] = (c.pitch as i16) as c_int;
                     pm.cmd.angles[1] = ((c.yaw + r * c.yawinc) as i16) as c_int;
                     pm.cmd.angles[2] = (c.roll as i16) as c_int;
