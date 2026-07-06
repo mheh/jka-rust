@@ -1,6 +1,6 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 786 markers — 177 `TODO: Port`,
+Totals: 785 markers — 176 `TODO: Port`,
 553 `PORT-NOTE`, 56 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
@@ -10,16 +10,12 @@ judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
-  the actionable findings. (14)
+  the actionable findings. (13)
 - **STALE-escalated** — mechanical fix known but crosses files; left in place. (3)
 
 PORT-NOTE section is a plain re-grep (not audited).
 
-## TODO: Port — COMPLEX (14)
-
-### crates/mp/game/src/game_globals.rs
-- L689: navInfo_t
-  - navInfo_t is ported (crates/mp/game/src/npc/nav_info_s.rs:12, with size/offset asserts), but the corresponding oracle global (frameNavInfo) is currently implemented as NPC_move.rs's own `static mut FRAME_NAV_INFO: navInfo_t` rather than threaded through GameWorld, in violation of porting-rules B3. Wiring the () placeholder to a real field requires refactoring NPC_move.rs's static-mut global and its several call sites (NPC_move.rs, g_nav.rs callers) to read/write ctx.world instead — not a file-local mechanical retype.
+## TODO: Port — COMPLEX (13)
 
 ### crates/mp/qshared/src/common/mp/gentity.rs
 - L94: Vehicle_t
@@ -527,7 +523,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/game_globals.rs
 - L7 [LEGIT]: //! `//TODO: Port <type>` marker — the porter fills the real type when
-- L859 [?]: // it"); shapes are exactly what the `g_log.md` packet's TODO comments
+- L873 [?]: // it"); shapes are exactly what the `g_log.md` packet's TODO comments
 
 ### crates/mp/game/src/npc_c.rs
 - L1416 [LEGIT]: // TODO: Add vehicle behaviors here.
