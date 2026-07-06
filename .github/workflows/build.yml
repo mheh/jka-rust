@@ -25,11 +25,12 @@ name: Build modules
 # Zip names are STABLE (no version segment) so the rolling `latest` release
 # keeps stable download URLs; the built commit is recorded in the release body.
 #
-# The build matrix is gated behind a full-workspace compile — this repo's
-# truth bar: every ABI struct carries size/offset static-asserts, so a green
-# build IS the layout test. `cargo test` becomes the gate once the oracle
-# differential harness (referee swap) lands; today the parked pmove-parity WIP
-# test target does not compile, so it cannot gate.
+# The build matrix is gated behind a full-workspace compile + test run. The
+# compile is this repo's layout bar (every ABI struct carries size/offset
+# static-asserts), and the test run carries the oracle differential parity
+# suites (pmove/bglib/qmath/saberload goldens under crates/mp/game/tests/).
+# Tests run single-threaded: the oracle harness convention assumes it (shared
+# global RNG seed).
 
 on:
   push:
@@ -65,6 +66,9 @@ jobs:
 
       - name: Full workspace build (layout asserts are compile-time)
         run: cargo build --workspace
+
+      - name: Workspace tests incl. oracle parity suites (single-threaded)
+        run: cargo test --workspace -- --test-threads=1
 
   build:
     name: ${{ matrix.target.module }} (${{ matrix.profile }})
