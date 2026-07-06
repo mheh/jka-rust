@@ -1109,7 +1109,16 @@ pub fn Q_PrintStrlen(string: *const c_char) -> c_int {
         let mut len: c_int = 0;
         let mut p = string;
         while *p != 0 {
-            if *p == b'^' as c_char && *p.offset(1) != 0 {
+            // `Q_IsColorString(p)` = `^` followed by a digit '0'..='7' (and not
+            // '^'); the port previously accepted any non-NUL follower, which
+            // over-counted `^^`/`^8...` escapes (caught by the oracle slice).
+            let n = *p.offset(1);
+            if *p == b'^' as c_char
+                && n != 0
+                && n != b'^' as c_char
+                && n >= b'0' as c_char
+                && n <= b'7' as c_char
+            {
                 p = p.offset(2);
                 continue;
             }
@@ -1132,7 +1141,16 @@ pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
             if c == 0 {
                 break;
             }
-            if c == b'^' as c_char && *s.offset(1) != 0 {
+            // `Q_IsColorString(s)` = `^` followed by a digit '0'..='7' (see
+            // Q_PrintStrlen); the port previously skipped on any non-NUL
+            // follower, wrongly stripping `^^`/`^8...` (caught by the slice).
+            let n = *s.offset(1);
+            if c == b'^' as c_char
+                && n != 0
+                && n != b'^' as c_char
+                && n >= b'0' as c_char
+                && n <= b'7' as c_char
+            {
                 s = s.offset(1);
             } else if c >= 0x20 && c <= 0x7E {
                 *d = c;
@@ -1204,8 +1222,10 @@ pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
             return c"".as_ptr() as *mut c_char;
         }
 
-        if c_strlen(s) >= 1024 {
-            // BIG_INFO_STRING check (oracle has Com_Error(ERR_DROP, ...))
+        if c_strlen(s) >= BIG_INFO_STRING {
+            // Raven guards on `BIG_INFO_STRING` (8192), not `MAX_INFO_STRING`;
+            // the port previously hard-coded 1024 (a divergence caught by the
+            // oracle slice's big-infostring case). Com_Error(ERR_DROP, ...) -> panic.
             panic!("Info_ValueForKey: oversize infostring");
         }
 
@@ -1241,7 +1261,10 @@ pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
             }
             *o = 0;
 
-            if c_strcmp(key, pkey.as_ptr() as *const c_char) == 0 {
+            // Raven matches the key case-INSENSITIVELY (`!Q_stricmp(key,pkey)`);
+            // the port previously used case-sensitive strcmp (a divergence
+            // caught by the oracle slice's "Name" vs "name" probe).
+            if crate::q_shared::Q_stricmp(key, pkey.as_ptr() as *const c_char) == 0 {
                 return INFO_VALUE[INFO_VALUEINDEX as usize].as_mut_ptr();
             }
 

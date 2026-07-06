@@ -1,0 +1,1406 @@
+== clamp ==
+ci -100
+ci -100
+ci -100
+ci -100
+ci -100
+ci -100
+ci -100
+ci -100
+ci -1
+ci -1
+ci -1
+ci -1
+ci -1
+ci -1
+ci -100
+ci -1
+ci 0
+ci 0
+ci 0
+ci 0
+ci 0
+ci -100
+ci -1
+ci 0
+ci 1
+ci 1
+ci 1
+ci 1
+ci -100
+ci -1
+ci 0
+ci 1
+ci 5
+ci 5
+ci 5
+ci -100
+ci -1
+ci 0
+ci 1
+ci 5
+ci 50
+ci 50
+ci -100
+ci -1
+ci 0
+ci 1
+ci 5
+ci 50
+ci 100
+ci -1
+ci -100
+ci -100
+ci -100
+ci -100
+ci -100
+ci -100
+ci -1
+ci -1
+ci -1
+ci -1
+ci -1
+ci -1
+ci -1
+ci -1
+ci -1
+ci 0
+ci 0
+ci 0
+ci 0
+ci 0
+ci -1
+ci -1
+ci 0
+ci 1
+ci 1
+ci 1
+ci 1
+ci -1
+ci -1
+ci 0
+ci 1
+ci 5
+ci 5
+ci 5
+ci -1
+ci -1
+ci 0
+ci 1
+ci 5
+ci 50
+ci 50
+ci -1
+ci -1
+ci 0
+ci 1
+ci 5
+ci 50
+ci 100
+ci 0
+ci 0
+ci -100
+ci -100
+ci -100
+ci -100
+ci -100
+ci 0
+ci 0
+ci -1
+ci -1
+ci -1
+ci -1
+ci -1
+ci 0
+ci 0
+ci 0
+ci 0
+ci 0
+ci 0
+ci 0
+ci 0
+ci 0
+ci 0
+ci 1
+ci 1
+ci 1
+ci 1
+ci 0
+ci 0
+ci 0
+ci 1
+ci 5
+ci 5
+ci 5
+ci 0
+ci 0
+ci 0
+ci 1
+ci 5
+ci 50
+ci 50
+ci 0
+ci 0
+ci 0
+ci 1
+ci 5
+ci 50
+ci 100
+ci 1
+ci 1
+ci 1
+ci -100
+ci -100
+ci -100
+ci -100
+ci 1
+ci 1
+ci 1
+ci -1
+ci -1
+ci -1
+ci -1
+ci 1
+ci 1
+ci 1
+ci 0
+ci 0
+ci 0
+ci 0
+ci 1
+ci 1
+ci 1
+ci 1
+ci 1
+ci 1
+ci 1
+ci 1
+ci 1
+ci 1
+ci 1
+ci 5
+ci 5
+ci 5
+ci 1
+ci 1
+ci 1
+ci 1
+ci 5
+ci 50
+ci 50
+ci 1
+ci 1
+ci 1
+ci 1
+ci 5
+ci 50
+ci 100
+ci 5
+ci 5
+ci 5
+ci 5
+ci -100
+ci -100
+ci -100
+ci 5
+ci 5
+ci 5
+ci 5
+ci -1
+ci -1
+ci -1
+ci 5
+ci 5
+ci 5
+ci 5
+ci 0
+ci 0
+ci 0
+ci 5
+ci 5
+ci 5
+ci 5
+ci 1
+ci 1
+ci 1
+ci 5
+ci 5
+ci 5
+ci 5
+ci 5
+ci 5
+ci 5
+ci 5
+ci 5
+ci 5
+ci 5
+ci 5
+ci 50
+ci 50
+ci 5
+ci 5
+ci 5
+ci 5
+ci 5
+ci 50
+ci 100
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci -100
+ci -100
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci -1
+ci -1
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 0
+ci 0
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 1
+ci 1
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 5
+ci 5
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 50
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci -100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci -1
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 0
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 1
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 5
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 50
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+ci 100
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf c2c80000
+cf bfc00000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 00000000
+cf c2c80000
+cf bfc00000
+cf 00000000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf c2c80000
+cf bfc00000
+cf 00000000
+cf 3fc00000
+cf 40a80000
+cf 40a80000
+cf c2c80000
+cf bfc00000
+cf 00000000
+cf 3fc00000
+cf 40a80000
+cf 42c80000
+cf bfc00000
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 00000000
+cf bfc00000
+cf bfc00000
+cf 00000000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf bfc00000
+cf bfc00000
+cf 00000000
+cf 3fc00000
+cf 40a80000
+cf 40a80000
+cf bfc00000
+cf bfc00000
+cf 00000000
+cf 3fc00000
+cf 40a80000
+cf 42c80000
+cf 00000000
+cf 00000000
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf 00000000
+cf 00000000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 3fc00000
+cf 40a80000
+cf 40a80000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 3fc00000
+cf 40a80000
+cf 42c80000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf c2c80000
+cf c2c80000
+cf c2c80000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf bfc00000
+cf bfc00000
+cf bfc00000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 00000000
+cf 00000000
+cf 00000000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 40a80000
+cf 40a80000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 3fc00000
+cf 40a80000
+cf 42c80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf c2c80000
+cf c2c80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf bfc00000
+cf bfc00000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 00000000
+cf 00000000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 3fc00000
+cf 3fc00000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 40a80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf c2c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf bfc00000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 00000000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 3fc00000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 40a80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+cf 42c80000
+== tokens ==
+qt "alpha" line 1 nul 0
+qt "beta" line 1 nul 0
+qt "gamma" line 2 nul 0
+qt "quoted string here" line 3 nul 0
+qt "trailer" line 4 nul 0
+qt "{" line 5 nul 0
+qt "open" line 5 nul 0
+qt "}" line 5 nul 0
+qt "[" line 5 nul 0
+qt "brack" line 5 nul 0
+qt "]" line 5 nul 0
+qt "(" line 5 nul 0
+qt "paren" line 5 nul 0
+qt ")" line 6 nul 0
+qt "punct" line 7 nul 0
+qt "," line 7 nul 0
+qt "." line 7 nul 0
+qt ";" line 7 nul 0
+qt ":" line 7 nul 0
+qt "!" line 7 nul 0
+qt "?" line 7 nul 0
+qt "=" line 7 nul 0
+qt "+" line 7 nul 0
+qt "-" line 7 nul 0
+qt "*" line 8 nul 0
+qt "afterblock" line 10 nul 0
+qt "hi" line 11 nul 0
+qt "bit" line 11 nul 0
+qt "wo" line 11 nul 0
+qt "rd" line 11 nul 0
+qt "tab" line 12 nul 0
+qt "separated" line 13 nul 0
+qt "doubleblank" line 16 nul 0
+qt "final" line 19 nul 0
+qt "123" line 19 nul 0
+qt "-45" line 20 nul 0
+qt "" line 21 nul 1
+qf "" line 1 nul 0
+qf "alpha" line 1 nul 0
+qf "beta" line 1 nul 0
+qf "gamma" line 2 nul 0
+qf "" line 3 nul 0
+qf "quoted string here" line 3 nul 0
+qf "trailer" line 4 nul 0
+qf "" line 5 nul 0
+qf "{" line 5 nul 0
+qf "open" line 5 nul 0
+qf "}" line 5 nul 0
+qf "[" line 5 nul 0
+qf "brack" line 5 nul 0
+qf "]" line 5 nul 0
+qf "(" line 5 nul 0
+qf "paren" line 5 nul 0
+qf ")" line 6 nul 0
+qf "" line 7 nul 0
+qf "punct" line 7 nul 0
+qf "," line 7 nul 0
+qf "." line 7 nul 0
+qf ";" line 7 nul 0
+qf ":" line 7 nul 0
+qf "!" line 7 nul 0
+qf "?" line 7 nul 0
+qf "=" line 7 nul 0
+qf "+" line 7 nul 0
+qf "-" line 7 nul 0
+qf "*" line 8 nul 0
+qf "" line 9 nul 0
+qf "afterblock" line 10 nul 0
+qf "" line 11 nul 0
+qf "hi" line 11 nul 0
+qf "bit" line 11 nul 0
+qf "wo" line 11 nul 0
+qf "rd" line 11 nul 0
+qf "" line 12 nul 0
+qf "tab" line 12 nul 0
+qf "separated" line 13 nul 0
+qf "" line 15 nul 0
+qf "doubleblank" line 16 nul 0
+qf "" line 19 nul 0
+qf "final" line 19 nul 0
+qf "123" line 19 nul 0
+qf "-45" line 20 nul 0
+qf "" line 21 nul 1
+== compress ==
+cz 0 len 12 " hello world"
+cz 1 len 3 "a\x0ab"
+cz 2 len 3 "x y"
+cz 3 len 21 "\x22quoted   spaces\x22 out"
+cz 4 len 17 "line1\x0aline2\x0aline3"
+cz 5 len 16 " tabs and spaces"
+cz 6 len 11 "no_compress"
+cz 7 len 0 ""
+cz 8 len 0 ""
+cz 9 len 8 "trailing"
+cz 10 len 9 "hi\x80 wo\xffrd"
+== braced ==
+br 0 off 13 line 0 rest "after"
+br 1 off 3 line 0 rest "trailing"
+br 2 off 19 line 0 rest "end"
+br 3 off -1 line 0 rest ""
+br 4 off 7 line 0 rest "token"
+== skipline ==
+sl 0 off 13 line 1
+sl 1 off 16 line 0
+sl 2 off 1 line 1
+sl 3 off 2 line 1
+== strhelpers ==
+is -1 p 0 l 0 u 0 a 0
+is 0 p 0 l 0 u 0 a 0
+is 31 p 0 l 0 u 0 a 0
+is 32 p 1 l 0 u 0 a 0
+is 64 p 1 l 0 u 0 a 0
+is 90 p 1 l 0 u 1 a 1
+is 97 p 1 l 1 u 0 a 1
+is 122 p 1 l 1 u 0 a 1
+is 126 p 1 l 0 u 0 a 0
+is 127 p 0 l 0 u 0 a 0
+is 128 p 0 l 0 u 0 a 0
+is 255 p 0 l 0 u 0 a 0
+strip "" -> ""
+strip "file" -> "file"
+strip "file.ext" -> "file"
+strip "a.b.c" -> "a"
+strip ".hidden" -> ""
+strip "no_dot" -> "no_dot"
+strip "path/to/file.tga" -> "path/to/file"
+defext "file" ".tga" -> "file.tga"
+defext "file.bmp" ".tga" -> "file.bmp"
+defext "path/to/file" ".md3" -> "path/to/file.md3"
+defext "path/to/file.ext" ".md3" -> "path/to/file.ext"
+defext "noext" ".cfg" -> "noext.cfg"
+defext "dir.x/name" ".wav" -> "dir.x/name.wav"
+ncpyz 0 1 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 0 2 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 0 4 00 00 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 0 8 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 0 16 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa
+ncpyz 1 1 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 1 2 68 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 1 4 68 69 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 1 8 68 69 00 00 00 00 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 1 16 68 69 00 00 00 00 00 00 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa
+ncpyz 2 1 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 2 2 65 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 2 4 65 78 61 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 2 8 65 78 61 63 74 66 69 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 2 16 65 78 61 63 74 66 69 74 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa
+ncpyz 3 1 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 3 2 6c 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 3 4 6c 6f 6e 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 3 8 6c 6f 6e 67 65 72 74 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 3 16 6c 6f 6e 67 65 72 74 68 61 6e 74 68 65 62 75 00 aa aa aa aa aa aa aa aa
+ncpyz 4 1 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 4 2 61 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 4 4 61 62 63 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 4 8 61 62 63 00 00 00 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+ncpyz 4 16 61 62 63 00 00 00 00 00 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa
+cat 0 0 4 00 00 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 0 0 8 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 0 0 16 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa
+cat 0 1 4 62 61 72 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 0 1 8 62 61 72 00 00 00 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 0 1 16 62 61 72 00 00 00 00 00 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa
+cat 0 2 4 61 70 70 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 0 2 8 61 70 70 65 6e 64 6d 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 0 2 16 61 70 70 65 6e 64 6d 65 6c 6f 6e 67 00 00 00 00 aa aa aa aa aa aa aa aa
+cat 1 0 4 66 6f 6f 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 1 0 8 66 6f 6f 00 00 00 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 1 0 16 66 6f 6f 00 00 00 00 00 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa
+cat 1 1 4 66 6f 6f 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 1 1 8 66 6f 6f 62 61 72 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 1 1 16 66 6f 6f 62 61 72 00 00 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa
+cat 1 2 4 66 6f 6f 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 1 2 8 66 6f 6f 61 70 70 65 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 1 2 16 66 6f 6f 61 70 70 65 6e 64 6d 65 6c 6f 6e 67 00 aa aa aa aa aa aa aa aa
+cat 2 0 8 31 32 33 34 35 00 00 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 2 0 16 31 32 33 34 35 00 00 00 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa
+cat 2 1 8 31 32 33 34 35 62 61 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 2 1 16 31 32 33 34 35 62 61 72 00 00 00 00 00 00 00 00 aa aa aa aa aa aa aa aa
+cat 2 2 8 31 32 33 34 35 61 70 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+cat 2 2 16 31 32 33 34 35 61 70 70 65 6e 64 6d 65 6c 6f 00 aa aa aa aa aa aa aa aa
+stricmp 0 0
+stricmpn 0 0 0
+stricmpn 0 1 0
+stricmpn 0 2 0
+stricmpn 0 3 0
+stricmpn 0 5 0
+stricmpn 0 99999 0
+strncmp 0 0 0
+strncmp 0 1 0
+strncmp 0 2 0
+strncmp 0 3 0
+strncmp 0 5 0
+strncmp 0 99999 0
+stricmp 1 0
+stricmpn 1 0 0
+stricmpn 1 1 0
+stricmpn 1 2 0
+stricmpn 1 3 0
+stricmpn 1 5 0
+stricmpn 1 99999 0
+strncmp 1 0 0
+strncmp 1 1 0
+strncmp 1 2 0
+strncmp 1 3 0
+strncmp 1 5 0
+strncmp 1 99999 0
+stricmp 2 0
+stricmpn 2 0 0
+stricmpn 2 1 0
+stricmpn 2 2 0
+stricmpn 2 3 0
+stricmpn 2 5 0
+stricmpn 2 99999 0
+strncmp 2 0 0
+strncmp 2 1 1
+strncmp 2 2 1
+strncmp 2 3 1
+strncmp 2 5 1
+strncmp 2 99999 1
+stricmp 3 -1
+stricmpn 3 0 0
+stricmpn 3 1 0
+stricmpn 3 2 0
+stricmpn 3 3 -1
+stricmpn 3 5 -1
+stricmpn 3 99999 -1
+strncmp 3 0 0
+strncmp 3 1 0
+strncmp 3 2 0
+strncmp 3 3 -1
+strncmp 3 5 -1
+strncmp 3 99999 -1
+stricmp 4 0
+stricmpn 4 0 0
+stricmpn 4 1 0
+stricmpn 4 2 0
+stricmpn 4 3 0
+stricmpn 4 5 0
+stricmpn 4 99999 0
+strncmp 4 0 0
+strncmp 4 1 0
+strncmp 4 2 0
+strncmp 4 3 0
+strncmp 4 5 0
+strncmp 4 99999 0
+stricmp 5 0
+stricmpn 5 0 0
+stricmpn 5 1 0
+stricmpn 5 2 0
+stricmpn 5 3 0
+stricmpn 5 5 0
+stricmpn 5 99999 0
+strncmp 5 0 0
+strncmp 5 1 -1
+strncmp 5 2 -1
+strncmp 5 3 -1
+strncmp 5 5 -1
+strncmp 5 99999 -1
+stricmp 6 0
+stricmpn 6 0 0
+stricmpn 6 1 0
+stricmpn 6 2 0
+stricmpn 6 3 0
+stricmpn 6 5 0
+stricmpn 6 99999 0
+strncmp 6 0 0
+strncmp 6 1 1
+strncmp 6 2 1
+strncmp 6 3 1
+strncmp 6 5 1
+strncmp 6 99999 1
+stricmp 7 1
+stricmpn 7 0 0
+stricmpn 7 1 0
+stricmpn 7 2 0
+stricmpn 7 3 1
+stricmpn 7 5 1
+stricmpn 7 99999 1
+strncmp 7 0 0
+strncmp 7 1 0
+strncmp 7 2 0
+strncmp 7 3 1
+strncmp 7 5 1
+strncmp 7 99999 1
+stricmp 8 -1
+stricmpn 8 0 0
+stricmpn 8 1 0
+stricmpn 8 2 0
+stricmpn 8 3 -1
+stricmpn 8 5 -1
+stricmpn 8 99999 -1
+strncmp 8 0 0
+strncmp 8 1 0
+strncmp 8 2 0
+strncmp 8 3 -1
+strncmp 8 5 -1
+strncmp 8 99999 -1
+stricmp 9 -1
+stricmpn 9 0 0
+stricmpn 9 1 0
+stricmpn 9 2 0
+stricmpn 9 3 0
+stricmpn 9 5 -1
+stricmpn 9 99999 -1
+strncmp 9 0 0
+strncmp 9 1 0
+strncmp 9 2 0
+strncmp 9 3 0
+strncmp 9 5 -1
+strncmp 9 99999 -1
+stricmp 10 0
+stricmpn 10 0 0
+stricmpn 10 1 0
+stricmpn 10 2 0
+stricmpn 10 3 0
+stricmpn 10 5 0
+stricmpn 10 99999 0
+strncmp 10 0 0
+strncmp 10 1 -1
+strncmp 10 2 -1
+strncmp 10 3 -1
+strncmp 10 5 -1
+strncmp 10 99999 -1
+stricmp 11 0
+stricmpn 11 0 0
+stricmpn 11 1 0
+stricmpn 11 2 0
+stricmpn 11 3 0
+stricmpn 11 5 0
+stricmpn 11 99999 0
+strncmp 11 0 0
+strncmp 11 1 0
+strncmp 11 2 0
+strncmp 11 3 0
+strncmp 11 5 0
+strncmp 11 99999 0
+stricmp 12 -1
+stricmpn 12 0 0
+stricmpn 12 1 0
+stricmpn 12 2 -1
+stricmpn 12 3 -1
+stricmpn 12 5 -1
+stricmpn 12 99999 -1
+strncmp 12 0 0
+strncmp 12 1 0
+strncmp 12 2 -1
+strncmp 12 3 -1
+strncmp 12 5 -1
+strncmp 12 99999 -1
+stricmp 13 0
+stricmpn 13 0 0
+stricmpn 13 1 0
+stricmpn 13 2 0
+stricmpn 13 3 0
+stricmpn 13 5 0
+stricmpn 13 99999 0
+strncmp 13 0 0
+strncmp 13 1 -1
+strncmp 13 2 -1
+strncmp 13 3 -1
+strncmp 13 5 -1
+strncmp 13 99999 -1
+stricmp_null -1 -1 -1
+stricmpn_null 0 -1 1
+lwr "" upr ""
+lwr "hello world" upr "HELLO WORLD"
+lwr "allcaps" upr "ALLCAPS"
+lwr "already lower" upr "ALREADY LOWER"
+lwr "mixed123!@#" upr "MIXED123!@#"
+pslen 0 0
+clean 0 ""
+pslen 1 5
+clean 1 "hello"
+pslen 2 3
+clean 2 "red"
+pslen 3 3
+clean 3 "rgb"
+pslen 4 9
+clean 4 "^^literal"
+pslen 5 10
+clean 5 "^8notcolor"
+pslen 6 9
+clean 6 "trailing^"
+pslen 7 1
+clean 7 "^"
+pslen 8 9
+clean 8 "abcde"
+pslen 9 11
+clean 9 "whiteblack^"
+pslen 10 14
+clean 10 "plain text 123"
+pslen_null 0
+rrchr 0 97 -1
+rrchr 0 47 -1
+rrchr 0 122 -1
+rrchr 0 0 0
+rrchr 0 114 -1
+rrchr 1 97 0
+rrchr 1 47 -1
+rrchr 1 122 -1
+rrchr 1 0 1
+rrchr 1 114 -1
+rrchr 2 97 -1
+rrchr 2 47 -1
+rrchr 2 122 -1
+rrchr 2 0 5
+rrchr 2 114 -1
+rrchr 3 97 10
+rrchr 3 47 -1
+rrchr 3 122 -1
+rrchr 3 0 11
+rrchr 3 114 9
+rrchr 4 97 0
+rrchr 4 47 5
+rrchr 4 122 -1
+rrchr 4 0 7
+rrchr 4 114 -1
+rrchr 5 97 2
+rrchr 5 47 8
+rrchr 5 122 -1
+rrchr 5 0 9
+rrchr 5 114 1
+rrchr 6 97 -1
+rrchr 6 47 -1
+rrchr 6 122 -1
+rrchr 6 0 7
+rrchr 6 114 6
+== va ==
+va1 "first-literal"
+va2 "second-literal"
+va1b "third-literal"
+va2b "second-literal"
+va3 "third-literal"
+== sprintf ==
+sp1 68 65 6c 6c 6f 20 77 6f 72 6c 64 00 00 00 00 00 00 00 00 00 00 00 00 00
+sp2 74 72 75 6e 63 61 74 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+sp3 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+sp4 00 aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
+== info ==
+rec 0 ""
+val 1
+vfk "name" ""
+vfk "team" ""
+vfk "key2" ""
+vfk "empty" ""
+vfk "onlykey" ""
+vfk "desc" ""
+vfk "missing" ""
+vfk "Name" ""
+vfk "" ""
+np "" ""
+rk "name" ""
+rk "team" ""
+rk "key1" ""
+rk "desc" ""
+rk "onlykey" ""
+rk "missing" ""
+rk "quote" ""
+rk "semi" ""
+rkb "name" ""
+rkb "team" ""
+rkb "key1" ""
+rkb "desc" ""
+rkb "onlykey" ""
+rkb "missing" ""
+rkb "quote" ""
+rkb "semi" ""
+svk "name" "alice" "\x5cname\x5calice"
+svk "new" "val" "\x5cnew\x5cval"
+svk "team" "" ""
+svk "x" "y" "\x5cx\x5cy"
+svk "quote" "a\x22b" ""
+svkb "name" "alice" "\x5cname\x5calice"
+svkb "new" "val" "\x5cnew\x5cval"
+svkb "team" "" ""
+svkb "x" "y" "\x5cx\x5cy"
+svkb "quote" "a\x22b" ""
+--
+rec 1 "\x5cname\x5cbob\x5cteam\x5cred"
+val 1
+vfk "name" "bob"
+vfk "team" "red"
+vfk "key2" ""
+vfk "empty" ""
+vfk "onlykey" ""
+vfk "desc" ""
+vfk "missing" ""
+vfk "Name" "bob"
+vfk "" ""
+np "name" "bob"
+np "team" "red"
+rk "name" "\x5cteam\x5cred"
+rk "team" "\x5cname\x5cbob"
+rk "key1" "\x5cname\x5cbob\x5cteam\x5cred"
+rk "desc" "\x5cname\x5cbob\x5cteam\x5cred"
+rk "onlykey" "\x5cname\x5cbob\x5cteam\x5cred"
+rk "missing" "\x5cname\x5cbob\x5cteam\x5cred"
+rk "quote" "\x5cname\x5cbob\x5cteam\x5cred"
+rk "semi" "\x5cname\x5cbob\x5cteam\x5cred"
+rkb "name" "\x5cteam\x5cred"
+rkb "team" "\x5cname\x5cbob"
+rkb "key1" "\x5cname\x5cbob\x5cteam\x5cred"
+rkb "desc" "\x5cname\x5cbob\x5cteam\x5cred"
+rkb "onlykey" "\x5cname\x5cbob\x5cteam\x5cred"
+rkb "missing" "\x5cname\x5cbob\x5cteam\x5cred"
+rkb "quote" "\x5cname\x5cbob\x5cteam\x5cred"
+rkb "semi" "\x5cname\x5cbob\x5cteam\x5cred"
+svk "name" "alice" "\x5cname\x5calice\x5cteam\x5cred"
+svk "new" "val" "\x5cnew\x5cval\x5cname\x5cbob\x5cteam\x5cred"
+svk "team" "" "\x5cname\x5cbob"
+svk "x" "y" "\x5cx\x5cy\x5cname\x5cbob\x5cteam\x5cred"
+svk "quote" "a\x22b" "\x5cname\x5cbob\x5cteam\x5cred"
+svkb "name" "alice" "\x5cteam\x5cred\x5cname\x5calice"
+svkb "new" "val" "\x5cname\x5cbob\x5cteam\x5cred\x5cnew\x5cval"
+svkb "team" "" "\x5cname\x5cbob"
+svkb "x" "y" "\x5cname\x5cbob\x5cteam\x5cred\x5cx\x5cy"
+svkb "quote" "a\x22b" "\x5cname\x5cbob\x5cteam\x5cred"
+--
+rec 2 "name\x5cbob\x5cteam\x5cred"
+val 1
+vfk "name" "bob"
+vfk "team" "red"
+vfk "key2" ""
+vfk "empty" ""
+vfk "onlykey" ""
+vfk "desc" ""
+vfk "missing" ""
+vfk "Name" "bob"
+vfk "" ""
+np "name" "bob"
+np "team" "red"
+rk "name" "\x5cteam\x5cred"
+rk "team" "name\x5cbob"
+rk "key1" "name\x5cbob\x5cteam\x5cred"
+rk "desc" "name\x5cbob\x5cteam\x5cred"
+rk "onlykey" "name\x5cbob\x5cteam\x5cred"
+rk "missing" "name\x5cbob\x5cteam\x5cred"
+rk "quote" "name\x5cbob\x5cteam\x5cred"
+rk "semi" "name\x5cbob\x5cteam\x5cred"
+rkb "name" "\x5cteam\x5cred"
+rkb "team" "name\x5cbob"
+rkb "key1" "name\x5cbob\x5cteam\x5cred"
+rkb "desc" "name\x5cbob\x5cteam\x5cred"
+rkb "onlykey" "name\x5cbob\x5cteam\x5cred"
+rkb "missing" "name\x5cbob\x5cteam\x5cred"
+rkb "quote" "name\x5cbob\x5cteam\x5cred"
+rkb "semi" "name\x5cbob\x5cteam\x5cred"
+svk "name" "alice" "\x5cname\x5calice\x5cteam\x5cred"
+svk "new" "val" "\x5cnew\x5cvalname\x5cbob\x5cteam\x5cred"
+svk "team" "" "name\x5cbob"
+svk "x" "y" "\x5cx\x5cyname\x5cbob\x5cteam\x5cred"
+svk "quote" "a\x22b" "name\x5cbob\x5cteam\x5cred"
+svkb "name" "alice" "\x5cteam\x5cred\x5cname\x5calice"
+svkb "new" "val" "name\x5cbob\x5cteam\x5cred\x5cnew\x5cval"
+svkb "team" "" "name\x5cbob"
+svkb "x" "y" "name\x5cbob\x5cteam\x5cred\x5cx\x5cy"
+svkb "quote" "a\x22b" "name\x5cbob\x5cteam\x5cred"
+--
+rec 3 "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+val 1
+vfk "name" ""
+vfk "team" ""
+vfk "key2" "val2"
+vfk "empty" ""
+vfk "onlykey" ""
+vfk "desc" ""
+vfk "missing" ""
+vfk "Name" ""
+vfk "" ""
+np "key1" "val1"
+np "key2" "val2"
+np "key3" "val3"
+rk "name" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rk "team" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rk "key1" "\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rk "desc" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rk "onlykey" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rk "missing" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rk "quote" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rk "semi" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rkb "name" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rkb "team" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rkb "key1" "\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rkb "desc" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rkb "onlykey" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rkb "missing" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rkb "quote" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+rkb "semi" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+svk "name" "alice" "\x5cname\x5calice\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+svk "new" "val" "\x5cnew\x5cval\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+svk "team" "" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+svk "x" "y" "\x5cx\x5cy\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+svk "quote" "a\x22b" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+svkb "name" "alice" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3\x5cname\x5calice"
+svkb "new" "val" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3\x5cnew\x5cval"
+svkb "team" "" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+svkb "x" "y" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3\x5cx\x5cy"
+svkb "quote" "a\x22b" "\x5ckey1\x5cval1\x5ckey2\x5cval2\x5ckey3\x5cval3"
+--
+rec 4 "\x5cempty\x5c\x5cnext\x5cx"
+val 1
+vfk "name" ""
+vfk "team" ""
+vfk "key2" ""
+vfk "empty" ""
+vfk "onlykey" ""
+vfk "desc" ""
+vfk "missing" ""
+vfk "Name" ""
+vfk "" ""
+np "empty" ""
+np "next" "x"
+rk "name" "\x5cempty\x5c\x5cnext\x5cx"
+rk "team" "\x5cempty\x5c\x5cnext\x5cx"
+rk "key1" "\x5cempty\x5c\x5cnext\x5cx"
+rk "desc" "\x5cempty\x5c\x5cnext\x5cx"
+rk "onlykey" "\x5cempty\x5c\x5cnext\x5cx"
+rk "missing" "\x5cempty\x5c\x5cnext\x5cx"
+rk "quote" "\x5cempty\x5c\x5cnext\x5cx"
+rk "semi" "\x5cempty\x5c\x5cnext\x5cx"
+rkb "name" "\x5cempty\x5c\x5cnext\x5cx"
+rkb "team" "\x5cempty\x5c\x5cnext\x5cx"
+rkb "key1" "\x5cempty\x5c\x5cnext\x5cx"
+rkb "desc" "\x5cempty\x5c\x5cnext\x5cx"
+rkb "onlykey" "\x5cempty\x5c\x5cnext\x5cx"
+rkb "missing" "\x5cempty\x5c\x5cnext\x5cx"
+rkb "quote" "\x5cempty\x5c\x5cnext\x5cx"
+rkb "semi" "\x5cempty\x5c\x5cnext\x5cx"
+svk "name" "alice" "\x5cname\x5calice\x5cempty\x5c\x5cnext\x5cx"
+svk "new" "val" "\x5cnew\x5cval\x5cempty\x5c\x5cnext\x5cx"
+svk "team" "" "\x5cempty\x5c\x5cnext\x5cx"
+svk "x" "y" "\x5cx\x5cy\x5cempty\x5c\x5cnext\x5cx"
+svk "quote" "a\x22b" "\x5cempty\x5c\x5cnext\x5cx"
+svkb "name" "alice" "\x5cempty\x5c\x5cnext\x5cx\x5cname\x5calice"
+svkb "new" "val" "\x5cempty\x5c\x5cnext\x5cx\x5cnew\x5cval"
+svkb "team" "" "\x5cempty\x5c\x5cnext\x5cx"
+svkb "x" "y" "\x5cempty\x5c\x5cnext\x5cx\x5cx\x5cy"
+svkb "quote" "a\x22b" "\x5cempty\x5c\x5cnext\x5cx"
+--
+rec 5 "\x5conlykey"
+val 1
+vfk "name" ""
+vfk "team" ""
+vfk "key2" ""
+vfk "empty" ""
+vfk "onlykey" ""
+vfk "desc" ""
+vfk "missing" ""
+vfk "Name" ""
+vfk "" ""
+np "onlykey" ""
+rk "name" "\x5conlykey"
+rk "team" "\x5conlykey"
+rk "key1" "\x5conlykey"
+rk "desc" "\x5conlykey"
+rk "onlykey" "\x5conlykey"
+rk "missing" "\x5conlykey"
+rk "quote" "\x5conlykey"
+rk "semi" "\x5conlykey"
+rkb "name" "\x5conlykey"
+rkb "team" "\x5conlykey"
+rkb "key1" "\x5conlykey"
+rkb "desc" "\x5conlykey"
+rkb "onlykey" "\x5conlykey"
+rkb "missing" "\x5conlykey"
+rkb "quote" "\x5conlykey"
+rkb "semi" "\x5conlykey"
+svk "name" "alice" "\x5cname\x5calice\x5conlykey"
+svk "new" "val" "\x5cnew\x5cval\x5conlykey"
+svk "team" "" "\x5conlykey"
+svk "x" "y" "\x5cx\x5cy\x5conlykey"
+svk "quote" "a\x22b" "\x5conlykey"
+svkb "name" "alice" "\x5conlykey\x5cname\x5calice"
+svkb "new" "val" "\x5conlykey\x5cnew\x5cval"
+svkb "team" "" "\x5conlykey"
+svkb "x" "y" "\x5conlykey\x5cx\x5cy"
+svkb "quote" "a\x22b" "\x5conlykey"
+--
+rec 6 "\x5cname\x5cbob\x5c"
+val 1
+vfk "name" "bob"
+vfk "team" ""
+vfk "key2" ""
+vfk "empty" ""
+vfk "onlykey" ""
+vfk "desc" ""
+vfk "missing" ""
+vfk "Name" "bob"
+vfk "" ""
+np "name" "bob"
+np "" ""
+rk "name" "\x5c"
+rk "team" "\x5cname\x5cbob\x5c"
+rk "key1" "\x5cname\x5cbob\x5c"
+rk "desc" "\x5cname\x5cbob\x5c"
+rk "onlykey" "\x5cname\x5cbob\x5c"
+rk "missing" "\x5cname\x5cbob\x5c"
+rk "quote" "\x5cname\x5cbob\x5c"
+rk "semi" "\x5cname\x5cbob\x5c"
+rkb "name" "\x5c"
+rkb "team" "\x5cname\x5cbob\x5c"
+rkb "key1" "\x5cname\x5cbob\x5c"
+rkb "desc" "\x5cname\x5cbob\x5c"
+rkb "onlykey" "\x5cname\x5cbob\x5c"
+rkb "missing" "\x5cname\x5cbob\x5c"
+rkb "quote" "\x5cname\x5cbob\x5c"
+rkb "semi" "\x5cname\x5cbob\x5c"
+svk "name" "alice" "\x5cname\x5calice\x5c"
+svk "new" "val" "\x5cnew\x5cval\x5cname\x5cbob\x5c"
+svk "team" "" "\x5cname\x5cbob\x5c"
+svk "x" "y" "\x5cx\x5cy\x5cname\x5cbob\x5c"
+svk "quote" "a\x22b" "\x5cname\x5cbob\x5c"
+svkb "name" "alice" "\x5c\x5cname\x5calice"
+svkb "new" "val" "\x5cname\x5cbob\x5c\x5cnew\x5cval"
+svkb "team" "" "\x5cname\x5cbob\x5c"
+svkb "x" "y" "\x5cname\x5cbob\x5c\x5cx\x5cy"
+svkb "quote" "a\x22b" "\x5cname\x5cbob\x5c"
+--
+rec 7 "\x5cquote\x5ca\x22b\x5cok\x5c1"
+val 0
+vfk "name" ""
+vfk "team" ""
+vfk "key2" ""
+vfk "empty" ""
+vfk "onlykey" ""
+vfk "desc" ""
+vfk "missing" ""
+vfk "Name" ""
+vfk "" ""
+np "quote" "a\x22b"
+np "ok" "1"
+rk "name" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rk "team" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rk "key1" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rk "desc" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rk "onlykey" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rk "missing" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rk "quote" "\x5cok\x5c1"
+rk "semi" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rkb "name" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rkb "team" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rkb "key1" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rkb "desc" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rkb "onlykey" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rkb "missing" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+rkb "quote" "\x5cok\x5c1"
+rkb "semi" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+svk "name" "alice" "\x5cname\x5calice\x5cquote\x5ca\x22b\x5cok\x5c1"
+svk "new" "val" "\x5cnew\x5cval\x5cquote\x5ca\x22b\x5cok\x5c1"
+svk "team" "" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+svk "x" "y" "\x5cx\x5cy\x5cquote\x5ca\x22b\x5cok\x5c1"
+svk "quote" "a\x22b" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+svkb "name" "alice" "\x5cquote\x5ca\x22b\x5cok\x5c1\x5cname\x5calice"
+svkb "new" "val" "\x5cquote\x5ca\x22b\x5cok\x5c1\x5cnew\x5cval"
+svkb "team" "" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+svkb "x" "y" "\x5cquote\x5ca\x22b\x5cok\x5c1\x5cx\x5cy"
+svkb "quote" "a\x22b" "\x5cquote\x5ca\x22b\x5cok\x5c1"
+--
+rec 8 "\x5csemi\x5ca;b\x5cok\x5c1"
+val 0
+vfk "name" ""
+vfk "team" ""
+vfk "key2" ""
+vfk "empty" ""
+vfk "onlykey" ""
+vfk "desc" ""
+vfk "missing" ""
+vfk "Name" ""
+vfk "" ""
+np "semi" "a;b"
+np "ok" "1"
+rk "name" "\x5csemi\x5ca;b\x5cok\x5c1"
+rk "team" "\x5csemi\x5ca;b\x5cok\x5c1"
+rk "key1" "\x5csemi\x5ca;b\x5cok\x5c1"
+rk "desc" "\x5csemi\x5ca;b\x5cok\x5c1"
+rk "onlykey" "\x5csemi\x5ca;b\x5cok\x5c1"
+rk "missing" "\x5csemi\x5ca;b\x5cok\x5c1"
+rk "quote" "\x5csemi\x5ca;b\x5cok\x5c1"
+rk "semi" "\x5cok\x5c1"
+rkb "name" "\x5csemi\x5ca;b\x5cok\x5c1"
+rkb "team" "\x5csemi\x5ca;b\x5cok\x5c1"
+rkb "key1" "\x5csemi\x5ca;b\x5cok\x5c1"
+rkb "desc" "\x5csemi\x5ca;b\x5cok\x5c1"
+rkb "onlykey" "\x5csemi\x5ca;b\x5cok\x5c1"
+rkb "missing" "\x5csemi\x5ca;b\x5cok\x5c1"
+rkb "quote" "\x5csemi\x5ca;b\x5cok\x5c1"
+rkb "semi" "\x5cok\x5c1"
+svk "name" "alice" "\x5cname\x5calice\x5csemi\x5ca;b\x5cok\x5c1"
+svk "new" "val" "\x5cnew\x5cval\x5csemi\x5ca;b\x5cok\x5c1"
+svk "team" "" "\x5csemi\x5ca;b\x5cok\x5c1"
+svk "x" "y" "\x5cx\x5cy\x5csemi\x5ca;b\x5cok\x5c1"
+svk "quote" "a\x22b" "\x5csemi\x5ca;b\x5cok\x5c1"
+svkb "name" "alice" "\x5csemi\x5ca;b\x5cok\x5c1\x5cname\x5calice"
+svkb "new" "val" "\x5csemi\x5ca;b\x5cok\x5c1\x5cnew\x5cval"
+svkb "team" "" "\x5csemi\x5ca;b\x5cok\x5c1"
+svkb "x" "y" "\x5csemi\x5ca;b\x5cok\x5c1\x5cx\x5cy"
+svkb "quote" "a\x22b" "\x5csemi\x5ca;b\x5cok\x5c1"
+--
+rec 9 "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+val 1
+vfk "name" ""
+vfk "team" ""
+vfk "key2" ""
+vfk "empty" ""
+vfk "onlykey" ""
+vfk "desc" "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+vfk "missing" ""
+vfk "Name" ""
+vfk "" ""
+np "desc" "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+np "end" "1"
+rk "name" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rk "team" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rk "key1" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rk "desc" "\x5cend\x5c1"
+rk "onlykey" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rk "missing" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rk "quote" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rk "semi" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rkb "name" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rkb "team" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rkb "key1" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rkb "desc" "\x5cend\x5c1"
+rkb "onlykey" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rkb "missing" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rkb "quote" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+rkb "semi" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+svk "name" "alice" "\x5cname\x5calice\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+svk "new" "val" "\x5cnew\x5cval\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+svk "team" "" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+svk "x" "y" "\x5cx\x5cy\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+svk "quote" "a\x22b" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+svkb "name" "alice" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1\x5cname\x5calice"
+svkb "new" "val" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1\x5cnew\x5cval"
+svkb "team" "" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+svkb "x" "y" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1\x5cx\x5cy"
+svkb "quote" "a\x22b" "\x5cdesc\x5cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\x5cend\x5c1"
+--
+big len 1100
+big val 1
+big vfk k50 "v50"
+big vfk missing ""
+big np "k0" "v0"
+== end ==
