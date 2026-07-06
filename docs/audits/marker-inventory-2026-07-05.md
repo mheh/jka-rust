@@ -1,21 +1,21 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 785 markers — 176 `TODO: Port`,
+Totals: 781 markers — 172 `TODO: Port`,
 553 `PORT-NOTE`, 56 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
 judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 
-- **LEGIT** — subject genuinely unported; marker accurate. (160)
+- **LEGIT** — subject genuinely unported; marker accurate. (157)
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
-  the actionable findings. (13)
+  the actionable findings. (12)
 - **STALE-escalated** — mechanical fix known but crosses files; left in place. (3)
 
 PORT-NOTE section is a plain re-grep (not audited).
 
-## TODO: Port — COMPLEX (13)
+## TODO: Port — COMPLEX (12)
 
 ### crates/mp/qshared/src/common/mp/gentity.rs
 - L94: Vehicle_t
@@ -30,10 +30,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/sp/cgame/src/media/cgs_t.rs
 - L47: clientInfo_t (cross-crate, sp_game -> sp_cgame not wired)
   - clientInfo_t is fully ported at sp_game::shared::client_info_t::clientInfo_t (confirmed: `pub struct clientInfo_t` at that path), exactly as the marker itself states. But resolving this in cgs_t.rs would mean replacing `OpaqueClientInfo_t = [u64; 62]` (a #[repr(C)] field inside cgs_t, size/offset-asserted at line 259+) with the real cross-crate type, which requires adding a new sp_cgame -> sp_game dependency edge (confirmed absent in crates/sp/cgame/Cargo.toml) — an architecture-layering change with effects beyond this file, not a mechanical local fix.
-
-### crates/sp/engine/server/src/server_host.rs
-- L30: server_t/serverStatic_t fields (SP Server island)
-  - server_t and serverStatic_t ARE already ported as full #[repr(C)] types (crates/sp/engine/server/src/server/server_t.rs and .../server_static_t.rs), but wiring `sv`/`svs` fields of those types into the (non-repr(C), no size/offset asserts) `Server` struct is not a mechanical retype: it requires designing ownership/initialization for large arrays (server_t alone is ~397KB with a 1024-entry svEntity_t array), and downstream `sv_init_game_progs`/`sv_shutdown_game_progs` — both still todo!() stubs — would need real init/shutdown logic to populate them. Not file-local single-line fix; genuine design work.
 
 ### crates/sp/game/src/shared/weapon_info_s.rs
 - L40: centity_t
@@ -71,7 +67,7 @@ PORT-NOTE section is a plain re-grep (not audited).
   - Validator claim is false: CMiniHeap IS used by a field in this struct — G2API_CollisionDetect's G2VertSpace parameter (line 448, currently `*mut c_void`) is Raven's `CMiniHeap *G2VertSpace` (oracle/oracle/code/game/g_public.h:403-404). The marker correctly documents that placeholder. Retyping it to `*mut CMiniHeap` (ported at crates/sp/engine/qcommon/src/miniheap/cmini_heap.rs) requires adding sp_engine_qcommon as a dependency in crates/sp/abi/Cargo.toml, which is outside my assigned file — so I left the marker and field untouched rather than deleting it.
 
 
-## TODO: Port — LEGIT (160)
+## TODO: Port — LEGIT (157)
 
 ### crates/abi-transport/src/generic/engine.rs
 - L78: RunStatic per-call handler surface
@@ -183,14 +179,10 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/engine/rmg/src/lib.rs
 - L7: CRMManager (C++ track)
 
-### crates/mp/engine/server/src/server/sv_entity_s.rs
-- L18: worldSector_s
-
 ### crates/mp/engine/server/src/server_host.rs
-- L38: worldSector_t (`sv_worldSectors[AREA_NODES]`) + sv_numworldSectors
-- L41: bot_debugpoly_t (`debugpolygons`) + gWPArray[MAX_WPARRAY_SIZE]
-- L81: SV_GameSystemCalls exhaustive dispatch
-- L133: SV_InitGameProgs ctx injection (&mut Engine.sv)
+- L55: bot_debugpoly_t (`debugpolygons`) + gWPArray[MAX_WPARRAY_SIZE]
+- L95: SV_GameSystemCalls exhaustive dispatch
+- L147: SV_InitGameProgs ctx injection (&mut Engine.sv)
 
 ### crates/mp/game/src/FighterNPC.rs
 - L103: BG_FighterUpdate traceFunc callback signature
@@ -345,9 +337,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/sp/engine/server/src/lib.rs
 - L1: module sp_engine_server
-
-### crates/sp/engine/server/src/server/sv_entity_s.rs
-- L18: worldSector_s
 
 ### crates/sp/game/src/gi.rs
 - L24: gi::* outbound-call wrappers (one per game_import_t member)
