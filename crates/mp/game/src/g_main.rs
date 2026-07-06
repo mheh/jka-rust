@@ -23,6 +23,7 @@ use crate::prelude::*;
 use std::ffi::CString;
 
 use crate::bg_lib::qsort;
+use crate::com_boundary::{com_error_sink, com_print_sink};
 use crate::world::GameWorld;
 use crate::game_cvars::{GameCvars, GAME_CVAR_TABLE};
 use crate::client::client_connected::{CON_CONNECTED, CON_CONNECTING};
@@ -509,11 +510,16 @@ pub fn Com_Error(
     error: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    // PORT-NOTE(ctx-free-boundary): this fn is called from bg-tier/no-ctx sites
-    // (bg_pmove.rs) with no `GameContext` to route through `G_Error`/
-    // `trap_Error`. Frozen Group A rules `Com_Error` -> panic; `level` (ERR_*)
-    // is folded into the message rather than dropped.
+    // PORT-NOTE(ctx-free-boundary): resolved — the shell registers a print-sink
+    // fn pointer at `dllEntry` (`com_boundary::set_com_error_sink`) that routes
+    // through `trap_Error`; `level` is dropped, matching Raven's `G_Error("%s",
+    // text)` call which never passes it on. Unregistered (in-process tests that
+    // never call `dllEntry`) keeps the frozen Group A panic fallback.
     unsafe {
+        if let Some(sink) = com_error_sink() {
+            sink(error);
+            return;
+        }
         let msg = cstr_to_str(error);
         panic!("Com_Error({}): {}", level, msg);
     }
@@ -528,10 +534,16 @@ pub fn Com_Printf(
     msg: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    // PORT-NOTE(ctx-free-boundary): no `GameContext`/engine handle reaches this
-    // ctx-free fn-ptr boundary to route through `G_Printf`/`trap_Printf`;
-    // print directly (matches the "%s" passthrough Raven's body does).
+    // PORT-NOTE(ctx-free-boundary): resolved — the shell registers a print-sink
+    // fn pointer at `dllEntry` (`com_boundary::set_com_print_sink`) that routes
+    // through `trap_Printf` (`G_PRINT`), matching Raven's `G_Printf("%s", text)`
+    // call. Unregistered (in-process tests that never call `dllEntry`) keeps
+    // the `eprint!` fallback.
     unsafe {
+        if let Some(sink) = com_print_sink() {
+            sink(msg);
+            return;
+        }
         eprint!("{}", cstr_to_str(msg));
     }
 }

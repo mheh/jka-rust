@@ -177,3 +177,30 @@ faithful-first rule); fits DEC-04's arc (unify only after porting). Precedents
 already inside the settled decisions: DEC-07's dropped word-packing round-trip
 (internal plumbing, no observable behavior) and DEC-05's wasm transport (the
 generic layer is already the true call in one mode).
+
+## DEC-12 — Ctx-free boundaries route via narrow capability sinks (user, 2026-07-06)
+
+Raven's two ctx-free fn-pointer boundaries — `Com_Printf`/`Com_Error`
+(`g_main.c:1208-1228`), called from bg-tier sites that carry no
+`GameContext` by design — reach the engine through **print-only fn-pointer
+sinks**: `OnceLock<fn(*const c_char)>` statics in `mp_game`
+(`com_boundary.rs`), registered by the shell at `dllEntry` with fns that
+route through its sanctioned `ENGINE` static to `trap::Printf`/`trap::Error`.
+Ruled a narrow SEAM-D1 extension after weighing three options:
+
+- **Chosen — capability sink**: the ambient channel can *only* print;
+  widening it is a visible type change requiring a new ruling. Matches the
+  future bg-split shape ("bg needs a print capability") so it dissolves
+  cleanly at Stage 1/2.
+- Rejected — whole `OnceLock<Engine>` in `mp_game`: faithful to Raven's
+  g_syscalls.c file-static, but makes the entire syscall surface ambiently
+  reachable — a standing temptation to erode porting-rules §B4.
+- Rejected (for now) — threading `&Engine` into all ~32 calling files: the
+  §B4-pure end state, but forces the bg-tier capability design mid-referee
+  and churns bg signatures the future `mp_bg`/cgame split owns.
+
+Fallbacks when unregistered (in-process tests without `dllEntry`):
+`Com_Printf` keeps `eprint!`; `Com_Error` keeps the frozen Group A `panic!`.
+On the registered path `Com_Error` forwards and returns, dropping `level`,
+exactly as Raven's body does. GameWorld is untouched — no world state goes
+ambient; the two statics hold immutable fn pointers set once.

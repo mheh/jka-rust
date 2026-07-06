@@ -4,6 +4,7 @@
 //! that delegates into `mp_game` (`GameContext` receiver, SEAM-Q12). The logic
 //! crate `mp_game` has no entrypoint/`OnceLock`/`WorldCell` code of its own.
 
+use std::ffi::c_char;
 use std::sync::OnceLock;
 
 mod world_cell;
@@ -11,6 +12,7 @@ mod world_cell;
 use abi_transport::entrypoints::{AbiCommand, AbiWord, RawExportTable, RawImportTable, RawSyscall};
 use abi_transport::generic::engine::CEngine;
 use abi_transport::generic::{DecodeVmMain, Dispatch, EncodeVmMainReturn, VmMainTransport};
+use mp_game::com_boundary::{route_error, route_print, set_com_error_sink, set_com_print_sink};
 use mp_game::vmcalls::{
     BotAiStartFrame, GameClientBegin, GameClientCommand, GameClientConnect, GameClientDisconnect,
     GameClientThink, GameClientUserinfoChanged, GameConsoleCommand, GameGetitemindexbytag,
@@ -36,6 +38,24 @@ static WORLD: WorldCell = WorldCell::new();
 #[no_mangle]
 pub extern "C-unwind" fn dllEntry(syscall: RawSyscall) {
     ENGINE.set(CEngine::new(syscall)).ok();
+    set_com_print_sink(com_print_sink);
+    set_com_error_sink(com_error_sink);
+}
+
+/// The registered `Com_Printf` route (SEAM-D1 narrow extension): reads the
+/// one `ENGINE` static and forwards through `trap_Printf` exactly like
+/// `G_Printf` does.
+fn com_print_sink(msg: *const c_char) {
+    let engine = ENGINE.get().expect("dllEntry set ENGINE");
+    route_print(engine, msg);
+}
+
+/// The registered `Com_Error` route (SEAM-D1 narrow extension): reads the
+/// one `ENGINE` static and forwards through `trap_Error` exactly like
+/// `G_Error` does.
+fn com_error_sink(msg: *const c_char) {
+    let engine = ENGINE.get().expect("dllEntry set ENGINE");
+    route_error(engine, msg);
 }
 
 /// Raven `vmMain` (`g_main.c:515`). Bootstraps/derives the `WORLD` pointer,
