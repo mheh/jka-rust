@@ -1347,7 +1347,7 @@ pub fn NPC_ParseParms(
                 if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0 {
                     continue;
                 }
-                (*NPC).fullName = crate::g_spawn::G_NewString(value);
+                (*NPC).fullName = crate::g_spawn::G_NewString(ctx, value);
                 continue;
             }
 

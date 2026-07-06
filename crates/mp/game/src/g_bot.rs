@@ -152,7 +152,7 @@ pub fn G_ParseInfos(
             // NOTE: extra space for arena number.
             let info_s = cstr_to_str(info.as_ptr());
             let alloc_size = info_s.len() + "\\num\\".len() + format!("{}", MAX_ARENAS).len() + 1;
-            let dest = G_Alloc(alloc_size as c_int) as *mut c_char;
+            let dest = G_Alloc(ctx, alloc_size as c_int) as *mut c_char;
             if !dest.is_null() {
                 let bytes = info_s.as_bytes();
                 for i in 0..bytes.len() {

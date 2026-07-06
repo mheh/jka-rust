@@ -1242,7 +1242,7 @@ pub fn SP_target_interest(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
     if !unsafe { (*self_).target.is_null() } && unsafe { *(*self_).target } != 0 {
         world.level.interestPoints[world.level.numInterestPoints as usize].target =
-            G_NewString(unsafe { (*self_).target });
+            G_NewString(ctx, unsafe { (*self_).target });
     }
 
     world.level.numInterestPoints += 1;

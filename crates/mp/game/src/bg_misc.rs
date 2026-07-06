@@ -281,7 +281,7 @@ pub fn BG_ParseField(
                 match (*f).r#type {
                     fieldtype_t::F_LSTRING => {
                         // QAGAME (jampgame) branch: G_NewString.
-                        let s = G_NewString(value);
+                        let s = G_NewString(ctx, value);
                         *(b.offset((*f).ofs as isize) as *mut *mut c_char) = s;
                     }
                     fieldtype_t::F_VECTOR => {

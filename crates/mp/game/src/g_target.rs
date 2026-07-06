@@ -1053,7 +1053,7 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         // DIVERGENCE: store owned string instead of va() pointer
                         let name = format!("newICARUSEnt{}", (*ctx.world).globals.numNewICARUSEnts);
                         (*ctx.world).globals.numNewICARUSEnts += 1;
-                        (*activator_ent).script_targetname = G_NewString(cstr(&name).as_ptr());
+                        (*activator_ent).script_targetname = G_NewString(ctx, cstr(&name).as_ptr());
                     }
 
                     if trap::ICARUS_ValidEnt(ctx.engine, GIcarusValidentArgs::new(activator_ent))
@@ -1257,7 +1257,7 @@ pub fn SP_target_level_change(ctx: GameContext<'_>, self_: *mut gentity_t) {
             b"\0".as_ptr() as *const c_char,
             &mut s,
         );
-        (*self_).message = G_NewString(s);
+        (*self_).message = G_NewString(ctx, s);
 
         if (*self_).message.is_null() || *(*self_).message == b'\0' as c_char {
             // G_Error("target_level_change with no mapname!\n");
@@ -1308,7 +1308,7 @@ pub fn SP_target_play_music(ctx: GameContext<'_>, self_: *mut gentity_t) {
             // Error case; informational message dropped.
         }
 
-        (*self_).message = G_NewString(s);
+        (*self_).message = G_NewString(ctx, s);
 
         (*self_).use_ = Some(EntUse::target_play_music_use);
     }

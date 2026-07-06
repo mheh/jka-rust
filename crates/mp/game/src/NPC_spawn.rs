@@ -1123,7 +1123,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
         if (*ent).NPC_type.is_null() {
             (*ent).NPC_type = c"random".as_ptr() as *mut c_char;
         } else {
-            (*ent).NPC_type = crate::q_shared::Q_strlwr(crate::g_spawn::G_NewString(
+            (*ent).NPC_type = crate::q_shared::Q_strlwr(crate::g_spawn::G_NewString(ctx, 
                 (*ent).NPC_type as *const c_char,
             ));
         }
@@ -2443,7 +2443,7 @@ pub fn SP_NPC_Monster_Swamp(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3467-3472`
 pub fn SP_NPC_Monster_Howler(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"howler".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"howler".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2453,7 +2453,7 @@ pub fn SP_NPC_Monster_Howler(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3481-3487`
 pub fn SP_NPC_MineMonster(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"minemonster".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"minemonster".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
     NPC_MineMonster_Precache(ctx);
@@ -2464,7 +2464,7 @@ pub fn SP_NPC_MineMonster(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3496-3501`
 pub fn SP_NPC_Monster_Claw(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"Claw".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"Claw".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2474,7 +2474,7 @@ pub fn SP_NPC_Monster_Claw(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3510-3515`
 pub fn SP_NPC_Monster_Glider(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"Glider".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"Glider".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2484,7 +2484,7 @@ pub fn SP_NPC_Monster_Glider(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3524-3529`
 pub fn SP_NPC_Monster_Flier2(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"Flier2".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"Flier2".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2494,7 +2494,7 @@ pub fn SP_NPC_Monster_Flier2(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3538-3543`
 pub fn SP_NPC_Monster_Lizard(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"Lizard".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"Lizard".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2504,7 +2504,7 @@ pub fn SP_NPC_Monster_Lizard(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3552-3557`
 pub fn SP_NPC_Monster_Fish(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"Fish".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"Fish".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2514,7 +2514,7 @@ pub fn SP_NPC_Monster_Fish(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3568-3575`
 pub fn SP_NPC_Monster_Wampa(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"wampa".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"wampa".as_ptr() as *const c_char);
     }
     NPC_Wampa_Precache(ctx);
     SP_NPC_spawner(ctx, self_);
@@ -2525,7 +2525,7 @@ pub fn SP_NPC_Monster_Wampa(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3584-3589`
 pub fn SP_NPC_Monster_Rancor(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"rancor".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"rancor".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2535,7 +2535,7 @@ pub fn SP_NPC_Monster_Rancor(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3602-3609`
 pub fn SP_NPC_Droid_Interrogator(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"interrogator".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"interrogator".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
     NPC_Interrogator_Precache(ctx, self_);
@@ -2546,7 +2546,7 @@ pub fn SP_NPC_Droid_Interrogator(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3620-3627`
 pub fn SP_NPC_Droid_Probe(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"probe".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"probe".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
     NPC_Probe_Precache(ctx);
@@ -2557,7 +2557,7 @@ pub fn SP_NPC_Droid_Probe(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3639-3646`
 pub fn SP_NPC_Droid_Mark1(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"mark1".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"mark1".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
     NPC_Mark1_Precache(ctx);
@@ -2568,7 +2568,7 @@ pub fn SP_NPC_Droid_Mark1(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3658-3665`
 pub fn SP_NPC_Droid_Mark2(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"mark2".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"mark2".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
     NPC_Mark2_Precache(ctx);
@@ -2580,9 +2580,9 @@ pub fn SP_NPC_Droid_Mark2(ctx: GameContext<'_>, self_: *mut gentity_t) {
 pub fn SP_NPC_Droid_ATST(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if ((*self_).spawnflags & 1) != 0 {
-            (*self_).NPC_type = G_NewString(c"atst_vehicle".as_ptr() as *const c_char);
+            (*self_).NPC_type = G_NewString(ctx, c"atst_vehicle".as_ptr() as *const c_char);
         } else {
-            (*self_).NPC_type = G_NewString(c"atst".as_ptr() as *const c_char);
+            (*self_).NPC_type = G_NewString(ctx, c"atst".as_ptr() as *const c_char);
         }
     }
     SP_NPC_spawner(ctx, self_);
@@ -2594,7 +2594,7 @@ pub fn SP_NPC_Droid_ATST(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3699-3706`
 pub fn SP_NPC_Droid_Remote(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"remote".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"remote".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
     NPC_Remote_Precache(ctx);
@@ -2605,7 +2605,7 @@ pub fn SP_NPC_Droid_Remote(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3717-3724`
 pub fn SP_NPC_Droid_Seeker(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"seeker".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"seeker".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
     NPC_Seeker_Precache(ctx);
@@ -2616,7 +2616,7 @@ pub fn SP_NPC_Droid_Seeker(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3735-3742`
 pub fn SP_NPC_Droid_Sentry(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"sentry".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"sentry".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
     NPC_Sentry_Precache(ctx);
@@ -2627,7 +2627,7 @@ pub fn SP_NPC_Droid_Sentry(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3755-3763`
 pub fn SP_NPC_Droid_Gonk(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"gonk".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"gonk".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
     NPC_Gonk_Precache(ctx);
@@ -2638,7 +2638,7 @@ pub fn SP_NPC_Droid_Gonk(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3776-3785`
 pub fn SP_NPC_Droid_Mouse(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).NPC_type = G_NewString(c"mouse".as_ptr() as *const c_char);
+        (*self_).NPC_type = G_NewString(ctx, c"mouse".as_ptr() as *const c_char);
     }
     SP_NPC_spawner(ctx, self_);
     NPC_Mouse_Precache(ctx);
@@ -2650,9 +2650,9 @@ pub fn SP_NPC_Droid_Mouse(ctx: GameContext<'_>, self_: *mut gentity_t) {
 pub fn SP_NPC_Droid_R2D2(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if ((*self_).spawnflags & 1) != 0 {
-            (*self_).NPC_type = G_NewString(c"r2d2_imp".as_ptr() as *const c_char);
+            (*self_).NPC_type = G_NewString(ctx, c"r2d2_imp".as_ptr() as *const c_char);
         } else {
-            (*self_).NPC_type = G_NewString(c"r2d2".as_ptr() as *const c_char);
+            (*self_).NPC_type = G_NewString(ctx, c"r2d2".as_ptr() as *const c_char);
         }
     }
     SP_NPC_spawner(ctx, self_);
@@ -2665,9 +2665,9 @@ pub fn SP_NPC_Droid_R2D2(ctx: GameContext<'_>, self_: *mut gentity_t) {
 pub fn SP_NPC_Droid_R5D2(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if ((*self_).spawnflags & 1) != 0 {
-            (*self_).NPC_type = G_NewString(c"r5d2_imp".as_ptr() as *const c_char);
+            (*self_).NPC_type = G_NewString(ctx, c"r5d2_imp".as_ptr() as *const c_char);
         } else {
-            (*self_).NPC_type = G_NewString(c"r5d2".as_ptr() as *const c_char);
+            (*self_).NPC_type = G_NewString(ctx, c"r5d2".as_ptr() as *const c_char);
         }
     }
     SP_NPC_spawner(ctx, self_);
@@ -2680,9 +2680,9 @@ pub fn SP_NPC_Droid_R5D2(ctx: GameContext<'_>, self_: *mut gentity_t) {
 pub fn SP_NPC_Droid_Protocol(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if ((*self_).spawnflags & 1) != 0 {
-            (*self_).NPC_type = G_NewString(c"protocol_imp".as_ptr() as *const c_char);
+            (*self_).NPC_type = G_NewString(ctx, c"protocol_imp".as_ptr() as *const c_char);
         } else {
-            (*self_).NPC_type = G_NewString(c"protocol".as_ptr() as *const c_char);
+            (*self_).NPC_type = G_NewString(ctx, c"protocol".as_ptr() as *const c_char);
         }
     }
     SP_NPC_spawner(ctx, self_);
@@ -2793,17 +2793,17 @@ pub fn NPC_SpawnType(
     );
 
     unsafe {
-        (*npc_spawner).NPC_type = G_NewString(npc_type);
+        (*npc_spawner).NPC_type = G_NewString(ctx, npc_type);
 
         if !targetname.is_null() {
-            (*npc_spawner).NPC_targetname = G_NewString(targetname);
+            (*npc_spawner).NPC_targetname = G_NewString(ctx, targetname);
         }
 
         (*npc_spawner).count = 1;
         (*npc_spawner).delay = 0;
 
         if isVehicle != 0 {
-            (*npc_spawner).classname = G_NewString(c"NPC_Vehicle".as_ptr() as *const c_char);
+            (*npc_spawner).classname = G_NewString(ctx, c"NPC_Vehicle".as_ptr() as *const c_char);
         }
     }
 

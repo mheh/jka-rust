@@ -354,7 +354,7 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 /// real linefeeds so message texts can be multi-line.
 ///
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:724-749`
-pub fn G_NewString(string: *const c_char) -> *mut c_char {
+pub fn G_NewString(ctx: GameContext<'_>, string: *const c_char) -> *mut c_char {
     unsafe {
         let mut l = 0isize;
         while *string.offset(l) != 0 {
@@ -362,7 +362,7 @@ pub fn G_NewString(string: *const c_char) -> *mut c_char {
         }
         l += 1; // + 1 for the NUL, matching `strlen(string) + 1`
 
-        let newb = G_Alloc(l as c_int) as *mut c_char;
+        let newb = G_Alloc(ctx, l as c_int) as *mut c_char;
         let mut new_p = newb;
 
         let mut i: isize = 0;

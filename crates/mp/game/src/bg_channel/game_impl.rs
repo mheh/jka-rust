@@ -549,14 +549,23 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         unsafe { (*self.world).g_entities[entNum as usize].s.torsoAnim }
     }
     fn alloc(&mut self, size: c_int) -> *mut c_void {
-        // `G_Alloc` is a ctx-free bump allocator.
+        // `G_Alloc` bumps the game pool via `ctx.world`; rebuild the ctx from the
+        // impl's owned `world`/`engine` (STATE-D6 leaf reborrow).
         // Source: `oracle/oracle/codemp/game/g_mem.c` (`G_Alloc`).
-        crate::g_mem::G_Alloc(size)
+        let ctx = GameContext {
+            world: self.world,
+            engine: self.engine,
+        };
+        crate::g_mem::G_Alloc(ctx, size)
     }
     fn new_string(&mut self, string: *const c_char) -> *mut c_char {
-        // `G_NewString` is ctx-free.
+        // `G_NewString` copies into the game pool via `ctx.world`.
         // Source: `oracle/oracle/codemp/game/g_spawn.c` (`G_NewString`).
-        crate::g_spawn::G_NewString(string)
+        let ctx = GameContext {
+            world: self.world,
+            engine: self.engine,
+        };
+        crate::g_spawn::G_NewString(ctx, string)
     }
     fn play_effect(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) {
         // `G_PlayEffect` is ctx-free and takes `org`/`ang` by value; the spawned

@@ -319,7 +319,7 @@ pub fn Q3_Play(
             let file = CString::new(std::ffi::CStr::from_ptr(name).to_bytes()).unwrap();
             (*ent).roffid = trap::ROFF_Cache(ctx.engine, GRoffCacheArgs::new(file));
             if (*ent).roffid != 0 {
-                (*ent).roffname = G_NewString(name);
+                (*ent).roffname = G_NewString(ctx, name);
 
                 // Save this off for later
                 trap::ICARUS_TaskIDSet(
@@ -2861,7 +2861,7 @@ pub fn Q3_SetTargetName(ctx: GameContext<'_>, entID: c_int, targetname: *const c
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, targetname) == 0 {
             (*self_).targetname = std::ptr::null_mut();
         } else {
-            (*self_).targetname = G_NewString(targetname);
+            (*self_).targetname = G_NewString(ctx, targetname);
         }
     }
 }
@@ -2876,7 +2876,7 @@ pub fn Q3_SetTarget(ctx: GameContext<'_>, entID: c_int, target: *const c_char) {
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, target) == 0 {
             (*self_).target = std::ptr::null_mut();
         } else {
-            (*self_).target = G_NewString(target);
+            (*self_).target = G_NewString(ctx, target);
         }
     }
 }
@@ -2924,7 +2924,7 @@ pub fn Q3_SetFullName(ctx: GameContext<'_>, entID: c_int, fullName: *const c_cha
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, fullName) == 0 {
             (*self_).fullName = std::ptr::null_mut();
         } else {
-            (*self_).fullName = G_NewString(fullName);
+            (*self_).fullName = G_NewString(ctx, fullName);
         }
     }
 }
@@ -2973,7 +2973,7 @@ pub fn Q3_SetParm(ctx: GameContext<'_>, entID: c_int, parmNum: c_int, parmValue:
         }
 
         if (*ent).parms.is_null() {
-            (*ent).parms = G_Alloc(core::mem::size_of::<parms_t>() as c_int) as *mut parms_t;
+            (*ent).parms = G_Alloc(ctx, core::mem::size_of::<parms_t>() as c_int) as *mut parms_t;
         }
 
         let val = Q3_GameSideCheckStringCounterIncrement(parmValue);
@@ -3821,7 +3821,7 @@ pub fn Q3_SetBehaviorSet(
             if !(*ent).behaviorSet[bSet as usize].is_null() {
                 //				gi.TagFree( ent->behaviorSet[bSet] );
             }
-            (*ent).behaviorSet[bSet as usize] = G_NewString(scriptname); //FIXME: This really isn't good...
+            (*ent).behaviorSet[bSet as usize] = G_NewString(ctx, scriptname); //FIXME: This really isn't good...
         }
         qtrue
     }

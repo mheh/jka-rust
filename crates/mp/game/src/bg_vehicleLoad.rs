@@ -41,6 +41,9 @@ pub fn BG_ParseVehWeaponParm(
     vehWeapon: *mut vehWeaponInfo_t,
     parmName: *mut c_char,
     pValue: *mut c_char,
+    // Threaded so the MP (`_JK2MP`) `VF_LSTRING` branch can bump the bg pool
+    // (`BG_Alloc`); the game pool is unreachable from bg-tier code.
+    bg: &mut BgState,
 ) -> qboolean {
     unsafe {
         let value = cstr_to_str(pValue);
@@ -60,7 +63,12 @@ pub fn BG_ParseVehWeaponParm(
                     VF_LSTRING => {
                         let slot = b.add(field.ofs as usize) as *mut *mut c_char;
                         if (*slot).is_null() {
-                            *slot = G_NewString(cstr(&value).as_ptr());
+                            // Raven `_JK2MP` (MP) branch: a fixed 1024-byte bg-pool block
+                            // (overwritable later), NOT SP's `G_NewString` — bg-tier code has
+                            // no game pool. Source: oracle/oracle/codemp/game/bg_vehicleLoad.c:195-197
+                            let dest = crate::bg_misc::BG_Alloc(1024, bg) as *mut c_char;
+                            Q_strncpyz(dest, cstr(&value).as_ptr(), 1024);
+                            *slot = dest;
                         }
                     }
                     VF_VECTOR => {
@@ -215,7 +223,7 @@ pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_in
                     ))
                     .as_ptr(),
                 );
-            } else if BG_ParseVehWeaponParm(vehWeapon, parmName.as_mut_ptr(), value) == qfalse {
+            } else if BG_ParseVehWeaponParm(vehWeapon, parmName.as_mut_ptr(), value, bg) == qfalse {
                 let pn = cstr_to_str(parmName.as_ptr());
                 let v = cstr_to_str(value);
                 Com_Printf(
@@ -357,6 +365,9 @@ pub fn BG_ParseVehicleParm(
     vehicle: *mut vehicleInfo_t,
     parmName: *mut c_char,
     pValue: *mut c_char,
+    // Threaded so the MP (`_JK2MP`) `VF_LSTRING` branch can bump the bg pool
+    // (`BG_Alloc`); the game pool is unreachable from bg-tier code.
+    bg: &mut BgState,
 ) -> qboolean {
     unsafe {
         let value = cstr_to_str(pValue);
@@ -377,7 +388,12 @@ pub fn BG_ParseVehicleParm(
                     VF_LSTRING => {
                         let slot = b.add(field.ofs as usize) as *mut *mut c_char;
                         if (*slot).is_null() {
-                            *slot = G_NewString(cstr(&value).as_ptr());
+                            // Raven `_JK2MP` (MP) branch: a fixed 128-byte bg-pool block
+                            // (overwritable later), NOT SP's `G_NewString` — bg-tier code has
+                            // no game pool. Source: oracle/oracle/codemp/game/bg_vehicleLoad.c:195-197
+                            let dest = crate::bg_misc::BG_Alloc(128, bg) as *mut c_char;
+                            Q_strncpyz(dest, cstr(&value).as_ptr(), 128);
+                            *slot = dest;
                         }
                     }
                     VF_VECTOR => {
@@ -557,7 +573,7 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
                 ) == 0
             }) {
                 Q_strncpyz(weap_muzzle[n - 1].as_mut_ptr(), value, 128);
-            } else if BG_ParseVehicleParm(vehicle, parmName.as_mut_ptr(), value) == qfalse {
+            } else if BG_ParseVehicleParm(vehicle, parmName.as_mut_ptr(), value, bg) == qfalse {
                 let pn = cstr_to_str(parmName.as_ptr());
                 let v = cstr_to_str(value);
                 Com_Printf(
@@ -578,6 +594,7 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
                 vehicle,
                 cstr("weap1").as_ptr() as *mut c_char,
                 weap1.as_mut_ptr(),
+                bg,
             ) == qfalse
             {
                 let w = cstr_to_str(weap1.as_ptr());
@@ -596,6 +613,7 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
                 vehicle,
                 cstr("weap2").as_ptr() as *mut c_char,
                 weap2.as_mut_ptr(),
+                bg,
             ) == qfalse
             {
                 let w = cstr_to_str(weap2.as_ptr());
@@ -616,6 +634,7 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
                     vehicle,
                     cstr(&key).as_ptr() as *mut c_char,
                     weap_muzzle[n - 1].as_mut_ptr(),
+                    bg,
                 ) == qfalse
                 {
                     let w = cstr_to_str(weap_muzzle[n - 1].as_ptr());
