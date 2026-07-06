@@ -15,9 +15,6 @@ use crate::prelude::*;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// Unported types referenced in this file (need porting before this compiles):
-// void ()(trace_t , vec_t , vec_t , vec_t , vec_t , int, int)
-
 // Integration round-1: these cross-file callees already exist in-crate; the
 // staged skeleton had faithfully transcribed them as an `extern "C" { .. }`
 // block (as if resolved at link time), which cannot work for plain-Rust
@@ -100,9 +97,20 @@ pub fn BG_FighterUpdate(
     trMins: vec3_t,
     trMaxs: vec3_t,
     gravity: f32,
-    //TODO: Port BG_FighterUpdate traceFunc callback signature
-    // Source: oracle/oracle/codemp/game/FighterNPC.c:100
-    traceFunc: *mut c_void,
+    // Raven: `void (*traceFunc)(trace_t*, const vec3_t, const vec3_t, const
+    // vec3_t, const vec3_t, int, int)` — same shape as `pmove_t::trace`.
+    // Source: `oracle/oracle/codemp/game/FighterNPC.c:100`
+    traceFunc: Option<
+        unsafe extern "C" fn(
+            results: *mut trace_t,
+            start: *const vec3_t,
+            mins: *const vec3_t,
+            maxs: *const vec3_t,
+            end: *const vec3_t,
+            passEntityNum: c_int,
+            contentMask: c_int,
+        ),
+    >,
 ) -> qboolean {
     unsafe {
         let mut bottom = [0.0f32; 3];
@@ -162,29 +170,22 @@ pub fn BG_FighterUpdate(
         }
 
         // Call trace function
-        let trace_fn: extern "C" fn(
-            *mut trace_t,
-            *const f32,
-            *const f32,
-            *const f32,
-            *const f32,
-            c_int,
-            c_int,
-        ) = std::mem::transmute(traceFunc);
-        trace_fn(
-            &mut (*pVeh).m_LandTrace,
-            &(*parentPS).origin[0],
-            &trMins[0],
-            &trMaxs[0],
-            &bottom[0],
-            (*pVeh)
-                .m_pParentEntity
-                .cast::<gentity_t>()
-                .as_ref()
-                .map(|e| e.s.number)
-                .unwrap_or(0),
-            3 | 4, // MASK_NPCSOLID & ~CONTENTS_BODY
-        );
+        if let Some(trace_fn) = traceFunc {
+            trace_fn(
+                &mut (*pVeh).m_LandTrace,
+                &(*parentPS).origin,
+                &trMins,
+                &trMaxs,
+                &bottom,
+                (*pVeh)
+                    .m_pParentEntity
+                    .cast::<gentity_t>()
+                    .as_ref()
+                    .map(|e| e.s.number)
+                    .unwrap_or(0),
+                3 | 4, // MASK_NPCSOLID & ~CONTENTS_BODY
+            );
+        }
 
         qtrue
     }
