@@ -34,17 +34,10 @@ pub struct gtimer_t {
 /// Source: `oracle/oracle/codemp/game/g_timer.c:8`
 pub const MAX_GTIMERS: usize = 16384;
 
-// Timer state — file-scope globals per oracle (to become GameWorld fields).
-// Accessed via unsafe statics to match oracle structure until architecture threads GameWorld.
+// Timer state — file-scope globals per oracle, now GameWorld fields
+// (`GameGlobals::g_timerPool`/`g_timers`/`g_timerFreeList`), reached through
+// `ctx.world.globals` at every call site below.
 // Source: `oracle/oracle/codemp/game/g_timer.c:17-19`
-pub static mut g_timerPool: [gtimer_t; MAX_GTIMERS] = [gtimer_t {
-    name: core::ptr::null(),
-    time: 0,
-    next: core::ptr::null_mut(),
-}; MAX_GTIMERS];
-pub static mut g_timers: [*mut gtimer_t; MAX_GENTITIES as usize] =
-    [core::ptr::null_mut(); MAX_GENTITIES as usize];
-pub static mut g_timerFreeList: *mut gtimer_t = core::ptr::null_mut();
 
 // PORT-NOTE(level-global-access): Timer functions need level.time from GameWorld but
 // have no GameWorld parameter. Temporarily using a global-scope reference passed from engine init.
@@ -57,19 +50,22 @@ pub static mut g_level_time: c_int = 0;
 /// Source: `oracle/oracle/codemp/game/g_timer.c:27-41`
 pub fn TIMER_Clear(ctx: GameContext<'_>) {
     unsafe {
+        let world = &mut *ctx.world;
+
         // Clear all timers for each entity
         for i in 0..MAX_GENTITIES {
-            g_timers[i as usize] = core::ptr::null_mut();
+            world.globals.g_timers.0[i as usize] = core::ptr::null_mut();
         }
 
         // Initialize the free list: each timer points to the next one
         for i in 0..MAX_GTIMERS - 1 {
-            g_timerPool[i].next = &mut g_timerPool[i + 1];
+            let next = &mut world.globals.g_timerPool.0[i + 1] as *mut gtimer_t;
+            world.globals.g_timerPool.0[i].next = next;
         }
         // Last timer in pool has no next
-        g_timerPool[MAX_GTIMERS - 1].next = core::ptr::null_mut();
+        world.globals.g_timerPool.0[MAX_GTIMERS - 1].next = core::ptr::null_mut();
         // Free list starts at first timer in pool
-        g_timerFreeList = &mut g_timerPool[0];
+        world.globals.g_timerFreeList = &mut world.globals.g_timerPool.0[0];
     }
 }
 
@@ -78,6 +74,8 @@ pub fn TIMER_Clear(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/g_timer.c:49-74`
 pub fn TIMER_Clear2(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
+        let world = &mut *ctx.world;
+
         // Rudimentary safety checks
         if ent.is_null() {
             return;
@@ -89,7 +87,7 @@ pub fn TIMER_Clear2(ctx: GameContext<'_>, ent: *mut gentity_t) {
             return;
         }
 
-        let mut p = g_timers[entity_num];
+        let mut p = world.globals.g_timers.0[entity_num];
 
         // No timers at all -> do nothing
         if p.is_null() {
@@ -102,9 +100,9 @@ pub fn TIMER_Clear2(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         // Splice the lists: attach entity's timer list to free list
-        (*p).next = g_timerFreeList;
-        g_timerFreeList = g_timers[entity_num];
-        g_timers[entity_num] = core::ptr::null_mut();
+        (*p).next = world.globals.g_timerFreeList;
+        world.globals.g_timerFreeList = world.globals.g_timers.0[entity_num];
+        world.globals.g_timers.0[entity_num] = core::ptr::null_mut();
     }
 }
 
@@ -113,8 +111,9 @@ pub fn TIMER_Clear2(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_timer.c:79-103`
 pub fn TIMER_GetNew(ctx: GameContext<'_>, num: c_int, identifier: *const c_char) -> *mut c_void {
     unsafe {
+        let world = &mut *ctx.world;
         let num_usize = num as usize;
-        let mut p = g_timers[num_usize];
+        let mut p = world.globals.g_timers.0[num_usize];
 
         // Search for an existing timer with this name
         while !p.is_null() {
@@ -127,14 +126,14 @@ pub fn TIMER_GetNew(ctx: GameContext<'_>, num: c_int, identifier: *const c_char)
         }
 
         // No existing timer with this name was found, so grab one from the free list
-        if g_timerFreeList.is_null() {
+        if world.globals.g_timerFreeList.is_null() {
             return core::ptr::null_mut();
         }
 
-        p = g_timerFreeList;
-        g_timerFreeList = (*g_timerFreeList).next;
-        (*p).next = g_timers[num_usize];
-        g_timers[num_usize] = p;
+        p = world.globals.g_timerFreeList;
+        world.globals.g_timerFreeList = (*world.globals.g_timerFreeList).next;
+        (*p).next = world.globals.g_timers.0[num_usize];
+        world.globals.g_timers.0[num_usize] = p;
         p as *mut c_void
     }
 }
@@ -148,8 +147,9 @@ pub fn TIMER_GetExisting(
     identifier: *const c_char,
 ) -> *mut c_void {
     unsafe {
+        let world = &mut *ctx.world;
         let num_usize = num as usize;
-        let mut p = g_timers[num_usize];
+        let mut p = world.globals.g_timers.0[num_usize];
 
         while !p.is_null() {
             if Q_stricmp((*p).name, identifier) == 0 {
@@ -243,16 +243,17 @@ pub fn TIMER_Done(
 /// Source: `oracle/oracle/codemp/game/g_timer.c:187-211`
 pub fn TIMER_RemoveHelper(ctx: GameContext<'_>, num: c_int, timer: *mut c_void) {
     unsafe {
+        let world = &mut *ctx.world;
         let num_usize = num as usize;
         let timer = timer as *mut gtimer_t;
 
-        let mut p = g_timers[num_usize];
+        let mut p = world.globals.g_timers.0[num_usize];
 
         // Special case: first timer in list
         if p == timer {
-            g_timers[num_usize] = (*g_timers[num_usize]).next;
-            (*timer).next = g_timerFreeList;
-            g_timerFreeList = timer;
+            world.globals.g_timers.0[num_usize] = (*world.globals.g_timers.0[num_usize]).next;
+            (*timer).next = world.globals.g_timerFreeList;
+            world.globals.g_timerFreeList = timer;
             return;
         }
 
@@ -267,8 +268,8 @@ pub fn TIMER_RemoveHelper(ctx: GameContext<'_>, num: c_int, timer: *mut c_void) 
 
         // Rewire
         (*p).next = (*timer).next;
-        (*timer).next = g_timerFreeList;
-        g_timerFreeList = timer;
+        (*timer).next = world.globals.g_timerFreeList;
+        world.globals.g_timerFreeList = timer;
     }
 }
 

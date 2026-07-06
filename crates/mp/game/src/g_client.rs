@@ -3417,13 +3417,14 @@ pub fn ClientDisconnect(ctx: GameContext<'_>, clientNum: c_int) {
                 .add((*((*ent).client as *mut gclient_t)).ps.m_iVehicleNum as usize);
 
             if (*veh).inuse != qfalse && !(*veh).client.is_null() && !(*veh).m_pVehicle.is_null() {
-                // PORT-NOTE(vehicle-eject-unported): m_pVehicleInfo->Eject is a C++
-                // vtable call not yet ported; the connected-flag dance around it is
-                // transcribed faithfully but the call itself cannot be made yet.
                 let p_con = (*((*ent).client as *mut gclient_t)).pers.connected;
                 (*((*ent).client as *mut gclient_t)).pers.connected = CON_DISCONNECTED as _;
-                //TODO: Port m_pVehicleInfo->Eject
-                // Source: oracle/oracle/codemp/game/g_client.c:3862
+                crate::veh_dispatch::eject(
+                    ctx,
+                    (*veh).m_pVehicle as *mut Vehicle_t,
+                    ent as *mut bgEntity_t,
+                    qtrue,
+                );
                 (*((*ent).client as *mut gclient_t)).pers.connected = p_con;
             }
         }

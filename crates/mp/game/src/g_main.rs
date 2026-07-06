@@ -12,9 +12,7 @@
 //! `PORT-NOTE`/`todo!()`) — notably: the `GAME_CVAR_TABLE` per-row
 //! register/update loops (`G_RegisterCvars`/`G_UpdateCvars`) need field
 //! reflection Rust has none of and are left untranscribed with a `//TODO:
-//! Port` marker; several `CS_*` configstring-index constants and
-//! `EXEC_APPEND`/`EXEC_INSERT`/`VOTE_TIME` used throughout have no ported
-//! home yet (missing_symbols); `CalculateRanks`' `qsort(..., SortRanks)`
+//! Port` marker; `CalculateRanks`' `qsort(..., SortRanks)`
 //! registration is a real ctx/no-ctx ABI shape mismatch (see
 //! shape_mismatches); a handful of ctx-free fn-ptr boundary fns
 //! (`Com_Error`/`Com_Printf`/`BG_GetTime`) approximate their missing
@@ -126,13 +124,11 @@ pub fn G_FindTeams(ctx: GameContext<'_>) {
         let mut i: c_int = 1;
         while i < num_entities {
             let e = &mut *base.add(i as usize);
-            if e.inuse != qfalse && !e.team.is_null() && e.flags & FL_TEAMSLAVE == 0 {
-                // CONTENTS_TRIGGER not yet ported as a const anywhere in this
-                // crate graph (precedent: g_mover.rs `G_FindDoorTrigger`,
-                // g_nav.rs) — the "triggers never link up in teams" skip is
-                // therefore omitted.
-                //TODO: Port CONTENTS_TRIGGER
-                // Source: oracle/oracle/codemp/game/q_shared.h (CONTENTS_* bitmask)
+            if e.inuse != qfalse
+                && !e.team.is_null()
+                && e.flags & FL_TEAMSLAVE == 0
+                && e.r.contents != mp_qshared::shared::surface_flags::CONTENTS_TRIGGER
+            {
                 e.teammaster = Some(ent_id(base, e as *const gentity_t));
                 let mut j = i + 1;
                 while j < num_entities {
@@ -672,8 +668,6 @@ pub fn AdjustTournamentScores(ctx: GameContext<'_>) {
                 let clientNum = world.level.sortedClients[cl_success as usize];
                 world.clients[clientNum as usize].sess.wins += 1;
                 ClientUserinfoChanged(ctx, clientNum);
-                //TODO: Port CS_CLIENT_DUELWINNER
-                // Source: oracle/oracle/codemp/game/bg_public.h (CS_* configstring index table)
                 trap::SetConfigstring(
                     ctx.engine,
                     mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
@@ -866,12 +860,6 @@ pub fn G_ResetDuelists(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-NOTE(unported-const): needs the `CS_SCORES1`/`CS_SCORES2`/
-// `CS_CLIENT_DUELWINNER`/`SCORE_NOT_PRESENT` configstring-index constants
-// (`bg_public.h`) — no ported table anywhere in the crate — plus
-// `qsort(level.sortedClients, …, SortRanks)`'s bare-comparator registration
-// (SortRanks itself is fully ported above). Fabricating the CS_* indices
-// would be inventing behavior (porting-rules §A2).
 /// Raven `CalculateRanks`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1751-1906`
@@ -995,8 +983,6 @@ pub fn CalculateRanks(ctx: GameContext<'_>) {
             }
         }
 
-        //TODO: Port CS_SCORES1/CS_SCORES2/CS_CLIENT_DUELWINNER/SCORE_NOT_PRESENT
-        // Source: oracle/oracle/codemp/game/bg_public.h (CS_* configstring index table)
         if world.cvars.g_gametype.integer >= GT_TEAM {
             trap::SetConfigstring(
                 ctx.engine,
@@ -1258,8 +1244,6 @@ pub fn BeginIntermission(ctx: GameContext<'_>) {
         if world.cvars.g_gametype.integer == GT_DUEL
             || world.cvars.g_gametype.integer == GT_POWERDUEL
         {
-            //TODO: Port CS_CLIENT_DUELWINNER
-            // Source: oracle/oracle/codemp/game/bg_public.h (CS_* configstring index table)
             trap::SetConfigstring(
                 ctx.engine,
                 mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
@@ -1379,8 +1363,6 @@ pub fn ExitLevel(ctx: GameContext<'_>) {
         {
             if DuelLimitHit(ctx) == qfalse {
                 if world.level.restarted == qfalse {
-                    //TODO: Port EXEC_APPEND
-                    // Source: oracle/oracle/codemp/game/g_main.c:2151 (bg_public.h cbufExec_t)
                     trap::SendConsoleCommand(
                         ctx.engine,
                         mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("map_restart 0\n")),
@@ -1507,8 +1489,6 @@ pub fn LogExit(ctx: GameContext<'_>, string: *const c_char) {
 
         world.level.intermissionQueued = world.level.time;
 
-        //TODO: Port CS_INTERMISSION
-        // Source: oracle/oracle/codemp/game/bg_public.h (CS_* configstring index table)
         trap::SetConfigstring(
             ctx.engine,
             mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
@@ -1712,8 +1692,6 @@ pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
                     }
                 }
 
-                //TODO: Port CS_CLIENT_DUELISTS/CS_CLIENT_DUELWINNER
-                // Source: oracle/oracle/codemp/game/bg_public.h (CS_* configstring index table)
                 if world.cvars.g_gametype.integer == GT_POWERDUEL {
                     if world.level.numPlayingClients >= 3 && world.level.numNonSpectatorClients >= 3
                     {
@@ -2173,9 +2151,6 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
             }
         }
 
-        //TODO: Port CS_* PRINTREDTEAM/PRINTBLUETEAM string keys are fine (they
-        // route through G_GetStringEdString); no unported CS_* configstring
-        // index is needed in this tail (capturelimit exit uses only LogExit).
         if world.cvars.g_gametype.integer >= GT_CTF && world.cvars.g_capturelimit.integer != 0 {
             if world.level.teamScores[TEAM_RED as usize] >= world.cvars.g_capturelimit.integer {
                 let red = cstr_to_str(G_GetStringEdString(
@@ -2262,12 +2237,6 @@ pub fn G_RemoveDuelist(ctx: GameContext<'_>, team: c_int) {
     }
 }
 
-// PORT-NOTE(unported-const): `CS_CLIENT_DUELISTS`/`CS_CLIENT_DUELHEALTHS`/
-// `CS_WARMUP` (no ported CS_* table) and `EV_GLOBAL_DUEL` (entity-event enum,
-// not yet ported) block this fn; `G_PowerDuelCount`/`G_RemoveDuelist`/
-// `AddTournamentPlayer`/`AddPowerDuelPlayers`/`G_CanResetDuelists`/
-// `G_ResetDuelists` are all otherwise available (the latter itself parked on
-// `ClientSpawn`).
 /// Raven `CheckTournament`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2948-3216`
@@ -2275,8 +2244,6 @@ pub fn CheckTournament(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
 
-        //TODO: Port CS_CLIENT_DUELISTS/CS_CLIENT_DUELHEALTHS/CS_WARMUP
-        // Source: oracle/oracle/codemp/game/bg_public.h (CS_* configstring index table)
         if world.cvars.g_gametype.integer == GT_POWERDUEL {
             if world.level.numPlayingClients >= 3 && world.level.numNonSpectatorClients >= 3 {
                 trap::SetConfigstring(
@@ -2752,8 +2719,6 @@ pub fn CheckVote(ctx: GameContext<'_>) {
             return;
         }
         world.level.voteTime = 0;
-        //TODO: Port CS_VOTE_TIME
-        // Source: oracle/oracle/codemp/game/bg_public.h (CS_* configstring index table)
         trap::SetConfigstring(
             ctx.engine,
             mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
@@ -2982,8 +2947,6 @@ pub fn CheckTeamVote(ctx: GameContext<'_>, team: c_int) {
             return;
         }
         world.level.teamVoteTime[cs_offset] = 0;
-        //TODO: Port CS_TEAMVOTE_TIME
-        // Source: oracle/oracle/codemp/game/bg_public.h (CS_* configstring index table)
         trap::SetConfigstring(
             ctx.engine,
             mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(

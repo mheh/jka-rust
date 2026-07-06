@@ -2,8 +2,9 @@
 
 use core::ffi::c_char;
 
-//TODO: Port MAX_PLAYERMODELS
-// Source: oracle/oracle/codemp/ui/ui_local.h:594
+/// `MAX_PLAYERMODELS`.
+///
+/// Source: `oracle/oracle/codemp/ui/ui_local.h:594`
 const MAX_PLAYERMODELS: usize = 32;
 
 /// Raven `playerSpeciesInfo_t`.

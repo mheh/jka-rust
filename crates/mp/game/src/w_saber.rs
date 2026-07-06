@@ -183,9 +183,6 @@ const WEAPON_DROPPING: c_int = weaponstate_t::WEAPON_DROPPING as c_int;
 // `qtrue`/`qfalse` spellings are not exported here, so the ported bodies below
 // return the bare `1`/`0` those constants alias.
 
-// Unported types referenced in this file (need porting before this compiles):
-// saberFace_t, sabersLockMode_t
-
 /// Raven `RandFloat`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:39-43`
@@ -1374,8 +1371,7 @@ pub fn WP_SabersCheckLock2(
     ctx: GameContext<'_>,
     attacker: *mut gentity_t,
     defender: *mut gentity_t,
-    //TODO: Port sabersLockMode_t  (C: `sabersLockMode_t`)
-    mut lockMode: c_int,
+    mut lockMode: sabersLockMode_t,
 ) -> qboolean {
     unsafe {
         let ac = (*attacker).client as *mut gclient_t;
@@ -1398,11 +1394,13 @@ pub fn WP_SabersCheckLock2(
         let ss_tavion = saber_styles_t::SS_TAVION as c_int;
 
         // MATCH ANIMS
-        if lockMode == LOCK_RANDOM as c_int {
-            lockMode = (*ctx.world)
-                .bg_state
-                .rng
-                .Q_irand(LOCK_FIRST as c_int, (LOCK_RANDOM as c_int) - 1);
+        if lockMode == LOCK_RANDOM {
+            lockMode = core::mem::transmute::<c_int, sabersLockMode_t>(
+                (*ctx.world)
+                    .bg_state
+                    .rng
+                    .Q_irand(LOCK_FIRST as c_int, (LOCK_RANDOM as c_int) - 1),
+            );
         }
         if (*ac).ps.fd.saberAnimLevel >= ss_fast
             && (*ac).ps.fd.saberAnimLevel <= ss_tavion
@@ -1410,43 +1408,43 @@ pub fn WP_SabersCheckLock2(
             && (*dc).ps.fd.saberAnimLevel <= ss_tavion
         {
             // 2 single sabers?  Just do it the old way...
-            if lockMode == LOCK_TOP as c_int {
+            if lockMode == LOCK_TOP {
                 attAnim = BOTH_BF2LOCK as c_int;
                 defAnim = BOTH_BF1LOCK as c_int;
                 attStart = 0.5f32;
                 defStart = 0.5f32;
                 idealDist = LOCK_IDEAL_DIST_TOP;
-            } else if lockMode == LOCK_DIAG_TR as c_int {
+            } else if lockMode == LOCK_DIAG_TR {
                 attAnim = BOTH_CCWCIRCLELOCK as c_int;
                 defAnim = BOTH_CWCIRCLELOCK as c_int;
                 attStart = 0.5f32;
                 defStart = 0.5f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
-            } else if lockMode == LOCK_DIAG_TL as c_int {
+            } else if lockMode == LOCK_DIAG_TL {
                 attAnim = BOTH_CWCIRCLELOCK as c_int;
                 defAnim = BOTH_CCWCIRCLELOCK as c_int;
                 attStart = 0.5f32;
                 defStart = 0.5f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
-            } else if lockMode == LOCK_DIAG_BR as c_int {
+            } else if lockMode == LOCK_DIAG_BR {
                 attAnim = BOTH_CWCIRCLELOCK as c_int;
                 defAnim = BOTH_CCWCIRCLELOCK as c_int;
                 attStart = 0.85f32;
                 defStart = 0.85f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
-            } else if lockMode == LOCK_DIAG_BL as c_int {
+            } else if lockMode == LOCK_DIAG_BL {
                 attAnim = BOTH_CCWCIRCLELOCK as c_int;
                 defAnim = BOTH_CWCIRCLELOCK as c_int;
                 attStart = 0.85f32;
                 defStart = 0.85f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
-            } else if lockMode == LOCK_R as c_int {
+            } else if lockMode == LOCK_R {
                 attAnim = BOTH_CCWCIRCLELOCK as c_int;
                 defAnim = BOTH_CWCIRCLELOCK as c_int;
                 attStart = 0.75f32;
                 defStart = 0.75f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
-            } else if lockMode == LOCK_L as c_int {
+            } else if lockMode == LOCK_L {
                 attAnim = BOTH_CWCIRCLELOCK as c_int;
                 defAnim = BOTH_CCWCIRCLELOCK as c_int;
                 attStart = 0.75f32;
@@ -1458,7 +1456,7 @@ pub fn WP_SabersCheckLock2(
         } else {
             // use the new system — all new saberlocks are 46.08 apart
             idealDist = LOCK_IDEAL_DIST_JKA;
-            if lockMode == LOCK_TOP as c_int {
+            if lockMode == LOCK_TOP {
                 // top lock
                 attAnim = G_SaberLockAnim(
                     (*ac).ps.fd.saberAnimLevel,
@@ -1478,7 +1476,7 @@ pub fn WP_SabersCheckLock2(
                 defStart = 0.5f32;
             } else {
                 // side lock
-                if lockMode == LOCK_DIAG_TR as c_int {
+                if lockMode == LOCK_DIAG_TR {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1495,7 +1493,7 @@ pub fn WP_SabersCheckLock2(
                     );
                     attStart = 0.5f32;
                     defStart = 0.5f32;
-                } else if lockMode == LOCK_DIAG_TL as c_int {
+                } else if lockMode == LOCK_DIAG_TL {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1512,7 +1510,7 @@ pub fn WP_SabersCheckLock2(
                     );
                     attStart = 0.5f32;
                     defStart = 0.5f32;
-                } else if lockMode == LOCK_DIAG_BR as c_int {
+                } else if lockMode == LOCK_DIAG_BR {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1537,7 +1535,7 @@ pub fn WP_SabersCheckLock2(
                     } else {
                         defStart = 0.15f32;
                     }
-                } else if lockMode == LOCK_DIAG_BL as c_int {
+                } else if lockMode == LOCK_DIAG_BL {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1562,7 +1560,7 @@ pub fn WP_SabersCheckLock2(
                     } else {
                         defStart = 0.15f32;
                     }
-                } else if lockMode == LOCK_R as c_int {
+                } else if lockMode == LOCK_R {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1587,7 +1585,7 @@ pub fn WP_SabersCheckLock2(
                     } else {
                         defStart = 0.25f32;
                     }
-                } else if lockMode == LOCK_L as c_int {
+                } else if lockMode == LOCK_L {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1758,7 +1756,7 @@ pub fn WP_SabersCheckLock(
         let mut ent2BlockingPlayer: qboolean = qfalse;
 
         if (*ctx.world).cvars.g_debugSaberLocks.integer != 0 {
-            WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_RANDOM as c_int);
+            WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_RANDOM);
             return qtrue;
         }
         // for now.. it's not fair to the lone duelist (no dual saber lock anims).
@@ -1900,7 +1898,7 @@ pub fn WP_SabersCheckLock(
             || ta1 == BOTH_A7_T__B_ as c_int
         {
             // ent1 is attacking top-down
-            return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_TOP as c_int);
+            return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_TOP);
         }
 
         if ta2 == BOTH_A1_T__B_ as c_int
@@ -1912,7 +1910,7 @@ pub fn WP_SabersCheckLock(
             || ta2 == BOTH_A7_T__B_ as c_int
         {
             // ent2 is attacking top-down
-            return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_TOP as c_int);
+            return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_TOP);
         }
 
         if (*ent1).s.number == 0
@@ -1939,7 +1937,7 @@ pub fn WP_SabersCheckLock(
         {
             // ent1 is attacking diagonally
             if ent2BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TR as c_int);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TR);
             }
             if ta2 == BOTH_A1_TR_BL as c_int
                 || ta2 == BOTH_A2_TR_BL as c_int
@@ -1950,7 +1948,7 @@ pub fn WP_SabersCheckLock(
                 || ta2 == BOTH_A7_TR_BL as c_int
                 || ta2 == BOTH_P1_S1_TL as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TR as c_int);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TR);
             }
             if ta2 == BOTH_A1_BR_TL as c_int
                 || ta2 == BOTH_A2_BR_TL as c_int
@@ -1961,7 +1959,7 @@ pub fn WP_SabersCheckLock(
                 || ta2 == BOTH_A7_BR_TL as c_int
                 || ta2 == BOTH_P1_S1_BL as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_BL as c_int);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_BL);
             }
             return qfalse;
         }
@@ -1976,7 +1974,7 @@ pub fn WP_SabersCheckLock(
         {
             // ent2 is attacking diagonally
             if ent1BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TR as c_int);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TR);
             }
             if ta1 == BOTH_A1_TR_BL as c_int
                 || ta1 == BOTH_A2_TR_BL as c_int
@@ -1987,7 +1985,7 @@ pub fn WP_SabersCheckLock(
                 || ta1 == BOTH_A7_TR_BL as c_int
                 || ta1 == BOTH_P1_S1_TL as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TR as c_int);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TR);
             }
             if ta1 == BOTH_A1_BR_TL as c_int
                 || ta1 == BOTH_A2_BR_TL as c_int
@@ -1998,7 +1996,7 @@ pub fn WP_SabersCheckLock(
                 || ta1 == BOTH_A7_BR_TL as c_int
                 || ta1 == BOTH_P1_S1_BL as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_BL as c_int);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_BL);
             }
             return qfalse;
         }
@@ -2014,7 +2012,7 @@ pub fn WP_SabersCheckLock(
         {
             // ent1 is attacking diagonally
             if ent2BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TL as c_int);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TL);
             }
             if ta2 == BOTH_A1_TL_BR as c_int
                 || ta2 == BOTH_A2_TL_BR as c_int
@@ -2025,7 +2023,7 @@ pub fn WP_SabersCheckLock(
                 || ta2 == BOTH_A7_TL_BR as c_int
                 || ta2 == BOTH_P1_S1_TR as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TL as c_int);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TL);
             }
             if ta2 == BOTH_A1_BL_TR as c_int
                 || ta2 == BOTH_A2_BL_TR as c_int
@@ -2036,7 +2034,7 @@ pub fn WP_SabersCheckLock(
                 || ta2 == BOTH_A7_BL_TR as c_int
                 || ta2 == BOTH_P1_S1_BR as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_BR as c_int);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_BR);
             }
             return qfalse;
         }
@@ -2051,7 +2049,7 @@ pub fn WP_SabersCheckLock(
         {
             // ent2 is attacking diagonally
             if ent1BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TL as c_int);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TL);
             }
             if ta1 == BOTH_A1_TL_BR as c_int
                 || ta1 == BOTH_A2_TL_BR as c_int
@@ -2062,7 +2060,7 @@ pub fn WP_SabersCheckLock(
                 || ta1 == BOTH_A7_TL_BR as c_int
                 || ta1 == BOTH_P1_S1_TR as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TL as c_int);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TL);
             }
             if ta1 == BOTH_A1_BL_TR as c_int
                 || ta1 == BOTH_A2_BL_TR as c_int
@@ -2073,7 +2071,7 @@ pub fn WP_SabersCheckLock(
                 || ta1 == BOTH_A7_BL_TR as c_int
                 || ta1 == BOTH_P1_S1_BR as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_BR as c_int);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_BR);
             }
             return qfalse;
         }
@@ -2088,7 +2086,7 @@ pub fn WP_SabersCheckLock(
         {
             // ent1 is attacking l to r
             if ent2BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_L as c_int);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_L);
             }
             if ta2 == BOTH_A1_TL_BR as c_int
                 || ta2 == BOTH_A2_TL_BR as c_int
@@ -2101,7 +2099,7 @@ pub fn WP_SabersCheckLock(
                 || ta2 == BOTH_P1_S1_BL as c_int
             {
                 // ent2 is attacking or blocking on the r
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_L as c_int);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_L);
             }
             return qfalse;
         }
@@ -2115,7 +2113,7 @@ pub fn WP_SabersCheckLock(
         {
             // ent2 is attacking l to r
             if ent1BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_L as c_int);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_L);
             }
             if ta1 == BOTH_A1_TL_BR as c_int
                 || ta1 == BOTH_A2_TL_BR as c_int
@@ -2128,7 +2126,7 @@ pub fn WP_SabersCheckLock(
                 || ta1 == BOTH_P1_S1_BL as c_int
             {
                 // ent1 is attacking or blocking on the r
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_L as c_int);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_L);
             }
             return qfalse;
         }
@@ -2143,7 +2141,7 @@ pub fn WP_SabersCheckLock(
         {
             // ent1 is attacking r to l
             if ent2BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_R as c_int);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_R);
             }
             if ta2 == BOTH_A1_TR_BL as c_int
                 || ta2 == BOTH_A2_TR_BL as c_int
@@ -2156,7 +2154,7 @@ pub fn WP_SabersCheckLock(
                 || ta2 == BOTH_P1_S1_BR as c_int
             {
                 // ent2 is attacking or blocking on the l
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_R as c_int);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_R);
             }
             return qfalse;
         }
@@ -2170,7 +2168,7 @@ pub fn WP_SabersCheckLock(
         {
             // ent2 is attacking r to l
             if ent1BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_R as c_int);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_R);
             }
             if ta1 == BOTH_A1_TR_BL as c_int
                 || ta1 == BOTH_A2_TR_BL as c_int
@@ -2183,12 +2181,12 @@ pub fn WP_SabersCheckLock(
                 || ta1 == BOTH_P1_S1_BR as c_int
             {
                 // ent1 is attacking or blocking on the l
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_R as c_int);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_R);
             }
             return qfalse;
         }
         if (*ctx.world).bg_state.rng.Q_irand(0, 10) == 0 {
-            return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_RANDOM as c_int);
+            return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_RANDOM);
         }
         qfalse
     }
@@ -2782,8 +2780,7 @@ pub fn G_BuildSaberFaces(
     fwd: vec3_t,
     right: vec3_t,
     fNum: *mut c_int,
-    //TODO: Port saberFace_t  (C: `saberFace_t **`)
-    fList: *mut *mut c_void,
+    fList: *mut *mut saberFace_t,
 ) {
     unsafe {
         // PORT-NOTE(faces): Raven's `static saberFace_t faces[12]` is a
@@ -2912,7 +2909,7 @@ pub fn G_BuildSaberFaces(
 
         // yeah.. always going to be 12 I suppose.
         *fNum = i as c_int;
-        *fList = FACES.as_mut_ptr() as *mut c_void;
+        *fList = FACES.as_mut_ptr();
     }
 }
 
@@ -2953,14 +2950,10 @@ pub fn G_SabCol_PointRelativeToPlane(pos: vec3_t, side: *mut f32, planeEq: *mut 
 /// Raven `G_SaberFaceCollisionCheck`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2599-2697`
-// PORT-NOTE(saberFace_t): the resolved sig keeps `fList: *mut c_void`; the type
-// `saberFace_t` is ported (`crate::saber::saber_face_t`), so the body casts and
-// walks it as Raven does. `atkMins`/`atkMaxs`/`impactPoint` are out-param slots.
 pub fn G_SaberFaceCollisionCheck(
     ctx: GameContext<'_>,
     fNum: c_int,
-    //TODO: Port saberFace_t  (C: `saberFace_t *`)
-    fList: *mut c_void,
+    fList: *mut saberFace_t,
     atkStart: vec3_t,
     atkEnd: vec3_t,
     atkMins: &mut vec3_t,
@@ -2984,7 +2977,7 @@ pub fn G_SaberFaceCollisionCheck(
 
         _VectorSubtract(atkEnd, atkStart, &mut dir);
 
-        let mut fl = fList as *mut saberFace_t;
+        let mut fl = fList;
         while i < fNum {
             G_SabCol_CalcPlaneEq((*fl).v1, (*fl).v2, (*fl).v3, planeEq.as_mut_ptr());
 
@@ -3131,7 +3124,7 @@ pub fn G_SaberCollide(
                 let mut base: vec3_t = [0.0; 3];
                 let mut tip: vec3_t = [0.0; 3];
                 let mut fNum: c_int = 0;
-                let mut fList: *mut c_void = core::ptr::null_mut();
+                let mut fList: *mut saberFace_t = core::ptr::null_mut();
 
                 //go through each blade on the defender's sabers
                 while j < (*dc).saber[i as usize].numBlades {
@@ -3157,7 +3150,7 @@ pub fn G_SaberCollide(
                             fwd,
                             right,
                             &mut fNum,
-                            &mut fList as *mut *mut c_void,
+                            &mut fList,
                         );
                         if fNum > 0 {
                             if G_SaberFaceCollisionCheck(
@@ -5326,7 +5319,7 @@ pub fn CheckSaberDamage(
             }
 
             if (*ctx.world).cvars.g_debugSaberLocks.integer != 0 {
-                WP_SabersCheckLock2(ctx, self_, otherOwner, LOCK_RANDOM as c_int);
+                WP_SabersCheckLock2(ctx, self_, otherOwner, LOCK_RANDOM);
                 return qtrue;
             }
             didHit = qtrue;

@@ -2406,13 +2406,12 @@ const CP_RETREAT: c_int = 0x0002_0000;
 
 /// `combatPt_t` — local mirror of the oracle's file-local `typedef struct
 /// { float dist; int index; } combatPt_t` used only as the collector's
-/// scratch array; `combatPt_t` itself isn't ported centrally yet, so the
-/// resolved `*mut c_void` param is cast to this shape at the two call sites.
+/// scratch array.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2569-2574`
 #[repr(C)]
 #[derive(Copy, Clone)]
-struct CombatPt {
+pub struct CombatPt {
     dist: f32,
     index: c_int,
 }
@@ -2426,15 +2425,11 @@ pub fn NPC_CollectCombatPoints(
     ctx: GameContext<'_>,
     origin: vec3_t,
     radius: f32,
-    //TODO: Port combatPt_t  (C: `combatPt_t *`)
-    points: *mut c_void,
+    points: *mut CombatPt,
     flags: c_int,
 ) -> c_int {
     unsafe {
         let world = &mut *ctx.world;
-        // PORT-NOTE(combatPt_t): combatPt_t isn't ported centrally; reinterpret
-        // the resolved `*mut c_void` as the local mirror struct (see above).
-        let points = points as *mut CombatPt;
 
         let radiusSqr = radius * radius;
         let mut bestDistance = crate::g_public_consts::Q3_INFINITE as f32;
@@ -2568,7 +2563,7 @@ pub fn NPC_FindCombatPoint(
             ctx,
             enemyPosition,
             collRad,
-            points.as_mut_ptr() as *mut c_void,
+            points.as_mut_ptr(),
             flags,
         ); //position
 

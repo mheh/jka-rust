@@ -1,7 +1,8 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::{c_char, c_float, c_int, c_void};
+use core::ffi::{c_char, c_float, c_int};
 
+use crate::common::mp::qcommon::aas_areainfo_t;
 use crate::shared::vec3_t;
 
 use super::aas_altroutegoal_s::aas_altroutegoal_t;
@@ -49,9 +50,8 @@ pub struct aas_export_s {
             maxareas: c_int,
         ) -> c_int,
     >,
-    //TODO: Port aas_areainfo_s
-    // Source: oracle/oracle/codemp/game/botlib.h:214
-    pub AAS_AreaInfo: Option<unsafe extern "C" fn(areanum: c_int, info: *mut c_void) -> c_int>,
+    pub AAS_AreaInfo:
+        Option<unsafe extern "C" fn(areanum: c_int, info: *mut aas_areainfo_t) -> c_int>,
     //--------------------------------------------
     // be_aas_bspq3.c
     //--------------------------------------------

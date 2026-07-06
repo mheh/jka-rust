@@ -1642,13 +1642,20 @@ pub fn NPC_VehiclePrecache(ctx: GameContext<'_>, spawner: *mut gentity_t) -> qbo
                         let anim_cfg = cstr("/animation.cfg");
                         let n = crate::q_shared::Q_strlen(anim_cfg.as_ptr());
                         core::ptr::copy_nonoverlapping(anim_cfg.as_ptr(), slash, n as usize + 1);
-                        // PORT-NOTE(bg-tier-panimate): BG_ParseAnimationFile is a
-                        // PmoveContext method per the packet; NPC_VehiclePrecache
-                        // is game-tier with no PmoveContext in scope — calling
-                        // through bg_state's animation set directly is left as a
-                        // literal reference to the Raven subject.
-                        //TODO: Port BG_ParseAnimationFile call wiring
-                        // Source: oracle/oracle/codemp/game/NPC_spawn.c:2141
+
+                        let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
+                        let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                            world: ctx.world,
+                            engine: ctx.engine,
+                        };
+                        crate::bg_panimate::BG_ParseAnimationFile(
+                            &mut (*ctx.world).bg_state,
+                            &traps,
+                            &mut callbacks,
+                            gla_name.as_ptr(),
+                            core::ptr::null_mut(),
+                            QFALSE,
+                        );
                     }
                 }
                 trap::G2API_CleanGhoul2Models(

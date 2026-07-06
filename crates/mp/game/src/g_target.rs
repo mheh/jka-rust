@@ -462,7 +462,7 @@ pub fn SP_target_speaker(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.loopIsSoundset = qfalse;
         }
 
-        // TODO: Port fn-pointer assignment: (*ent).use = Use_Target_Speaker;
+        (*ent).use_ = Some(EntUse::Use_Target_Speaker);
 
         if (*ent).spawnflags & 4 != 0 {
             (*ent).r.svFlags |= SVF_BROADCAST;
@@ -612,9 +612,8 @@ pub fn target_laser_start(ctx: GameContext<'_>, self_: *mut gentity_t) {
             G_SetMovedir(&mut (*self_).s.angles, &mut (*self_).movedir);
         }
 
-        // TODO: Port fn-pointer assignments:
-        // (*self_).use = target_laser_use;
-        // (*self_).think = target_laser_think;
+        (*self_).use_ = Some(EntUse::target_laser_use);
+        (*self_).think = Some(EntThink::target_laser_think);
 
         if (*self_).damage == 0 {
             (*self_).damage = 1;
@@ -713,12 +712,11 @@ pub fn target_relay_use(
             // never use again
             if ranscript != 0 {
                 // crap, can't remove!
-                // TODO: Port fn-pointer assignment: (*self_).use = NULL;
+                (*self_).use_ = None;
             } else {
                 // remove
-                // TODO: Port fn-pointer assignments:
-                // (*self_).think = G_FreeEntity;
-                // (*self_).nextthink = level.time + FRAMETIME;
+                (*self_).think = Some(EntThink::G_FreeEntity);
+                (*self_).nextthink = (*ctx.world).level.time + crate::g_items::FRAMETIME;
             }
         }
 
@@ -939,7 +937,7 @@ pub fn target_random_use(
         G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
 
         if (*self_).spawnflags & 1 != 0 {
-            // TODO: Port fn-pointer assignment: (*self_).use = NULL;
+            (*self_).use_ = None;
         }
 
         // Count matching targets
@@ -1114,7 +1112,7 @@ pub fn target_scriptrunner_use(
         (*self_).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), other);
         if (*self_).delay != (0.0) as i32 {
             // delay before firing scriptrunner
-            // TODO: Port fn-pointer assignment: (*self_).think = scriptrunner_run;
+            (*self_).think = Some(EntThink::scriptrunner_run);
             (*self_).nextthink = (*ctx.world).level.time + (*self_).delay;
         } else {
             scriptrunner_run(ctx, self_);

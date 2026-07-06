@@ -904,13 +904,11 @@ pub fn PlayersInGame(ctx: GameContext<'_>) -> c_int {
 pub fn BotAISetupClient(
     ctx: GameContext<'_>,
     client: c_int,
-    //TODO: Port bot_settings_s  (C: `struct bot_settings_s *`)
-    settings: *mut c_void,
+    settings: *mut bot_settings_t,
     restart: qboolean,
 ) -> c_int {
     // PORT-NOTE(botstates/PRT_FATAL): `globals.botstates` is a `()`
-    // placeholder (indexed as intended); `PRT_FATAL` has no ported home yet;
-    // `settings` kept as `*mut c_void` (bot_settings_s cast).
+    // placeholder (indexed as intended); `PRT_FATAL` has no ported home yet.
     unsafe {
         let world = ctx.world;
         if (*world).globals.botstates[client as usize].is_null() {
@@ -929,7 +927,7 @@ pub fn BotAISetupClient(
             return qfalse;
         }
 
-        core::ptr::copy_nonoverlapping(settings as *const bot_settings_t, &mut (*bs).settings, 1);
+        core::ptr::copy_nonoverlapping(settings, &mut (*bs).settings, 1);
 
         (*bs).client = client; // need the client number before personality stuff
 

@@ -29,8 +29,6 @@ pub struct game_export_t {
     // init and shutdown will be called every single level
     // levelTime will be near zero, while globalTime will be a large number
     // that can be used to track spectator entry times across restarts
-    //TODO: Port Init variadic-free but multi-arg pointer signature
-    // Source: oracle/oracle/code/game/g_public.h:482
     pub Init: Option<
         unsafe extern "C-unwind" fn(
             mapname: *const c_char,

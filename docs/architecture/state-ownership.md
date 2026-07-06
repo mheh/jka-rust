@@ -613,6 +613,10 @@ pinned in either doc yet, and rides the same not-yet-FROZEN-sibling gate as the
 other SEAM IDs (engine-seam.md is REVIEWED, not FROZEN; STATE-Q7). This doc fixes
 only *which value* `ServerGame` denotes.
 
+*Amendment (2026-07-05, user ruling): concrete shape pinned —
+`pub type ServerGame = Server;` (plain alias, not a wrapper struct;
+`crates/mp/engine/server/src/server_host.rs`). STATE-Q7 residual CLOSED.*
+
 **Two distinct types are both named `Engine` — disambiguation (STATE-Q8).** This
 doc's `pub struct Engine` (crate `mp_engine_core`) is the **engine-island
 aggregate** (`common`/`sv`/`cl`/`cm`/`snd`). It is a **different type** from

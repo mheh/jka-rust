@@ -15,7 +15,7 @@
 use crate::prelude::*;
 
 use crate::bg_misc::{
-    BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_EmplacedView,
+    BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_CycleInven, BG_EmplacedView,
     BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta, BG_FindItem, BG_FindItemForHoldable,
     BG_FindItemForWeapon,
 };
@@ -1762,10 +1762,6 @@ pub fn G_SpecialSpawnItem(ctx: GameContext<'_>, ent: *mut gentity_t, item: *mut 
 
         (*ent).s.eType = ET_ITEM as c_int;
         // store item number in modelindex
-        //TODO: Port bg_itemlist
-        // Source: oracle/oracle/codemp/game/g_items.c:1311 — `item - bg_itemlist`
-        // needs the bg-owned `bg_itemlist` table (unported anywhere in the
-        // crate graph; see `bg_misc.rs`).
         (*ent).s.modelindex = item.offset_from(bg_itemlist.as_ptr()) as c_int;
 
         (*ent).r.contents = CONTENTS_TRIGGER;
@@ -1964,11 +1960,27 @@ pub fn EWebDie(
                 (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
                     !(1 << HI_EWEB);
 
-                //TODO: Port bg_itemlist
-                // Source: oracle/oracle/codemp/game/g_items.c:1473-1478 — the
-                // de-select-and-cycle-inventory branch needs the bg-owned
-                // `bg_itemlist` table (unported anywhere in the crate graph;
-                // see `bg_misc.rs`).
+                if (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEM as usize]
+                    > 0
+                    && bg_itemlist[(*((*owner).client as *mut gclient_t)).ps.stats
+                        [STAT_HOLDABLE_ITEM as usize]
+                        as usize]
+                        .giType
+                        == IT_HOLDABLE
+                    && bg_itemlist[(*((*owner).client as *mut gclient_t)).ps.stats
+                        [STAT_HOLDABLE_ITEM as usize]
+                        as usize]
+                        .giTag
+                        == HI_EWEB
+                {
+                    //he has it selected so deselect it and select the first thing available
+                    (*((*owner).client as *mut gclient_t)).ps.stats
+                        [STAT_HOLDABLE_ITEM as usize] = 0;
+                    BG_CycleInven(
+                        &mut (*((*owner).client as *mut gclient_t)).ps as *mut playerState_t,
+                        1,
+                    );
+                }
             }
         }
     }
@@ -2863,10 +2875,6 @@ pub fn Pickup_Powerup(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gen
 /// Source: `oracle/oracle/codemp/game/g_items.c:2104-2113`
 pub fn Pickup_Holdable(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
     unsafe {
-        //TODO: Port bg_itemlist
-        // Source: oracle/oracle/codemp/game/g_items.c:2106 — `ent->item - bg_itemlist`
-        // needs the bg-owned `bg_itemlist` table (unported anywhere in the
-        // crate graph; see `bg_misc.rs`).
         (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] =
             (*ent).item.offset_from(bg_itemlist.as_ptr()) as c_int;
 
@@ -2894,9 +2902,6 @@ pub fn Pickup_Holdable(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut ge
 /// Source: `oracle/oracle/codemp/game/g_items.c:2118-2128`
 pub fn Add_Ammo(ctx: GameContext<'_>, ent: *mut gentity_t, weapon: c_int, count: c_int) {
     unsafe {
-        //TODO: Port ammoData
-        // Source: oracle/oracle/codemp/game/g_items.c:2120-2126 — needs the
-        // bg-owned `ammoData` table (unported anywhere in the crate graph).
         if (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize]
             < ammoData[weapon as usize].max
         {
@@ -3015,9 +3020,6 @@ pub fn Pickup_Weapon(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gent
         (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |=
             1 << (*(*ent).item).giTag;
 
-        //TODO: Port weaponData
-        // Source: oracle/oracle/codemp/game/g_items.c:2221 — needs the
-        // bg-owned `weaponData` table (unported anywhere in the crate graph).
         Add_Ammo(
             ctx,
             other,
@@ -3387,11 +3389,25 @@ pub fn Touch_Item(
                     || (*(*ent).item).giTag == AMMO_TRIPMINE as c_int
                     || (*(*ent).item).giTag == AMMO_DETPACK as c_int
                 {
-                    //TODO: Port weaponData
-                    // Source: oracle/oracle/codemp/game/g_items.c:2511-2514 — the
-                    // `weaponData[weapForAmmo].ammoIndex` ammo check needs the
-                    // bg-owned `weaponData` table (unported anywhere in the
-                    // crate graph; see `bg_misc.rs`).
+                    let mut weapForAmmo: c_int = 0;
+
+                    if (*(*ent).item).giTag == AMMO_THERMAL as c_int {
+                        weapForAmmo = WP_THERMAL as c_int;
+                    } else if (*(*ent).item).giTag == AMMO_TRIPMINE as c_int {
+                        weapForAmmo = WP_TRIP_MINE as c_int;
+                    } else {
+                        weapForAmmo = WP_DET_PACK as c_int;
+                    }
+
+                    if !other.is_null()
+                        && !(*other).client.is_null()
+                        && (*((*other).client as *mut gclient_t)).ps.ammo
+                            [weaponData[weapForAmmo as usize].ammoIndex as usize]
+                            > 0
+                    {
+                        (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |=
+                            1 << weapForAmmo;
+                    }
                 }
                 predict = qtrue;
             }
@@ -3552,10 +3568,6 @@ pub fn LaunchItem(
         let dropped = G_Spawn(ctx);
 
         (*dropped).s.eType = ET_ITEM as c_int;
-        //TODO: Port bg_itemlist
-        // Source: oracle/oracle/codemp/game/g_items.c:2664 — `item - bg_itemlist`
-        // needs the bg-owned `bg_itemlist` table (unported anywhere in the
-        // crate graph; see `bg_misc.rs`).
         (*dropped).s.modelindex = item.offset_from(bg_itemlist.as_ptr()) as c_int; // store item number in modelindex
         if (*dropped).s.modelindex < 0 {
             (*dropped).s.modelindex = 0;
@@ -3773,10 +3785,6 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).r.maxs = [8.0, 8.0, 16.0];
 
         (*ent).s.eType = ET_ITEM as c_int;
-        //TODO: Port bg_itemlist
-        // Source: oracle/oracle/codemp/game/g_items.c:2897 — `ent->item - bg_itemlist`
-        // needs the bg-owned `bg_itemlist` table (unported anywhere in the
-        // crate graph; see `bg_misc.rs`).
         (*ent).s.modelindex = (*ent).item.offset_from(bg_itemlist.as_ptr()) as c_int; // store item number in modelindex
         (*ent).s.modelindex2 = 0; // zero indicates this isn't a dropped item
 
@@ -3855,10 +3863,6 @@ pub fn G_CheckTeamItems(ctx: GameContext<'_>) {
         {
             // check for the two flags
             let mut item = BG_FindItem(c"team_CTF_redflag".as_ptr());
-            //TODO: Port bg_itemlist
-            // Source: oracle/oracle/codemp/game/g_items.c:2983 — `item - bg_itemlist`
-            // needs the bg-owned `bg_itemlist` table (unported anywhere in the
-            // crate graph; see `bg_misc.rs`).
             if item.is_null()
                 || (*ctx.world).globals.itemRegistered.0
                     [item.offset_from(bg_itemlist.as_ptr()) as usize]
@@ -3912,10 +3916,6 @@ pub fn RegisterItem(ctx: GameContext<'_>, item: *mut gitem_t) {
         if item.is_null() {
             G_Error(ctx, c"RegisterItem: NULL".as_ptr());
         }
-        //TODO: Port bg_itemlist
-        // Source: oracle/oracle/codemp/game/g_items.c:3024 — `item - bg_itemlist`
-        // needs the bg-owned `bg_itemlist` table (unported anywhere in the
-        // crate graph; see `bg_misc.rs`).
         (*ctx.world).globals.itemRegistered.0[item.offset_from(bg_itemlist.as_ptr()) as usize] =
             qtrue;
     }
@@ -3929,9 +3929,6 @@ pub fn RegisterItem(ctx: GameContext<'_>, item: *mut gitem_t) {
 /// Source: `oracle/oracle/codemp/game/g_items.c:3036-3054`
 pub fn SaveRegisteredItems(ctx: GameContext<'_>) {
     unsafe {
-        //TODO: Port bg_numItems
-        // Source: oracle/oracle/codemp/game/g_items.c:3042 — bg-owned
-        // item-table count, not ported anywhere in the crate graph.
         let mut string: Vec<c_char> = vec![0; crate::game_globals::MAX_ITEMS + 1];
         let mut count = 0;
         for i in 0..bg_numItems {

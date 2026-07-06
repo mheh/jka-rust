@@ -71,43 +71,24 @@ const FRAMETIME: c_int = 100;
 // Pass-3 local-recipe consts (module-private, same convention as the
 // `FRAMETIME`/`MASK_PLAYERSOLID` consts above — each not yet ported to a
 // shared location, so declared locally with its oracle source cited).
-//TODO: Port PMF_FOLLOW
-// Source: oracle/oracle/codemp/game/bg_public.h:415
-const PMF_FOLLOW: c_int = 4096;
-//TODO: Port CS_GLOBAL_AMBIENT_SET
-// Source: oracle/oracle/codemp/game/bg_public.h:88
-pub const CS_GLOBAL_AMBIENT_SET: c_int = 32;
-//TODO: Port SIEGETEAM_TEAM1
-// Source: oracle/oracle/codemp/game/bg_saga.h:3
-pub const SIEGETEAM_TEAM1: c_int = 1;
-//TODO: Port SIEGETEAM_TEAM2
-// Source: oracle/oracle/codemp/game/bg_saga.h:4
-pub const SIEGETEAM_TEAM2: c_int = 2;
-//TODO: Port PUSH_CONSTANT
+// `PMF_FOLLOW`, `CS_GLOBAL_AMBIENT_SET`, `SIEGETEAM_TEAM1`/`SIEGETEAM_TEAM2`
+// are ported (`mp_qshared::common::mp::qcommon::pm_flags`,
+// `mp_bg::public::configstring`, `mp_bg::saga::siege_team_t`) and reach this
+// file through `crate::prelude::*`.
 // Source: oracle/oracle/codemp/game/g_trigger.c:899
 pub const PUSH_CONSTANT: c_int = 2;
-//TODO: Port PUSH_LINEAR
 // Source: oracle/oracle/codemp/game/g_trigger.c:895
 pub const PUSH_LINEAR: c_int = 4;
-//TODO: Port PUSH_RELATIVE
 // Source: oracle/oracle/codemp/game/g_trigger.c:896
 pub const PUSH_RELATIVE: c_int = 16;
-//TODO: Port PUSH_MULTIPLE
 // Source: oracle/oracle/codemp/game/g_trigger.c:897
 pub const PUSH_MULTIPLE: c_int = 2048;
-//TODO: Port HYPERSPACE_TIME
 // Source: oracle/oracle/codemp/game/bg_public.h:1679
 pub const HYPERSPACE_TIME: c_int = 4000;
-//TODO: Port HYPERSPACE_TELEPORT_FRAC
 // Source: oracle/oracle/codemp/game/bg_public.h:1680
 pub const HYPERSPACE_TELEPORT_FRAC: f32 = 0.75;
-//TODO: Port EF2_HYPERSPACE
-// Source: oracle/oracle/codemp/game/bg_public.h:621
-const EF2_HYPERSPACE: c_int = 1 << 5;
-//TODO: Port EF_RAG
-// Source: oracle/oracle/codemp/game/bg_public.h:576
-const EF_RAG: c_int = 1 << 6;
-//TODO: Port INITIAL_SUFFOCATION_DELAY
+// `EF2_HYPERSPACE`/`EF_RAG` are ported (`mp_bg::public::entity_effects`) and
+// reach this file through `crate::prelude::*`.
 // Source: oracle/oracle/codemp/game/g_trigger.c:1441
 pub const INITIAL_SUFFOCATION_DELAY: c_int = 500;
 
@@ -1376,10 +1357,9 @@ pub fn trigger_teleporter_touch(
         if (*other).client.is_null() {
             return;
         }
-        // TODO: Port PM_DEAD / ps.pm_type check — playerState_t.pm_type field
-        // access needs the typed `gclient_t` this staged `client: *mut c_void`
-        // does not carry.
-        // Source: oracle/oracle/codemp/game/g_trigger.c:1208-1215
+        if (*((*other).client as *mut gclient_t)).ps.pm_type == pmtype_t::PM_DEAD as c_int {
+            return;
+        }
 
         let dest = G_PickTarget(ctx, (*self_).target);
         if dest.is_null() {

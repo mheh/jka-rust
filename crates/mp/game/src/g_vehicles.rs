@@ -1029,8 +1029,6 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
                 &mut (*pVeh).m_vPrevOrientation,
             );
             crate::veh_dispatch::process_orient_commands(ctx, pVeh);
-            //TODO: Port SetClientViewAngle
-            // Source: oracle/oracle/codemp/game/g_client.c (fn not yet ported to g_client.rs)
             SetClientViewAngle(parent, *((*pVeh).m_vOrientation as *const vec3_t));
             if !(*pVeh).m_pPilot.is_null() {
                 SetClientViewAngle(
@@ -1294,8 +1292,6 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
 
         // Process the orient commands.
         crate::veh_dispatch::process_orient_commands(ctx, pVeh);
-        //TODO: Port SetClientViewAngle
-        // Source: oracle/oracle/codemp/game/g_client.c (fn not yet ported to g_client.rs)
         SetClientViewAngle(parent, *((*pVeh).m_vOrientation as *const vec3_t));
         if !(*pVeh).m_pPilot.is_null() {
             // MP
@@ -2636,8 +2632,6 @@ pub fn Eject(
         (*ec).ps.viewangles[PITCH as usize] = 0.0;
         (*ec).ps.viewangles[ROLL as usize] = 0.0;
         (*ec).ps.viewangles[YAW as usize] = *(*pVeh).m_vOrientation.add(YAW as usize);
-        //TODO: Port SetClientViewAngle
-        // Source: oracle/oracle/codemp/game/g_client.c (fn not yet ported to g_client.rs)
         crate::g_client::SetClientViewAngle(ent, (*ec).ps.viewangles);
 
         if (*ec).solidHack != 0 {
@@ -2796,7 +2790,6 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     }
 }
 
-//TODO: Port RegisterAssets
 // Source: oracle/oracle/codemp/game/g_vehicles.c:1618-1620
 /// Raven `RegisterAssets` — register all the assets used by this vehicle. The
 /// base implementation is an empty function body in Raven (see cite); this

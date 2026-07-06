@@ -1760,12 +1760,9 @@ pub fn SP_func_door(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).pos1 = temp;
         }
 
-        //TODO: Port EF_SHADER_ANIM
-        // Source: oracle/oracle/codemp/game/g_mover.c:1438-1441 — a locked
-        // door additionally sets `s.eFlags |= EF_SHADER_ANIM; s.frame = 0`
-        // here; `EF_SHADER_ANIM`'s bit value is not type-ported anywhere in
-        // the crate graph yet.
         if (*ent).spawnflags & MOVER_LOCKED != 0 {
+            //a locked door, set up as locked until used directly
+            (*ent).s.eFlags |= EF_SHADER_ANIM; // use frame-controlled shader anim
             (*ent).s.frame = 0; // first stage of anim
         }
         InitMover(ctx, ent);
@@ -2262,12 +2259,6 @@ pub fn SP_func_train(ctx: GameContext<'_>, self_: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(unported-consts): `EF_SHADER_ANIM`/`SVF_BROADCAST`-adjacent
-// `EF2_HYPERSPACE` bit values (`q_shared.h`) are not type-ported anywhere in
-// the crate graph yet — the `model2scale`/`hyperspace` tail (g_mover.c:1988-
-// 2018) needs them; the rest of the spawn body is faithfully ported below it
-// with those two statements each left as an explicit `//TODO: Port` no-op
-// per the marker convention (rule 2: no guessed bit patterns).
 /// Raven `SP_func_static`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1956-2019`
@@ -2296,8 +2287,11 @@ pub fn SP_func_static(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).r.svFlags |= SVF_BROADCAST;
         }
 
-        //TODO: Port EF_SHADER_ANIM
-        // Source: oracle/oracle/codemp/game/g_mover.c:1977-1981
+        if (*ent).spawnflags & 4 != 0 {
+            // SWITCH_SHADER
+            (*ent).s.eFlags |= EF_SHADER_ANIM; // use frame-controlled shader anim
+            (*ent).s.frame = 0; // first stage of anim
+        }
 
         if (*ent).spawnflags & 1 != 0 || (*ent).spawnflags & 2 != 0 {
             // so we know it's push/pullable on the client
@@ -2318,10 +2312,6 @@ pub fn SP_func_static(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.iModelScale = 1023;
         }
 
-        //TODO: Port EF2_HYPERSPACE
-        // Source: oracle/oracle/codemp/game/g_mover.c:2006-2011 — a nonzero
-        // "hyperspace" spawn key additionally sets `r.svFlags |=
-        // SVF_BROADCAST; s.eFlags2 |= EF2_HYPERSPACE` here.
         let mut test = 0;
         G_SpawnInt(
             ctx,
@@ -2331,13 +2321,15 @@ pub fn SP_func_static(ctx: GameContext<'_>, ent: *mut gentity_t) {
         );
         if test != 0 {
             (*ent).r.svFlags |= SVF_BROADCAST;
+            (*ent).s.eFlags2 |= EF2_HYPERSPACE;
         }
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
-        //TODO: Port EF_PERMANENT
-        // Source: oracle/oracle/codemp/game/g_mover.c:2015-2018 — inside a
-        // BSP instance, `s.eFlags = EF_PERMANENT` here.
+        if (*ctx.world).level.mBSPInstanceDepth != 0 {
+            // this means that this guy will never be updated, moved, changed, etc.
+            (*ent).s.eFlags = EF_PERMANENT;
+        }
     }
 }
 
@@ -2392,9 +2384,6 @@ pub fn func_rotating_use(
     }
 }
 
-// PORT-NOTE(unported-consts): the `IMPACT`/`RADAR` spawnflag branches
-// need `EF_RADAROBJECT`'s bit value (`bg_public.h`), not type-ported
-// anywhere in the crate graph yet; left as an explicit `//TODO: Port` no-op.
 /// Raven `SP_func_rotating`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2133-2209`
@@ -2469,10 +2458,12 @@ pub fn SP_func_rotating(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 (*ent).damage = 2;
             }
         }
-        //TODO: Port EF_RADAROBJECT
-        // Source: oracle/oracle/codemp/game/g_mover.c:2204-2208 — the RADAR
-        // spawnflag (2) additionally sets `s.speed = Distance(absmin,
-        // absmax)*0.5` and `s.eFlags |= EF_RADAROBJECT` here.
+        if (*ent).spawnflags & 2 != 0 {
+            // RADAR: show up on Radar at close range and play impact sound
+            // when close...? Range based on my size
+            (*ent).s.speed = Distance((*ent).r.absmin, (*ent).r.absmax) * 0.5;
+            (*ent).s.eFlags |= EF_RADAROBJECT;
+        }
     }
 }
 
@@ -2693,13 +2684,9 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: *mut gentity_t) {
         // if a missile is stuck to us, blow it up so we don't look dumb
         for i in 0..mp_qshared::shared::MAX_GENTITIES {
             let other = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
-            //TODO: Port EF_MISSILE_STICK
-            // Source: oracle/oracle/codemp/game/g_mover.c:2409 — the
-            // `EF_MISSILE_STICK` eFlags bit isn't type-ported anywhere in
-            // the crate graph yet, so this sub-condition can't be checked
-            // faithfully; left unguarded (over-inclusive) rather than
-            // silently dropped.
-            if (*other).s.groundEntityNum == (*self_).s.number {
+            if (*other).s.groundEntityNum == (*self_).s.number
+                && (*other).s.eFlags & EF_MISSILE_STICK != 0
+            {
                 G_Damage(
                     ctx,
                     other,
@@ -2896,12 +2883,6 @@ pub fn funcBBrushUse(
     }
 }
 
-// PORT-NOTE(unported-consts): the stone-chunk branch compares
-// `material` against `MAT_DRK_STONE`/`MAT_LT_STONE`/`MAT_GREY_STONE`/
-// `MAT_SNOWY_ROCK` (`material_t`'s anonymous enum, `q_shared.h`) — not
-// type-ported anywhere in the crate graph yet (same blocker as
-// `CacheChunkEffects` in this file); left as an explicit `//TODO: Port`
-// no-op, rest of the body faithfully ported.
 /// Raven `funcBBrushPain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2532-2597`
@@ -2936,11 +2917,69 @@ pub fn funcBBrushPain(
 
         G_ActivateBehavior(ctx, self_, bSet_t::BSET_PAIN as c_int);
 
-        //TODO: Port MAT_DRK_STONE, MAT_LT_STONE, MAT_GREY_STONE, MAT_SNOWY_ROCK
-        // Source: oracle/oracle/codemp/game/g_mover.c:2556-2588 — the stone
-        // chunk-spawning branch (`G_Chunks` with a `Q_irand(1,3)`-scaled
-        // count) needs these `material_t` values, not type-ported anywhere
-        // in the crate graph yet.
+        if (*self_).material == MAT_DRK_STONE
+            || (*self_).material == MAT_LT_STONE
+            || (*self_).material == MAT_GREY_STONE
+            || (*self_).material == MAT_SNOWY_ROCK
+        {
+            // size
+            let size = [
+                (*self_).r.absmax[0] - (*self_).r.absmin[0],
+                (*self_).r.absmax[1] - (*self_).r.absmin[1],
+                (*self_).r.absmax[2] - (*self_).r.absmin[2],
+            ];
+            // This formula really has no logical basis other than the fact
+            // that it seemed to be the closest to yielding the results that
+            // I wanted. Volume is length * width * height...then break
+            // that volume down based on how many chunks we have.
+            let scale = VectorLength(size) / 100.0;
+
+            // Raven's dead `VectorMA(absmin, 0.5, size, org)` (result overwritten unread) dropped.
+            let mut org = [
+                (*self_).r.absmin[0] + (*self_).r.absmax[0],
+                (*self_).r.absmin[1] + (*self_).r.absmax[1],
+                (*self_).r.absmin[2] + (*self_).r.absmax[2],
+            ];
+            for c in org.iter_mut() {
+                *c *= 0.5;
+            }
+
+            let dir = if !attacker.is_null() && !(*attacker).client.is_null() {
+                let mut d = [
+                    (*attacker).r.currentOrigin[0] - org[0],
+                    (*attacker).r.currentOrigin[1] - org[1],
+                    (*attacker).r.currentOrigin[2] - org[2],
+                ];
+                VectorNormalize(&mut d);
+                d
+            } else {
+                [0.0, 0.0, 1.0]
+            };
+
+            let mut numChunks = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+            if (*self_).radius > 0.0 {
+                // designer wants to scale number of chunks, helpful because
+                // the above scale code is far from perfect — I do this
+                // after the scale calculation because it seems that the
+                // chunk size generally seems to be very close, it's just
+                // the number of chunks is a bit weak.
+                numChunks = (numChunks as f32 * (*self_).radius).ceil() as c_int;
+            }
+
+            G_Chunks(
+                ctx,
+                (*self_).s.number,
+                org,
+                dir,
+                (*self_).r.absmin,
+                (*self_).r.absmax,
+                300.0,
+                numChunks,
+                (*self_).material,
+                0,
+                scale * (*self_).mass,
+            );
+        }
 
         if (*self_).wait == 0.0 {
             (*self_).pain = None;
@@ -3007,11 +3046,10 @@ pub fn InitBBrush(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.constantLight = r | (g << 8) | (b << 16) | (i << 24);
         }
 
-        //TODO: Port SVF_PLAYER_USABLE
-        // Source: oracle/oracle/codemp/game/g_mover.c:2651-2654 — spawnflag
-        // bit 128 additionally sets `r.svFlags |= SVF_PLAYER_USABLE` here;
-        // that flag's bit value isn't type-ported anywhere in the crate
-        // graph yet.
+        if (*ent).spawnflags & 128 != 0 {
+            // can be used by the player's BUTTON_USE
+            (*ent).r.svFlags |= SVF_PLAYER_USABLE;
+        }
 
         (*ent).s.eType = entityType_t::ET_MOVER as c_int;
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
@@ -3136,10 +3174,6 @@ pub fn SP_func_breakable(ctx: GameContext<'_>, self_: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(unported-consts): the first branch (`SVF_GLASS_BRUSH`)
-// needs that bit value (`q_shared.h`), not type-ported anywhere in the
-// crate graph yet; skipped with an explicit `//TODO: Port` — the remaining
-// classname checks are faithfully ported.
 /// Raven `G_EntIsBreakable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2831-2866`
@@ -3151,8 +3185,9 @@ pub fn G_EntIsBreakable(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
 
         let ent = &mut (*ctx.world).g_entities[entityNum as usize] as *mut gentity_t;
 
-        //TODO: Port SVF_GLASS_BRUSH
-        // Source: oracle/oracle/codemp/game/g_mover.c:2841-2844
+        if (*ent).r.svFlags & SVF_GLASS_BRUSH != 0 {
+            return qtrue;
+        }
 
         if crate::q_shared::Q_stricmp((*ent).classname, c"func_breakable".as_ptr()) == 0 {
             return qtrue;
@@ -3299,9 +3334,6 @@ pub fn GlassUse(
     }
 }
 
-// PORT-NOTE(unported-consts): `ent->r.svFlags = SVF_GLASS_BRUSH` needs
-// that bit value (`q_shared.h`), not type-ported anywhere in the crate graph
-// yet — the rest of the spawn body is faithfully ported below it.
 /// Raven `SP_func_glass`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2957-2990`
@@ -3313,9 +3345,7 @@ pub fn SP_func_glass(ctx: GameContext<'_>, ent: *mut gentity_t) {
         );
         InitMover(ctx, ent);
 
-        //TODO: Port SVF_GLASS_BRUSH
-        // Source: oracle/oracle/codemp/game/g_mover.c:2961 — Raven sets
-        // `ent->r.svFlags = SVF_GLASS_BRUSH` here.
+        (*ent).r.svFlags = SVF_GLASS_BRUSH;
 
         (*ent).s.pos.trBase = (*ent).s.origin;
         (*ent).r.currentOrigin = (*ent).s.origin;
@@ -3384,19 +3414,13 @@ pub fn func_wait_return_solid(ctx: GameContext<'_>, self_: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(unported-consts): `self->r.svFlags |= SVF_PLAYER_USABLE`
-// needs that bit value (`q_shared.h`), not type-ported anywhere in the crate
-// graph yet.
 /// Raven `func_usable_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3027-3035`
 pub fn func_usable_think(self_: *mut gentity_t) {
     unsafe {
         if (*self_).spawnflags & 8 != 0 {
-            //TODO: Port SVF_PLAYER_USABLE
-            // Source: oracle/oracle/codemp/game/g_mover.c:3031 — Raven sets
-            // `self->r.svFlags |= SVF_PLAYER_USABLE` here (replace the
-            // usable flag).
+            (*self_).r.svFlags |= SVF_PLAYER_USABLE; // replace the usable flag
             (*self_).use_ = Some(EntUse::func_usable_use);
             (*self_).think = None;
         }
@@ -3509,12 +3533,6 @@ pub fn func_usable_die(
     }
 }
 
-// PORT-NOTE(unported-consts): the `spawnflags & 1` branch and the
-// `genericValue5 > 0` tail need `SVF_NOCLIENT`/`EF_NODRAW`/`EF_SHADER_ANIM`;
-// `SVF_NOCLIENT`/`EF_NODRAW` are available (reused above) but
-// `EF_SHADER_ANIM` is not type-ported anywhere in the crate graph yet —
-// that one assignment is left as an explicit `//TODO: Port` no-op, the rest
-// of the body faithfully ported.
 /// Raven `SP_func_usable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3140-3203`
@@ -3571,8 +3589,7 @@ pub fn SP_func_usable(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         if (*self_).genericValue5 > 0 {
             (*self_).s.frame = 0;
-            //TODO: Port EF_SHADER_ANIM
-            // Source: oracle/oracle/codemp/game/g_mover.c:3198
+            (*self_).s.eFlags |= EF_SHADER_ANIM;
             (*self_).s.time = (*self_).genericValue5 + 1;
         }
 

@@ -8,3 +8,4 @@ pub mod server_state_t;
 pub mod server_static_t;
 pub mod server_t;
 pub mod sv_entity_s;
+pub mod world_sector_s;
