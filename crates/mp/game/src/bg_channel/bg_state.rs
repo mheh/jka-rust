@@ -17,6 +17,7 @@ use core::ffi::{c_char, c_int};
 use crate::prelude::*;
 
 use super::rng::Rng;
+use crate::bg_panimate::MAX_ANIM_FILES;
 use mp_bg::public::bg_loaded_anim::bgLoadedAnim_t;
 use mp_bg::public::bg_loaded_events::bgLoadedEvents_t;
 use mp_bg::public::saber_move_data::saberMoveData_t;
@@ -166,9 +167,12 @@ impl BgState {
     pub fn new() -> Self {
         Self {
             rng: Rng::new(),
-            bgAllAnims: Vec::new(),
+            // Sized like Raven's fixed `bgLoadedAnim_t bgAllAnims[MAX_ANIM_FILES]` /
+            // `bgLoadedEvents_t bgAllEvents[MAX_ANIM_FILES]` zeroed statics
+            // (loaders index them directly rather than push/grow).
+            bgAllAnims: vec![unsafe { core::mem::zeroed() }; MAX_ANIM_FILES as usize],
             bgNumAllAnims: 0,
-            bgAllEvents: Vec::new(),
+            bgAllEvents: vec![unsafe { core::mem::zeroed() }; MAX_ANIM_FILES as usize],
             // Raven initialises this to 1 (first entry is the null/default).
             bgNumAnimEvents: 1,
             bgHumanoidAnimations: Vec::new(),
