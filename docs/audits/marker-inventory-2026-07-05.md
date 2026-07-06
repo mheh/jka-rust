@@ -1,6 +1,6 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 796 markers — 185 `TODO: Port`,
+Totals: 795 markers — 184 `TODO: Port`,
 554 `PORT-NOTE`, 57 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
@@ -10,12 +10,12 @@ judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
-  the actionable findings. (24)
+  the actionable findings. (23; weaponData/Pickup_Item done in 43d83f4)
 - **STALE-escalated** — mechanical fix known but crosses files; left in place. (3)
 
 PORT-NOTE section is a plain re-grep (not audited).
 
-## TODO: Port — COMPLEX (24)
+## TODO: Port — COMPLEX (23)
 
 ### crates/mp/engine/server/src/server_host.rs
 - L16: Server fields (sv: server_t incl. the SS_DEAD liveness state,
@@ -32,8 +32,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/game/src/g_items.rs
 - L1963: bg_itemlist
   - bg_itemlist is ported (bg_itemlist.rs:26) and BG_CycleInven is ported (bg_misc.rs:907), so the stated blocker is gone, but the branch itself (oracle g_items.c:1471-1478: check `STAT_HOLDABLE_ITEM`'s bg_itemlist entry is IT_HOLDABLE/HI_EWEB, then reset the stat and call BG_CycleInven) was never written — the `if` block here is empty. Completing it requires authoring new conditional logic, not a mechanical retype.
-- L3376: weaponData
-  - weaponData is ported (weapon_data.rs:10), so the stated blocker is gone, but the branch body (oracle g_items.c:2496-2514: map AMMO_THERMAL/AMMO_TRIPMINE/else to a weapon, then check `ps.ammo[weaponData[weapForAmmo].ammoIndex] > 0` and set the STAT_WEAPONS bit) was never written — the block at lines 3389-3395 is empty aside from the marker. Requires authoring new logic, not a mechanical retype.
 
 ### crates/mp/game/src/g_mover.rs
 - L2926: MAT_DRK_STONE, MAT_LT_STONE, MAT_GREY_STONE, MAT_SNOWY_ROCK
