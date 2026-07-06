@@ -1,0 +1,639 @@
+//! Differential parity test for the jampgame `q_shared` port against the Raven
+//! oracle. Reproduces `tools/jampgame-oracle/golden/qshared.txt` (generated
+//! only by the C dumper `main_qshared.c` over the committed
+//! `fixtures/qshared/`) by calling the PORTED `mp_game::q_shared` functions and
+//! byte-comparing to the golden.
+//!
+//! Single-threaded, single process by construction: the oracle keeps parser
+//! state in file statics (`com_lines`, `va`'s rotating buffer), and the port
+//! mirrors that with module-level `static mut`s. The whole dump is ONE `#[test]`
+//! whose sections run in the exact order the C dumper emits them, so the shared
+//! statics evolve identically on both sides. Run with `--test-threads=1`.
+//! See `tools/jampgame-oracle/README.md`.
+//!
+//! Scope note: `Com_sprintf`/`va` are exercised with LITERAL formats only — the
+//! port's implementations are documented variadic stubs that echo the format
+//! string without argument substitution, so `%s/%i/%d/%c/%x` conversions cannot
+//! reach parity (reported as a finding, not fixtured).
+#![allow(non_snake_case)]
+
+use core::ffi::{c_char, c_int};
+use std::fmt::Write as _;
+use std::path::PathBuf;
+
+use mp_game::prelude::{cstr, qfalse, qtrue};
+use mp_game::q_shared::{
+    va, Com_Clamp, Com_Clampi, Com_sprintf, COM_BeginParseSession, COM_Compress,
+    COM_DefaultExtension, COM_GetCurrentParseLine, COM_ParseExt, COM_StripExtension, Info_NextPair,
+    Info_RemoveKey, Info_RemoveKey_Big, Info_SetValueForKey, Info_SetValueForKey_Big,
+    Info_Validate, Info_ValueForKey, Q_CleanStr, Q_PrintStrlen, Q_isalpha, Q_islower, Q_isprint,
+    Q_isupper, Q_strcat, Q_stricmp, Q_stricmpn, Q_strlwr, Q_strncmp, Q_strncpyz, Q_strrchr,
+    Q_strupr, SkipBracedSection, SkipRestOfLine,
+};
+
+fn oracle_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tools/jampgame-oracle")
+}
+
+fn read_fixture(name: &str) -> Vec<u8> {
+    let path = oracle_dir().join("fixtures/qshared").join(name);
+    std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
+}
+
+fn compare(name: &str, got: &str) {
+    let golden_path = oracle_dir().join("golden").join(format!("{name}.txt"));
+    let golden = std::fs::read_to_string(&golden_path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", golden_path.display()));
+    if got == golden {
+        return;
+    }
+    let g: Vec<&str> = golden.lines().collect();
+    let o: Vec<&str> = got.lines().collect();
+    for (i, (gl, ol)) in g.iter().zip(o.iter()).enumerate() {
+        if gl != ol {
+            panic!(
+                "{name} parity mismatch at line {} (oracle vs port):\n  oracle: {gl}\n  port:   {ol}",
+                i + 1
+            );
+        }
+    }
+    panic!(
+        "{name} parity length mismatch: oracle {} lines, port {} lines",
+        g.len(),
+        o.len()
+    );
+}
+
+// --- canonical emit helpers (mirror main_qshared.c byte-for-byte) ---
+
+/// Read a C string (up to NUL) into a byte vector.
+fn read_cstr(p: *const c_char) -> Vec<u8> {
+    let mut v = Vec::new();
+    let mut q = p;
+    unsafe {
+        while *q != 0 {
+            v.push(*q as u8);
+            q = q.add(1);
+        }
+    }
+    v
+}
+
+/// A quoted, escaped string: printable ASCII except `"`/`\` verbatim, else \xHH.
+fn qstr(o: &mut String, bytes: &[u8]) {
+    o.push('"');
+    for &c in bytes {
+        if (0x20..=0x7e).contains(&c) && c != b'"' && c != b'\\' {
+            o.push(c as char);
+        } else {
+            let _ = write!(o, "\\x{c:02x}");
+        }
+    }
+    o.push('"');
+}
+
+fn qstr_p(o: &mut String, p: *const c_char) {
+    let b = read_cstr(p);
+    qstr(o, &b);
+}
+
+/// A fixed byte window as space-separated %02x.
+fn hex(o: &mut String, b: &[c_char]) {
+    for (i, &c) in b.iter().enumerate() {
+        let _ = write!(o, "{}{:02x}", if i > 0 { " " } else { "" }, c as u8);
+    }
+}
+
+/// Build a NUL-terminated `Vec<c_char>` from bytes.
+fn cbuf_b(b: &[u8]) -> Vec<c_char> {
+    let mut v: Vec<c_char> = b.iter().map(|&x| x as c_char).collect();
+    v.push(0);
+    v
+}
+fn cbuf(s: &str) -> Vec<c_char> {
+    cbuf_b(s.as_bytes())
+}
+
+const NULLP: *const c_char = core::ptr::null();
+
+// ============================ sections ============================
+
+fn dump_clamp(o: &mut String) {
+    o.push_str("== clamp ==\n");
+    let iv = [-100i32, -1, 0, 1, 5, 50, 100];
+    for &a in &iv {
+        for &b in &iv {
+            for &c in &iv {
+                let _ = writeln!(o, "ci {}", Com_Clampi(a, b, c));
+            }
+        }
+    }
+    let cv = [-100.0f32, -1.5, 0.0, 1.5, 5.25, 100.0];
+    for &a in &cv {
+        for &b in &cv {
+            for &c in &cv {
+                let _ = writeln!(o, "cf {:08x}", Com_Clamp(a, b, c).to_bits());
+            }
+        }
+    }
+}
+
+fn dump_tokens(o: &mut String) {
+    o.push_str("== tokens ==\n");
+    let cb = cbuf_b(&read_fixture("tokens.txt"));
+
+    // pass 1: allowLineBreaks = qtrue
+    let name = cstr("tokens");
+    COM_BeginParseSession(name.as_ptr());
+    let mut p: *const c_char = cb.as_ptr();
+    for _ in 0..200 {
+        let tok = COM_ParseExt(&mut p, qtrue);
+        let eof = p.is_null();
+        let _ = write!(o, "qt ");
+        qstr_p(o, tok);
+        let _ = writeln!(o, " line {} nul {}", COM_GetCurrentParseLine(), eof as i32);
+        let first = unsafe { *tok };
+        if first == 0 && eof {
+            break;
+        }
+    }
+
+    // pass 2: allowLineBreaks = qfalse (empty token returned at line breaks)
+    COM_BeginParseSession(name.as_ptr());
+    p = cb.as_ptr();
+    for _ in 0..200 {
+        let tok = COM_ParseExt(&mut p, qfalse);
+        let eof = p.is_null();
+        let _ = write!(o, "qf ");
+        qstr_p(o, tok);
+        let _ = writeln!(o, " line {} nul {}", COM_GetCurrentParseLine(), eof as i32);
+        if eof {
+            break;
+        }
+    }
+}
+
+fn dump_compress(o: &mut String) {
+    o.push_str("== compress ==\n");
+    let data = read_fixture("compress.txt");
+    for (idx, rec) in data.split(|&b| b == 0).enumerate() {
+        let mut cb = cbuf_b(rec);
+        let r = COM_Compress(cb.as_mut_ptr());
+        let _ = write!(o, "cz {idx} len {r} ");
+        qstr_p(o, cb.as_ptr());
+        let _ = writeln!(o);
+    }
+}
+
+fn dump_braced(o: &mut String) {
+    o.push_str("== braced ==\n");
+    let cases = [
+        "{ a { b } c } after",
+        "{ } trailing",
+        "{nested{deeper{x}}} end",
+        "{ unterminated { block ",
+        "noBrace token here",
+    ];
+    let name = cstr("braced");
+    for (i, input) in cases.iter().enumerate() {
+        let cb = cbuf(input);
+        COM_BeginParseSession(name.as_ptr());
+        let mut p: *const c_char = cb.as_ptr();
+        SkipBracedSection(&mut p);
+        let off: i64 = if p.is_null() {
+            -1
+        } else {
+            unsafe { p.offset_from(cb.as_ptr()) as i64 }
+        };
+        let rest: Vec<u8> = if p.is_null() {
+            Vec::new()
+        } else {
+            read_cstr(COM_ParseExt(&mut p, qtrue))
+        };
+        let line = COM_GetCurrentParseLine();
+        let _ = write!(o, "br {i} off {off} line {line} rest ");
+        qstr(o, &rest);
+        let _ = writeln!(o);
+    }
+}
+
+fn dump_skipline(o: &mut String) {
+    o.push_str("== skipline ==\n");
+    let cases = [
+        "rest of line\nnext line",
+        "no newline here",
+        "\nimmediate",
+        "a\nb\nc",
+    ];
+    let name = cstr("skipline");
+    for (i, input) in cases.iter().enumerate() {
+        let cb = cbuf(input);
+        COM_BeginParseSession(name.as_ptr());
+        let mut p: *const c_char = cb.as_ptr();
+        SkipRestOfLine(&mut p);
+        // Raven's SkipRestOfLine consumes the terminating NUL when there is no
+        // newline, leaving the cursor one past the NUL; dereferencing it is UB.
+        // Only the (defined) offset + line counter are dumped (§19).
+        let off = unsafe { p.offset_from(cb.as_ptr()) };
+        let line = COM_GetCurrentParseLine();
+        let _ = writeln!(o, "sl {i} off {off} line {line}");
+    }
+}
+
+fn dump_strhelpers(o: &mut String) {
+    o.push_str("== strhelpers ==\n");
+
+    // isXXX predicates over signed-char edges.
+    let ic = [-1i32, 0, 0x1f, 0x20, 0x40, 0x5a, 0x61, 0x7a, 0x7e, 0x7f, 0x80, 0xff];
+    for &c in &ic {
+        let _ = writeln!(
+            o,
+            "is {} p {} l {} u {} a {}",
+            c,
+            Q_isprint(c),
+            Q_islower(c),
+            Q_isupper(c),
+            Q_isalpha(c)
+        );
+    }
+
+    // COM_StripExtension.
+    let sx = [
+        "",
+        "file",
+        "file.ext",
+        "a.b.c",
+        ".hidden",
+        "no_dot",
+        "path/to/file.tga",
+    ];
+    for s in sx {
+        let inb = cbuf(s);
+        let mut out = vec![0 as c_char; 64];
+        COM_StripExtension(inb.as_ptr(), out.as_mut_ptr());
+        let _ = write!(o, "strip ");
+        qstr(o, s.as_bytes());
+        let _ = write!(o, " -> ");
+        qstr_p(o, out.as_ptr());
+        let _ = writeln!(o);
+    }
+
+    // COM_DefaultExtension (non-empty paths; empty path reads path[-1] = UB).
+    let dx = [
+        ("file", ".tga"),
+        ("file.bmp", ".tga"),
+        ("path/to/file", ".md3"),
+        ("path/to/file.ext", ".md3"),
+        ("noext", ".cfg"),
+        ("dir.x/name", ".wav"),
+    ];
+    for (p, e) in dx {
+        let mut path = vec![0 as c_char; 128];
+        for (i, b) in p.bytes().enumerate() {
+            path[i] = b as c_char;
+        }
+        let ext = cbuf(e);
+        COM_DefaultExtension(path.as_mut_ptr(), 128, ext.as_ptr());
+        let _ = write!(o, "defext ");
+        qstr(o, p.as_bytes());
+        let _ = write!(o, " ");
+        qstr(o, e.as_bytes());
+        let _ = write!(o, " -> ");
+        qstr_p(o, path.as_ptr());
+        let _ = writeln!(o);
+    }
+
+    // Q_strncpyz (24-byte window filled with 0xAA to observe zero-padding).
+    let ncz = ["", "hi", "exactfit", "longerthanthebuffer.....", "abc"];
+    let nsz = [1i32, 2, 4, 8, 16];
+    for (i, s) in ncz.iter().enumerate() {
+        for &sz in &nsz {
+            let mut b = vec![0xAAu8 as c_char; 24];
+            let src = cbuf(s);
+            Q_strncpyz(b.as_mut_ptr(), src.as_ptr(), sz);
+            let _ = write!(o, "ncpyz {i} {sz} ");
+            hex(o, &b);
+            let _ = writeln!(o);
+        }
+    }
+
+    // Q_strcat (skip combos the C would Com_Error-abort on: strlen(init) >= size).
+    let cat_i = ["", "foo", "12345"];
+    let cat_s = ["", "bar", "appendmelong"];
+    let cat_sz = [4i32, 8, 16];
+    for (a, init) in cat_i.iter().enumerate() {
+        for (b, s) in cat_s.iter().enumerate() {
+            for &z in &cat_sz {
+                if init.len() as c_int >= z {
+                    continue;
+                }
+                let mut buf = vec![0xAAu8 as c_char; 24];
+                for (k, by) in init.bytes().enumerate() {
+                    buf[k] = by as c_char;
+                }
+                buf[init.len()] = 0;
+                let src = cbuf(s);
+                Q_strcat(buf.as_mut_ptr(), z, src.as_ptr());
+                let _ = write!(o, "cat {a} {b} {z} ");
+                hex(o, &buf);
+                let _ = writeln!(o);
+            }
+        }
+    }
+
+    // Q_stricmp / Q_stricmpn / Q_strncmp over case/prefix/high-bit pairs.
+    let cmp_a: [&[u8]; 14] = [
+        b"", b"a", b"a", b"abc", b"abc", b"Hello", b"hello", b"abc", b"ab", b"zoo", b"Test123",
+        b"\x80x", b"a\x80", b"MixedCase",
+    ];
+    let cmp_b: [&[u8]; 14] = [
+        b"", b"a", b"A", b"abd", b"abc", b"hello", b"HELLO", b"ab", b"abc", b"zoon", b"test123",
+        b"\x80x", b"a\x7f", b"mixedcase",
+    ];
+    let cmp_n = [0i32, 1, 2, 3, 5, 99999];
+    for i in 0..cmp_a.len() {
+        let a = cbuf_b(cmp_a[i]);
+        let b = cbuf_b(cmp_b[i]);
+        let _ = writeln!(o, "stricmp {i} {}", Q_stricmp(a.as_ptr(), b.as_ptr()));
+        for &n in &cmp_n {
+            let _ = writeln!(o, "stricmpn {i} {n} {}", Q_stricmpn(a.as_ptr(), b.as_ptr(), n));
+        }
+        for &n in &cmp_n {
+            let _ = writeln!(o, "strncmp {i} {n} {}", Q_strncmp(a.as_ptr(), b.as_ptr(), n));
+        }
+    }
+    let x = cbuf("x");
+    let _ = writeln!(
+        o,
+        "stricmp_null {} {} {}",
+        Q_stricmp(NULLP, x.as_ptr()),
+        Q_stricmp(x.as_ptr(), NULLP),
+        Q_stricmp(NULLP, NULLP)
+    );
+    let _ = writeln!(
+        o,
+        "stricmpn_null {} {} {}",
+        Q_stricmpn(NULLP, NULLP, 5),
+        Q_stricmpn(NULLP, x.as_ptr(), 5),
+        Q_stricmpn(x.as_ptr(), NULLP, 5)
+    );
+
+    // Q_strlwr / Q_strupr (ASCII only).
+    let lu = ["", "Hello World", "ALLCAPS", "already lower", "MiXeD123!@#"];
+    for s in lu {
+        let mut a = cbuf(s);
+        let mut b = cbuf(s);
+        Q_strlwr(a.as_mut_ptr());
+        Q_strupr(b.as_mut_ptr());
+        let _ = write!(o, "lwr ");
+        qstr_p(o, a.as_ptr());
+        let _ = write!(o, " upr ");
+        qstr_p(o, b.as_ptr());
+        let _ = writeln!(o);
+    }
+
+    // Q_PrintStrlen / Q_CleanStr over color/control-byte strings.
+    let col: [&[u8]; 11] = [
+        b"",
+        b"hello",
+        b"^1red",
+        b"^1r^2g^3b",
+        b"^^literal",
+        b"^8notcolor",
+        b"trailing^",
+        b"^",
+        b"a\x01b\x1fc\x7fd\x80e",
+        b"^7white^0black^",
+        b"plain text 123",
+    ];
+    for (i, c) in col.iter().enumerate() {
+        let sb = cbuf_b(c);
+        let _ = writeln!(o, "pslen {i} {}", Q_PrintStrlen(sb.as_ptr()));
+        let mut cs = cbuf_b(c);
+        Q_CleanStr(cs.as_mut_ptr());
+        let _ = write!(o, "clean {i} ");
+        qstr_p(o, cs.as_ptr());
+        let _ = writeln!(o);
+    }
+    let _ = writeln!(o, "pslen_null {}", Q_PrintStrlen(NULLP));
+
+    // Q_strrchr: dump offset of the found char (or -1).
+    let rc = ["", "a", "hello", "abracadabra", "a/b/c/d", "trailing/", "^1color"];
+    let rcc = [b'a' as c_int, b'/' as c_int, b'z' as c_int, 0, b'r' as c_int];
+    for (i, s) in rc.iter().enumerate() {
+        let cb = cbuf(s);
+        for &c in &rcc {
+            let r = Q_strrchr(cb.as_ptr(), c);
+            let off: i64 = if r.is_null() {
+                -1
+            } else {
+                unsafe { r.offset_from(cb.as_ptr()) as i64 }
+            };
+            let _ = writeln!(o, "rrchr {i} {c} {off}");
+        }
+    }
+}
+
+fn dump_va(o: &mut String) {
+    o.push_str("== va ==\n");
+    let f1 = cstr("first-literal");
+    let p1 = va(f1.as_ptr());
+    let f2 = cstr("second-literal");
+    let p2 = va(f2.as_ptr());
+    let _ = write!(o, "va1 ");
+    qstr_p(o, p1);
+    let _ = writeln!(o);
+    let _ = write!(o, "va2 ");
+    qstr_p(o, p2);
+    let _ = writeln!(o);
+    let f3 = cstr("third-literal");
+    let p3 = va(f3.as_ptr()); // reuses p1's slot (2-slot rotation)
+    let _ = write!(o, "va1b ");
+    qstr_p(o, p1);
+    let _ = writeln!(o);
+    let _ = write!(o, "va2b ");
+    qstr_p(o, p2);
+    let _ = writeln!(o);
+    let _ = write!(o, "va3 ");
+    qstr_p(o, p3);
+    let _ = writeln!(o);
+}
+
+fn dump_sprintf(o: &mut String) {
+    o.push_str("== sprintf ==\n");
+    let cases = [
+        ("sp1", 24i32, "hello world"),
+        ("sp2", 8, "truncate me please"),
+        ("sp3", 24, ""),
+        ("sp4", 1, "anything"),
+    ];
+    for (tag, size, lit) in cases {
+        let mut b = vec![0xAAu8 as c_char; 24];
+        let f = cbuf(lit);
+        Com_sprintf(b.as_mut_ptr(), size, f.as_ptr());
+        let _ = write!(o, "{tag} ");
+        hex(o, &b);
+        let _ = writeln!(o);
+    }
+}
+
+// --- info: probe key tables mirror main_qshared.c ---
+const VKEYS: &[&str] = &["name", "team", "key2", "empty", "onlykey", "desc", "missing", "Name", ""];
+const RKEYS: &[&str] = &["name", "team", "key1", "desc", "onlykey", "missing", "quote", "semi"];
+const SKV: &[(&str, &str)] = &[
+    ("name", "alice"),
+    ("new", "val"),
+    ("team", ""),
+    ("x", "y"),
+    ("quote", "a\"b"),
+];
+
+fn dump_info_record(o: &mut String, idx: usize, rec: &[u8]) {
+    let cb = cbuf_b(rec);
+    let s = cb.as_ptr();
+
+    let _ = write!(o, "rec {idx} ");
+    qstr(o, rec);
+    let _ = writeln!(o);
+    let _ = writeln!(o, "val {}", Info_Validate(s));
+
+    for vk in VKEYS {
+        let k = cbuf(vk);
+        let v = Info_ValueForKey(s, k.as_ptr());
+        let _ = write!(o, "vfk ");
+        qstr(o, vk.as_bytes());
+        let _ = write!(o, " ");
+        qstr_p(o, v);
+        let _ = writeln!(o);
+    }
+
+    // Info_NextPair iteration.
+    let mut h: *const c_char = s;
+    for _ in 0..12 {
+        let mut key = vec![0 as c_char; 1024];
+        let mut value = vec![0 as c_char; 1024];
+        Info_NextPair(&mut h, key.as_mut_ptr(), value.as_mut_ptr());
+        let _ = write!(o, "np ");
+        qstr_p(o, key.as_ptr());
+        let _ = write!(o, " ");
+        qstr_p(o, value.as_ptr());
+        let _ = writeln!(o);
+        if unsafe { *h } == 0 {
+            break;
+        }
+    }
+
+    for rk in RKEYS {
+        let mut tmp = vec![0 as c_char; 1100];
+        for (i, &b) in rec.iter().enumerate() {
+            tmp[i] = b as c_char;
+        }
+        let k = cbuf(rk);
+        Info_RemoveKey(tmp.as_mut_ptr(), k.as_ptr());
+        let _ = write!(o, "rk ");
+        qstr(o, rk.as_bytes());
+        let _ = write!(o, " ");
+        qstr_p(o, tmp.as_ptr());
+        let _ = writeln!(o);
+    }
+    for rk in RKEYS {
+        let mut tmp = vec![0 as c_char; 9000];
+        for (i, &b) in rec.iter().enumerate() {
+            tmp[i] = b as c_char;
+        }
+        let k = cbuf(rk);
+        Info_RemoveKey_Big(tmp.as_mut_ptr(), k.as_ptr());
+        let _ = write!(o, "rkb ");
+        qstr(o, rk.as_bytes());
+        let _ = write!(o, " ");
+        qstr_p(o, tmp.as_ptr());
+        let _ = writeln!(o);
+    }
+    for (k, v) in SKV {
+        let mut tmp = vec![0 as c_char; 1100];
+        for (i, &b) in rec.iter().enumerate() {
+            tmp[i] = b as c_char;
+        }
+        let ck = cbuf(k);
+        let cv = cbuf(v);
+        Info_SetValueForKey(tmp.as_mut_ptr(), ck.as_ptr(), cv.as_ptr());
+        let _ = write!(o, "svk ");
+        qstr(o, k.as_bytes());
+        let _ = write!(o, " ");
+        qstr(o, v.as_bytes());
+        let _ = write!(o, " ");
+        qstr_p(o, tmp.as_ptr());
+        let _ = writeln!(o);
+    }
+    for (k, v) in SKV {
+        let mut tmp = vec![0 as c_char; 9000];
+        for (i, &b) in rec.iter().enumerate() {
+            tmp[i] = b as c_char;
+        }
+        let ck = cbuf(k);
+        let cv = cbuf(v);
+        Info_SetValueForKey_Big(tmp.as_mut_ptr(), ck.as_ptr(), cv.as_ptr());
+        let _ = write!(o, "svkb ");
+        qstr(o, k.as_bytes());
+        let _ = write!(o, " ");
+        qstr(o, v.as_bytes());
+        let _ = write!(o, " ");
+        qstr_p(o, tmp.as_ptr());
+        let _ = writeln!(o);
+    }
+    o.push_str("--\n");
+}
+
+fn dump_info(o: &mut String) {
+    o.push_str("== info ==\n");
+    let data = read_fixture("infostrings.txt");
+    for (idx, rec) in data.split(|&b| b == 0).enumerate() {
+        dump_info_record(o, idx, rec);
+    }
+
+    // Big infostring in (MAX_INFO_STRING, BIG_INFO_STRING); exercises the
+    // Info_ValueForKey BIG_INFO_STRING guard. Built identically to the C dumper.
+    let mut big = String::new();
+    let mut i = 0;
+    while big.len() < 1100 {
+        let _ = write!(big, "\\k{i}\\v{i}");
+        i += 1;
+    }
+    let bigc = cbuf(&big);
+    let s = bigc.as_ptr();
+    let _ = writeln!(o, "big len {}", big.len());
+    let _ = writeln!(o, "big val {}", Info_Validate(s));
+    let k50 = cbuf("k50");
+    let _ = write!(o, "big vfk k50 ");
+    qstr_p(o, Info_ValueForKey(s, k50.as_ptr()));
+    let _ = writeln!(o);
+    let miss = cbuf("missing");
+    let _ = write!(o, "big vfk missing ");
+    qstr_p(o, Info_ValueForKey(s, miss.as_ptr()));
+    let _ = writeln!(o);
+    let mut h: *const c_char = s;
+    let mut key = vec![0 as c_char; 1024];
+    let mut value = vec![0 as c_char; 1024];
+    Info_NextPair(&mut h, key.as_mut_ptr(), value.as_mut_ptr());
+    let _ = write!(o, "big np ");
+    qstr_p(o, key.as_ptr());
+    let _ = write!(o, " ");
+    qstr_p(o, value.as_ptr());
+    let _ = writeln!(o);
+}
+
+#[test]
+fn qshared_parity() {
+    let mut o = String::new();
+    dump_clamp(&mut o);
+    dump_tokens(&mut o);
+    dump_compress(&mut o);
+    dump_braced(&mut o);
+    dump_skipline(&mut o);
+    dump_strhelpers(&mut o);
+    dump_va(&mut o);
+    dump_sprintf(&mut o);
+    dump_info(&mut o);
+    o.push_str("== end ==\n");
+    compare("qshared", &o);
+}

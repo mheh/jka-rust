@@ -142,7 +142,7 @@ pub fn G_ParseInfos(
 
                 let token2 = COM_ParseExt(&mut bufp as *mut *const c_char, qfalse);
                 let value_ptr = if *token2 == 0 {
-                    cstr("<NULL>").as_ptr()
+                    c"<NULL>".as_ptr()
                 } else {
                     token2 as *const c_char
                 };

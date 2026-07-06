@@ -2909,7 +2909,7 @@ pub fn G_BuildSaberFaces(
 
         // yeah.. always going to be 12 I suppose.
         *fNum = i as c_int;
-        *fList = FACES.as_mut_ptr();
+        *fList = (&raw mut FACES).cast::<saberFace_t>();
     }
 }
 

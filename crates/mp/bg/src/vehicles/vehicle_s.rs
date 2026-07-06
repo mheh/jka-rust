@@ -4,7 +4,7 @@
 
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::{c_int, c_void};
+use core::ffi::c_int;
 
 use mp_qshared::common::mp::qcommon::usercmd_t;
 use mp_qshared::common::mp::trace_t::trace_t;

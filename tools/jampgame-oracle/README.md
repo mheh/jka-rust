@@ -26,6 +26,30 @@ only needed to regenerate or spot-check.
 
 ## Slices
 
+Slices added 2026-07-06 are self-contained: each has its own `run_<slice>.sh`
+(own `build-<slice>/` dir, gitignored), `main_<slice>.c`, `fixtures/<slice>/`,
+`golden/<slice>.txt`, and `crates/mp/game/tests/<slice>_parity.rs` — the build
+model and rules below apply unchanged. Current set:
+
+- **qshared** (`run_qshared.sh`) — `q_shared.c` tokenizer (`COM_Parse`/
+  `COM_ParseExt`/`COM_Compress`/`SkipBracedSection`), path/string helpers
+  (`Q_str*`, `Q_CleanStr`, `va`), and the `Info_*` family incl. `_Big`
+  variants. Reconciliation fixed 4 port bugs (see the slice commit).
+- **bgmisc** (`run_bgmisc.sh`) — `BG_EvaluateTrajectory`/`Delta` over every
+  `trType_t`, the full `bg_itemlist`/`weaponData`/`ammoData` tables,
+  `BG_FindItem*`, `BG_CanItemBeGrabbed` (every branch), and
+  `BG_PlayerStateToEntityState(ExtraPolate)`. Fixed the port's f32-vs-f64
+  trajectory evaluation. `snap=1` excluded (§19 — the `-D__linux__` macro
+  truncates where retail x87 rounds; platform-ifdef not arbitrable here).
+- **pmove_saber** (`run_pmove_saber.sh`) — the pmove single-step model
+  (spec/world/RNG tripwire unchanged) re-based on `WP_SABER`: stance/gait
+  anims, standing/running/strafing attack arcs (`saberMove` chains), jump.
+  Dump line appends `sm sb shl sen sal sac`. Zeroed `g_entities` makes
+  `BG_MySaber` NULL on both sides — custom-saber override paths stay
+  deliberately out of scope.
+
+Original slices:
+
 - **qmath** — RNG streams (`Rand_Init`/`flrand`/`Q_flrand`/`irand`/`Q_irand`
   over 4 seeds, ~800 interleaved draws each; `Q_rand`/`Q_random`/`Q_crandom`),
   `ClampChar`/`ClampShort`/`Q_log2`/`Q_rsqrt`/`Q_fabs`/`powf`/`ByteToDir`/

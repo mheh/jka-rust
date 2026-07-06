@@ -20,5 +20,7 @@ pub struct ModuleSlot {
     /// to — the injected ctx + `system_calls` pair (`vm->systemCall`,
     /// `vm.cpp:506`), one per slot, stored at load (skeleton-findings
     /// resolution 2, 2026-07-03).
+    // Ported engine-boot state; read once the engine→module syscall slice is wired.
+    #[allow(dead_code)]
     pub(crate) engine: EngineSlot,
 }

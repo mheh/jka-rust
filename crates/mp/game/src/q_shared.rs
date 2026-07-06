@@ -343,7 +343,11 @@ pub fn FloatNoSwap(f: *const f32) -> f32 {
 pub fn COM_BeginParseSession(name: *const c_char) {
     unsafe {
         COM_LINES = 0;
-        crate::q_shared::Q_strncpyz(COM_PARSENAME.as_mut_ptr(), name, MAX_QPATH as c_int);
+        crate::q_shared::Q_strncpyz(
+            (&raw mut COM_PARSENAME).cast::<c_char>(),
+            name,
+            MAX_QPATH as c_int,
+        );
     }
 }
 
@@ -372,8 +376,9 @@ pub fn COM_ParseError(format: *mut c_char) {
     unsafe {
         let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char).to_string_lossy();
         let parsename_str =
-            std::ffi::CStr::from_ptr(COM_PARSENAME.as_ptr() as *const c_char).to_string_lossy();
-        let msg = format!("ERROR: {}, line {}: {}", parsename_str, COM_LINES, fmt_str);
+            std::ffi::CStr::from_ptr((&raw const COM_PARSENAME).cast::<c_char>()).to_string_lossy();
+        let com_lines = COM_LINES;
+        let msg = format!("ERROR: {}, line {}: {}", parsename_str, com_lines, fmt_str);
         let c_msg = std::ffi::CString::new(msg).unwrap();
         crate::g_main::Com_Printf(c_msg.as_ptr());
     }
@@ -389,10 +394,11 @@ pub fn COM_ParseWarning(format: *mut c_char) {
     unsafe {
         let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char).to_string_lossy();
         let parsename_str =
-            std::ffi::CStr::from_ptr(COM_PARSENAME.as_ptr() as *const c_char).to_string_lossy();
+            std::ffi::CStr::from_ptr((&raw const COM_PARSENAME).cast::<c_char>()).to_string_lossy();
+        let com_lines = COM_LINES;
         let msg = format!(
             "WARNING: {}, line {}: {}",
-            parsename_str, COM_LINES, fmt_str
+            parsename_str, com_lines, fmt_str
         );
         let c_msg = std::ffi::CString::new(msg).unwrap();
         crate::g_main::Com_Printf(c_msg.as_ptr());
@@ -522,7 +528,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
         // make sure incoming data is valid
         if data.is_null() {
             *data_p = std::ptr::null();
-            return COM_TOKEN.as_mut_ptr();
+            return (&raw mut COM_TOKEN).cast::<c_char>();
         }
 
         loop {
@@ -530,11 +536,11 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
             data = crate::q_shared::SkipWhitespace(data, &mut hasNewLines);
             if data.is_null() {
                 *data_p = std::ptr::null();
-                return COM_TOKEN.as_mut_ptr();
+                return (&raw mut COM_TOKEN).cast::<c_char>();
             }
             if hasNewLines == QTRUE && allowLineBreaks == QFALSE {
                 *data_p = data;
-                return COM_TOKEN.as_mut_ptr();
+                return (&raw mut COM_TOKEN).cast::<c_char>();
             }
 
             c = *data as c_int;
@@ -568,7 +574,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
                 if c == b'"' as c_int || c == 0 {
                     COM_TOKEN[len as usize] = 0;
                     *data_p = data as *const c_char;
-                    return COM_TOKEN.as_mut_ptr();
+                    return (&raw mut COM_TOKEN).cast::<c_char>();
                 }
                 if len < MAX_TOKEN_CHARS as c_int {
                     COM_TOKEN[len as usize] = c as c_char;
@@ -599,7 +605,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
         COM_TOKEN[len as usize] = 0;
 
         *data_p = data as *const c_char;
-        COM_TOKEN.as_mut_ptr()
+        (&raw mut COM_TOKEN).cast::<c_char>()
     }
 }
 
@@ -1103,7 +1109,16 @@ pub fn Q_PrintStrlen(string: *const c_char) -> c_int {
         let mut len: c_int = 0;
         let mut p = string;
         while *p != 0 {
-            if *p == b'^' as c_char && *p.offset(1) != 0 {
+            // `Q_IsColorString(p)` = `^` followed by a digit '0'..='7' (and not
+            // '^'); the port previously accepted any non-NUL follower, which
+            // over-counted `^^`/`^8...` escapes (caught by the oracle slice).
+            let n = *p.offset(1);
+            if *p == b'^' as c_char
+                && n != 0
+                && n != b'^' as c_char
+                && n >= b'0' as c_char
+                && n <= b'7' as c_char
+            {
                 p = p.offset(2);
                 continue;
             }
@@ -1126,7 +1141,16 @@ pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
             if c == 0 {
                 break;
             }
-            if c == b'^' as c_char && *s.offset(1) != 0 {
+            // `Q_IsColorString(s)` = `^` followed by a digit '0'..='7' (see
+            // Q_PrintStrlen); the port previously skipped on any non-NUL
+            // follower, wrongly stripping `^^`/`^8...` (caught by the slice).
+            let n = *s.offset(1);
+            if c == b'^' as c_char
+                && n != 0
+                && n != b'^' as c_char
+                && n >= b'0' as c_char
+                && n <= b'7' as c_char
+            {
                 s = s.offset(1);
             } else if c >= 0x20 && c <= 0x7E {
                 *d = c;
@@ -1198,8 +1222,10 @@ pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
             return c"".as_ptr() as *mut c_char;
         }
 
-        if c_strlen(s) >= 1024 {
-            // BIG_INFO_STRING check (oracle has Com_Error(ERR_DROP, ...))
+        if c_strlen(s) >= BIG_INFO_STRING {
+            // Raven guards on `BIG_INFO_STRING` (8192), not `MAX_INFO_STRING`;
+            // the port previously hard-coded 1024 (a divergence caught by the
+            // oracle slice's big-infostring case). Com_Error(ERR_DROP, ...) -> panic.
             panic!("Info_ValueForKey: oversize infostring");
         }
 
@@ -1235,7 +1261,10 @@ pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
             }
             *o = 0;
 
-            if c_strcmp(key, pkey.as_ptr() as *const c_char) == 0 {
+            // Raven matches the key case-INSENSITIVELY (`!Q_stricmp(key,pkey)`);
+            // the port previously used case-sensitive strcmp (a divergence
+            // caught by the oracle slice's "Name" vs "name" probe).
+            if crate::q_shared::Q_stricmp(key, pkey.as_ptr() as *const c_char) == 0 {
                 return INFO_VALUE[INFO_VALUEINDEX as usize].as_mut_ptr();
             }
 

@@ -6,13 +6,13 @@
 //! 2026-07-03). The shim unpacks the va_list into a 16-word `intptr_t` frame
 //! exactly as oracle `VM_DllSyscall` does (`vm.cpp:366-375`) and forwards here.
 
-/// The raw C-variadic fn assigned to a hosted module's `syscall` slot — our
-/// `VM_DllSyscall` equivalent, defined in `game_syscall_trampoline.c`.
-/// Declared (not defined) in Rust so the loader can hand its address to the
-/// module handshake (`dllEntry(syscall)`, `win_main.cpp:879-887`).
-///
-/// Source: `oracle/oracle/codemp/qcommon/vm.cpp:363-380`
 extern "C-unwind" {
+    /// The raw C-variadic fn assigned to a hosted module's `syscall` slot — our
+    /// `VM_DllSyscall` equivalent, defined in `game_syscall_trampoline.c`.
+    /// Declared (not defined) in Rust so the loader can hand its address to the
+    /// module handshake (`dllEntry(syscall)`, `win_main.cpp:879-887`).
+    ///
+    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:363-380`
     pub fn game_syscall_trampoline(arg: isize, ...) -> isize;
 }
 

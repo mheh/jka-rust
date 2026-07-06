@@ -1,17 +1,27 @@
-//! Pmove single-step differential parity test against the Raven oracle.
+//! Pmove SABER-wielding differential parity test against the Raven oracle.
 //!
-//! Drives the ported `mp_game::bg_pmove::Pmove` over the same fixtures and the
-//! same synthetic `animation.cfg` as the C dumpers in `tools/jampgame-oracle/`
-//! and byte-compares to the committed goldens. Two goldens:
-//!
-//! * `golden/pmove_trace.txt` — the `pmworld.h` axial-brush trace stub in
-//!   isolation (`TestTraps` transcribes the identical f32 algorithm).
-//! * `golden/pmove.txt` — the six on-foot scenarios driven through `Pmove`.
+//! Drives the ported `mp_game::bg_pmove::Pmove` with `weapon = WP_SABER` over the
+//! `fixtures/pmove_saber/` scenarios and the same synthetic `animation.cfg` as
+//! the C dumper `tools/jampgame-oracle/main_pmove_saber.c`, and byte-compares to
+//! the committed golden `golden/pmove_saber.txt`. It reproduces the melee slice's
+//! world stub, RNG tripwire, anim mirror, fixture grammar, and dump format
+//! (`tests/pmove_parity.rs`), extended with the saber attack/stance chain that
+//! `PM_Weapon` dispatches to `PM_WeaponLightsaber` when the weapon is WP_SABER.
 //!
 //! `TestTraps` (BgTraps) is the world: an axial-brush trace/pointcontents +
-//! `rintf` snap_vector. `TestCallbacks` (GameCallbacks) panics on everything but
-//! the two anim restart-check reads, served from the prior-frame anim mirror.
-//! See `tools/jampgame-oracle/pmove-spec.md` and `README.md` (pmove section).
+//! `rintf` snap_vector — verbatim from `pmworld.h`. `TestCallbacks`
+//! (GameCallbacks) panics on everything but the two anim restart-check reads,
+//! served from the prior-frame anim mirror.
+//!
+//! Saber determinism (mirrored from `main_pmove_saber.c`): `g_entities`/the
+//! `bgEntity_t` arena are zeroed, so `BG_MySaber` returns NULL on both sides —
+//! no per-saber `saberInfo` data is read and every saber-object override path is
+//! skipped identically, staying off the known xbox-residue divergence classes in
+//! `oracle/discrepancies/bg_saber.md`. `bg_saber.c` makes no G2API/effect/sound
+//! calls on the reachable path, and the only holdrand draw in the chain (the
+//! saber-lock super-break) is unreachable here — so `rng` holds `89abcdef` in
+//! every scenario. See `tools/jampgame-oracle/main_pmove_saber.c` for the full
+//! provenance and the exact list of divergences from `main_pmove.c`.
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int, c_void};
@@ -29,7 +39,7 @@ fn oracle_dir() -> PathBuf {
 }
 
 fn fixture_dir() -> PathBuf {
-    oracle_dir().join("fixtures/pmove")
+    oracle_dir().join("fixtures/pmove_saber")
 }
 
 fn compare(name: &str, got: &str) {
@@ -400,9 +410,9 @@ impl BgTraps for TestTraps {
         0
     }
 
-    // --- everything below is off the basic on-foot MELEE path ---
+    // --- everything below is off the basic saber path ---
     fn r_register_skin(&self, _name: *const c_char) -> qhandle_t {
-        unreachable!("r_register_skin off the basic pmove path")
+        unreachable!("r_register_skin off the basic pmove saber path")
     }
     fn g2api_init_ghoul2_model(
         &self,
@@ -591,7 +601,7 @@ impl GameCallbacks for TestCallbacks {
         _df: c_int,
         _m: c_int,
     ) {
-        unreachable!("damage off the basic pmove path")
+        unreachable!("damage off the basic pmove saber path")
     }
     fn damage_from_killer(
         &mut self,
@@ -693,11 +703,13 @@ impl GameCallbacks for TestCallbacks {
 }
 
 // ================================ ps baseline ================================
+// The melee baseline plus the saber pin-set (mirror of `main_pmove_saber.c`
+// `ps_baseline`): single-saber MEDIUM style, saber lit and in-hand.
 
 fn ps_baseline() -> playerState_t {
     let mut ps: playerState_t = unsafe { core::mem::zeroed() };
     ps.pm_type = PM_NORMAL as c_int;
-    ps.weapon = WP_MELEE;
+    ps.weapon = WP_SABER;
     ps.weaponstate = WEAPON_READY as c_int;
     ps.stats[STAT_HEALTH as usize] = 100;
     ps.gravity = 800;
@@ -710,6 +722,12 @@ fn ps_baseline() -> playerState_t {
     ps.clientNum = 0;
     ps.m_iVehicleNum = 0;
     ps.commandTime = 0;
+    // saber pins.
+    ps.fd.saberAnimLevel = saber_styles_t::SS_MEDIUM as c_int;
+    ps.fd.saberAnimLevelBase = saber_styles_t::SS_MEDIUM as c_int;
+    ps.saberEntityNum = 1; // nonzero: PM_GetSaberStance gives a real stance
+    ps.saberHolstered = 0; // sabers ON -> BG_SabersOff() false
+    ps.saberMove = 0; // LS_NONE; settles to LS_READY on step 1
     ps
 }
 
@@ -739,6 +757,14 @@ fn apply_ps_override(ps: &mut playerState_t, tok: &[&str]) {
         "basespeed" => ps.basespeed = parse_int(tok[2]),
         "fallingToDeath" => ps.fallingToDeath = parse_int(tok[2]),
         "clientNum" => ps.clientNum = parse_int(tok[2]),
+        // --- saber-slice additions (mirror the C psfield table) ---
+        "saberEntityNum" => ps.saberEntityNum = parse_int(tok[2]),
+        "saberMove" => ps.saberMove = parse_int(tok[2]),
+        "saberHolstered" => ps.saberHolstered = parse_int(tok[2]),
+        "saberBlocked" => ps.saberBlocked = parse_int(tok[2]),
+        "saberInFlight" => ps.saberInFlight = parse_int(tok[2]),
+        "saberAnimLevel" => ps.fd.saberAnimLevel = parse_int(tok[2]),
+        "saberAnimLevelBase" => ps.fd.saberAnimLevelBase = parse_int(tok[2]),
         other => panic!("unknown ps field '{other}'"),
     }
 }
@@ -757,7 +783,8 @@ fn dump_step(o: &mut String, step: i32, pm: &pmove_t, ps: &playerState_t, ntr: i
          la={}:{} ta={}:{} fl={}{} bob={} vh={} ef={:x} seq={} \
          ev={}:{},{}:{} wt={} ws={} spd={:08x} wl={} wtp={} \
          nt={} mn={:08x} mx={:08x} xy={:08x} air={} f2d={} fjz={:08x} \
-         ntr={} rng={:08x}",
+         ntr={} rng={:08x} \
+         sm={} sb={} shl={} sen={} sal={} sac={}",
         step,
         ps.commandTime,
         f2b(ps.origin[0]),
@@ -803,6 +830,12 @@ fn dump_step(o: &mut String, step: i32, pm: &pmove_t, ps: &playerState_t, ntr: i
         f2b(ps.fd.forceJumpZStart),
         ntr,
         rng,
+        ps.saberMove,
+        ps.saberBlocked,
+        ps.saberHolstered,
+        ps.saberEntityNum,
+        ps.fd.saberAnimLevel,
+        ps.saberAttackChainCount,
     );
 }
 
@@ -956,7 +989,7 @@ fn run_scenario(name: &str) -> String {
                     pm.cmd.rightmove = c.right as i8 as c_schar;
                     pm.cmd.upmove = c.up as i8 as c_schar;
                     pm.cmd.buttons = c.buttons;
-                    pm.cmd.weapon = WP_MELEE as byte;
+                    pm.cmd.weapon = WP_SABER as byte;
                     pm.cmd.angles[0] = (c.pitch as i16) as c_int;
                     pm.cmd.angles[1] = ((c.yaw + r * c.yawinc) as i16) as c_int;
                     pm.cmd.angles[2] = (c.roll as i16) as c_int;
@@ -983,90 +1016,21 @@ fn run_scenario(name: &str) -> String {
     o
 }
 
-// ============================= the raw-trace golden ===========================
-
-fn run_trace() -> String {
-    let text = std::fs::read_to_string(fixture_dir().join("trace.txt")).unwrap();
-    let mut brushes: Vec<Brush> = Vec::new();
-    let mut sweep_no = 0i32;
-    let mut o = String::new();
-    o.push_str("== pmove_trace ==\n");
-
-    for line in text.lines() {
-        let line = strip_comment(line);
-        let tok: Vec<&str> = line.split_whitespace().collect();
-        if tok.is_empty() {
-            continue;
-        }
-        match tok[0] {
-            "reset" => {
-                brushes.clear();
-                o.push_str("reset\n");
-            }
-            "brush" if tok.len() >= 7 => {
-                let surf = if tok.len() >= 8 { parse_surf(tok[7]) } else { 0 };
-                brushes.push(Brush {
-                    mins: [parse_float(tok[1]), parse_float(tok[2]), parse_float(tok[3])],
-                    maxs: [parse_float(tok[4]), parse_float(tok[5]), parse_float(tok[6])],
-                    surface_flags: surf,
-                });
-                let _ = writeln!(o, "brush {} surf={:x}", brushes.len() - 1, surf);
-            }
-            "sweep" if tok.len() >= 13 => {
-                let start = [parse_float(tok[1]), parse_float(tok[2]), parse_float(tok[3])];
-                let end = [parse_float(tok[4]), parse_float(tok[5]), parse_float(tok[6])];
-                let mins = [parse_float(tok[7]), parse_float(tok[8]), parse_float(tok[9])];
-                let maxs = [parse_float(tok[10]), parse_float(tok[11]), parse_float(tok[12])];
-                let tr = trace_world(&brushes, &start, &mins, &maxs, &end);
-                let _ = writeln!(
-                    o,
-                    "sweep {} as={} ss={} frac={:08x} end={:08x},{:08x},{:08x} \
-                     nrm={:08x},{:08x},{:08x} pd={:08x} pt={} psb={} sf={:x} ct={:x} en={}",
-                    sweep_no,
-                    tr.allsolid,
-                    tr.startsolid,
-                    f2b(tr.fraction),
-                    f2b(tr.endpos[0]),
-                    f2b(tr.endpos[1]),
-                    f2b(tr.endpos[2]),
-                    f2b(tr.plane.normal[0]),
-                    f2b(tr.plane.normal[1]),
-                    f2b(tr.plane.normal[2]),
-                    f2b(tr.plane.dist),
-                    tr.plane.r#type,
-                    tr.plane.signbits,
-                    tr.surfaceFlags as u32,
-                    tr.contents as u32,
-                    tr.entityNum,
-                );
-                sweep_no += 1;
-            }
-            other => panic!("bad trace line: {other}"),
-        }
-    }
-    o.push_str("== end ==\n");
-    o
-}
-
 // =================================== test ====================================
 
 #[test]
-fn pmove_parity() {
-    // 1) Prove the axial-brush trace stub in isolation first.
-    compare("pmove_trace", &run_trace());
-
-    // 2) Then the six on-foot scenarios through the real Pmove.
+fn pmove_saber_parity() {
     let scenarios = [
-        "idle",
-        "walk-fwd",
-        "strafe-turn",
-        "jump-land",
-        "fall-onto-box",
-        "wall-step",
+        "saber-idle",
+        "saber-walk",
+        "saber-attack-stand",
+        "saber-attack-run",
+        "saber-attack-strafe",
+        "saber-jump",
     ];
     let mut o = String::new();
     for s in scenarios {
         o.push_str(&run_scenario(s));
     }
-    compare("pmove", &o);
+    compare("pmove_saber", &o);
 }

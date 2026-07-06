@@ -45,7 +45,6 @@ pub use mp_bg::public::gametype::{
     gametype_t, GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_MAX_GAME_TYPE,
     GT_POWERDUEL, GT_SIEGE, GT_SINGLE_PLAYER, GT_TEAM,
 };
-pub use mp_bg::public::holdable::*;
 pub use mp_bg::public::item_type::*;
 pub use mp_bg::public::powerup::*;
 pub use mp_bg::public::saber_move_name::*;
@@ -396,7 +395,6 @@ pub use crate::level::tag_owner::*; // .claude/worktrees/agent-a43cc53200d2fdf54
 pub use crate::npc_c::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/npc_c.rs
 pub use crate::q_math::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/q_math.rs
 pub use crate::saber::saber_flags::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/saber/saber_flags.rs
-pub use crate::teams::class::class_t::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/teams/class.rs
 pub use crate::tri_coll_test::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/tri_coll_test.rs
 pub use crate::NPC_AI_Atst::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Atst.rs
 pub use crate::NPC_AI_Droid::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Droid.rs
@@ -423,18 +421,14 @@ pub use mp_bg::local::force_levels::forceJumpStrength; // .claude/worktrees/agen
 pub use mp_bg::local::force_levels::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/force_levels.rs
 pub use mp_bg::local::force_power_needed::forcePowerNeeded; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/force_power_needed.rs
 pub use mp_bg::public::dm_flags::DF_NO_FALLING; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/dm_flags.rs
-pub use mp_bg::public::g2_model_parts::g2ModelParts_t::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/g2_model_parts.rs
-pub use mp_bg::public::gametype::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/gametype.rs
 pub use mp_bg::public::saber_move_data_table::saberMoveData; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saber_move_data_table.rs
 pub use mp_bg::public::saber_move_data_table::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saber_move_data_table.rs
-pub use mp_bg::public::saber_quadrant::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saber_quadrant.rs
 pub use mp_bg::public::saberlock::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saberlock.rs
 pub use mp_bg::public::spawn::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/spawn.rs
 pub use mp_bg::vehicles::turret_stats_t::MAX_VEHICLE_TURRET_MUZZLES; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/turret_stats_t.rs
 pub use mp_bg::vehicles::vehicle_s::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/vehicle_s.rs
-pub use mp_bg::vehicles::vehicle_type_t::{vehicleType_t, vehicleType_t::*}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/vehicle_type_t.rs
+pub use mp_bg::vehicles::vehicle_type_t::vehicleType_t; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/vehicle_type_t.rs
 pub use mp_bg::weapons::ammo_data::ammoData; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/weapons/ammo_data.rs
-pub use mp_bg::weapons::ammo_t::ammo_t::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/weapons/ammo_t.rs
 pub use mp_qshared::common::mp::gentity::NUM_BSETS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/gentity.rs
 pub use mp_qshared::common::mp::gentity::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/gentity.rs
 pub use mp_qshared::common::mp::qcommon::parms::{parms_t, MAX_PARMS}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/parms.rs
@@ -447,8 +441,15 @@ pub use mp_qshared::shared::file_mode::{FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_W
 pub use mp_qshared::shared::flag_status::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/flag_status.rs
 pub use mp_qshared::shared::q_color::Q_COLOR_ESCAPE; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/q_color.rs
 pub use mp_qshared::shared::saber_blocked_type::{saberBlockedType_t, saberBlockedType_t::*}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/saber_blocked_type.rs
-pub use mp_qshared::shared::trajectory::trType_t::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/trajectory.rs
 pub use mp_qshared::shared::wpobject::MAX_NEIGHBOR_SIZE; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/wpobject.rs // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_vehicleLoad.rs
+
+// Pin the first-winner definition of consts that are transcribed identically in
+// two modules (same values) so the glob re-exports above are unambiguous, until
+// the duplicate-const consolidation sweep removes one copy of each.
+pub use crate::npc::squad_state::NUM_SQUAD_STATES;
+pub use crate::NPC_AI_Stormtrooper::CPF_DUCK;
+pub use mp_bg::public::configstring::{CS_CLIENT_JEDIMASTER, CS_ITEMS};
+pub use mp_qshared::common::mp::qcommon::task_id_t::taskID_t::NUM_TIDS;
 
 // Raven `G_ICARUS_TASKIDPENDING` args re-export under the misspelled
 // `GICARUSTaskIDPendingArgs` spelling that `NPC_sounds.rs` transcribes bare;

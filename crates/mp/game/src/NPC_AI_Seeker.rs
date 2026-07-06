@@ -73,12 +73,16 @@ pub fn NPC_Seeker_Pain(
         if (*((*self_).NPC as *mut gNPC_t)).aiFlags & crate::npc::ai_flags::NPCAI_CUSTOM_GRAVITY
             == 0
         {
+            // Raven passes the global `vec3_origin` as `dir`; G_Damage normalizes
+            // `dir` in place (a no-op on the zero vector), so a fresh local copy
+            // is behaviorally identical.
+            let mut origin = vec3_origin;
             crate::g_combat::G_Damage(
                 ctx,
                 self_,
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
-                Some(&mut crate::q_math::vec3_origin),
+                Some(&mut origin),
                 crate::q_math::vec3_origin,
                 999,
                 0,

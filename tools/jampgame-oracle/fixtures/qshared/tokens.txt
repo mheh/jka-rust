@@ -1,0 +1,14 @@
+// leading line comment
+alpha beta   gamma
+"quoted string here" trailer
+{ open } [ brack ] ( paren )
+punct , . ; : ! ? = + - *
+/* block comment
+spanning two lines */ afterblock
+hi€bit woÿrd €  
+tab	separated
+
+doubleblank
+
+
+final 123 -45

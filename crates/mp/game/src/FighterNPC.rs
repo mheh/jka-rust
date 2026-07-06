@@ -428,7 +428,7 @@ pub fn FighterDamageRoutine(
                 let parent_ent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
                 let num = (*parent_ent).s.number;
 
-                if num % 3 != 0 {
+                if num % 3 == 0 {
                     // NOT everyone should do this
                     *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
                     if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
@@ -439,7 +439,7 @@ pub fn FighterDamageRoutine(
                 } else if num % 2 == 0 {
                     *(*pVeh).m_vOrientation.add(0) -= (*pVeh).m_fTimeModifier;
                     if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
-                        if *(*pVeh).m_vOrientation.add(0) < -60.0f32 {
+                        if *(*pVeh).m_vOrientation.add(0) > -60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = -60.0f32;
                         }
                     }

@@ -378,7 +378,7 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
 
         let missile = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc, 0);
 
-        (*missile).classname = cstr("bryar_proj").as_ptr().cast_mut();
+        (*missile).classname = c"bryar_proj".as_ptr().cast_mut();
         (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
 
         if world.cvars.g_spskill.integer <= 1 {

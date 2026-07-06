@@ -37,14 +37,14 @@ rust-analyzer is stale in this workspace — **always confirm compilation with
   (renderer deferral, WASM transport, wire compat, …). Cite, never re-litigate.
 - `docs/doc-standards.md` — template + gates for logic-port design docs
   (`docs/architecture/`, `docs/modules/`, `docs/subsystems/`).
-- `docs/type-port-todo.md` — live per-type port status (MP + SP; type port is
-  complete — Waves 0–7).
-- `docs/type-port-scope.md`, `docs/oracle-types.md` — type-port scope and the
-  mechanical oracle type index (reference).
 - `docs/GOAL.md` — project goal (drop-in ABI compatibility checklists).
 - `docs/abi-traps.md` — generated trap_* signature reference.
-- `docs/engine-plan.md` — legacy engine sketch; being superseded by
-  `docs/architecture/engine-seam.md` (see decisions ledger).
+- `docs/audits/marker-inventory-2026-07-05.md` — validated open-work inventory
+  (`TODO: Port` by verdict + PORT-NOTE re-grep); regenerated, never hand-edited.
+- `docs/roadmap-final-stages.md` — ordered post-parity roadmap (referee gates
+  everything; then safe-state migration and beyond).
+- The completed type-port campaign docs (plan/scope/todo/oracle-types index)
+  were removed 2026-07-06; history lives in git.
 
 ## Port tooling & the logic-port pipeline
 
@@ -62,11 +62,14 @@ sharding) → the pass-3 port workflow (blind parallel transcribers) → the
 integrate workflow (triage → bounded fix rounds → serial finisher) plus
 `bulkfix.py` batch tooling (`--cast` int/float/enum span casts, `--overlay`
 c_void-family modes). **jampgame transcription and integration are done**:
-`mp_game` compiles with 0 errors (integrate phase: ~5,800 → 0), `cargo check
---workspace` green, merged to master 2026-07-05. Remaining on jampgame:
-`todo!()` stub burn-down (76 at green, in progress), then per-file oracle
-review and the referee swap — oracle differential tests (single-threaded; the
-oracle has global state) replace clang layout as ground truth. The
+`mp_game` compiles with 0 errors (integrate phase: ~5,800 → 0), `cargo build
+--workspace` green, merged to master 2026-07-05; `todo!()` stubs and open
+`TODO: Port` markers both at zero (2026-07-06). CI builds and publishes
+engine-named modules on master pushes (`.github/workflows/build.yml`, rolling
+`latest` release; 32-bit lanes allowed-failure pending an ILP32 assert pass).
+Remaining on jampgame: per-file oracle review and the referee swap — oracle
+differential tests (single-threaded; the oracle has global state) replace
+clang layout as ground truth — then the safe-state migration. The
 `dangerous_implicit_autorefs` lint is allowed crate-wide in `mp_game`
 (documented in its lib.rs) pending the safe-state migration.
 

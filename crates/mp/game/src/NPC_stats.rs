@@ -782,7 +782,7 @@ pub fn NPC_ParseParms(
 
         write_cstr_field(&mut customSkin, "default");
         if NPCName.is_null() || *NPCName == 0 {
-            NPCName = cstr("Player").as_ptr();
+            NPCName = c"Player".as_ptr();
         }
 
         let npc_ptr = (*NPC).NPC as *mut gNPC_t;

@@ -1,0 +1,18 @@
+# Saber scenario 3: saber-attack-stand. Stand still 5 commands to settle to
+# LS_READY/BOTH_STAND2, then hold BUTTON_ATTACK (1) for 12 while standing (no
+# forward/right). Exercises PM_Weapon -> PM_WeaponLightsaber -> the standing
+# neutral-attack path (bg_saber.c:3728): with no movement it takes
+# saberMoveData[curmove].chain_attack, sets `both` (whole-body) attack anim,
+# PM_SetSaberMove drives the torso attack anim + torsoTimer, and weaponTime is
+# armed to torsoTimer so the swing plays out and chains. Watch sm (saberMove),
+# sac (saberAttackChainCount), wt (weaponTime), ws (weaponstate -> WEAPON_FIRING),
+# ta (torso attack anim). NULL saber (g_entities zeroed) -> no saber-override
+# paths; grounded + zero force power -> no cartwheel/DFA/kata specials. rng holds
+# 89abcdef (PM_irand_timesync uses Q_random(serverTime), not holdrand).
+# origin z 24.25 = 0x41c20000.
+brush -4096 -4096 -4096 4096 4096 0 surf=0x2000
+
+ps origin 0x00000000 0x00000000 0x41c20000
+start
+cmd 50 0 0 0 0 0 0 0 x5
+cmd 50 0 0 0 1 0 0 0 x12

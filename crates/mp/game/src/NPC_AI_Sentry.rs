@@ -247,7 +247,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
         let missile =
             crate::g_missile::CreateMissile(ctx, muzzle, forward, 1600.0, 10000, NPC, qfalse);
 
-        (*missile).classname = cstr("bryar_proj").as_ptr().cast_mut();
+        (*missile).classname = c"bryar_proj".as_ptr().cast_mut();
         (*missile).s.weapon = WP_BRYAR_PISTOL;
 
         (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;

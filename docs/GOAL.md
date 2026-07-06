@@ -27,9 +27,9 @@ Raven's `jampgamex86.dll`:
   when Raven exposes no wrapper, callsite, or transport behavior.
 - [x] Expose exported C symbols with the original names: `dllEntry` and
   `vmMain` (`crates/jampgame`, the thin cdylib shell).
-- [ ] Match Raven's calling convention and `vmMain` argument/return word
-  behavior. (The 12-word signature and `-1` fall-through are live; most
-  command arms are still `todo!()` pending wiring.)
+- [x] Match Raven's calling convention and `vmMain` argument/return word
+  behavior. (The 12-word signature and `-1` fall-through are live; all
+  command arms are wired to `mp_game` entrypoints.)
 - [x] Store and call the engine syscall callback handed in through `dllEntry`
   (`ENGINE: OnceLock<CEngine>`, called by every `trap::*` wrapper).
 - [x] Match argument packing for ints, pointers, and floats, including the
@@ -44,8 +44,10 @@ Raven's `jampgamex86.dll`:
 - [ ] Implement engine-observable side effects for `GAME_INIT`,
   `GAME_RUN_FRAME`, `GAME_SHUTDOWN`, client lifecycle calls, botlib, ICARUS, nav,
   Ghoul2, and related systems.
-- [ ] Build the Rust game module as a native dynamic library with the filename
-  and platform conventions expected by the engine.
+- [x] Build the Rust game module as a native dynamic library with the filename
+  and platform conventions expected by the engine (CI packages engine-named
+  modules — `jampgamex86_64.dll`/`.so` — on every master push; the 32-bit
+  `jampgamex86.dll`/`jampgamei386.so` lanes await the ILP32 assert pass).
 - [ ] Add an ABI smoke test that loads the Rust module through the same
   `dllEntry`/`vmMain` contract as the engine.
 - [ ] Add differential tests against Raven/oracle behavior for representative
@@ -62,11 +64,12 @@ So the ABI target is:
 
 The present state is not yet a drop-in `jampgamex86.dll` replacement, but it is
 no longer just the scaffold: the full jampgame logic port is transcribed and
-integrated (`mp_game` compiles green, merged 2026-07-05), without losing the
-original ABI numbers or mixing MP game, MP cgame, MP UI, and SP surfaces into
-one global enum. What remains before hot-swap is `todo!()` stub burn-down,
-wiring the remaining `vmMain` command arms, and oracle differential
-verification — compiling green is not verified parity.
+integrated (`mp_game` compiles green, merged 2026-07-05; `todo!()` stubs and
+open `TODO: Port` markers both at zero, all `vmMain` arms wired, CI publishing
+engine-named modules), without losing the original ABI numbers or mixing MP
+game, MP cgame, MP UI, and SP surfaces into one global enum. What remains
+before hot-swap is oracle differential verification (the referee swap) and a
+live-engine smoke test — compiling green is not verified parity.
 
 ## Related ABI Track: SP `GetGameAPI`
 
@@ -88,8 +91,12 @@ the same enum transport.
 
 - [x] Create a generic function-table ABI vocabulary alongside the existing
   syscall/vmMain vocabulary.
-- [ ] Port Raven SP `game_import_t` as a `#[repr(C)]` Rust import table with
-  Raven comments and source line references.
+- [x] Port Raven SP `game_import_t` as a `#[repr(C)]` Rust import table with
+  Raven comments and source line references
+  (`crates/sp/abi/src/game/public/game_import_t.rs`; a handful of member
+  types remain opaque behind `TODO: Port` markers — CGhoul2Info,
+  IGhoul2InfoArray, CRagDollUpdateParams, the variadic `Printf`/`Error`/
+  `SendServerCommand` args — see the marker inventory).
   - [ ] Create the SP game ABI type foundation for table fields:
     `qboolean`, `fileHandle_t`, `fsMode_t`, `cvar_t`, `gentity_t`,
     `usercmd_t`, `trace_t`, `vec3_t`, `qhandle_t`, `memtag_t`,
@@ -108,8 +115,9 @@ the same enum transport.
     fields, so Rust signatures model the full parameter list only.
   - [ ] Add a layout verification plan for `game_import_t`, including size and
     representative field offsets against Raven headers.
-- [ ] Port Raven SP `game_export_t` as a `#[repr(C)]` Rust export table with
-  Raven comments and source line references.
+- [x] Port Raven SP `game_export_t` as a `#[repr(C)]` Rust export table with
+  Raven comments and source line references
+  (`crates/sp/abi/src/game/public/game_export_t.rs`).
   - [ ] Reuse the SP game ABI type foundation for export callbacks and shared
     variables such as `gentity_t`, `usercmd_t`, `qboolean`, and
     `SavedGameJustLoaded_e`.
@@ -122,8 +130,8 @@ the same enum transport.
     C signature, Raven source line, Rust type translation, and notes.
   - [ ] Add a layout verification plan for `game_export_t`, including size and
     representative field offsets against Raven headers.
-- [ ] Add the SP `GetGameAPI` exported symbol only after the import/export
-  tables exist.
+- [x] Add the SP `GetGameAPI` exported symbol only after the import/export
+  tables exist (`crates/jagame`; `GI_Init` wiring still marked).
 - [ ] Store or expose the imported SP engine table in a way that SP game code
   can call without every callsite handling raw unsafe pointers directly.
 - [ ] Stub exported SP game table functions where behavior is not ported yet,

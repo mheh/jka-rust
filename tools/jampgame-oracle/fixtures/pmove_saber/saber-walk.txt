@@ -1,0 +1,14 @@
+# Saber scenario 2: saber-walk. Run forward (forwardmove=127) for 30x50ms so the
+# player accelerates from rest across the flat floor while wielding a lit saber,
+# then hold BUTTON_WALKING (16) for 20 more to drop into the walk gait. Exercises
+# the saber gait torso-anim selection (PM_WeaponLightsaber's RAISING/idle handler
+# maps the run/walk LEGS anim onto the torso for the saber), which differs from
+# the melee gait, plus bobCycle accumulation and PM_Friction. No attack pressed,
+# so no attack chain and no holdrand draw (rng holds 89abcdef).
+# origin z 24.25 = 0x41c20000 (box bottom 0.25 above the floor top at z=0).
+brush -4096 -4096 -4096 4096 4096 0 surf=0x2000
+
+ps origin 0x00000000 0x00000000 0x41c20000
+start
+cmd 50 127 0 0 0 0 0 0 x30
+cmd 50 127 0 0 16 0 0 0 x20

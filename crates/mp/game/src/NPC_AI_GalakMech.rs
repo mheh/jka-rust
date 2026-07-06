@@ -796,7 +796,7 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
                                 MASK_SHOT,
                             ),
                         );
-                        _VectorCopy(tr.endpos, &mut IMPACT_POS_4);
+                        _VectorCopy(tr.endpos, &mut *(&raw mut IMPACT_POS_4));
                     }
 
                     // see if impact would be too close to me
@@ -951,7 +951,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         (*ctx.world).globals.faceEnemy4 = qfalse;
         (*ctx.world).globals.shoot4 = qfalse;
         (*ctx.world).globals.hitAlly4 = qfalse;
-        VectorClear(&mut IMPACT_POS_4);
+        VectorClear(&mut *(&raw mut IMPACT_POS_4));
         (*ctx.world).globals.enemyDist4 =
             DistanceSquared((*npc_ent).r.currentOrigin, (*enemy_ent).r.currentOrigin);
 

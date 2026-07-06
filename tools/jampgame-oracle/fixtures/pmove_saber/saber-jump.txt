@@ -1,0 +1,16 @@
+# Saber scenario 6: saber-jump. Idle 5 commands to settle the saber READY stance,
+# hold jump (upmove=127) for 2, then release and coast ~28 commands over the top
+# of the arc back to a landing -- all with the saber lit but NO attack button.
+# Exercises PM_CheckJump (EV_JUMP, plain 270-unit force-0 jump), Pmove's
+# PMF_JUMP_HELD -> cmd.upmove=20 refeed, the ballistic arc under gravity=800, and
+# PM_CrashLand on touchdown, WHILE PM_WeaponLightsaber runs the saber
+# jumping/in-air torso-anim handling each step (distinct from the melee jump). No
+# attack is pressed, so no saber attack-arc / cartwheel path is entered and no
+# holdrand draw happens (rng holds 89abcdef). origin z 24.25 = 0x41c20000.
+brush -4096 -4096 -4096 4096 4096 0 surf=0x2000
+
+ps origin 0x00000000 0x00000000 0x41c20000
+start
+cmd 50 0 0 0   0 0 0 0 x5
+cmd 50 0 0 127 0 0 0 0 x2
+cmd 50 0 0 0   0 0 0 0 x28
