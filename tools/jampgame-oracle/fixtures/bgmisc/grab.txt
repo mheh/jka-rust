@@ -1,0 +1,200 @@
+# BG_CanItemBeGrabbed fixture. Each block: `reset`, then `gametype`/`ent`/`ps`
+# lines, then `run <label>`. `nullps` makes the ps pointer NULL for the run.
+# ent fields: modelindex modelindex2 generic1 powerups eFlags.
+# modelindex map (bg_itemlist): 1=IT_ARMOR(sm) 3=IT_HEALTH(q25) 4=HOLDABLE HI_SEEKER
+#   6=HOLDABLE HI_MEDPAC 15=POWERUP FORCE_LIGHT 18=POWERUP YSALAMIRI 21=WEAPON SABER
+#   25=WEAPON BLASTER 35=WEAPON THERMAL 41=AMMO BLASTER 45=AMMO all(tag -1)
+#   46=TEAM REDFLAG 47=TEAM BLUEFLAG
+# GT_CTF=8 GT_CTY=9 ; TEAM_RED=1 TEAM_BLUE=2 ; EF_DROPPEDWEAPON=0x2000000
+# 1<<WP_BLASTER=32 ; 1<<HI_SEEKER=2 ; 1<<FP_RAGE=256 ; AMMO_THERMAL idx=7 AMMO_BLASTER idx=2
+
+# --- null ps safety return ---
+reset
+ent modelindex 25
+nullps
+run nullps
+
+# --- trueJedi gating (force/saber only) ---
+reset
+ent modelindex 21
+ps trueJedi 1
+run tj_saber
+reset
+ent modelindex 25
+ps trueJedi 1
+run tj_blaster
+reset
+ent modelindex 3
+ps trueJedi 1
+run tj_health
+reset
+ent modelindex 15
+ps trueJedi 1
+run tj_force_light
+reset
+ent modelindex 18
+ps trueJedi 1
+run tj_ysalamiri
+reset
+ent modelindex 1
+ps trueJedi 1
+ps maxhealth 100
+run tj_armor
+
+# --- trueNonJedi gating (no force powerups / no seeker / no saber) ---
+reset
+ent modelindex 15
+ps trueNonJedi 1
+run tnj_force_light
+reset
+ent modelindex 18
+ps trueNonJedi 1
+run tnj_ysalamiri
+reset
+ent modelindex 4
+ps trueNonJedi 1
+run tnj_seeker
+reset
+ent modelindex 21
+ps trueNonJedi 1
+run tnj_saber
+reset
+ent modelindex 25
+ps trueNonJedi 1
+run tnj_blaster
+
+# --- isJediMaster: no weapons/ammo ---
+reset
+ent modelindex 25
+ps isJediMaster 1
+run jm_blaster
+reset
+ent modelindex 41
+ps isJediMaster 1
+run jm_ammo
+reset
+ent modelindex 1
+ps isJediMaster 1
+ps maxhealth 100
+run jm_armor
+
+# --- duelInProgress: nothing ---
+reset
+ent modelindex 1
+ps duelInProgress 1
+ps maxhealth 100
+run duel_armor
+
+# --- IT_WEAPON branch ---
+reset
+ent modelindex 25
+run wpn_plain
+reset
+ent modelindex 25
+ent generic1 0
+ent powerups 1
+run wpn_owner_powered
+reset
+ent modelindex 25
+ps statweapons 32
+run wpn_alreadyhave
+reset
+ent modelindex 25
+ent eFlags 0x2000000
+ps statweapons 32
+run wpn_dropped_have
+reset
+ent modelindex 35
+ps ammo 7 10
+run wpn_thermal_full
+reset
+ent modelindex 35
+ps ammo 7 5
+run wpn_thermal_room
+
+# --- IT_AMMO branch ---
+reset
+ent modelindex 45
+run ammo_all
+reset
+ent modelindex 41
+ps ammo 2 300
+run ammo_full
+reset
+ent modelindex 41
+ps ammo 2 100
+run ammo_room
+
+# --- IT_ARMOR branch ---
+reset
+ent modelindex 1
+ps armor 100
+ps maxhealth 100
+run armor_full
+reset
+ent modelindex 1
+ps armor 0
+ps maxhealth 100
+run armor_room
+
+# --- IT_HEALTH branch (q=25 normal path; FP_RAGE gate) ---
+reset
+ent modelindex 3
+ps fd_forcePowersActive 256
+ps maxhealth 100
+run health_rage
+reset
+ent modelindex 3
+ps health 100
+ps maxhealth 100
+run health_full
+reset
+ent modelindex 3
+ps health 50
+ps maxhealth 100
+run health_room
+
+# --- IT_POWERUP branch ---
+reset
+ent modelindex 15
+run pu_force_plain
+reset
+ent modelindex 15
+ps powerups_ysalamiri 1
+run pu_force_ysalblock
+reset
+ent modelindex 18
+ps powerups_ysalamiri 1
+run pu_ysalamiri
+
+# --- IT_TEAM branch ---
+reset
+gametype 8
+ent modelindex 46
+ps persistant_team 1
+run team_red_ownflag_base
+reset
+gametype 8
+ent modelindex 46
+ent modelindex2 1
+ps persistant_team 1
+run team_red_ownflag_dropped
+reset
+gametype 8
+ent modelindex 47
+ps persistant_team 1
+run team_red_enemyflag
+reset
+gametype 0
+ent modelindex 46
+ps persistant_team 1
+run team_notctf
+
+# --- IT_HOLDABLE branch ---
+reset
+ent modelindex 4
+run hold_seeker_new
+reset
+ent modelindex 4
+ps holdables 2
+run hold_seeker_have

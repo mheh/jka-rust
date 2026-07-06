@@ -1106,14 +1106,19 @@ pub fn BG_EvaluateTrajectory(tr: *const trajectory_t, atTime: c_int, result: &mu
                 result[2] = tr_ref.trBase[2];
             }
             crate::trajectory::trType_t::TR_LINEAR => {
-                let deltaTime = (atTime - tr_ref.trTime) as f32 * 0.001;
+                // Raven: `deltaTime = ( atTime - tr->trTime ) * 0.001` — the `*
+                // 0.001` is a double multiply stored back into `float deltaTime`,
+                // so the intermediate rounds through f64 before the f32 MA.
+                let deltaTime = ((atTime - tr_ref.trTime) as f64 * 0.001) as f32;
                 result[0] = tr_ref.trBase[0] + deltaTime * tr_ref.trDelta[0];
                 result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
                 result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2];
             }
             crate::trajectory::trType_t::TR_SINE => {
                 let deltaTime = (atTime - tr_ref.trTime) as f32 / tr_ref.trDuration as f32;
-                let phase = (deltaTime * std::f32::consts::PI * 2.0).sin();
+                // Raven calls the double libm `sin` with double `M_PI`, storing
+                // the result into `float phase`.
+                let phase = (deltaTime as f64 * std::f64::consts::PI * 2.0).sin() as f32;
                 result[0] = tr_ref.trBase[0] + phase * tr_ref.trDelta[0];
                 result[1] = tr_ref.trBase[1] + phase * tr_ref.trDelta[1];
                 result[2] = tr_ref.trBase[2] + phase * tr_ref.trDelta[2];
@@ -1123,7 +1128,7 @@ pub fn BG_EvaluateTrajectory(tr: *const trajectory_t, atTime: c_int, result: &mu
                 if t > tr_ref.trTime + tr_ref.trDuration {
                     t = tr_ref.trTime + tr_ref.trDuration;
                 }
-                let mut deltaTime = (t - tr_ref.trTime) as f32 * 0.001;
+                let mut deltaTime = ((t - tr_ref.trTime) as f64 * 0.001) as f32;
                 if deltaTime < 0.0 {
                     deltaTime = 0.0;
                 }
@@ -1139,20 +1144,26 @@ pub fn BG_EvaluateTrajectory(tr: *const trajectory_t, atTime: c_int, result: &mu
                 let deltaTime = if t - tr_ref.trTime > tr_ref.trDuration || t - tr_ref.trTime <= 0 {
                     0.0
                 } else {
-                    let angle =
-                        90.0 - (90.0 * ((t - tr_ref.trTime) as f32) / tr_ref.trDuration as f32);
-                    tr_ref.trDuration as f32 * 0.001 * angle.to_radians().cos()
+                    // Raven: `DEG2RAD` and the libm `cos` are double; only the
+                    // f32-declared `deltaTime` product rounds to f32.
+                    let deg =
+                        90.0f32 - (90.0f32 * (t as f32 - tr_ref.trTime as f32) / tr_ref.trDuration as f32);
+                    let c = ((deg as f64 * std::f64::consts::PI) / 180.0).cos() as f32;
+                    tr_ref.trDuration as f32 * 0.001 * c
                 };
                 result[0] = tr_ref.trBase[0] + deltaTime * tr_ref.trDelta[0];
                 result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
                 result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2];
             }
             crate::trajectory::trType_t::TR_GRAVITY => {
-                let deltaTime = (atTime - tr_ref.trTime) as f32 * 0.001;
+                let deltaTime = ((atTime - tr_ref.trTime) as f64 * 0.001) as f32;
                 result[0] = tr_ref.trBase[0] + deltaTime * tr_ref.trDelta[0];
                 result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
-                result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2]
-                    - 0.5 * 800.0 * deltaTime * deltaTime;
+                result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2];
+                // Raven: `result[2] -= 0.5 * DEFAULT_GRAVITY * deltaTime *
+                // deltaTime` — a double subexpression subtracted from the float.
+                result[2] =
+                    (result[2] as f64 - 0.5 * 800.0 * deltaTime as f64 * deltaTime as f64) as f32;
             }
             _ => {
                 panic!(
@@ -1185,7 +1196,10 @@ pub fn BG_EvaluateTrajectoryDelta(tr: *const trajectory_t, atTime: c_int, result
             }
             crate::trajectory::trType_t::TR_SINE => {
                 let deltaTime = (atTime - tr_ref.trTime) as f32 / tr_ref.trDuration as f32;
-                let phase = (deltaTime * std::f32::consts::PI * 2.0).cos() * 0.5;
+                // Raven: `phase = cos(...)` (double libm) stored into `float
+                // phase`, then `phase *= 0.5` (a second f32 rounding).
+                let phase = (deltaTime as f64 * std::f64::consts::PI * 2.0).cos() as f32;
+                let phase = (phase as f64 * 0.5) as f32;
                 result[0] = phase * tr_ref.trDelta[0];
                 result[1] = phase * tr_ref.trDelta[1];
                 result[2] = phase * tr_ref.trDelta[2];
@@ -1208,20 +1222,23 @@ pub fn BG_EvaluateTrajectoryDelta(tr: *const trajectory_t, atTime: c_int, result
                     result[2] = 0.0;
                     return;
                 }
-                let deltaTime = tr_ref.trDuration as f32
-                    * 0.001
-                    * ((90.0
-                        - (90.0 * ((atTime - tr_ref.trTime) as f32) / tr_ref.trDuration as f32))
-                        .to_radians()
-                        .cos());
+                // Raven: `DEG2RAD` and the libm `cos` are double; only the
+                // f32-declared `deltaTime` product rounds to f32.
+                let deg = 90.0f32
+                    - (90.0f32 * (atTime as f32 - tr_ref.trTime as f32) / tr_ref.trDuration as f32);
+                let c = ((deg as f64 * std::f64::consts::PI) / 180.0).cos() as f32;
+                let deltaTime = tr_ref.trDuration as f32 * 0.001 * c;
                 result[0] = deltaTime * tr_ref.trDelta[0];
                 result[1] = deltaTime * tr_ref.trDelta[1];
                 result[2] = deltaTime * tr_ref.trDelta[2];
             }
             crate::trajectory::trType_t::TR_GRAVITY => {
-                let deltaTime = (atTime - tr_ref.trTime) as f32 * 0.001;
+                let deltaTime = ((atTime - tr_ref.trTime) as f64 * 0.001) as f32;
                 result[0] = tr_ref.trDelta[0];
                 result[1] = tr_ref.trDelta[1];
+                // Raven: `result[2] -= DEFAULT_GRAVITY * deltaTime` — `800`
+                // (int) * `deltaTime` (float) is an all-f32 product (unlike the
+                // position path, whose `0.5` double literal forces f64).
                 result[2] = tr_ref.trDelta[2] - 800.0 * deltaTime;
             }
             _ => {

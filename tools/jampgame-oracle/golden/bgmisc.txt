@@ -1,0 +1,2547 @@
+== bgmisc ==
+== trajectory ==
+T 0 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 1 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 2 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 3 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 4 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 5 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 6 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 7 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 8 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 9 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 10 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 11 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 12 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 13 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 14 et 42aa0000 c1a00000 c2040000 ed 41200000 c1a00000 41f00000
+T 15 et 42b40000 c1f00000 c1900000 ed 41200000 c1a00000 41f00000
+T 16 et 42c80000 c2480000 41400000 ed 41200000 c1a00000 41f00000
+T 17 et 42d20000 c2700000 41d80000 ed 41200000 c1a00000 41f00000
+T 18 et 42f00000 c2b40000 42900000 ed 41200000 c1a00000 41f00000
+T 19 et 430c0000 c3020000 43040000 ed 41200000 c1a00000 41f00000
+T 20 et 43160000 c3160000 43220000 ed 41200000 c1a00000 41f00000
+T 21 et 42c80000 c2480000 41400000 ed 41200000 c1a00000 41f00000
+T 22 et 42c80000 c2480000 41400000 ed 41200000 c1a00000 41f00000
+T 23 et 42c80000 c2480000 41400000 ed 41200000 c1a00000 41f00000
+T 24 et 42d20000 c2700000 41d80000 ed 41200000 c1a00000 41f00000
+T 25 et 42f00000 c2b40000 42900000 ed 41200000 c1a00000 41f00000
+T 26 et 430c0000 c3020000 43040000 ed 41200000 c1a00000 41f00000
+T 27 et 430c0000 c3020000 43040000 ed 00000000 00000000 00000000
+T 28 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 29 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 30 et 42c80000 c2480000 41400000 ed 00000000 00000000 00000000
+T 31 et 42d79b73 c28336e6 420da4b3 ed 40f9b732 c179b732 41bb4966
+T 32 et 430048c6 c2d52318 42c1b4a4 ed 41e24630 c2624630 42a9b4a4
+T 33 et 430c0000 c3020000 43040000 ed 42200000 c2a00000 42f00000
+T 34 et 430c0000 c3020000 43040000 ed 00000000 00000000 00000000
+T 35 et 42b9db9d c20f6e74 c1136948 ed c0624630 40e24630 c129b4a4
+T 36 et 42b40000 c1f00000 c1900000 ed 25b07d7e a6307d7e 26845e1f
+T 37 et 42c80000 c2480000 41400000 ed 40a00000 c1200000 41700000
+T 38 et 42d62463 c28048c6 4204da52 ed 40624630 c0e24630 4129b4a4
+T 39 et 42c80000 c2480000 41400000 ed c0a00000 41200000 c1700000
+T 40 et 42c80000 c2480000 41400000 ed 40a00000 c1200000 41700000
+T 41 et 42dc0000 c28c0000 42280000 ed 26dc9cde a75c9cde 27a575a6
+T 42 et 42aa0000 c1a00000 c4694000 ed 41200000 c1a00000 4499c000
+T 43 et 42b40000 c1f00000 c3d10000 ed 41200000 c1a00000 444f8000
+T 44 et 42c80000 c2480000 41400000 ed 41200000 c1a00000 41f00000
+T 45 et 42d20000 c2700000 c2920000 ed 41200000 c1a00000 c3b90000
+T 46 et 42f00000 c2b40000 c4bf0000 ed 41200000 c1a00000 c4c44000
+T 47 et 430c0000 c3020000 c5c3e000 ed 41200000 c1a00000 c5462000
+T 48 et 43160000 c3160000 c619b800 ed 41200000 c1a00000 c5782000
+T 49 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 50 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 51 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 52 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 53 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 54 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 55 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 56 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 57 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 58 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 59 et 402af1aa 410a9375 c22a8831 ed 41500000 c1880000 42ca0000
+T 60 et 407e24dd 40dec083 c20221ca ed 41500000 c1880000 42ca0000
+T 61 et 414c5a1d c0918938 420f6042 ed 41500000 c1880000 42ca0000
+T 62 et 417abc6a c1056c8b 426977ce ed 41500000 c1880000 42ca0000
+T 63 et 41e55e36 c1cab646 431f5df4 ed 41500000 c1880000 42ca0000
+T 64 et 40e00000 40400000 c1100000 ed 41500000 c1880000 42ca0000
+T 65 et 40e00000 40400000 c1100000 ed 41500000 c1880000 42ca0000
+T 66 et 414c5a1d c0918938 420f6042 ed 41500000 c1880000 42ca0000
+T 67 et 417abc6a c1056c8b 426977ce ed 41500000 c1880000 42ca0000
+T 68 et 41b85604 c18fd2f1 42e7449b ed 00000000 00000000 00000000
+T 69 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 70 et 40e00000 40400000 c1100000 ed 00000000 00000000 00000000
+T 71 et 4179772e c103c33c 42670018 ed 4109772e c133c33c 4285800c
+T 72 et 419855db c14bf43d 42a91ce9 ed 4140abb6 c17bf43d 42bb1ce9
+T 73 et 41b85605 c18fd2f2 42e7449d ed 00000000 00000000 00000000
+T 74 et c0bcc470 419ef173 c2da6e28 ed bf4f0a94 3f875f88 c0c911a8
+T 75 et c0a1a34e 419612ee c2cd41c3 ed 401c02c9 c04c03a5 419782b5
+T 76 et 418836de c121ca93 4289cd07 ed c0846365 40ad1f84 c20091c2
+T 77 et 406e770c 40e900ee c209becf ed c0c94bb0 41039dcc c2437d33
+T 78 et 418bcb4a c12b275e 4290c100 ed c0766651 40a11b84 c1ef4ac0
+T 79 et 402af1aa 410a9375 c2adfa2a ed 41500000 c1880000 43b7b333
+T 80 et 407e24dd 40dec083 c258fe90 ed 41500000 c1880000 438fb333
+T 81 et 414c5a1d c0918938 c22c0aa6 ed 41500000 c1880000 c37e3334
+T 82 et 417abc6a c1056c8b c2ef2d5d ed 41500000 c1880000 c3d84ccc
+T 83 et 41e55e36 c1cab646 c46e0c13 ed 41500000 c1880000 c49a1334
+== itemlist ==
+item 0
+ classname (null)
+ pickup_sound (null)
+ world_model0 (null)
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon (null)
+ quantity 0
+ giType 0
+ giTag 0
+ precaches 
+ sounds 
+ description 
+item 1
+ classname item_shield_sm_instant
+ pickup_sound sound/player/pickupshield.wav
+ world_model0 models/map_objects/mp/psd_sm.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/mp/small_shield
+ quantity 25
+ giType 3
+ giTag 1
+ precaches 
+ sounds 
+ description (null)
+item 2
+ classname item_shield_lrg_instant
+ pickup_sound sound/player/pickupshield.wav
+ world_model0 models/map_objects/mp/psd.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/mp/large_shield
+ quantity 100
+ giType 3
+ giTag 2
+ precaches 
+ sounds 
+ description 
+item 3
+ classname item_medpak_instant
+ pickup_sound sound/player/pickuphealth.wav
+ world_model0 models/map_objects/mp/medpac.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_medkit
+ quantity 25
+ giType 4
+ giTag 0
+ precaches 
+ sounds 
+ description 
+item 4
+ classname item_seeker
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/items/remote.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_seeker
+ quantity 120
+ giType 6
+ giTag 1
+ precaches 
+ sounds 
+ description @MENUS_AN_ATTACK_DRONE_SIMILAR
+item 5
+ classname item_shield
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/map_objects/mp/shield.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_shieldwall
+ quantity 120
+ giType 6
+ giTag 2
+ precaches 
+ sounds sound/weapons/detpack/stick.wav sound/movers/doors/forcefield_on.wav sound/movers/doors/forcefield_off.wav sound/movers/doors/forcefield_lp.wav sound/effects/bumpfield.wav
+ description @MENUS_THIS_STATIONARY_ENERGY
+item 6
+ classname item_medpac
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/map_objects/mp/bacta.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_bacta
+ quantity 25
+ giType 6
+ giTag 3
+ precaches 
+ sounds 
+ description @SP_INGAME_BACTA_DESC
+item 7
+ classname item_medpac_big
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/items/big_bacta.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_big_bacta
+ quantity 25
+ giType 6
+ giTag 4
+ precaches 
+ sounds 
+ description @SP_INGAME_BACTA_DESC
+item 8
+ classname item_binoculars
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/items/binoculars.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_zoom
+ quantity 60
+ giType 6
+ giTag 5
+ precaches 
+ sounds 
+ description @SP_INGAME_LA_GOGGLES_DESC
+item 9
+ classname item_sentry_gun
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/items/psgun.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_sentrygun
+ quantity 120
+ giType 6
+ giTag 6
+ precaches 
+ sounds 
+ description @MENUS_THIS_DEADLY_WEAPON_IS
+item 10
+ classname item_jetpack
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/items/psgun.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_jetpack
+ quantity 120
+ giType 6
+ giTag 7
+ precaches effects/boba/jet.efx
+ sounds sound/chars/boba/JETON.wav sound/chars/boba/JETHOVER.wav sound/effects/fire_lp.wav
+ description @MENUS_JETPACK_DESC
+item 11
+ classname item_healthdisp
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/map_objects/mp/bacta.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_healthdisp
+ quantity 120
+ giType 6
+ giTag 8
+ precaches 
+ sounds 
+ description 
+item 12
+ classname item_ammodisp
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/map_objects/mp/bacta.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_ammodisp
+ quantity 120
+ giType 6
+ giTag 9
+ precaches 
+ sounds 
+ description 
+item 13
+ classname item_eweb_holdable
+ pickup_sound sound/interface/shieldcon_empty
+ world_model0 models/map_objects/hoth/eweb_model.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_eweb
+ quantity 120
+ giType 6
+ giTag 10
+ precaches 
+ sounds 
+ description @MENUS_EWEB_DESC
+item 14
+ classname item_cloak
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/items/psgun.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_cloak
+ quantity 120
+ giType 6
+ giTag 11
+ precaches 
+ sounds 
+ description @MENUS_CLOAK_DESC
+item 15
+ classname item_force_enlighten_light
+ pickup_sound sound/player/enlightenment.wav
+ world_model0 models/map_objects/mp/jedi_enlightenment.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/mpi_jlight
+ quantity 25
+ giType 5
+ giTag 12
+ precaches 
+ sounds 
+ description 
+item 16
+ classname item_force_enlighten_dark
+ pickup_sound sound/player/enlightenment.wav
+ world_model0 models/map_objects/mp/dk_enlightenment.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/mpi_dklight
+ quantity 25
+ giType 5
+ giTag 13
+ precaches 
+ sounds 
+ description 
+item 17
+ classname item_force_boon
+ pickup_sound sound/player/boon.wav
+ world_model0 models/map_objects/mp/force_boon.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/mpi_fboon
+ quantity 25
+ giType 5
+ giTag 14
+ precaches 
+ sounds 
+ description 
+item 18
+ classname item_ysalimari
+ pickup_sound sound/player/ysalimari.wav
+ world_model0 models/map_objects/mp/ysalimari.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/mpi_ysamari
+ quantity 25
+ giType 5
+ giTag 15
+ precaches 
+ sounds 
+ description 
+item 19
+ classname weapon_stun_baton
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/stun_baton/baton_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/stun_baton/baton.md3
+ icon gfx/hud/w_icon_stunbaton
+ quantity 100
+ giType 1
+ giTag 1
+ precaches 
+ sounds 
+ description 
+item 20
+ classname weapon_melee
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/stun_baton/baton_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/stun_baton/baton.md3
+ icon gfx/hud/w_icon_melee
+ quantity 100
+ giType 1
+ giTag 2
+ precaches 
+ sounds 
+ description @MENUS_MELEE_DESC
+item 21
+ classname weapon_saber
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/saber/saber_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/saber/saber_w.md3
+ icon gfx/hud/w_icon_lightsaber
+ quantity 100
+ giType 1
+ giTag 3
+ precaches 
+ sounds 
+ description @MENUS_AN_ELEGANT_WEAPON_FOR
+item 22
+ classname weapon_blaster_pistol
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/blaster_pistol/blaster_pistol_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/blaster_pistol/blaster_pistol.md3
+ icon gfx/hud/w_icon_blaster_pistol
+ quantity 100
+ giType 1
+ giTag 4
+ precaches 
+ sounds 
+ description @MENUS_BLASTER_PISTOL_DESC
+item 23
+ classname weapon_concussion_rifle
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/concussion/c_rifle_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/concussion/c_rifle.md3
+ icon gfx/hud/w_icon_c_rifle
+ quantity 50
+ giType 1
+ giTag 15
+ precaches 
+ sounds 
+ description @MENUS_CONC_RIFLE_DESC
+item 24
+ classname weapon_bryar_pistol
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/briar_pistol/briar_pistol_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/briar_pistol/briar_pistol.md3
+ icon gfx/hud/w_icon_briar
+ quantity 100
+ giType 1
+ giTag 16
+ precaches 
+ sounds 
+ description @SP_INGAME_BLASTER_PISTOL
+item 25
+ classname weapon_blaster
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/blaster_r/blaster_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/blaster_r/blaster.md3
+ icon gfx/hud/w_icon_blaster
+ quantity 100
+ giType 1
+ giTag 5
+ precaches 
+ sounds 
+ description @MENUS_THE_PRIMARY_WEAPON_OF
+item 26
+ classname weapon_disruptor
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/disruptor/disruptor_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/disruptor/disruptor.md3
+ icon gfx/hud/w_icon_disruptor
+ quantity 100
+ giType 1
+ giTag 6
+ precaches 
+ sounds 
+ description @MENUS_THIS_NEFARIOUS_WEAPON
+item 27
+ classname weapon_bowcaster
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/bowcaster/bowcaster_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/bowcaster/bowcaster.md3
+ icon gfx/hud/w_icon_bowcaster
+ quantity 100
+ giType 1
+ giTag 7
+ precaches 
+ sounds 
+ description @MENUS_THIS_ARCHAIC_LOOKING
+item 28
+ classname weapon_repeater
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/heavy_repeater/heavy_repeater_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/heavy_repeater/heavy_repeater.md3
+ icon gfx/hud/w_icon_repeater
+ quantity 100
+ giType 1
+ giTag 8
+ precaches 
+ sounds 
+ description @MENUS_THIS_DESTRUCTIVE_PROJECTILE
+item 29
+ classname weapon_demp2
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/demp2/demp2_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/demp2/demp2.md3
+ icon gfx/hud/w_icon_demp2
+ quantity 100
+ giType 1
+ giTag 9
+ precaches 
+ sounds 
+ description @MENUS_COMMONLY_REFERRED_TO
+item 30
+ classname weapon_flechette
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/golan_arms/golan_arms_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/golan_arms/golan_arms.md3
+ icon gfx/hud/w_icon_flechette
+ quantity 100
+ giType 1
+ giTag 10
+ precaches 
+ sounds 
+ description @MENUS_WIDELY_USED_BY_THE_CORPORATE
+item 31
+ classname weapon_rocket_launcher
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/merr_sonn/merr_sonn_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/merr_sonn/merr_sonn.md3
+ icon gfx/hud/w_icon_merrsonn
+ quantity 3
+ giType 1
+ giTag 11
+ precaches 
+ sounds 
+ description @MENUS_THE_PLX_2M_IS_AN_EXTREMELY
+item 32
+ classname ammo_thermal
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/thermal/thermal_pu.md3
+ world_model1 models/weapons2/thermal/thermal_w.glm
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/thermal/thermal.md3
+ icon gfx/hud/w_icon_thermal
+ quantity 4
+ giType 2
+ giTag 7
+ precaches 
+ sounds 
+ description @MENUS_THE_THERMAL_DETONATOR
+item 33
+ classname ammo_tripmine
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/laser_trap/laser_trap_pu.md3
+ world_model1 models/weapons2/laser_trap/laser_trap_w.glm
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/laser_trap/laser_trap.md3
+ icon gfx/hud/w_icon_tripmine
+ quantity 3
+ giType 2
+ giTag 8
+ precaches 
+ sounds 
+ description @MENUS_TRIP_MINES_CONSIST_OF
+item 34
+ classname ammo_detpack
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/detpack/det_pack_pu.md3
+ world_model1 models/weapons2/detpack/det_pack_proj.glm
+ world_model2 models/weapons2/detpack/det_pack_w.glm
+ world_model3 (null)
+ view_model models/weapons2/detpack/det_pack.md3
+ icon gfx/hud/w_icon_detpack
+ quantity 3
+ giType 2
+ giTag 9
+ precaches 
+ sounds 
+ description @MENUS_A_DETONATION_PACK_IS
+item 35
+ classname weapon_thermal
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/thermal/thermal_w.glm
+ world_model1 models/weapons2/thermal/thermal_pu.md3
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/thermal/thermal.md3
+ icon gfx/hud/w_icon_thermal
+ quantity 4
+ giType 1
+ giTag 12
+ precaches 
+ sounds 
+ description @MENUS_THE_THERMAL_DETONATOR
+item 36
+ classname weapon_trip_mine
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/laser_trap/laser_trap_w.glm
+ world_model1 models/weapons2/laser_trap/laser_trap_pu.md3
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/laser_trap/laser_trap.md3
+ icon gfx/hud/w_icon_tripmine
+ quantity 3
+ giType 1
+ giTag 13
+ precaches 
+ sounds 
+ description @MENUS_TRIP_MINES_CONSIST_OF
+item 37
+ classname weapon_det_pack
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/detpack/det_pack_proj.glm
+ world_model1 models/weapons2/detpack/det_pack_pu.md3
+ world_model2 models/weapons2/detpack/det_pack_w.glm
+ world_model3 (null)
+ view_model models/weapons2/detpack/det_pack.md3
+ icon gfx/hud/w_icon_detpack
+ quantity 3
+ giType 1
+ giTag 14
+ precaches 
+ sounds 
+ description @MENUS_A_DETONATION_PACK_IS
+item 38
+ classname weapon_emplaced
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/blaster_r/blaster_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/blaster_r/blaster.md3
+ icon gfx/hud/w_icon_blaster
+ quantity 50
+ giType 1
+ giTag 17
+ precaches 
+ sounds 
+ description 
+item 39
+ classname weapon_turretwp
+ pickup_sound sound/weapons/w_pkup.wav
+ world_model0 models/weapons2/blaster_r/blaster_w.glm
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model models/weapons2/blaster_r/blaster.md3
+ icon gfx/hud/w_icon_blaster
+ quantity 50
+ giType 1
+ giTag 18
+ precaches 
+ sounds 
+ description 
+item 40
+ classname ammo_force
+ pickup_sound sound/player/pickupenergy.wav
+ world_model0 models/items/energy_cell.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/w_icon_blaster
+ quantity 100
+ giType 2
+ giTag 1
+ precaches 
+ sounds 
+ description 
+item 41
+ classname ammo_blaster
+ pickup_sound sound/player/pickupenergy.wav
+ world_model0 models/items/energy_cell.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/i_icon_battery
+ quantity 100
+ giType 2
+ giTag 2
+ precaches 
+ sounds 
+ description 
+item 42
+ classname ammo_powercell
+ pickup_sound sound/player/pickupenergy.wav
+ world_model0 models/items/power_cell.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/mp/ammo_power_cell
+ quantity 100
+ giType 2
+ giTag 3
+ precaches 
+ sounds 
+ description 
+item 43
+ classname ammo_metallic_bolts
+ pickup_sound sound/player/pickupenergy.wav
+ world_model0 models/items/metallic_bolts.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/mp/ammo_metallic_bolts
+ quantity 100
+ giType 2
+ giTag 4
+ precaches 
+ sounds 
+ description 
+item 44
+ classname ammo_rockets
+ pickup_sound sound/player/pickupenergy.wav
+ world_model0 models/items/rockets.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/mp/ammo_rockets
+ quantity 3
+ giType 2
+ giTag 5
+ precaches 
+ sounds 
+ description 
+item 45
+ classname ammo_all
+ pickup_sound sound/player/pickupenergy.wav
+ world_model0 models/items/battery.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/mp/ammo_rockets
+ quantity 0
+ giType 2
+ giTag -1
+ precaches 
+ sounds 
+ description 
+item 46
+ classname team_CTF_redflag
+ pickup_sound (null)
+ world_model0 models/flags/r_flag.md3
+ world_model1 models/flags/r_flag_ysal.md3
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/mpi_rflag
+ quantity 0
+ giType 8
+ giTag 4
+ precaches 
+ sounds 
+ description 
+item 47
+ classname team_CTF_blueflag
+ pickup_sound (null)
+ world_model0 models/flags/b_flag.md3
+ world_model1 models/flags/b_flag_ysal.md3
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon gfx/hud/mpi_bflag
+ quantity 0
+ giType 8
+ giTag 5
+ precaches 
+ sounds 
+ description 
+item 48
+ classname team_CTF_neutralflag
+ pickup_sound (null)
+ world_model0 models/flags/n_flag.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon icons/iconf_neutral1
+ quantity 0
+ giType 8
+ giTag 6
+ precaches 
+ sounds 
+ description 
+item 49
+ classname item_redcube
+ pickup_sound sound/player/pickupenergy.wav
+ world_model0 models/powerups/orb/r_orb.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon icons/iconh_rorb
+ quantity 0
+ giType 8
+ giTag 0
+ precaches 
+ sounds 
+ description 
+item 50
+ classname item_bluecube
+ pickup_sound sound/player/pickupenergy.wav
+ world_model0 models/powerups/orb/b_orb.md3
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon icons/iconh_borb
+ quantity 0
+ giType 8
+ giTag 0
+ precaches 
+ sounds 
+ description 
+item 51
+ classname (null)
+ pickup_sound (null)
+ world_model0 (null)
+ world_model1 (null)
+ world_model2 (null)
+ world_model3 (null)
+ view_model (null)
+ icon (null)
+ quantity 0
+ giType 0
+ giTag 0
+ precaches (null)
+ sounds (null)
+ description (null)
+== findid ==
+weapon 1 19
+weapon 2 20
+weapon 3 21
+weapon 4 22
+weapon 5 25
+weapon 6 26
+weapon 7 27
+weapon 8 28
+weapon 9 29
+weapon 10 30
+weapon 11 31
+weapon 12 35
+weapon 13 36
+weapon 14 37
+weapon 15 23
+weapon 16 24
+weapon 17 38
+weapon 18 39
+ammo 1 40
+ammo 2 41
+ammo 3 42
+ammo 4 43
+ammo 5 44
+ammo 7 32
+ammo 8 33
+ammo 9 34
+holdable 1 4
+holdable 2 5
+holdable 3 6
+holdable 4 7
+holdable 5 8
+holdable 6 9
+holdable 7 10
+holdable 8 11
+holdable 9 12
+holdable 10 13
+holdable 11 14
+powerup 0 49
+powerup 1 -1
+powerup 2 -1
+powerup 3 -1
+powerup 4 46
+powerup 5 47
+powerup 6 48
+powerup 7 -1
+powerup 8 -1
+powerup 9 -1
+powerup 10 -1
+powerup 11 -1
+powerup 12 15
+powerup 13 16
+powerup 14 17
+powerup 15 18
+powerup 16 -1
+powerup 999 -1
+find "weapon_saber" 21
+find "weapon_blaster" 25
+find "ammo_blaster" 41
+find "item_shield_sm_instant" 1
+find "team_CTF_redflag" 46
+find "item_medpac" 6
+find "item_force_enlighten_light" 15
+find "weapon_stun_baton" 19
+find "nonexistent_item" -1
+find "" -1
+== weapondata ==
+wd 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+wd 1 0 5 0 400 8192 0 400 8192 0 0 0 0 0 0
+wd 2 0 5 0 400 8192 0 400 8192 0 0 0 0 0 0
+wd 3 0 5 0 100 8192 0 100 8192 0 0 0 0 0 0
+wd 4 2 0 0 800 8192 0 800 8192 0 0 0 0 0 0
+wd 5 2 5 2 350 8192 3 150 8192 0 0 0 0 0 0
+wd 6 3 5 5 600 8192 6 1300 8192 0 200 0 3 0 1700
+wd 7 3 5 5 1000 8192 5 750 8192 400 0 5 0 1700 0
+wd 8 4 5 1 100 8192 15 800 8192 0 0 0 0 0 0
+wd 9 3 5 8 500 8192 6 900 8192 0 250 0 3 0 2100
+wd 10 4 5 10 700 8192 15 800 8192 0 0 0 0 0 0
+wd 11 5 5 1 900 8192 2 1200 8192 0 0 0 0 0 0
+wd 12 7 0 1 800 8192 1 400 8192 0 0 0 0 0 0
+wd 13 8 0 1 800 8192 1 400 8192 0 0 0 0 0 0
+wd 14 9 0 1 800 8192 0 400 8192 0 0 0 0 0 0
+wd 15 4 40 40 800 8192 50 1200 8192 0 0 0 0 0 0
+wd 16 2 15 2 400 8192 2 400 8192 0 200 0 1 0 1500
+wd 17 0 0 0 100 8192 0 100 8192 0 0 0 0 0 0
+wd 18 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+== ammodata ==
+ad 0 0
+ad 1 100
+ad 2 300
+ad 3 300
+ad 4 300
+ad 5 25
+ad 6 800
+ad 7 10
+ad 8 10
+ad 9 10
+== grab ==
+grab nullps 0
+grab tj_saber 1
+grab tj_blaster 0
+grab tj_health 0
+grab tj_force_light 1
+grab tj_ysalamiri 0
+grab tj_armor 1
+grab tnj_force_light 0
+grab tnj_ysalamiri 1
+grab tnj_seeker 0
+grab tnj_saber 0
+grab tnj_blaster 1
+grab jm_blaster 0
+grab jm_ammo 0
+grab jm_armor 1
+grab duel_armor 0
+grab wpn_plain 1
+grab wpn_owner_powered 0
+grab wpn_alreadyhave 0
+grab wpn_dropped_have 1
+grab wpn_thermal_full 0
+grab wpn_thermal_room 1
+grab ammo_all 1
+grab ammo_full 0
+grab ammo_room 1
+grab armor_full 0
+grab armor_room 1
+grab health_rage 0
+grab health_full 0
+grab health_room 1
+grab pu_force_plain 1
+grab pu_force_ysalblock 0
+grab pu_ysalamiri 1
+grab team_red_ownflag_base 0
+grab team_red_ownflag_dropped 1
+grab team_red_enemyflag 1
+grab team_notctf 0
+grab hold_seeker_new 1
+grab hold_seeker_have 0
+== ps2es ==
+es player_full
+ eType 1
+ number 3
+ pos.trType 1
+ pos.trBase 3f800000 40000000 40400000
+ pos.trDelta 40800000 40a00000 40c00000
+ apos.trType 1
+ apos.trBase 40e00000 41000000 41100000
+ trickedentindex 1
+ trickedentindex2 2
+ trickedentindex3 3
+ trickedentindex4 4
+ forceFrame 21
+ emplacedOwner 99
+ speed 43160000
+ genericenemyindex -1
+ activeForcePass 4
+ angles2 00000000 40c00000 00000000
+ legsAnim 111
+ torsoAnim 222
+ legsFlip 1
+ torsoFlip 1
+ clientNum 3
+ eFlags 64
+ eFlags2 128
+ saberInFlight 1
+ saberEntityNum 12
+ saberMove 34
+ forcePowersActive 341
+ bolt1 0
+ otherEntityNum2 9
+ saberHolstered 2
+ event 0
+ eventParm 0
+ weapon 5
+ groundEntityNum 3
+ powerups 0
+ loopSound 77
+ generic1 88
+ modelindex2 4
+ constantLight 555
+ origin2 41200000 41a00000 41f00000
+ isJediMaster 0
+ time2 7
+ fireflag 3
+ heldByClient 6
+ ragAttach 7
+ iModelScale 150
+ brokenLimbs 3
+ hasLookTarget 1
+ lookTarget 8
+ customRGBA 200 150 100 50
+ m_iVehicleNum 2
+ ps.entityEventSequence 0
+es spectator
+ eType 12
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+es intermission
+ eType 12
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+es gibbed
+ eType 12
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 2
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+es dead
+ eType 1
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 2
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+es alive_cleardead
+ eType 1
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+es seeker_off
+ eType 1
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+es seeker_on
+ eType 1
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex 5
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 2097152
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+es duel
+ eType 1
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 1
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+es extevent
+ eType 1
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 42
+ eventParm 7
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+es events_seq
+ eType 1
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 20
+ eventParm 5
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 1
+es events_clamp
+ eType 1
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 287
+ eventParm 9
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 10
+es powerups
+ eType 1
+ number 0
+ pos.trType 1
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 32777
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+es snap_off
+ eType 1
+ number 0
+ pos.trType 1
+ pos.trBase 42c96666 c2851eb8 41c9999a
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 42b7999a 42360000 c2360000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+== ps2esxp ==
+es player_full
+ eType 1
+ number 3
+ pos.trType 3
+ pos.trBase 3f800000 40000000 40400000
+ pos.trDelta 40800000 40a00000 40c00000
+ apos.trType 1
+ apos.trBase 40e00000 41000000 41100000
+ trickedentindex 1
+ trickedentindex2 2
+ trickedentindex3 3
+ trickedentindex4 4
+ forceFrame 21
+ emplacedOwner 99
+ speed 43160000
+ genericenemyindex -1
+ activeForcePass 4
+ angles2 00000000 40c00000 00000000
+ legsAnim 111
+ torsoAnim 222
+ legsFlip 1
+ torsoFlip 1
+ clientNum 3
+ eFlags 64
+ eFlags2 128
+ saberInFlight 1
+ saberEntityNum 12
+ saberMove 34
+ forcePowersActive 341
+ bolt1 0
+ otherEntityNum2 9
+ saberHolstered 2
+ event 0
+ eventParm 0
+ weapon 5
+ groundEntityNum 3
+ powerups 0
+ loopSound 77
+ generic1 88
+ modelindex2 4
+ constantLight 555
+ origin2 41200000 41a00000 41f00000
+ isJediMaster 0
+ time2 7
+ fireflag 3
+ heldByClient 6
+ ragAttach 7
+ iModelScale 150
+ brokenLimbs 3
+ hasLookTarget 1
+ lookTarget 8
+ customRGBA 200 150 100 50
+ m_iVehicleNum 2
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es spectator
+ eType 12
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es intermission
+ eType 12
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es gibbed
+ eType 12
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 2
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es dead
+ eType 1
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 2
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es alive_cleardead
+ eType 1
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es seeker_off
+ eType 1
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es seeker_on
+ eType 1
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex 5
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 2097152
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es duel
+ eType 1
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 1
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es extevent
+ eType 1
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 42
+ eventParm 7
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es events_seq
+ eType 1
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 20
+ eventParm 5
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 1
+ pos.trTime 12345
+ pos.trDuration 50
+es events_clamp
+ eType 1
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 287
+ eventParm 9
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 10
+ pos.trTime 12345
+ pos.trDuration 50
+es powerups
+ eType 1
+ number 0
+ pos.trType 3
+ pos.trBase 00000000 00000000 00000000
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 00000000 00000000 00000000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 32777
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+es snap_off
+ eType 1
+ number 0
+ pos.trType 3
+ pos.trBase 42c96666 c2851eb8 41c9999a
+ pos.trDelta 00000000 00000000 00000000
+ apos.trType 1
+ apos.trBase 42b7999a 42360000 c2360000
+ trickedentindex 0
+ trickedentindex2 0
+ trickedentindex3 0
+ trickedentindex4 0
+ forceFrame 0
+ emplacedOwner 0
+ speed 00000000
+ genericenemyindex -1
+ activeForcePass 0
+ angles2 00000000 00000000 00000000
+ legsAnim 0
+ torsoAnim 0
+ legsFlip 0
+ torsoFlip 0
+ clientNum 0
+ eFlags 0
+ eFlags2 0
+ saberInFlight 0
+ saberEntityNum 0
+ saberMove 0
+ forcePowersActive 0
+ bolt1 0
+ otherEntityNum2 0
+ saberHolstered 0
+ event 0
+ eventParm 0
+ weapon 0
+ groundEntityNum 0
+ powerups 0
+ loopSound 0
+ generic1 0
+ modelindex2 0
+ constantLight 0
+ origin2 00000000 00000000 00000000
+ isJediMaster 0
+ time2 0
+ fireflag 0
+ heldByClient 0
+ ragAttach 0
+ iModelScale 0
+ brokenLimbs 0
+ hasLookTarget 0
+ lookTarget 0
+ customRGBA 0 0 0 0
+ m_iVehicleNum 0
+ ps.entityEventSequence 0
+ pos.trTime 12345
+ pos.trDuration 50
+== end ==

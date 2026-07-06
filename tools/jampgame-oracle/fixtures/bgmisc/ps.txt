@@ -1,0 +1,171 @@
+# BG_PlayerStateToEntityState fixture. Each block: `reset`, `ps <field ...>`
+# lines and an optional `snap 0|1`, then `run <label>`. Floats: plain int =
+# (float)atol, or 0xXXXXXXXX f32 bits. PM_NORMAL=0 PM_SPECTATOR=4
+# PM_INTERMISSION=7 ; ET_PLAYER=1 ET_INVISIBLE=15 ; GIB_HEALTH=-40 ; EF_DEAD=2.
+
+# --- kitchen sink: every copied field distinct, ET_PLAYER, no snap ---
+reset
+ps pm_type 0
+ps health 100
+ps maxhealth 100
+ps clientNum 3
+ps genericEnemyIndex -1
+ps origin 1 2 3
+ps velocity 4 5 6
+ps viewangles 7 8 9
+ps movementDir 6
+ps legsAnim 111
+ps torsoAnim 222
+ps legsFlip 1
+ps torsoFlip 1
+ps eFlags 0x40
+ps eFlags2 0x80
+ps saberInFlight 1
+ps saberEntityNum 12
+ps saberMove 34
+ps saberHolstered 2
+ps fd_forcePowersActive 0x155
+ps emplacedIndex 9
+ps weapon 5
+ps groundEntityNum 3
+ps loopSound 77
+ps generic1 88
+ps weaponstate 4
+ps weaponChargeTime 555
+ps holocronBits 0x7
+ps fd_saberAnimLevel 3
+ps heldByClient 6
+ps ragAttach 7
+ps iModelScale 150
+ps brokenLimbs 0x3
+ps hasLookTarget 1
+ps lookTarget 8
+ps m_iVehicleNum 2
+ps activeForcePass 4
+ps speed 0x43160000
+ps saberLockFrame 21
+ps electrifyTime 99
+ps fd_mtti1 1
+ps fd_mtti2 2
+ps fd_mtti3 3
+ps fd_mtti4 4
+ps lastHitLoc 10 20 30
+ps customRGBA 0 200
+ps customRGBA 1 150
+ps customRGBA 2 100
+ps customRGBA 3 50
+run player_full
+
+# --- eType selection ---
+reset
+ps pm_type 4
+ps health 100
+ps genericEnemyIndex -1
+run spectator
+reset
+ps pm_type 7
+ps health 100
+ps genericEnemyIndex -1
+run intermission
+reset
+ps pm_type 0
+ps health -50
+ps genericEnemyIndex -1
+run gibbed
+
+# --- EF_DEAD set / clear ---
+reset
+ps pm_type 0
+ps health 0
+ps genericEnemyIndex -1
+run dead
+reset
+ps pm_type 0
+ps health 5
+ps eFlags 2
+ps genericEnemyIndex -1
+run alive_cleardead
+
+# --- EF_SEEKERDRONE from genericEnemyIndex ---
+reset
+ps pm_type 0
+ps health 100
+ps genericEnemyIndex -1
+run seeker_off
+reset
+ps pm_type 0
+ps health 100
+ps genericEnemyIndex 5
+run seeker_on
+
+# --- duel -> bolt1 ---
+reset
+ps pm_type 0
+ps health 100
+ps genericEnemyIndex -1
+ps duelInProgress 1
+run duel
+
+# --- external event path ---
+reset
+ps pm_type 0
+ps health 100
+ps genericEnemyIndex -1
+ps externalEvent 42
+ps externalEventParm 7
+run extevent
+
+# --- events[] sequence path (seq index, tag bits, advance) ---
+reset
+ps pm_type 0
+ps health 100
+ps genericEnemyIndex -1
+ps eventSequence 2
+ps entityEventSequence 0
+ps events 0 20
+ps events 1 21
+ps eventParms 0 5
+ps eventParms 1 6
+run events_seq
+
+# --- events[] clamp (entityEventSequence < eventSequence - MAX_PS_EVENTS) ---
+reset
+ps pm_type 0
+ps health 100
+ps genericEnemyIndex -1
+ps eventSequence 11
+ps entityEventSequence 0
+ps events 0 30
+ps events 1 31
+ps eventParms 0 8
+ps eventParms 1 9
+run events_clamp
+
+# --- powerups bit composition ---
+reset
+ps pm_type 0
+ps health 100
+ps genericEnemyIndex -1
+ps powerups 0 1000
+ps powerups 3 1000
+ps powerups 15 1000
+run powerups
+
+# --- snap=0 leaves origin/viewangles untouched (the pos/apos copy path) ---
+# NOTE: snap=1 is deliberately NOT tested here. Under the harness's mandatory
+# -D__linux__ (chosen only to dodge q_shared.h's uncompilable MSVC __asm
+# SnapVector), bg_misc.c binds the `#define SnapVector(v) {(int)v...}` TRUNCATION
+# macro. The port's snap_vector models the RETAIL x87 `fld/fistp` ROUND-to-
+# nearest (q_shared.h:1408 — every compilable macro branch truncates; only the
+# uncompilable Windows __asm rounds), matching retail JA and the reference
+# oracle_c harness (which redefines SnapVector to round). This platform-ifdef
+# rounding-mode split cannot be arbitrated by an unedited-TU __linux__ build, so
+# snap=1 is excluded (porting-rules §19); the non-snap copy path is covered.
+reset
+ps pm_type 0
+ps health 100
+ps genericEnemyIndex -1
+ps origin 0x42c96666 0xc2851eb8 0x41c9999a
+ps viewangles 0x42b7999a 0x42360000 0xc2360000
+snap 0
+run snap_off
