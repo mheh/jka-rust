@@ -1,7 +1,5 @@
 // PORT-COMPLETE: pass-3 blind transcription filled the remaining 47 fns
-// (zero-park policy — no fn left `todo!()`-bodied). A remaining unported
-// symbol referenced verbatim: `tagOwner_t`/`refTagOwnerMap` (bg-dep, see
-// `// PORT-NOTE(...)` markers at each site). `g_shooterClients`/
+// (zero-park policy — no fn left `todo!()`-bodied). `g_shooterClients`/
 // `g_shooterClientInit` are now ported as a real `GameWorld` field
 // (`shooterClient_t` array, this file).
 //! FAITHFUL port of `oracle/oracle/codemp/game/g_misc.c`.
@@ -42,9 +40,6 @@ use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::means_of_death::meansOfDeath_t::MOD_UNKNOWN;
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
-
-// Unported types referenced in this file (need porting before this compiles):
-// tagOwner_t
 
 /// Raven `HOLOCRON_RESPAWN_TIME`.
 ///
