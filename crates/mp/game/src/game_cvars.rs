@@ -246,6 +246,10 @@ pub struct GameCvars {
     pub g_autoKickTKSpammers: vmCvar_t,
     /// `"g_autoBanTKSpammers"` — default `"0"`.
     pub g_autoBanTKSpammers: vmCvar_t,
+    /// `"g_saberDebugBox"` — default `"0"`, flags `CVAR_CHEAT`. `DEBUG_SABER_BOX`
+    /// is unconditionally `#define`d in `g_local.h:82`, so this row is live.
+    /// Source: `oracle/oracle/codemp/game/g_main.c:427-429`
+    pub g_saberDebugBox: vmCvar_t,
     /// `"d_altRoutes"` — default `"0"`.
     pub d_altRoutes: vmCvar_t,
     /// `"d_patched"` — default `"0"`.
@@ -364,10 +368,11 @@ pub struct CvarTableEntry {
     pub team_shader: bool,
 }
 
-/// Raven `gameCvarTable` (139 rows, verbatim order).
+/// Raven `gameCvarTable` (140 rows, verbatim order — incl. the live
+/// `DEBUG_SABER_BOX` row).
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:230-475`
-pub const GAME_CVAR_TABLE: [CvarTableEntry; 139] = [
+pub const GAME_CVAR_TABLE: [CvarTableEntry; 140] = [
     CvarTableEntry {
         field: Some("g_cheats"),
         name: "sv_cheats",
@@ -1296,6 +1301,17 @@ pub const GAME_CVAR_TABLE: [CvarTableEntry; 139] = [
         default: "0",
         flags: "CVAR_ARCHIVE",
         track_change: true,
+        team_shader: false,
+    },
+    // `#ifdef DEBUG_SABER_BOX` — `g_local.h:82` `#define`s it unconditionally, so
+    // this row is compiled into the oracle's `gameCvarTable`.
+    // Source: `oracle/oracle/codemp/game/g_main.c:427-429`
+    CvarTableEntry {
+        field: Some("g_saberDebugBox"),
+        name: "g_saberDebugBox",
+        default: "0",
+        flags: "CVAR_CHEAT",
+        track_change: false,
         team_shader: false,
     },
     CvarTableEntry {

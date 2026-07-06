@@ -601,6 +601,18 @@ impl Default for GameCvarModCounts {
     }
 }
 
+/// `CheckCvars`' function-scope `static int lastMod = -1` (`g_main.c:3456`) —
+/// a genuine cross-frame static, homed here. Newtype so `GameGlobals` keeps
+/// `#[derive(Default)]` while this field seeds to `-1` (not 0), matching Raven's
+/// initializer so the first `CheckCvars` call always fires.
+pub struct CheckCvarsLastMod(pub c_int);
+
+impl Default for CheckCvarsLastMod {
+    fn default() -> Self {
+        CheckCvarsLastMod(-1)
+    }
+}
+
 /// `teamgame_t` — CTF flag-state file global (`g_team.c:18`).
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:18`
@@ -763,6 +775,8 @@ pub struct GameGlobals {
         [crate::botai::boteventtracker_s::boteventtracker_t; mp_qshared::shared::MAX_CLIENTS],
     /// `gUpdateVars`. Source: `oracle/oracle/codemp/game/ai_main.c:7485`
     pub gUpdateVars: c_int,
+    /// `CheckCvars`' `static int lastMod = -1` (`g_main.c:3456`).
+    pub checkCvarsLastMod: CheckCvarsLastMod,
     /// `static int lastbotthink_time` — bot-think cadence latch (function-scope
     /// static in `BotAIStartFrame`; genuine cross-frame state).
     /// Source: `oracle/oracle/codemp/game/ai_main.c:7497`

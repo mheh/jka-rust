@@ -288,6 +288,7 @@ impl GameCvars {
             "g_autoBanKillSpammers" => &mut cvars.g_autoBanKillSpammers,
             "g_autoKickTKSpammers" => &mut cvars.g_autoKickTKSpammers,
             "g_autoBanTKSpammers" => &mut cvars.g_autoBanTKSpammers,
+            "g_saberDebugBox" => &mut cvars.g_saberDebugBox,
             "d_altRoutes" => &mut cvars.d_altRoutes,
             "d_patched" => &mut cvars.d_patched,
             "g_saberRealisticCombat" => &mut cvars.g_saberRealisticCombat,
@@ -3270,15 +3271,12 @@ pub fn CheckCvars(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
 
-        // PORT-NOTE(cross-frame-static): Raven's `static int lastMod = -1` is a
-        // genuine cross-frame static; it wants a
-        // GameWorld field. No such field is cited by this packet, so it is
-        // approximated with a per-call local — this makes the "only run once
-        // per modification" gate always re-fire (behavioral divergence, noted
-        // here per §19).
-        let last_mod: c_int = -1;
+        // Raven's `static int lastMod = -1` is a genuine cross-frame static,
+        // homed on `GameGlobals::checkCvarsLastMod` (seeds to -1) so the gate
+        // fires once per g_password modification, not every frame.
+        if world.cvars.g_password.modificationCount != world.globals.checkCvarsLastMod.0 {
+            world.globals.checkCvarsLastMod.0 = world.cvars.g_password.modificationCount;
 
-        if world.cvars.g_password.modificationCount != last_mod {
             let mut password = cstr_to_str(world.cvars.g_password.string.as_ptr());
             password = password.replace('%', ".");
             trap::Cvar_Set(

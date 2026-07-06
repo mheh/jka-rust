@@ -457,16 +457,55 @@ fn diff_runs(sc: &Scenario, a: &[FrameSnap], b: &[FrameSnap]) -> Result<String, 
             let idx = (0..sa.sc_imports.len().min(sb.sc_imports.len()))
                 .find(|&i| sa.sc_imports[i] != sb.sc_imports[i]);
             match idx {
-                Some(i) => r.push_str(&format!(
-                    "  syscall stream: first divergent call #{i}: oracle={} rust={}\n",
-                    referee_import_name(sa.sc_imports[i]),
-                    referee_import_name(sb.sc_imports[i]),
-                )),
-                None => r.push_str(&format!(
-                    "  syscall stream: same prefix, lengths/texts differ (oracle {} calls, rust {} calls)\n",
-                    sa.sc_imports.len(),
-                    sb.sc_imports.len(),
-                )),
+                Some(i) => {
+                    r.push_str(&format!(
+                        "  syscall stream: first divergent call #{i}: oracle={} rust={}\n",
+                        referee_import_name(sa.sc_imports[i]),
+                        referee_import_name(sb.sc_imports[i]),
+                    ));
+                    // Decoded window of calls around the divergence from BOTH
+                    // streams — shows which loop each side is in. Never weakens
+                    // the comparison; report-only.
+                    let win = 12usize;
+                    let lo = i.saturating_sub(win);
+                    let hi_a = (i + win + 1).min(sa.sc_imports.len());
+                    let hi_b = (i + win + 1).min(sb.sc_imports.len());
+                    r.push_str("    --- oracle stream window ---\n");
+                    for j in lo..hi_a {
+                        let mark = if j == i { " <==" } else { "" };
+                        r.push_str(&format!(
+                            "      #{j}: {}{mark}\n",
+                            referee_import_name(sa.sc_imports[j])
+                        ));
+                    }
+                    r.push_str("    --- rust   stream window ---\n");
+                    for j in lo..hi_b {
+                        let mark = if j == i { " <==" } else { "" };
+                        r.push_str(&format!(
+                            "      #{j}: {}{mark}\n",
+                            referee_import_name(sb.sc_imports[j])
+                        ));
+                    }
+                }
+                None => {
+                    r.push_str(&format!(
+                        "  syscall stream: same import prefix, lengths/texts differ (oracle {} calls, rust {} calls)\n",
+                        sa.sc_imports.len(),
+                        sb.sc_imports.len(),
+                    ));
+                    // One import stream is a prefix of the other; show the tail
+                    // window from the shorter length onward from BOTH streams.
+                    let common = sa.sc_imports.len().min(sb.sc_imports.len());
+                    let lo = common.saturating_sub(6);
+                    r.push_str("    --- oracle stream tail ---\n");
+                    for j in lo..sa.sc_imports.len() {
+                        r.push_str(&format!("      #{j}: {}\n", referee_import_name(sa.sc_imports[j])));
+                    }
+                    r.push_str("    --- rust   stream tail ---\n");
+                    for j in lo..sb.sc_imports.len() {
+                        r.push_str(&format!("      #{j}: {}\n", referee_import_name(sb.sc_imports[j])));
+                    }
+                }
             }
             if sa.sc_texts != sb.sc_texts {
                 if let Some(i) = (0..sa.sc_texts.len().min(sb.sc_texts.len()))
