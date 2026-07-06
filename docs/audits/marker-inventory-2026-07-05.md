@@ -1,7 +1,7 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 786 markers — 178 `TODO: Port`,
-552 `PORT-NOTE`, 56 other TODO forms.
+Totals: 786 markers — 177 `TODO: Port`,
+553 `PORT-NOTE`, 56 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
 judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
@@ -10,16 +10,12 @@ judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
-  the actionable findings. (15)
+  the actionable findings. (14)
 - **STALE-escalated** — mechanical fix known but crosses files; left in place. (3)
 
 PORT-NOTE section is a plain re-grep (not audited).
 
-## TODO: Port — COMPLEX (15)
-
-### crates/mp/game/src/g_init_game.rs
-- L38: G_InitGame body (G_RegisterCvars, level wiring, back-pointers,
-  - The individual building blocks this marker lists are now ported (G_RegisterCvars at g_main.rs:182, trap::LocateGameData at trap.rs:1400, G_SpawnEntitiesFromString at g_spawn.rs:1459), but g_init_game() is still the live-wired GAME_INIT entrypoint (world/game_context.rs:86) and is explicitly a 'Slice-0 minimal' stub that calls none of them. Assembling the real G_InitGame body (level/back-pointer wiring, trap_SV_RegisterSharedMemory, cvar registration order, entity-spawn sequencing per g_main.c:897-1015) is substantial new orchestration logic, not a mechanical retype/placeholder swap.
+## TODO: Port — COMPLEX (14)
 
 ### crates/mp/game/src/game_globals.rs
 - L689: navInfo_t
@@ -585,7 +581,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L15 [LEGIT]: /// TODO: SP transport path does not provide a direct `UI_S_STARTLOCALSOUND` case in `oracle/oracle/code/client/cl_ui.cpp`.
 
 
-## NOTE (552)
+## NOTE (553)
 
 ### crates/mp/game/src/FighterNPC.rs
 - L1309: (untopiced)
@@ -889,6 +885,9 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L5683: dir/point-null
 - L5753: point-null
 - L5769: ctx-and-dir
+
+### crates/mp/game/src/g_init_game.rs
+- L51: unported-const
 
 ### crates/mp/game/src/g_items.rs
 - L12: (untopiced)
