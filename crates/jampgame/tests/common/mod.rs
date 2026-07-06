@@ -31,19 +31,30 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+pub mod reflog;
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ffi::{c_char, c_int, c_void, CStr, CString};
-use std::path::PathBuf;
+use std::ffi::{c_char, c_int, c_short, c_void, CStr, CString};
+use std::path::{Path, PathBuf};
 
 use mp_abi::game::exports::MpGameExport;
 use mp_abi::game::imports::MpGameImport;
 use mp_engine_qcommon::vm::{arm_game_slot, game_syscall_trampoline};
+use mp_qshared::common::mp::qcommon::usercmd_t;
+use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::cvar::vmCvar_t;
+use mp_qshared::shared::limits::ENTITYNUM_NONE;
+use mp_qshared::shared::vec3_t;
 use native_platform::entrypoints::{AbiWord, RawSyscall, RawVmMain};
 use native_platform::module_loader::{
-    sys_load_dll, ModuleNaming, ModuleSearchPolicy, SearchStep,
+    sys_load_dll, LoadedModule, ModuleNaming, ModuleSearchPolicy, SearchStep,
 };
+
+// The referee differential driver (`tests/referee.rs`) reuses this mock verbatim
+// as its deterministic engine; the pub surface below (`referee_*` fns) is its
+// entry into the same MOCK the smoke lifecycle drives. Kept in one module so the
+// oracle and Rust runs go through byte-identical engine behavior.
 
 // ---------------------------------------------------------------------------
 // Import-number constants (wire values). Used as `match` patterns in the mock.
@@ -71,6 +82,12 @@ const G_GET_CONFIGSTRING: isize = MpGameImport::G_GET_CONFIGSTRING as isize;
 const G_GET_ENTITY_TOKEN: isize = MpGameImport::G_GET_ENTITY_TOKEN as isize;
 const G_LOCATE_GAME_DATA: isize = MpGameImport::G_LOCATE_GAME_DATA as isize;
 const G_SET_USERINFO: isize = MpGameImport::G_SET_USERINFO as isize;
+const G_GET_USERCMD: isize = MpGameImport::G_GET_USERCMD as isize;
+const G_SEND_SERVER_COMMAND: isize = MpGameImport::G_SEND_SERVER_COMMAND as isize;
+const G_SEND_CONSOLE_COMMAND: isize = MpGameImport::G_SEND_CONSOLE_COMMAND as isize;
+const G_TRACE: isize = MpGameImport::G_TRACE as isize;
+const G_TRACECAPSULE: isize = MpGameImport::G_TRACECAPSULE as isize;
+const G_G2TRACE: isize = MpGameImport::G_G2TRACE as isize;
 
 /// Realistic userinfo string for client 0, exercising the keys
 /// `ClientUserinfoChanged` reads (g_client.c:1888). A drop-in of what a real
@@ -99,12 +116,12 @@ const CLIENT0_USERINFO: &str = "\\name\\Padawan\\rate\\25000\\snaps\\20\\model\\
 /// of `GAME_INIT` (`g_public.h:145`: the game tells the server where and how big
 /// the entity/client arrays are).
 #[derive(Clone, Copy, Debug)]
-struct LocateData {
-    g_ents: *mut c_void,
-    num_g_entities: c_int,
-    sizeof_g_entity_t: c_int,
-    clients: *mut c_void,
-    sizeof_g_client: c_int,
+pub struct LocateData {
+    pub g_ents: *mut c_void,
+    pub num_g_entities: c_int,
+    pub sizeof_g_entity_t: c_int,
+    pub clients: *mut c_void,
+    pub sizeof_g_client: c_int,
 }
 
 struct MockEngine {
@@ -137,6 +154,16 @@ struct MockEngine {
     counts: BTreeMap<isize, u32>,
     /// Imports hit that the mock does not model (served the permissive `0`).
     logged_only: BTreeMap<isize, u32>,
+    /// Per-client `usercmd_t` served by `G_GET_USERCMD` (the referee injects the
+    /// replay log's input here each frame; unset clients get an all-zero cmd).
+    usercmds: BTreeMap<c_int, usercmd_t>,
+    /// Import-number sequence issued since the last `referee_begin_frame`
+    /// (pointer-free — just the wire numbers, in call order).
+    frame_imports: Vec<isize>,
+    /// String payloads of the string-bearing syscalls issued this frame
+    /// (`SET_CONFIGSTRING`/`SEND_SERVER_COMMAND`/`SEND_CONSOLE_COMMAND`/`PRINT`),
+    /// captured by pointed-to DATA so the digest never hashes a raw address.
+    frame_texts: Vec<(isize, c_int, String)>,
 }
 
 impl MockEngine {
@@ -193,6 +220,9 @@ impl MockEngine {
             g_error: None,
             counts: BTreeMap::new(),
             logged_only: BTreeMap::new(),
+            usercmds: BTreeMap::new(),
+            frame_imports: Vec::new(),
+            frame_texts: Vec::new(),
         }
     }
 
@@ -270,11 +300,15 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
     MOCK.with(|m| {
         let mut m = m.borrow_mut();
         *m.counts.entry(n).or_insert(0) += 1;
+        // Pointer-free syscall-stream record for the referee digest: the wire
+        // number in call order. String/scalar payloads are added per arm below.
+        m.frame_imports.push(n);
 
         match n {
             G_PRINT => {
                 let s = unsafe { c_str(word(args, 1)) };
                 eprint!("[G_PRINT] {s}");
+                m.frame_texts.push((n, 0, s.clone()));
                 m.prints.push(s);
                 0
             }
@@ -397,7 +431,60 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
             G_SET_CONFIGSTRING => {
                 let num = unsafe { word(args, 1) } as c_int;
                 let s = unsafe { c_str(word(args, 2)) };
+                m.frame_texts.push((n, num, s.clone()));
                 m.configstrings.insert(num, s);
+                0
+            }
+            // ---- usercmd delivery (referee replay input) -------------------
+            // `void trap_GetUsercmd( int clientNum, usercmd_t *cmd )` — fill the
+            // out-param from the per-client cmd the referee injected for this
+            // frame (all-zero for unset clients — a valid idle cmd).
+            // Source: oracle/oracle/codemp/game/g_public.h:219.
+            G_GET_USERCMD => {
+                let num = unsafe { word(args, 1) } as c_int;
+                let out = unsafe { word(args, 2) } as *mut usercmd_t;
+                if !out.is_null() {
+                    let cmd = m.usercmds.get(&num).copied().unwrap_or_default();
+                    unsafe { *out = cmd };
+                }
+                0
+            }
+            // ---- broadcast commands (captured by DATA for the digest) -------
+            // `void trap_SendServerCommand( int clientNum, const char *text )`
+            // and `void trap_SendConsoleCommand( int when, const char *text )`.
+            // The pointed-to string is hashed (not the pointer) so the two runs'
+            // differing heap addresses never perturb the syscall-stream digest.
+            G_SEND_SERVER_COMMAND | G_SEND_CONSOLE_COMMAND => {
+                let arg1 = unsafe { word(args, 1) } as c_int;
+                let s = unsafe { c_str(word(args, 2)) };
+                m.frame_texts.push((n, arg1, s));
+                0
+            }
+            // ---- collision traces (DETERMINISM-CRITICAL) -------------------
+            // `trap_Trace`/`trap_TraceCapsule`/`trap_G2Trace` are OUT-PARAM
+            // syscalls: the engine writes the `trace_t` result. The old
+            // permissive default returned 0 but left `*results` UNINITIALIZED —
+            // pmove's ground/step traces then read the module's stack garbage,
+            // making `origin.z` (and everything downstream) nondeterministic
+            // ACROSS PROCESSES (the referee's oracle-vs-oracle self-test caught
+            // exactly this). Serve a deterministic empty-space result: moved
+            // fully to `end`, hit nothing. Same layout for all three (results at
+            // word 1, end vec3 at word 5). Source: g_public.h trap_Trace.
+            G_TRACE | G_TRACECAPSULE | G_G2TRACE => {
+                let results = unsafe { word(args, 1) } as *mut trace_t;
+                let end = unsafe { word(args, 5) } as *const vec3_t;
+                if !results.is_null() {
+                    let endpos = if end.is_null() {
+                        [0.0, 0.0, 0.0]
+                    } else {
+                        unsafe { *end }
+                    };
+                    let mut tr: trace_t = unsafe { core::mem::zeroed() };
+                    tr.fraction = 1.0; // 1.0 = didn't hit anything
+                    tr.entityNum = ENTITYNUM_NONE as c_short;
+                    tr.endpos = endpos;
+                    unsafe { *results = tr };
+                }
                 0
             }
             G_GET_CONFIGSTRING => {
@@ -815,4 +902,165 @@ fn import_name(n: isize) -> String {
         G_NAV_CHECKBLOCKEDEDGES, G_NAV_CLEARCHECKEDNODES, G_G2_INITGHOUL2MODEL,
     );
     format!("syscall#{n}")
+}
+
+// ===========================================================================
+// Referee differential-driver surface (used by `tests/referee.rs`).
+//
+// The same MOCK, the same trampoline, the same loader — the referee simply
+// drives it with a scenario, snapshots the module's playerState/entityState via
+// the LOCATE_GAME_DATA pointers, and diffs. Everything here is a deterministic
+// pure function of (call sequence, injected inputs). The one call-count-coupled
+// syscall is `G_MILLISECONDS` (monotonic counter); it feeds profiling paths, not
+// snapshot state — see the referee module doc for the determinism audit.
+// ===========================================================================
+
+/// FNV-1a over a byte slice — a stable, portable rolling hash for the
+/// syscall-stream digest (no `DefaultHasher` random seed, no address content).
+fn fnv1a(seed: u64, bytes: &[u8]) -> u64 {
+    let mut h = seed;
+    for &b in bytes {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
+}
+
+const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+
+/// Reset the mock to a fresh, empty engine (for the second referee run). The
+/// caller re-applies the scenario (map tokens, userinfos) afterwards.
+pub fn referee_reset() {
+    MOCK.with(|m| *m.borrow_mut() = MockEngine::new());
+}
+
+/// Install the BSP entity token stream for a scenario's map variant (resets the
+/// read cursor). Tokens are served verbatim by `G_GET_ENTITY_TOKEN`.
+pub fn referee_set_map(tokens: &[&str]) {
+    MOCK.with(|m| {
+        let mut m = m.borrow_mut();
+        m.tokens = tokens.iter().map(|s| CString::new(*s).unwrap()).collect();
+        m.token_idx = 0;
+    });
+}
+
+/// Override an engine cvar value (served by the cvar-family syscalls). The
+/// referee sets `g_synchronousClients=1` so `G_RunClient` simulates each client
+/// from its latched usercmd every frame.
+pub fn referee_set_cvar(name: &str, value: &str) {
+    MOCK.with(|m| {
+        m.borrow_mut().cvars.insert(name.to_string(), value.to_string());
+    });
+}
+
+/// Seed a client's userinfo string (served by `G_GET_USERINFO`).
+pub fn referee_set_userinfo(num: c_int, s: &str) {
+    MOCK.with(|m| {
+        m.borrow_mut().userinfos.insert(num, s.to_string());
+    });
+}
+
+/// Inject the replay usercmd for a client for the upcoming frame's
+/// `GAME_CLIENT_THINK` (`G_GET_USERCMD` returns it).
+pub fn referee_set_usercmd(num: c_int, cmd: usercmd_t) {
+    MOCK.with(|m| {
+        m.borrow_mut().usercmds.insert(num, cmd);
+    });
+}
+
+/// Mark a frame boundary: clear the per-frame syscall accumulators.
+pub fn referee_begin_frame() {
+    MOCK.with(|m| {
+        let mut m = m.borrow_mut();
+        m.frame_imports.clear();
+        m.frame_texts.clear();
+    });
+}
+
+/// Rolling hash of the syscalls issued since the last `referee_begin_frame`:
+/// the import-number sequence plus every captured string payload (by DATA). No
+/// pointer value ever enters the hash, so the two runs' differing heap layouts
+/// cannot perturb it.
+pub fn referee_frame_syscall_digest() -> u64 {
+    MOCK.with(|m| {
+        let m = m.borrow();
+        let mut h = FNV_OFFSET;
+        for &n in &m.frame_imports {
+            h = fnv1a(h, &(n as i64).to_le_bytes());
+        }
+        for (imp, arg, text) in &m.frame_texts {
+            h = fnv1a(h, &(*imp as i64).to_le_bytes());
+            h = fnv1a(h, &(*arg as i64).to_le_bytes());
+            h = fnv1a(h, text.as_bytes());
+            h = fnv1a(h, &[0]);
+        }
+        h
+    })
+}
+
+/// Decoded syscall stream for the current frame (for the divergence report):
+/// the import-number sequence and the string payloads.
+pub fn referee_frame_syscalls() -> (Vec<isize>, Vec<(isize, c_int, String)>) {
+    MOCK.with(|m| {
+        let m = m.borrow();
+        (m.frame_imports.clone(), m.frame_texts.clone())
+    })
+}
+
+/// The captured `G_LOCATE_GAME_DATA` payload (`None` until `GAME_INIT`).
+pub fn referee_locate() -> Option<LocateData> {
+    MOCK.with(|m| m.borrow().locate)
+}
+
+/// The `G_ERROR` message, if the module raised one (a hard failure).
+pub fn referee_error() -> Option<String> {
+    MOCK.with(|m| m.borrow().g_error.clone())
+}
+
+/// Human-readable import name (re-exported for the divergence report).
+pub fn referee_import_name(n: isize) -> String {
+    import_name(n)
+}
+
+/// Arm the engine slot with the mock syscall (call before the first `vmMain`).
+pub fn referee_arm() {
+    arm_game_slot(std::ptr::null_mut(), mock_syscall);
+}
+
+/// Load a module dylib through the real ported loader and hand back the owning
+/// handle (keep it alive for the whole run — dropping it unloads the module).
+pub fn referee_load(dylib: &Path) -> LoadedModule {
+    let dir = dylib.parent().unwrap().to_path_buf();
+    let file = dylib.file_name().unwrap().to_str().unwrap().to_string();
+    let name: &str = split_dylib_stem(&file);
+    let policy = ModuleSearchPolicy {
+        naming: ModuleNaming {
+            suffix: Some(platform_dylib_suffix()),
+        },
+        direct_first: false,
+        steps: vec![SearchStep::FsPath {
+            base: dir,
+            gamedir: String::new(),
+        }],
+    };
+    let syscall: RawSyscall = game_syscall_trampoline as *const c_void;
+    sys_load_dll(&policy, name, syscall).expect("sys_load_dll resolved dllEntry+vmMain")
+}
+
+/// Invoke `vmMain(command, args...)` (pub wrapper over the shared `call_vm`).
+pub fn referee_vm_call(vm_main: RawVmMain, command: MpGameExport, args: &[AbiWord]) -> AbiWord {
+    call_vm(vm_main, command, args)
+}
+
+/// Run `f` on a 64 MiB-stack "engine" thread (GAME_INIT builds a multi-MiB
+/// `GameWorld` by value — the default test stack overflows, as in the smoke
+/// drive). Panics propagate as a join failure = test failure.
+pub fn run_on_engine_thread_fn(f: impl FnOnce() + Send + 'static) {
+    std::thread::Builder::new()
+        .name("referee-engine".into())
+        .stack_size(64 * 1024 * 1024)
+        .spawn(f)
+        .expect("spawn engine thread")
+        .join()
+        .expect("referee engine thread panicked");
 }
