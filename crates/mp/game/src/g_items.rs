@@ -15,7 +15,7 @@
 use crate::prelude::*;
 
 use crate::bg_misc::{
-    BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_EmplacedView,
+    BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_CycleInven, BG_EmplacedView,
     BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta, BG_FindItem, BG_FindItemForHoldable,
     BG_FindItemForWeapon,
 };
@@ -1960,11 +1960,27 @@ pub fn EWebDie(
                 (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
                     !(1 << HI_EWEB);
 
-                //TODO: Port bg_itemlist
-                // Source: oracle/oracle/codemp/game/g_items.c:1473-1478 — the
-                // de-select-and-cycle-inventory branch needs the bg-owned
-                // `bg_itemlist` table (unported anywhere in the crate graph;
-                // see `bg_misc.rs`).
+                if (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEM as usize]
+                    > 0
+                    && bg_itemlist[(*((*owner).client as *mut gclient_t)).ps.stats
+                        [STAT_HOLDABLE_ITEM as usize]
+                        as usize]
+                        .giType
+                        == IT_HOLDABLE
+                    && bg_itemlist[(*((*owner).client as *mut gclient_t)).ps.stats
+                        [STAT_HOLDABLE_ITEM as usize]
+                        as usize]
+                        .giTag
+                        == HI_EWEB
+                {
+                    //he has it selected so deselect it and select the first thing available
+                    (*((*owner).client as *mut gclient_t)).ps.stats
+                        [STAT_HOLDABLE_ITEM as usize] = 0;
+                    BG_CycleInven(
+                        &mut (*((*owner).client as *mut gclient_t)).ps as *mut playerState_t,
+                        1,
+                    );
+                }
             }
         }
     }
