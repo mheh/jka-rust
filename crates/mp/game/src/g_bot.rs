@@ -797,12 +797,7 @@ pub fn G_BotConnect(ctx: GameContext<'_>, clientNum: c_int, restart: qboolean) -
             &cstr_to_str(Info_ValueForKey(userinfo.as_ptr(), cstr("team").as_ptr())),
         );
 
-        let ok = BotAISetupClient(
-            ctx,
-            clientNum,
-            &mut settings as *mut bot_settings_t as *mut c_void,
-            restart,
-        );
+        let ok = BotAISetupClient(ctx, clientNum, &mut settings as *mut bot_settings_t, restart);
         if ok == 0 {
             trap::DropClient(
                 ctx.engine,
