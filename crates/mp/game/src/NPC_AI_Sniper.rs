@@ -20,7 +20,7 @@ use crate::g_nav::{FlyingCreature, NAV_HitNavGoal};
 use crate::g_timer::{TIMER_Done, TIMER_Get, TIMER_Set};
 use crate::g_utils::GetAnglesForDirection;
 use crate::prelude::*;
-use crate::q_math::{vectoangles, AngleNormalize360, AngleVectors, VectorNormalize};
+use crate::q_math::{vec3_origin, vectoangles, AngleNormalize360, AngleVectors, VectorNormalize, _VectorMA};
 use crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth;
 use crate::NPC_combat::{
     NPC_ChangeWeapon, NPC_FindCombatPoint, NPC_FreeCombatPoint, NPC_MaxDistSquaredForWeapon,
@@ -33,6 +33,7 @@ use crate::NPC_reactions::NPC_Pain;
 use crate::NPC_senses::{NPC_CheckAlertEvents, NPC_CheckForDanger};
 use crate::NPC_sounds::G_AddVoiceEvent;
 use crate::NPC_utils::{CalcEntitySpot, NPC_CheckEnemyExt, NPC_ClearLOS4, NPC_UpdateAngles};
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::public::entity_event::entity_event_t::{
     EV_CONFUSE1, EV_CONFUSE3, EV_PUSHED1, EV_PUSHED3,
 };
@@ -741,30 +742,58 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
                     // GetAnglesForDirection(muzzle, target, angles);
                     AngleVectors(angles, Some(&mut forward), Some(&mut right), Some(&mut up));
 
-                    //TODO: Port Sniper_FireDecide miss loop body (VectorMA flrand(1.5,4)
-                    // draws x4, trap_Trace, Sniper_EvaluateShot) — the commented calls
-                    // below each consume a holdrand draw in the oracle, so this loop
-                    // desyncs the flrand stream until ported.
-                    // Source: oracle/oracle/codemp/game/NPC_AI_Sniper.c:536-565
                     while hit != 0 && tryMissCount < 10 {
                         tryMissCount += 1;
+                        let enemy_maxs2 = world.g_entities[(*NPC).enemy.unwrap().index()].r.maxs[2];
+                        let enemy_mins2 = world.g_entities[(*NPC).enemy.unwrap().index()].r.mins[2];
                         if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                             aimError = QTRUE;
                             if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
-                                // VectorMA(target, (*NPC)->enemy->r.maxs[2]*(*ctx.world).bg_state.rng.flrand(1.5, 4), right, target);
+                                _VectorMA(
+                                    target,
+                                    enemy_maxs2 * (*ctx.world).bg_state.rng.flrand(1.5, 4.0),
+                                    right,
+                                    &mut target,
+                                );
                             } else {
-                                // VectorMA(target, (*NPC)->enemy->r.mins[2]*(*ctx.world).bg_state.rng.flrand(1.5, 4), right, target);
+                                _VectorMA(
+                                    target,
+                                    enemy_mins2 * (*ctx.world).bg_state.rng.flrand(1.5, 4.0),
+                                    right,
+                                    &mut target,
+                                );
                             }
                         }
                         if aimError == QFALSE || (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                             if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
-                                // VectorMA(target, (*NPC)->enemy->r.maxs[2]*(*ctx.world).bg_state.rng.flrand(1.5, 4), up, target);
+                                _VectorMA(
+                                    target,
+                                    enemy_maxs2 * (*ctx.world).bg_state.rng.flrand(1.5, 4.0),
+                                    up,
+                                    &mut target,
+                                );
                             } else {
-                                // VectorMA(target, (*NPC)->enemy->r.mins[2]*(*ctx.world).bg_state.rng.flrand(1.5, 4), up, target);
+                                _VectorMA(
+                                    target,
+                                    enemy_mins2 * (*ctx.world).bg_state.rng.flrand(1.5, 4.0),
+                                    up,
+                                    &mut target,
+                                );
                             }
                         }
-                        // trap_Trace(&trace, muzzle, vec3_origin, vec3_origin, target, NPC->s.number, MASK_SHOT);
-                        // hit = Sniper_EvaluateShot(trace.entityNum);
+                        trap::Trace(
+                            ctx.engine,
+                            GTraceArgs::new(
+                                &mut trace as *mut trace_t,
+                                &muzzle as *const vec3_t,
+                                &vec3_origin as *const vec3_t,
+                                &vec3_origin as *const vec3_t,
+                                &target as *const vec3_t,
+                                (*NPC).s.number,
+                                MASK_SHOT,
+                            ),
+                        );
+                        hit = Sniper_EvaluateShot(ctx, trace.entityNum as c_int);
                     }
                     (*NPC).count += 1;
                 } else if world.globals.enemyLOS2 == 0 {
