@@ -1,12 +1,12 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 731 markers — 123 `TODO: Port`,
-553 `PORT-NOTE`, 55 other TODO forms.
+Totals: 720 markers — 120 `TODO: Port`,
+546 `PORT-NOTE`, 54 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
 judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 
-- **LEGIT** — subject genuinely unported; marker accurate. (106)
+- **LEGIT** — subject genuinely unported; marker accurate. (103)
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
@@ -73,7 +73,7 @@ PORT-NOTE section is a plain re-grep (not audited).
   - Validator claim does not match the file. Actual line 1 is `//! `mp_engine_server` crate. //TODO: Port module mp_engine_server` — subject is already `mp_engine_server` (not `server` as claimed), and there is no `// Source:` line to normalize. This exact one-line, no-Source-line form is the established house convention for crate-root module docs, verified identical across all 22 sibling crate lib.rs files (e.g. crates/mp/engine/qcommon/src/lib.rs, crates/mp/engine/client/src/lib.rs, crates/sp/engine/server/src/lib.rs, crates/mp/bg/src/lib.rs). Git history (git log -p --follow on this file) shows the line unchanged since crate creation in 71ec41c7. Fixing/normalizing it as described would actually break consistency with the rest of the codebase, so no edit was made.
 
 
-## TODO: Port — LEGIT (106)
+## TODO: Port — LEGIT (103)
 
 ### crates/abi-transport/src/generic/engine.rs
 - L78: RunStatic per-call handler surface
@@ -187,13 +187,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/bg_vehicleLoad.rs
 - L300: BG_SetSharedVehicleFunctions
-
-### crates/mp/game/src/g_main.rs
-- L3341: BG_GetTime level.time reach-through
-- L3357: level.time reach-through
-
-### crates/mp/game/src/world/game_context.rs
-- L304: Dispatch<C> for GameContext (GAME_ICARUS_* commands)
 
 ### crates/mp/renderer/src/lib.rs
 - L2: renderer subsystem (rd-vanilla logic; types already ported)
@@ -328,7 +321,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L8: ui live entrypoint exports (vmMain match, SEAM-D10)
 
 
-## TODO-other (55)
+## TODO-other (54)
 
 ### crates/mp/engine/core/src/lifecycle.rs
 - L33 [LEGIT]: /// carry `//TODO: Port` markers in step order so the transcript diff (DEC-09.2)
@@ -397,9 +390,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/game/src/g_log.rs
 - L7 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 
-### crates/mp/game/src/g_main.rs
-- L182 [?]: // `TODO: Port` subject) are transcribed in full.
-
 ### crates/mp/game/src/g_mem.rs
 - L7 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 
@@ -434,7 +424,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/game_globals.rs
 - L7 [LEGIT]: //! `//TODO: Port <type>` marker — the porter fills the real type when
-- L873 [?]: // it"); shapes are exactly what the `g_log.md` packet's TODO comments
+- L889 [?]: // it"); shapes are exactly what the `g_log.md` packet's TODO comments
 
 ### crates/mp/game/src/npc_c.rs
 - L1416 [LEGIT]: // TODO: Add vehicle behaviors here.
@@ -488,7 +478,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L15 [LEGIT]: /// TODO: SP transport path does not provide a direct `UI_S_STARTLOCALSOUND` case in `oracle/oracle/code/client/cl_ui.cpp`.
 
 
-## NOTE (553)
+## NOTE (546)
 
 ### crates/mp/game/src/FighterNPC.rs
 - L1310: (untopiced)
@@ -862,46 +852,39 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/game/src/g_main.rs
 - L11: <topic>
 - L12: (untopiced)
-- L18: cvar-mod-count-cache
-- L73: variadic-c-abi
-- L86: variadic-c-abi
-- L98: variadic-c-abi
-- L108: variadic-c-abi
-- L174: cvar-mod-count-cache
-- L377: (untopiced)
-- L459: (untopiced)
-- L480: variadic-c-abi
-- L490: ctx-free-boundary
-- L500: variadic-c-abi
-- L509: ctx-free-boundary
-- L838: unported-dep
-- L931: qsort-fn-pointer-registration
-- L1037: unported-dep
-- L1131: qsort-ctx-mismatch
-- L1359: unported-dep
-- L1437: unported-const
-- L1554: unported-dep
-- L1643: variadic-c-abi
-- L1653: variadic-c-abi
-- L1685: unported-const
-- L1758: unported-const
-- L2132: unported-dep
-- L2741: raw-ptr-skeleton-no-world-handle
-- L2776: raw-ptr-skeleton-no-world-handle
-- L2939: raw-ptr-skeleton-no-world-handle
-- L2966: raw-ptr-skeleton-no-world-handle
-- L3026: raw-ptr-skeleton-no-world-handle
-- L3071: raw-ptr-skeleton-no-world-handle
-- L3167: raw-ptr-skeleton-no-world-handle
-- L3178: cross-frame-static
-- L3219: raw-ptr-skeleton-no-world-handle
-- L3256: raw-ptr-skeleton-no-world-handle
-- L3330: raw-ptr-skeleton-no-world-handle
-- L3336: ctx-free-boundary
-- L3346: ctx-free-boundary
-- L3362: raw-ptr-skeleton-no-world-handle
-- L3899: raw-ptr-skeleton-no-world-handle
-- L3918: static-scratch-buffer
+- L70: variadic-c-abi
+- L83: variadic-c-abi
+- L95: variadic-c-abi
+- L105: variadic-c-abi
+- L502: variadic-c-abi
+- L512: ctx-free-boundary
+- L522: variadic-c-abi
+- L531: ctx-free-boundary
+- L860: unported-dep
+- L953: qsort-fn-pointer-registration
+- L1059: unported-dep
+- L1153: qsort-ctx-mismatch
+- L1381: unported-dep
+- L1459: unported-const
+- L1576: unported-dep
+- L1665: variadic-c-abi
+- L1675: variadic-c-abi
+- L1707: unported-const
+- L1780: unported-const
+- L2154: unported-dep
+- L2763: raw-ptr-skeleton-no-world-handle
+- L2798: raw-ptr-skeleton-no-world-handle
+- L2961: raw-ptr-skeleton-no-world-handle
+- L2988: raw-ptr-skeleton-no-world-handle
+- L3048: raw-ptr-skeleton-no-world-handle
+- L3093: raw-ptr-skeleton-no-world-handle
+- L3189: raw-ptr-skeleton-no-world-handle
+- L3200: cross-frame-static
+- L3241: raw-ptr-skeleton-no-world-handle
+- L3278: raw-ptr-skeleton-no-world-handle
+- L3368: raw-ptr-skeleton-no-world-handle
+- L3905: raw-ptr-skeleton-no-world-handle
+- L3924: static-scratch-buffer
 
 ### crates/mp/game/src/g_mem.rs
 - L33: state-threading-g-alloc
@@ -1035,10 +1018,10 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L927: bg-channel
 - L942: bg-boundary
 - L1229: PM_BGEntForNum
-- L1856: bg-boundary
-- L2011: bg-boundary
-- L2051: G_Damage-null-dir/point
-- L2175: bg-boundary
+- L1857: bg-boundary
+- L2012: bg-boundary
+- L2052: G_Damage-null-dir/point
+- L2176: bg-boundary
 
 ### crates/mp/game/src/g_weapon.rs
 - L200: seam-threading
