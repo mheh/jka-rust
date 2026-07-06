@@ -28,6 +28,16 @@ pub const MAX_GENTITIES: usize = 1024;
 /// Source: `oracle/oracle/codemp/game/q_shared.h:380`
 pub const MAX_STRING_CHARS: usize = 1024;
 
+/// Raven `MAX_INFO_STRING`.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:384`
+pub const MAX_INFO_STRING: usize = 1024;
+
+/// Raven `BIG_INFO_STRING` — used for system info key only.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:388`
+pub const BIG_INFO_STRING: usize = 8192;
+
 use core::ffi::c_int;
 
 /// Raven `ENTITYNUM_NONE`/`ENTITYNUM_WORLD`/`ENTITYNUM_MAX_NORMAL`.

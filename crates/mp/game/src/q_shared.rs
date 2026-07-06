@@ -18,7 +18,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use mp_qshared::shared::{QFALSE, QTRUE};
+use mp_qshared::shared::{BIG_INFO_STRING, MAX_INFO_STRING, QFALSE, QTRUE};
 
 // Parse-session state (cross-frame state -> GameWorld fields, pending full threading).
 // These are module-level statics mimicking Raven's file-static globals in q_shared.c.
@@ -1296,15 +1296,10 @@ pub fn Info_NextPair(head: *mut *const c_char, key: *mut c_char, value: *mut c_c
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1147-1195`
 pub fn Info_RemoveKey(mut s: *mut c_char, key: *const c_char) {
     unsafe {
-        // MAX_INFO_STRING/MAX_INFO_KEY/MAX_INFO_VALUE oversize checks
-        // (`strlen(s) >= MAX_INFO_STRING`) are omitted: those consts are not
-        // part of this file's resolved symbol surface (no cross-file
-        // signature was provided) and the local `pkey`/`value` scratch here
-        // are computed byte-by-byte with no fixed-size buffer to overflow in
-        // this translation, so the guard has no analogous failure mode to
-        // preserve.
-        //TODO: Port MAX_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_RemoveKey: oversize infostring")) once the const is ported.
-        // Source: oracle/oracle/codemp/game/q_shared.c:1153-1155
+        if c_strlen(s as *const c_char) >= MAX_INFO_STRING {
+            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+            panic!("Info_RemoveKey: oversize infostring");
+        }
 
         if !c_strchr(key, b'\\' as c_char).is_null() {
             return;
@@ -1365,8 +1360,10 @@ pub fn Info_RemoveKey(mut s: *mut c_char, key: *const c_char) {
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1202-1250`
 pub fn Info_RemoveKey_Big(s: *mut c_char, key: *const c_char) {
     unsafe {
-        //TODO: Port BIG_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_RemoveKey_Big: oversize infostring")) once the const is ported.
-        // Source: oracle/oracle/codemp/game/q_shared.c:1208-1210
+        if c_strlen(s as *const c_char) >= BIG_INFO_STRING {
+            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+            panic!("Info_RemoveKey_Big: oversize infostring");
+        }
 
         if !c_strchr(key, b'\\' as c_char).is_null() {
             return;
@@ -1442,8 +1439,10 @@ pub fn Info_Validate(s: *const c_char) -> qboolean {
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1280-1319`
 pub fn Info_SetValueForKey(s: *mut c_char, key: *const c_char, value: *const c_char) {
     unsafe {
-        //TODO: Port MAX_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_SetValueForKey: oversize infostring")) once the const is ported.
-        // Source: oracle/oracle/codemp/game/q_shared.c:1283-1285
+        if c_strlen(s as *const c_char) >= MAX_INFO_STRING {
+            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+            panic!("Info_SetValueForKey: oversize infostring");
+        }
 
         if !c_strchr(key, b'\\' as c_char).is_null() || !c_strchr(value, b'\\' as c_char).is_null()
         {
@@ -1471,10 +1470,7 @@ pub fn Info_SetValueForKey(s: *mut c_char, key: *const c_char, value: *const c_c
         let newi = format!("\\{key_s}\\{value_s}");
         let s_s = std::ffi::CStr::from_ptr(s).to_string_lossy();
 
-        if newi.len() + s_s.len() > /* MAX_INFO_STRING */ 1024 {
-            //TODO: Port MAX_INFO_STRING (currently hardcoded 1024 — not yet a
-            // resolved cross-file const for this packet).
-            // Source: oracle/oracle/codemp/game/q_shared.h (MAX_INFO_STRING)
+        if newi.len() + s_s.len() > MAX_INFO_STRING {
             com_printf_lit("Info string length exceeded\n");
             return;
         }
@@ -1493,8 +1489,10 @@ pub fn Info_SetValueForKey(s: *mut c_char, key: *const c_char, value: *const c_c
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1328-1366`
 pub fn Info_SetValueForKey_Big(s: *mut c_char, key: *const c_char, value: *const c_char) {
     unsafe {
-        //TODO: Port BIG_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_SetValueForKey: oversize infostring")) once the const is ported.
-        // Source: oracle/oracle/codemp/game/q_shared.c:1331-1333
+        if c_strlen(s as *const c_char) >= BIG_INFO_STRING {
+            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+            panic!("Info_SetValueForKey: oversize infostring");
+        }
 
         if !c_strchr(key, b'\\' as c_char).is_null() || !c_strchr(value, b'\\' as c_char).is_null()
         {
@@ -1522,10 +1520,7 @@ pub fn Info_SetValueForKey_Big(s: *mut c_char, key: *const c_char, value: *const
         let newi = format!("\\{key_s}\\{value_s}");
         let s_s = std::ffi::CStr::from_ptr(s).to_string_lossy();
 
-        if newi.len() + s_s.len() > /* BIG_INFO_STRING */ 8192 {
-            //TODO: Port BIG_INFO_STRING (currently hardcoded 8192 — not yet a
-            // resolved cross-file const for this packet).
-            // Source: oracle/oracle/codemp/game/q_shared.h (BIG_INFO_STRING)
+        if newi.len() + s_s.len() > BIG_INFO_STRING {
             com_printf_lit("BIG Info string length exceeded\n");
             return;
         }
