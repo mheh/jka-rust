@@ -78,6 +78,7 @@ pub mod bg_slidemove;
 pub mod bg_vehicleLoad;
 pub mod bg_vehicleLoad_tables;
 pub mod c_format;
+pub mod com_boundary;
 pub mod cstr_util;
 pub mod ent_fn_enums;
 pub mod ent_id;

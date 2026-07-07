@@ -1806,7 +1806,7 @@ pub fn ClientConnect(
     unsafe {
         let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
 
-        let mut userinfo_buf = [0i8; MAX_INFO_STRING as usize];
+        let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
         trap::GetUserinfo(
             ctx.engine,
             mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
@@ -1968,7 +1968,7 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
                 let mut team_str = "Red";
 
                 (*((*ent).client as *mut gclient_t)).sess.sessionTeam = PickTeam(ctx, -1);
-                let mut userinfo_buf = [0i8; MAX_INFO_STRING as usize];
+                let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
                 trap::GetUserinfo(
                     ctx.engine,
                     mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
@@ -2075,7 +2075,7 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
         crate::w_saber::WP_SaberInitBladeData(ctx, ent);
 
         // First time model setup for that player.
-        let mut userinfo_buf = [0i8; MAX_INFO_STRING as usize];
+        let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
         trap::GetUserinfo(
             ctx.engine,
             mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
@@ -2560,7 +2560,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let client = (*ent).client as *mut gclient_t;
 
         // first we want the userinfo so we can see if we should update this client's saber
-        let mut userinfo_buf = [0i8; MAX_INFO_STRING as usize];
+        let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
         trap::GetUserinfo(
             ctx.engine,
             mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
@@ -2851,19 +2851,19 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // Get the skin RGB based on his userinfo
         let value = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("char_color_red").as_ptr());
         (*client).ps.customRGBA[0] = if !value.is_null() {
-            cstr_to_str(value).parse().unwrap_or(0)
+            atoi(value)
         } else {
             255
         };
         let value = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("char_color_green").as_ptr());
         (*client).ps.customRGBA[1] = if !value.is_null() {
-            cstr_to_str(value).parse().unwrap_or(0)
+            atoi(value)
         } else {
             255
         };
         let value = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("char_color_blue").as_ptr());
         (*client).ps.customRGBA[2] = if !value.is_null() {
-            cstr_to_str(value).parse().unwrap_or(0)
+            atoi(value)
         } else {
             255
         };
@@ -4274,7 +4274,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
 
         // check the item prediction
         s = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"cg_predictItems".as_ptr());
-        if crate::bg_lib::atoi(s) == 0 {
+        if atoi(s) == 0 {
             (*client).pers.predictItemPickup = qfalse;
         } else {
             (*client).pers.predictItemPickup = qtrue;
@@ -4369,21 +4369,21 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
         // Get the skin RGB based on his userinfo
         value = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"char_color_red".as_ptr());
         if !value.is_null() {
-            (*client).ps.customRGBA[0] = crate::bg_lib::atoi(value) as c_int;
+            (*client).ps.customRGBA[0] = atoi(value) as c_int;
         } else {
             (*client).ps.customRGBA[0] = 255;
         }
 
         value = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"char_color_green".as_ptr());
         if !value.is_null() {
-            (*client).ps.customRGBA[1] = crate::bg_lib::atoi(value) as c_int;
+            (*client).ps.customRGBA[1] = atoi(value) as c_int;
         } else {
             (*client).ps.customRGBA[1] = 255;
         }
 
         value = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"char_color_blue".as_ptr());
         if !value.is_null() {
-            (*client).ps.customRGBA[2] = crate::bg_lib::atoi(value) as c_int;
+            (*client).ps.customRGBA[2] = atoi(value) as c_int;
         } else {
             (*client).ps.customRGBA[2] = 255;
         }
@@ -4540,7 +4540,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
             (*client).pers.teamInfo = qtrue;
         } else {
             s = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"teamoverlay".as_ptr());
-            if *s == 0 || crate::bg_lib::atoi(s) != 0 {
+            if *s == 0 || atoi(s) != 0 {
                 (*client).pers.teamInfo = qtrue;
             } else {
                 (*client).pers.teamInfo = qfalse;
@@ -4548,7 +4548,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
         }
 
         // team task (0 = none, 1 = offence, 2 = defence)
-        teamTask = crate::bg_lib::atoi(crate::q_shared::Info_ValueForKey(
+        teamTask = atoi(crate::q_shared::Info_ValueForKey(
             userinfo.as_ptr(),
             c"teamtask".as_ptr(),
         )) as c_int;

@@ -4,13 +4,15 @@
 //! that delegates into `mp_game` (`GameContext` receiver, SEAM-Q12). The logic
 //! crate `mp_game` has no entrypoint/`OnceLock`/`WorldCell` code of its own.
 
+use std::ffi::c_char;
 use std::sync::OnceLock;
 
 mod world_cell;
 
-use abi_transport::entrypoints::{AbiCommand, AbiWord, RawExportTable, RawImportTable, RawSyscall};
+use abi_transport::entrypoints::{AbiCommand, AbiWord, RawSyscall};
 use abi_transport::generic::engine::CEngine;
 use abi_transport::generic::{DecodeVmMain, Dispatch, EncodeVmMainReturn, VmMainTransport};
+use mp_game::com_boundary::{route_error, route_print, set_com_error_sink, set_com_print_sink};
 use mp_game::vmcalls::{
     BotAiStartFrame, GameClientBegin, GameClientCommand, GameClientConnect, GameClientDisconnect,
     GameClientThink, GameClientUserinfoChanged, GameConsoleCommand, GameGetitemindexbytag,
@@ -36,6 +38,24 @@ static WORLD: WorldCell = WorldCell::new();
 #[no_mangle]
 pub extern "C-unwind" fn dllEntry(syscall: RawSyscall) {
     ENGINE.set(CEngine::new(syscall)).ok();
+    set_com_print_sink(com_print_sink);
+    set_com_error_sink(com_error_sink);
+}
+
+/// The registered `Com_Printf` route (SEAM-D1 narrow extension): reads the
+/// one `ENGINE` static and forwards through `trap_Printf` exactly like
+/// `G_Printf` does.
+fn com_print_sink(msg: *const c_char) {
+    let engine = ENGINE.get().expect("dllEntry set ENGINE");
+    route_print(engine, msg);
+}
+
+/// The registered `Com_Error` route (SEAM-D1 narrow extension): reads the
+/// one `ENGINE` static and forwards through `trap_Error` exactly like
+/// `G_Error` does.
+fn com_error_sink(msg: *const c_char) {
+    let engine = ENGINE.get().expect("dllEntry set ENGINE");
+    route_error(engine, msg);
 }
 
 /// Raven `vmMain` (`g_main.c:515`). Bootstraps/derives the `WORLD` pointer,
@@ -326,14 +346,9 @@ pub extern "C-unwind" fn vmMain(
     result
 }
 
-/// OpenJK-only `GetModuleAPI` handshake (SEAM-Q7 open — zero oracle occurrences).
-/// Slice 0 does not touch it; stays a null stub.
-#[no_mangle]
-pub extern "C-unwind" fn GetModuleAPI(
-    _api_version: AbiCommand,
-    _import: RawImportTable,
-) -> RawExportTable {
-    //TODO: Port GetModuleAPI — contract is SEAM-Q7 (open)
-    // Source: docs/architecture/engine-seam.md § Live entrypoint exports (SEAM-Q7)
-    core::ptr::null_mut()
-}
+// `GetModuleAPI` is deliberately NOT exported (SEAM-Q7 ruling, 2026-07-06).
+// OpenJK's loader (sv_gameapi.cpp SV_BindGame) treats a present-but-NULL-
+// returning symbol as ERR_FATAL with no fallback; with the symbol absent it
+// falls back to the legacy `dllEntry`/`vmMain` path, whose widened intptr_t
+// signatures the exports above already match. Modern-path implementation is
+// tracked in https://github.com/mheh/jka-rust/issues/1.

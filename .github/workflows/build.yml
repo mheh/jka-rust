@@ -34,14 +34,14 @@ name: Build modules
 
 on:
   push:
-    branches: [master]
+    branches: [master, skeleton]
   workflow_dispatch:
 
 permissions:
   contents: write # the release job attaches assets to the rolling release
 
 concurrency:
-  group: build-master
+  group: build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -49,13 +49,13 @@ jobs:
     name: Workspace compile gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -73,6 +73,7 @@ jobs:
   build:
     name: ${{ matrix.target.module }} (${{ matrix.profile }})
     needs: test
+    if: github.ref == 'refs/heads/master'
     runs-on: ${{ matrix.target.runner }}
     continue-on-error: ${{ matrix.target.allow_failure }}
     strategy:
@@ -110,7 +111,7 @@ jobs:
             allow_failure: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -124,7 +125,7 @@ jobs:
           sudo apt-get install -y gcc-multilib
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -170,8 +171,8 @@ jobs:
     name: Update rolling release
     needs: build
     # `needs.build` is satisfied even when only the allowed-failure 32-bit
-    # lanes failed; publish whatever built.
-    if: github.event_name != 'pull_request'
+    # lanes failed; publish whatever built. Master-only (see `build`'s `if`).
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts

@@ -267,3 +267,90 @@ substantive fns (the ~55 trivial SP_NPC_* setters spot-verified).
 - **BG_GiveMeVectorFromMatrix — transcription CLEAN** (all matrix indices verified
   vs bg_misc.c:736-776); relocated to bg_misc.rs:1917 (its oracle home), prelude
   re-export repointed, 3 explicit imports + 10 inline-path call sites cleaned.
+
+### atof/sscanf parity round (2026-07-06): resolved + atoi class parked
+- **atof — RESOLVED.** Oracle dylib links Raven's own `atof` (nm: `_atof` T);
+  Rust `bg_lib::atof`/`_atof` verified faithful (f32 accumulator, f64 fraction
+  round-back, `_atof` leading-dot bug). All 53 live oracle atof sites route
+  through it — the one bypass, `G_SpawnFloat`'s exponent-accepting
+  `parse::<f64>` helper ("1e2" → 100.0 vs oracle 1.0), fixed (commit 13910be).
+- **sscanf %f — RESOLVED.** Oracle links libc sscanf (nm: `_sscanf` U). All 12
+  Rust `%f` sites had a shift-on-skip `filter_map` idiom; replaced by the shared
+  libc-faithful `cstr_util::sscanf_f32s` (longest-prefix, stop-at-first-failure,
+  count-returning, unmatched slots untouched per §19) + 5 unit tests.
+- **PARKED: atoi class.** Oracle links libc `atoi` (155 sites in codemp/game).
+  Many Rust sites use `.trim().parse().unwrap_or(0)` — diverges on trailing
+  garbage (libc atoi("12abc")=12, parse→0). Confirmed reachable-from-client
+  examples: g_cmds.rs:447,500,791,2612,2621; w_force.rs:351-368
+  (forceRank/forceSide); g_client.rs:2854-2866 (customRGBA userinfo).
+  Fix caveat: parity target is LIBC atoi, not `bg_lib::atoi` (Raven's is
+  Q3_VM-only there) — they differ on whitespace class (isspace vs `<= ' '`
+  signed-char) and overflow (strtol clamp vs wrap); `g_spawn.rs`'s local
+  `c_str_to_i32` is close but misses `\x0b`. Needs a census (type-inferred
+  `.parse()` undercounts) + one shared libc-atoi helper before a swap round.
+
+### atoi parity round (2026-07-06): RESOLVED (was parked above)
+- 3-shard census of all 154 live oracle atoi sites → commit 2b3f8263.
+  `cstr_util::atoi`/`atoi_str` (libc `(int)strtol` semantics: isspace class,
+  digit-prefix, clamp-in-i64-then-truncate overflow) is now the one game-logic
+  atoi; the prelude `atoi` re-export points at it (bg_lib::atoi stays as the
+  faithful Q3_VM-only port, doc-noted). 28 `.parse().unwrap_or` sites swapped
+  — four porter-invented defaults removed (-1 in Cmd_Tell_f/clientkick/
+  ClientForString, 999 in give-ammo's arg path; oracle is plain atoi → 0);
+  5 local reimplementations deleted (g_spawn c_str_to_i32, q_shared +
+  bg_saberLoad c_atoi twins, ai_util c_atoi/c_atoi_ptr); ~20 Unicode-trimming
+  `.trim()` pre-passes removed (libc atoi does not skip U+00A0 etc.).
+- Provably-OK sites annotated in place: g_svcmds.rs StringToFilter
+  (digit-only extraction), w_force.rs + bg_misc.rs single-char to_digit.
+- RESOLVED 2026-07-06: the missing `#ifndef FINAL_BUILD` debug commands — 8,
+  not 6 as first ledgered (debugDropSaber/debugKnockMeDown/debugSaberSwitch/
+  debugIKGrab/debugIKBeGrabbedBy/debugIKRelease/debugThrow, g_cmds.c:3762-4011,
+  + debugShipDamage, g_cmds.c:4056-4069) — ported into the ClientCommand chain
+  in oracle order after debugDismemberment (g_cmds.rs:~5073-5447). Scoping
+  found the ninth candidate block (saber-style prints, g_cmds.c:2844) is
+  `/* */`-commented in the oracle — dead, not ported. `#ifdef _DEBUG`
+  (g_cmds.c:3470-3656) and `#ifdef VM_MEMALLOC_DEBUG` debugTestAlloc
+  (g_cmds.c:4013-4055) dropped as dead surface per §20 (neither macro defined
+  in retail/oracle builds); PORT-NOTE(debug-build-gated-cmds) rewritten to
+  match. Referee: all scenarios still byte-identical.
+
+### Linux referee lane bring-up (2026-07-07): NDEBUG ruling + arm64 portability note
+- Oracle build regime change (user-ruled): `-DNDEBUG` added to
+  tools/referee-oracle/build.sh — retail jampgame was an MSVC Release build
+  (asserts compiled away), so asserts-active was a non-retail oracle behavior;
+  also unblocks glibc's C++ assert() under gnu++98. macOS baseline verified
+  unchanged (66/0/6 + 3 scenarios byte-identical after rebuild).
+- RESOLVED 2026-07-06 (was PARKED): aarch64-Linux `c_char = u8` — all 29
+  E0308s fixed by retyping seam buffers/locals `i8` → `c_char` (5 files,
+  13 lines: NPC_utils, ai_util, g_ICARUScb, g_client userinfo bufs, g_spawn
+  keyname/com_token) plus three equality-only `b'{'`/`b'}'` casts (printable
+  ASCII, sign-agnostic). No ordering/sign-sensitive comparison touched —
+  bg_lib's explicit `as i8` signed-char loops (bg_lib.rs:315-317 comment)
+  were already portable and are unchanged. `cargo check -p jampgame --target
+  aarch64-unknown-linux-gnu` now clean; native build/tests/referee scenarios
+  unchanged and byte-identical. (Full-workspace cross-check still blocked by
+  mp_engine_qcommon's host-cc build script; module crates are what matter.)
+
+### FINDING (2026-07-07, Linux CI lane first run): x86_64 ULP divergence in pmove velocity
+- Lane infrastructure fully green: recursive submodule checkout, oracle .so
+  builds (89 TUs, g++-13/14), SELFTEST passes (Linux oracle self-deterministic),
+  idle scenario 100 frames byte-identical.
+- OPEN: solo diverges frame 11 (velocity[0], 2 ULP: 0xc2a9d88d vs 0xc2a9d88f);
+  melee-brawl frame 45 (velocity[2], 1 ULP: 0x424b7230 vs 0x424b722f). Same
+  1-ULP FP class as the frametime fix (3ad83173) but Linux-x86_64-only — both
+  scenarios pass byte-identical on macOS arm64. Since IEEE add/mul/div/sqrt are
+  arch-deterministic and both sides share the host libm, prime suspects are a
+  libm call-pattern mismatch (e.g. sinf vs (float)sin — Apple libm may mask it,
+  glibc not) or a gcc-vs-LLVM excess-precision/codegen edge in an air-path
+  pmove expression (clients are AIRBORNE in the mock). Run: gh run 28835337105.
+
+### Referee CI lane removed (2026-07-07, user ruling)
+- The Linux x86_64 lane's 1-2 ULP pmove-velocity divergences (entry above) are
+  the OpenJK-#589 class: compiler FP-evaluation differences (gcc vs LLVM) in
+  the 2003 C, not a same-host parity failure — the FP-regime ruling's parity
+  target is same-host strict-IEEE, satisfied and byte-identical on the macOS
+  dev platform. Lane removed from Actions rather than chased; the referee
+  remains the local gate (cargo test -p jampgame --test referee -- --ignored).
+- Kept from the bring-up (all still useful): build.sh Darwin/Linux portability,
+  -fsigned-char + -DNDEBUG regime pins, referee.rs cfg-branched oracle path,
+  the mheh/jediacademy fork submodule chain, skeleton-push CI trigger.

@@ -78,7 +78,9 @@ pub use crate::bg_misc::{
 pub use crate::ai_main_consts::*;
 pub use crate::anim_table::animTable;
 pub use crate::bg_vehicleLoad_tables::*;
-pub use crate::cstr_util::{cstr, cstr_to_str, cstr_to_string, write_cstr_field};
+pub use crate::cstr_util::{
+    atoi_str, cstr, cstr_to_str, cstr_to_string, sscanf_f32s, write_cstr_field,
+};
 pub use crate::entity::flags::*;
 pub use crate::g_client::{playerMaxs, playerMins};
 pub use crate::g_items::FRAMETIME;
@@ -291,7 +293,7 @@ pub use mp_qshared::shared::{
 // spelled bare in pass-2 porter bodies but never wired into the prelude.
 // Each resolves to a single `pub fn`/`const` definition (scripted).
 pub use crate::bg_lib::atof;
-pub use crate::bg_lib::atoi;
+pub use crate::cstr_util::atoi;
 pub use crate::bg_misc::{BG_EmplacedView, BG_FindItemForWeapon};
 pub use crate::bg_panimate::{BG_InKnockDownOnly, BG_InReboundHold, BG_InReboundJump};
 pub use crate::bg_pmove::BG_SabersOff;

@@ -556,7 +556,7 @@ pub fn ParseEmotionalAttachments(bs: *mut bot_state_t, buf: *mut c_char) {
                 }
                 tbuf[tc as usize] = 0;
 
-                (*bs).loved[lovednum].level = c_atoi(&tbuf);
+                (*bs).loved[lovednum].level = atoi(tbuf.as_ptr() as *const c_char);
 
                 (*bs).lovednum += 1;
             } else {
@@ -624,7 +624,7 @@ pub fn ReadChatGroups(ctx: GameContext<'_>, bs: *mut bot_state_t, buf: *mut c_ch
 
         let mut i = 0usize;
         while *buf_b.offset(cgbplace) != 0 && i < crate::game_globals::MAX_CHAT_BUFFER_SIZE {
-            world.globals.gBotChatBuffer.0[client_idx][i] = *buf_b.offset(cgbplace) as i8;
+            world.globals.gBotChatBuffer.0[client_idx][i] = *buf_b.offset(cgbplace) as c_char;
             i += 1;
             cgbplace += 1;
         }
@@ -726,7 +726,7 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>, bs: *mut bot_state_t) {
 
         // Parse reflex (default: 100)
         if failed == 0 && GetPairedValue(group, "reflex\0".as_ptr() as *mut c_char, readbuf) != 0 {
-            bs_ref.skills.reflex = c_atoi_ptr(readbuf);
+            bs_ref.skills.reflex = atoi(readbuf);
         } else {
             bs_ref.skills.reflex = 100;
         }
@@ -767,7 +767,7 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>, bs: *mut bot_state_t) {
         if failed == 0
             && GetPairedValue(group, "perfectaim\0".as_ptr() as *mut c_char, readbuf) != 0
         {
-            bs_ref.skills.perfectaim = c_atoi_ptr(readbuf);
+            bs_ref.skills.perfectaim = atoi(readbuf);
         } else {
             bs_ref.skills.perfectaim = 0;
         }
@@ -776,7 +776,7 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>, bs: *mut bot_state_t) {
         if failed == 0
             && GetPairedValue(group, "chatability\0".as_ptr() as *mut c_char, readbuf) != 0
         {
-            bs_ref.canChat = c_atoi_ptr(readbuf);
+            bs_ref.canChat = atoi(readbuf);
         } else {
             bs_ref.canChat = 0;
         }
@@ -785,7 +785,7 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>, bs: *mut bot_state_t) {
         if failed == 0
             && GetPairedValue(group, "chatfrequency\0".as_ptr() as *mut c_char, readbuf) != 0
         {
-            bs_ref.chatFrequency = c_atoi_ptr(readbuf);
+            bs_ref.chatFrequency = atoi(readbuf);
         } else {
             bs_ref.chatFrequency = 5;
         }
@@ -793,14 +793,14 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>, bs: *mut bot_state_t) {
         // Parse hatelevel (default: 3)
         if failed == 0 && GetPairedValue(group, "hatelevel\0".as_ptr() as *mut c_char, readbuf) != 0
         {
-            bs_ref.loved_death_thresh = c_atoi_ptr(readbuf);
+            bs_ref.loved_death_thresh = atoi(readbuf);
         } else {
             bs_ref.loved_death_thresh = 3;
         }
 
         // Parse camper (default: 0)
         if failed == 0 && GetPairedValue(group, "camper\0".as_ptr() as *mut c_char, readbuf) != 0 {
-            bs_ref.isCamper = c_atoi_ptr(readbuf);
+            bs_ref.isCamper = atoi(readbuf);
         } else {
             bs_ref.isCamper = 0;
         }
@@ -809,7 +809,7 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>, bs: *mut bot_state_t) {
         if failed == 0
             && GetPairedValue(group, "saberspecialist\0".as_ptr() as *mut c_char, readbuf) != 0
         {
-            bs_ref.saberSpecialist = c_atoi_ptr(readbuf);
+            bs_ref.saberSpecialist = atoi(readbuf);
         } else {
             bs_ref.saberSpecialist = 0;
         }
@@ -871,49 +871,49 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>, bs: *mut bot_state_t) {
         if GetValueGroup(buf, "BotWeaponWeights\0".as_ptr() as *mut c_char, group) != 0 {
             if GetPairedValue(group, "WP_STUN_BATON\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_STUN_BATON as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_MELEE as usize] =
                     bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_STUN_BATON as usize];
             }
 
             if GetPairedValue(group, "WP_SABER\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_SABER as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_BRYAR_PISTOL\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_BLASTER\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_BLASTER as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_DISRUPTOR\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_DISRUPTOR as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_BOWCASTER\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_BOWCASTER as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_REPEATER\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_REPEATER as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_DEMP2\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_DEMP2 as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_FLECHETTE\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_FLECHETTE as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(
@@ -923,22 +923,22 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>, bs: *mut bot_state_t) {
             ) != 0
             {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_ROCKET_LAUNCHER as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_THERMAL\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_THERMAL as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_TRIP_MINE\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_TRIP_MINE as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_DET_PACK\0".as_ptr() as *mut c_char, readbuf) != 0 {
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_DET_PACK as usize] =
-                    c_atoi_ptr(readbuf) as f32;
+                    atoi(readbuf) as f32;
             }
         }
 
@@ -963,38 +963,6 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>, bs: *mut bot_state_t) {
 }
 
 // ---- local raw-C-string helpers (no libc dependency in this crate) ----
-
-/// Faithful `atoi` over a raw NUL-terminated C string.
-unsafe fn c_atoi_ptr(s: *const c_char) -> c_int {
-    let mut result = 0 as c_int;
-    let mut negative = false;
-    let mut i = 0isize;
-
-    // Skip whitespace
-    while *s.offset(i) == b' ' as c_char || *s.offset(i) == b'\t' as c_char {
-        i += 1;
-    }
-
-    // Check for sign
-    if *s.offset(i) == b'-' as c_char {
-        negative = true;
-        i += 1;
-    } else if *s.offset(i) == b'+' as c_char {
-        i += 1;
-    }
-
-    // Parse digits
-    while *s.offset(i) >= b'0' as c_char && *s.offset(i) <= b'9' as c_char {
-        result = result * 10 + ((*s.offset(i) - b'0' as c_char) as c_int);
-        i += 1;
-    }
-
-    if negative {
-        result = -result;
-    }
-
-    result
-}
 
 /// Faithful `strlen` over a raw NUL-terminated byte pointer.
 unsafe fn c_strlen(s: *const u8) -> usize {
@@ -1029,26 +997,3 @@ unsafe fn c_strstr(haystack: *const u8, needle: *const u8) -> Option<*const u8> 
     }
 }
 
-/// Faithful `atoi` over a NUL-terminated byte buffer (decimal, optional
-/// leading sign, stops at first non-digit — matches libc `atoi` behavior).
-fn c_atoi(buf: &[u8]) -> c_int {
-    let mut i = 0usize;
-    while i < buf.len() && (buf[i] == b' ' || buf[i] == 9) {
-        i += 1;
-    }
-    let mut neg = false;
-    if i < buf.len() && (buf[i] == b'-' || buf[i] == b'+') {
-        neg = buf[i] == b'-';
-        i += 1;
-    }
-    let mut val: c_int = 0;
-    while i < buf.len() && buf[i].is_ascii_digit() {
-        val = val.wrapping_mul(10).wrapping_add((buf[i] - b'0') as c_int);
-        i += 1;
-    }
-    if neg {
-        -val
-    } else {
-        val
-    }
-}

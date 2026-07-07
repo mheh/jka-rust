@@ -1345,7 +1345,10 @@ impl PmoveContext<'_> {
             // save old velocity for crashlanding
             _VectorCopy((*ps).velocity, &mut self.pml.previous_velocity);
 
-            self.pml.frametime = self.pml.msec as f32 * 0.001;
+            // Raven: `pml.msec * 0.001` — `msec` is int, `0.001` a double literal, so
+            // the product is computed in f64 and narrowed to the float `frametime`. An
+            // f32 multiply double-rounds and diverges by 1 ULP for some msec (e.g. 18).
+            self.pml.frametime = (self.pml.msec as f64 * 0.001) as f32;
 
             if (*ps).clientNum >= MAX_CLIENTS as c_int
                 && !self.pm_entSelf.is_null()

@@ -3167,7 +3167,7 @@ pub fn SP_func_breakable(ctx: GameContext<'_>, self_: *mut gentity_t) {
             && (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
             && (*self_).teamnodmg == 0
         {
-            (*self_).teamnodmg = crate::q_shared::c_atoi((*self_).team);
+            (*self_).teamnodmg = atoi((*self_).team);
         }
         (*self_).team = core::ptr::null_mut();
         if (*self_).model.is_null() {

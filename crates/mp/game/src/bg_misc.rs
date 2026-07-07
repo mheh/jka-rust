@@ -285,16 +285,12 @@ pub fn BG_ParseField(
                         *(b.offset((*f).ofs as isize) as *mut *mut c_char) = s;
                     }
                     fieldtype_t::F_VECTOR => {
-                        // sscanf(value, "%f %f %f", &vec[0], &vec[1], &vec[2])
+                        // sscanf(value, "%f %f %f", &vec[0], &vec[1], &vec[2]) —
+                        // oracle bg_misc.c:379 has no count check; unmatched
+                        // components are left at the 0.0 seed (porting-rules §19).
                         let text = std::ffi::CStr::from_ptr(value).to_string_lossy();
-                        let mut nums = text
-                            .split_whitespace()
-                            .filter_map(|t| t.parse::<f32>().ok());
-                        let vec: vec3_t = [
-                            nums.next().unwrap_or(0.0),
-                            nums.next().unwrap_or(0.0),
-                            nums.next().unwrap_or(0.0),
-                        ];
+                        let mut vec: vec3_t = [0.0, 0.0, 0.0];
+                        sscanf_f32s(&text, &mut vec);
                         let dst = b.offset((*f).ofs as isize) as *mut f32;
                         *dst = vec[0];
                         *dst.add(1) = vec[1];
@@ -388,7 +384,8 @@ pub fn BG_LegalizedForcePowers(
         let side_field = parts.next().unwrap_or("");
         let powers_field = parts.next().unwrap_or("");
 
-        let mut final_side: c_int = side_field.trim().parse::<c_int>().unwrap_or(0);
+        // Source: oracle/oracle/codemp/game/bg_misc.c:472 — plain `atoi(readBuf)`.
+        let mut final_side: c_int = atoi_str(&side_field);
         if final_side != FORCE_LIGHTSIDE && final_side != FORCE_DARKSIDE {
             // Not a valid side. You will be dark. Because I said so.
             final_side = FORCE_DARKSIDE;
@@ -411,6 +408,11 @@ pub fn BG_LegalizedForcePowers(
             .take(NUM_FORCE_POWERS_USIZE)
             .enumerate()
         {
+            // Oracle builds a 1-char `readBuf` (`readBuf[0]=powerBuf[i];
+            // readBuf[1]=0;`) and calls `atoi(readBuf)` on it
+            // (bg_misc.c:501-504) — over a single-char domain,
+            // `to_digit(10).unwrap_or(0)` is exactly libc `atoi`, so this is
+            // not re-flagged to `cstr_util::atoi`.
             final_powers[c] = ch.to_digit(10).unwrap_or(0) as c_int;
         }
 

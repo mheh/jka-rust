@@ -905,7 +905,7 @@ pub fn NPC_ParseParms(
                     (*client_ptr).ps.customRGBA[2] = (*ctx.world).bg_state.rng.Q_irand(0, 255);
                     (*client_ptr).ps.customRGBA[3] = 255;
                 } else {
-                    (*client_ptr).ps.customRGBA[0] = crate::bg_lib::atoi(value);
+                    (*client_ptr).ps.customRGBA[0] = atoi(value);
 
                     let mut n0: c_int = 0;
                     if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {

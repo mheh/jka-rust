@@ -155,7 +155,7 @@ pub fn G_SpawnFloat(
     unsafe {
         let mut s: *mut c_char = std::ptr::null_mut();
         let present = G_SpawnString(ctx, key, defaultString, &mut s);
-        *out = c_str_to_f64(s) as f32;
+        *out = atof(s) as f32;
         present
     }
 }
@@ -172,7 +172,7 @@ pub fn G_SpawnInt(
     unsafe {
         let mut s: *mut c_char = std::ptr::null_mut();
         let present = G_SpawnString(ctx, key, defaultString, &mut s);
-        *out = c_str_to_i32(s);
+        *out = atoi(s);
         present
     }
 }
@@ -189,89 +189,47 @@ pub fn G_SpawnVector(
     unsafe {
         let mut s: *mut c_char = std::ptr::null_mut();
         let present = G_SpawnString(ctx, key, defaultString, &mut s);
-        let (a, b, c) = sscanf_3f(s);
-        *out.add(0) = a;
-        *out.add(1) = b;
-        *out.add(2) = c;
+        // Unmatched components are left as whatever `*out` already held
+        // (porting-rules §19) — read the current 3 floats, let `sscanf_3f`
+        // overwrite only the ones libc `sscanf` would have matched.
+        let mut vec: [f32; 3] = [*out.add(0), *out.add(1), *out.add(2)];
+        sscanf_3f(s, &mut vec);
+        *out.add(0) = vec[0];
+        *out.add(1) = vec[1];
+        *out.add(2) = vec[2];
         present
     }
 }
 
 // ---------------------------------------------------------------------
 // Local helpers mirroring libc semantics used throughout this file
-// (`atof`/`atoi`/`sscanf("%f %f %f", ...)` — house rule: libc/other symbols
-// use the Rust std equivalent, no resolved signature needed). Faithful to
-// atof/atoi's "leading numeric prefix, 0 on failure" semantics.
+// (`atoi`/`sscanf("%f %f %f", ...)` — house rule: libc/other symbols use the
+// Rust std equivalent, no resolved signature needed). `atof` itself now
+// routes through `crate::bg_lib::atof` (verified faithful to the oracle DLL's
+// linked Raven `atof`, `bg_lib.c:774-839`); `sscanf_3f`/`sscanf_1f` route
+// through the shared libc-`%f` scanner `cstr_util::sscanf_f32s`.
 // ---------------------------------------------------------------------
 
-unsafe fn c_str_to_f64(s: *const c_char) -> f64 {
+/// `sscanf(s, "%f %f %f", &out[0], &out[1], &out[2])` via the shared
+/// libc-`%f`-faithful scanner. Unmatched components are left at whatever
+/// value `out` already held (porting-rules §19) — callers pre-seed `out`
+/// before calling.
+unsafe fn sscanf_3f(s: *const c_char, out: &mut [f32; 3]) {
     if s.is_null() {
-        return 0.0;
+        return;
     }
     let text = CStr::from_ptr(s).to_string_lossy();
-    text.trim_start()
-        .split(|c: char| {
-            !(c.is_ascii_digit() || c == '.' || c == '-' || c == '+' || c == 'e' || c == 'E')
-        })
-        .next()
-        .and_then(|t| t.parse::<f64>().ok())
-        .unwrap_or(0.0)
+    sscanf_f32s(&text, out);
 }
 
-unsafe fn c_str_to_i32(s: *const c_char) -> c_int {
-    // `atoi`: skip leading whitespace, an optional sign, then consecutive ASCII
-    // digits only (stops at the first non-digit) — not the float parser.
+/// `sscanf(s, "%f", out)` via the shared libc-`%f`-faithful scanner. Leaves
+/// `*out` untouched on a failed match (porting-rules §19).
+unsafe fn sscanf_1f(s: *const c_char, out: &mut f32) {
     if s.is_null() {
-        return 0;
-    }
-    let bytes = CStr::from_ptr(s).to_bytes();
-    let mut i = 0;
-    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-        i += 1;
-    }
-    let mut neg = false;
-    if i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-') {
-        neg = bytes[i] == b'-';
-        i += 1;
-    }
-    let mut val: c_int = 0;
-    while i < bytes.len() && bytes[i].is_ascii_digit() {
-        val = val
-            .wrapping_mul(10)
-            .wrapping_add((bytes[i] - b'0') as c_int);
-        i += 1;
-    }
-    if neg {
-        -val
-    } else {
-        val
-    }
-}
-
-unsafe fn sscanf_3f(s: *const c_char) -> (f32, f32, f32) {
-    if s.is_null() {
-        return (0.0, 0.0, 0.0);
+        return;
     }
     let text = CStr::from_ptr(s).to_string_lossy();
-    let mut nums = text
-        .split_whitespace()
-        .filter_map(|t| t.parse::<f32>().ok());
-    (
-        nums.next().unwrap_or(0.0),
-        nums.next().unwrap_or(0.0),
-        nums.next().unwrap_or(0.0),
-    )
-}
-
-unsafe fn sscanf_1f(s: *const c_char) -> f32 {
-    if s.is_null() {
-        return 0.0;
-    }
-    let text = CStr::from_ptr(s).to_string_lossy();
-    text.split_whitespace()
-        .next()
-        .and_then(|t| t.parse::<f32>().ok())
-        .unwrap_or(0.0)
+    sscanf_f32s(&text, std::slice::from_mut(out));
 }
 
 /// Raven `SP_item_botroam` — empty body (Raven's is a stub too).
@@ -968,16 +926,15 @@ pub const NOVALUE: &CStr = c"novalue";
 fn HandleEntityAdjustment(ctx: GameContext<'_>) {
     unsafe {
         let mut value: *mut c_char = std::ptr::null_mut();
-        let mut origin: vec3_t;
         let mut new_origin: vec3_t = [0.0; 3];
-        let mut angles: vec3_t;
 
         G_SpawnString(ctx, c"origin".as_ptr(), NOVALUE.as_ptr(), &mut value);
+        // `origin` is pre-seeded 0.0 (matching the else-branch below); any
+        // component `sscanf_3f` fails to match is left at that seed rather
+        // than picking up C's stack garbage (porting-rules §19).
+        let mut origin: vec3_t = [0.0, 0.0, 0.0];
         if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
-            let (a, b, c) = sscanf_3f(value);
-            origin = [a, b, c];
-        } else {
-            origin = [0.0, 0.0, 0.0];
+            sscanf_3f(value, &mut origin);
         }
 
         // `DEG2RAD(a)` is `(a * M_PI) / 180.0F` in f32; `cos`/`sin` are the double
@@ -1012,8 +969,8 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
 
         G_SpawnString(ctx, c"angles".as_ptr(), NOVALUE.as_ptr(), &mut value);
         if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
-            let (a, b, c) = sscanf_3f(value);
-            angles = [a, b, c];
+            let mut angles: vec3_t = [0.0, 0.0, 0.0];
+            sscanf_3f(value, &mut angles);
 
             // `fmod` is a double-precision truncated remainder whose sign follows
             // the dividend; `rem_euclid` (least non-negative) differs by 360 for a
@@ -1029,11 +986,10 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
             );
         } else {
             G_SpawnString(ctx, c"angle".as_ptr(), NOVALUE.as_ptr(), &mut value);
-            let mut angle1 = if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
-                sscanf_1f(value)
-            } else {
-                0.0
-            };
+            let mut angle1: f32 = 0.0;
+            if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
+                sscanf_1f(value, &mut angle1);
+            }
             angle1 = ((angle1 + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
             let temp = format!("{:.0}", angle1);
             let temp_c = CString::new(temp).unwrap();
@@ -1047,12 +1003,10 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
         // RJR experimental code for handling "direction" field of breakable
         // brushes, though direction is rarely ever used.
         G_SpawnString(ctx, c"direction".as_ptr(), NOVALUE.as_ptr(), &mut value);
-        let mut direction = if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
-            let (a, b, c) = sscanf_3f(value);
-            [a, b, c]
-        } else {
-            [0.0, 0.0, 0.0]
-        };
+        let mut direction: vec3_t = [0.0, 0.0, 0.0];
+        if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
+            sscanf_3f(value, &mut direction);
+        }
         direction[1] =
             ((direction[1] + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
         let temp = format!(
@@ -1107,8 +1061,8 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
 pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
     unsafe {
         const MAX_TOKEN_CHARS: usize = 1024;
-        let mut keyname = [0i8; MAX_TOKEN_CHARS];
-        let mut com_token = [0i8; MAX_TOKEN_CHARS];
+        let mut keyname = [0 as c_char; MAX_TOKEN_CHARS];
+        let mut com_token = [0 as c_char; MAX_TOKEN_CHARS];
 
         (*ctx.world).level.numSpawnVars = 0;
         (*ctx.world).level.numSpawnVarChars = 0;
@@ -1122,7 +1076,7 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
             // end of spawn string
             return QFALSE;
         }
-        if com_token[0] != b'{' as i8 {
+        if com_token[0] != b'{' as c_char {
             panic!("G_ParseSpawnVars: found {{ ... }} mismatch"); // G_Error -> panic (frozen Group A)
         }
 
@@ -1137,7 +1091,7 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
                 panic!("G_ParseSpawnVars: EOF without closing brace");
             }
 
-            if keyname[0] == b'}' as i8 {
+            if keyname[0] == b'}' as c_char {
                 break;
             }
 
@@ -1150,7 +1104,7 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
                 panic!("G_ParseSpawnVars: EOF without closing brace");
             }
 
-            if com_token[0] == b'}' as i8 {
+            if com_token[0] == b'}' as c_char {
                 panic!("G_ParseSpawnVars: closing brace without data");
             }
             if (*ctx.world).level.numSpawnVars == mp_bg::MAX_SPAWN_VARS as c_int {

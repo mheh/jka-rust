@@ -356,31 +356,6 @@ unsafe fn c_strcpy(dst: *mut c_char, src: *const c_char) {
     }
 }
 
-// Local helper: mirrors libc `atoi` (skip leading whitespace, optional
-// sign, longest leading run of digits, `0` on no parse).
-unsafe fn c_atoi(s: *const c_char) -> c_int {
-    let cstr = std::ffi::CStr::from_ptr(s);
-    let text = String::from_utf8_lossy(cstr.to_bytes());
-    let trimmed = text.trim_start();
-    let mut end = 0usize;
-    let mut chars = trimmed.char_indices();
-    let mut idx = 0usize;
-    if let Some((_, c)) = trimmed.char_indices().next() {
-        if c == '+' || c == '-' {
-            idx = c.len_utf8();
-        }
-    }
-    end = idx;
-    for (i, c) in trimmed[idx..].char_indices() {
-        if c.is_ascii_digit() {
-            end = idx + i + c.len_utf8();
-        } else {
-            break;
-        }
-    }
-    trimmed[..end].parse::<c_int>().unwrap_or(0)
-}
-
 // Differential-test observation seam. `BG_SoundIndex` is called context-free
 // (e.g. from `WP_SaberSetDefaults`, which threads no `BgState`), so the saber
 // differential test (`tests/jampgame_parity.rs`) observes its
@@ -1129,7 +1104,7 @@ pub fn WP_SaberParseParms(
                 if toklen == 10 {
                     n = -1;
                 } else if toklen == 11 {
-                    n = c_atoi(tok.offset(10)) - 1;
+                    n = atoi(tok.offset(10)) - 1;
                     if n > 7 || n < 1 {
                         let msg = format!(
                             "WARNING: bad saberColor '{}' in {}\n",
@@ -1170,7 +1145,7 @@ pub fn WP_SaberParseParms(
                 if toklen == 11 {
                     n = -1;
                 } else if toklen == 12 {
-                    let idx = c_atoi(tok.offset(11)) - 1;
+                    let idx = atoi(tok.offset(11)) - 1;
                     if idx > 7 || idx < 1 {
                         let msg = format!(
                             "WARNING: bad saberLength '{}' in {}\n",
@@ -1214,7 +1189,7 @@ pub fn WP_SaberParseParms(
                 if toklen == 11 {
                     n = -1;
                 } else if toklen == 12 {
-                    let idx = c_atoi(tok.offset(11)) - 1;
+                    let idx = atoi(tok.offset(11)) - 1;
                     if idx > 7 || idx < 1 {
                         let msg = format!(
                             "WARNING: bad saberRadius '{}' in {}\n",
@@ -2317,7 +2292,7 @@ pub fn WP_SaberValidForPlayerInMP(saberName: *const c_char, bg: &mut BgState) ->
             return QTRUE;
         }
         // return value
-        if c_atoi(allowed.as_ptr()) == 0 {
+        if atoi(allowed.as_ptr()) == 0 {
             QTRUE
         } else {
             QFALSE

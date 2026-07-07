@@ -636,14 +636,14 @@ pub fn SP_terrain(ctx: GameContext<'_>, ent: *mut gentity_t) {
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"numPatches".as_ptr(),
-            cstr(&format!("{}", crate::bg_lib::atoi(value))).as_ptr(),
+            cstr(&format!("{}", atoi(value))).as_ptr(),
         );
 
         G_SpawnString(ctx, c"terxels".as_ptr(), c"4".as_ptr(), &mut value);
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"terxels".as_ptr(),
-            cstr(&format!("{}", crate::bg_lib::atoi(value))).as_ptr(),
+            cstr(&format!("{}", atoi(value))).as_ptr(),
         );
 
         Info_SetValueForKey(temp.as_mut_ptr(), c"seed".as_ptr(), seed.as_ptr());

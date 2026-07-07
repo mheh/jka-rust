@@ -303,6 +303,11 @@ pub fn __builtin___memmove_chk(
 /// for the unported `bg_lib.c` function.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_lib.c:915-958`
+///
+/// This is the faithful Q3_VM-bytecode port; that `#if defined(Q3_VM)` span
+/// is never compiled into the native game DLL, which links libc `atoi`
+/// instead (`nm` shows `_atoi` U). Game-logic call sites use
+/// `cstr_util::atoi` (via the prelude), not this fn directly.
 pub fn atoi(string: *const c_char) -> c_int {
     unsafe {
         let mut string = string;

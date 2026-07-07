@@ -70,6 +70,10 @@ pub fn StringToFilter(ctx: GameContext<'_>, s: *mut c_char, f: *mut c_void) -> q
             .to_string_lossy();
         // Oracle assigns `atoi(num)` (int) into a byte, truncating to the low 8
         // bits (e.g. "300" -> 44); `as u8` reproduces that wrap. g_svcmds.c:89.
+        // `num` was hand-extracted above as a digit-only substring (the loop
+        // above only copies ASCII '0'-'9'), so a whole-token integer parse
+        // here is equivalent to libc `atoi` (no sign/whitespace/garbage to
+        // diverge on) — not re-flagged to `cstr_util::atoi`.
         b[i_val] = num_str.parse::<i32>().unwrap_or(0) as u8;
 
         if b[i_val] != 0 {
@@ -428,10 +432,7 @@ pub fn G_LoadIPBans(ctx: GameContext<'_>) {
     let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
 
     if !token.is_null() {
-        world.globals.numIPFilters = unsafe {
-            let token_str = std::ffi::CStr::from_ptr(token).to_string_lossy();
-            token_str.parse::<c_int>().unwrap_or(0)
-        };
+        world.globals.numIPFilters = atoi(token);
 
         for i in 0..(world.globals.numIPFilters as usize) {
             let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
@@ -516,8 +517,8 @@ pub fn ClientForString(ctx: GameContext<'_>, s: *const c_char) -> *mut gclient_t
 
     // Check if it's a numeric slot
     if unsafe { *s >= b'0' as c_char && *s <= b'9' as c_char } {
-        let s_str = unsafe { std::ffi::CStr::from_ptr(s).to_string_lossy() };
-        let idnum: c_int = s_str.parse().unwrap_or(-1);
+        // Plain `atoi(s)`; oracle has no -1 fallback here (g_svcmds.c:452).
+        let idnum: c_int = atoi(s);
 
         if idnum < 0 || idnum >= world.level.maxclients {
             crate::g_main::Com_Printf(cstr(&format!("Bad client slot: {}\n", idnum)).as_ptr());

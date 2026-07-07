@@ -620,8 +620,8 @@ time (SEAM-D10), not by the crate name. Live shapes (module cdylib `lib.rs`):
 }
 #[no_mangle] pub extern "C-unwind" fn vmMain(command: AbiCommand, arg0..arg11: AbiWord)
     -> AbiWord;                                  // → module-side inbound match
-#[no_mangle] pub extern "C-unwind" fn GetModuleAPI(api_version: AbiCommand,
-    import: RawImportTable) -> RawExportTable;   // OpenJK-only; contract SEAM-Q7
+// `GetModuleAPI` deliberately NOT exported — SEAM-Q7 ruling (see below);
+// OpenJK falls back to the legacy `dllEntry`/`vmMain` path when it is absent.
 
 // SP game (module-side, table ABI — NO word encoding, SEAM-D2):
 #[no_mangle] pub extern "C-unwind" fn GetGameAPI(import: *const game_import_t)
@@ -704,9 +704,16 @@ check, returned-table content, and call timing cannot be derived from oracle
 ground truth. It belongs to the OpenJK-native module-load handshake — the
 DEC-05/DEC-05.2 Raven-vs-OpenJK divergence surface — whose contract no cited doc
 captures (`tools/closure-prototype/NOTES.md`, the DEC-05 divergence record,
-included). Slice 0 does not touch it. Its body therefore stays the current
-`entrypoints.rs:59` null stub pending **SEAM-Q7**; the signature above is the
-existing `RawGetModuleApi` alias (`entrypoints.rs:25`), not a frozen contract.
+included). Slice 0 does not touch it. **SEAM-Q7 ruling (2026-07-06): the
+symbol is not exported at all.** The former null stub was worse than absence:
+OpenJK's loader (`SV_BindGame`, `codemp/server/sv_gameapi.cpp:2802-3140`)
+hard-fails (`ERR_FATAL "GetGameAPI failed"`, no fallback) when the symbol
+resolves but returns NULL, and falls back to the legacy `dllEntry`/`vmMain`
+path only when the symbol is absent — a path our exports already match
+width-for-width (`AbiWord = isize` = OpenJK's widened `intptr_t`
+`SystemCallProc`/`VMMainProc`). Implementing the real table exchange is
+tracked in <https://github.com/mheh/jka-rust/issues/1>, deferred pending
+coordination with OpenJK.
 
 ### Call-site conventions
 
@@ -1164,10 +1171,15 @@ function/struct/file per commit, slice-driven.
   contract is a Raven-vs-OpenJK compatibility decision (DEC-05.2 scope) that
   cannot be settled from oracle ground truth, and it is **not** exercised by
   Slice 0 (SEAM-D7, `dllEntry`/`vmMain` only), so it does not block the first
-  slice. Escalated to a design session; the natural home is the OpenJK-native
-  load path in `docs/architecture/module-loading.md` (pending). Until settled,
-  the export body stays the `entrypoints.rs:59` null stub (§ Live entrypoint
-  exports).
+  slice. **RULED 2026-07-06 (user): do not export the symbol.** The OpenJK
+  source investigation showed a present-but-NULL-returning `GetModuleAPI` is
+  an ERR_FATAL at OpenJK load time with no fallback, while an absent symbol
+  cleanly selects OpenJK's legacy `VM_CreateLegacy` path — which our
+  `dllEntry`/`vmMain` exports already satisfy (pointer-width `AbiWord`).
+  The former null stub was removed from `crates/jampgame/src/lib.rs`; the
+  real `gameImport_t`/`gameExport_t` implementation is deferred to
+  <https://github.com/mheh/jka-rust/issues/1>, to be resolved in
+  coordination with OpenJK.
 
 - **SEAM-Q11 — Module-side `wasm32` `Execute<C>` backend has no named type or
   file.** SEAM-D13 selects the `type Engine` wasm arm by `cfg(target_arch =
