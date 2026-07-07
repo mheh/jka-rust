@@ -285,16 +285,12 @@ pub fn BG_ParseField(
                         *(b.offset((*f).ofs as isize) as *mut *mut c_char) = s;
                     }
                     fieldtype_t::F_VECTOR => {
-                        // sscanf(value, "%f %f %f", &vec[0], &vec[1], &vec[2])
+                        // sscanf(value, "%f %f %f", &vec[0], &vec[1], &vec[2]) —
+                        // oracle bg_misc.c:379 has no count check; unmatched
+                        // components are left at the 0.0 seed (porting-rules §19).
                         let text = std::ffi::CStr::from_ptr(value).to_string_lossy();
-                        let mut nums = text
-                            .split_whitespace()
-                            .filter_map(|t| t.parse::<f32>().ok());
-                        let vec: vec3_t = [
-                            nums.next().unwrap_or(0.0),
-                            nums.next().unwrap_or(0.0),
-                            nums.next().unwrap_or(0.0),
-                        ];
+                        let mut vec: vec3_t = [0.0, 0.0, 0.0];
+                        sscanf_f32s(&text, &mut vec);
                         let dst = b.offset((*f).ofs as isize) as *mut f32;
                         *dst = vec[0];
                         *dst.add(1) = vec[1];

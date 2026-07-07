@@ -73,14 +73,12 @@ pub fn BG_ParseVehWeaponParm(
                     }
                     VF_VECTOR => {
                         let mut vec: vec3_t = [0.0, 0.0, 0.0];
-                        let parts: Vec<f32> = value
-                            .split_whitespace()
-                            .filter_map(|t| t.parse::<f32>().ok())
-                            .collect();
-                        // PORT-NOTE(sscanf-parity): Raven asserts 3 floats read and
-                        // logs on failure; we mirror the log, faithfully leaving
-                        // `vec` partially/zero-filled on a short parse.
-                        if parts.len() != 3 {
+                        // Raven: `_iFieldsRead = sscanf(value, "%f %f %f", &vec[0],
+                        // &vec[1], &vec[2]); assert(_iFieldsRead==3); if
+                        // (_iFieldsRead!=3) Com_Printf(...)` — reproduced via the
+                        // shared libc-`%f` scanner's returned count.
+                        let n = sscanf_f32s(&value, &mut vec);
+                        if n != 3 {
                             Com_Printf(
                                 cstr(&format!(
                                     "{}BG_ParseVehWeaponParm: VEC3 sscanf() failed to read 3 floats ('angle' key bug?)\n",
@@ -88,9 +86,6 @@ pub fn BG_ParseVehWeaponParm(
                                 ))
                                 .as_ptr(),
                             );
-                        }
-                        for (idx, v) in parts.iter().take(3).enumerate() {
-                            vec[idx] = *v;
                         }
                         let dst = b.add(field.ofs as usize) as *mut f32;
                         *dst.add(0) = vec[0];
@@ -398,11 +393,12 @@ pub fn BG_ParseVehicleParm(
                     }
                     VF_VECTOR => {
                         let mut vec: vec3_t = [0.0, 0.0, 0.0];
-                        let parts: Vec<f32> = value
-                            .split_whitespace()
-                            .filter_map(|t| t.parse::<f32>().ok())
-                            .collect();
-                        if parts.len() != 3 {
+                        // Raven: `_iFieldsRead = sscanf(value, "%f %f %f", &vec[0],
+                        // &vec[1], &vec[2]); assert(_iFieldsRead==3); if
+                        // (_iFieldsRead!=3) Com_Printf(...)` — reproduced via the
+                        // shared libc-`%f` scanner's returned count.
+                        let n = sscanf_f32s(&value, &mut vec);
+                        if n != 3 {
                             Com_Printf(
                                 cstr(&format!(
                                     "{}BG_ParseVehicleParm: VEC3 sscanf() failed to read 3 floats ('angle' key bug?)\n",
@@ -410,9 +406,6 @@ pub fn BG_ParseVehicleParm(
                                 ))
                                 .as_ptr(),
                             );
-                        }
-                        for (idx, v) in parts.iter().take(3).enumerate() {
-                            vec[idx] = *v;
                         }
                         // Raven bug (bg_vehicleLoad.c:885-887): the store offset is
                         // taken from `vehWeaponFields[i]`, not `vehicleFields[i]` —

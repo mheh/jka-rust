@@ -1232,12 +1232,11 @@ pub fn Q3_GetVector(
                 || toGet == SET_PARM16 as i32 =>
             {
                 // Raven: sscanf(parm, "%f %f %f", &value[0], &value[1], &value[2])
+                // — oracle g_ICARUScb.c:1604 has no count check; unmatched
+                // components are left untouched (porting-rules §19).
                 let parm_str =
                     cstr_to_str((*(*ent).parms).parm[(toGet - SET_PARM1 as i32) as usize].as_ptr());
-                let mut parts = parm_str.split_whitespace();
-                value[0] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
-                value[1] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
-                value[2] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                sscanf_f32s(&parm_str, value);
             }
             _ if toGet == SET_ORIGIN as i32 => *value = (*ent).r.currentOrigin,
             _ if toGet == SET_ANGLES as i32 => *value = (*ent).r.currentAngles,
@@ -4108,24 +4107,18 @@ pub fn Q3_Set(
         // Set this for callbacks
         let toSet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, type_name);
 
-        // PORT-NOTE(sscanf): Raven's `sscanf(data, "%f %f %f", ...)` has no
-        // ported dual in this crate (g_spawn.rs's `sscanf_3f` is a private
-        // helper in a different module) — inlined the same whitespace-split
-        // float-parse literally at each of the two call sites below rather
-        // than defining a new shared shim.
+        // Raven's `sscanf(data, "%f %f %f", ...)` at the three vector arms
+        // below now routes through the shared libc-`%f` scanner
+        // `cstr_util::sscanf_f32s` (stop-at-first-failure, longest-prefix
+        // parse — matching libc, not a naive whitespace-split).
         // §19: C leaves any component sscanf fails to parse UNINITIALIZED
-        // (garbage-float UB on `vector_data`); the fill below defaults missing
-        // components to 0.0. C's `%f` also stops at the first unparseable token
-        // whereas `filter_map(..ok())` skips non-numeric ones — divergent only
-        // on malformed data; real ICARUS scripts always pass three clean floats.
+        // (garbage-float UB on `vector_data`); we pick "leave the 0.0 seed
+        // above unmodified" as the one defined behavior.
         match toSet {
             _ if toSet == SET_ORIGIN as i32 => {
                 {
                     let s = cstr_to_str(data);
-                    let mut it = s.split_whitespace().filter_map(|t| t.parse::<f32>().ok());
-                    vector_data[0] = it.next().unwrap_or(0.0);
-                    vector_data[1] = it.next().unwrap_or(0.0);
-                    vector_data[2] = it.next().unwrap_or(0.0);
+                    sscanf_f32s(&s, &mut vector_data);
                 }
                 G_SetOrigin(ent, vector_data);
                 if Q_strncmp(b"NPC_\0".as_ptr() as *const c_char, (*ent).classname, 4) == 0 {
@@ -4137,10 +4130,7 @@ pub fn Q3_Set(
             _ if toSet == SET_TELEPORT_DEST as i32 => {
                 {
                     let s = cstr_to_str(data);
-                    let mut it = s.split_whitespace().filter_map(|t| t.parse::<f32>().ok());
-                    vector_data[0] = it.next().unwrap_or(0.0);
-                    vector_data[1] = it.next().unwrap_or(0.0);
-                    vector_data[2] = it.next().unwrap_or(0.0);
+                    sscanf_f32s(&s, &mut vector_data);
                 }
                 if Q3_SetTeleportDest(ctx, entID, vector_data) == qfalse {
                     trap::ICARUS_TaskIDSet(
@@ -4155,10 +4145,7 @@ pub fn Q3_Set(
 
             _ if toSet == SET_ANGLES as i32 => {
                 let s = cstr_to_str(data);
-                let mut it = s.split_whitespace().filter_map(|t| t.parse::<f32>().ok());
-                vector_data[0] = it.next().unwrap_or(0.0);
-                vector_data[1] = it.next().unwrap_or(0.0);
-                vector_data[2] = it.next().unwrap_or(0.0);
+                sscanf_f32s(&s, &mut vector_data);
                 Q3_SetAngles(ctx, entID, vector_data);
             }
 

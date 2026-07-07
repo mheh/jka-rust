@@ -78,7 +78,7 @@ pub use crate::bg_misc::{
 pub use crate::ai_main_consts::*;
 pub use crate::anim_table::animTable;
 pub use crate::bg_vehicleLoad_tables::*;
-pub use crate::cstr_util::{cstr, cstr_to_str, cstr_to_string, write_cstr_field};
+pub use crate::cstr_util::{cstr, cstr_to_str, cstr_to_string, sscanf_f32s, write_cstr_field};
 pub use crate::entity::flags::*;
 pub use crate::g_client::{playerMaxs, playerMins};
 pub use crate::g_items::FRAMETIME;
