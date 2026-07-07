@@ -1,6 +1,6 @@
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport};
 
 /// `GAME_ICARUS_KILL` MP game exports vmMain ABI token.
 ///
@@ -16,4 +16,17 @@ impl InboundVmCall for GameIcarusKill {
     type Output = ();
 
     const COMMAND: MpGameExport = MpGameExport::GAME_ICARUS_KILL;
+}
+
+impl DecodeVmMain for GameIcarusKill {
+    // Payload arrives out-of-band in `gSharedBuffer`, not via vmMain arg words —
+    // Source: `oracle/oracle/codemp/game/g_main.c:616`.
+    fn decode_vm_main(_t: VmMainTransport) -> Self::Args {}
+}
+
+impl EncodeVmMainReturn for GameIcarusKill {
+    fn encode_return(_output: Self::Output) -> isize {
+        // `... return 0;` — Source: `oracle/oracle/codemp/game/g_main.c:619`.
+        0
+    }
 }

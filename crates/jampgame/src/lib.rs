@@ -16,6 +16,10 @@ use mp_game::com_boundary::{route_error, route_print, set_com_error_sink, set_co
 use mp_game::vmcalls::{
     BotAiStartFrame, GameClientBegin, GameClientCommand, GameClientConnect, GameClientDisconnect,
     GameClientThink, GameClientUserinfoChanged, GameConsoleCommand, GameGetitemindexbytag,
+    GameIcarusGetfloat, GameIcarusGetsetidforstring, GameIcarusGetstring, GameIcarusGettag,
+    GameIcarusGetvector, GameIcarusKill, GameIcarusLerp2Angles, GameIcarusLerp2End,
+    GameIcarusLerp2Origin, GameIcarusLerp2Pos, GameIcarusLerp2Start, GameIcarusPlay,
+    GameIcarusPlaysound, GameIcarusRemove, GameIcarusSet, GameIcarusSoundindex, GameIcarusUse,
     GameInit, GameNavChecknodefailedforent, GameNavClearlos, GameNavClearpathbetweenpoints,
     GameNavClearpathtopoint, GameNavEntIsBreakable, GameNavEntIsDoor, GameNavEntIsRemovableUsable,
     GameNavEntIsUnlockedDoor, GameNavFindcombatpointwaypoints, GameRoffNotetrackCallback,
@@ -224,35 +228,104 @@ pub extern "C-unwind" fn vmMain(
                 GameSpawnRmgEntity::decode_vm_main(transport),
             ))
         }
-        // ESCALATION: the 17 ICARUS callback cases (g_main.c:558-668) read their
-        // `T_G_ICARUS_*` payloads out of the module's `gSharedBuffer`
-        // shared-memory region, which is not yet modeled in `GameWorld`. Wiring
-        // them needs a design decision (where the registered buffer lives and how
-        // it is typed at the seam), so they stay a single loud todo!() rather than
-        // a fake. Source: oracle/oracle/codemp/game/g_main.c:558-668.
-        MpGameExport::GAME_ICARUS_PLAYSOUND
-        | MpGameExport::GAME_ICARUS_SET
-        | MpGameExport::GAME_ICARUS_LERP2POS
-        | MpGameExport::GAME_ICARUS_LERP2ORIGIN
-        | MpGameExport::GAME_ICARUS_LERP2ANGLES
-        | MpGameExport::GAME_ICARUS_GETTAG
-        | MpGameExport::GAME_ICARUS_LERP2START
-        | MpGameExport::GAME_ICARUS_LERP2END
-        | MpGameExport::GAME_ICARUS_USE
-        | MpGameExport::GAME_ICARUS_KILL
-        | MpGameExport::GAME_ICARUS_REMOVE
-        | MpGameExport::GAME_ICARUS_PLAY
-        | MpGameExport::GAME_ICARUS_GETFLOAT
-        | MpGameExport::GAME_ICARUS_GETVECTOR
-        | MpGameExport::GAME_ICARUS_GETSTRING
-        | MpGameExport::GAME_ICARUS_SOUNDINDEX
-        | MpGameExport::GAME_ICARUS_GETSETIDFORSTRING => {
-            todo!(
-                "Port GAME_ICARUS_* dispatch — gSharedBuffer module shared-memory \
-                 transport is unmodeled (T_G_ICARUS_* payloads); \
-                 oracle/oracle/codemp/game/g_main.c:558-668"
-            )
+        // The 17 ICARUS callback cases (g_main.c:558-668). Each reads its
+        // `T_G_ICARUS_*` payload out of the engine-registered `gSharedBuffer`
+        // shared-memory region (registered in G_InitGame via
+        // trap::SV_RegisterSharedMemory); the per-command `Dispatch<C> for
+        // GameContext` impls (game_context.rs) overlay-cast that buffer and thread
+        // into the ported Q3_* handlers. `Args = ()` — the payload arrives
+        // out-of-band, not through the vmMain arg words.
+        // Source: oracle/oracle/codemp/game/g_main.c:558-668.
+        MpGameExport::GAME_ICARUS_PLAYSOUND => {
+            GameIcarusPlaysound::encode_return(Dispatch::<GameIcarusPlaysound>::dispatch(
+                &ctx,
+                GameIcarusPlaysound::decode_vm_main(transport),
+            ))
         }
+        MpGameExport::GAME_ICARUS_SET => GameIcarusSet::encode_return(
+            Dispatch::<GameIcarusSet>::dispatch(&ctx, GameIcarusSet::decode_vm_main(transport)),
+        ),
+        MpGameExport::GAME_ICARUS_LERP2POS => {
+            GameIcarusLerp2Pos::encode_return(Dispatch::<GameIcarusLerp2Pos>::dispatch(
+                &ctx,
+                GameIcarusLerp2Pos::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_LERP2ORIGIN => {
+            GameIcarusLerp2Origin::encode_return(Dispatch::<GameIcarusLerp2Origin>::dispatch(
+                &ctx,
+                GameIcarusLerp2Origin::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_LERP2ANGLES => {
+            GameIcarusLerp2Angles::encode_return(Dispatch::<GameIcarusLerp2Angles>::dispatch(
+                &ctx,
+                GameIcarusLerp2Angles::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_GETTAG => {
+            GameIcarusGettag::encode_return(Dispatch::<GameIcarusGettag>::dispatch(
+                &ctx,
+                GameIcarusGettag::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_LERP2START => {
+            GameIcarusLerp2Start::encode_return(Dispatch::<GameIcarusLerp2Start>::dispatch(
+                &ctx,
+                GameIcarusLerp2Start::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_LERP2END => {
+            GameIcarusLerp2End::encode_return(Dispatch::<GameIcarusLerp2End>::dispatch(
+                &ctx,
+                GameIcarusLerp2End::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_USE => GameIcarusUse::encode_return(
+            Dispatch::<GameIcarusUse>::dispatch(&ctx, GameIcarusUse::decode_vm_main(transport)),
+        ),
+        MpGameExport::GAME_ICARUS_KILL => GameIcarusKill::encode_return(
+            Dispatch::<GameIcarusKill>::dispatch(&ctx, GameIcarusKill::decode_vm_main(transport)),
+        ),
+        MpGameExport::GAME_ICARUS_REMOVE => {
+            GameIcarusRemove::encode_return(Dispatch::<GameIcarusRemove>::dispatch(
+                &ctx,
+                GameIcarusRemove::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_PLAY => GameIcarusPlay::encode_return(
+            Dispatch::<GameIcarusPlay>::dispatch(&ctx, GameIcarusPlay::decode_vm_main(transport)),
+        ),
+        MpGameExport::GAME_ICARUS_GETFLOAT => {
+            GameIcarusGetfloat::encode_return(Dispatch::<GameIcarusGetfloat>::dispatch(
+                &ctx,
+                GameIcarusGetfloat::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_GETVECTOR => {
+            GameIcarusGetvector::encode_return(Dispatch::<GameIcarusGetvector>::dispatch(
+                &ctx,
+                GameIcarusGetvector::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_GETSTRING => {
+            GameIcarusGetstring::encode_return(Dispatch::<GameIcarusGetstring>::dispatch(
+                &ctx,
+                GameIcarusGetstring::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_SOUNDINDEX => {
+            GameIcarusSoundindex::encode_return(Dispatch::<GameIcarusSoundindex>::dispatch(
+                &ctx,
+                GameIcarusSoundindex::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_GETSETIDFORSTRING => GameIcarusGetsetidforstring::encode_return(
+            Dispatch::<GameIcarusGetsetidforstring>::dispatch(
+                &ctx,
+                GameIcarusGetsetidforstring::decode_vm_main(transport),
+            ),
+        ),
         // `case GAME_NAV_CLEARPATHTOPOINT: return NAV_ClearPathToPoint(...);`
         // (g_main.c:672-673).
         MpGameExport::GAME_NAV_CLEARPATHTOPOINT => {

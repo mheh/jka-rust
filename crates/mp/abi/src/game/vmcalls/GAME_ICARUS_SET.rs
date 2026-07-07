@@ -1,7 +1,7 @@
 use super::super::MpGameExport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport};
 
 /// `GAME_ICARUS_SET` MP game exports vmMain ABI token.
 ///
@@ -17,4 +17,17 @@ impl InboundVmCall for GameIcarusSet {
     type Output = qboolean;
 
     const COMMAND: MpGameExport = MpGameExport::GAME_ICARUS_SET;
+}
+
+impl DecodeVmMain for GameIcarusSet {
+    // Payload arrives out-of-band in `gSharedBuffer`, not via vmMain arg words —
+    // Source: `oracle/oracle/codemp/game/g_main.c:563`.
+    fn decode_vm_main(_t: VmMainTransport) -> Self::Args {}
+}
+
+impl EncodeVmMainReturn for GameIcarusSet {
+    fn encode_return(output: Self::Output) -> isize {
+        // Returns the handler result. Source: `oracle/oracle/codemp/game/g_main.c:566`.
+        output as isize
+    }
 }
