@@ -348,10 +348,8 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
         readBuf[i_r] = 0;
         //THE RANK
-        (*cl).ps.fd.forceRank = std::str::from_utf8(&readBuf[..i_r])
-            .unwrap_or("0")
-            .parse()
-            .unwrap_or(0);
+        // Source: oracle/oracle/codemp/game/w_force.c:316 — plain `atoi(readBuf)`.
+        (*cl).ps.fd.forceRank = atoi_str(&String::from_utf8_lossy(&readBuf[..i_r]));
         i += 1;
 
         i_r = 0;
@@ -362,10 +360,8 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
         readBuf[i_r] = 0;
         //THE SIDE
-        (*cl).ps.fd.forceSide = std::str::from_utf8(&readBuf[..i_r])
-            .unwrap_or("0")
-            .parse()
-            .unwrap_or(0);
+        // Source: oracle/oracle/codemp/game/w_force.c:328 — plain `atoi(readBuf)`.
+        (*cl).ps.fd.forceSide = atoi_str(&String::from_utf8_lossy(&readBuf[..i_r]));
         i += 1;
 
         let mut fp_bytes = fp_bytes;
@@ -432,6 +428,11 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
             && (i_r as c_int) < (NUM_FORCE_POWERS) as i32
         {
             let ch = fp_bytes[i];
+            // Oracle builds a 1-char `readBuf` (`readBuf[0]=forcePowers[i];
+            // readBuf[1]=0;`) and calls `atoi(readBuf)` on it
+            // (w_force.c:398-402) — over a single-char domain,
+            // `to_digit(10).unwrap_or(0)` is exactly libc `atoi`, so this is
+            // not re-flagged to `cstr_util::atoi`.
             let digit = (ch as char).to_digit(10).unwrap_or(0) as c_int;
             (*cl).ps.fd.forcePowerLevel[i_r] = digit;
             if (*cl).ps.fd.forcePowerLevel[i_r] != 0 {

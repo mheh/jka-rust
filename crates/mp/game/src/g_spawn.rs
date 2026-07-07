@@ -172,7 +172,7 @@ pub fn G_SpawnInt(
     unsafe {
         let mut s: *mut c_char = std::ptr::null_mut();
         let present = G_SpawnString(ctx, key, defaultString, &mut s);
-        *out = c_str_to_i32(s);
+        *out = atoi(s);
         present
     }
 }
@@ -209,36 +209,6 @@ pub fn G_SpawnVector(
 // linked Raven `atof`, `bg_lib.c:774-839`); `sscanf_3f`/`sscanf_1f` route
 // through the shared libc-`%f` scanner `cstr_util::sscanf_f32s`.
 // ---------------------------------------------------------------------
-
-unsafe fn c_str_to_i32(s: *const c_char) -> c_int {
-    // `atoi`: skip leading whitespace, an optional sign, then consecutive ASCII
-    // digits only (stops at the first non-digit) — not the float parser.
-    if s.is_null() {
-        return 0;
-    }
-    let bytes = CStr::from_ptr(s).to_bytes();
-    let mut i = 0;
-    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-        i += 1;
-    }
-    let mut neg = false;
-    if i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-') {
-        neg = bytes[i] == b'-';
-        i += 1;
-    }
-    let mut val: c_int = 0;
-    while i < bytes.len() && bytes[i].is_ascii_digit() {
-        val = val
-            .wrapping_mul(10)
-            .wrapping_add((bytes[i] - b'0') as c_int);
-        i += 1;
-    }
-    if neg {
-        -val
-    } else {
-        val
-    }
-}
 
 /// `sscanf(s, "%f %f %f", &out[0], &out[1], &out[2])` via the shared
 /// libc-`%f`-faithful scanner. Unmatched components are left at whatever

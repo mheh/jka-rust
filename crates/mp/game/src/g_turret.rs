@@ -1031,5 +1031,5 @@ pub fn turret_base_spawn_top(ctx: GameContext<'_>, base: *mut gentity_t) -> qboo
     }
 }
 
-// `atoi` is the ported `bg_lib.c` function reached via the prelude
-// (`crate::bg_lib::atoi`); no local extern shim.
+// `atoi` is the libc-parity helper reached via the prelude
+// (`crate::cstr_util::atoi`); no local extern shim.

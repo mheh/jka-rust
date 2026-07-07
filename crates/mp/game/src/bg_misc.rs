@@ -384,7 +384,8 @@ pub fn BG_LegalizedForcePowers(
         let side_field = parts.next().unwrap_or("");
         let powers_field = parts.next().unwrap_or("");
 
-        let mut final_side: c_int = side_field.trim().parse::<c_int>().unwrap_or(0);
+        // Source: oracle/oracle/codemp/game/bg_misc.c:472 — plain `atoi(readBuf)`.
+        let mut final_side: c_int = atoi_str(&side_field);
         if final_side != FORCE_LIGHTSIDE && final_side != FORCE_DARKSIDE {
             // Not a valid side. You will be dark. Because I said so.
             final_side = FORCE_DARKSIDE;
@@ -407,6 +408,11 @@ pub fn BG_LegalizedForcePowers(
             .take(NUM_FORCE_POWERS_USIZE)
             .enumerate()
         {
+            // Oracle builds a 1-char `readBuf` (`readBuf[0]=powerBuf[i];
+            // readBuf[1]=0;`) and calls `atoi(readBuf)` on it
+            // (bg_misc.c:501-504) — over a single-char domain,
+            // `to_digit(10).unwrap_or(0)` is exactly libc `atoi`, so this is
+            // not re-flagged to `cstr_util::atoi`.
             final_powers[c] = ch.to_digit(10).unwrap_or(0) as c_int;
         }
 

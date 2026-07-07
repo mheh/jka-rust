@@ -1267,10 +1267,8 @@ pub fn finish_spawning_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
 
         // Handle team damage immunity
         if !(*base).team.is_null() && *(*base).team != 0 && (*base).teamnodmg == 0 {
-            // PORT-NOTE(atoi-usage): Raven uses atoi() to parse team string; we convert directly
-            let team_str =
-                core::ffi::CStr::from_ptr((*base).team as *const c_char).to_string_lossy();
-            (*base).teamnodmg = team_str.parse::<c_int>().unwrap_or(0);
+            // Source: oracle/oracle/codemp/game/g_turret_G2.c:1105
+            (*base).teamnodmg = atoi((*base).team as *const c_char);
         }
         (*base).team = core::ptr::null_mut();
 

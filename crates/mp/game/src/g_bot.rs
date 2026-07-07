@@ -1156,7 +1156,7 @@ pub fn Svcmd_AddBot_f(ctx: GameContext<'_>) {
         let delay: c_int = if string[0] == 0 {
             0
         } else {
-            crate::bg_lib::atoi(string.as_ptr())
+            atoi(string.as_ptr())
         };
 
         // alternative name

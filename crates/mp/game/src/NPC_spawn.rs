@@ -1389,7 +1389,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
         (*newent).teamnodmg = (*ent).teamnodmg;
         if !(*ent).team.is_null() && *(*ent).team != 0 {
             (*((*newent).client as *mut gclient_t)).sess.sessionTeam =
-                crate::bg_lib::atoi((*ent).team as *const c_char);
+                atoi((*ent).team as *const c_char);
         } else if (*newent).s.teamowner != TEAM_FREE {
             (*((*newent).client as *mut gclient_t)).sess.sessionTeam = (*newent).s.teamowner;
         } else if (*newent).alliedTeam != TEAM_FREE {

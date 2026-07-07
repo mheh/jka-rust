@@ -96,27 +96,6 @@ unsafe fn c_strcpy(dst: *mut c_char, src: *const c_char) {
     }
 }
 
-pub(crate) unsafe fn c_atoi(s: *const c_char) -> c_int {
-    let cstr = std::ffi::CStr::from_ptr(s);
-    let text = String::from_utf8_lossy(cstr.to_bytes());
-    let trimmed = text.trim_start();
-    let mut idx = 0usize;
-    if let Some(c) = trimmed.chars().next() {
-        if c == '+' || c == '-' {
-            idx = c.len_utf8();
-        }
-    }
-    let mut end = idx;
-    for (i, c) in trimmed[idx..].char_indices() {
-        if c.is_ascii_digit() {
-            end = idx + i + c.len_utf8();
-        } else {
-            break;
-        }
-    }
-    trimmed[..end].parse::<c_int>().unwrap_or(0)
-}
-
 /// Prints a fixed (no-interpolation) message via `Com_Printf`.
 unsafe fn com_printf_lit(msg: &str) {
     let c = std::ffi::CString::new(msg).unwrap();
@@ -645,7 +624,7 @@ pub fn COM_ParseInt(data: *mut *const c_char, i: *mut c_int) -> qboolean {
             com_printf_lit("unexpected EOF\n");
             return QTRUE;
         }
-        *i = c_atoi(token as *const c_char);
+        *i = atoi(token as *const c_char);
         QFALSE
     }
 }

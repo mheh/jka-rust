@@ -337,8 +337,7 @@ pub fn G_InitWorldSession(ctx: GameContext<'_>) {
         ),
     );
 
-    let s_str = unsafe { cstr_to_str(s.as_ptr()) };
-    let gt: i32 = s_str.parse().unwrap_or(0);
+    let gt: c_int = atoi(s.as_ptr());
 
     unsafe {
         if (*ctx.world).cvars.g_gametype.integer != gt {

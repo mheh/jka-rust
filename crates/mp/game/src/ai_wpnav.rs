@@ -2176,7 +2176,7 @@ pub fn LoadPathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
             read_lflags[i_cv as usize] = 0;
             i += 1;
 
-            (*w).globals.gLevelFlags = crate::bg_lib::atoi(read_lflags.as_ptr());
+            (*w).globals.gLevelFlags = atoi(read_lflags.as_ptr());
         } else {
             (*w).globals.gLevelFlags = 0;
         }
@@ -2200,7 +2200,7 @@ pub fn LoadPathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
                 i += 1;
             }
             *current_var.offset(i_cv) = 0;
-            thiswp.index = crate::bg_lib::atoi(current_var);
+            thiswp.index = atoi(current_var);
 
             i_cv = 0;
             i += 1;
@@ -2211,7 +2211,7 @@ pub fn LoadPathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
                 i += 1;
             }
             *current_var.offset(i_cv) = 0;
-            thiswp.flags = crate::bg_lib::atoi(current_var);
+            thiswp.flags = atoi(current_var);
 
             i_cv = 0;
             i += 1;
@@ -2272,7 +2272,7 @@ pub fn LoadPathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
                 *current_var.offset(i_cv) = 0;
 
                 thiswp.neighbors[thiswp.neighbornum as usize].num =
-                    crate::bg_lib::atoi(current_var);
+                    atoi(current_var);
 
                 if *file_string.offset(i) == b'-' as c_char {
                     i_cv = 0;
@@ -3434,7 +3434,7 @@ pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: *mut gentity
             optional_s_argument = ConcatArgs(ctx, 1);
 
             if !optional_s_argument.is_null() {
-                optional_argument = crate::bg_lib::atoi(optional_s_argument);
+                optional_argument = atoi(optional_s_argument);
             }
 
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
@@ -3456,7 +3456,7 @@ pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: *mut gentity
             optional_s_argument = ConcatArgs(ctx, 1);
 
             if !optional_s_argument.is_null() {
-                optional_argument = crate::bg_lib::atoi(optional_s_argument);
+                optional_argument = atoi(optional_s_argument);
             }
 
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
@@ -3473,7 +3473,7 @@ pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: *mut gentity
             optional_s_argument = ConcatArgs(ctx, 1);
 
             if !optional_s_argument.is_null() {
-                optional_argument = crate::bg_lib::atoi(optional_s_argument);
+                optional_argument = atoi(optional_s_argument);
             }
 
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
@@ -3544,7 +3544,7 @@ pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: *mut gentity
             optional_s_argument = ConcatArgs(ctx, 2);
 
             if !optional_s_argument.is_null() {
-                optional_argument = crate::bg_lib::atoi(optional_s_argument);
+                optional_argument = atoi(optional_s_argument);
             }
 
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
@@ -3604,7 +3604,7 @@ pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: *mut gentity
             optional_s_argument = ConcatArgs(ctx, 2);
 
             if !optional_s_argument.is_null() {
-                optional_argument = crate::bg_lib::atoi(optional_s_argument);
+                optional_argument = atoi(optional_s_argument);
             }
 
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {

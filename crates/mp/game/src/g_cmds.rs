@@ -347,13 +347,8 @@ pub fn ClientNumberFromString(ctx: GameContext<'_>, to: *mut gentity_t, s: *mut 
 
         if let Some(c0) = ss.as_bytes().first() {
             if (*c0 as char).is_ascii_digit() {
-                let idnum: c_int = ss
-                    .trim_start()
-                    .chars()
-                    .take_while(|c| c.is_ascii_digit())
-                    .collect::<String>()
-                    .parse()
-                    .unwrap_or(0);
+                // Source: oracle/oracle/codemp/game/g_cmds.c:193 — plain `atoi(s)`.
+                let idnum: c_int = atoi(s as *const c_char);
                 if idnum < 0 || idnum >= (*world).level.maxclients {
                     let msg = format!("print \"Bad client slot: {}\n\"", idnum);
                     trap::SendServerCommand(
@@ -444,7 +439,7 @@ pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: *mut gentity_t, baseArg: c_int) 
                 return;
             }
 
-            let i: c_int = cstr_to_str(otherindex.as_ptr()).trim().parse().unwrap_or(0);
+            let i: c_int = atoi_str(&cstr_to_str(otherindex.as_ptr()));
 
             if !(0..MAX_CLIENTS as c_int).contains(&i) {
                 crate::g_main::Com_Printf(cstr(&format!("{} is not a client index\n", i)).as_ptr());
@@ -497,7 +492,7 @@ pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: *mut gentity_t, baseArg: c_int) 
                         MAX_TOKEN_CHARS as c_int,
                     ),
                 );
-                (*ent).health = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
+                (*ent).health = atoi_str(&cstr_to_str(arg.as_ptr()));
                 if (*ent).health > (*client).ps.stats[STAT_MAX_HEALTH as usize] {
                     (*ent).health = (*client).ps.stats[STAT_MAX_HEALTH as usize];
                 }
@@ -527,7 +522,7 @@ pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: *mut gentity_t, baseArg: c_int) 
                     MAX_TOKEN_CHARS as c_int,
                 ),
             );
-            let n: c_int = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
+            let n: c_int = atoi_str(&cstr_to_str(arg.as_ptr()));
             (*client).ps.stats[STAT_WEAPONS as usize] |= 1 << n;
             return;
         }
@@ -546,7 +541,7 @@ pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: *mut gentity_t, baseArg: c_int) 
                         MAX_TOKEN_CHARS as c_int,
                     ),
                 );
-                num = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(999);
+                num = atoi_str(&cstr_to_str(arg.as_ptr()));
             }
             for i in 0..MAX_WEAPONS as usize {
                 (*client).ps.ammo[i] = num;
@@ -570,7 +565,7 @@ pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: *mut gentity_t, baseArg: c_int) 
                     ),
                 );
                 (*client).ps.stats[STAT_ARMOR as usize] =
-                    cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
+                    atoi_str(&cstr_to_str(arg.as_ptr()));
             } else {
                 (*client).ps.stats[STAT_ARMOR as usize] =
                     (*client).ps.stats[STAT_MAX_HEALTH as usize];
@@ -788,7 +783,7 @@ pub fn Cmd_TeamTask_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 MAX_TOKEN_CHARS as c_int,
             ),
         );
-        let task: c_int = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
+        let task: c_int = atoi_str(&cstr_to_str(arg.as_ptr()));
 
         let mut userinfo = [0 as c_char; MAX_INFO_STRING];
         trap::GetUserinfo(
@@ -2473,7 +2468,7 @@ pub fn Cmd_Tell_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 MAX_TOKEN_CHARS as c_int,
             ),
         );
-        let targetNum: c_int = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(-1);
+        let targetNum: c_int = atoi_str(&cstr_to_str(arg.as_ptr()));
         if targetNum < 0 || targetNum >= (*world).level.maxclients {
             return;
         }
@@ -2609,7 +2604,7 @@ pub fn Cmd_GameCommand_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 MAX_TOKEN_CHARS as c_int,
             ),
         );
-        let player: c_int = cstr_to_str(s.as_ptr()).trim().parse().unwrap_or(0);
+        let player: c_int = atoi_str(&cstr_to_str(s.as_ptr()));
         trap::Argv(
             ctx.engine,
             mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
@@ -2618,7 +2613,7 @@ pub fn Cmd_GameCommand_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 MAX_TOKEN_CHARS as c_int,
             ),
         );
-        let order: c_int = cstr_to_str(s.as_ptr()).trim().parse().unwrap_or(0);
+        let order: c_int = atoi_str(&cstr_to_str(s.as_ptr()));
 
         if player < 0 || player >= MAX_CLIENTS as c_int {
             return;
@@ -2917,7 +2912,7 @@ pub fn Cmd_CallVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if arg1_s.eq_ignore_ascii_case("g_gametype") {
-            let i: c_int = arg2_s.trim().parse().unwrap_or(0);
+            let i: c_int = atoi_str(&arg2_s);
             if i == GT_SINGLE_PLAYER || i < GT_FFA || i >= GT_MAX_GAME_TYPE {
                 trap::SendServerCommand(
                     ctx.engine,
@@ -2990,7 +2985,7 @@ pub fn Cmd_CallVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 &format!("map {}", mapName_str),
             );
         } else if arg1_s.eq_ignore_ascii_case("clientkick") {
-            let n: c_int = arg2_s.trim().parse().unwrap_or(-1);
+            let n: c_int = atoi_str(&arg2_s);
             if n < 0 || n >= MAX_CLIENTS as c_int {
                 let msg = format!("print \"invalid client number {}.\n\"", n);
                 trap::SendServerCommand(
@@ -3419,10 +3414,8 @@ pub fn Cmd_CallTeamVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 }
                 let numeric = i >= 3 || i >= bytes.len();
                 if numeric {
-                    // atoi: value of the leading digit run.
-                    let run: String =
-                        arg2_s.chars().take_while(|c| c.is_ascii_digit()).collect();
-                    targetClientNum = run.parse().unwrap_or(0);
+                    // Source: oracle/oracle/codemp/game/g_cmds.c:2273 — plain `atoi(arg2)`.
+                    targetClientNum = atoi_str(&arg2_s);
                     if targetClientNum < 0 || targetClientNum >= (*world).level.maxclients {
                         let msg = format!("print \"Bad client slot: {}\n\"", targetClientNum);
                         trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
@@ -4562,7 +4555,7 @@ pub fn Cmd_DebugSetSaberMove_f(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         let client = (*self_).client as *mut gclient_t;
-        (*client).ps.saberMove = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
+        (*client).ps.saberMove = atoi_str(&cstr_to_str(arg.as_ptr()));
         (*client).ps.saberBlocked = BLOCKED_BOUNCE_MOVE as c_int;
 
         if (*client).ps.saberMove >= LS_MOVE_MAX {
@@ -5001,7 +4994,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                     MAX_STRING_CHARS as c_int,
                 ),
             );
-            let bCl: c_int = cstr_to_str(sarg.as_ptr()).trim().parse().unwrap_or(0);
+            let bCl: c_int = atoi_str(&cstr_to_str(sarg.as_ptr()));
             crate::ai_main::Bot_SetForcedMovement(ctx, bCl, 4000, -1, -1);
         } else if cmd_s.eq_ignore_ascii_case("debugBMove_Back") && CheatsOk(ctx, ent) != qfalse {
             let mut sarg = [0 as c_char; MAX_STRING_CHARS];
@@ -5013,7 +5006,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                     MAX_STRING_CHARS as c_int,
                 ),
             );
-            let bCl: c_int = cstr_to_str(sarg.as_ptr()).trim().parse().unwrap_or(0);
+            let bCl: c_int = atoi_str(&cstr_to_str(sarg.as_ptr()));
             crate::ai_main::Bot_SetForcedMovement(ctx, bCl, -4000, -1, -1);
         } else if cmd_s.eq_ignore_ascii_case("debugBMove_Right") && CheatsOk(ctx, ent) != qfalse {
             let mut sarg = [0 as c_char; MAX_STRING_CHARS];
@@ -5025,7 +5018,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                     MAX_STRING_CHARS as c_int,
                 ),
             );
-            let bCl: c_int = cstr_to_str(sarg.as_ptr()).trim().parse().unwrap_or(0);
+            let bCl: c_int = atoi_str(&cstr_to_str(sarg.as_ptr()));
             crate::ai_main::Bot_SetForcedMovement(ctx, bCl, -1, 4000, -1);
         } else if cmd_s.eq_ignore_ascii_case("debugBMove_Left") && CheatsOk(ctx, ent) != qfalse {
             let mut sarg = [0 as c_char; MAX_STRING_CHARS];
@@ -5037,7 +5030,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                     MAX_STRING_CHARS as c_int,
                 ),
             );
-            let bCl: c_int = cstr_to_str(sarg.as_ptr()).trim().parse().unwrap_or(0);
+            let bCl: c_int = atoi_str(&cstr_to_str(sarg.as_ptr()));
             crate::ai_main::Bot_SetForcedMovement(ctx, bCl, -1, -4000, -1);
         } else if cmd_s.eq_ignore_ascii_case("debugBMove_Up") && CheatsOk(ctx, ent) != qfalse {
             let mut sarg = [0 as c_char; MAX_STRING_CHARS];
@@ -5049,7 +5042,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                     MAX_STRING_CHARS as c_int,
                 ),
             );
-            let bCl: c_int = cstr_to_str(sarg.as_ptr()).trim().parse().unwrap_or(0);
+            let bCl: c_int = atoi_str(&cstr_to_str(sarg.as_ptr()));
             crate::ai_main::Bot_SetForcedMovement(ctx, bCl, -1, -1, 4000);
         }
         // end bot debug cmds
@@ -5074,7 +5067,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                         ),
                     );
                     if arg[0] != 0 {
-                        iArg = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
+                        iArg = atoi_str(&cstr_to_str(arg.as_ptr()));
                     }
                 }
                 crate::g_combat::DismembermentByNum(ctx, ent, iArg);

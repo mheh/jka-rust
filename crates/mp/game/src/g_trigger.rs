@@ -85,8 +85,8 @@ pub const HYPERSPACE_TELEPORT_FRAC: f32 = 0.75;
 // Source: oracle/oracle/codemp/game/g_trigger.c:1441
 pub const INITIAL_SUFFOCATION_DELAY: c_int = 500;
 
-// `atoi` is the ported `bg_lib.c` function reached via the prelude
-// (`crate::bg_lib::atoi`); no local extern shim.
+// `atoi` is the libc-parity helper reached via the prelude
+// (`crate::cstr_util::atoi`); no local extern shim.
 
 // Seam helpers (local to this file, same recipe as `g_missile.rs`):
 // `gentity_t*` stored fields (`activator`) are `Option<EntityId>`; these
