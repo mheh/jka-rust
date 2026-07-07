@@ -22,3 +22,7 @@ pub struct waypointData_t {
     pub nodeID: c_int,
 }
 const _: () = assert!(core::mem::size_of::<waypointData_t>() == 324);
+
+// `#[repr(C)]` POD (`c_char`/`c_int` fields only); the all-zero image is a valid
+// inhabitant, so `tempWaypointList` builds heap-first via `zeroed_box`.
+unsafe impl native_platform::ZeroValid for waypointData_t {}

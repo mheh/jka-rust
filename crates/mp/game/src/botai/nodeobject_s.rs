@@ -25,3 +25,7 @@ const _: () = assert!(core::mem::offset_of!(nodeobject_t, weight) == 12);
 const _: () = assert!(core::mem::offset_of!(nodeobject_t, flags) == 16);
 const _: () = assert!(core::mem::offset_of!(nodeobject_t, neighbornum) == 20);
 const _: () = assert!(core::mem::offset_of!(nodeobject_t, inuse) == 24);
+
+// `#[repr(C)]` POD (`vec3_t`/`f32`/`c_int`); the all-zero image is a valid
+// inhabitant, so the ~448 KB `nodetable` box builds heap-first via `zeroed_box`.
+unsafe impl native_platform::ZeroValid for nodeobject_t {}

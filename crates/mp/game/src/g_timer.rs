@@ -29,6 +29,11 @@ pub struct gtimer_t {
     pub next: *mut gtimer_t,
 }
 
+// `#[repr(C)]` POD (raw pointers null-valid + `c_int`); the all-zero image is a
+// valid inhabitant — Raven's `g_timerPool` starts zeroed — so the ~384 KB pool
+// builds heap-first via `zeroed_box`.
+unsafe impl native_platform::ZeroValid for gtimer_t {}
+
 /// Maximum number of timers in the pool (Raven `MAX_GTIMERS`).
 /// Source: `oracle/oracle/codemp/game/g_timer.c:8`
 pub const MAX_GTIMERS: usize = 16384;

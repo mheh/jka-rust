@@ -102,6 +102,9 @@ impl GameWorld {
         >();
         let gSharedBuffer =
             native_platform::zeroed_box::<[u8; crate::g_local_consts::MAX_G_SHARED_BUFFER_SIZE]>();
+        // Keep in sync with `zeroed_boxed()`: every field in this (compiler-
+        // exhaustive) literal needs a matching `addr_of_mut!().write()` there,
+        // or its `assume_init` is UB on the missed field.
         GameWorld {
             level,
             g_entities,
@@ -125,4 +128,50 @@ impl GameWorld {
             gSharedBuffer,
         }
     }
+
+    /// Builds the zeroed island directly on the heap, field-by-field into an
+    /// uninitialized `Box`, so the ~1.4 MB `GameWorld` (and its ~0.5 MB inline
+    /// `globals` temporary) never transits the caller's stack by value. This is
+    /// the engine-path constructor (`vmMain(GAME_INIT)`, `lib.rs`): the engine
+    /// calls `vmMain` from a deep stack where a by-value `zeroed()` — whose
+    /// return slot plus the `Some(..)` temporary each hold a full world image —
+    /// overflowed the guard page. Same resulting values as [`Self::zeroed`];
+    /// only where the bytes land differs.
+    pub fn zeroed_boxed() -> Box<Self> {
+        // `Box::new_uninit` allocates the storage on the heap without ever
+        // materializing a `GameWorld` (or `MaybeUninit<GameWorld>`) on the
+        // stack; every field is then written in place exactly once, so the
+        // final `assume_init` observes a fully-initialized value (the real
+        // `Box` fields — `g_entities`, `nodetable`, `bg_state`'s `Vec`s — are
+        // written as live values, never left null).
+        let mut boxed: Box<core::mem::MaybeUninit<GameWorld>> = Box::new_uninit();
+        let p: *mut GameWorld = boxed.as_mut_ptr();
+        // SAFETY: `p` points at freshly-allocated, correctly-aligned storage for
+        // one `GameWorld`; each `addr_of_mut!` write initializes a distinct
+        // field exactly once before `assume_init`.
+        unsafe {
+            use core::ptr::addr_of_mut;
+            addr_of_mut!((*p).level).write(*native_platform::zeroed_box::<level_locals_t>());
+            addr_of_mut!((*p).g_entities).write(native_platform::zeroed_box());
+            addr_of_mut!((*p).clients).write(native_platform::zeroed_box());
+            addr_of_mut!((*p).cvars).write(GameCvars::default());
+            addr_of_mut!((*p).globals).write(crate::game_globals::GameGlobals::default());
+            addr_of_mut!((*p).speedLoopSound).write(0);
+            addr_of_mut!((*p).rageLoopSound).write(0);
+            addr_of_mut!((*p).protectLoopSound).write(0);
+            addr_of_mut!((*p).absorbLoopSound).write(0);
+            addr_of_mut!((*p).seeLoopSound).write(0);
+            addr_of_mut!((*p).ysalamiriLoopSound).write(0);
+            addr_of_mut!((*p).teamNumbers).write([0; 4]);
+            addr_of_mut!((*p).teamStrength).write([0; 4]);
+            addr_of_mut!((*p).teamCounter).write([0; 4]);
+            addr_of_mut!((*p).memoryPool).write(native_platform::zeroed_box());
+            addr_of_mut!((*p).allocPoint).write(0);
+            addr_of_mut!((*p).bg_state).write(crate::bg_channel::BgState::new());
+            addr_of_mut!((*p).refTagOwnerMap).write(native_platform::zeroed_box());
+            addr_of_mut!((*p).gSharedBuffer).write(native_platform::zeroed_box());
+            boxed.assume_init()
+        }
+    }
 }
+

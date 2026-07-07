@@ -80,25 +80,31 @@ pub extern "C-unwind" fn vmMain(
     arg11: AbiWord,
 ) -> AbiWord {
     // BOOTSTRAP (STATE-D6): GAME_INIT is the ONE command that WRITES the cell
-    // before reading it — it stores a zeroed GameWorld (GameWorld::zeroed,
-    // STATE-D9), THEN falls through so the dispatched GAME_INIT arm runs
-    // G_InitGame's init against it (g_main.c:515,979). The pre-decode compare
-    // is the frozen round-6 pinning spelling.
+    // before reading it — it stores a heap-boxed zeroed GameWorld
+    // (GameWorld::zeroed_boxed, STATE-D9), THEN falls through so the dispatched
+    // GAME_INIT arm runs G_InitGame's init against it (g_main.c:515,979).
+    // `zeroed_boxed` builds the ~1.4 MB island directly on the heap so it never
+    // transits this deep engine-called frame by value (an inline
+    // `Some(GameWorld::zeroed())` overflowed the guard page). The pre-decode
+    // compare is the frozen round-6 pinning spelling.
     if command == MpGameExport::GAME_INIT as AbiCommand {
         // SAFETY: single-threaded init; no reentrancy is possible before the
         // world exists (STATE-D6).
         unsafe {
-            *WORLD.0.get() = Some(GameWorld::zeroed());
+            *WORLD.0.get() = Some(GameWorld::zeroed_boxed());
         }
     }
 
     // SAFETY: single-threaded per Raven's contract; each (possibly reentrant)
     // entry derives its OWN raw `*mut GameWorld` — aliasing raw pointers are
-    // sound; a dispatch-spanning `&mut` would be UB (STATE-D6 discipline).
+    // sound; a dispatch-spanning `&mut` would be UB (STATE-D6 discipline). The
+    // cell holds `Box<GameWorld>`; `&mut **b` reborrows through the Box to the
+    // same `*mut GameWorld` the whole downstream (`GameContext`) expects.
     let world = unsafe {
-        (*WORLD.0.get())
+        let b = (*WORLD.0.get())
             .as_mut()
-            .expect("GAME_INIT built the world") as *mut GameWorld
+            .expect("GAME_INIT built the world");
+        &mut **b as *mut GameWorld
     };
     // Per-call receiver from WORLD + ENGINE.get() (SEAM-Q12) — plain struct
     // literal, pub fields (round-5 resolution; WorldPtr precedent, STATE-D8).

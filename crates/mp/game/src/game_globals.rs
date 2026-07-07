@@ -258,15 +258,19 @@ impl Default for ItemRegistered {
 }
 
 /// `gBotChatBuffer[MAX_CLIENTS][MAX_CHAT_BUFFER_SIZE]` — bot personality
-/// chat message buffers, one per client. Newtype because a 32×8192 array of
-/// bytes has no library `Default` impl (only arrays up to 32 elements do in
-/// stable Rust).
+/// chat message buffers, one per client. Boxed so the ~256 KB of bytes lives on
+/// the heap (not the `GameGlobals` stack image, which the engine's
+/// `vmMain(GAME_INIT)` builds on a constrained stack).
 /// Source: `oracle/oracle/codemp/game/ai_util.c:12`
-pub struct BotChatBuffer(pub [[c_char; MAX_CHAT_BUFFER_SIZE]; mp_qshared::shared::MAX_CLIENTS]);
+pub struct BotChatBuffer(
+    pub Box<[[c_char; MAX_CHAT_BUFFER_SIZE]; mp_qshared::shared::MAX_CLIENTS]>,
+);
 
 impl Default for BotChatBuffer {
     fn default() -> Self {
-        BotChatBuffer([[0; MAX_CHAT_BUFFER_SIZE]; mp_qshared::shared::MAX_CLIENTS])
+        // `zeroed_box` builds the buffer directly on the heap (`c_char: ZeroValid`)
+        // — no stack transit.
+        BotChatBuffer(native_platform::zeroed_box())
     }
 }
 
@@ -325,24 +329,26 @@ pub struct NodeTable(pub Box<[nodeobject_t; MAX_NODETABLE_SIZE]>);
 
 impl Default for NodeTable {
     fn default() -> Self {
-        // SAFETY: `nodeobject_t` is `#[repr(C)]` POD (`vec3_t`/`f32`/`c_int`);
-        // an all-zero bit pattern is a valid inhabitant.
-        NodeTable(Box::new(unsafe { core::mem::zeroed() }))
+        // `zeroed_box` builds the ~448 KB array directly on the heap
+        // (`nodeobject_t: ZeroValid`) so it never transits the stack — a naive
+        // `Box::new(zeroed())` materialized it on the stack (twice in debug) and
+        // overflowed the engine's `vmMain(GAME_INIT)` guard page.
+        NodeTable(native_platform::zeroed_box())
     }
 }
 
 /// `waypointData_t tempWaypointList[MAX_STORED_WAYPOINTS]` (`g_nav.c:1660`).
-/// Same >32-array `Default` gap as `NodeTable`; `waypointData_t` is
-/// `#[repr(C)]` POD so an all-zero image is valid.
+/// Boxed so the ~162 KB of POD lives on the heap (not the `GameGlobals` stack
+/// image, which the engine's `vmMain(GAME_INIT)` builds on a constrained
+/// stack); `waypointData_t` is `#[repr(C)]` POD so an all-zero image is valid.
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1660`
-#[derive(Clone, Copy)]
-pub struct TempWaypointList(pub [waypointData_t; MAX_STORED_WAYPOINTS]);
+pub struct TempWaypointList(pub Box<[waypointData_t; MAX_STORED_WAYPOINTS]>);
 
 impl Default for TempWaypointList {
     fn default() -> Self {
-        // SAFETY: `waypointData_t` is `#[repr(C)]` POD (`c_char`/`c_int`
-        // fields only); an all-zero bit pattern is a valid inhabitant.
-        TempWaypointList(unsafe { core::mem::zeroed() })
+        // `zeroed_box` builds the array directly on the heap
+        // (`waypointData_t: ZeroValid`) — no stack transit.
+        TempWaypointList(native_platform::zeroed_box())
     }
 }
 
@@ -546,20 +552,17 @@ impl Default for VehiclePoolOccupied {
 }
 
 /// `gtimer_t g_timerPool[MAX_GTIMERS]` (`g_timer.c:17`) — the fixed timer pool,
-/// intrusively linked into a free list. Newtype because a 16384-element array
-/// has no library `Default` impl (only arrays up to 32 elements do in stable
-/// Rust).
-pub struct GTimerPool(pub [crate::g_timer::gtimer_t; crate::g_timer::MAX_GTIMERS]);
+/// intrusively linked into a free list. Boxed so the ~384 KB pool lives on the
+/// heap (not the `GameGlobals` stack image, which the engine's
+/// `vmMain(GAME_INIT)` builds on a constrained stack); the all-null/zero start
+/// matches Raven's zero-initialized pool.
+pub struct GTimerPool(pub Box<[crate::g_timer::gtimer_t; crate::g_timer::MAX_GTIMERS]>);
 
 impl Default for GTimerPool {
     fn default() -> Self {
-        GTimerPool(
-            [crate::g_timer::gtimer_t {
-                name: core::ptr::null(),
-                time: 0,
-                next: core::ptr::null_mut(),
-            }; crate::g_timer::MAX_GTIMERS],
-        )
+        // `zeroed_box` builds the pool directly on the heap
+        // (`gtimer_t: ZeroValid` — null pointers + 0) — no stack transit.
+        GTimerPool(native_platform::zeroed_box())
     }
 }
 

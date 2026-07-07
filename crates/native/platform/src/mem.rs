@@ -19,8 +19,11 @@ pub unsafe trait ZeroValid {}
 unsafe impl<T: ZeroValid, const N: usize> ZeroValid for [T; N] {}
 
 // Primitive integer byte-patterns: all-zero is a valid value. `u8` backs
-// `GameWorld`'s raw scratch `memoryPool` byte array.
+// `GameWorld`'s raw scratch `memoryPool` byte array; `i8` backs `c_char` on
+// the targets where it is signed (x86_64), so `[c_char; N]` heap buffers
+// (e.g. `gBotChatBuffer`) can build through `zeroed_box` on every platform.
 unsafe impl ZeroValid for u8 {}
+unsafe impl ZeroValid for i8 {}
 
 /// THE sanctioned construction idiom for large `#[repr(C)]` all-zeroes-valid
 /// types: `alloc_zeroed` the storage and `Box::from_raw` it, so a large array is
