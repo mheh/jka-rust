@@ -307,3 +307,15 @@ substantive fns (the ~55 trivial SP_NPC_* setters spot-verified).
   into the oracle dylib (build.sh defines neither _DEBUG nor FINAL_BUILD), so
   they are live ground truth; tracked by PORT-NOTE(debug-build-gated-cmds) at
   g_cmds.rs:~4972. A referee scenario issuing those commands would diverge.
+
+### Linux referee lane bring-up (2026-07-07): NDEBUG ruling + arm64 portability note
+- Oracle build regime change (user-ruled): `-DNDEBUG` added to
+  tools/referee-oracle/build.sh — retail jampgame was an MSVC Release build
+  (asserts compiled away), so asserts-active was a non-retail oracle behavior;
+  also unblocks glibc's C++ assert() under gnu++98. macOS baseline verified
+  unchanged (66/0/6 + 3 scenarios byte-identical after rebuild).
+- PARKED (arch portability, not reachable from current targets): on
+  aarch64-Linux `c_char = u8`, exposing 29 E0308s in mp_game from hardcoded
+  `*mut i8` buffers (e.g. g_spawn.rs:1101 com_token). Harmless on
+  macOS/x86_64-Linux/Windows (c_char = i8). Fix class: declare seam buffers
+  as c_char, not i8. Revisit only if arm64-Linux becomes a target.

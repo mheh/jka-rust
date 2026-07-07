@@ -92,10 +92,14 @@ esac
 #   vehicle/NPC TUs to the MP bg_vehicles.h path, past the SP-only includes) +
 #   __linux__ (wraps dllEntry/vmMain in `extern "C"` for unmangled exports) +
 #   _FORTIFY_SOURCE=0 (no fortify wrappers).
+# NDEBUG: retail jampgame was an MSVC Release build, so asserts were compiled
+#   away — NDEBUG is the retail-faithful assert regime. It also sidesteps
+#   glibc's C++ assert() (a static_cast to bool) rejecting Raven's
+#   pointer-as-condition asserts under gnu++98 on the Linux lane.
 CXXFLAGS="-x c++ -std=gnu++98 -fpermissive -w -O2 -fno-fast-math -ffp-contract=off \
 	-fsigned-char $PICFLAG \
 	-fexceptions -funwind-tables \
-	-DQAGAME -D_JK2MP -D__linux__ -D_FORTIFY_SOURCE=0 \
+	-DQAGAME -D_JK2MP -D__linux__ -D_FORTIFY_SOURCE=0 -DNDEBUG \
 	-include $SHIM \
 	-I $C/game -I $C/qcommon -I $C/ghoul2 -I $C/cgame -I $C/icarus"
 
