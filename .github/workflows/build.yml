@@ -49,13 +49,13 @@ jobs:
     name: Workspace compile gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -90,7 +90,7 @@ jobs:
       # mirror) at oracle/oracle — the referee builds Raven's TUs from
       # oracle/oracle/codemp, so unlike the other jobs this checkout must
       # fetch the full chain.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -98,7 +98,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -112,7 +112,7 @@ jobs:
       # script and its compile shim) so a real change rebuilds correctly.
       - name: Cache built oracle dylib
         id: oracle-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: tools/referee-oracle/build
           key: referee-oracle-${{ runner.os }}-${{ hashFiles('oracle/oracle/codemp/**', 'tools/referee-oracle/build.sh', 'tools/referee-oracle/shim/**') }}
@@ -171,7 +171,7 @@ jobs:
             allow_failure: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -185,7 +185,7 @@ jobs:
           sudo apt-get install -y gcc-multilib
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
