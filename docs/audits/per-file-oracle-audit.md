@@ -302,11 +302,17 @@ substantive fns (the ~55 trivial SP_NPC_* setters spot-verified).
   `.trim()` pre-passes removed (libc atoi does not skip U+00A0 etc.).
 - Provably-OK sites annotated in place: g_svcmds.rs StringToFilter
   (digit-only extraction), w_force.rs + bg_misc.rs single-char to_digit.
-- NOT in scope, still open: the 6 MISSING `#ifndef FINAL_BUILD` debug commands
-  (debugSaberSwitch/debugIK*/debugShipDamage, g_cmds.c:3801-4066) — compiled
-  into the oracle dylib (build.sh defines neither _DEBUG nor FINAL_BUILD), so
-  they are live ground truth; tracked by PORT-NOTE(debug-build-gated-cmds) at
-  g_cmds.rs:~4972. A referee scenario issuing those commands would diverge.
+- RESOLVED 2026-07-06: the missing `#ifndef FINAL_BUILD` debug commands — 8,
+  not 6 as first ledgered (debugDropSaber/debugKnockMeDown/debugSaberSwitch/
+  debugIKGrab/debugIKBeGrabbedBy/debugIKRelease/debugThrow, g_cmds.c:3762-4011,
+  + debugShipDamage, g_cmds.c:4056-4069) — ported into the ClientCommand chain
+  in oracle order after debugDismemberment (g_cmds.rs:~5073-5447). Scoping
+  found the ninth candidate block (saber-style prints, g_cmds.c:2844) is
+  `/* */`-commented in the oracle — dead, not ported. `#ifdef _DEBUG`
+  (g_cmds.c:3470-3656) and `#ifdef VM_MEMALLOC_DEBUG` debugTestAlloc
+  (g_cmds.c:4013-4055) dropped as dead surface per §20 (neither macro defined
+  in retail/oracle builds); PORT-NOTE(debug-build-gated-cmds) rewritten to
+  match. Referee: all scenarios still byte-identical.
 
 ### Linux referee lane bring-up (2026-07-07): NDEBUG ruling + arm64 portability note
 - Oracle build regime change (user-ruled): `-DNDEBUG` added to

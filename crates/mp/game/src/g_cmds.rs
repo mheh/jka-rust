@@ -4962,18 +4962,16 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                 }
             }
         }
-        // PORT-NOTE(debug-build-gated-cmds): Raven gates several branches on
-        // build-config macros (`_DEBUG`, `VM_MEMALLOC_DEBUG`, `#ifndef
-        // FINAL_BUILD`) this workspace does not model. Ported the 3 short
-        // `#ifndef FINAL_BUILD` branches above (debugSetSaberMove/
-        // debugSetBodyAnim/debugDismemberment). NOT yet transcribed (scope cut
-        // under this pass's time budget, not a design decision — revisit before
-        // calling g_cmds.c fully closed): the `#ifdef _DEBUG` block (relax,
-        // holdme, limb_break, headexplodey, debugstupidthing, arbitraryprint,
-        // handcut, loveandpeace), the `#ifdef VM_MEMALLOC_DEBUG` malloc-stress
-        // block, and the remaining `#ifndef FINAL_BUILD` branches (debugDropSaber,
-        // debugKnockMeDown, debugSaberSwitch, debugIKGrab, debugIKBeGrabbedBy,
-        // debugIKRelease, debugThrow, debugShipDamage) — g_cmds.c:3470-4070.
+        // PORT-NOTE(debug-build-gated-cmds): all live `#ifndef FINAL_BUILD`
+        // branches are now ported (debugSetSaberMove/debugSetBodyAnim/
+        // debugDismemberment above, plus debugDropSaber/debugKnockMeDown/
+        // debugSaberSwitch/debugIKGrab/debugIKBeGrabbedBy/debugIKRelease/
+        // debugThrow/debugShipDamage below) — the oracle/retail dylibs compile
+        // these (FINAL_BUILD undefined). Dropped as dead surface (§20, neither
+        // macro defined in any build we target): the `#ifdef _DEBUG` block
+        // (relax, holdme, limb_break, headexplodey, debugstupidthing,
+        // arbitraryprint, handcut, loveandpeace) — g_cmds.c:3470-3656 — and the
+        // `#ifdef VM_MEMALLOC_DEBUG` debugTestAlloc branch — g_cmds.c:4013-4055.
         else if cmd_s.eq_ignore_ascii_case("thedestroyer")
             && CheatsOk(ctx, ent) != qfalse
             && !ent.is_null()
@@ -5072,6 +5070,382 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                 }
                 crate::g_combat::DismembermentByNum(ctx, ent, iArg);
             }
+        } else if cmd_s.eq_ignore_ascii_case("debugDropSaber") {
+            let client = (*ent).client as *mut gclient_t;
+            if (*client).ps.weapon == WP_SABER
+                && (*client).ps.saberEntityNum != 0
+                && (*client).ps.saberInFlight == qfalse
+            {
+                crate::w_saber::saberKnockOutOfHand(
+                    ctx,
+                    &mut (*world).g_entities[(*client).ps.saberEntityNum as usize] as *mut gentity_t,
+                    ent,
+                    vec3_origin,
+                );
+            }
+        } else if cmd_s.eq_ignore_ascii_case("debugKnockMeDown") {
+            let client = (*ent).client as *mut gclient_t;
+            if crate::bg_pmove::BG_KnockDownable(&mut (*client).ps) != qfalse {
+                (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
+                (*client).ps.forceDodgeAnim = 0;
+                if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) > 1 {
+                    (*client).ps.forceHandExtendTime = (*world).level.time + 1100;
+                    (*client).ps.quickerGetup = qfalse;
+                } else {
+                    (*client).ps.forceHandExtendTime = (*world).level.time + 700;
+                    (*client).ps.quickerGetup = qtrue;
+                }
+            }
+        } else if cmd_s.eq_ignore_ascii_case("debugSaberSwitch") {
+            let mut targ: *mut gentity_t = core::ptr::null_mut();
+
+            if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) > 1 {
+                let mut arg = [0 as c_char; MAX_STRING_CHARS];
+                trap::Argv(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                        1,
+                        arg.as_mut_ptr(),
+                        MAX_STRING_CHARS as c_int,
+                    ),
+                );
+
+                if arg[0] != 0 {
+                    let x = atoi_str(&cstr_to_str(arg.as_ptr()));
+
+                    if x >= 0 && x < MAX_CLIENTS as c_int {
+                        targ = &mut (*world).g_entities[x as usize] as *mut gentity_t;
+                    }
+                }
+            }
+
+            if !targ.is_null() && (*targ).inuse != qfalse && !(*targ).client.is_null() {
+                Cmd_ToggleSaber_f(ctx, targ);
+            }
+        } else if cmd_s.eq_ignore_ascii_case("debugIKGrab") {
+            let mut targ: *mut gentity_t = core::ptr::null_mut();
+
+            if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) > 1 {
+                let mut arg = [0 as c_char; MAX_STRING_CHARS];
+                trap::Argv(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                        1,
+                        arg.as_mut_ptr(),
+                        MAX_STRING_CHARS as c_int,
+                    ),
+                );
+
+                if arg[0] != 0 {
+                    let x = atoi_str(&cstr_to_str(arg.as_ptr()));
+
+                    if x >= 0 && x < MAX_CLIENTS as c_int {
+                        targ = &mut (*world).g_entities[x as usize] as *mut gentity_t;
+                    }
+                }
+            }
+
+            if !targ.is_null()
+                && (*targ).inuse != qfalse
+                && !(*targ).client.is_null()
+                && (*ent).s.number != (*targ).s.number
+            {
+                let targClient = (*targ).client as *mut gclient_t;
+                (*targClient).ps.heldByClient = (*ent).s.number + 1;
+            }
+        } else if cmd_s.eq_ignore_ascii_case("debugIKBeGrabbedBy") {
+            let mut targ: *mut gentity_t = core::ptr::null_mut();
+
+            if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) > 1 {
+                let mut arg = [0 as c_char; MAX_STRING_CHARS];
+                trap::Argv(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                        1,
+                        arg.as_mut_ptr(),
+                        MAX_STRING_CHARS as c_int,
+                    ),
+                );
+
+                if arg[0] != 0 {
+                    let x = atoi_str(&cstr_to_str(arg.as_ptr()));
+
+                    if x >= 0 && x < MAX_CLIENTS as c_int {
+                        targ = &mut (*world).g_entities[x as usize] as *mut gentity_t;
+                    }
+                }
+            }
+
+            if !targ.is_null()
+                && (*targ).inuse != qfalse
+                && !(*targ).client.is_null()
+                && (*ent).s.number != (*targ).s.number
+            {
+                let client = (*ent).client as *mut gclient_t;
+                (*client).ps.heldByClient = (*targ).s.number + 1;
+            }
+        } else if cmd_s.eq_ignore_ascii_case("debugIKRelease") {
+            let mut targ: *mut gentity_t = core::ptr::null_mut();
+
+            if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) > 1 {
+                let mut arg = [0 as c_char; MAX_STRING_CHARS];
+                trap::Argv(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                        1,
+                        arg.as_mut_ptr(),
+                        MAX_STRING_CHARS as c_int,
+                    ),
+                );
+
+                if arg[0] != 0 {
+                    let x = atoi_str(&cstr_to_str(arg.as_ptr()));
+
+                    if x >= 0 && x < MAX_CLIENTS as c_int {
+                        targ = &mut (*world).g_entities[x as usize] as *mut gentity_t;
+                    }
+                }
+            }
+
+            if !targ.is_null() && (*targ).inuse != qfalse && !(*targ).client.is_null() {
+                let targClient = (*targ).client as *mut gclient_t;
+                (*targClient).ps.heldByClient = 0;
+            }
+        } else if cmd_s.eq_ignore_ascii_case("debugThrow") {
+            let client = (*ent).client as *mut gclient_t;
+            let mut tr: trace_t = core::mem::zeroed();
+            let mut tTo: vec3_t = [0.0; 3];
+            let mut fwd: vec3_t = [0.0; 3];
+
+            if (*client).ps.weaponTime > 0
+                || (*client).ps.forceHandExtend != HANDEXTEND_NONE as c_int
+                || (*client).ps.groundEntityNum == ENTITYNUM_NONE
+                || (*ent).health < 1
+            {
+                return;
+            }
+
+            crate::q_math::AngleVectors((*client).ps.viewangles, Some(&mut fwd), None, None);
+            tTo[0] = (*client).ps.origin[0] + fwd[0] * 32.0;
+            tTo[1] = (*client).ps.origin[1] + fwd[1] * 32.0;
+            tTo[2] = (*client).ps.origin[2] + fwd[2] * 32.0;
+
+            trap::Trace(
+                ctx.engine,
+                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &(*client).ps.origin as *const vec3_t,
+                    core::ptr::null(),
+                    core::ptr::null(),
+                    &tTo as *const vec3_t,
+                    (*ent).s.number,
+                    MASK_PLAYERSOLID,
+                ),
+            );
+
+            if tr.fraction != 1.0 {
+                let other = &mut (*world).g_entities[tr.entityNum as usize] as *mut gentity_t;
+                let otherClient = (*other).client as *mut gclient_t;
+
+                if (*other).inuse != qfalse
+                    && !(*other).client.is_null()
+                    && (*otherClient).ps.forceHandExtend == HANDEXTEND_NONE as c_int
+                    && (*otherClient).ps.groundEntityNum != ENTITYNUM_NONE
+                    && (*other).health > 0
+                    && (*client).ps.origin[2] as c_int == (*otherClient).ps.origin[2] as c_int
+                {
+                    let pDif: f32 = 40.0;
+                    let mut entAngles: vec3_t = [0.0; 3];
+                    let mut entDir: vec3_t = [0.0; 3];
+                    let mut otherAngles: vec3_t = [0.0; 3];
+                    let mut otherDir: vec3_t = [0.0; 3];
+                    let mut intendedOrigin: vec3_t = [0.0; 3];
+                    let mut boltOrg: vec3_t = [0.0; 3];
+                    let mut pBoltOrg: vec3_t = [0.0; 3];
+                    let mut tAngles: vec3_t = [0.0; 3];
+                    let mut vDif: vec3_t = [0.0; 3];
+                    let mut fwd: vec3_t = [0.0; 3];
+                    let mut right: vec3_t = [0.0; 3];
+                    let mut tr: trace_t = core::mem::zeroed();
+                    let mut tr2: trace_t = core::mem::zeroed();
+
+                    crate::q_math::_VectorSubtract(
+                        (*otherClient).ps.origin,
+                        (*client).ps.origin,
+                        &mut otherDir,
+                    );
+                    crate::q_math::_VectorCopy((*client).ps.viewangles, &mut entAngles);
+                    entAngles[YAW] = vectoyaw(otherDir);
+                    crate::g_client::SetClientViewAngle(ent, entAngles);
+
+                    (*client).ps.forceHandExtend = HANDEXTEND_PRETHROW as c_int;
+                    (*client).ps.forceHandExtendTime = (*world).level.time + 5000;
+
+                    (*client).throwingIndex = (*other).s.number;
+                    (*client).doingThrow = (*world).level.time + 5000;
+                    (*client).beingThrown = 0;
+
+                    crate::q_math::_VectorSubtract(
+                        (*client).ps.origin,
+                        (*otherClient).ps.origin,
+                        &mut entDir,
+                    );
+                    crate::q_math::_VectorCopy((*otherClient).ps.viewangles, &mut otherAngles);
+                    otherAngles[YAW] = vectoyaw(entDir);
+                    crate::g_client::SetClientViewAngle(other, otherAngles);
+
+                    (*otherClient).ps.forceHandExtend = HANDEXTEND_PRETHROWN as c_int;
+                    (*otherClient).ps.forceHandExtendTime = (*world).level.time + 5000;
+
+                    (*otherClient).throwingIndex = (*ent).s.number;
+                    (*otherClient).beingThrown = (*world).level.time + 5000;
+                    (*otherClient).doingThrow = 0;
+
+                    //Doing this now at a stage in the throw, isntead of initially.
+                    //other->client->ps.heldByClient = ent->s.number+1;
+
+                    crate::g_utils::G_EntitySound(
+                        ctx,
+                        other,
+                        CHAN_VOICE as c_int,
+                        crate::g_utils::G_SoundIndex(c"*pain100.wav".as_ptr()),
+                    );
+                    crate::g_utils::G_EntitySound(
+                        ctx,
+                        ent,
+                        CHAN_VOICE as c_int,
+                        crate::g_utils::G_SoundIndex(c"*jump1.wav".as_ptr()),
+                    );
+                    crate::g_utils::G_Sound(
+                        ctx,
+                        other,
+                        CHAN_AUTO as c_int,
+                        crate::g_utils::G_SoundIndex(
+                            c"sound/movers/objects/objectHit.wav".as_ptr(),
+                        ),
+                    );
+
+                    //see if we can move to be next to the hand.. if it's not clear, break the throw.
+                    crate::q_math::VectorClear(&mut tAngles);
+                    tAngles[YAW] = (*client).ps.viewangles[YAW];
+                    crate::q_math::_VectorCopy((*client).ps.origin, &mut pBoltOrg);
+                    crate::q_math::AngleVectors(tAngles, Some(&mut fwd), Some(&mut right), None);
+                    boltOrg[0] = pBoltOrg[0] + fwd[0] * 8.0 + right[0] * pDif;
+                    boltOrg[1] = pBoltOrg[1] + fwd[1] * 8.0 + right[1] * pDif;
+                    boltOrg[2] = pBoltOrg[2];
+
+                    crate::q_math::_VectorSubtract(boltOrg, pBoltOrg, &mut vDif);
+                    crate::q_math::VectorNormalize(&mut vDif);
+
+                    crate::q_math::VectorClear(&mut (*otherClient).ps.velocity);
+                    intendedOrigin[0] = pBoltOrg[0] + vDif[0] * pDif;
+                    intendedOrigin[1] = pBoltOrg[1] + vDif[1] * pDif;
+                    intendedOrigin[2] = (*otherClient).ps.origin[2];
+
+                    trap::Trace(
+                        ctx.engine,
+                        mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                            &mut tr as *mut trace_t,
+                            &intendedOrigin as *const vec3_t,
+                            &(*other).r.mins as *const vec3_t,
+                            &(*other).r.maxs as *const vec3_t,
+                            &intendedOrigin as *const vec3_t,
+                            (*other).s.number,
+                            (*other).clipmask,
+                        ),
+                    );
+                    trap::Trace(
+                        ctx.engine,
+                        mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                            &mut tr2 as *mut trace_t,
+                            &(*client).ps.origin as *const vec3_t,
+                            &(*ent).r.mins as *const vec3_t,
+                            &(*ent).r.maxs as *const vec3_t,
+                            &intendedOrigin as *const vec3_t,
+                            (*ent).s.number,
+                            CONTENTS_SOLID,
+                        ),
+                    );
+
+                    if tr.fraction == 1.0
+                        && tr.startsolid == qfalse as u8
+                        && tr2.fraction == 1.0
+                        && tr2.startsolid == qfalse as u8
+                    {
+                        crate::q_math::_VectorCopy(intendedOrigin, &mut (*otherClient).ps.origin);
+                    } else {
+                        //if the guy can't be put here then it's time to break the throw off.
+                        let mut oppDir: vec3_t = [0.0; 3];
+                        let strength: c_int = 4;
+
+                        (*otherClient).ps.heldByClient = 0;
+                        (*otherClient).beingThrown = 0;
+                        (*client).doingThrow = 0;
+
+                        (*client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
+                        crate::g_utils::G_EntitySound(
+                            ctx,
+                            ent,
+                            CHAN_VOICE as c_int,
+                            crate::g_utils::G_SoundIndex(c"*pain25.wav".as_ptr()),
+                        );
+
+                        (*otherClient).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
+                        crate::q_math::_VectorSubtract(
+                            (*otherClient).ps.origin,
+                            (*client).ps.origin,
+                            &mut oppDir,
+                        );
+                        crate::q_math::VectorNormalize(&mut oppDir);
+                        (*otherClient).ps.velocity[0] = oppDir[0] * (strength * 40) as f32;
+                        (*otherClient).ps.velocity[1] = oppDir[1] * (strength * 40) as f32;
+                        (*otherClient).ps.velocity[2] = 150.0;
+
+                        crate::q_math::_VectorSubtract(
+                            (*client).ps.origin,
+                            (*otherClient).ps.origin,
+                            &mut oppDir,
+                        );
+                        crate::q_math::VectorNormalize(&mut oppDir);
+                        (*client).ps.velocity[0] = oppDir[0] * (strength * 40) as f32;
+                        (*client).ps.velocity[1] = oppDir[1] * (strength * 40) as f32;
+                        (*client).ps.velocity[2] = 150.0;
+                    }
+                }
+            }
+        }
+        // Dropped dead surface (porting-rules §20): the `#ifdef VM_MEMALLOC_DEBUG`
+        // `debugTestAlloc` branch — `g_cmds.c:4013-4055`. VM_MEMALLOC_DEBUG is
+        // never defined in any build we target, so it is not compiled in.
+        else if cmd_s.eq_ignore_ascii_case("debugShipDamage") {
+            let mut arg = [0 as c_char; MAX_STRING_CHARS];
+            let mut arg2 = [0 as c_char; MAX_STRING_CHARS];
+
+            trap::Argv(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    1,
+                    arg.as_mut_ptr(),
+                    MAX_STRING_CHARS as c_int,
+                ),
+            );
+            trap::Argv(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    2,
+                    arg2.as_mut_ptr(),
+                    MAX_STRING_CHARS as c_int,
+                ),
+            );
+            let shipSurf = SHIPSURF_FRONT + atoi_str(&cstr_to_str(arg.as_ptr()));
+            let damageLevel = atoi_str(&cstr_to_str(arg2.as_ptr()));
+
+            crate::g_vehicles::G_SetVehDamageFlags(
+                ctx,
+                &mut (*world).g_entities[(*ent).s.m_iVehicleNum as usize] as *mut gentity_t,
+                shipSurf,
+                damageLevel,
+            );
         } else {
             if cmd_s.eq_ignore_ascii_case("addbot") {
                 // because addbot isn't a recognized command unless you're the
