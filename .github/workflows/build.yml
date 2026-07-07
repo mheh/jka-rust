@@ -34,14 +34,14 @@ name: Build modules
 
 on:
   push:
-    branches: [master]
+    branches: [master, skeleton]
   workflow_dispatch:
 
 permissions:
   contents: write # the release job attaches assets to the rolling release
 
 concurrency:
-  group: build-master
+  group: build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -70,9 +70,63 @@ jobs:
       - name: Workspace tests incl. oracle parity suites (single-threaded)
         run: cargo test --workspace -- --test-threads=1
 
+  # Oracle-vs-Rust differential gate: builds Raven's UNMODIFIED jampgame source
+  # (tools/referee-oracle/build.sh) as a native Linux .so and byte-diffs it
+  # against our `jampgame` cdylib over identical driven inputs. Runs on every
+  # push (master or skeleton) so in-progress work gets referee signal before
+  # it reaches master; `build`/`release` (which publish) stay master-only.
+  #
+  # Two steps against the built oracle: a SELFTEST (both sides load the oracle
+  # dylib) proves the harness itself is deterministic on this platform before
+  # the real oracle-vs-Rust diff is meaningful; only then does the real run
+  # carry any signal.
+  referee:
+    name: Referee (oracle diff, linux x86_64)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: referee-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: referee-cargo-
+
+      # The oracle tree (oracle/oracle/**) is immutable — this cache effectively
+      # never invalidates in practice, but is still keyed on it (plus the build
+      # script and its compile shim) so a real change rebuilds correctly.
+      - name: Cache built oracle dylib
+        id: oracle-cache
+        uses: actions/cache@v4
+        with:
+          path: tools/referee-oracle/build
+          key: referee-oracle-${{ runner.os }}-${{ hashFiles('oracle/oracle/codemp/**', 'tools/referee-oracle/build.sh', 'tools/referee-oracle/shim/**') }}
+
+      - name: Build oracle dylib (Raven's unmodified jampgame source)
+        if: steps.oracle-cache.outputs.cache-hit != 'true'
+        run: tools/referee-oracle/build.sh
+
+      - name: Full workspace build (jampgame cdylib for the loader to find)
+        run: cargo build --workspace
+
+      - name: Referee selftest (harness determinism canary, both sides = oracle)
+        run: REFEREE_SELFTEST=1 cargo test -p jampgame --test referee -- --ignored --test-threads=1
+
+      - name: Referee run (oracle vs Rust jampgame, byte-diff)
+        run: cargo test -p jampgame --test referee -- --ignored --test-threads=1
+
   build:
     name: ${{ matrix.target.module }} (${{ matrix.profile }})
     needs: test
+    if: github.ref == 'refs/heads/master'
     runs-on: ${{ matrix.target.runner }}
     continue-on-error: ${{ matrix.target.allow_failure }}
     strategy:
@@ -168,10 +222,10 @@ jobs:
 
   release:
     name: Update rolling release
-    needs: build
+    needs: [build, referee]
     # `needs.build` is satisfied even when only the allowed-failure 32-bit
-    # lanes failed; publish whatever built.
-    if: github.event_name != 'pull_request'
+    # lanes failed; publish whatever built. Master-only (see `build`'s `if`).
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts

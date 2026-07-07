@@ -551,7 +551,18 @@ fn repo_root() -> PathBuf {
 }
 
 fn oracle_dylib() -> PathBuf {
-    repo_root().join("tools/referee-oracle/build/liboraclejampgame.dylib")
+    // Mirrors `common::dylib_filename`'s platform cfg-branch style; the oracle's
+    // own filename convention comes from `tools/referee-oracle/build.sh`
+    // (Darwin: liboraclejampgame.dylib, Linux: liboraclejampgame.so). Windows is
+    // not built by build.sh yet — the name here is a placeholder for when it is.
+    #[cfg(target_os = "macos")]
+    let name = "liboraclejampgame.dylib";
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let name = "liboraclejampgame.so";
+    #[cfg(windows)]
+    let name = "liboraclejampgame.dll";
+
+    repo_root().join("tools/referee-oracle/build").join(name)
 }
 
 fn logs_dir() -> PathBuf {

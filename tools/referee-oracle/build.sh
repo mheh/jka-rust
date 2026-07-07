@@ -25,7 +25,7 @@ SHIM="$(pwd)/shim/oracle_shim.h"
 # --- pick a real GCC (NOT Apple clang) ----------------------------------------
 CXX="${CXX:-}"
 if [ -z "$CXX" ]; then
-	for c in g++-16 g++-15 g++-14 g++-13 g++-12; do
+	for c in g++-16 g++-15 g++-14 g++-13 g++-12 g++; do
 		if command -v "$c" >/dev/null 2>&1; then CXX="$c"; break; fi
 		if [ -x "/opt/homebrew/bin/$c" ]; then CXX="/opt/homebrew/bin/$c"; break; fi
 	done
@@ -66,6 +66,14 @@ PY
 
 C=build/src/codemp
 
+# --- platform branch (Darwin dylib / Linux so) ---------------------------------
+OS="$(uname -s)"
+case "$OS" in
+	Darwin) LIBOUT=build/liboraclejampgame.dylib; PICFLAG="";;
+	Linux)  LIBOUT=build/liboraclejampgame.so; PICFLAG="-fPIC";;
+	*) echo "error: unsupported platform '$OS' (only Darwin and Linux are supported)" >&2; exit 1;;
+esac
+
 # --- flags --------------------------------------------------------------------
 # Dialect: gnu++98 — Raven is C++98-era; it also keeps `std::move`/`std::forward`
 #   out of scope, which otherwise collide with Raven's global `move`/`forward`
@@ -73,6 +81,10 @@ C=build/src/codemp
 # -fpermissive: downgrade the 64-bit `FOFS ((int)&ptr)` pointer->int narrowing
 #   (a hard error in strict C++) to a warning — the values are small field
 #   offsets, so the truncation is numerically harmless.
+# -fsigned-char: pins retail `char` semantics on platforms where it defaults
+#   unsigned (e.g. aarch64 Linux gcc); a no-op on Apple/x86 where char is
+#   already signed. Matches OpenJK (sets it for all GNU/Clang builds) and
+#   Raven's own legacy unix makefile (oracle/oracle/codemp/unix/makefile:78).
 # FP regime (parity-defining): -fno-fast-math -ffp-contract=off matches what
 #   rustc/LLVM do for the Rust cdylib (IEEE, NO fused multiply-add). -O2 to match
 #   the release profile. See README.md.
@@ -81,6 +93,7 @@ C=build/src/codemp
 #   __linux__ (wraps dllEntry/vmMain in `extern "C"` for unmangled exports) +
 #   _FORTIFY_SOURCE=0 (no fortify wrappers).
 CXXFLAGS="-x c++ -std=gnu++98 -fpermissive -w -O2 -fno-fast-math -ffp-contract=off \
+	-fsigned-char $PICFLAG \
 	-fexceptions -funwind-tables \
 	-DQAGAME -D_JK2MP -D__linux__ -D_FORTIFY_SOURCE=0 \
 	-include $SHIM \
@@ -97,14 +110,29 @@ done
 echo "referee-oracle: compiled $n TUs"
 
 # --- link the loadable module -------------------------------------------------
-"$CXX" -dynamiclib -o build/liboraclejampgame.dylib build/obj/*.o -lm
-echo "referee-oracle: linked build/liboraclejampgame.dylib"
+case "$OS" in
+	Darwin) "$CXX" -dynamiclib -o "$LIBOUT" build/obj/*.o -lm;;
+	Linux)  "$CXX" -shared -o "$LIBOUT" build/obj/*.o -lm;;
+esac
+echo "referee-oracle: linked $LIBOUT"
 
 # --- sanity: the engine entrypoints must be visible for dlsym -----------------
-if ! nm -gU build/liboraclejampgame.dylib | grep -qE '_dllEntry$'; then
-	echo "error: dllEntry not exported" >&2; exit 1
-fi
-if ! nm -gU build/liboraclejampgame.dylib | grep -qE '_vmMain$'; then
-	echo "error: vmMain not exported" >&2; exit 1
-fi
+case "$OS" in
+	Darwin)
+		if ! nm -gU "$LIBOUT" | grep -qE '_dllEntry$'; then
+			echo "error: dllEntry not exported" >&2; exit 1
+		fi
+		if ! nm -gU "$LIBOUT" | grep -qE '_vmMain$'; then
+			echo "error: vmMain not exported" >&2; exit 1
+		fi
+		;;
+	Linux)
+		if ! nm -gD --defined-only "$LIBOUT" | grep -qE '\bdllEntry$'; then
+			echo "error: dllEntry not exported" >&2; exit 1
+		fi
+		if ! nm -gD --defined-only "$LIBOUT" | grep -qE '\bvmMain$'; then
+			echo "error: vmMain not exported" >&2; exit 1
+		fi
+		;;
+esac
 echo "referee-oracle: OK — dllEntry + vmMain exported"
