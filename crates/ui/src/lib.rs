@@ -8,7 +8,7 @@
 //! //TODO: Port ui live entrypoint exports (vmMain match, SEAM-D10)
 //! // Source: oracle/oracle/codemp/ui/ui_main.c:579
 
-use abi_transport::entrypoints::{AbiCommand, AbiWord, RawExportTable, RawImportTable, RawSyscall};
+use abi_transport::entrypoints::{AbiCommand, AbiWord, RawSyscall};
 
 /// Raven/OpenJK QVM-style `dllEntry` export (interim stub).
 #[no_mangle]
@@ -35,11 +35,7 @@ pub extern "C" fn vmMain(
     0
 }
 
-/// Raven/OpenJK table-style `GetModuleAPI` export (interim stub; SEAM-Q7).
-#[no_mangle]
-pub extern "C" fn GetModuleAPI(
-    _api_version: AbiCommand,
-    _import: RawImportTable,
-) -> RawExportTable {
-    core::ptr::null_mut()
-}
+// `GetModuleAPI` is deliberately NOT exported (SEAM-Q7 ruling, 2026-07-06,
+// same as `jampgame`): OpenJK hard-fails on a present-but-NULL-returning
+// symbol and falls back to the legacy `dllEntry`/`vmMain` path only when it
+// is absent. Tracked in https://github.com/mheh/jka-rust/issues/1.
