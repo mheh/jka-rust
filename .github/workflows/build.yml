@@ -85,7 +85,12 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
+      # `oracle/` is a git submodule (mheh/jedi-academy-rust, public) — the
+      # referee builds Raven's TUs from oracle/oracle/codemp, so unlike the
+      # other jobs this checkout must fetch it.
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
