@@ -3242,14 +3242,15 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // the respawned flag will be cleared after the attack and jump keys come up
         (*client).ps.pm_flags |= PMF_RESPAWNED;
 
+        // Raven `client - level.clients` — pointer difference in gclient_t
+        // units (ent_id would divide the byte offset by gentity_t's stride and
+        // produce a wrong, potentially out-of-range clientNum).
+        let client_num = (client as usize - (*ctx.world).clients.as_ptr() as usize)
+            / core::mem::size_of::<gclient_t>();
         trap::GetUsercmd(
             ctx.engine,
             mp_abi::game::syscalls::G_GET_USERCMD::GGetUsercmdArgs::new(
-                ent_id(
-                    (*ctx.world).clients.as_ptr() as *const _,
-                    client as *const _,
-                )
-                .index() as c_int,
+                client_num as c_int,
                 &mut (*client).pers.cmd,
             ),
         );

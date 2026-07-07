@@ -1425,8 +1425,8 @@ pub fn G_MuteSound(ctx: GameContext<'_>, entnum: c_int, channel: c_int) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1345-1372`
 pub fn G_Sound(ctx: GameContext<'_>, ent: *mut gentity_t, channel: c_int, soundIndex: c_int) {
-    debug_assert!(soundIndex != 0);
-
+    // No assert on soundIndex — Raven's G_Sound accepts 0 (benign no-sound
+    // event); a porter-invented debug_assert here killed live bot spawns.
     unsafe {
         let te = G_SoundTempEntity(
             ctx,
