@@ -1871,7 +1871,7 @@ pub fn BG_TempAlloc(size: c_int, bg: &mut BgState) -> *mut c_void {
 // Raven `MAX_POOL_SIZE` — QAGAME (jampgame) arm; CGAME/ui arms are dropped
 // per porting-rules §20 (MP jampgame only).
 // Source: `oracle/oracle/codemp/game/bg_misc.c:3311-3316`
-const MAX_POOL_SIZE: c_int = 3000000;
+pub const MAX_POOL_SIZE: c_int = 3000000;
 
 /// Raven `BG_TempFree`.
 ///

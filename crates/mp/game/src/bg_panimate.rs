@@ -1934,7 +1934,13 @@ pub fn BG_FlipPart(ps: *mut playerState_t, part: c_int) {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1706-1710`
 impl PmoveContext<'_> {
     pub fn BG_InitAnimsets(&mut self) {
-        self.bg.bgAllAnims = Default::default();
+        // Raven `memset(&bgAllAnims, 0, sizeof(bgAllAnims))` zeroes the fixed
+        // `bgLoadedAnim_t bgAllAnims[MAX_ANIM_FILES]` array *in place* — it keeps
+        // the array's fixed length. `Default::default()` would give a length-0
+        // `Vec`, so later `bgAllAnims[0]`/`[nextIndex]` indexing (a fixed-extent
+        // access, e.g. `BG_ParseAnimationFile`) would panic. Re-fill with
+        // `MAX_ANIM_FILES` zeroed entries to preserve Raven's fixed size.
+        self.bg.bgAllAnims = vec![unsafe { core::mem::zeroed() }; MAX_ANIM_FILES as usize];
         self.bg.BGPAFtextLoaded = 0;
     }
 }

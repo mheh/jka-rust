@@ -18,6 +18,7 @@ use crate::prelude::*;
 
 use super::rng::Rng;
 use crate::bg_panimate::MAX_ANIM_FILES;
+use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::bg_loaded_anim::bgLoadedAnim_t;
 use mp_bg::public::bg_loaded_events::bgLoadedEvents_t;
 use mp_bg::public::saber_move_data::saberMoveData_t;
@@ -177,7 +178,17 @@ impl BgState {
             bgAllEvents: vec![unsafe { core::mem::zeroed() }; MAX_ANIM_FILES as usize],
             // Raven initialises this to 1 (first entry is the null/default).
             bgNumAnimEvents: 1,
-            bgHumanoidAnimations: Vec::new(),
+            // Sized like Raven's fixed `animation_t bgHumanoidAnimations[
+            // MAX_TOTALANIMATIONS]` zeroed static (the only statically-allocated
+            // animation set): `BG_ParseAnimationFile` receives `.as_mut_ptr()` as
+            // `animset` and writes MAX_ANIMATIONS entries (with face/legs code
+            // indexing up to MAX_TOTALANIMATIONS), so an empty `Vec` gives a
+            // dangling pointer. Same fixed-array pre-size convention as
+            // `bgAllAnims`/`g_vehicleInfo` above.
+            bgHumanoidAnimations: vec![
+                unsafe { core::mem::zeroed() };
+                animNumber_t::MAX_TOTALANIMATIONS as usize
+            ],
             BGPAFtext: Vec::new(),
             BGPAFtextLoaded: qfalse,
             SaberParms: Vec::new(),
@@ -220,9 +231,16 @@ impl BgState {
             siege_info: vec![0; 16384],
             siege_valid: 0,
             concat_args_line: Vec::new(),
-            bg_pool: Vec::new(),
+            // Sized like Raven's fixed `char bg_pool[MAX_POOL_SIZE]` zeroed static
+            // (`BG_Alloc`/`BG_TempAlloc` write through `.as_mut_ptr()` to a fixed
+            // extent, so an empty `Vec` gives a dangling pointer). `bg_poolTail`
+            // mirrors Raven's static initializer `bg_poolTail = MAX_POOL_SIZE`
+            // (bg_misc.c:3326) — not 0 — so the descending temp-alloc arithmetic
+            // starts at the top of the pool. Same fixed-array pre-size convention
+            // as `bgHumanoidAnimations`/`g_vehicleInfo` above.
+            bg_pool: vec![0; crate::bg_misc::MAX_POOL_SIZE as usize],
             bg_poolSize: 0,
-            bg_poolTail: 0,
+            bg_poolTail: crate::bg_misc::MAX_POOL_SIZE,
             c_pmove: 0,
             bg_fighterAltControl: 0,
         }
