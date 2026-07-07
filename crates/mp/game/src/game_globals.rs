@@ -551,6 +551,21 @@ impl Default for VehiclePoolOccupied {
     }
 }
 
+/// `static Vehicle_t g_vehiclePool[MAX_VEHICLES_AT_A_TIME]` (`g_utils.c:385`) —
+/// the fixed pool `G_AllocateVehicleObject` hands out slots from. Boxed so the
+/// ~122 KB slab (`976 * 128`) lives on the heap, not in the `GameGlobals` stack
+/// image the engine builds during `vmMain(GAME_INIT)`; the all-zero start
+/// matches Raven's zero-initialized `static`.
+pub struct VehiclePool(pub Box<[Vehicle_t; MAX_VEHICLES_AT_A_TIME]>);
+
+impl Default for VehiclePool {
+    fn default() -> Self {
+        // `zeroed_box` builds the slab directly on the heap (`Vehicle_t: ZeroValid`
+        // — null pointers + POD) — no stack transit.
+        VehiclePool(native_platform::zeroed_box())
+    }
+}
+
 /// `gtimer_t g_timerPool[MAX_GTIMERS]` (`g_timer.c:17`) — the fixed timer pool,
 /// intrusively linked into a free list. Boxed so the ~384 KB pool lives on the
 /// heap (not the `GameGlobals` stack image, which the engine's
@@ -1132,6 +1147,9 @@ pub struct GameGlobals {
     /// `VehiclePoolOccupied`).
     /// Source: `oracle/oracle/codemp/game/g_utils.c:386`
     pub g_vehiclePoolOccupied: VehiclePoolOccupied,
+    /// `Vehicle_t g_vehiclePool[MAX_VEHICLES_AT_A_TIME]` (see `VehiclePool`).
+    /// Source: `oracle/oracle/codemp/game/g_utils.c:385`
+    pub g_vehiclePool: VehiclePool,
     /// `remapCount`. Source: `oracle/oracle/codemp/game/g_utils.c:17`
     pub remapCount: c_int,
     /// `shaderRemap_t remappedShaders[MAX_SHADER_REMAPS]` (see

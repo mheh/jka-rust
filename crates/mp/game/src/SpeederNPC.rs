@@ -476,15 +476,13 @@ pub fn G_CreateSpeederNPC(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t, strTy
         // Zero-initialize the vehicle
         core::ptr::write_bytes(*pVeh, 0, 1);
 
-        // Set the vehicle info pointer from the type string
-        // PORT-NOTE(bg-vehicle-table): g_vehicleInfo table access requires
-        // ctx.world.bg_state.g_vehicleInfo or equivalent; BG_VehicleGetIndex returns index
+        // Set the vehicle info pointer based on vehicle type name.
         let vehicleIndex: c_int = BG_VehicleGetIndex(
             strType,
             &mut (*ctx.world).bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         );
-        // (*pVeh)->m_pVehicleInfo = &g_vehicleInfo[vehicleIndex];
-        // Placeholder until g_vehicleInfo is accessible via ctx
+        (*(*pVeh)).m_pVehicleInfo = &(*ctx.world).bg_state.g_vehicleInfo[vehicleIndex as usize]
+            as *const _ as *mut vehicleInfo_t;
     }
 }

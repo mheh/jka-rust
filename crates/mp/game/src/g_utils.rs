@@ -486,8 +486,6 @@ pub fn G_FreeFakeClient(cl: *mut *mut gclient_t) {}
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:388-410`
 pub fn G_AllocateVehicleObject(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t) {
-    // PORT-NOTE(missing-vehicle-pool-storage): g_vehiclePool array is not ported to GameWorld.
-    // This function allocates from that missing storage. Implementing with available globals only.
     unsafe {
         let world = &mut *ctx.world;
         let mut i: c_int = 0;
@@ -500,12 +498,12 @@ pub fn G_AllocateVehicleObject(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t) 
         }
 
         while i < crate::game_globals::MAX_VEHICLES_AT_A_TIME as c_int {
+            // iterate through and try to find a free one
             if world.globals.g_vehiclePoolOccupied.0[i as usize] == qfalse {
                 world.globals.g_vehiclePoolOccupied.0[i as usize] = qtrue;
-                // Cannot allocate from g_vehiclePool as it doesn't exist in GameWorld.
-                // The vehicle object itself must be provided by the caller or allocated elsewhere.
-                // For now, set to null to indicate failure until g_vehiclePool is ported.
-                *pVeh = core::ptr::null_mut();
+                let slot = &mut world.globals.g_vehiclePool.0[i as usize] as *mut Vehicle_t;
+                core::ptr::write_bytes(slot, 0, 1);
+                *pVeh = slot;
                 return;
             }
             i += 1;
@@ -521,14 +519,17 @@ pub fn G_AllocateVehicleObject(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t) 
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:413-426`
 pub fn G_FreeVehicleObject(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
-    // PORT-NOTE(missing-vehicle-pool-storage): Same limitation as G_AllocateVehicleObject.
     unsafe {
         let world = &mut *ctx.world;
         let mut i: c_int = 0;
         while i < crate::game_globals::MAX_VEHICLES_AT_A_TIME as c_int {
-            // Cannot compare &g_vehiclePool[i] == pVeh without g_vehiclePool storage.
-            // The comparison logic is deferred until g_vehiclePool is available.
-            // For now, just iterate and mark nothing (cannot find the matching pool entry).
+            if world.globals.g_vehiclePoolOccupied.0[i as usize] == qtrue
+                && core::ptr::eq(&world.globals.g_vehiclePool.0[i as usize], pVeh)
+            {
+                // guess this is it
+                world.globals.g_vehiclePoolOccupied.0[i as usize] = qfalse;
+                break;
+            }
             i += 1;
         }
     }
@@ -545,6 +546,10 @@ pub fn G_CreateFakeClient(ctx: GameContext<'_>, entNum: c_int, cl: *mut *mut gcl
     unsafe {
         let world = &mut *ctx.world;
         if world.globals.gClPtrs.0[entNum as usize].is_null() {
+            // `gclient_t` holds pointer fields (align 8); pad to an 8-byte
+            // boundary first (see `BG_AllocPad8`) so every `(*client).field`
+            // access downstream is safely dereferenceable.
+            crate::bg_misc::BG_AllocPad8(&mut world.bg_state);
             world.globals.gClPtrs.0[entNum as usize] = crate::bg_misc::BG_Alloc(
                 core::mem::size_of::<gclient_t>() as c_int,
                 &mut world.bg_state,

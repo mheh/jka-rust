@@ -8,3 +8,4 @@ name = "mp_bg"
 
 [dependencies]
 mp_qshared = { path = "../qshared" }
+native_platform = { path = "../../native/platform" }

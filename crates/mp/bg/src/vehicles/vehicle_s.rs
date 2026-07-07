@@ -287,6 +287,14 @@ pub struct Vehicle_t {
     pub m_pOldPilot: *mut bgEntity_t,
 }
 
+// All fields are raw pointers (null-valid), integers, floats, `vec3_t`, and POD
+// `#[repr(C)]` sub-structs (`usercmd_t`, `trace_t`, `vehWeaponStatus_t`,
+// `vehTurretStatus_t`) — no `NonNull`/enum-niche/reference fields — so all-zero
+// bytes are a valid `Vehicle_t`. Enables `zeroed_box::<[Vehicle_t; N]>()` for the
+// `g_vehiclePool` slab (mirrors Raven's zero-initialized `static Vehicle_t`
+// pool, `g_utils.c:385`).
+unsafe impl native_platform::ZeroValid for Vehicle_t {}
+
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<Vehicle_t>() == 976);
 #[cfg(target_pointer_width = "64")]

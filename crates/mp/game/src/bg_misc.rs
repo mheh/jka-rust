@@ -1832,6 +1832,32 @@ pub fn BG_Alloc(size: c_int, bg: &mut BgState) -> *mut c_void {
     }
 }
 
+/// Non-Raven helper (no oracle source — a Rust-only alignment shim, not a
+/// port): pads `bg`'s pool to an 8-byte boundary, without touching
+/// `BG_Alloc`'s own rounding/bookkeeping above.
+///
+/// Raven's bump allocator only rounds to 4 bytes and C's `memset`-driven
+/// access is alignment-indifferent, so 4-byte alignment was always enough
+/// there. Rust is not: dereferencing a raw pointer via `(*p).field` requires
+/// `p` aligned for its *whole* pointee type, and stable debug builds now
+/// panic ("misaligned pointer dereference") on any such access, not just on
+/// the explicit `write_bytes`/`copy_nonoverlapping`/`ptr::read` calls
+/// porting-rules §19 already covers. The three BG_Alloc/B_Alloc call sites
+/// that store pointer-bearing structs (`bot_state_t`, the fake-client
+/// `gclient_t`, `gNPC_t` — all need align 8) call this first so their
+/// allocation lands 8-aligned; every other call site is untouched, so
+/// `bg_poolSize`'s progression for them is unchanged.
+pub fn BG_AllocPad8(bg: &mut BgState) {
+    // Mirrors BG_Alloc's own `(poolSize + 3) & !3` rounding to predict where
+    // the *next* real allocation would start, without performing it.
+    let predicted = (bg.bg_poolSize + 3) & !3;
+    if predicted % 8 != 0 {
+        // The gap to the next 8-byte boundary from a 4-aligned position is
+        // always exactly 4 bytes.
+        BG_Alloc(4, bg);
+    }
+}
+
 /// Raven `BG_AllocUnaligned`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3343-3354`

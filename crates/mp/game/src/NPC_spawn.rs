@@ -977,6 +977,10 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
 pub fn New_NPC_t(ctx: GameContext<'_>, entNum: c_int) -> *mut gNPC_t {
     unsafe {
         if (*ctx.world).globals.gNPCPtrs[entNum as usize].is_null() {
+            // `gNPC_t` holds a `*mut AIGroupInfo_t` field (align 8); pad to an
+            // 8-byte boundary first (see `BG_AllocPad8`) so every `(*ptr).field`
+            // access downstream is safely dereferenceable.
+            crate::bg_misc::BG_AllocPad8(&mut (*ctx.world).bg_state);
             (*ctx.world).globals.gNPCPtrs[entNum as usize] = BG_Alloc(
                 core::mem::size_of::<gNPC_t>() as c_int,
                 &mut (*ctx.world).bg_state,
@@ -986,7 +990,9 @@ pub fn New_NPC_t(ctx: GameContext<'_>, entNum: c_int) -> *mut gNPC_t {
         let ptr = (*ctx.world).globals.gNPCPtrs[entNum as usize];
 
         if !ptr.is_null() {
-            core::ptr::write_bytes(ptr, 0, 1);
+            // Byte-wise, like C's memset: `ptr` is BG_Alloc pool storage (4-byte
+            // aligned only), not guaranteed 8-aligned for gNPC_t's pointer field.
+            core::ptr::write_bytes(ptr as *mut u8, 0, core::mem::size_of::<gNPC_t>());
         }
 
         ptr
@@ -1116,7 +1122,16 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
             return newent;
         }
 
-        core::ptr::write_bytes((*newent).client, 0, 1);
+        // Byte-wise over sizeof(gclient_t): `client` is `*mut c_void` here, so a
+        // typed write_bytes would zero only 1 byte (size_of::<c_void>()), not the
+        // whole struct C's `memset(newent->client, 0, sizeof(*newent->client))`
+        // zeroes; the backing storage (G_CreateFakeClient -> BG_Alloc) is also
+        // only 4-byte aligned, below gclient_t's pointer-field alignment.
+        core::ptr::write_bytes(
+            (*newent).client as *mut u8,
+            0,
+            core::mem::size_of::<gclient_t>(),
+        );
 
         (*newent).playerState =
             &mut (*((*newent).client as *mut gclient_t)).ps as *mut playerState_t;

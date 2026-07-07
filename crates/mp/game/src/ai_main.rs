@@ -913,12 +913,23 @@ pub fn BotAISetupClient(
     unsafe {
         let world = ctx.world;
         if (*world).globals.botstates[client as usize].is_null() {
+            // `bot_state_t` holds `*mut wpobject_t` fields (align 8); pad the pool
+            // to an 8-byte boundary first (see `BG_AllocPad8`) so every later
+            // `(*bs).field` access is safely dereferenceable.
+            crate::bg_misc::BG_AllocPad8(&mut (*world).bg_state);
             (*world).globals.botstates[client as usize] =
                 crate::ai_util::B_Alloc(ctx, core::mem::size_of::<bot_state_t>() as c_int)
                     as *mut bot_state_t;
         }
 
-        core::ptr::write_bytes((*world).globals.botstates[client as usize], 0, 1);
+        // C's `memset(bs, 0, sizeof(bot_state_t))` is byte-wise; BG_Alloc's bump
+        // allocator only guarantees 4-byte alignment, not `bot_state_t`'s 8, so the
+        // typed write_bytes (which checks pointee alignment) must not be used here.
+        core::ptr::write_bytes(
+            (*world).globals.botstates[client as usize] as *mut u8,
+            0,
+            core::mem::size_of::<bot_state_t>(),
+        );
 
         let bs = (*world).globals.botstates[client as usize];
 
@@ -999,7 +1010,9 @@ pub fn BotAIShutdownClient(ctx: GameContext<'_>, client: c_int, restart: qboolea
         // free the weapon weights
         trap::BotFreeWeaponState(ctx.engine, BotlibAiFreeWeaponStateArgs::new((*bs).ws));
         // clear the bot state
-        core::ptr::write_bytes(bs, 0, 1);
+        // Byte-wise, like C's memset: `bs` comes from B_Alloc/BG_Alloc's 4-byte
+        // bump allocator, not guaranteed 8-aligned for bot_state_t's pointer fields.
+        core::ptr::write_bytes(bs as *mut u8, 0, core::mem::size_of::<bot_state_t>());
         // set the inuse flag to qfalse
         (*bs).inuse = qfalse;
         // there's one bot less
@@ -1027,7 +1040,9 @@ pub fn BotResetState(ctx: GameContext<'_>, bs: *mut bot_state_t) {
         let weaponstate = (*bs).ws;
         let entergame_time = (*bs).entergame_time;
         // Reset the whole state.
-        core::ptr::write_bytes(bs, 0, 1);
+        // Byte-wise: `bs` is B_Alloc/BG_Alloc pool storage (4-byte aligned only),
+        // not guaranteed 8-aligned for bot_state_t's pointer fields.
+        core::ptr::write_bytes(bs as *mut u8, 0, core::mem::size_of::<bot_state_t>());
         // Copy back the preserved state.
         (*bs).ms = movestate;
         (*bs).gs = goalstate;
