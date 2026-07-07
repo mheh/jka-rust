@@ -3374,7 +3374,12 @@ pub fn Touch_Item(
             }
         }
 
-        G_LogPrintf(ctx, c"Item: %i %s\n".as_ptr());
+        let logmsg = format!(
+            "Item: {} {}\n",
+            (*other).s.number,
+            cstr_to_str((*(*ent).item).classname)
+        );
+        G_LogPrintf(ctx, cstr(&logmsg).as_ptr());
 
         let mut predict = (*((*other).client as *mut gclient_t))
             .pers
