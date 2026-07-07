@@ -624,7 +624,7 @@ pub fn ReadChatGroups(ctx: GameContext<'_>, bs: *mut bot_state_t, buf: *mut c_ch
 
         let mut i = 0usize;
         while *buf_b.offset(cgbplace) != 0 && i < crate::game_globals::MAX_CHAT_BUFFER_SIZE {
-            world.globals.gBotChatBuffer.0[client_idx][i] = *buf_b.offset(cgbplace) as i8;
+            world.globals.gBotChatBuffer.0[client_idx][i] = *buf_b.offset(cgbplace) as c_char;
             i += 1;
             cgbplace += 1;
         }

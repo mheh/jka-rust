@@ -231,7 +231,7 @@ pub fn Q3_PlaySound(
 ) -> c_int {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
-        let mut final_name = [0i8; MAX_QPATH as usize];
+        let mut final_name = [0 as c_char; MAX_QPATH as usize];
         Q_strncpyz(final_name.as_mut_ptr(), name, MAX_QPATH as c_int);
         Q_strupr(final_name.as_mut_ptr());
         COM_StripExtension(final_name.as_ptr(), final_name.as_mut_ptr());
@@ -264,7 +264,7 @@ pub fn Q3_PlaySound(
         }
 
         if type_voice != 0 {
-            let mut buf = [0i8; 128];
+            let mut buf = [0 as c_char; 128];
             trap::Cvar_VariableStringBuffer(
                 ctx.engine,
                 GCvarVariableStringBufferArgs::new(

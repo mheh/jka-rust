@@ -320,11 +320,16 @@ substantive fns (the ~55 trivial SP_NPC_* setters spot-verified).
   (asserts compiled away), so asserts-active was a non-retail oracle behavior;
   also unblocks glibc's C++ assert() under gnu++98. macOS baseline verified
   unchanged (66/0/6 + 3 scenarios byte-identical after rebuild).
-- PARKED (arch portability, not reachable from current targets): on
-  aarch64-Linux `c_char = u8`, exposing 29 E0308s in mp_game from hardcoded
-  `*mut i8` buffers (e.g. g_spawn.rs:1101 com_token). Harmless on
-  macOS/x86_64-Linux/Windows (c_char = i8). Fix class: declare seam buffers
-  as c_char, not i8. Revisit only if arm64-Linux becomes a target.
+- RESOLVED 2026-07-06 (was PARKED): aarch64-Linux `c_char = u8` — all 29
+  E0308s fixed by retyping seam buffers/locals `i8` → `c_char` (5 files,
+  13 lines: NPC_utils, ai_util, g_ICARUScb, g_client userinfo bufs, g_spawn
+  keyname/com_token) plus three equality-only `b'{'`/`b'}'` casts (printable
+  ASCII, sign-agnostic). No ordering/sign-sensitive comparison touched —
+  bg_lib's explicit `as i8` signed-char loops (bg_lib.rs:315-317 comment)
+  were already portable and are unchanged. `cargo check -p jampgame --target
+  aarch64-unknown-linux-gnu` now clean; native build/tests/referee scenarios
+  unchanged and byte-identical. (Full-workspace cross-check still blocked by
+  mp_engine_qcommon's host-cc build script; module crates are what matter.)
 
 ### FINDING (2026-07-07, Linux CI lane first run): x86_64 ULP divergence in pmove velocity
 - Lane infrastructure fully green: recursive submodule checkout, oracle .so

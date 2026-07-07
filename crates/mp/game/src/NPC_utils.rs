@@ -354,7 +354,7 @@ pub fn NPC_UpdateAngles(ctx: GameContext<'_>, doPitch: qboolean, doYaw: qboolean
         if (*npc).s.weapon == WP_SABER
             && ((*npc_client).ps.fd.forcePowersActive & (1 << (FP_SPEED as c_int))) != 0
         {
-            let mut buf = [0i8; 128];
+            let mut buf = [0 as c_char; 128];
             trap::Cvar_VariableStringBuffer(
                 ctx.engine,
                 GCvarVariableStringBufferArgs::new(

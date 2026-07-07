@@ -1806,7 +1806,7 @@ pub fn ClientConnect(
     unsafe {
         let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
 
-        let mut userinfo_buf = [0i8; MAX_INFO_STRING as usize];
+        let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
         trap::GetUserinfo(
             ctx.engine,
             mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
@@ -1968,7 +1968,7 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
                 let mut team_str = "Red";
 
                 (*((*ent).client as *mut gclient_t)).sess.sessionTeam = PickTeam(ctx, -1);
-                let mut userinfo_buf = [0i8; MAX_INFO_STRING as usize];
+                let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
                 trap::GetUserinfo(
                     ctx.engine,
                     mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
@@ -2075,7 +2075,7 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
         crate::w_saber::WP_SaberInitBladeData(ctx, ent);
 
         // First time model setup for that player.
-        let mut userinfo_buf = [0i8; MAX_INFO_STRING as usize];
+        let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
         trap::GetUserinfo(
             ctx.engine,
             mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
@@ -2560,7 +2560,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let client = (*ent).client as *mut gclient_t;
 
         // first we want the userinfo so we can see if we should update this client's saber
-        let mut userinfo_buf = [0i8; MAX_INFO_STRING as usize];
+        let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
         trap::GetUserinfo(
             ctx.engine,
             mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(

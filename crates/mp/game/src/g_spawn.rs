@@ -1061,8 +1061,8 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
 pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
     unsafe {
         const MAX_TOKEN_CHARS: usize = 1024;
-        let mut keyname = [0i8; MAX_TOKEN_CHARS];
-        let mut com_token = [0i8; MAX_TOKEN_CHARS];
+        let mut keyname = [0 as c_char; MAX_TOKEN_CHARS];
+        let mut com_token = [0 as c_char; MAX_TOKEN_CHARS];
 
         (*ctx.world).level.numSpawnVars = 0;
         (*ctx.world).level.numSpawnVarChars = 0;
@@ -1076,7 +1076,7 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
             // end of spawn string
             return QFALSE;
         }
-        if com_token[0] != b'{' as i8 {
+        if com_token[0] != b'{' as c_char {
             panic!("G_ParseSpawnVars: found {{ ... }} mismatch"); // G_Error -> panic (frozen Group A)
         }
 
@@ -1091,7 +1091,7 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
                 panic!("G_ParseSpawnVars: EOF without closing brace");
             }
 
-            if keyname[0] == b'}' as i8 {
+            if keyname[0] == b'}' as c_char {
                 break;
             }
 
@@ -1104,7 +1104,7 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
                 panic!("G_ParseSpawnVars: EOF without closing brace");
             }
 
-            if com_token[0] == b'}' as i8 {
+            if com_token[0] == b'}' as c_char {
                 panic!("G_ParseSpawnVars: closing brace without data");
             }
             if (*ctx.world).level.numSpawnVars == mp_bg::MAX_SPAWN_VARS as c_int {
