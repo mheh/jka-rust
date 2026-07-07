@@ -332,3 +332,14 @@ substantive fns (the ~55 trivial SP_NPC_* setters spot-verified).
   libm call-pattern mismatch (e.g. sinf vs (float)sin — Apple libm may mask it,
   glibc not) or a gcc-vs-LLVM excess-precision/codegen edge in an air-path
   pmove expression (clients are AIRBORNE in the mock). Run: gh run 28835337105.
+
+### Referee CI lane removed (2026-07-07, user ruling)
+- The Linux x86_64 lane's 1-2 ULP pmove-velocity divergences (entry above) are
+  the OpenJK-#589 class: compiler FP-evaluation differences (gcc vs LLVM) in
+  the 2003 C, not a same-host parity failure — the FP-regime ruling's parity
+  target is same-host strict-IEEE, satisfied and byte-identical on the macOS
+  dev platform. Lane removed from Actions rather than chased; the referee
+  remains the local gate (cargo test -p jampgame --test referee -- --ignored).
+- Kept from the bring-up (all still useful): build.sh Darwin/Linux portability,
+  -fsigned-char + -DNDEBUG regime pins, referee.rs cfg-branched oracle path,
+  the mheh/jediacademy fork submodule chain, skeleton-push CI trigger.
