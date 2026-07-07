@@ -288,3 +288,22 @@ substantive fns (the ~55 trivial SP_NPC_* setters spot-verified).
   signed-char) and overflow (strtol clamp vs wrap); `g_spawn.rs`'s local
   `c_str_to_i32` is close but misses `\x0b`. Needs a census (type-inferred
   `.parse()` undercounts) + one shared libc-atoi helper before a swap round.
+
+### atoi parity round (2026-07-06): RESOLVED (was parked above)
+- 3-shard census of all 154 live oracle atoi sites → commit 2b3f8263.
+  `cstr_util::atoi`/`atoi_str` (libc `(int)strtol` semantics: isspace class,
+  digit-prefix, clamp-in-i64-then-truncate overflow) is now the one game-logic
+  atoi; the prelude `atoi` re-export points at it (bg_lib::atoi stays as the
+  faithful Q3_VM-only port, doc-noted). 28 `.parse().unwrap_or` sites swapped
+  — four porter-invented defaults removed (-1 in Cmd_Tell_f/clientkick/
+  ClientForString, 999 in give-ammo's arg path; oracle is plain atoi → 0);
+  5 local reimplementations deleted (g_spawn c_str_to_i32, q_shared +
+  bg_saberLoad c_atoi twins, ai_util c_atoi/c_atoi_ptr); ~20 Unicode-trimming
+  `.trim()` pre-passes removed (libc atoi does not skip U+00A0 etc.).
+- Provably-OK sites annotated in place: g_svcmds.rs StringToFilter
+  (digit-only extraction), w_force.rs + bg_misc.rs single-char to_digit.
+- NOT in scope, still open: the 6 MISSING `#ifndef FINAL_BUILD` debug commands
+  (debugSaberSwitch/debugIK*/debugShipDamage, g_cmds.c:3801-4066) — compiled
+  into the oracle dylib (build.sh defines neither _DEBUG nor FINAL_BUILD), so
+  they are live ground truth; tracked by PORT-NOTE(debug-build-gated-cmds) at
+  g_cmds.rs:~4972. A referee scenario issuing those commands would diverge.
