@@ -319,3 +319,16 @@ substantive fns (the ~55 trivial SP_NPC_* setters spot-verified).
   `*mut i8` buffers (e.g. g_spawn.rs:1101 com_token). Harmless on
   macOS/x86_64-Linux/Windows (c_char = i8). Fix class: declare seam buffers
   as c_char, not i8. Revisit only if arm64-Linux becomes a target.
+
+### FINDING (2026-07-07, Linux CI lane first run): x86_64 ULP divergence in pmove velocity
+- Lane infrastructure fully green: recursive submodule checkout, oracle .so
+  builds (89 TUs, g++-13/14), SELFTEST passes (Linux oracle self-deterministic),
+  idle scenario 100 frames byte-identical.
+- OPEN: solo diverges frame 11 (velocity[0], 2 ULP: 0xc2a9d88d vs 0xc2a9d88f);
+  melee-brawl frame 45 (velocity[2], 1 ULP: 0x424b7230 vs 0x424b722f). Same
+  1-ULP FP class as the frametime fix (3ad83173) but Linux-x86_64-only — both
+  scenarios pass byte-identical on macOS arm64. Since IEEE add/mul/div/sqrt are
+  arch-deterministic and both sides share the host libm, prime suspects are a
+  libm call-pattern mismatch (e.g. sinf vs (float)sin — Apple libm may mask it,
+  glibc not) or a gcc-vs-LLVM excess-precision/codegen edge in an air-path
+  pmove expression (clients are AIRBORNE in the mock). Run: gh run 28835337105.
