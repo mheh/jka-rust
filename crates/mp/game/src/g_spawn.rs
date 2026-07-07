@@ -113,8 +113,10 @@ const ENTITYNUM_WORLD: c_int = 0;
 ///
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:6-23`
 /// Raven `MAX_AMBIENT_SETS`.
-/// Source: `oracle/oracle/codemp/game/g_local.h` (MAX_AMBIENT_SETS)
-pub const MAX_AMBIENT_SETS: c_int = 64;
+///
+/// Raven: ambient soundsets must be sent over in config strings.
+/// Source: `oracle/oracle/codemp/game/q_shared.h:2035`
+pub const MAX_AMBIENT_SETS: c_int = 256;
 
 pub fn G_SpawnString(
     ctx: GameContext<'_>,

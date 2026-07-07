@@ -110,7 +110,7 @@ pub const CS_GLOBAL_AMBIENT_SET: c_int = 32;
 pub const CS_AMBIENT_SET: c_int = 37;
 
 // Raven computes the rest of the table from running offsets
-// (`CS_X = CS_PREV + MAX_PREV`); MAX_AMBIENT_SETS=64, MAX_MODELS=512,
+// (`CS_X = CS_PREV + MAX_PREV`); MAX_AMBIENT_SETS=256, MAX_MODELS=512,
 // MAX_SOUNDS=256, MAX_ICONS=64, MAX_CLIENTS=32, MAX_G2BONES=64,
 // MAX_LOCATIONS=64, MAX_FX=64, MAX_LIGHT_STYLES=64, MAX_TERRAINS=1,
 // MAX_SUB_BSP=32 (all from `q_shared.h`/`bg_public.h`/`cgs_t.rs`), folded
@@ -118,7 +118,7 @@ pub const CS_AMBIENT_SET: c_int = 37;
 // crates that own several of those MAX_* consts.
 //
 // Source: `oracle/oracle/codemp/game/bg_public.h:92-120`
-pub const CS_SIEGE_STATE: c_int = CS_AMBIENT_SET + 64;
+pub const CS_SIEGE_STATE: c_int = CS_AMBIENT_SET + 256;
 pub const CS_SIEGE_OBJECTIVES: c_int = CS_SIEGE_STATE + 1;
 pub const CS_SIEGE_TIMEOVERRIDE: c_int = CS_SIEGE_OBJECTIVES + 1;
 pub const CS_SIEGE_WINTEAM: c_int = CS_SIEGE_TIMEOVERRIDE + 1;
