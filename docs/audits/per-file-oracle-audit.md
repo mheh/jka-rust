@@ -267,3 +267,24 @@ substantive fns (the ~55 trivial SP_NPC_* setters spot-verified).
 - **BG_GiveMeVectorFromMatrix — transcription CLEAN** (all matrix indices verified
   vs bg_misc.c:736-776); relocated to bg_misc.rs:1917 (its oracle home), prelude
   re-export repointed, 3 explicit imports + 10 inline-path call sites cleaned.
+
+### atof/sscanf parity round (2026-07-06): resolved + atoi class parked
+- **atof — RESOLVED.** Oracle dylib links Raven's own `atof` (nm: `_atof` T);
+  Rust `bg_lib::atof`/`_atof` verified faithful (f32 accumulator, f64 fraction
+  round-back, `_atof` leading-dot bug). All 53 live oracle atof sites route
+  through it — the one bypass, `G_SpawnFloat`'s exponent-accepting
+  `parse::<f64>` helper ("1e2" → 100.0 vs oracle 1.0), fixed (commit 13910be).
+- **sscanf %f — RESOLVED.** Oracle links libc sscanf (nm: `_sscanf` U). All 12
+  Rust `%f` sites had a shift-on-skip `filter_map` idiom; replaced by the shared
+  libc-faithful `cstr_util::sscanf_f32s` (longest-prefix, stop-at-first-failure,
+  count-returning, unmatched slots untouched per §19) + 5 unit tests.
+- **PARKED: atoi class.** Oracle links libc `atoi` (155 sites in codemp/game).
+  Many Rust sites use `.trim().parse().unwrap_or(0)` — diverges on trailing
+  garbage (libc atoi("12abc")=12, parse→0). Confirmed reachable-from-client
+  examples: g_cmds.rs:447,500,791,2612,2621; w_force.rs:351-368
+  (forceRank/forceSide); g_client.rs:2854-2866 (customRGBA userinfo).
+  Fix caveat: parity target is LIBC atoi, not `bg_lib::atoi` (Raven's is
+  Q3_VM-only there) — they differ on whitespace class (isspace vs `<= ' '`
+  signed-char) and overflow (strtol clamp vs wrap); `g_spawn.rs`'s local
+  `c_str_to_i32` is close but misses `\x0b`. Needs a census (type-inferred
+  `.parse()` undercounts) + one shared libc-atoi helper before a swap round.
