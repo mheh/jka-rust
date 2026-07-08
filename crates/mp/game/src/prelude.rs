@@ -62,6 +62,7 @@ pub use mp_bg::vehicles::vehicle_type_t::vehicleType_t::*;
 pub use mp_bg::weapons::weaponData;
 pub use mp_bg::weapons::weapon_t::*;
 pub use mp_bg::weapons::WP_MuzzlePoint;
+pub use mp_qshared::common::mp::ghoul2::bone_flags::*;
 pub use mp_qshared::common::mp::qcommon::pm_flags::*;
 pub use mp_qshared::shared::force_powers::*;
 pub use mp_qshared::shared::limits::*;

@@ -104,9 +104,9 @@ pub(crate) fn SHORT2ANGLE(x: c_int) -> f32 {
 // `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
 // via the prelude glob (no per-file copy).
 
-/// Raven `BONE_ANGLES_POSTMULT` (ghoul2 bone-angle apply mode).
-/// Source: `oracle/oracle/code/game/ghoul2_shared.h:54`
-pub const BONE_ANGLES_POSTMULT: c_int = 0x0002;
+// Raven `BONE_ANGLES_POSTMULT` (ghoul2 bone-angle apply mode) resolves via the
+// canonical `mp_qshared::common::mp::ghoul2::bone_flags` module (crate prelude
+// glob).
 
 /// Raven `TURN_ON` flag for surface toggling.
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1022`

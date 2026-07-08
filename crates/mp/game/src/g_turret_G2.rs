@@ -127,10 +127,8 @@ pub fn G2Tur_SetBoneAngles(
             return;
         }
 
-        // Raven ghoul2 bone-angle flag (see `SetupGameGhoul2Model`); one shared
-        // ported ghoul2-flags module is wanted (CONSOLIDATION).
-        // Source: `oracle/oracle/codemp/ghoul2/G2.h:9`
-        const BONE_ANGLES_POSTMULT: c_int = 0x0002;
+        // Raven `BONE_ANGLES_POSTMULT` resolves via the canonical
+        // `mp_qshared::common::mp::ghoul2::bone_flags` module (crate prelude glob).
         let flags = BONE_ANGLES_POSTMULT;
         let up = POSITIVE_Y as c_int;
         let right = NEGATIVE_Z as c_int;
@@ -413,11 +411,9 @@ pub fn TurboLaser_SetBoneAnim(
             (*eweb).s.legsAnim = endFrame;
         }
 
-        // Raven `ghoul2/G2.h` bone-anim flags — transcribed locally (see
-        // `EWeb_SetBoneAnim` in `g_items.rs`, same idiom).
-        const BONE_ANIM_OVERRIDE: c_int = 0x0008;
-        const BONE_ANIM_OVERRIDE_FREEZE: c_int = 0x0040 + BONE_ANIM_OVERRIDE;
-        const BONE_ANIM_BLEND: c_int = 0x0080;
+        // Raven `ghoul2/G2.h` bone-anim flags resolve via the canonical
+        // `mp_qshared::common::mp::ghoul2::bone_flags` module (crate prelude glob;
+        // see `EWeb_SetBoneAnim` in `g_items.rs`, same idiom).
 
         // now set the animation on the server ghoul2 instance.
         debug_assert!(!(*eweb).ghoul2.is_null());

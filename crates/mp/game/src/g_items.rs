@@ -2011,12 +2011,10 @@ pub fn EWeb_SetBoneAngles(
     bone: *mut c_char,
     angles: vec3_t,
 ) {
-    // Raven `BONE_ANGLES_POSTMULT` (`ghoul2/G2.h:9`). The ghoul2 G2.h flags have
-    // no shared workspace module yet (a private copy also lives in `NPC_utils`);
-    // kept local at the verified value. Consolidation candidate.
+    // Raven `BONE_ANGLES_POSTMULT` resolves via the canonical
+    // `mp_qshared::common::mp::ghoul2::bone_flags` module (crate prelude glob).
     // Orientations (`POSITIVE_Y`/`NEGATIVE_Z`/`NEGATIVE_X`) come from the
     // already-ported `Eorientations` enum (prelude glob import).
-    const BONE_ANGLES_POSTMULT: c_int = 0x0002;
 
     unsafe {
         let boneIndex = G_BoneIndex(ctx, bone as *const c_char);
@@ -2124,12 +2122,8 @@ pub fn EWeb_SetBoneAnim(
             (*eweb).s.legsAnim = endFrame;
         }
 
-        // Raven `ghoul2/G2.h:21-24` bone-anim flags. No shared workspace module
-        // for the ghoul2 G2.h flags yet; kept local at verified values.
-        // Consolidation candidate.
-        const BONE_ANIM_OVERRIDE: c_int = 0x0008;
-        pub const BONE_ANIM_OVERRIDE_FREEZE: c_int = 0x0040 + BONE_ANIM_OVERRIDE;
-        pub const BONE_ANIM_BLEND: c_int = 0x0080;
+        // Raven `ghoul2/G2.h:22-25` bone-anim flags resolve via the canonical
+        // `mp_qshared::common::mp::ghoul2::bone_flags` module (crate prelude glob).
 
         // now set the animation on the server ghoul2 instance.
         debug_assert!(!(*eweb).ghoul2.is_null());

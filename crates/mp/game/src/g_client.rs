@@ -78,19 +78,9 @@ use mp_bg::public::gametype::GT_POWERDUEL;
 use mp_qshared::shared::{MAX_CLIENTS, MAX_GENTITIES};
 use std::ffi::CString;
 
-/// Raven ghoul2 bone-anim flags (`BONE_ANIM_*`), used by `G_UpdateClientAnims`.
-/// Source: `oracle/oracle/codemp/ghoul2/G2.h:22-25`
-const BONE_ANIM_OVERRIDE: c_int = 0x0008;
-const BONE_ANIM_OVERRIDE_LOOP: c_int = 0x0010;
-const BONE_ANIM_OVERRIDE_FREEZE: c_int = 0x0040 + BONE_ANIM_OVERRIDE;
-const BONE_ANIM_BLEND: c_int = 0x0080;
-
-/// Raven ghoul2 bone-angle flag (`BONE_ANGLES_POSTMULT`), used by
-/// `SetupGameGhoul2Model`. Source: `oracle/oracle/codemp/ghoul2/G2.h:9`
-// CONSOLIDATION: the ghoul2 `BONE_*` flags (G2.h:8-25) are transcribed as
-// scattered file-locals across g_client/g_turret_G2/g_items/NPC_utils; they
-// want one shared ported ghoul2-flags module.
-const BONE_ANGLES_POSTMULT: c_int = 0x0002;
+// Ghoul2 `BONE_ANIM_*`/`BONE_ANGLES_POSTMULT` flags (used by
+// `G_UpdateClientAnims`/`SetupGameGhoul2Model`) resolve via the canonical
+// `mp_qshared::common::mp::ghoul2::bone_flags` module (crate prelude glob).
 
 /// Raven `BODY_SINK_TIME` — how long a corpse persists before it is unlinked.
 /// Source: `oracle/oracle/codemp/game/g_client.c:946`

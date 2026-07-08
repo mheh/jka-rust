@@ -96,8 +96,9 @@ pub const FLY_HOVER: c_int = 3;
 // The const sweep removed the local shadows of `SURF_SLICK`, `MASK_WATER`,
 // `PMF_STUCK_TO_WALL`, `PMF_TIME_KNOCKBACK`, `PMF_JUMP_HELD`, `BUTTON_ATTACK`
 // and `BUTTON_ALT_ATTACK` — the qshared canonicals (`surface_flags`,
-// `pm_flags`, `usercmd_button`) and `BONE_ANGLES_POSTMULT` (NPC_utils) reach
-// this file identically through `crate::prelude::*`.
+// `pm_flags`, `usercmd_button`) and `BONE_ANGLES_POSTMULT`
+// (`ghoul2::bone_flags`) reach this file identically through
+// `crate::prelude::*`.
 /// `MINS_Z`. Source: `oracle/oracle/codemp/game/bg_public.h:46`
 pub const MINS_Z: c_int = -24;
 /// `MIN_WALK_NORMAL`. Source: `oracle/oracle/codemp/game/bg_local.h:5`
