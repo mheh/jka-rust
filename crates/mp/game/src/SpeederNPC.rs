@@ -12,40 +12,16 @@ use crate::g_vehicles::{VEH_MOUNT_THROW_LEFT, VEH_MOUNT_THROW_RIGHT};
 use crate::prelude::*;
 use core::ffi::c_int;
 
-// Vehicle flag constants (from oracle/oracle/codemp/game/bg_vehicles.h)
-// These control vehicle state like flying, slide-braking, acceleration, etc.
-const VEH_FLYING: u64 = 0x0000_0001;
-const VEH_STRAFERAM: u64 = 0x0000_0002;
-const VEH_SLIDEBREAKING: u64 = 0x0000_0004;
-const VEH_ACCELERATORON: u64 = 0x0000_0008;
-const VEH_ARMORLOW: u64 = 0x0000_0010;
-const VEH_ARMORGONE: u64 = 0x0000_0020;
-const VEH_CRASHING: u64 = 0x0000_0040;
-const VEH_SABERINLEFTHAND: u64 = 0x0000_0080;
-const VEH_OUTOFCONTROL: u64 = 0x0000_0100;
-
-// Button flags (from oracle/oracle/codemp/game/q_shared.h / usercmd_t)
-const BUTTON_ATTACK: c_int = 1;
-const BUTTON_USE: c_int = 32;
-const BUTTON_ALT_ATTACK: c_int = 128;
-
-// Weapon constants (weapon_t, oracle/oracle/codemp/game/bg_weapons.h)
-const WP_NONE: c_int = 0;
-const WP_MELEE: c_int = 2;
-const WP_SABER: c_int = 3;
-const WP_BLASTER: c_int = 5;
-
-// Entity and effect flag constants (bg_public.h)
-const ENTITYNUM_NONE: c_int = -1;
-const EF_JETPACK_ACTIVE: c_int = 1 << 11;
-const EF_DEAD: c_int = 1 << 1;
-
-// Animation flag constants
-const SETANIM_FLAG_NORMAL: c_int = 0;
-const SETANIM_FLAG_OVERRIDE: c_int = 0x0100;
-const SETANIM_FLAG_HOLD: c_int = 0x0200;
-const SETANIM_FLAG_RESTART: c_int = 0x0400;
-const SETANIM_FLAG_HOLDLESS: c_int = 0x0800;
+// Vehicle flags (`vehFlags_t`), buttons (`BUTTON_*`), weapons (`weapon_t`),
+// entity effects (`EF_*`), set-anim flags (`SETANIM_FLAG_*`), and orientation
+// indices (`PITCH`/`YAW`/`ROLL`) all resolve to their canonical workspace
+// definitions through `crate::prelude::*`. The former per-file placeholder
+// consts here carried guessed values (e.g. VEH_SLIDEBREAKING = 0x4 instead of
+// the real 0x80, and the SETANIM_FLAG_* bits were all off by 8x) and shadowed
+// the canonical items with live-buggy numbers, so they were removed.
+//
+// `vehFlags_t` variants are `#[repr(i32)]`, so use sites masking `m_ulFlags`
+// (u64) cast with `as u64`, matching bg_pmove.rs / AnimalNPC.rs / g_vehicles.rs.
 
 // `animNumber_t`/`BOTH_VS_IDLE`/… are the canonical `mp_bg::public::anim_number`
 // enum + variants, reached via the prelude glob. The former per-file
@@ -54,15 +30,10 @@ const SETANIM_FLAG_HOLDLESS: c_int = 0x0800;
 // call site through `crate::prelude::*` (porting-rules §E dedupe-at-import
 // rule).
 
-// Orientation indices (already in prelude but redefining locally for clarity)
-const PITCH: usize = 0;
-const YAW: usize = 1;
-const ROLL: usize = 2;
-
-// Exhausts and turret constants
-const MAX_VEHICLE_EXHAUSTS: usize = 12;
-const STRAFERAM_DURATION: c_int = 500;
-const STRAFERAM_ANGLE: f32 = 15.0f32;
+// `PITCH`/`YAW`/`ROLL` (q_math) and `MAX_VEHICLE_EXHAUSTS` (vehicle_s) come from
+// the prelude. `STRAFERAM_DURATION`/`STRAFERAM_ANGLE` (oracle SpeederNPC.c:97-98,
+// both = 8) are used only inside the `#ifndef _JK2MP` SP-only strafe-ram code,
+// which is dead in the `_JK2MP` MP build, so they are not defined here.
 
 /// Raven `VEH_StartStrafeRam`.
 ///
@@ -126,7 +97,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         }
 
         // Determine speed increment based on flying status
-        if (*pVeh).m_ulFlags & VEH_FLYING != 0 {
+        if (*pVeh).m_ulFlags & (VEH_FLYING as u64) != 0 {
             speedInc = (*pVeh)
                 .m_pVehicleInfo
                 .as_ref()
@@ -214,19 +185,19 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         }
 
         // Slide breaking
-        if (*pVeh).m_ulFlags & VEH_SLIDEBREAKING != 0 {
+        if (*pVeh).m_ulFlags & (VEH_SLIDEBREAKING as u64) != 0 {
             if (*pVeh).m_ucmd.forwardmove >= 0 {
-                (*pVeh).m_ulFlags &= !VEH_SLIDEBREAKING;
+                (*pVeh).m_ulFlags &= !(VEH_SLIDEBREAKING as u64);
             }
             if !parentPS.is_null() {
                 (*parentPS).speed = 0.0f32;
             }
         } else if (curTime > (*pVeh).m_iTurboTime)
-            && ((*pVeh).m_ulFlags & VEH_FLYING == 0)
+            && ((*pVeh).m_ulFlags & (VEH_FLYING as u64) == 0)
             && ((*pVeh).m_ucmd.forwardmove < 0)
             && (*(*pVeh).m_vOrientation.add(ROLL) as f32).abs() > 25.0f32
         {
-            (*pVeh).m_ulFlags |= VEH_SLIDEBREAKING;
+            (*pVeh).m_ulFlags |= VEH_SLIDEBREAKING as u64;
         }
 
         // Determine speed max based on turbo

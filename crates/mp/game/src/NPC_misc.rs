@@ -9,12 +9,15 @@
 use crate::g_main::Com_Printf;
 use crate::prelude::*;
 
-// Raven DEBUG_LEVEL_* constants from b_local.h
-// Source: oracle/oracle/codemp/game/b_local.h:23-26
-const DEBUG_LEVEL_DETAIL: c_int = 1;
+// Raven DEBUG_LEVEL_* constants from b_local.h. The former values here
+// (DETAIL 1 / WARNING 5 / ERROR 7) were guessed and inverted the severity
+// ordering the `cv->value < debugLevel` gate depends on — a live bug — so they
+// are corrected to the oracle values.
+// Source: oracle/oracle/codemp/game/b_local.h:22-25
+const DEBUG_LEVEL_DETAIL: c_int = 4;
 const DEBUG_LEVEL_INFO: c_int = 3;
-const DEBUG_LEVEL_WARNING: c_int = 5;
-const DEBUG_LEVEL_ERROR: c_int = 7;
+const DEBUG_LEVEL_WARNING: c_int = 2;
+const DEBUG_LEVEL_ERROR: c_int = 1;
 
 /// Raven `Debug_Printf`.
 ///

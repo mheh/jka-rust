@@ -17,10 +17,13 @@ use crate::g_timer::{TIMER_Done, TIMER_Exists, TIMER_Set};
 use crate::g_utils::{vtos, G_Sound};
 use crate::g_utils::{G_CheckInSolid, G_FreeEntity, G_SetOrigin};
 use crate::level::combat_point::MAX_COMBAT_POINTS;
+use crate::npc::ai_flags::NPCAI_BURST_WEAPON;
+use crate::npc::check_flags::{CHECK_360, CHECK_FOV, CHECK_VISRANGE};
+use crate::npc::script_flags::{SCF_ALT_FIRE, SCF_DONT_FIRE, SCF_NO_GROUPS};
 use crate::prelude::*;
 use crate::q_math::{
     _DotProduct, _VectorCopy, _VectorMA, _VectorSubtract, vec3_origin, vectoangles, AngleVectors,
-    DistanceHorizontalSquared, VectorLength, VectorLengthSquared, VectorNormalize,
+    DistanceHorizontalSquared, VectorLength, VectorLengthSquared, VectorNormalize, PITCH, YAW,
 };
 use crate::q_shared::Q_stricmp;
 use crate::teams::class::*;
@@ -46,19 +49,7 @@ use mp_bg::public::weaponstate::weaponstate_t::{
 };
 use mp_bg::weapons::weapon_t::*;
 use mp_qshared::common::mp::trace_t::trace_t;
-
-// Raven `NPCAI_BURST_WEAPON` (`gNPC_t::aiFlags` bit) — not yet ported as a
-// central const; inlined here from the header value.
-// Source: `oracle/oracle/codemp/game/b_public.h:7`
-const NPCAI_BURST_WEAPON: c_int = 0x00000002;
-
-// Raven visibility-check flags (`NPC_CheckVisibility`'s local consts,
-// duplicated per-file precedent set by `NPC_senses.rs`) — used by callers
-// here to build the `flags` argument.
-// Source: `oracle/oracle/codemp/game/NPC_senses.c:257-276`
-const CHECK_360: c_int = 2;
-const CHECK_FOV: c_int = 4;
-const CHECK_VISRANGE: c_int = 16;
+use mp_qshared::shared::MASK_SHOT;
 
 // Raven `DEBUG_LEVEL_INFO` (`b_local.h:23`) — not yet ported as a central
 // const; inlined here from the header value.
@@ -83,21 +74,6 @@ unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t 
 
 // Unported types referenced in this file (need porting before this compiles):
 // combatPt_t
-
-// Raven `SCF_NO_GROUPS` (`gNPC_t::scriptFlags` bit) — not yet ported as a
-// central const; inlined here from the header value.
-// Source: `oracle/oracle/codemp/game/b_public.h:44`
-const SCF_NO_GROUPS: i32 = 0x00020000;
-
-// Raven `SCF_ALT_FIRE` (`gNPC_t::scriptFlags` bit) — not yet ported as a
-// central const; inlined here from the header value.
-// Source: `oracle/oracle/codemp/game/b_public.h:33`
-const SCF_ALT_FIRE: i32 = 0x00000040;
-
-// Raven `SCF_DONT_FIRE` (`gNPC_t::scriptFlags` bit) — not yet ported as a
-// central const; inlined here from the header value.
-// Source: `oracle/oracle/codemp/game/b_public.h:41`
-const SCF_DONT_FIRE: i32 = 0x00004000;
 
 /// Raven `G_ClearEnemy`.
 ///
@@ -995,11 +971,6 @@ pub fn ShotThroughGlass(
         0
     }
 }
-
-// Raven `MASK_SHOT` (`CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_CORPSE|CONTENTS_TERRAIN`)
-// — not yet ported as a central const; inlined here from the header value.
-// Source: `oracle/oracle/codemp/game/bg_public.h:1177`
-const MASK_SHOT: c_int = 0x1 | 0x100 | 0x200 | 0x1000;
 
 /// Raven `CanShoot`.
 ///
@@ -2107,11 +2078,6 @@ pub fn NPC_CheckDefend(ctx: GameContext<'_>, scale: f32) -> qboolean {
     }
 }
 
-// Raven angle-index consts (`q_shared.h` `PITCH`/`YAW`/`ROLL` anonymous enum)
-// — not yet ported centrally; per-file precedent (`bg_pmove.rs`, `AnimalNPC.rs`).
-const PITCH: usize = 0;
-const YAW: usize = 1;
-
 /// Raven `NPC_CheckCanAttack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2263-2465`
@@ -2753,9 +2719,10 @@ pub fn NPC_FindCombatPoint(
     }
 }
 
-// Raven `ENTITYNUM_NONE` (`MAX_GENTITIES - 1`) — not yet ported centrally in
-// this file; per-file precedent (`g_navnew.rs`).
-const ENTITYNUM_NONE_LOCAL: c_int = (mp_qshared::shared::MAX_GENTITIES - 1) as c_int;
+// Raven `ENTITYNUM_NONE` (`MAX_GENTITIES - 1`) — file-local alias of the
+// canonical `mp_qshared::shared::ENTITYNUM_NONE` (kept to avoid churning this
+// file's use sites).
+const ENTITYNUM_NONE_LOCAL: c_int = mp_qshared::shared::ENTITYNUM_NONE;
 
 // Raven `CPF_DUCK`/`CPF_FLEE`/`CPF_INVESTIGATE`/`CPF_SQUAD`
 // (`combatPoint_t::flags` bits) — not yet ported as central consts; inlined
@@ -2974,7 +2941,8 @@ pub fn NPC_SearchForWeapons(ctx: GameContext<'_>) -> *mut gentity_t {
 
 // Raven `NF_CLEAR_PATH` (`g_nav.h`, nav-flags bit) — not yet ported as a
 // central const; inlined here from the header value.
-const NF_CLEAR_PATH_LOCAL: c_int = 0x0000_0001;
+// Source: `oracle/oracle/codemp/game/g_nav.h:36`
+const NF_CLEAR_PATH_LOCAL: c_int = 0x0000_0002;
 
 /// Raven `NPC_SetPickUpGoal`.
 ///

@@ -1,21 +1,10 @@
-// PORT-COMPLETE: NPC_AI_GalakMech.c 11/15
+// PORT-COMPLETE: NPC_AI_GalakMech.c 15/15
 //! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_GalakMech.c`.
 //!
-//! Pass-2 packet port: the `NPC`/`NPCInfo`/`ucmd` ambient globals resolved to
-//! real `GameGlobals` fields (`*mut gentity_t`/`*mut gNPC_t`/`usercmd_t`)
-//! during this pass, so 9 of the 13 parked fns (`NPC_GalakMech_Init`,
-//! `GM_CreateExplosion`, `GM_Dying`, `NPC_GM_Pain`, `GM_HoldPosition`,
-//! `NPC_BSGM_Patrol`, `GM_CheckMoveState`, `NPC_GM_StartLaser`,
-//! `GM_StartGloat`) are ported faithfully. 4 remain parked:
-//!
-//! - `GM_Move` — reads `navInfo_t`'s `NIF_COLLISION` flag bit, unresolved by
-//!   this packet (same gap as `g_navnew.rs`'s `NAVNEW_AvoidCollision`).
-//! - `GM_CheckFireState` — the packet's own STATE FIELDS section groups
-//!   `impactPos4` as a "bg-owned/const" global rather than a
-//!   `ctx.world.globals` field, leaving its placement unsettled.
-//! - `NPC_BSGM_Attack`/`NPC_BSGM_Default` — 636/67 LOC bodies with further
-//!   unresolved consts (`shieldMins`/`shieldMaxs`) and fn-pointer-store
-//!   surface beyond this packet's scope; parked rather than guessed.
+//! All functions are ported: `GM_Move` reads the canonical `NIF_COLLISION`
+//! bit, `GM_CheckFireState`/`NPC_BSGM_Attack`/`NPC_BSGM_Default` place their
+//! `*4` state in `ctx.world.globals`, and `impactPos4` lives in the file-static
+//! `IMPACT_POS_4` below.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::entity::flags::{FL_NO_KNOCKBACK, FL_SHIELDED};
@@ -43,21 +32,18 @@ const BS_CINEMATIC: bState_t = bState_t::BS_CINEMATIC;
 // Source: `oracle/oracle/codemp/game/g_local.h`
 use crate::entity::hit_location::HL_GENERIC1;
 
-// Raven `gNPC_t::scriptFlags` bits — same local-const precedent
-// as `NPC_combat.rs`.
-// Source: `oracle/oracle/codemp/game/b_public.h`
-const SCF_ALT_FIRE: i32 = 0x00000040;
-const SCF_CHASE_ENEMIES: i32 = 0x00000080;
-const SCF_DONT_FIRE: i32 = 0x00000800;
-const SCF_FIRE_WEAPON: i32 = 0x00001000;
+// Raven `gNPC_t::scriptFlags` bits (`SCF_*`, b_public.h:26-52) resolve to the
+// canonical `crate::npc::script_flags` consts through the prelude glob. The
+// former local placeholders here had guessed values (SCF_CHASE_ENEMIES 0x80,
+// SCF_DONT_FIRE 0x800, SCF_FIRE_WEAPON 0x1000 vs the real 0x400/0x4000/0x40000),
+// which masked the wrong scriptFlags bits — a live bug — so they were removed.
 
-// Raven `FRAMETIME` (`bg_public.h`) — same local-const precedent as
-// `g_mover.rs`.
+// Raven `FRAMETIME` (`bg_public.h`) = 100. Kept local (no central definition
+// exists yet; see consolidation note) — value matches the oracle.
 const FRAMETIME: c_int = 100;
 
-// Raven file-static `navInfo_t::flags` bit `NIF_COLLISION` (b_local.h:305 = 0x4).
-// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c` (used throughout)
-const NIF_COLLISION: i32 = 0x00000004;
+// Raven `NIF_COLLISION` (`navInfo_t::flags` bit) resolves to the canonical
+// `crate::npc::nav_info_s::NIF_COLLISION` through the prelude glob.
 
 // Raven file-static `vec3_t impactPos4` — shared across GM_CheckFireState,
 // NPC_BSGM_Attack, and others for caching impact positions.
@@ -74,8 +60,12 @@ const MELEE_DIST_SQUARED: f32 = 6400.0; // 80*80
 const MIN_LOB_DIST_SQUARED: f32 = 65536.0; // 256*256
 const MAX_LOB_DIST_SQUARED: f32 = 200704.0; // 448*448
 const REPEATER_ALT_SIZE: f32 = 3.0; // half of bbox size
+// Raven `#define GENERATOR_HEALTH 25`.
+// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:23`
 const GENERATOR_HEALTH: c_int = 25; // Shield generator health threshold
-const ARMOR_EFFECT_TIME: c_int = 3000;
+// Raven `#define ARMOR_EFFECT_TIME 500` (was a guessed 3000 — corrected).
+// Source: `oracle/oracle/codemp/game/w_saber.h:1`
+const ARMOR_EFFECT_TIME: c_int = 500;
 
 /// Inline helper from `oracle/oracle/codemp/game/bg_public.h:1524-1564`
 /// (same local-copy precedent as `NPC_AI_Mark2.rs`'s private helper of the

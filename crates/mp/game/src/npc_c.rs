@@ -47,12 +47,12 @@ const qfalse: qboolean = 0;
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:46-103`
 pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
-    // Raven `bg_public.h:604`: `#define EF_DISINTEGRATION (1<<26)`.
-    const EF_DISINTEGRATION: c_int = 1 << 26;
-    // Raven `b_local.h:164`: `#define ALERT_CLEAR_TIME 200`.
+    // `EF_DISINTEGRATION` (entity_effects) and `CONTENTS_TRIGGER` (surface_flags)
+    // resolve to their canonical workspace consts through the prelude glob.
+    // `ALERT_CLEAR_TIME` (b_local.h = 200) has no importable module-level home
+    // yet (the peer copy in NPC_senses.rs is fn-local), so it stays local.
+    // Source: oracle/oracle/codemp/game/b_local.h
     const ALERT_CLEAR_TIME: c_int = 200;
-    // Raven `g_local.h` `CONTENTS_TRIGGER` (`g_items.rs`/`g_mover.rs` precedent).
-    const CONTENTS_TRIGGER: c_int = 0x0000_0400;
 
     unsafe {
         let world = &mut *ctx.world;
@@ -131,10 +131,9 @@ pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:115-223`
 pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: *mut gentity_t) {
-    // Raven `bg_public.h:604`: `#define EF_DISINTEGRATION (1<<26)`.
-    const EF_DISINTEGRATION: c_int = 1 << 26;
-    // Raven `g_local.h`: `#define FRAMETIME 100` (local per file-group, matching
-    // the `g_ICARUScb.rs` precedent).
+    // `EF_DISINTEGRATION` (entity_effects) resolves via the prelude glob.
+    // Raven `bg_public.h`: `#define FRAMETIME 100` — no central const yet, kept
+    // local (consolidation candidate).
     const FRAMETIME: c_int = 100;
     // Raven `entity_effects.rs` doesn't yet re-export `EF2_HELD_BY_MONSTER`
     // through the prelude glob — imported explicitly below.
@@ -348,9 +347,7 @@ pub fn pitch_roll_for_slope(
     forwhom: *mut gentity_t,
     pass_slope: Option<&mut vec3_t>,
 ) {
-    const PITCH: usize = 0;
-    const ROLL: usize = 2;
-
+    // `PITCH`/`ROLL` resolve to the canonical `crate::q_math` consts via the prelude.
     unsafe {
         // if we don't have a slope, get one
         let slope: vec3_t = match pass_slope {
@@ -479,8 +476,9 @@ pub fn pitch_roll_for_slope(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:478-607`
 pub fn DeadThink(ctx: GameContext<'_>) {
+    // `CONTENTS_NODROP` (surface_flags) resolves via the prelude glob.
+    // `FRAMETIME` (bg_public.h = 100) kept local — no central const (consolidation candidate).
     const FRAMETIME: c_int = 100;
-    const CONTENTS_NODROP: c_int = 0x0000_0800;
 
     unsafe {
         let world = &mut *ctx.world;
@@ -756,13 +754,8 @@ pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:683-735`
 pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
-    // Raven `b_public.h:27-43` scriptFlags bits.
-    const SCF_CROUCHED: c_int = 0x00000001;
-    const SCF_WALKING: c_int = 0x00000002;
-    const SCF_LEAN_RIGHT: c_int = 0x00000008;
-    const SCF_LEAN_LEFT: c_int = 0x00000010;
-    const SCF_RUNNING: c_int = 0x00000020;
-    const SCF_ALT_FIRE: c_int = 0x00000040;
+    // Raven `b_public.h:27-43` scriptFlags bits (`SCF_*`) resolve to the
+    // canonical `crate::npc::script_flags` consts through the prelude glob.
     use mp_qshared::common::mp::qcommon::usercmd_button::{
         BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_USE, BUTTON_WALKING,
     };
@@ -822,8 +815,8 @@ pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:738-833`
 pub fn NPC_HandleAIFlags(ctx: GameContext<'_>) {
-    // Raven `b_public.h:17`: `#define NPCAI_LOST 0x00002000`.
-    const NPCAI_LOST: c_int = 0x00002000;
+    // `NPCAI_LOST` (b_public.h) resolves to the canonical `crate::npc::ai_flags`
+    // const through the prelude glob.
     use mp_bg::public::entity_event::entity_event_t;
 
     unsafe {
@@ -951,8 +944,7 @@ pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:920-931`
 pub fn NPC_KeepCurrentFacing(ctx: GameContext<'_>) {
-    const PITCH: usize = 0;
-    const YAW: usize = 1;
+    // `PITCH`/`YAW` resolve to the canonical `crate::q_math` consts via the prelude.
 
     unsafe {
         let world = &mut *ctx.world;
@@ -1701,10 +1693,9 @@ pub fn G_DroidSounds(ctx: GameContext<'_>, self_: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1826-1979`
 pub fn NPC_Think(ctx: GameContext<'_>, self_: *mut gentity_t) {
+    // `PMF_FOLLOW` (pm_flags) resolves to its canonical const via the prelude glob.
+    // `FRAMETIME` (bg_public.h = 100) kept local — no central const (consolidation candidate).
     const FRAMETIME: c_int = 100;
-    // Raven `w_force.rs:98` precedent — `playerState_t::pm_flags` bit, not yet
-    // centrally ported.
-    const PMF_FOLLOW: c_int = 4096;
     use mp_bg::vehicles::vehicle_s::Vehicle_t;
 
     unsafe {
@@ -1746,10 +1737,10 @@ pub fn NPC_Think(ctx: GameContext<'_>, self_: *mut gentity_t) {
             return;
         }
 
-        // see if NPC ai is frozen
-        // Raven `svFlags` bit `SVF_ICARUS_FREEZE` (`g_local.h`) — not yet
-        // centrally ported; local const per the codebase's per-file precedent.
-        const SVF_ICARUS_FREEZE: c_int = 0x00000400;
+        // see if NPC ai is frozen. `SVF_ICARUS_FREEZE` (g_public.h = 0x8000)
+        // resolves to the canonical `crate::g_public_consts` const via the
+        // prelude glob (the former local const here had a guessed 0x400, so the
+        // freeze check masked the wrong svFlags bit — a live bug).
         if world.cvars.debugNPCFreeze.value != 0.0 || ((*self_).r.svFlags & SVF_ICARUS_FREEZE) != 0
         {
             crate::NPC_utils::NPC_UpdateAngles(ctx, 1, 1);

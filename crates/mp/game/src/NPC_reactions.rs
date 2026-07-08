@@ -17,24 +17,21 @@
 //! (`gentity_t::NPC`/`::client` are opaque `*mut c_void`, cast per the
 //! `NPC_combat.rs` precedent).
 //!
-//! PARKED (see PORT-NOTE markers): several functions read the ambient
-//! bot-AI "current actor" globals (`NPC`, `NPCInfo`) that Raven's
-//! `ai_main.c` think-loop sets per NPC frame — there is no `GameWorld`/
-//! `GameContext` field for them and no entity parameter to substitute (topic
-//! `ai-context`, matching the `NPC_combat.rs`/`NPC_utils.rs` precedent in
-//! this same mega-pass). `NPC_ChoosePainAnimation` also indexes the
-//! runtime-populated `bgAllAnims`/`bgHumanoidAnimations` animation tables
-//! (topic `raw-ptr-skeleton-no-world-handle`, matching `g_combat.rs`).
-//! `NPC_Respond`'s droid-class branches call `va(fmt, args…)` with real variadic arguments
-//! (topic `va-varargs`; the resolved `va` signature drops the C varargs, same
-//! as the `g_client.rs`/`w_force.rs`/`NPC_utils.rs` precedent) — cannot be
-//! transcribed faithfully without inventing behavior.
+//! Ambient-state resolution (formerly parked topics, now bodied): the bot-AI
+//! "current actor" globals Raven's `ai_main.c` think-loop sets per frame
+//! (`NPC`, `NPCInfo`) are threaded as `(*ctx.world).globals.NPC` /
+//! `.NPCInfo`; `NPC_ChoosePainAnimation` indexes the runtime-populated
+//! `bgAllAnims`/`bgHumanoidAnimations` tables through `(*ctx.world).bg_state`;
+//! and `NPC_Respond`'s droid-class `va(fmt, …)` sound-path calls are ported
+//! faithfully via `format!()` (they format one `int`, so the string is
+//! byte-identical to Raven's).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
 
+use crate::entity::hit_location::HL_GENERIC1;
 use crate::g_utils::{G_AddEvent, G_Sound, G_UseTargets2};
 use crate::npc_c::{RestoreNPCGlobals, SaveNPCGlobals, SetNPCGlobals};
 use crate::q_shared::Q_stricmp;
@@ -54,9 +51,11 @@ use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 /// Source: `oracle/oracle/codemp/game/NPC_reactions.c:42-131`
 pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: *mut gentity_t, r#mod: c_int) {
     unsafe {
-        const FL_NOTARGET: c_int = 0x00000020;
-        const WP_SABER: c_int = 1;
-        const MOD_SABER: c_int = 16;
+        // `FL_NOTARGET` (crate::entity::flags) and `WP_SABER` (mp_bg weapon_t,
+        // c_int const == 3) come from the prelude. `mod` is a plain c_int, so
+        // keep a local c_int alias sourced from the canonical meansOfDeath_t.
+        // Source: `oracle/oracle/codemp/game/bg_public.h:1046-1099`
+        const MOD_SABER: c_int = meansOfDeath_t::MOD_SABER as c_int;
 
         // valid ent
         if other.is_null() {
@@ -141,8 +140,8 @@ pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
         // Raven: `!self->NPC || !(self->NPC->aiFlags&NPCAI_DIE_ON_IMPACT)`.
+        // NPCAI_DIE_ON_IMPACT resolves through the prelude (crate::npc::ai_flags).
         // Source: oracle/oracle/codemp/game/b_public.h:23
-        const NPCAI_DIE_ON_IMPACT: c_int = 0x00100000;
         if npc.is_null() || ((*npc).aiFlags & NPCAI_DIE_ON_IMPACT) == 0 {
             let client = (*self_).client as *mut gclient_t;
             let pending = trap::ICARUS_TaskIDPending(
@@ -213,23 +212,21 @@ pub fn NPC_ChoosePainAnimation(
     voiceEvent: c_int,
 ) {
     unsafe {
-        const BOTH_PAIN1: c_int = 335;
-        const BOTH_PAIN2: c_int = 336;
-        const BOTH_PAIN3: c_int = 337;
-        const BOTH_PAIN18: c_int = 352;
-        const HL_GENERIC1: c_int = 19;
-        const CLASS_GALAKMECH: c_int = 13;
-        const CLASS_PROTOCOL: c_int = 5;
-        const CLASS_DESANN: c_int = 8;
-        const SETANIM_BOTH: c_int = 3;
-        const SETANIM_LEGS: c_int = 2;
-        const SETANIM_FLAG_OVERRIDE: c_int = 1;
-        const SETANIM_FLAG_HOLD: c_int = 2;
-        const WP_SABER: c_int = 1;
-        const WP_THERMAL: c_int = 19;
-        const MOD_MELEE: c_int = 18;
-        const MOD_CRUSH: c_int = 12;
-        const NPCTEAM_PLAYER: c_int = 0;
+        // Pain-anim numbers are `animNumber_t` variants; keep local c_int
+        // aliases because `pain_anim` and `BG_PickAnim` operate in c_int.
+        // Source: `oracle/oracle/codemp/game/anims.h:6-1791`
+        const BOTH_PAIN1: c_int = animNumber_t::BOTH_PAIN1 as c_int;
+        const BOTH_PAIN2: c_int = animNumber_t::BOTH_PAIN2 as c_int;
+        const BOTH_PAIN3: c_int = animNumber_t::BOTH_PAIN3 as c_int;
+        const BOTH_PAIN18: c_int = animNumber_t::BOTH_PAIN18 as c_int;
+        // `mod` is a plain c_int; alias the canonical meansOfDeath_t variants.
+        // Source: `oracle/oracle/codemp/game/bg_public.h:1046-1099`
+        const MOD_MELEE: c_int = meansOfDeath_t::MOD_MELEE as c_int;
+        const MOD_CRUSH: c_int = meansOfDeath_t::MOD_CRUSH as c_int;
+        // `HL_GENERIC1` (top-of-file import), `SETANIM_*` (mp_bg set_anim),
+        // `WP_SABER`/`WP_THERMAL` (mp_bg weapon_t), `NPCTEAM_PLAYER`
+        // (crate::teams::npcteam) and the `CLASS_*` `class_t` variants all
+        // resolve through the prelude — no local placeholders.
 
         // If we've already taken pain, then don't take it again
         if (*ctx.world).level.time < (*self_).painDebounceTime && r#mod != MOD_MELEE {
@@ -247,7 +244,7 @@ pub fn NPC_ChoosePainAnimation(
         let client = (*self_).client as *mut gclient_t;
         let mut pain_chance = 0.5f32;
 
-        if !client.is_null() && (*client).NPC_class as c_int == CLASS_GALAKMECH {
+        if !client.is_null() && (*client).NPC_class == CLASS_GALAKMECH {
             if hitLoc == HL_GENERIC1 {
                 // Hit the antenna!
                 pain_chance = 1.0f32;
@@ -261,6 +258,7 @@ pub fn NPC_ChoosePainAnimation(
             }
         } else if !client.is_null()
             && (*client).playerTeam == NPCTEAM_PLAYER
+            // playerTeam is npcteam_t (== c_int); NPCTEAM_PLAYER from prelude.
             && !other.is_null()
             && (*other).s.number == 0
         {
@@ -279,13 +277,13 @@ pub fn NPC_ChoosePainAnimation(
                 } else {
                     pain_chance = 1.0f32;
                 }
-            } else if !client.is_null() && (*client).NPC_class as c_int == CLASS_PROTOCOL {
+            } else if !client.is_null() && (*client).NPC_class == CLASS_PROTOCOL {
                 pain_chance = 1.0f32;
             } else {
                 pain_chance = NPC_GetPainChance(ctx, self_, damage);
             }
 
-            if !client.is_null() && (*client).NPC_class as c_int == CLASS_DESANN {
+            if !client.is_null() && (*client).NPC_class == CLASS_DESANN {
                 pain_chance *= 0.5f32;
             }
         }
@@ -314,7 +312,7 @@ pub fn NPC_ChoosePainAnimation(
                     let npc = (*self_).NPC as *mut gNPC_t;
                     let local_anim_index = (*self_).localAnimIndex;
 
-                    if !client.is_null() && (*client).NPC_class as c_int == CLASS_GALAKMECH {
+                    if !client.is_null() && (*client).NPC_class == CLASS_GALAKMECH {
                         pain_anim = BOTH_PAIN1;
                     } else if r#mod == MOD_MELEE {
                         pain_anim = crate::bg_panimate::BG_PickAnim(
@@ -421,15 +419,20 @@ pub fn NPC_Pain(
     damage: c_int,
 ) {
     unsafe {
+        // `otherTeam` is npcteam_t (== c_int); keep TEAM_FREE (== 0) local.
         const TEAM_FREE: c_int = 0;
-        const NPCTEAM_PLAYER: c_int = 0;
-        const MOD_MELEE: c_int = 18;
-        const BSET_FLEE: c_int = 4;
-        const BSET_PAIN: c_int = 2;
-        const BSET_FFIRE: c_int = 5;
-        const PM_DEAD: c_int = 3;
-        // entity_event_t::EV_FFWARN — the absolute event enum value.
-        const EV_FFWARN: c_int = 131;
+        // BSET_* are bSet_t variants but G_ActivateBehavior takes c_int; PM_DEAD
+        // is a pmtype_t variant compared against the c_int `pm_type` field; and
+        // EV_FFWARN is the absolute entity_event_t value G_AddVoiceEvent
+        // consumes — alias each from its canonical enum so values track the port.
+        // Source: bSet_t `oracle/oracle/codemp/game/g_public.h:641-664`,
+        // pmtype_t `oracle/oracle/codemp/game/bg_public.h:360-370`,
+        // entity_event_t `oracle/oracle/codemp/game/bg_public.h:745-990`.
+        const BSET_FLEE: c_int = bSet_t::BSET_FLEE as c_int;
+        const BSET_PAIN: c_int = bSet_t::BSET_PAIN as c_int;
+        const BSET_FFIRE: c_int = bSet_t::BSET_FFIRE as c_int;
+        const PM_DEAD: c_int = pmtype_t::PM_DEAD as c_int;
+        const EV_FFWARN: c_int = entity_event_t::EV_FFWARN as c_int;
 
         let mut other_team = TEAM_FREE;
         let mut voice_event = -1;
@@ -528,19 +531,20 @@ pub fn NPC_Pain(
                     } else {
                         // Turn on our ally
                         (*npc).blockedSpeechDebounceTime = 0;
-                        voice_event = 132; // EV_FFTURN
+                        voice_event = entity_event_t::EV_FFTURN as c_int;
                         // C chained assignment sets all three to BS_DEFAULT.
                         (*npc).defaultBehavior = bState_t::BS_DEFAULT;
                         (*npc).tempBehavior = bState_t::BS_DEFAULT;
                         (*npc).behaviorState = bState_t::BS_DEFAULT;
-                        (*other).flags &= !0x00000020; // ~FL_NOTARGET
-                        (*self_).r.svFlags &= !0x00008000; // ~SVF_ICARUS_FREEZE
+                        (*other).flags &= !FL_NOTARGET;
+                        (*self_).r.svFlags &= !SVF_ICARUS_FREEZE;
                         G_SetEnemy(ctx, self_, other);
-                        // ~(SCF_DONT_FIRE|SCF_CROUCHED|SCF_WALKING|SCF_NO_COMBAT_TALK|SCF_FORCED_MARCH)
-                        (*npc).scriptFlags &=
-                            !(0x00004000 | 0x00000001 | 0x00000002 | 0x00000200 | 0x00010000);
-                        // |= (SCF_CHASE_ENEMIES|SCF_NO_MIND_TRICK)
-                        (*npc).scriptFlags |= (0x00000400 | 0x00080000);
+                        (*npc).scriptFlags &= !(SCF_DONT_FIRE
+                            | SCF_CROUCHED
+                            | SCF_WALKING
+                            | SCF_NO_COMBAT_TALK
+                            | SCF_FORCED_MARCH);
+                        (*npc).scriptFlags |= SCF_CHASE_ENEMIES | SCF_NO_MIND_TRICK;
 
                         if (*ctx.world).globals.killPlayerTimer == 0 {
                             (*ctx.world).globals.killPlayerTimer = (*ctx.world).level.time + 10000;
@@ -608,8 +612,8 @@ pub fn NPC_Touch(
     trace: *mut trace_t,
 ) {
     unsafe {
-        const MAX_CLIENTS: c_int = 64;
-        const NPCAI_TOUCHED_GOAL: c_int = 0x00002000;
+        // MAX_CLIENTS_I32 (mp_qshared limits, == 32) and NPCAI_TOUCHED_GOAL
+        // (crate::npc::ai_flags, == 0x8) resolve through the prelude.
 
         let npc = (*self_).NPC as *mut gNPC_t;
         if npc.is_null() {
@@ -623,7 +627,7 @@ pub fn NPC_Touch(
         if !(*self_).message.is_null() && (*self_).health <= 0 {
             // Player touched me
             let other_client = (*other).client as *mut gclient_t;
-            if !other.is_null() && !other_client.is_null() && (*other).s.number < MAX_CLIENTS {
+            if !other.is_null() && !other_client.is_null() && (*other).s.number < MAX_CLIENTS_I32 {
                 // Placeholder: would handle key pickup here (commented out in oracle)
             }
         }
@@ -650,8 +654,7 @@ pub fn NPC_Touch(
             // Check for enemy collision. Oracle's only active test is
             // `!(other->flags & FL_NOTARGET)`; the SVF_IGNORE_ENEMIES clause is
             // commented out there, so it is not reintroduced here.
-            if ((*other).flags & 0x00000020) == 0 {
-                // ~FL_NOTARGET
+            if ((*other).flags & FL_NOTARGET) == 0 {
                 let client = (*self_).client as *mut gclient_t;
                 if !client.is_null() && (*client).enemyTeam != 0 {
                     // See if we bumped into an enemy
@@ -715,10 +718,9 @@ pub fn NPC_TempLookTarget(
             return;
         }
 
-        // Raven `EF2_HELD_BY_MONSTER` (`playerState_t::eFlags2` bit) — not yet
-        // ported as a central const; inlined here from the header value.
+        // Raven `EF2_HELD_BY_MONSTER` (`playerState_t::eFlags2` bit) resolves
+        // through the prelude (mp_bg::public::entity_effects).
         // Source: oracle/oracle/codemp/game/bg_public.h:616
-        const EF2_HELD_BY_MONSTER: c_int = 1 << 0;
         if ((*client).ps.eFlags2 & EF2_HELD_BY_MONSTER) != 0 {
             //lookTarget is set by and to the monster that's holding you, no other operations can change that
             return;
@@ -750,17 +752,9 @@ pub fn NPC_TempLookTarget(
 /// Source: `oracle/oracle/codemp/game/NPC_reactions.c:690-942`
 pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) {
     unsafe {
-        const CLASS_JAN: c_int = 1;
-        const CLASS_LANDO: c_int = 2;
-        const CLASS_LUKE: c_int = 3;
-        const CLASS_JEDI: c_int = 4;
-        const CLASS_PRISONER: c_int = 6;
-        const CLASS_REBEL: c_int = 7;
-        const CLASS_BESPIN_COP: c_int = 9;
-        const CLASS_R2D2: c_int = 20;
-        const CLASS_R5D2: c_int = 21;
-        const CLASS_MOUSE: c_int = 22;
-        const CLASS_GONK: c_int = 23;
+        // The `CLASS_*` `class_t` variants resolve through the prelude; the
+        // match below is on `NPC_class` (already `class_t`) directly rather than
+        // a c_int cast, so no local class placeholders are needed.
         const CHAN_AUTO: c_int = 0;
         // Absolute entity_event_t values — G_AddVoiceEvent consumes the enum
         // value directly, so these must match the ported entity_event_t.
@@ -803,7 +797,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
             return;
         }
 
-        let npc_class = (*client).NPC_class as c_int;
+        let npc_class = (*client).NPC_class;
         let npc = (*self_).NPC as *mut gNPC_t;
 
         match npc_class {
@@ -995,19 +989,19 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
         if event != -1 {
             // Hack here because we reuse some "combat" and "extra" sounds
             let add_flag = if !npc.is_null() {
-                ((*npc).scriptFlags & 0x00000200) != 0 // SCF_NO_COMBAT_TALK
+                ((*npc).scriptFlags & SCF_NO_COMBAT_TALK) != 0
             } else {
                 false
             };
 
             if !npc.is_null() {
-                (*npc).scriptFlags &= !0x00000200; // ~SCF_NO_COMBAT_TALK
+                (*npc).scriptFlags &= !SCF_NO_COMBAT_TALK;
             }
 
             crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, event, 3000);
 
             if add_flag && !npc.is_null() {
-                (*npc).scriptFlags |= 0x00000200; // |= SCF_NO_COMBAT_TALK
+                (*npc).scriptFlags |= SCF_NO_COMBAT_TALK;
             }
         }
     }
@@ -1072,10 +1066,14 @@ pub fn NPC_Use(
     activator: *mut gentity_t,
 ) {
     unsafe {
-        const PM_DEAD: c_int = 3;
-        const CLASS_VEHICLE: c_int = 19;
-        const CLASS_GONK: c_int = 23;
-        const BSET_USE: c_int = 3;
+        // `pm_type` is a c_int field and `BSET_USE` indexes `behaviorSet`
+        // (c_int/usize), so alias both from their canonical enums.
+        // `CLASS_VEHICLE`/`CLASS_GONK` are `class_t` variants from the prelude,
+        // compared against `NPC_class` directly below.
+        // Source: pmtype_t `oracle/oracle/codemp/game/bg_public.h:360-370`,
+        // bSet_t `oracle/oracle/codemp/game/g_public.h:641-664`.
+        const PM_DEAD: c_int = pmtype_t::PM_DEAD as c_int;
+        const BSET_USE: c_int = bSet_t::BSET_USE as c_int;
 
         let client = (*self_).client as *mut gclient_t;
         if client.is_null() || (*client).ps.pm_type == PM_DEAD {
@@ -1088,7 +1086,7 @@ pub fn NPC_Use(
         let npc = (*self_).NPC as *mut gNPC_t;
         if !client.is_null() && !npc.is_null() {
             // Check if this is a vehicle
-            if (*client).NPC_class as c_int == CLASS_VEHICLE {
+            if (*client).NPC_class == CLASS_VEHICLE {
                 // If this is a vehicle, let the other guy board it.
                 let pVeh = (*self_).m_pVehicle as *mut Vehicle_t;
                 if !pVeh.is_null() && !(*pVeh).m_pVehicleInfo.is_null() {
@@ -1112,7 +1110,7 @@ pub fn NPC_Use(
             // Run any use instructions
             if !activator.is_null()
                 && (*activator).s.number == 0
-                && (*client).NPC_class as c_int == CLASS_GONK
+                && (*client).NPC_class == CLASS_GONK
             {
                 // Must be using the gonk, so attempt to give battery power.
                 // Oracle itself leaves the Add_Batteries call commented out
@@ -1126,10 +1124,10 @@ pub fn NPC_Use(
                 && (*self_).enemy.is_none()
                 && !activator.is_null()
                 && (*activator).s.number == 0
-                && ((*npc).scriptFlags & 0x00000080) == 0
+                && ((*npc).scriptFlags & SCF_NO_RESPONSE) == 0
             {
                 // I don't have an enemy and I was used by the player
-                // (oracle gates on !(scriptFlags & SCF_NO_RESPONSE) = 0x80)
+                // (oracle gates on !(scriptFlags & SCF_NO_RESPONSE))
                 NPC_UseResponse(ctx, self_, other, 0);
             }
         }
