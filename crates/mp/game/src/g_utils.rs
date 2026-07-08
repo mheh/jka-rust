@@ -12,9 +12,7 @@
 //! `ammoData`/`bgSiegeClasses`/`bgAllAnims`; the `CS_*` configstring
 //! wire-index chain; `SVF_PLAYER_USABLE`; the LCG `rand()`/`Rng` seam;
 //! the `g_vehiclePool` storage field; the scratch-buffer-return
-//! idiom (`tv`/`vtos`/`BuildShaderStateConfig`); ctx-free bg-boundary
-//! signatures (`G_ModelIndex`/`G_SoundIndex`/`G_EffectIndex`/`G_AddEvent`/
-//! `G_PlayEffect`/`G_PlayEffectID`); or fn-pointer dispatch (`TryUse`'s
+//! idiom (`tv`/`vtos`/`BuildShaderStateConfig`); or fn-pointer dispatch (`TryUse`'s
 //! touch-pointer comparison) per the fn-ID-enum ruling. See
 //! PORT-NOTE markers.
 #![allow(non_snake_case, unused, clippy::all)]
@@ -1321,13 +1319,24 @@ pub fn G_AddPredictableEvent(ent: *mut gentity_t, event: c_int, eventParm: c_int
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1221-1243`
 pub fn G_AddEvent(ent: *mut gentity_t, event: c_int, eventParm: c_int) {
-    // PORT-NOTE(ctx-free-boundary-needs-worldstate): G_AddEvent is in the ctx-free boundary set
-    // but the oracle body needs level.time from GameWorld. Without ctx, cannot access level.time.
+    // Ctx-less boundary fn (Raven reads the `level` global directly); world via
+    // the `g_strap` seam world cell, engine (for the zero-event G_Printf) via
+    // the strap_engine() precedent (see G_ModelIndex/G_SoundIndex).
     unsafe {
         if event == 0 {
-            // Cannot call G_Printf without ctx. Skipping debug output pending architectural resolution.
+            let ctx = GameContext {
+                world: crate::g_strap::strap_world(),
+                engine: crate::g_strap::strap_engine(),
+            };
+            let msg = format!(
+                "G_AddEvent: zero event added for entity {}\n",
+                (*ent).s.number
+            );
+            G_Printf(ctx, cstr(&msg).as_ptr());
             return;
         }
+
+        let level_time = (*crate::g_strap::strap_world()).level.time;
 
         if !(*ent).client.is_null() {
             let client = (*ent).client as *mut gclient_t;
@@ -1335,14 +1344,14 @@ pub fn G_AddEvent(ent: *mut gentity_t, event: c_int, eventParm: c_int) {
             bits = (bits + EV_EVENT_BIT1) & EV_EVENT_BITS;
             (*client).ps.externalEvent = event | bits;
             (*client).ps.externalEventParm = eventParm;
-            // (*client).ps.externalEventTime = level.time;  // BLOCKED: no ctx to reach level.time
+            (*client).ps.externalEventTime = level_time;
         } else {
             let mut bits = (*ent).s.event & EV_EVENT_BITS;
             bits = (bits + EV_EVENT_BIT1) & EV_EVENT_BITS;
             (*ent).s.event = event | bits;
             (*ent).s.eventParm = eventParm;
         }
-        // (*ent).eventTime = level.time;  // BLOCKED: no ctx to reach level.time
+        (*ent).eventTime = level_time;
     }
 }
 
@@ -1350,18 +1359,20 @@ pub fn G_AddEvent(ent: *mut gentity_t, event: c_int, eventParm: c_int) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1250-1260`
 pub fn G_PlayEffect(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
-    // PORT-NOTE(ctx-free-boundary-needs-entity-alloc): This function is in the ctx-free boundary set
-    // but needs ctx to call G_TempEntity for entity allocation. Without ctx, cannot create entities.
-    // Architectural resolution pending (either add ctx or provide GameCallbacks upcall).
+    // Ctx-less boundary fn; ctx rebuilt from the `g_strap` seam cells (world +
+    // engine) so `G_TempEntity` can allocate — mirrors Raven reaching the
+    // `level`/`g_entities` globals directly (see G_AddEvent).
     unsafe {
-        // The oracle body would be:
-        // te = G_TempEntity(org, EV_PLAY_EFFECT);
-        // (*te).s.angles = ang;
-        // (*te).s.origin = org;
-        // (*te).s.eventParm = fxID;
-        // return te;
-        // But G_TempEntity requires ctx. Returning null as placeholder.
-        core::ptr::null_mut()
+        let ctx = GameContext {
+            world: crate::g_strap::strap_world(),
+            engine: crate::g_strap::strap_engine(),
+        };
+        let te = G_TempEntity(ctx, org, EV_PLAY_EFFECT as c_int);
+        (*te).s.angles = ang;
+        (*te).s.origin = org;
+        (*te).s.eventParm = fxID;
+
+        te
     }
 }
 
@@ -1369,19 +1380,25 @@ pub fn G_PlayEffect(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1267-1284`
 pub fn G_PlayEffectID(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
-    // PORT-NOTE(ctx-free-boundary-needs-entity-alloc): Same architectural issue as G_PlayEffect.
+    // play an effect by the G_EffectIndex'd ID instead of a predefined effect ID
+    // Ctx-less boundary fn; ctx rebuilt from the `g_strap` seam cells (see
+    // G_PlayEffect).
     unsafe {
-        // The oracle body would be:
-        // te = G_TempEntity(org, EV_PLAY_EFFECT_ID);
-        // (*te).s.angles = ang;
-        // (*te).s.origin = org;
-        // (*te).s.eventParm = fxID;
-        // if (!(*te).s.angles[0] && !(*te).s.angles[1] && !(*te).s.angles[2]) {
-        //     (*te).s.angles[1] = 1;
-        // }
-        // return te;
-        // But G_TempEntity requires ctx. Returning null as placeholder.
-        core::ptr::null_mut()
+        let ctx = GameContext {
+            world: crate::g_strap::strap_world(),
+            engine: crate::g_strap::strap_engine(),
+        };
+        let te = G_TempEntity(ctx, org, EV_PLAY_EFFECT_ID as c_int);
+        (*te).s.angles = ang;
+        (*te).s.origin = org;
+        (*te).s.eventParm = fxID;
+
+        if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0 {
+            // play off this dir by default then.
+            (*te).s.angles[1] = 1.0;
+        }
+
+        te
     }
 }
 

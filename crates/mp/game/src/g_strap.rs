@@ -58,6 +58,50 @@ pub(crate) fn strap_engine() -> &'static Engine {
     }
 }
 
+/// Seam world handle for the ctx-less boundary fns whose oracle bodies read
+/// the `level`/`g_entities` globals directly (`G_AddEvent`/`G_PlayEffect`/
+/// `G_PlayEffectID`, `g_utils.c`). Mirrors [`StrapEngine`], but unlike the
+/// engine (which outlives the module, so `OnceLock` fits) the shell recreates
+/// the `GameWorld` Box at every GAME_INIT — this cell is RE-ARMED each
+/// GAME_INIT instead of write-once. §D11 seam confinement applies; ctx-taking
+/// game code keeps using `ctx.world`.
+struct StrapWorld(std::cell::UnsafeCell<*mut crate::world::GameWorld>);
+// SAFETY: same soundness argument as `StrapEngine` above — the module runs
+// single-threaded per Raven's contract; the cell is written at GAME_INIT and
+// read single-threaded from the ctx-less boundary fns (§D11 seam confinement).
+unsafe impl Send for StrapWorld {}
+unsafe impl Sync for StrapWorld {}
+
+/// The re-armable seam world cell (see [`StrapWorld`]).
+static STRAP_WORLD: StrapWorld = StrapWorld(std::cell::UnsafeCell::new(core::ptr::null_mut()));
+
+/// Arm (or re-arm) the seam world cell. Called from `g_init_game` (GAME_INIT)
+/// beside [`init_strap_engine`], each time the shell rebuilds the world.
+/// Source: `oracle/oracle/codemp/game/g_main.c:897` (`G_InitGame`).
+pub fn init_strap_world(world: *mut crate::world::GameWorld) {
+    // SAFETY: single-threaded GAME_INIT (STATE-D6); no boundary fn can run
+    // concurrently with the arm.
+    unsafe {
+        *STRAP_WORLD.0.get() = world;
+    }
+}
+
+/// Read the seam world handle; panics loudly (house stub style) if a ctx-less
+/// boundary fn runs before GAME_INIT armed the cell. Used by the ctx-less
+/// `G_AddEvent`/`G_PlayEffect`/`G_PlayEffectID` boundary fns (`g_utils.rs`),
+/// which mirror Raven's direct `level`-global reads the same way.
+pub(crate) fn strap_world() -> *mut crate::world::GameWorld {
+    // SAFETY: single-threaded read of the seam cell (see StrapWorld).
+    let w = unsafe { *STRAP_WORLD.0.get() };
+    if w.is_null() {
+        panic!(
+            "ctx-less world boundary fn called before init_strap_world (GAME_INIT) \
+             armed the seam cell"
+        );
+    }
+    w
+}
+
 /// Raven `strap_G2API_GetBoltMatrix`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_strap.c:6-10`

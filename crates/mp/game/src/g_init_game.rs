@@ -60,6 +60,11 @@ pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
     // Arm the ctx-less `strap_*` seam engine cell from the GAME_INIT
     // entrypoint that owns the engine, before any bg logic can call `strap_*`.
     crate::g_strap::init_strap_engine(ctx.engine);
+    // Arm (re-arm) the seam world cell for the ctx-less boundary fns whose
+    // oracle bodies read the `level` global (`G_AddEvent`/`G_PlayEffect`/
+    // `G_PlayEffectID`, `g_utils.c`); the shell rebuilds the world Box every
+    // GAME_INIT, so this re-arms each time.
+    crate::g_strap::init_strap_world(ctx.world);
 
     unsafe {
         let world = &mut *ctx.world;
