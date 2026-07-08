@@ -22,7 +22,8 @@ use mp_game::g_combat::{CheckArmor, G_GetHitLocation, RaySphereIntersections};
 use mp_game::prelude::*;
 use mp_game::world::{GameContext, GameWorld};
 
-const YAW: usize = 1;
+// `YAW` comes from `mp_game::prelude` (canonical `q_math::YAW`, imported above
+// via the glob); no test-local shadow needed.
 
 fn oracle_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tools/jampgame-oracle")

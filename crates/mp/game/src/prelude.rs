@@ -51,7 +51,7 @@ pub use mp_bg::public::saber_move_name::*;
 pub use mp_bg::public::set_anim::*;
 pub use mp_bg::public::team::*;
 pub use mp_bg::public::{bg_parryDebounce, JUMP_VELOCITY};
-pub use mp_bg::public::{CROUCH_VIEWHEIGHT, DEAD_VIEWHEIGHT, DEFAULT_VIEWHEIGHT};
+pub use mp_bg::public::{CROUCH_VIEWHEIGHT, DEAD_VIEWHEIGHT, DEFAULT_MAXS_2, DEFAULT_VIEWHEIGHT};
 pub use mp_bg::vehicles::e_weapon_pose::EWeaponPose;
 pub use mp_bg::vehicles::e_weapon_pose::EWeaponPose::*;
 pub use mp_bg::vehicles::veh_flags_t::vehFlags_t::*;
