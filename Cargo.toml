@@ -47,3 +47,17 @@ members = [
     "crates/ui",
     "crates/jagame",
 ]
+
+# ABI panic policy (2026-07-08): the game-module cdylibs catch panics at their
+# `vmMain` choke point and route them through the engine's `Com_Error`/`G_ERROR`
+# path (see `crates/jampgame/src/lib.rs`). That firewall REQUIRES unwinding —
+# `std::panic::catch_unwind` cannot catch under `panic = "abort"` (the process
+# aborts before the catch). This pins the invariant so a future profile edit
+# cannot silently switch to abort and turn every panic into a contextless crash.
+# Unwinding out of these modules is never actually let escape the boundary
+# (`extern "C-unwind"` + catch_unwind at `vmMain`), so this is sound.
+[profile.release]
+panic = "unwind"
+
+[profile.dev]
+panic = "unwind"

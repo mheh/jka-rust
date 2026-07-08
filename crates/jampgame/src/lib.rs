@@ -4,9 +4,12 @@
 //! that delegates into `mp_game` (`GameContext` receiver, SEAM-Q12). The logic
 //! crate `mp_game` has no entrypoint/`OnceLock`/`WorldCell` code of its own.
 
-use std::ffi::c_char;
+use std::ffi::{c_char, CString};
+use std::panic::AssertUnwindSafe;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
+mod panic_guard;
 mod world_cell;
 
 use abi_transport::entrypoints::{AbiCommand, AbiWord, RawSyscall};
@@ -39,11 +42,28 @@ static WORLD: WorldCell = WorldCell::new();
 
 /// Raven `dllEntry` (`g_syscalls.c:14-16`). Stores the engine syscall trampoline
 /// into the one `OnceLock<CEngine>`. `extern "C-unwind"` (SEAM-D12).
+///
+/// PANIC POLICY (2026-07-08): `dllEntry` runs BEFORE the engine syscall pointer
+/// is armed, so there is no `Com_Error`/`G_ERROR` path to route a failure
+/// through yet. Its only sound failure mode is `eprintln!` + `std::process::
+/// abort()` — a panic must never unwind raw across the `extern "C-unwind"`
+/// boundary into the C engine (UB). The capture hook is installed FIRST so any
+/// panic in the remaining setup is still recorded with `file:line`.
 #[no_mangle]
 pub extern "C-unwind" fn dllEntry(syscall: RawSyscall) {
-    ENGINE.set(CEngine::new(syscall)).ok();
-    set_com_print_sink(com_print_sink);
-    set_com_error_sink(com_error_sink);
+    let armed = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        panic_guard::install_hook();
+        ENGINE.set(CEngine::new(syscall)).ok();
+        set_com_print_sink(com_print_sink);
+        set_com_error_sink(com_error_sink);
+    }));
+    if armed.is_err() {
+        let msg = panic_guard::take().unwrap_or_else(|| "panic in dllEntry".to_string());
+        eprintln!(
+            "jampgame: fatal panic during dllEntry (engine error path not yet armed): {msg}"
+        );
+        std::process::abort();
+    }
 }
 
 /// The registered `Com_Printf` route (SEAM-D1 narrow extension): reads the
@@ -62,13 +82,95 @@ fn com_error_sink(msg: *const c_char) {
     route_error(engine, msg);
 }
 
-/// Raven `vmMain` (`g_main.c:515`). Bootstraps/derives the `WORLD` pointer,
-/// constructs a `GameContext` per call from `WORLD` + `ENGINE.get()` (SEAM-Q12),
-/// and routes the decoded `MpGameExport` command through the exhaustive match to
-/// its `Dispatch<C>` impl. `extern "C-unwind"` (SEAM-D12).
+/// Raven `vmMain` (`g_main.c:515`) — the single engine→game choke point AND the
+/// ABI panic firewall (panic policy, 2026-07-08). Every engine call flows
+/// through here; the decoded dispatch itself lives in [`vm_main_dispatch`],
+/// wrapped in `std::panic::catch_unwind` so NO Rust panic ever unwinds raw
+/// across the `extern "C-unwind"` boundary into the C engine (that is UB, or at
+/// best an abort with no context). On a caught panic we report a readable
+/// `file:line — message` through the engine's `Com_Error`/`G_ERROR` path (see
+/// [`report_panic_and_die`], which then never returns). `extern "C-unwind"`
+/// (SEAM-D12).
 #[no_mangle]
 #[allow(clippy::too_many_arguments)]
 pub extern "C-unwind" fn vmMain(
+    command: AbiCommand,
+    arg0: AbiWord,
+    arg1: AbiWord,
+    arg2: AbiWord,
+    arg3: AbiWord,
+    arg4: AbiWord,
+    arg5: AbiWord,
+    arg6: AbiWord,
+    arg7: AbiWord,
+    arg8: AbiWord,
+    arg9: AbiWord,
+    arg10: AbiWord,
+    arg11: AbiWord,
+) -> AbiWord {
+    let dispatched = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        vm_main_dispatch(
+            command, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11,
+        )
+    }));
+    match dispatched {
+        Ok(word) => word,
+        Err(_) => {
+            // The hook (installed at dllEntry) already recorded the payload +
+            // file:line into a thread-local — catch_unwind's `Any` is lossy, so
+            // prefer that record. report_panic_and_die never returns.
+            let msg = panic_guard::take()
+                .unwrap_or_else(|| "panic with no captured payload/location".to_string());
+            report_panic_and_die(&msg)
+        }
+    }
+}
+
+/// Set for the duration of a panic report. A second panic reaching
+/// [`report_panic_and_die`] while this is set means the engine error path
+/// itself failed, so we abort rather than loop forever.
+static PANIC_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
+/// Report a panic caught at [`vmMain`] through the engine's `Com_Error`/
+/// `G_ERROR` path, then never return.
+///
+/// The engine's `Com_Error` longjmps back into the engine and NEVER returns —
+/// that is the exact contract C game code relies on when it calls `G_Error`
+/// (`oracle/oracle/codemp/game/g_main.c:1208`). So on success this call does not
+/// come back; the game dies with a readable message, same as a C-side fatal.
+/// If the error trap is unavailable (engine pointer not yet armed, or the
+/// message held an interior NUL), or the trap itself panics, or we are already
+/// inside a panic report (recursion), there is nothing sound left to do but
+/// `std::process::abort()` — after printing `file:line — reason` so the operator
+/// still gets context.
+fn report_panic_and_die(msg: &str) -> ! {
+    if PANIC_IN_PROGRESS.swap(true, Ordering::SeqCst) {
+        eprintln!("jampgame: recursive panic while reporting a panic; aborting");
+        std::process::abort();
+    }
+    let full = format!("jampgame panic: {msg}");
+    if ENGINE.get().is_some() {
+        if let Ok(cmsg) = CString::new(full.clone()) {
+            // Route through Com_Error (G_ERROR): longjmps, never returns.
+            // Guarded so a panic *inside* the trap falls through to abort
+            // instead of unwinding across the boundary a second time.
+            let _ = std::panic::catch_unwind(|| com_error_sink(cmsg.as_ptr()));
+        }
+    }
+    // Reached only if the engine error path was unavailable or (impossibly)
+    // returned. Print and abort — never let the panic escape the boundary.
+    eprintln!("{full}");
+    eprintln!("jampgame: engine error path unavailable or returned; aborting");
+    std::process::abort();
+}
+
+/// The decoded-dispatch body of [`vmMain`], factored out so the export can wrap
+/// it in `catch_unwind`. Bootstraps/derives the `WORLD` pointer, constructs a
+/// `GameContext` per call from `WORLD` + `ENGINE.get()` (SEAM-Q12), and routes
+/// the decoded `MpGameExport` command through the exhaustive match to its
+/// `Dispatch<C>` impl.
+#[allow(clippy::too_many_arguments)]
+fn vm_main_dispatch(
     command: AbiCommand,
     arg0: AbiWord,
     arg1: AbiWord,
