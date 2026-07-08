@@ -104,12 +104,8 @@ pub const WPFLAG_SIEGE_IMPERIALOBJ: c_int = 0x00100000;
 pub const WPFLAG_NOMOVEFUNC: c_int = 0x00200000;
 pub const WPFLAG_CALCULATED: c_int = 0x00400000;
 pub const WPFLAG_NEVERONEWAY: c_int = 0x00800000;
-// `MASK_PLAYERSOLID = CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY|CONTENTS_TERRAIN`
-// (`bg_public.h:1172`); `CONTENTS_PLAYERCLIP` (`surfaceflags.h:14`) has no
-// ported home yet, so both are transcribed here verbatim.
-const CONTENTS_PLAYERCLIP: c_int = 0x00000010;
-const MASK_PLAYERSOLID: c_int =
-    CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_BODY | CONTENTS_TERRAIN;
+// `CONTENTS_PLAYERCLIP` / `MASK_PLAYERSOLID` come from the prelude
+// (`mp_qshared::shared::surface_flags`).
 
 /// `trap_Trace` helper: a point/box solid trace, faithfully passing NULL for
 /// `mins`/`maxs` when the caller wants a point trace (Raven passes literal
@@ -262,11 +258,7 @@ pub fn GetFlagStr(ctx: GameContext<'_>, flags: c_int) -> *mut c_char {
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:212-222`
 pub fn G_TestLine(ctx: GameContext<'_>, start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
     let ev_testline = mp_bg::public::entity_event::entity_event_t::EV_TESTLINE as c_int;
-    // `SVF_BROADCAST` (svflags #define) is not yet ported anywhere in the
-    // crate graph; defined locally, verbatim.
-    // Source: `oracle/oracle/codemp/game/g_public.h:20`
-    const SVF_BROADCAST: c_int = 0x00000020;
-
+    // `SVF_BROADCAST` comes from the prelude (`crate::g_public_consts`).
     unsafe {
         let te = G_TempEntity(ctx, start, ev_testline);
         (*te).s.origin = start;
@@ -281,9 +273,7 @@ pub fn G_TestLine(ctx: GameContext<'_>, start: vec3_t, end: vec3_t, color: c_int
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:224-347`
 pub fn BotWaypointRender(ctx: GameContext<'_>) {
-    // `SVF_BROADCAST` (svflags #define), local per this file's convention
-    // (cf. `G_TestLine`). Source: `oracle/oracle/codemp/game/g_public.h:20`
-    const SVF_BROADCAST: c_int = 0x00000020;
+    // `SVF_BROADCAST` comes from the prelude (`crate::g_public_consts`).
     let ev_scoreplum = mp_bg::public::entity_event::entity_event_t::EV_SCOREPLUM as c_int;
 
     unsafe {

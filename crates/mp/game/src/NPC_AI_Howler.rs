@@ -22,6 +22,7 @@
 
 use crate::prelude::*;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_bg::public::set_anim::{SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 
 // Raven `#define LSTATE_*` — file-scope local state for Howler NPC
 // (stored in `gNPC_t::localState`).
@@ -37,10 +38,8 @@ const MAX_DISTANCE: c_int = 128;
 
 // SETANIM_BOTH (= SETANIM_TORSO|SETANIM_LEGS), BOTH_PAIN1, and BOTH_ATTACK1 come
 // from the prelude (set_anim / anim_number); no local copies here so the enum
-// values stay authoritative.
+// values stay authoritative. SETANIM_FLAG_* imported from `mp_bg::public::set_anim`.
 // Source: `oracle/oracle/codemp/game/bg_public.h:500`, `anims.h`
-const SETANIM_FLAG_OVERRIDE: c_int = 1;
-const SETANIM_FLAG_HOLD: c_int = 2;
 
 /// Raven `NPC_Howler_Precache`.
 ///

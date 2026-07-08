@@ -19,6 +19,8 @@ use crate::prelude::*;
 pub fn G_Alloc(ctx: GameContext<'_>, size: c_int) -> *mut c_void {
     use crate::g_main::{G_Error, G_Printf};
 
+    // Raven `#define POOLSIZE (256 * 1024)` — `g_mem.c` file-local.
+    // Source: `oracle/oracle/codemp/game/g_mem.c:11`
     const POOLSIZE: c_int = 262144; // 256 * 1024
 
     unsafe {

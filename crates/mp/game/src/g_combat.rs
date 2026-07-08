@@ -39,14 +39,9 @@ use mp_qshared::shared::MAX_CLIENTS;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2.
-const PITCH: usize = 0;
-const YAW: usize = 1;
-const ROLL: usize = 2;
-
-// Raven `SVF_BROADCAST` svflags #define, transcribed locally per the sibling
-// convention (`g_team.rs`). Source: `oracle/oracle/codemp/game/g_local.h`.
-const SVF_BROADCAST: c_int = 0x00000020;
+// `PITCH`/`YAW`/`ROLL` (`crate::q_math`) and `SVF_BROADCAST`
+// (`crate::g_public_consts`) resolve via the crate prelude glob
+// (placeholder-const sweep: removed the shadowing local copies).
 
 /// Raven `#define ARMOR_PROTECTION 0.50` — shields only stop 50% of
 /// armor-piercing damage.
@@ -1767,9 +1762,7 @@ pub fn G_BroadcastObit(
     wasInVehicle: c_int,
     wasJediMaster: qboolean,
 ) {
-    // Raven `SVF_BROADCAST` svflags #define, transcribed locally per the sibling
-    // convention (`g_team.rs`). Source: `oracle/oracle/codemp/game/g_local.h`.
-    const SVF_BROADCAST: c_int = 0x00000020;
+    // `SVF_BROADCAST` resolves via the crate prelude glob (`crate::g_public_consts`).
     unsafe {
         // broadcast the death event to everyone
         if (*self_).s.eType != entityType_t::ET_NPC as c_int

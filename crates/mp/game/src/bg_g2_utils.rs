@@ -151,6 +151,8 @@ pub fn BG_GetRootSurfNameWithVariant(
     bg: &BgState,
     traps: &dyn BgTraps,
 ) -> qboolean {
+    // Raven file-local `#define MAX_VARIANTS 8`.
+    // Source: `oracle/oracle/codemp/game/bg_g2_utils.c:100`
     const MAX_VARIANTS: c_int = 8;
 
     if ghoul2.is_null() || traps.g2api_get_surface_render_status(ghoul2, 0, rootSurfName) == qfalse

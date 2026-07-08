@@ -66,9 +66,8 @@ pub const VEH_EJECT_BOTTOM: c_int = 5;
 const DEFAULT_MINS_2: f32 = -24.0;
 const DEFAULT_MAXS_2: f32 = 40.0;
 
-/// Raven `SVF_NOCLIENT` — don't send entity to clients, even if it has effects.
-/// Source: `oracle/oracle/codemp/game/g_public.h:17`
-const SVF_NOCLIENT: c_int = 0x0000_0001;
+// `SVF_NOCLIENT` resolves via the crate prelude glob (`crate::g_public_consts`);
+// the shadowing local copy was removed by the placeholder-const sweep.
 
 /// Raven vehicle-surface indices (`bg_vehicles.h:427-430`).
 pub const SHIPSURF_FRONT: c_int = 0;
@@ -104,10 +103,8 @@ const TURN_OFF: c_int = 0x0000_0100;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2.
-const PITCH: usize = 0;
-const YAW: usize = 1;
-const ROLL: usize = 2;
+// `PITCH`/`YAW`/`ROLL` resolve via the crate prelude glob (`crate::q_math`);
+// the shadowing local copies were removed by the placeholder-const sweep.
 
 /// Raven `Vehicle_SetAnim`.
 ///

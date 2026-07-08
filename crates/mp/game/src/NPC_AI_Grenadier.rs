@@ -8,8 +8,15 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_public_consts::SVF_GLASS_BRUSH;
 use crate::g_timer::TIMER_Set;
+use crate::npc::nav_info_s::NIF_COLLISION;
+use crate::npc::script_flags::{
+    SCF_CHASE_ENEMIES, SCF_DONT_FIRE, SCF_FIRE_WEAPON, SCF_IGNORE_ALERTS, SCF_LOOK_FOR_ENEMIES,
+    SCF_USE_CP_NEAREST,
+};
 use crate::prelude::*;
+use crate::q_math::{PITCH, YAW};
 use crate::NPC_combat::G_ClearEnemy;
 use crate::NPC_reactions::NPC_Pain;
 use crate::NPC_sounds::G_AddVoiceEvent;
@@ -37,22 +44,9 @@ const SQUAD_TRANSITION: i32 = 4;
 const SQUAD_POINT: i32 = 5;
 const SQUAD_SCOUT: i32 = 6;
 
-// Navigation flag constants.
-// Source: `oracle/oracle/codemp/game/b_local.h:314-322`
-pub const NIF_COLLISION: i32 = 0x00000004;
-
-// Script flags.
-// Source: `oracle/oracle/codemp/game/b_public.h`
-const SCF_CHASE_ENEMIES: i32 = 0x00000400;
-const SCF_USE_CP_NEAREST: i32 = 0x00100000;
-const SCF_DONT_FIRE: i32 = 0x00004000;
-const SCF_FIRE_WEAPON: i32 = 0x00040000;
-const SCF_IGNORE_ALERTS: i32 = 0x00002000;
-// Oracle `b_public.h:38`: SCF_LOOK_FOR_ENEMIES = 0x00000800.
-const SCF_LOOK_FOR_ENEMIES: i32 = 0x00000800;
-
-// Combat point flags.
-// Source: `oracle/oracle/codemp/game/b_public.h`
+// Combat point flags (`combatPoint_t` request bits) — shared `b_local.h`
+// family scattered across NPC files; kept file-local pending a shared home.
+// Source: `oracle/oracle/codemp/game/b_local.h:244-259`
 pub const CP_CLEAR: c_int = 0x00000002; // Has a clear shot to the enemy
 pub const CP_NEAREST: c_int = 0x00000010; // Find the nearest combat point
 pub const CP_APPROACH_ENEMY: c_int = 0x00000200; // Try to get closer to enemy
@@ -60,14 +54,6 @@ pub const CP_CLOSEST: c_int = 0x00000400; // Take closest to enemy
 pub const CP_FLANK: c_int = 0x00000800; // Pick a combatPoint behind enemy
 pub const CP_HAS_ROUTE: c_int = 0x00001000; // We have a route to this point
 pub const CP_HORZ_DIST_COLL: c_int = 0x00008000; // Collect within horizontal dist
-
-// Angle indices for vec3 arrays.
-const PITCH: usize = 0;
-const YAW: usize = 1;
-
-// Entity state flags.
-// Source: `oracle/oracle/codemp/game/g_public.h`
-const SVF_GLASS_BRUSH: i32 = 0x08000000; // Ent is a glass brush
 
 /// Raven `Grenadier_ClearTimers`.
 ///

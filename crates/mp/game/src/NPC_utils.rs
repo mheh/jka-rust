@@ -84,20 +84,10 @@ const Q3_INFINITE: f32 = 16777216.0;
 // Source: `oracle/oracle/codemp/game/q_shared.h`
 const WORLD_SIZE: f32 = 131072.0;
 
-// Raven `#define MASK_PLAYERSOLID (CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY|CONTENTS_TERRAIN)`.
-// Source: `oracle/oracle/codemp/game/q_shared.h`
-const MASK_PLAYERSOLID: c_int =
-    CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_BODY | CONTENTS_TERRAIN;
-
 // Raven `#define MAX_RADIUS_ENTS 256` (per-file local const, scopes
 // `NPC_FindNearestEnemy`; distinct from the 128 value in `NPC_AI_Utils.rs`).
 // Source: `oracle/oracle/codemp/game/NPC_utils.c:1243`
 const MAX_RADIUS_ENTS: usize = 256;
-
-// Raven `SCF_DONT_FIRE` (`gNPC_t::scriptFlags` bit), per-file local const,
-// same idiom as `NPC_combat.rs`.
-// Source: `oracle/oracle/codemp/game/b_public.h:41`
-const SCF_DONT_FIRE: c_int = 0x00004000;
 
 /// Raven `ANGLE2SHORT(x)` — `((int)((x)*65536/360) & 65535)`.
 /// Source: `oracle/oracle/codemp/game/q_shared.h:1972`
@@ -136,12 +126,10 @@ unsafe fn VALIDSTRING(a: *const c_char) -> bool {
 /// Source: `oracle/oracle/codemp/game/bg_public.h:138`
 pub const BG_NUM_TOGGLEABLE_SURFACES: c_int = 31;
 
-/// Raven `PMF_FOLLOW` — spectate following another player.
-/// Source: `oracle/oracle/codemp/game/bg_public.h:415`
-const PMF_FOLLOW: c_int = 4096;
-
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
-use mp_qshared::shared::MAX_CLIENTS;
+use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
+use mp_qshared::shared::{MASK_PLAYERSOLID, MAX_CLIENTS};
+use crate::npc::script_flags::SCF_DONT_FIRE;
 
 use mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs;
 use mp_abi::game::syscalls::G_G2_SETSURFACEONOFF::GG2SetsurfaceonoffArgs;

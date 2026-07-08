@@ -19,8 +19,7 @@
 use crate::g_main::level_time;
 use crate::prelude::*;
 
-// Raven angle-vector index (`q_shared.h`): YAW=1.
-const YAW: usize = 1;
+// `YAW` (angle-vector index) comes from the prelude (`crate::q_math::YAW`).
 
 /// Raven `DeathUpdate` — update death sequence.
 ///

@@ -48,26 +48,15 @@ use mp_qshared::shared::trajectory::trType_t::TR_LINEAR;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// Raven `MASK_PLAYERSOLID` (`g_local.h`, module-private everywhere it's been
-// ported so far — mirrors `g_items.rs`'s local recipe).
-// Source: `oracle/oracle/codemp/game/g_local.h`
-const CONTENTS_PLAYERCLIP: c_int = 0x0000_0010;
-const MASK_PLAYERSOLID: c_int = mp_qshared::shared::surface_flags::CONTENTS_SOLID
-    | CONTENTS_PLAYERCLIP
-    | mp_qshared::shared::surface_flags::CONTENTS_BODY
-    | mp_qshared::shared::surface_flags::CONTENTS_TERRAIN;
+// `CONTENTS_PLAYERCLIP`/`MASK_PLAYERSOLID` (`mp_qshared::shared::surface_flags`)
+// and `FRAMETIME` (`crate::g_items`) resolve via the crate prelude glob; the
+// shadowing local copies were removed by the placeholder-const sweep.
 
-// Raven `FRAMETIME` (`g_local.h:37`) — not yet ported elsewhere (same local
-// recipe as `g_items.rs`/`g_ICARUScb.rs`).
-const FRAMETIME: c_int = 100;
-
-// Pass-3 local-recipe consts (module-private, same convention as the
-// `FRAMETIME`/`MASK_PLAYERSOLID` consts above — each not yet ported to a
-// shared location, so declared locally with its oracle source cited).
-// `PMF_FOLLOW`, `CS_GLOBAL_AMBIENT_SET`, `SIEGETEAM_TEAM1`/`SIEGETEAM_TEAM2`
-// are ported (`mp_qshared::common::mp::qcommon::pm_flags`,
-// `mp_bg::public::configstring`, `mp_bg::saga::siege_team_t`) and reach this
-// file through `crate::prelude::*`.
+// Pass-3 file-scope spawnflag `#define`s (module-private, oracle source cited
+// per const). `PMF_FOLLOW`, `CS_GLOBAL_AMBIENT_SET`,
+// `SIEGETEAM_TEAM1`/`SIEGETEAM_TEAM2` are ported
+// (`mp_qshared::common::mp::qcommon::pm_flags`, `mp_bg::public::configstring`,
+// `mp_bg::saga::siege_team_t`) and reach this file through `crate::prelude::*`.
 // Source: oracle/oracle/codemp/game/g_trigger.c:899
 pub const PUSH_CONSTANT: c_int = 2;
 // Source: oracle/oracle/codemp/game/g_trigger.c:895

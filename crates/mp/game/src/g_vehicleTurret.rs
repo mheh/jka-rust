@@ -32,9 +32,8 @@ use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD};
 use mp_qshared::shared::surface_flags::MASK_SHOT;
 
-// Helper: Raven angle-vector indices
-const PITCH: usize = 0;
-const YAW: usize = 1;
+// `PITCH`/`YAW` resolve via the crate prelude glob (`crate::q_math`); the
+// shadowing local copies were removed by the placeholder-const sweep.
 
 /// Raven `VEH_TurretCheckFire`.
 ///

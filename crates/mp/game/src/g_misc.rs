@@ -588,7 +588,8 @@ pub fn SP_terrain(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_abi::game::syscalls::G_RMG_INIT::GRmgInitArgs;
     use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
     use mp_qshared::shared::MAX_QPATH;
-    const MAX_INFO_STRING: usize = 1024;
+    // `MAX_INFO_STRING` resolves via the crate prelude glob
+    // (`mp_qshared::shared::limits`).
     unsafe {
         // Force it to 1 when there is terrain on the level.
         trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("RMG"), cstr("1")));

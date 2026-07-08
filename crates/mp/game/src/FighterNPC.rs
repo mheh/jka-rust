@@ -40,7 +40,7 @@ use crate::q_math::{AngleNormalize180, AngleNormalize360, AngleSubtract};
 // Source: `oracle/oracle/codemp/game/{bg_public.h,bg_vehicles.h,FighterNPC.c}`.
 const HYPERSPACE_SPEED: f32 = 10000.0; // bg_public.h:1681
 const HYPERSPACE_TELEPORT_FRAC: f32 = 0.75; // bg_public.h
-const HYPERSPACE_TIME: c_int = 4000; // g_trigger.rs / bg
+const HYPERSPACE_TIME: c_int = 4000; // bg_public.h:1679
 const FIGHTER_MIN_TAKEOFF_FRACTION: f32 = 0.7; // FighterNPC.c:369
 const MIN_LANDING_SLOPE: f32 = 0.8; // bg_vehicles.h
 const MIN_LANDING_SPEED: f32 = 200.0; // bg_public.h

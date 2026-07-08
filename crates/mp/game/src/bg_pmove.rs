@@ -89,9 +89,15 @@ pub const FLY_NORMAL: c_int = 1;
 pub const FLY_VEHICLE: c_int = 2;
 pub const FLY_HOVER: c_int = 3;
 
-// --- Constants the pmove slice reads that are not (yet) centrally exported;
-// defined here per the codebase's per-file `#define` convention (cf. w_force.rs
-// defining its own `PMF_STUCK_TO_WALL`). Each cites its Raven `#define`.
+// --- Constants the pmove slice reads that have no central export; defined here
+// per the codebase's per-file `#define` convention. Each cites its Raven
+// `#define`.
+//
+// The const sweep removed the local shadows of `SURF_SLICK`, `MASK_WATER`,
+// `PMF_STUCK_TO_WALL`, `PMF_TIME_KNOCKBACK`, `PMF_JUMP_HELD`, `BUTTON_ATTACK`
+// and `BUTTON_ALT_ATTACK` — the qshared canonicals (`surface_flags`,
+// `pm_flags`, `usercmd_button`) and `BONE_ANGLES_POSTMULT` (NPC_utils) reach
+// this file identically through `crate::prelude::*`.
 /// `MINS_Z`. Source: `oracle/oracle/codemp/game/bg_public.h:46`
 pub const MINS_Z: c_int = -24;
 /// `MIN_WALK_NORMAL`. Source: `oracle/oracle/codemp/game/bg_local.h:5`
@@ -109,26 +115,8 @@ pub const JUMP_OFF_WALL_SPEED: f32 = 200.0;
 /// `PM_AdjustStandAnimForSlope`.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4802`
 pub const SLOPE_RECALC_INT: c_int = 100;
-/// `SURF_SLICK`. Source: `oracle/oracle/codemp/game/surfaceflags.h:39`
-const SURF_SLICK: c_int = 0x0000_4000;
-/// `CONTENTS_LAVA|WATER|SLIME`. Source: `oracle/oracle/codemp/game/surfaceflags.h:11,12,30`
-const MASK_WATER: c_int = 0x0000_0002 | 0x0000_0004 | 0x0002_0000;
-/// `PMF_STUCK_TO_WALL`. Source: `oracle/oracle/codemp/game/bg_public.h:417`
-const PMF_STUCK_TO_WALL: c_int = 16384;
-/// `PMF_TIME_KNOCKBACK`. Source: `oracle/oracle/codemp/game/bg_public.h:409`
-const PMF_TIME_KNOCKBACK: c_int = 64;
-/// `PMF_JUMP_HELD`. Source: `oracle/oracle/codemp/game/bg_public.h:404`
-const PMF_JUMP_HELD: c_int = 2;
 /// `PS_PMOVEFRAMECOUNTBITS`. Source: `oracle/oracle/codemp/game/q_shared.h:2141`
 pub const PS_PMOVEFRAMECOUNTBITS: c_int = 6;
-/// `BUTTON_ATTACK`. Source: `oracle/oracle/codemp/game/q_shared.h:2451`
-const BUTTON_ATTACK: c_int = 1;
-/// `BUTTON_ALT_ATTACK`. Source: `oracle/oracle/codemp/game/q_shared.h:2462`
-const BUTTON_ALT_ATTACK: c_int = 128;
-
-/// Raven `BONE_ANGLES_POSTMULT` (ghoul2 bone-angle apply mode).
-/// Source: `oracle/oracle/code/game/ghoul2_shared.h:54`
-const BONE_ANGLES_POSTMULT: c_int = 0x0002;
 
 // `PM_BGEntForNum` is a `PmoveContext<'_>` method below (already filled); the stale
 // free-fn stub is removed (no dead duplicate).

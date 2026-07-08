@@ -38,11 +38,7 @@ use crate::NPC_move::NAV_GetLastMove;
 
 pub const MAX_RADIUS_ENTS: usize = 128;
 
-// Raven `SCF_NO_GROUPS` (`gNPC_t::scriptFlags` bit) — not yet ported as a
-// central const; inlined here from the header value (precedent:
-// `NPC_combat.rs`).
-// Source: `oracle/oracle/codemp/game/b_public.h:44`
-const SCF_NO_GROUPS: c_int = 0x00020000;
+use crate::npc::script_flags::SCF_NO_GROUPS;
 
 // `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
 // via the prelude glob (no per-file copy).

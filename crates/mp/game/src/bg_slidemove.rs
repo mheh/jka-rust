@@ -37,8 +37,8 @@ pub const OVERCLIP: f32 = 1.001;
 pub const STEPSIZE: f32 = 18.0;
 /// `MIN_WALK_NORMAL`. Source: `oracle/oracle/codemp/game/bg_local.h:5`
 const MIN_WALK_NORMAL: f32 = 0.7;
-/// `PMF_STUCK_TO_WALL`. Source: `oracle/oracle/codemp/game/bg_public.h:417`
-const PMF_STUCK_TO_WALL: c_int = 16384;
+// `PMF_STUCK_TO_WALL` local shadow removed in the const sweep — the qshared
+// `pm_flags` canonical (value 16384) reaches this file via `crate::prelude::*`.
 /// `SOLID_BMODEL`. Source: `oracle/oracle/codemp/game/q_shared.h:2642`
 pub const SOLID_BMODEL: c_int = 0xffffff;
 

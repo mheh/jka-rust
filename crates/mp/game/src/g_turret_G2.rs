@@ -43,25 +43,12 @@ pub const SPF_SHOWONRADAR: c_int = 32;
 /// Raven `g_turret_G2.c:318` (`START_DIS`).
 const START_DIS: f32 = 15.0;
 
-/// Raven `bg_public.h:558-621` `eFlags`/`eFlags2` bits this file references
-/// — not yet ported to `mp_bg::public::entity_effects`; transcribed locally
-/// per the established per-file idiom (see `g_items.rs`'s `EF_G2ANIMATING`).
-const EF_G2ANIMATING: c_int = 1 << 0;
-const EF_RADAROBJECT: c_int = 1 << 2;
-const EF_SHADER_ANIM: c_int = 1 << 4;
-const EF2_BRACKET_ENTITY: c_int = 1 << 6;
-
-/// Raven `bg_public.h:1177` (`MASK_SHOT`).
-const MASK_SHOT: c_int = CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_CORPSE | CONTENTS_TERRAIN;
-/// Raven `surfaceflags.h:31` (`CONTENTS_LIGHTSABER`) + the `g_local.h`
-/// content bits `finish_spawning_turretG2` combines into `r.contents`.
-const CONTENTS_LIGHTSABER: c_int = 0x0004_0000;
-const CONTENTS_PLAYERCLIP: c_int = 0x0000_0010;
-const CONTENTS_MONSTERCLIP: c_int = 0x0000_0020;
-const CONTENTS_SHOTCLIP: c_int = 0x0000_0080;
-
-/// Raven `g_local.h:37` (`FRAMETIME`, msec).
-const FRAMETIME: c_int = 100;
+// `EF_G2ANIMATING`/`EF_RADAROBJECT`/`EF_SHADER_ANIM`/`EF2_BRACKET_ENTITY`
+// (`mp_bg::public::entity_effects`, which re-exports the `EF_*` set from
+// `entity_flags`), `MASK_SHOT`/`CONTENTS_LIGHTSABER`/`CONTENTS_PLAYERCLIP`/
+// `CONTENTS_MONSTERCLIP`/`CONTENTS_SHOTCLIP` (`mp_qshared::shared::surface_flags`)
+// and `FRAMETIME` (`crate::g_items`) all resolve via the crate prelude glob;
+// the shadowing local copies were removed by the placeholder-const sweep.
 
 /// `material_t` is `c_int` (fork per type-port); `MAT_METAL = 0`
 /// (`q_shared.h:969`).
@@ -140,6 +127,9 @@ pub fn G2Tur_SetBoneAngles(
             return;
         }
 
+        // Raven ghoul2 bone-angle flag (see `SetupGameGhoul2Model`); one shared
+        // ported ghoul2-flags module is wanted (CONSOLIDATION).
+        // Source: `oracle/oracle/codemp/ghoul2/G2.h:9`
         const BONE_ANGLES_POSTMULT: c_int = 0x0002;
         let flags = BONE_ANGLES_POSTMULT;
         let up = POSITIVE_Y as c_int;
@@ -850,8 +840,8 @@ pub fn turretG2_turnoff(ctx: GameContext<'_>, self_: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:677-826`
 pub fn turretG2_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
-    const MAX_GENTITIES: usize = mp_qshared::shared::MAX_GENTITIES;
-
+    // `MAX_GENTITIES` resolves via the crate prelude glob
+    // (`mp_qshared::shared::limits`); the redundant local alias was removed.
     unsafe {
         let mut found = qfalse;
         let mut foundClient = qfalse;

@@ -53,11 +53,9 @@ use mp_qshared::shared::{QFALSE, QTRUE};
 
 use crate::q_math::VectorNormalize;
 
-/// Raven `ENTITYNUM_NONE`/`ENTITYNUM_WORLD` — derived from `MAX_GENTITIES`,
-/// an invariant unchanged across every id-tech-3 engine build including JKA.
-/// Source: `oracle/oracle/codemp/game/q_shared.h` (ENTITYNUM_NONE/ENTITYNUM_WORLD defines)
-const ENTITYNUM_NONE: c_int = (MAX_GENTITIES - 1) as c_int;
-const ENTITYNUM_WORLD: c_int = (MAX_GENTITIES - 2) as c_int;
+// `ENTITYNUM_NONE`/`ENTITYNUM_WORLD` resolve via the crate prelude glob
+// (`mp_qshared::shared::limits`); the shadowing local copies were removed by
+// the placeholder-const sweep.
 
 // Raven `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` (`bg_public.h:41-42`); file-local per
 // the same duplication precedent as `g_nav.rs`/`g_weapon.rs`/`bg_pmove.rs`/

@@ -122,7 +122,8 @@ pub fn AddRemap(
 /// Source: `oracle/oracle/codemp/game/g_utils.c:39-50`
 pub fn BuildShaderStateConfig(ctx: GameContext<'_>) -> *const c_char {
     unsafe {
-        const MAX_STRING_CHARS: usize = 1024;
+        // `MAX_STRING_CHARS` resolves via the crate prelude glob
+        // (`mp_qshared::shared::limits`).
         #[allow(non_upper_case_globals)] // Raven `static char buff[...]` spelling
         static mut buff: [c_char; MAX_STRING_CHARS * 4] = [0; MAX_STRING_CHARS * 4];
 
@@ -169,7 +170,7 @@ pub fn G_FindConfigstringIndex(
             return 0;
         }
 
-        const MAX_STRING_CHARS: usize = 1024;
+        // `MAX_STRING_CHARS` resolves via the crate prelude glob.
         let mut i = 1;
         let mut s = [0 as c_char; MAX_STRING_CHARS];
         while i < max {
@@ -357,15 +358,14 @@ pub fn G_RadiusList(
     }
 
     unsafe {
-        const MAX_GENTITIES_LOCAL: usize = mp_qshared::shared::MAX_GENTITIES;
-        let mut entity_list = [0 as c_int; MAX_GENTITIES_LOCAL];
+        let mut entity_list = [0 as c_int; MAX_GENTITIES];
         let num_listed_entities = trap::EntitiesInBox(
             ctx.engine,
             GEntitiesInBoxArgs::new(
                 mins.as_ptr() as *const vec3_t,
                 maxs.as_ptr() as *const vec3_t,
                 entity_list.as_mut_ptr(),
-                MAX_GENTITIES_LOCAL as c_int,
+                MAX_GENTITIES as c_int,
             ),
         );
 
@@ -1237,15 +1237,14 @@ pub fn G_KillBox(ctx: GameContext<'_>, ent: *mut gentity_t) {
             maxs[i] = (*client).ps.origin[i] + (*ent).r.maxs[i];
         }
 
-        const MAX_GENTITIES_LOCAL: usize = mp_qshared::shared::MAX_GENTITIES;
-        let mut touch = [0 as c_int; MAX_GENTITIES_LOCAL];
+        let mut touch = [0 as c_int; MAX_GENTITIES];
         let num = trap::EntitiesInBox(
             ctx.engine,
             GEntitiesInBoxArgs::new(
                 mins.as_ptr() as *const vec3_t,
                 maxs.as_ptr() as *const vec3_t,
                 touch.as_mut_ptr(),
-                MAX_GENTITIES_LOCAL as c_int,
+                MAX_GENTITIES as c_int,
             ),
         );
 

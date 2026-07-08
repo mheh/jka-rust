@@ -60,11 +60,9 @@ use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{
     SS_DUAL, SS_FAST, SS_STAFF, SS_STRONG,
 };
 
-// PORT-NOTE(unported-const): `MAX_INFO_STRING` has no ported home; 1024 is the
-// oracle's usual value, used only for local scratch-buffer sizing (matches
-// the g_misc.rs/g_bot.rs/g_cmds.rs precedent).
-// Source: `oracle/oracle/codemp/qcommon/q_shared.h`
-const MAX_INFO_STRING: usize = 1024;
+// `MAX_INFO_STRING` resolves via the crate prelude glob
+// (`mp_qshared::shared::limits`); the shadowing local copy was removed by the
+// placeholder-const sweep.
 
 use crate::client::client_connected::CON_DISCONNECTED;
 use crate::ent_fn_enums::{EntDie, EntThink, EntTouch, EntUse};
@@ -88,7 +86,10 @@ const BONE_ANIM_OVERRIDE_FREEZE: c_int = 0x0040 + BONE_ANIM_OVERRIDE;
 const BONE_ANIM_BLEND: c_int = 0x0080;
 
 /// Raven ghoul2 bone-angle flag (`BONE_ANGLES_POSTMULT`), used by
-/// `SetupGameGhoul2Model`. Source: `oracle/oracle/codemp/ghoul2/G2.h:30`
+/// `SetupGameGhoul2Model`. Source: `oracle/oracle/codemp/ghoul2/G2.h:9`
+// CONSOLIDATION: the ghoul2 `BONE_*` flags (G2.h:8-25) are transcribed as
+// scattered file-locals across g_client/g_turret_G2/g_items/NPC_utils; they
+// want one shared ported ghoul2-flags module.
 const BONE_ANGLES_POSTMULT: c_int = 0x0002;
 
 /// Raven `BODY_SINK_TIME` — how long a corpse persists before it is unlinked.
@@ -99,13 +100,11 @@ pub const BODY_SINK_TIME: c_int = 30000;
 /// Source: `oracle/oracle/codemp/game/g_client.c:256`
 pub const JMSABER_RESPAWN_TIME: c_int = 20000;
 
-/// Raven `CS_CLIENT_JEDIMASTER` — configstring index of the current Jedi Master.
-/// Source: `oracle/oracle/codemp/game/bg_public.h:84`
-pub const CS_CLIENT_JEDIMASTER: c_int = 28;
-
-/// Raven default player bbox extents (`bg_public.h:41-42`).
-pub const DEFAULT_MINS_2: c_int = -24;
-pub const DEFAULT_MAXS_2: c_int = 40;
+// `CS_CLIENT_JEDIMASTER` resolves via the crate prelude glob
+// (`mp_bg::public::configstring`); `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` are
+// imported from their ported home below. Shadowing local copies removed by the
+// placeholder-const sweep.
+use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 
 /// Raven `CROUCH_MAXS_2` — the crouched player bbox max Z.
 /// Source: `oracle/oracle/codemp/game/bg_public.h:44`

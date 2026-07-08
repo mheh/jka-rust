@@ -17,7 +17,10 @@ use crate::level::alert_event::{
     alertEventLevel_e, alertEventLevel_e::AEL_DANGER, alertEventType_e, alertEvent_t,
     MAX_ALERT_EVENTS,
 };
+use crate::g_public_consts::SVF_GLASS_BRUSH;
 use crate::level::interest_point::MAX_INTEREST_POINTS;
+use crate::npc::check_flags::{CHECK_360, CHECK_FOV, CHECK_PVS, CHECK_SHOOT, CHECK_VISRANGE};
+use crate::npc::script_flags::SCF_DONT_FLEE;
 use crate::prelude::*;
 use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
@@ -29,12 +32,6 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::shared::{
     CONTENTS_OPAQUE, ENTITYNUM_NONE, ENTITYNUM_WORLD, MASK_OPAQUE, MAX_GENTITIES,
 };
-
-// SVF flags (from g_public.h)
-const SVF_GLASS_BRUSH: c_int = 0x08000000; // Ent is a glass brush
-
-// SCF script flags (from b_public.h)
-const SCF_DONT_FLEE: c_int = 0x00008000; // NPC never flees
 
 /// Vector comparison helper — returns 1 if vectors are equal, 0 otherwise.
 fn vector_compare(v1: vec3_t, v2: vec3_t) -> bool {
@@ -358,13 +355,7 @@ pub fn NPC_CheckVisibility(
     ent: *mut gentity_t,
     flags: c_int,
 ) -> visibility_t {
-    // Visibility check flags
-    pub const CHECK_PVS: c_int = 1;
-    pub const CHECK_360: c_int = 2;
-    pub const CHECK_FOV: c_int = 4;
-    pub const CHECK_SHOOT: c_int = 8;
-    pub const CHECK_VISRANGE: c_int = 16;
-
+    // Visibility check flags: `crate::npc::check_flags` (`b_local.h:165-169`).
     // flags should never be 0
     if flags == 0 {
         return visibility_t::VIS_NOT;

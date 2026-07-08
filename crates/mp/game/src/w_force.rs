@@ -104,20 +104,10 @@ use mp_qshared::common::mp::qcommon::usercmd_button::*;
 /// Raven `M_PI` (`<math.h>`), used by the seeker-drone orbit math.
 const M_PI: f64 = std::f64::consts::PI;
 
-/// Raven `PITCH`/`YAW`/`ROLL` — Euler-angle component indices.
-/// Source: `oracle/oracle/codemp/game/q_shared.h`
-const PITCH: usize = 0;
-const YAW: usize = 1;
-const ROLL: usize = 2;
-
-/// Raven `PMF_FOLLOW`/`PMF_STUCK_TO_WALL` (`playerState_t::pm_flags` bits).
-/// Source: `oracle/oracle/codemp/game/bg_public.h:415,417`
-const PMF_FOLLOW: c_int = 4096;
-const PMF_STUCK_TO_WALL: c_int = 16384;
-
-/// Raven `SFL_TWO_HANDED` (`weaponData_t::weaponflags` bit) — uses both hands.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:691`
-pub const SFL_TWO_HANDED: c_int = 1 << 4;
+// `PITCH`/`YAW`/`ROLL` (`crate::q_math`), `PMF_FOLLOW`/`PMF_STUCK_TO_WALL`
+// (`mp_qshared::…::pm_flags`) and `SFL_TWO_HANDED` (`crate::saber::saber_flags`,
+// the canonical `SFL_*` home) all resolve via the crate prelude glob; the
+// shadowing local copies were removed by the placeholder-const sweep.
 
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_bg::public::entity_event::entity_event_t::{

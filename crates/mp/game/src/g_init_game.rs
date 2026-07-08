@@ -48,10 +48,9 @@ use mp_abi::game::syscalls::G_NAV_SETPATHSCALCULATED::GNavSetpathscalculatedArgs
 use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
 use mp_abi::game::syscalls::G_SET_SHARED_BUFFER::GSetSharedBufferArgs;
 
-// PORT-NOTE(unported-const): `MAX_INFO_STRING` has no ported home; 1024 is the
-// oracle's usual value (matches the g_client.rs/g_misc.rs/g_bot.rs precedent).
-// Source: `oracle/oracle/codemp/game/q_shared.h:384`
-const MAX_INFO_STRING: usize = 1024;
+// `MAX_INFO_STRING` resolves via the crate prelude glob
+// (`mp_qshared::shared::limits`); the shadowing local copy (and its stale "no
+// ported home" note) was removed by the placeholder-const sweep.
 
 /// Raven `void G_InitGame( int levelTime, int randomSeed, int restart )`.
 ///

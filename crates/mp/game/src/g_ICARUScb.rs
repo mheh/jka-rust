@@ -24,10 +24,8 @@ use crate::q_math::vec3_origin;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// Raven's server frame period; ported locally per house precedent (see
-// `g_mover.rs:69`) since it's a `#define` constant, not a global.
-// Source: `oracle/oracle/codemp/game/g_local.h`
-const FRAMETIME: c_int = 100;
+// `FRAMETIME` resolves via the crate prelude glob (`crate::g_items`); the
+// shadowing local copy was removed by the placeholder-const sweep.
 
 // Raven ICARUS `Q3_Registers.h` anonymous variable-type enum. Ported locally
 // (small, self-contained, independent of the `interpreter.h` ID/Type enum

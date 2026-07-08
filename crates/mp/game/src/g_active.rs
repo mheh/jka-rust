@@ -34,23 +34,10 @@ use mp_qshared::shared::trajectory::trType_t::*; // TR_GRAVITY
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// Raven `PITCH`/`YAW`/`ROLL` — Euler-angle component indices.
-// Source: `oracle/oracle/codemp/game/q_shared.h`
-const PITCH: usize = 0;
-const YAW: usize = 1;
-const ROLL: usize = 2;
-
-// Raven `PMF_FOLLOW` (`playerState_t::pm_flags` bit).
-// Source: `oracle/oracle/codemp/game/bg_public.h:415`
-const PMF_FOLLOW: c_int = 4096;
-
-// Raven `bg_public.h`/`surfaceflags.h` `MASK_PLAYERSOLID` derived contents
-// mask (base `CONTENTS_*` flags live in `mp_qshared::shared::surface_flags`
-// and are prelude-globbed; the combo mask itself is transcribed locally,
-// matching the `g_items.rs:106` precedent).
-// Source: `oracle/oracle/codemp/game/bg_public.h:29`
-const MASK_PLAYERSOLID: c_int =
-    CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_BODY | CONTENTS_TERRAIN;
+// `PITCH`/`YAW`/`ROLL` (`crate::q_math`), `PMF_FOLLOW`
+// (`mp_qshared::…::pm_flags`) and `MASK_PLAYERSOLID`
+// (`mp_qshared::shared::surface_flags`) resolve via the crate prelude glob
+// (placeholder-const sweep: removed the shadowing local copies).
 
 // Raven `#define FALL_FADE_TIME 3000` (q_shared.h).
 // Source: `oracle/oracle/codemp/game/q_shared.h:2148`

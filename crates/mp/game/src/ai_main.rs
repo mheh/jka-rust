@@ -486,7 +486,7 @@ pub fn BotChangeViewAngle(angle: f32, ideal_angle: f32, speed: f32) -> f32 {
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:470-530`
 pub fn BotChangeViewAngles(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32) {
-    const PITCH: usize = 0;
+    // `PITCH` (angle index) comes from the prelude (`crate::q_math::PITCH`).
     unsafe {
         let bs = &mut *bs;
         if bs.ideal_viewangles[PITCH] > 180.0 {

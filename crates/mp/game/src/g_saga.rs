@@ -778,32 +778,11 @@ pub fn UseSiegeTarget(
     }
 }
 
-// Raven's `SVF_BROADCAST` svflags `#define` is not yet ported anywhere in the
-// crate graph; defined locally, verbatim, following the `g_team.rs` precedent.
-// Source: `oracle/oracle/codemp/game/g_public.h:20`
-const SVF_BROADCAST: c_int = 0x00000020;
-
-// Raven's `PMF_FOLLOW` playerState pm_flags bit is not yet ported anywhere in
-// the crate graph as an importable symbol; defined locally, verbatim,
-// following the `g_trigger.rs` precedent.
-// Source: `oracle/oracle/codemp/game/bg_public.h:415`
-const PMF_FOLLOW: c_int = 4096;
-
-// Raven's `CONTENTS_NODROP` bit is not yet ported anywhere in the crate graph
-// as an importable symbol; defined locally, verbatim, following the
-// `g_items.rs`/`npc_c.rs` precedent.
-// Source: `oracle/oracle/codemp/game/surfaceflags.h`
-const CONTENTS_NODROP: c_int = 0x0000_0800;
-
-// Raven's `CONTENTS_TRIGGER`/`MASK_PLAYERSOLID` are not yet ported anywhere in
-// the crate graph as importable symbols; defined locally, verbatim, following
-// the `g_items.rs`/`g_active.rs` precedent.
-// Source: `oracle/oracle/codemp/game/surfaceflags.h`, `oracle/oracle/codemp/game/g_local.h`
-const CONTENTS_TRIGGER: c_int = 0x0000_0400;
-const MASK_PLAYERSOLID: c_int = mp_qshared::shared::surface_flags::CONTENTS_SOLID
-    | mp_qshared::shared::surface_flags::CONTENTS_PLAYERCLIP
-    | mp_qshared::shared::surface_flags::CONTENTS_BODY
-    | mp_qshared::shared::surface_flags::CONTENTS_TERRAIN;
+// `SVF_BROADCAST` (`crate::g_public_consts`), `PMF_FOLLOW`
+// (`mp_qshared::…::pm_flags`), `CONTENTS_NODROP`/`CONTENTS_TRIGGER`/
+// `MASK_PLAYERSOLID` (`mp_qshared::shared::surface_flags`) all resolve via the
+// crate prelude glob; the shadowing local copies (and their stale "not yet
+// ported" notes) were removed by the placeholder-const sweep.
 
 /// Raven `SiegeBroadcast_OBJECTIVECOMPLETE`.
 ///

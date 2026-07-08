@@ -106,8 +106,9 @@ pub fn G_ParseInfos(
     max: c_int,
     infos: *mut *mut c_char,
 ) -> c_int {
+    // `MAX_TOKEN_CHARS` (q_shared.h) is kept local; `MAX_INFO_STRING` resolves
+    // via the crate prelude glob (`mp_qshared::shared::limits`).
     const MAX_TOKEN_CHARS: usize = 1024;
-    const MAX_INFO_STRING: usize = 1024;
     unsafe {
         let mut count: c_int = 0;
         let mut bufp: *const c_char = buf as *const c_char;
@@ -167,6 +168,8 @@ pub fn G_ParseInfos(
     }
 }
 
+// Raven `g_bot.c` file-scope `#define`s (verified against the owning TU).
+// Source: `oracle/oracle/codemp/game/g_bot.c:9,13,19`
 const MAX_ARENAS: c_int = 1024;
 const MAX_ARENAS_TEXT: usize = 8192;
 const MAX_BOTS: c_int = 1024;
@@ -780,7 +783,7 @@ pub fn G_RemoveQueuedBotBegin(ctx: GameContext<'_>, clientNum: c_int) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:768-784`
 pub fn G_BotConnect(ctx: GameContext<'_>, clientNum: c_int, restart: qboolean) -> qboolean {
-    const MAX_INFO_STRING: usize = 1024;
+    // `MAX_INFO_STRING` resolves via the crate prelude glob.
     unsafe {
         let mut settings: bot_settings_t = core::mem::zeroed();
         let mut userinfo: [c_char; MAX_INFO_STRING] = [0; MAX_INFO_STRING];
@@ -827,7 +830,7 @@ pub fn G_AddBot(
     delay: c_int,
     altname: *mut c_char,
 ) {
-    const MAX_INFO_STRING: usize = 1024;
+    // `MAX_INFO_STRING` resolves via the crate prelude glob.
     unsafe {
         // get the botinfo from bots.txt
         let botinfo = G_GetBotInfoByName(ctx, name);

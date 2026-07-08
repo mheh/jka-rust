@@ -57,21 +57,11 @@ pub struct PushedEntry {
     pub deltayaw: c_int,
 }
 
-// Raven file-scope `#define`s not yet ported anywhere in the crate graph;
-// values reused from the identical local transcriptions already present in
-// sibling files (`CONTENTS_TRIGGER`: `g_items.rs:44`; `SVF_NOCLIENT`:
-// `g_vehicles.rs:33`; `SVF_BROADCAST`: `g_combat.rs:876`; `FRAMETIME`:
-// `g_items.rs:79`) rather than freshly guessed here.
-// Source: `oracle/oracle/codemp/game/q_shared.h`, `oracle/oracle/codemp/game/g_local.h`
-const CONTENTS_TRIGGER: c_int = 0x0000_0400;
-const SVF_NOCLIENT: c_int = 0x0000_0001;
-const SVF_BROADCAST: c_int = 0x0000_0020;
-const FRAMETIME: c_int = 100;
+// `CONTENTS_TRIGGER` (`mp_qshared::shared::surface_flags`), `SVF_NOCLIENT`/
+// `SVF_BROADCAST` (`crate::g_public_consts`), `FRAMETIME` (`crate::g_items`)
+// and `YAW` (`crate::q_math`) all resolve via the crate prelude glob; the
+// shadowing local copies were removed by the placeholder-const sweep.
 pub const FUNC_WALL_OFF: c_int = 1;
-
-// Raven `YAW` axis index (`q_shared.h`); same value used throughout the
-// crate (e.g. `g_active.rs`'s local `const YAW: usize = 1`).
-const YAW: usize = 1;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`

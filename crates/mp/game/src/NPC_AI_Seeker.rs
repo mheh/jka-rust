@@ -7,7 +7,9 @@
 //! globals are now threaded through GameContext and accessed via ctx.world.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::npc::script_flags::SCF_CHASE_ENEMIES;
 use crate::prelude::*;
+use mp_qshared::shared::{CONTENTS_LIGHTSABER, MASK_SHOT};
 
 // Raven `#define VELOCITY_DECAY 0.7f32` (oracle/oracle/codemp/game/NPC_AI_Seeker.c:8).
 const VELOCITY_DECAY: f32 = 0.7f32;
@@ -37,17 +39,11 @@ const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
 // Local constants for Seeker AI.
-// Source: oracle/oracle/codemp/game/NPC_AI_Seeker.c / q_shared.h / g_local.h
-const CONTENTS_LIGHTSABER: c_int = 0x00040000;
-// Oracle: `missile->clipmask = MASK_SHOT | CONTENTS_LIGHTSABER`, where
-// MASK_SHOT = SOLID|BODY|CORPSE|TERRAIN (0x1301). Fold LIGHTSABER in here so
-// the net clipmask is 0x41301; CONTENTS_TERRAIN (0x1000) must be included.
-const MASK_SHOT: c_int = CONTENTS_LIGHTSABER | 0x00000001 | 0x00000100 | 0x00000200 | 0x00001000; // LIGHTSABER|SOLID|BODY|CORPSE|TERRAIN
+// Source: oracle/oracle/codemp/game/NPC_AI_Seeker.c / g_local.h
 const MOD_FALLING: c_int = 38;
 const MOD_BLASTER: c_int = 6;
 const MOD_UNKNOWN: c_int = 0;
 const MOD_TELEFRAG: c_int = 37;
-const SCF_CHASE_ENEMIES: i32 = 0x00000400;
 
 /// Raven `NPC_Seeker_Precache`.
 ///
@@ -475,7 +471,7 @@ pub fn Seeker_Fire(ctx: GameContext<'_>) {
         (*missile).damage = 5;
         (*missile).dflags = crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
         (*missile).methodOfDeath = MOD_BLASTER as c_int;
-        (*missile).clipmask = MASK_SHOT;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
         if (*NPC).r.ownerNum < ENTITYNUM_NONE {
             (*missile).r.ownerNum = (*NPC).r.ownerNum;
         }
