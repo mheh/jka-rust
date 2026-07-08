@@ -1285,8 +1285,12 @@ pub fn Touch_DoorTriggerSpectator(
     _trace: *mut trace_t,
 ) {
     unsafe {
-        const DEFAULT_MINS_2: f32 = -24.0;
-        const DEFAULT_MAXS_2: f32 = 40.0;
+        // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in
+        // `mp_bg::public::viewheight` (`c_int`, cast here to match the
+        // `vec3_t` components they seed).
+        // Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
+        const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
+        const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
         let axis = (*ent).count as usize;
         let mut dir: vec3_t = [0.0; 3];

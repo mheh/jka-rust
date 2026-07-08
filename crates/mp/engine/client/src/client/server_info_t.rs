@@ -3,10 +3,8 @@
 use std::os::raw::{c_char, c_int};
 
 use mp_engine_qcommon::qcommon::netadr_t::netadr_t;
+use mp_qshared::shared::limits::MAX_NAME_LENGTH;
 use mp_qshared::shared::qboolean;
-
-/// Raven `MAX_NAME_LENGTH` — max length of a client name.
-const MAX_NAME_LENGTH: usize = 32;
 
 /// Raven `serverInfo_t` — a server's info as shown in the server browser.
 ///

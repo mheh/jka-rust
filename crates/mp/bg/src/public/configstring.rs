@@ -145,32 +145,14 @@ pub const CS_BSP_MODELS: c_int = CS_TERRAINS + 1;
 
 pub const CS_MAX: c_int = CS_BSP_MODELS + 32;
 
-/// Raven `MAX_MODELS` — these are sent over the net as -12 bits.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2020`
-pub const MAX_MODELS: c_int = 512;
-
-/// Raven `MAX_SOUNDS` — so they cannot be blindly increased.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2021`
-pub const MAX_SOUNDS: c_int = 256;
-
-/// Raven `MAX_FX` — max effects strings.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2023`
-pub const MAX_FX: c_int = 64;
-
-/// Raven `MAX_ICONS` — max registered icons you can have per map.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2022`
-pub const MAX_ICONS: c_int = 64;
+// `MAX_MODELS`/`MAX_SOUNDS`/`MAX_FX`/`MAX_ICONS`/`MAX_SUB_BSP` moved down to
+// `mp_qshared` (engine/server + renderer consume copies and, per
+// workspace-architecture, may not depend on `bg`); re-exported here so
+// existing `mp_bg::public::configstring::MAX_*` call sites keep resolving.
+// Source: `oracle/oracle/codemp/game/q_shared.h:2020-2025`
+pub use mp_qshared::shared::limits::{MAX_FX, MAX_ICONS, MAX_MODELS, MAX_SOUNDS, MAX_SUB_BSP};
 
 /// Raven `MAX_G2BONES` (changed from `MAX_CHARSKINS`, value still equal).
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.h:2030`
 pub const MAX_G2BONES: c_int = 64;
-
-/// Raven `MAX_SUB_BSP`.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2025`
-pub const MAX_SUB_BSP: c_int = 32;

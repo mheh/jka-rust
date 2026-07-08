@@ -2,6 +2,7 @@
 
 use core::ffi::{c_float, c_int, c_uint};
 
+use mp_qshared::shared::limits::MAX_SUB_BSP as MAX_SUB_BSP_I32;
 use mp_qshared::shared::{qboolean, vec3_t};
 
 use super::front_end_counters_t::frontEndCounters_t;
@@ -28,9 +29,10 @@ const MAX_LIGHTMAPS: usize = 256;
 /// Source: `oracle/oracle/codemp/renderer/tr_local.h:1138`
 const MAX_MOD_KNOWN: usize = 1024;
 
-/// `MAX_SUB_BSP` — rwwRMG - added.
+/// `MAX_SUB_BSP` — rwwRMG - added. `usize`-typed dual of the canonical
+/// `mp_qshared::shared::limits::MAX_SUB_BSP` (`c_int`), for array sizing.
 /// Source: `oracle/oracle/codemp/game/q_shared.h:2025`
-const MAX_SUB_BSP: usize = 32;
+const MAX_SUB_BSP: usize = MAX_SUB_BSP_I32 as usize;
 
 /// `MAX_SHADERS` (non-`_XBOX` branch; 14 bits, see `QSORT_SHADERNUM_SHIFT`).
 /// Source: `oracle/oracle/codemp/renderer/tr_local.h:40-46`

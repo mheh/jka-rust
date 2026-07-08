@@ -6,6 +6,7 @@ use mp_abi::cgame::public::snapshot_t::snapshot_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::common::mp::qcommon::playerState_t;
+use mp_qshared::shared::limits::MAX_NAME_LENGTH;
 use mp_qshared::shared::{qboolean, qhandle_t, vec3_t, MAX_CLIENTS, MAX_QPATH, MAX_STRING_CHARS};
 
 use super::chat_box_item_s::chatBoxItem_t;
@@ -31,12 +32,6 @@ pub const MAX_PREDICTED_EVENTS: usize = 16;
 ///
 /// Source: `oracle/oracle/codemp/cgame/cg_local.h:747`
 pub const MAX_CHATBOX_ITEMS: usize = 5;
-
-/// Raven `MAX_NAME_LENGTH`.
-///
-/// Raven: max length of a client name.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:400`
-pub const MAX_NAME_LENGTH: usize = 32;
 
 /// Raven `MAX_CG_SHARED_BUFFER_SIZE`.
 ///

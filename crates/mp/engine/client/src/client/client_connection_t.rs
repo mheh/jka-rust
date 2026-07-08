@@ -4,14 +4,10 @@ use std::os::raw::c_char;
 
 use mp_engine_qcommon::qcommon::netadr_t::netadr_t;
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
+use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 use mp_qshared::shared::{fileHandle_t, qboolean, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS};
 
 use super::rm_automap_symbol_t::rmAutomapSymbol_t;
-
-/// Raven `MAX_STRING_TOKENS` — max tokens resulting from Cmd_TokenizeString.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:381`
-const MAX_STRING_TOKENS: usize = 1024;
 
 /// Raven `MAX_RELIABLE_COMMANDS` — max string commands buffered for retransmit.
 ///

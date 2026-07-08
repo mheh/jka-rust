@@ -98,3 +98,9 @@ pub const MASK_OPAQUE: c_int = CONTENTS_SOLID | CONTENTS_SLIME | CONTENTS_LAVA |
 ///
 /// Source: `oracle/oracle/codemp/game/bg_public.h:1177`
 pub const MASK_SHOT: c_int = CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_CORPSE | CONTENTS_TERRAIN;
+
+/// Raven `SOLID_BMODEL` — an entity's `solid` field is set to this sentinel
+/// when the entity uses its brush model as its collision shape.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:2642`
+pub const SOLID_BMODEL: c_int = 0xffffff;

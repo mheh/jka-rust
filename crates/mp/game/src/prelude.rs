@@ -371,7 +371,6 @@ pub use crate::client::client_connected::*; // .claude/worktrees/agent-a43cc5320
 pub use crate::client::client_persistant::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/client/client_persistant.rs
 pub use crate::g_active::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_active.rs
 pub use crate::g_client::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_client.rs
-pub use crate::g_cmds::MAX_TOKEN_CHARS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_cmds.rs
 pub use crate::g_cmds::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_cmds.rs
 pub use crate::g_icarus_set_type::{setTable, setType_t, setType_t::*}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_icarus_set_type.rs
 pub use crate::g_items::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_items.rs

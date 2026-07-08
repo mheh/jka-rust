@@ -21,8 +21,10 @@ use crate::saber::evasion_type_t::evasionType_t;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::entity_event::entity_event_t;
 // Consts defined in sibling modules but not re-exported through the prelude glob;
-// imported here so call sites keep the bare Raven spelling.
-use crate::bg_slidemove::{SOLID_BMODEL, STEPSIZE};
+// imported here so call sites keep the bare Raven spelling. `SOLID_BMODEL`
+// (`q_shared.h:2642`) reaches this file via the prelude's
+// `mp_qshared::shared::surface_flags::*` glob.
+use crate::bg_slidemove::STEPSIZE;
 use crate::NPC_AI_Stormtrooper::MIN_ROCKET_DIST_SQUARED;
 // Explicit import to dedupe an E0659 glob ambiguity (known SFL_*/SVF_* debt);
 // canonical path per crate::saber::saber_flags.

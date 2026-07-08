@@ -120,8 +120,8 @@ use mp_qshared::shared::surface_flags::{
 // Source: `oracle/oracle/codemp/game/g_public.h:22,25`
 use crate::g_public_consts::{SVF_BROADCAST, SVF_NOCLIENT, SVF_SINGLECLIENT};
 
-// Raven `bg_public.h:82` `CS_ITEMS`.
-pub const CS_ITEMS: c_int = 27;
+// Raven `bg_public.h:82` `CS_ITEMS` — canonical in `mp_bg::public::configstring`,
+// reaches this file via the crate prelude glob (`crate::prelude::*`).
 
 // Raven `bg_public.h` `EF_ITEMPLACEHOLDER`/`EF_CLIENTSMOOTH`/`EF_G2ANIMATING`,
 // canonical in `mp_bg::public::entity_flags`.

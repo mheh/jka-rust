@@ -3,6 +3,7 @@
 
 use core::ffi::c_int;
 
+use mp_qshared::shared::limits::MAX_WPARRAY_SIZE as MAX_WPARRAY_SIZE_I32;
 use mp_qshared::shared::wpobject_t;
 
 use crate::server::bot_debugpoly_t::bot_debugpoly_t;
@@ -11,10 +12,11 @@ use crate::server::server_t::server_t;
 use crate::server::world_sector_s::{worldSector_t, AREA_NODES};
 
 /// Raven `MAX_WPARRAY_SIZE` — bot waypoint pointer-table capacity
-/// (`gWPArray[MAX_WPARRAY_SIZE]`).
+/// (`gWPArray[MAX_WPARRAY_SIZE]`). `usize`-typed dual of the canonical
+/// `mp_qshared::shared::limits::MAX_WPARRAY_SIZE` (`c_int`), for array sizing.
 ///
 /// Type definition source: `oracle/oracle/codemp/game/q_shared.h:993`
-pub const MAX_WPARRAY_SIZE: usize = 4096;
+pub const MAX_WPARRAY_SIZE: usize = MAX_WPARRAY_SIZE_I32 as usize;
 
 /// Raven `sv_bot.cpp` file-scope globals: `debugpolygons`/`bot_maxdebugpolys`
 /// (the bot-debug-polygon pool) + `gWPArray`/`gWPNum` (the bot waypoint

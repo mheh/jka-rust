@@ -1065,9 +1065,8 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:1018-1067`
 pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
     unsafe {
-        // `MAX_TOKEN_CHARS` (value 1024) is re-exported from `g_cmds` via the
-        // prelude; imported explicitly here. Source: `oracle/oracle/codemp/game/q_shared.h:369`
-        use crate::g_cmds::MAX_TOKEN_CHARS;
+        // `MAX_TOKEN_CHARS` (value 1024) canonical in `mp_qshared::shared::limits`,
+        // reaches this file via the crate prelude glob.
         let mut keyname = [0 as c_char; MAX_TOKEN_CHARS];
         let mut com_token = [0 as c_char; MAX_TOKEN_CHARS];
 

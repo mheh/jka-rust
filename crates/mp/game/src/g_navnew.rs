@@ -57,11 +57,11 @@ use crate::q_math::VectorNormalize;
 // (`mp_qshared::shared::limits`); the shadowing local copies were removed by
 // the placeholder-const sweep.
 
-// Raven `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` (`bg_public.h:41-42`); file-local per
-// the same duplication precedent as `g_nav.rs`/`g_weapon.rs`/`bg_pmove.rs`/
-// `ai_wpnav.rs`/`NPC_stats.rs`/`g_vehicles.rs` (no canonical shared module).
-const DEFAULT_MINS_2: f32 = -24.0;
-const DEFAULT_MAXS_2: f32 = 40.0;
+// `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
+// (`c_int`, cast here to match the `vec3_t` components they seed).
+// Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
+const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
+const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
 /// Raven `NAV_CheckNodeFailedForEnt`.
 ///

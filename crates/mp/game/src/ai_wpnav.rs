@@ -77,9 +77,9 @@ pub const botGlobalNavWeaponWeights: [f32; WP_NUM_WEAPONS as usize] = [
 
 // ── ai_wpnav.c / ai_main.h / q_shared.h constants used below (verbatim, per
 // the file's own local-const precedent — cf. `GetFlagStr`/`G_TestLine`). ──
-// Source: `oracle/oracle/codemp/game/q_shared.h:993`,
-//         `oracle/oracle/codemp/game/ai_wpnav.c:2505`
-pub const MAX_WPARRAY_SIZE: c_int = 4096;
+// `MAX_WPARRAY_SIZE` (`q_shared.h:993`) resolves via the crate prelude glob
+// (`mp_qshared::shared::limits`).
+// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2505`
 pub const MAX_NODETABLE_SIZE: c_int = 16384;
 pub const MAX_SPAWNPOINT_ARRAY: usize = 64;
 // Source: `oracle/oracle/codemp/game/q_shared.h:996,999`,
@@ -2932,10 +2932,11 @@ pub fn G_BackwardAttachment(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:3055-3250`
 pub fn G_RMGPathing(ctx: GameContext<'_>) {
-    // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` (`bg_public.h:41-42`), file-local per
-    // this file's convention (cf. `MASK_PLAYERSOLID`).
-    const DEFAULT_MINS_2: f32 = -24.0;
-    const DEFAULT_MAXS_2: f32 = 40.0;
+    // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
+    // (`c_int`, cast here to match the `vec3_t` components they seed).
+    // Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
+    const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
+    const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
     unsafe {
         let w = ctx.world;

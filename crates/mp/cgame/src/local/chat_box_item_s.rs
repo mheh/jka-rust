@@ -2,10 +2,7 @@
 
 use core::ffi::c_char;
 
-/// Raven `MAX_SAY_TEXT`.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:402`
-pub const MAX_SAY_TEXT: usize = 150;
+use mp_qshared::shared::limits::MAX_SAY_TEXT;
 
 /// Raven `chatBoxItem_t` — a single line stored in the cgame chat box history.
 ///

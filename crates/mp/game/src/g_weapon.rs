@@ -29,9 +29,10 @@ const qfalse: qboolean = 0;
 // `mp_qshared::shared::surface_flags::MASK_SHOT`,
 // `oracle/oracle/codemp/game/bg_public.h:1177`); no local mirror.
 
-// Raven `DEFAULT_MINS_2` (`bg_public.h:41`); file-local per the same
-// convention as `g_vehicles.rs`/`ai_wpnav.rs`.
-const DEFAULT_MINS_2: f32 = -24.0;
+// `DEFAULT_MINS_2` canonical in `mp_bg::public::viewheight` (`c_int`, cast
+// here to match the `vec3_t` component it seeds).
+// Source: `oracle/oracle/codemp/game/bg_public.h:41`
+const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
 
 // Per-weapon damage/velocity/size `#define`s, file-local to `g_weapon.c` in
 // Raven (never promoted to a header), ported the same way here.

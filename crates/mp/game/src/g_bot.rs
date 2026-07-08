@@ -106,9 +106,6 @@ pub fn G_ParseInfos(
     max: c_int,
     infos: *mut *mut c_char,
 ) -> c_int {
-    // `MAX_TOKEN_CHARS` (q_shared.h) is kept local; `MAX_INFO_STRING` resolves
-    // via the crate prelude glob (`mp_qshared::shared::limits`).
-    const MAX_TOKEN_CHARS: usize = 1024;
     unsafe {
         let mut count: c_int = 0;
         let mut bufp: *const c_char = buf as *const c_char;
@@ -1102,7 +1099,6 @@ pub fn G_AddBot(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:1041-1093`
 pub fn Svcmd_AddBot_f(ctx: GameContext<'_>) {
-    const MAX_TOKEN_CHARS: usize = 1024;
     unsafe {
         // are bots enabled?
         if trap::Cvar_VariableIntegerValue(

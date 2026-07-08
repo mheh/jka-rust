@@ -2598,7 +2598,6 @@ impl PmoveContext<'_> {
     /// Raven `PM_CheckJump`. `METROID_JUMP` is defined, so that block is compiled.
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1788-2775`
     pub fn PM_CheckJump(&mut self) -> qboolean {
-        use crate::bg_slidemove::SOLID_BMODEL;
         use crate::saber::saber_flags::*;
         use animNumber_t::*;
         use mp_bg::public::jump_velocity::JUMP_VELOCITY;
@@ -10118,8 +10117,10 @@ impl PmoveContext<'_> {
         clientNum: c_int,
         tracemask: c_int,
     ) {
-        /// `DEFAULT_MINS_2`. Source: `oracle/oracle/codemp/game/bg_public.h`
-        const DEFAULT_MINS_2: f32 = -24.0;
+        // `DEFAULT_MINS_2` canonical in `mp_bg::public::viewheight` (`c_int`,
+        // cast here to match the `vec3_t` component it seeds).
+        // Source: `oracle/oracle/codemp/game/bg_public.h:41`
+        const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
 
         unsafe {
             if veh.is_null() {

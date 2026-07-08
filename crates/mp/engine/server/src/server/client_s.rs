@@ -5,6 +5,7 @@ use core::ffi::c_char;
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
+use mp_qshared::shared::limits::MAX_NAME_LENGTH;
 use mp_qshared::shared::{fileHandle_t, qboolean, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS};
 
 use super::client_snapshot_t::clientSnapshot_t;
@@ -17,11 +18,6 @@ use super::client_state_t::clientState_t;
 ///
 /// Source: `oracle/oracle/codemp/qcommon/qcommon.h:106`
 const MAX_RELIABLE_COMMANDS: usize = 128;
-
-/// Raven `MAX_NAME_LENGTH`.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:400`
-const MAX_NAME_LENGTH: usize = 32;
 
 /// Raven `MAX_DOWNLOAD_WINDOW` — max of eight download frames.
 ///

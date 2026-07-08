@@ -86,10 +86,6 @@ unsafe fn cstr_eq(mut a: *const c_char, mut b: *const c_char) -> bool {
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-/// Raven `MAX_TOKEN_CHARS` — command/argument token buffer size.
-/// Source: `oracle/oracle/codemp/game/q_shared.h`
-pub const MAX_TOKEN_CHARS: usize = 1024;
-
 /// `ent - g_entities` — the entity's slot index (client number for players).
 #[inline]
 unsafe fn ent_index(ctx: GameContext<'_>, ent: *const gentity_t) -> c_int {
@@ -2354,7 +2350,6 @@ pub fn G_Say(
             }
         }
 
-        const MAX_SAY_TEXT: usize = 150; // Source: `oracle/oracle/codemp/game/g_local.h`
         let mut text = [0 as c_char; MAX_SAY_TEXT];
         write_cstr_field(&mut text, &chat);
         let text_str = cstr_to_str(text.as_ptr());
@@ -2686,7 +2681,6 @@ pub fn G_ClientNumberFromName(ctx: GameContext<'_>, name: *const c_char) -> c_in
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:1899-1937`
 pub fn SanitizeString2(r#in: *mut c_char, out: *mut c_char) {
-    pub const MAX_NAME_LENGTH: usize = 32; // Source: `oracle/oracle/codemp/game/bg_public.h`
     unsafe {
         let mut i: isize = 0;
         let mut r: isize = 0;
@@ -2768,7 +2762,6 @@ pub fn Cmd_CallVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     // Oracle `MAX_VOTE_COUNT` is 3 (was wrongly 5), canonical in
     // `client_persistant`. Source: `oracle/oracle/codemp/game/g_local.h:439`
     use crate::client::client_persistant::MAX_VOTE_COUNT;
-    const MAX_STRING_TOKENS: usize = 1024;
 
     unsafe {
         let world = ctx.world;
@@ -3257,7 +3250,6 @@ pub fn Cmd_Vote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
 pub fn Cmd_CallTeamVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_TEAM;
 
-    const MAX_STRING_TOKENS: usize = 1024;
     // `MAX_NETNAME`/`MAX_VOTE_COUNT` canonical in `client_persistant`;
     // `ENTITYNUM_NONE` in `mp_qshared::shared::limits` (all value-correct here).
     // Sources: `oracle/oracle/codemp/game/g_local.h:438-439`, `q_shared.h:2014`

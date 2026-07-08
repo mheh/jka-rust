@@ -1610,11 +1610,13 @@ pub fn NAV_MoveToGoal(ctx: GameContext<'_>, self_: *mut gentity_t, info: *mut na
     }
 }
 
-// Raven `DEFAULT_MINS_2`/`DEFAULT_MAXS_2`/`CROUCH_MAXS_2` (`bg_public.h`),
-// file-local per the established `g_weapon.rs`/`ai_wpnav.rs` precedent (no
-// canonical crate-wide home yet).
-const DEFAULT_MINS_2: f32 = -24.0;
-const DEFAULT_MAXS_2: f32 = 40.0;
+// `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
+// (`c_int`, cast here to match the `vec3_t` components they seed).
+// Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
+const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
+const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
+// Raven `CROUCH_MAXS_2` (`bg_public.h`), file-local per the established
+// precedent (no canonical crate-wide home yet).
 const CROUCH_MAXS_2: f32 = 16.0;
 
 /// Raven `waypoint_testDirection`.

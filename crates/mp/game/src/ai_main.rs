@@ -1699,12 +1699,10 @@ pub fn MoveTowardIdealAngles(bs: *mut bot_state_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1556-1633`
 pub fn BotTrace_Strafe(ctx: GameContext<'_>, bs: *mut bot_state_t, traceto: vec3_t) -> c_int {
-    // PORT-NOTE(DEFAULT_MAXS_2/STRAFEAROUND_*): these consts have no shared
-    // ported home yet; referenced as cited and reported as missing.
-    // Raven `DEFAULT_MAXS_2` (`bg_public.h:41-42`); file-local per the
-    // `g_navnew.rs`/`g_mover.rs`/`ai_wpnav.rs` precedent (f32, matches the
-    // vec3_t component it seeds).
-    const DEFAULT_MAXS_2: f32 = 40.0;
+    // `DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight` (`c_int`,
+    // cast here to match the `vec3_t` component it seeds).
+    // Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
+    const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
     unsafe {
         let localPlayerMins: vec3_t = [-15.0, -15.0, /*DEFAULT_MINS_2*/ -8.0];
         let localPlayerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];

@@ -62,9 +62,11 @@ pub const VEH_EJECT_REAR: c_int = 3;
 pub const VEH_EJECT_TOP: c_int = 4;
 pub const VEH_EJECT_BOTTOM: c_int = 5;
 // Default player bbox z-extents (used for the MP eject-clearance trace).
+// Canonical in `mp_bg::public::viewheight` (`c_int`, cast here to match the
+// `vec3_t` components they seed).
 // Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
-const DEFAULT_MINS_2: f32 = -24.0;
-const DEFAULT_MAXS_2: f32 = 40.0;
+const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
+const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
 // `SVF_NOCLIENT` resolves via the crate prelude glob (`crate::g_public_consts`);
 // the shadowing local copy was removed by the placeholder-const sweep.

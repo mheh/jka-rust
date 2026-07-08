@@ -48,13 +48,16 @@ impl core::ops::IndexMut<usize> for IpFilters {
 // Source: `oracle/oracle/codemp/game/bg_public.h:31`
 pub const MAX_ITEMS: usize = 256;
 
-// Raven `ai_wpnav.c` / `q_shared.h` waypoint-arena sizes.
+// Raven `ai_wpnav.c` / `q_shared.h` waypoint-arena sizes. `MAX_WPARRAY_SIZE`
+// canonical in `mp_qshared::shared::limits` (`c_int`, cast here);
+// `MAX_NODETABLE_SIZE` canonical in `ai_wpnav` (`c_int`, cast here);
+// `MAX_SPAWNPOINT_ARRAY` canonical in `ai_wpnav` (already `usize`, plain import).
 // Source: `oracle/oracle/codemp/game/q_shared.h:993`,
 //         `oracle/oracle/codemp/game/ai_main.h:15`,
 //         `oracle/oracle/codemp/game/ai_wpnav.c:2505`
-const MAX_WPARRAY_SIZE: usize = 4096;
-const MAX_NODETABLE_SIZE: usize = 16384;
-const MAX_SPAWNPOINT_ARRAY: usize = 64;
+use crate::ai_wpnav::MAX_SPAWNPOINT_ARRAY;
+const MAX_WPARRAY_SIZE: usize = mp_qshared::shared::limits::MAX_WPARRAY_SIZE as usize;
+const MAX_NODETABLE_SIZE: usize = crate::ai_wpnav::MAX_NODETABLE_SIZE as usize;
 
 // Raven `#define MAX_SHADER_REMAPS 128` / `MAX_G2_KILL_QUEUE 256` /
 // `MAX_VEHICLES_AT_A_TIME 128` (`g_utils.c:15,875,384`). Pass-2 backfill of
@@ -83,9 +86,10 @@ const BOT_SPAWN_QUEUE_DEPTH: usize = 16;
 const MAX_SABER_VICTIMS: usize = 16;
 
 // Raven `#define MAX_SIEGE_INFO_SIZE 16384` (`bg_saga.h:1`) — sizes the
-// `gParseObjectives` siege-config parse buffer.
+// `gParseObjectives` siege-config parse buffer. Canonical in
+// `mp_bg::saga::siege_team_t` (`i32`, cast here).
 // Source: `oracle/oracle/codemp/game/bg_saga.h:1`
-const MAX_SIEGE_INFO_SIZE: usize = 16384;
+const MAX_SIEGE_INFO_SIZE: usize = mp_bg::saga::siege_team_t::MAX_SIEGE_INFO_SIZE as usize;
 
 /// `botSpawnQueue_t` — bot spawn queue entry (`g_bot.c:21-24`).
 ///

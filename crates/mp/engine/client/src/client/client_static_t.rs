@@ -4,6 +4,7 @@ use core::ffi::c_char;
 use core::ffi::c_int;
 
 use mp_engine_qcommon::qcommon::netadr_t::netadr_t;
+use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
 use mp_qshared::shared::{connstate_t, qboolean, qhandle_t, MAX_INFO_STRING};
 
 use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
@@ -26,14 +27,6 @@ const MAX_OTHER_SERVERS: usize = 128;
 ///
 /// Source: `oracle/oracle/codemp/client/client.h`
 const MAX_GLOBAL_SERVERS: usize = 2048;
-
-/// Raven `MAX_TOKEN_CHARS` — max length of a parsed token.
-///
-/// Consolidation candidate: canonical `MAX_TOKEN_CHARS` lives in `mp_game`
-/// (`g_cmds.rs`), which this engine crate must not depend on; kept local until
-/// a `mp_qshared` home exists.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:382`
-const MAX_TOKEN_CHARS: usize = 1024;
 
 // `MAX_INFO_STRING` (`q_shared.h`) imported from its canonical home in
 // `mp_qshared::shared`.

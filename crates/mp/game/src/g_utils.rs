@@ -1661,7 +1661,6 @@ pub fn TryHeal(ctx: GameContext<'_>, ent: *mut gentity_t, target: *mut gentity_t
     use mp_bg::public::gametype::GT_SIEGE;
     use mp_bg::public::set_anim::{SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE, SETANIM_TORSO};
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
-    const SOLID_BMODEL: c_int = crate::bg_slidemove::SOLID_BMODEL;
     const BOTH_BUTTON_HOLD: c_int = animNumber_t::BOTH_BUTTON_HOLD as c_int;
     const BOTH_CONSOLE1: c_int = animNumber_t::BOTH_CONSOLE1 as c_int;
 

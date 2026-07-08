@@ -6,6 +6,7 @@ use core::ffi::c_void;
 use mp_bg::public::configstring::{MAX_FX, MAX_ICONS, MAX_MODELS, MAX_SOUNDS};
 use mp_bg::public::gametype::gametype_t;
 use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
+use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 use mp_qshared::shared::{
     fxHandle_t, gameState_t, qboolean, qhandle_t, sfxHandle_t, vec3_t, MAX_CLIENTS, MAX_QPATH,
 };
@@ -17,11 +18,6 @@ use super::client_info_t::clientInfo_t;
 // `MAX_MODELS`/`MAX_SOUNDS`/`MAX_ICONS`/`MAX_FX` are the shared configstring
 // limits (`q_shared.h:2020-2023`); imported from their canonical home in
 // `mp_bg::public::configstring` (`c_int`, cast to `usize` at the array sites).
-
-/// Raven `MAX_STRING_TOKENS` — max tokens resulting from Cmd_TokenizeString.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:381`
-pub const MAX_STRING_TOKENS: usize = 1024;
 
 /// Raven `cgs_t` — the entire cgame state that persists across an active
 /// connection, similar to `svs.clients[]`.

@@ -12,12 +12,13 @@ use crate::bg_channel::GameBgTraps;
 use crate::prelude::*;
 use std::ffi::CString;
 
-// Raven `DEFAULT_MINS_2`/`DEFAULT_MAXS_2`/`CROUCH_MAXS_2` (`bg_public.h`) —
-// redeclared locally per the existing per-file-local-const convention
-// (`g_nav.rs`/`g_weapon.rs` each carry their own copy rather than a shared
-// export).
-const DEFAULT_MINS_2: f32 = -24.0;
-const DEFAULT_MAXS_2: f32 = 40.0;
+// `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
+// (`c_int`, cast here to match the `vec3_t` components they seed).
+// Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
+const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
+const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
+// Raven `CROUCH_MAXS_2` (`bg_public.h`) — redeclared locally per the existing
+// per-file-local-const convention (no canonical shared export).
 const CROUCH_MAXS_2: f32 = 16.0;
 
 /// Raven `MAX_NPC_DATA_SIZE` — maximum size for NPC stat loading buffer.

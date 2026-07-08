@@ -2,6 +2,7 @@
 
 use core::ffi::c_char;
 
+use mp_qshared::shared::limits::MAX_NAME_LENGTH;
 use mp_qshared::shared::{qboolean, qhandle_t, sfxHandle_t, MAX_CLIENTS, MAX_STRING_CHARS};
 use mp_uishared::shared::display_context_def_t::displayContextDef_t;
 
@@ -30,11 +31,6 @@ const MAX_TEAMS: usize = 64;
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_local.h:566`
 const MAX_GAMETYPES: usize = 16;
-
-/// `MAX_NAME_LENGTH` — max length of a client name.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:400`
-const MAX_NAME_LENGTH: usize = 32;
 
 /// `MAX_MAPS`.
 ///
