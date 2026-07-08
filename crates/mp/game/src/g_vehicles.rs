@@ -113,6 +113,7 @@ const ROLL: usize = 2;
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:91-100`
 pub fn Vehicle_SetAnim(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     setAnimParts: c_int,
     anim: c_int,
@@ -123,15 +124,25 @@ pub fn Vehicle_SetAnim(
         // Raven: assert(ent->client);
         debug_assert!(!(*ent).client.is_null());
         let client = (*ent).client as *mut gclient_t;
-        // PORT-NOTE(bg-channel): MP `_JK2MP` path is
+        // MP `_JK2MP` path:
         //   BG_SetAnim(&client->ps, bgAllAnims[ent->localAnimIndex].anims,
         //              setAnimParts, anim, setAnimFlags, iBlend)
-        // but BG_SetAnim is a `PmoveContext<'_>` method (needs bgAllAnims off
-        // BgState + a PmoveContext receiver) and this boundary-set fn's LAW
-        // signature carries no bg channel. Staged pending the channel retrofit;
-        // the legsAnim copy below (which reads the value BG_SetAnim would set)
-        // is transcribed faithfully so the shape is preserved.
-        let _ = (setAnimParts, anim, setAnimFlags, iBlend);
+        // `BG_SetAnim` is a `PmoveContext` method (`bgAllAnims` off `BgState`);
+        // build a pm-null per-call context from `ctx`, matching the `G_SetAnim`
+        // game-tier wrapper precedent (`g_utils.rs`).
+        let ps = &mut (*client).ps as *mut playerState_t;
+        let anims = (*ctx.world).bg_state.bgAllAnims[(*ent).localAnimIndex as usize].anims;
+        let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
+        let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+            world: ctx.world,
+            engine: ctx.engine,
+        };
+        let mut pmc = crate::bg_channel::PmoveContext::new(
+            &mut (*ctx.world).bg_state,
+            &traps,
+            &mut callbacks,
+        );
+        pmc.BG_SetAnim(ps, anims, setAnimParts, anim, setAnimFlags, iBlend);
         (*ent).s.legsAnim = (*client).ps.legsAnim;
     }
 }
@@ -1445,7 +1456,7 @@ pub fn UpdateRider(
                             (*pVeh).m_EjectDir = VEH_EJECT_LEFT;
                         }
                         _VectorScale((*pc).ps.velocity, 0.25f32, &mut (*rc).ps.velocity);
-                        Vehicle_SetAnim(rider, SETANIM_BOTH, Anim, iFlags, iBlend);
+                        Vehicle_SetAnim(ctx, rider, SETANIM_BOTH, Anim, iFlags, iBlend);
                         // just to make sure it's cleared when roll is done
                         (*rc).ps.weaponTime = (*rc).ps.torsoTimer - 200;
                         crate::g_utils::G_AddEvent(rider, EV_ROLL as c_int, 0);
@@ -1480,7 +1491,7 @@ pub fn UpdateRider(
                     }
 
                     _VectorScale((*pc).ps.velocity, 0.25f32, &mut (*rc).ps.velocity);
-                    Vehicle_SetAnim(rider, SETANIM_BOTH, Anim, iFlags, iBlend);
+                    Vehicle_SetAnim(ctx, rider, SETANIM_BOTH, Anim, iFlags, iBlend);
                 }
             } else {
                 // Flying, so just fall off.
@@ -1520,6 +1531,7 @@ pub fn UpdateRider(
                         crate::g_utils::G_AddEvent(rider, (EV_JUMP) as i32, 0);
                     }
                     Vehicle_SetAnim(
+                        ctx,
                         rider,
                         SETANIM_BOTH,
                         animNumber_t::BOTH_JUMP1 as c_int,
@@ -1552,6 +1564,7 @@ pub fn UpdateRider(
                     if ((*pVeh).m_ulFlags & (VEH_FLYING as u64)) == 0 {
                         _VectorScale((*pc).ps.velocity, 0.25f32, &mut (*rc).ps.velocity);
                         Vehicle_SetAnim(
+                            ctx,
                             rider,
                             SETANIM_BOTH,
                             Anim,

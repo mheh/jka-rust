@@ -1598,11 +1598,20 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
             if (*target).s.number < MAX_CLIENTS as c_int && (*tcl).ps.m_iVehicleNum != 0 {
                 //a player on a vehicle
-                // PORT-NOTE(vehicle-vtable): faithful Raven grabs
-                // `vehEnt->m_pVehicle->m_pVehicleInfo->Eject(...)` — the
-                // vehicle vtable dispatch is not in this packet's resolved call
-                // surface. Left as a no-op eject; the surrounding grip logic is
-                // otherwise faithful.
+                let vehEnt = &mut (*ctx.world).g_entities[(*tcl).ps.m_iVehicleNum as usize]
+                    as *mut gentity_t;
+                if (*vehEnt).inuse != qfalse
+                    && !(*vehEnt).client.is_null()
+                    && !(*vehEnt).m_pVehicle.is_null()
+                {
+                    let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+                    if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
+                        || (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_ANIMAL
+                    {
+                        //push the guy off
+                        crate::veh_dispatch::eject(ctx, pVeh, target as *mut bgEntity_t, qfalse);
+                    }
+                }
             }
             (*cl).ps.fd.forceGripEntityNum = (tr.entityNum) as i32;
             (*tcl).ps.fd.forceGripStarted = level_time as f32;
@@ -3892,11 +3901,28 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                                 && (*pcl).ps.m_iVehicleNum != 0
                                 && dirLen <= 128.0
                             {
-                                // PORT-NOTE(vehicle-vtable): faithful Raven grabs
-                                // `vehEnt->m_pVehicle->m_pVehicleInfo->Eject(...)`
-                                // — the vehicle vtable dispatch is not in
-                                // this packet's resolved call surface; left as a
-                                // no-op eject.
+                                //a player on a vehicle
+                                let vehEnt = &mut (*ctx.world).g_entities
+                                    [(*pcl).ps.m_iVehicleNum as usize]
+                                    as *mut gentity_t;
+                                if (*vehEnt).inuse != qfalse
+                                    && !(*vehEnt).client.is_null()
+                                    && !(*vehEnt).m_pVehicle.is_null()
+                                {
+                                    let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+                                    if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
+                                        || (*(*pVeh).m_pVehicleInfo).r#type
+                                            == vehicleType_t::VH_ANIMAL
+                                    {
+                                        //push the guy off
+                                        crate::veh_dispatch::eject(
+                                            ctx,
+                                            pVeh,
+                                            push_list[x] as *mut bgEntity_t,
+                                            qfalse,
+                                        );
+                                    }
+                                }
                             }
                         }
                     }

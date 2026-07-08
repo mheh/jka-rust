@@ -1782,9 +1782,10 @@ pub fn TryUse(ctx: GameContext<'_>, ent: *mut gentity_t) {
             let current_veh =
                 &mut world.g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
             if (*current_veh).inuse != qfalse && !(*current_veh).m_pVehicle.is_null() {
-                // PORT-NOTE(vehicle-dispatch-not-wired): Vehicle vtable (Eject/Board) dispatch is not wired.
-                // Skipping vehicle eject/board logic pending vehicle subsystem completion.
-                (*client).pers.cmd.buttons &= !BUTTON_USE;
+                let pVeh = (*current_veh).m_pVehicle as *mut Vehicle_t;
+                if (*pVeh).m_iBoarding == 0 {
+                    crate::veh_dispatch::eject(ctx, pVeh, ent as *mut bgEntity_t, qfalse);
+                }
                 return;
             }
         }
@@ -1855,9 +1856,26 @@ pub fn TryUse(ctx: GameContext<'_>, ent: *mut gentity_t) {
             && (*target).s.NPC_class == CLASS_VEHICLE
             && ((*client).ps.zoomMode == qfalse)
         {
-            // PORT-NOTE(vehicle-dispatch-not-wired): Vehicle vtable dispatch not available.
-            (*client).pers.cmd.buttons &= !BUTTON_USE;
-            return;
+            //if target is a vehicle then perform appropriate checks
+            let pVeh = (*target).m_pVehicle as *mut Vehicle_t;
+            if !(*pVeh).m_pVehicleInfo.is_null() {
+                if (*ent).r.ownerNum == (*target).s.number {
+                    //user is already on this vehicle so eject him
+                    crate::veh_dispatch::eject(ctx, pVeh, ent as *mut bgEntity_t, qfalse);
+                } else {
+                    // Otherwise board this vehicle.
+                    if world.cvars.g_gametype.integer < GT_TEAM
+                        || (*target).alliedTeam == 0
+                        || ((*target).alliedTeam == (*client).sess.sessionTeam)
+                    {
+                        //not belonging to a team, or client is on same team
+                        crate::veh_dispatch::board(ctx, pVeh, ent as *mut bgEntity_t);
+                    }
+                }
+                //clear the damn button!
+                (*client).pers.cmd.buttons &= !BUTTON_USE;
+                return;
+            }
         }
 
         // Check for dispenser usage

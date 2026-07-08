@@ -266,7 +266,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
             anim = BOTH_VT_BUCK;
             iBlend = 500;
-            Vehicle_SetAnim(parent, SETANIM_LEGS, BOTH_VT_BUCK as c_int, iFlags, iBlend);
+            Vehicle_SetAnim(ctx, parent, SETANIM_LEGS, BOTH_VT_BUCK as c_int, iFlags, iBlend);
             return;
         }
 
@@ -292,9 +292,9 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 (*pVeh).m_iBoarding = level_time + iAnimLen;
 
                 iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
-                Vehicle_SetAnim(parent, SETANIM_LEGS, anim as c_int, iFlags, iBlend);
+                Vehicle_SetAnim(ctx, parent, SETANIM_LEGS, anim as c_int, iFlags, iBlend);
                 if !pilot.is_null() {
-                    Vehicle_SetAnim(pilot, SETANIM_BOTH, anim as c_int, iFlags, iBlend);
+                    Vehicle_SetAnim(ctx, pilot, SETANIM_BOTH, anim as c_int, iFlags, iBlend);
                 }
                 return;
             } else if (*pVeh).m_iBoarding <= level_time {
@@ -341,7 +341,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             }
         }
 
-        Vehicle_SetAnim(parent, SETANIM_LEGS, anim as c_int, iFlags, iBlend);
+        Vehicle_SetAnim(ctx, parent, SETANIM_LEGS, anim as c_int, iFlags, iBlend);
     }
 }
 
@@ -535,7 +535,7 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             }
         }
 
-        Vehicle_SetAnim(pilot, SETANIM_BOTH, anim as c_int, iFlags, iBlend);
+        Vehicle_SetAnim(ctx, pilot, SETANIM_BOTH, anim as c_int, iFlags, iBlend);
     }
 }
 

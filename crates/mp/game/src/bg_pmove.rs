@@ -361,10 +361,10 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_SetVehicleAngles`.
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:482-635`
-    // PORT-NOTE(vehicle-angles-normal-by-value): resolved LAW keeps `normal` by value, so the Raven `else if (normal)`
-    // NULL test cannot be expressed — the "in air" (normal==NULL) branch is unreachable here
-    // and callers pass a zero vec for the flying case. Reported as a shape_mismatch.
-    pub fn PM_SetVehicleAngles(&mut self, normal: vec3_t) {
+    // The Raven C parameter is `vec3_t normal` (a `float*`), and the body branches
+    // on `else if (normal)` vs `else` (NULL == in air). Ported as `Option<vec3_t>`
+    // so the NULL test is faithful: `Some` = valid ground surface, `None` = in air.
+    pub fn PM_SetVehicleAngles(&mut self, normal: Option<vec3_t>) {
         unsafe {
             let pEnt = self.pm_entSelf;
             if pEnt.is_null() || (*pEnt).s.NPC_class != CLASS_VEHICLE as c_int {
@@ -395,8 +395,8 @@ impl PmoveContext<'_> {
                 //in water
                 vAngles[PITCH] += ((*(*self.pm).ps).viewangles[PITCH] - vAngles[PITCH]) * 0.75
                     + (pitchBias as f64 * 0.5) as f32;
-            } else {
-                //have a valid surface below me (normal is always present under LAW)
+            } else if let Some(normal) = normal {
+                //have a valid surface below me
                 self.PM_pitch_roll_for_slope(pEnt, normal, &mut vAngles);
                 if self.pml.groundTrace.contents & (CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA)
                     != 0
@@ -405,6 +405,11 @@ impl PmoveContext<'_> {
                     vAngles[PITCH] += ((*(*self.pm).ps).viewangles[PITCH] - vAngles[PITCH]) * 0.5
                         + (pitchBias * 0.5);
                 }
+            } else {
+                //in air, let pitch match view...?
+                vAngles[PITCH] = (*(*self.pm).ps).viewangles[PITCH] * 0.5 + pitchBias;
+                //don't bank so fast when in the air
+                vehicleBankingSpeed *= 0.125 * self.pml.frametime;
             }
 
             //NOTE: if angles are flat and we're moving through air (not on ground), then pitch/bank?
@@ -681,15 +686,14 @@ impl PmoveContext<'_> {
             }
             if self.pml.groundPlane != qfalse {
                 let n = self.pml.groundTrace.plane.normal;
-                self.PM_SetVehicleAngles(n);
+                self.PM_SetVehicleAngles(Some(n));
                 // We're on the ground.
                 (*pVeh).m_ulFlags &= !(VEH_FLYING as u64);
 
                 (*pVeh).m_vAngularVelocity = 0.0;
             } else {
-                // NULL call: flying-in-air; by-value normal cannot express NULL
-                // (see PORT-NOTE(vehicle-angles-normal-by-value) on `PM_SetVehicleAngles`).
-                self.PM_SetVehicleAngles(crate::q_math::vec3_origin);
+                // NULL call: flying-in-air (Raven passes NULL for `normal`).
+                self.PM_SetVehicleAngles(None);
                 // We're flying in the air.
                 (*pVeh).m_ulFlags |= VEH_FLYING as u64;
 

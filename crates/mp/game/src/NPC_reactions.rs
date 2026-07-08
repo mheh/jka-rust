@@ -1085,19 +1085,20 @@ pub fn NPC_Use(
         if !client.is_null() && !npc.is_null() {
             // Check if this is a vehicle
             if (*client).NPC_class as c_int == CLASS_VEHICLE {
-                // PORT-NOTE(vehicle-vtable): CLASS_VEHICLE entity calls C++ vehicleInfo_t vtable methods
-                // (EjectAll, Eject, Board) which are deferred per porting-rules §F (C++ track)
-                let m_vehicle = (*self_).m_pVehicle;
-                if !m_vehicle.is_null() {
-                    // Check if I used myself, or if other is riding this vehicle
+                // If this is a vehicle, let the other guy board it.
+                let pVeh = (*self_).m_pVehicle as *mut Vehicle_t;
+                if !pVeh.is_null() && !(*pVeh).m_pVehicleInfo.is_null() {
+                    //if I used myself, eject everyone on me
                     if other == self_ {
-                        // Eject everyone on me (deferred: pVeh->m_pVehicleInfo->EjectAll(pVeh))
-                    } else if (*other).s.owner == (*self_).s.number {
-                        // If other is already riding this vehicle (self), eject him
-                        // (deferred: pVeh->m_pVehicleInfo->Eject(pVeh, (bgEntity_t *)other, qfalse))
-                    } else {
-                        // Otherwise board this vehicle
-                        // (deferred: pVeh->m_pVehicleInfo->Board(pVeh, (bgEntity_t *)other))
+                        crate::veh_dispatch::eject_all(ctx, pVeh);
+                    }
+                    // If other is already riding this vehicle (self), eject him.
+                    else if (*other).s.owner == (*self_).s.number {
+                        crate::veh_dispatch::eject(ctx, pVeh, other as *mut bgEntity_t, qfalse);
+                    }
+                    // Otherwise board this vehicle.
+                    else {
+                        crate::veh_dispatch::board(ctx, pVeh, other as *mut bgEntity_t);
                     }
                 }
             } else if crate::NPC_AI_Jedi::Jedi_WaitingAmbush(self_) != 0 {
@@ -1109,8 +1110,10 @@ pub fn NPC_Use(
                 && (*activator).s.number == 0
                 && (*client).NPC_class as c_int == CLASS_GONK
             {
-                // Must be using the gonk, so attempt to give battery power
-                // (deferred: Add_Batteries(activator, &self->client->ps.batteryCharge))
+                // Must be using the gonk, so attempt to give battery power.
+                // Oracle itself leaves the Add_Batteries call commented out
+                // (`//rwwFIXMEFIXME: support for this?`), so this is a faithful
+                // empty body — not a port gap.
             }
 
             if !(*self_).behaviorSet[BSET_USE as usize].is_null() {
