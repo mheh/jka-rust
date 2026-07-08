@@ -25,11 +25,9 @@ use crate::level::damage_flags::{
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// Raven `MASK_SHOT` (`CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_CORPSE|CONTENTS_TERRAIN`);
-// the `CONTENTS_*` bits come from the prelude's `surface_flags` re-export. Local
-// `const` mirrors the same in-repo convention as `NPC_combat.rs`.
-// Source: `oracle/oracle/codemp/game/surfaceflags.h` (masks in `bg_public.h:1170`)
-const MASK_SHOT: c_int = CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_CORPSE | CONTENTS_TERRAIN;
+// `MASK_SHOT` resolves via the prelude's `surface_flags` re-export (canonical
+// `mp_qshared::shared::surface_flags::MASK_SHOT`,
+// `oracle/oracle/codemp/game/bg_public.h:1177`); no local mirror.
 
 // Raven `DEFAULT_MINS_2` (`bg_public.h:41`); file-local per the same
 // convention as `g_vehicles.rs`/`ai_wpnav.rs`.
@@ -167,15 +165,12 @@ const EMPLACED_GUN_HEALTH: c_int = 800;
 // original — still a plain `#define` there, never externed).
 const MAX_STRAFE_TIME: f32 = 2000.0;
 
-// Local mirrors of the same `surfaceflags.h` masks used across this file
-// (`g_items.rs`/`g_turret_G2.rs` precedent).
-const CONTENTS_LIGHTSABER: c_int = 0x0004_0000;
-const CONTENTS_SHOTCLIP: c_int = 0x0000_0080;
-const MASK_SOLID: c_int = CONTENTS_SOLID;
-
-// Raven `#define SVF_BROADCAST 0x00000020` (`g_local.h`); local mirror,
-// same in-repo convention as `g_utils.rs`/`g_items.rs`.
-const SVF_BROADCAST: c_int = 0x0000_0020;
+// `CONTENTS_LIGHTSABER`, `CONTENTS_SHOTCLIP`, `MASK_SOLID`, and `SVF_BROADCAST`
+// resolve via the prelude re-exports (canonical `mp_qshared::shared::surface_flags`
+// / `crate::g_public_consts`); no local mirrors. The former local
+// `MASK_SOLID = CONTENTS_SOLID` dropped `CONTENTS_TERRAIN` relative to Raven's
+// `#define MASK_SOLID (CONTENTS_SOLID|CONTENTS_TERRAIN)` (`bg_public.h:1171`) — a
+// trace-mask parity bug now fixed by deferring to the canonical value.
 
 // Raven `team_t::TEAM_SPECTATOR` (`bg_public.h`); local mirror, same
 // in-repo convention as `g_team.rs`.
@@ -323,7 +318,6 @@ pub fn WP_FireBryarPistol(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qb
     }
 }
 
-// PORT-NOTE(bg-dep): `MASK_SHOT`/`CONTENTS_LIGHTSABER` (q_shared.h content/trace mask flags) are not yet ported anywhere in the crate graph and are not in the packet's resolved call surface — where do these live once ported?
 /// Raven `WP_FireTurretMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:304-326`
@@ -359,7 +353,6 @@ pub fn WP_FireTurretMissile(
     }
 }
 
-// PORT-NOTE(bg-dep): `MASK_SHOT`/`CONTENTS_LIGHTSABER` (q_shared.h content/trace mask flags) are not yet ported anywhere in the crate graph and are not in the packet's resolved call surface — where do these live once ported?
 /// Raven `WP_FireGenericBlasterMissile`.
 ///
 /// Only the seeker drone uses this, but it might be useful for other things
@@ -393,7 +386,6 @@ pub fn WP_FireGenericBlasterMissile(
     }
 }
 
-// PORT-NOTE(bg-dep): `MASK_SHOT`/`CONTENTS_LIGHTSABER` (q_shared.h content/trace mask flags) are not yet ported anywhere in the crate graph and are not in the packet's resolved call surface — where do these live once ported?
 /// Raven `WP_FireBlasterMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:359-383`
@@ -471,7 +463,6 @@ pub fn WP_FireTurboLaserMissile(
     }
 }
 
-// PORT-NOTE(bg-dep): `MASK_SHOT`/`CONTENTS_LIGHTSABER` (q_shared.h content/trace mask flags) are not yet ported anywhere in the crate graph and are not in the packet's resolved call surface — where do these live once ported?
 /// Raven `WP_FireEmplacedMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:422-448`
@@ -4695,8 +4686,8 @@ pub fn G_EstimateCamPos(
     camPos: &mut vec3_t,
 ) {
     unsafe {
-        // PORT-NOTE(unported-const): `CONTENTS_PLAYERCLIP` isn't in the ported
-        // surfaceflags set yet; referenced bare, reported as a missing symbol.
+        // `MASK_SOLID`/`CONTENTS_PLAYERCLIP` come from the prelude's `surface_flags`
+        // re-export. Raven: `int MASK_CAMERACLIP = (MASK_SOLID|CONTENTS_PLAYERCLIP);`
         let MASK_CAMERACLIP: c_int = MASK_SOLID | CONTENTS_PLAYERCLIP;
         let CAMERA_SIZE: f32 = 4.0;
         let cameramins: vec3_t = [-CAMERA_SIZE, -CAMERA_SIZE, -CAMERA_SIZE];
