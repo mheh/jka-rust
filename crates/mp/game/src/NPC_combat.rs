@@ -10,6 +10,7 @@
 
 use crate::entity::flags::FL_NOTARGET;
 use crate::g_combat::G_AlertTeam;
+use crate::g_team::S_COLOR_RED;
 use crate::g_items::{Add_Ammo, CheckItemCanBePickedUpByNPC};
 use crate::g_nav::NAV_FindClosestWaypointForPoint2;
 use crate::g_nav::{NAV_ClearPathToPoint, NAV_GetNearestNode, NPC_SetMoveGoal};
@@ -2296,14 +2297,17 @@ pub fn IdealDistance(ctx: GameContext<'_>, self_: *mut gentity_t) -> f32 {
 
 /// Raven `SP_point_combat`.
 ///
-/// Raven: the `#ifndef FINAL_BUILD` debug `Com_Printf` diagnostics are
-/// release-dead (no `va`/C-varargs seam is resolved yet either) — dropped
-/// per house ruling on debug-only prints (porting-rules §20).
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2516-2546`
 pub fn SP_point_combat(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let numCombatPoints = (*ctx.world).level.numCombatPoints as usize;
         if numCombatPoints >= MAX_COMBAT_POINTS {
+            let s = format!(
+                "{}ERROR:  Too many combat points, limit is {}\n",
+                S_COLOR_RED.to_str().unwrap(),
+                MAX_COMBAT_POINTS
+            );
+            Com_Printf(cstr(&s).as_ptr());
             G_FreeEntity(ctx, self_);
             return;
         }
@@ -2316,7 +2320,12 @@ pub fn SP_point_combat(ctx: GameContext<'_>, self_: *mut gentity_t) {
         );
 
         if G_CheckInSolid(ctx, self_, 1) != 0 {
-            //ERROR: combat point at %s in solid! — debug-only, dropped
+            let s = format!(
+                "{}ERROR: combat point at {} in solid!\n",
+                S_COLOR_RED.to_str().unwrap(),
+                cstr_to_str(vtos(ctx, (*self_).r.currentOrigin))
+            );
+            Com_Printf(cstr(&s).as_ptr());
         }
 
         (*ctx.world).level.combatPoints[numCombatPoints].origin = (*self_).r.currentOrigin;
@@ -2331,9 +2340,6 @@ pub fn SP_point_combat(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `CP_FindCombatPointWaypoints`.
 ///
-/// Raven: the `#ifndef FINAL_BUILD` debug `Com_Printf` diagnostic is
-/// release-dead — dropped per house ruling on debug-only prints
-/// (porting-rules §20).
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2548-2562`
 pub fn CP_FindCombatPointWaypoints(ctx: GameContext<'_>) {
     unsafe {
@@ -2342,6 +2348,15 @@ pub fn CP_FindCombatPointWaypoints(ctx: GameContext<'_>) {
             let origin = (*ctx.world).level.combatPoints[i].origin;
             (*ctx.world).level.combatPoints[i].waypoint =
                 NAV_FindClosestWaypointForPoint2(ctx, origin);
+
+            if (*ctx.world).level.combatPoints[i].waypoint == WAYPOINT_NONE {
+                let s = format!(
+                    "{}ERROR: Combat Point at {} has no waypoint!\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    cstr_to_str(vtos(ctx, (*ctx.world).level.combatPoints[i].origin))
+                );
+                Com_Printf(cstr(&s).as_ptr());
+            }
         }
     }
 }

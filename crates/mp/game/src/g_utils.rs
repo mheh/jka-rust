@@ -24,6 +24,9 @@ use crate::g_main::G_Printf;
 use crate::q_shared::Q_strcat;
 use crate::trap;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
+use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
+use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
+use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
 
 /// Raven `EV_EVENT_BIT1`.
 ///
@@ -834,18 +837,23 @@ pub fn G_InitGentity(ctx: GameContext<'_>, e: *mut gentity_t) {
 
 /// Raven `G_SpewEntList`.
 ///
+/// Referee build defines neither `FINAL_BUILD` nor `Q3_VM`, so Raven's
+/// `#ifndef VM_OR_FINAL_BUILD` `entspew.txt` file log is live there; ported
+/// alongside the (always-compiled) `Com_Printf` reporting.
 /// Source: `oracle/oracle/codemp/game/g_utils.c:705-787`
 pub fn G_SpewEntList(ctx: GameContext<'_>) {
-    // Raven `#ifndef VM_OR_FINAL_BUILD` file-write branch (`entspew.txt`,
-    // `g_utils.c:721-724,749-753,767-772,780-785`) is dev/debug tooling atop
-    // the same `Com_Printf` lines below; dropped per §20 (dead surface for
-    // the shipping VM build), keeping the printf reporting faithful.
     unsafe {
         let world = &*ctx.world;
         let mut numNPC = 0;
         let mut numProjectile = 0;
         let mut numTempEnt = 0;
         let mut numTempEntST = 0;
+
+        let mut fh: fileHandle_t = 0;
+        trap::FS_FOpenFile(
+            ctx.engine,
+            GFsFopenFileArgs::new(CString::new("entspew.txt").unwrap(), &mut fh, FS_WRITE),
+        );
 
         for i in 0..mp_qshared::shared::ENTITYNUM_MAX_NORMAL as usize {
             let ent = &world.g_entities[i];
@@ -859,10 +867,52 @@ pub fn G_SpewEntList(ctx: GameContext<'_>) {
                     if ent.s.eFlags & EF_SOUNDTRACKER != 0 {
                         numTempEntST += 1;
                     }
+
+                    let s = format!(
+                        "TEMPENT {:4}: EV {}\n",
+                        ent.s.number,
+                        ent.s.eType - mp_bg::public::entity_type::entityType_t::ET_EVENTS as c_int
+                    );
+                    Com_Printf(cstr(&s).as_ptr());
+                    if fh != 0 {
+                        let bytes = s.as_bytes();
+                        trap::FS_Write(
+                            ctx.engine,
+                            GFsWriteArgs::new(bytes.as_ptr(), bytes.len() as c_int, fh),
+                        );
+                    }
+                }
+
+                let className = if !ent.classname.is_null() && *ent.classname != 0 {
+                    cstr_to_str(ent.classname)
+                } else {
+                    "Unknown".to_string()
+                };
+                let s = format!("ENT {:4}: Classname {}\n", ent.s.number, className);
+                Com_Printf(cstr(&s).as_ptr());
+                if fh != 0 {
+                    let bytes = s.as_bytes();
+                    trap::FS_Write(
+                        ctx.engine,
+                        GFsWriteArgs::new(bytes.as_ptr(), bytes.len() as c_int, fh),
+                    );
                 }
             }
         }
-        let _ = (numNPC, numProjectile, numTempEnt, numTempEntST);
+
+        let s = format!(
+            "TempEnt count: {}\nTempEnt ST: {}\nNPC count: {}\nProjectile count: {}\n",
+            numTempEnt, numTempEntST, numNPC, numProjectile
+        );
+        Com_Printf(cstr(&s).as_ptr());
+        if fh != 0 {
+            let bytes = s.as_bytes();
+            trap::FS_Write(
+                ctx.engine,
+                GFsWriteArgs::new(bytes.as_ptr(), bytes.len() as c_int, fh),
+            );
+            trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(fh));
+        }
     }
 }
 

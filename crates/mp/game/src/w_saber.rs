@@ -334,8 +334,10 @@ pub fn G_SaberAttackPower(ctx: GameContext<'_>, ent: *mut gentity_t, attacking: 
                 }
             }
 
-            // (Oracle's `#ifndef FINAL_BUILD` `g_saberDebugPrint` Com_Printf is
-            // dropped — variadic Com_Printf seam pending; no behavioral effect.)
+            if (*ctx.world).cvars.g_saberDebugPrint.integer > 1 {
+                let s = format!("Client {}: ATT STR: {}\n", (*ent).s.number, baseLevel);
+                crate::g_main::Com_Printf(cstr(&s).as_ptr());
+            }
         }
 
         if ((*client).ps.brokenLimbs & (1 << (BROKENLIMB_RARM as c_int))) != 0
