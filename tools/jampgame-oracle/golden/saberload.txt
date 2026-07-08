@@ -6,9 +6,9 @@ fullName "Kyle Katarn's Lightsaber"
 type 1
 model "models/weapons2/saber_reborn/saber_w.glm"
 skin 0
-soundOn 0
-soundLoop 0
-soundOff 0
+soundOn 1
+soundLoop 2
+soundOff 3
 numBlades 1
 blade0 color 4 radius 40400000 lengthMax 42200000
 blade1 color 4 radius 40400000 lengthMax 42200000
@@ -95,9 +95,9 @@ fullName "Training Staff"
 type 2
 model "models/weapons2/saber_staff/saber_staff_w.glm"
 skin 0
-soundOn 0
-soundLoop 0
-soundOff 0
+soundOn 1
+soundLoop 2
+soundOff 3
 numBlades 2
 blade0 color 0 radius 40800000 lengthMax 42100000
 blade1 color 3 radius 40800000 lengthMax 42000000
@@ -121,7 +121,7 @@ singleBladeStyle 2
 saberFlags 48
 saberFlags2 65536
 spinSound 0
-swingSound 0 0 0
+swingSound 4 5 6
 moveSpeedScale 3f800000
 animSpeedScale 3f800000
 kataMove -1
@@ -158,7 +158,7 @@ splashKnockback 00000000
 trailStyle2 2
 g2MarksShader2 0
 g2WeaponMarkShader2 0
-hit2Sound 0 0 0
+hit2Sound 7 8 9
 block2Sound 0 0 0
 bounce2Sound 0 0 0
 blockEffect2 0
@@ -187,9 +187,9 @@ fullName "Edge Case Saber"
 type 6
 model "models/weapons2/saber_reborn/saber_w.glm"
 skin 1
-soundOn 0
-soundLoop 0
-soundOff 0
+soundOn 1
+soundLoop 2
+soundOff 3
 numBlades 1
 blade0 color 5 radius 3e800000 lengthMax 40800000
 blade1 color 5 radius 3e800000 lengthMax 40800000
@@ -235,7 +235,7 @@ bladeStyle2Start 0
 trailStyle 0
 g2MarksShader 0
 g2WeaponMarkShader 0
-hitSound 0 0 0
+hitSound 7 8 9
 blockSound 0 0 0
 bounceSound 0 0 0
 blockEffect 0
@@ -277,9 +277,9 @@ fullName "Broken Saber"
 type 1
 model "models/weapons2/saber_reborn/saber_w.glm"
 skin 0
-soundOn 0
-soundLoop 0
-soundOff 0
+soundOn 1
+soundLoop 2
+soundOff 3
 numBlades 1
 blade0 color 2 radius 40400000 lengthMax 41f00000
 blade1 color 2 radius 40400000 lengthMax 41f00000
@@ -363,9 +363,9 @@ fullName "lightsaber"
 type 1
 model "models/weapons2/saber_reborn/saber_w.glm"
 skin 0
-soundOn 0
-soundLoop 0
-soundOff 0
+soundOn 1
+soundLoop 2
+soundOff 3
 numBlades 1
 blade0 color 0 radius 40400000 lengthMax 42000000
 blade1 color 0 radius 40400000 lengthMax 42000000
@@ -449,9 +449,9 @@ fullName "Kyle Katarn's Lightsaber"
 type 1
 model "models/weapons2/saber_reborn/saber_w.glm"
 skin 0
-soundOn 0
-soundLoop 0
-soundOff 0
+soundOn 1
+soundLoop 2
+soundOff 3
 numBlades 1
 blade0 color 4 radius 40400000 lengthMax 42200000
 blade1 color 4 radius 40400000 lengthMax 42200000

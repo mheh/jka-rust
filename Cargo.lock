@@ -202,6 +202,7 @@ version = "0.1.0"
 dependencies = [
  "mp_abi",
  "mp_bg",
+ "mp_engine_qcommon",
  "mp_engine_select",
  "mp_qshared",
  "native_platform",

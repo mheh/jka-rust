@@ -596,19 +596,28 @@ fn bglib_parity() {
 // PORTED `WP_SaberLoadParms` + `WP_SaberParseParms` over the same
 // `fixtures/sabers/*.sab`. A tiny `TestTraps` serves the fixtures dir through
 // the real `BgTraps` FS seam and mints deterministic skin handles; the
-// context-free sound-registration order is observed through the port's
-// `saber_snd_tape_*` seam. See `tools/jampgame-oracle/README.md`.
+// context-free sound registrations reach a configstring-servicing mock engine
+// through the real `g_strap` seam (real 1,2,3… indices), and their order is
+// observed through the port's `saber_snd_tape_*` seam. See
+// `tools/jampgame-oracle/README.md`.
 mod saberload {
     use super::{compare, oracle_dir, CBits};
     use core::ffi::{c_char, c_int, c_void};
     use std::cell::{Cell, RefCell};
+    use std::collections::BTreeMap;
+    use std::ffi::CStr;
     use std::fmt::Write as _;
     use std::path::PathBuf;
+    use std::sync::OnceLock;
 
+    use mp_abi::game::imports::MpGameImport;
+    use mp_engine_qcommon::vm::{arm_game_slot, game_syscall_trampoline};
+    use mp_engine_select::Engine;
     use mp_game::bg_channel::{BgState, BgTraps};
     use mp_game::bg_saberLoad::{
         saber_snd_tape_drain, saber_snd_tape_enable, WP_SaberLoadParms, WP_SaberParseParms,
     };
+    use mp_game::g_strap::init_strap_engine;
     use mp_game::prelude::*;
 
     // The saber names parsed, in order. Mirrors main_saberload.c's g_names.
@@ -620,6 +629,61 @@ mod saberload {
         "nonexistent_xyz",
         "",
     ];
+
+    // ---- strap-seam mock engine (configstrings) ----------------------------
+    // `BG_SoundIndex` -> `G_SoundIndex` is the real configstring registration
+    // (`G_FindConfigstringIndex` over `CS_SOUNDS`), reached ctx-free through the
+    // `g_strap` seam cell. Serve it with a real engine stand-in: the C-variadic
+    // inbound trampoline (`game_syscall_trampoline` armed via `arm_game_slot` —
+    // the jampgame smoke-test precedent, crates/jampgame/tests/common/mod.rs)
+    // dispatching to a configstring table that persists across all six parses,
+    // like a real engine's per-level table. Distinct names mint 1,2,3…; repeats
+    // dedup. The oracle dumper's G_SoundIndex stub mirrors these semantics.
+    thread_local! {
+        static CONFIGSTRINGS: RefCell<BTreeMap<isize, Vec<u8>>> =
+            const { RefCell::new(BTreeMap::new()) };
+    }
+
+    /// Fixed-arity dispatch target behind the trampoline: services
+    /// `G_GET_CONFIGSTRING`/`G_SET_CONFIGSTRING` only; any other import on the
+    /// saber-load path is a test bug and panics loudly.
+    extern "C-unwind" fn cs_syscall(_ctx: *mut c_void, args: *const isize) -> isize {
+        const GET: isize = MpGameImport::G_GET_CONFIGSTRING as isize;
+        const SET: isize = MpGameImport::G_SET_CONFIGSTRING as isize;
+        // SAFETY: `args` is the trampoline's 16-word frame (`args[0]` = import
+        // number, the rest the syscall's words in encode order).
+        unsafe {
+            match *args {
+                GET => {
+                    // ( int num, char *buffer, int bufferSize ) — the stored
+                    // string ("" when unset), NUL-terminated, truncated.
+                    let (num, buf, size) = (*args.add(1), *args.add(2) as *mut u8, *args.add(3));
+                    let s =
+                        CONFIGSTRINGS.with(|cs| cs.borrow().get(&num).cloned().unwrap_or_default());
+                    if !buf.is_null() && size > 0 {
+                        let n = s.len().min(size as usize - 1);
+                        core::ptr::copy_nonoverlapping(s.as_ptr(), buf, n);
+                        *buf.add(n) = 0;
+                    }
+                    0
+                }
+                SET => {
+                    // ( int num, const char *string )
+                    let (num, ptr) = (*args.add(1), *args.add(2) as *const c_char);
+                    let s = if ptr.is_null() {
+                        Vec::new()
+                    } else {
+                        CStr::from_ptr(ptr).to_bytes().to_vec()
+                    };
+                    CONFIGSTRINGS.with(|cs| {
+                        cs.borrow_mut().insert(num, s);
+                    });
+                    0
+                }
+                other => panic!("saberload mock engine: unmodeled syscall #{other}"),
+            }
+        }
+    }
 
     /// A fixtures-backed `BgTraps`: the FS calls read `<dir>/sabers/*`, and
     /// `r_register_skin` mints a per-saber counter with a name log. Every other
@@ -946,6 +1010,15 @@ mod saberload {
 
     #[test]
     fn saberload_parity() {
+        // Arm the `g_strap` seam (the GAME_INIT stand-in) BEFORE any parse —
+        // `WP_SaberSetDefaults` registers sounds immediately. The `Engine` is a
+        // process-static because the seam cell keeps a raw pointer to it.
+        arm_game_slot(core::ptr::null_mut(), cs_syscall);
+        static ENGINE: OnceLock<Engine> = OnceLock::new();
+        init_strap_engine(
+            ENGINE.get_or_init(|| Engine::new(game_syscall_trampoline as *const c_void)),
+        );
+
         let dir = oracle_dir().join("fixtures");
         let traps = TestTraps::new(dir);
         let mut bg = BgState::new();

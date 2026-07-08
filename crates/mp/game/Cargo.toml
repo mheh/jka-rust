@@ -15,3 +15,10 @@ mp_abi = { path = "../abi" }
 mp_engine_select = { path = "../engine-select" }
 # STATE-D9: zeroed_box/ZeroValid for GameWorld construction (doc-sanctioned edge).
 native_platform = { path = "../../native/platform" }
+
+[dev-dependencies]
+# Saberload parity test (tests/jampgame_parity.rs): the inbound C-variadic
+# syscall trampoline + `arm_game_slot`, so the test's configstring-servicing
+# mock engine can sit behind the real `CEngine` seam (the jampgame smoke-test
+# precedent, crates/jampgame/tests/common/mod.rs).
+mp_engine_qcommon = { path = "../engine/qcommon" }
