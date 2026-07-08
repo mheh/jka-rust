@@ -1559,10 +1559,13 @@ pub fn G_UseDispenserOn(
     target: *mut gentity_t,
 ) {
     unsafe {
-        const HI_HEALTHDISP: c_int = 0;
-        const HI_AMMODISP: c_int = 1;
-        const STAT_HEALTH: usize = 0;
-        const STAT_MAX_HEALTH: usize = 1;
+        // HI_HEALTHDISP (8) / HI_AMMODISP (9) come from the canonical prelude glob
+        // (mp_bg::public::holdable) so the value matches the STAT_HOLDABLE_ITEMS bit
+        // and the dispType TryUse passes in. STAT_HEALTH (0) / STAT_MAX_HEALTH (8)
+        // are the canonical statIndex_t slots (mp_bg::public::stat_index) cast to
+        // usize for indexing — the old local `STAT_MAX_HEALTH = 1` read STAT_HOLDABLE_ITEM.
+        const STAT_HEALTH: usize = statIndex_t::STAT_HEALTH as usize;
+        const STAT_MAX_HEALTH: usize = statIndex_t::STAT_MAX_HEALTH as usize;
 
         let world = &*ctx.world;
         let level_time = world.level.time;
@@ -1605,12 +1608,16 @@ pub fn G_UseDispenserOn(
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1508-1544`
 pub fn G_CanUseDispOn(ctx: GameContext<'_>, ent: *mut gentity_t, dispType: c_int) -> c_int {
     unsafe {
-        const HI_HEALTHDISP: c_int = 0;
-        const HI_AMMODISP: c_int = 1;
-        const STAT_HEALTH: usize = 0;
-        const STAT_MAX_HEALTH: usize = 1;
-        const WP_NONE: c_int = 0;
-        // Raven `LAST_USEABLE_WEAPON` == `WP_BRYAR_OLD` (q_shared.h).
+        // HI_HEALTHDISP (8) / HI_AMMODISP (9) come from the canonical prelude glob
+        // (mp_bg::public::holdable) so the compared dispType matches TryUse's caller.
+        // STAT_HEALTH (0) / STAT_MAX_HEALTH (8) are canonical statIndex_t slots
+        // (mp_bg::public::stat_index); WP_NONE (0) is the canonical prelude value.
+        // The old local `STAT_MAX_HEALTH = 1` read STAT_HOLDABLE_ITEM, so the
+        // "he's hurt" check compared health against the wrong stat.
+        const STAT_HEALTH: usize = statIndex_t::STAT_HEALTH as usize;
+        const STAT_MAX_HEALTH: usize = statIndex_t::STAT_MAX_HEALTH as usize;
+        // Raven `#define LAST_USEABLE_WEAPON WP_BRYAR_OLD` (bg_weapons.h:43); the
+        // port has no shared const for it, so mirror it locally from canonical WP_BRYAR_OLD.
         const LAST_USEABLE_WEAPON: c_int = WP_BRYAR_OLD;
 
         //dead or invalid
@@ -1758,33 +1765,25 @@ pub fn TryHeal(ctx: GameContext<'_>, ent: *mut gentity_t, target: *mut gentity_t
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1618-1875`
 pub fn TryUse(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    const GT_SIEGE: c_int = 4;
-    const HANDEXTEND_NONE: c_int = 0;
-    const HANDEXTEND_DRAGGING: c_int = 0;
-    const TEAM_SPECTATOR: c_int = 3;
-    const BOTH_BUTTON_HOLD: c_int = 0;
-    const BOTH_CONSOLE1: c_int = 0;
-    const SETANIM_TORSO: c_int = 2;
-    const SETANIM_FLAG_OVERRIDE: c_int = 1;
-    const SETANIM_FLAG_HOLD: c_int = 2;
-    const PMF_FOLLOW: c_int = 0;
-    const MASK_OPAQUE: c_int = 0;
-    const CONTENTS_SOLID: c_int = 0;
-    const CONTENTS_BODY: c_int = 0;
-    const CONTENTS_ITEM: c_int = 0;
-    const CONTENTS_CORPSE: c_int = 0;
+    // GT_SIEGE (7), TEAM_SPECTATOR (3), PMF_FOLLOW (4096), SETANIM_TORSO (1),
+    // SETANIM_FLAG_OVERRIDE/HOLD, MASK_OPAQUE/CONTENTS_*, HI_HEALTHDISP (8)/
+    // HI_AMMODISP (9) and ENTITYNUM_NONE (1023) all resolve to the port's
+    // canonical constants via the prelude glob (mp_bg::public::{gametype,team,
+    // set_anim}, mp_qshared::shared::{surface_flags,limits}, qcommon::pm_flags,
+    // mp_bg::public::holdable). Only the enum-typed values need a local c_int
+    // cast, the same pattern commit 09afce35 established inside TryHeal.
+    const HANDEXTEND_NONE: c_int = forceHandAnims_t::HANDEXTEND_NONE as c_int;
+    const HANDEXTEND_DRAGGING: c_int = forceHandAnims_t::HANDEXTEND_DRAGGING as c_int;
+    const BOTH_BUTTON_HOLD: c_int = animNumber_t::BOTH_BUTTON_HOLD as c_int;
+    const BOTH_CONSOLE1: c_int = animNumber_t::BOTH_CONSOLE1 as c_int;
+    const CLASS_VEHICLE: c_int = class_t::CLASS_VEHICLE as c_int;
     const USE_DISTANCE: f32 = 64.0;
-    const HI_HEALTHDISP: c_int = 0;
-    const HI_AMMODISP: c_int = 1;
-    const HI_JETPACK: c_int = 2;
-    const CLASS_VEHICLE: c_int = 0;
-    const ENTITYNUM_NONE: c_int = 1023;
 
     unsafe {
         let world = &mut *ctx.world;
 
         if world.globals.gSiegeRoundBegun == qfalse
-            && world.cvars.g_gametype.value as c_int == GT_SIEGE
+            && world.cvars.g_gametype.integer == GT_SIEGE
         {
             return;
         }
@@ -1950,10 +1949,10 @@ pub fn TryUse(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         // Check for valid use target
         if ValidUseTarget(target) != qfalse
-            && (world.cvars.g_gametype.value as c_int != GT_SIEGE
+            && (world.cvars.g_gametype.integer != GT_SIEGE
                 || (*target).alliedTeam == 0
                 || (*target).alliedTeam != (*client).sess.sessionTeam
-                || (world.cvars.g_ff_objectives.value as c_int) != 0)
+                || world.cvars.g_ff_objectives.integer != 0)
         {
             if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD || (*client).ps.torsoAnim == BOTH_CONSOLE1
             {
@@ -1992,10 +1991,10 @@ pub fn TryUse(ctx: GameContext<'_>, ent: *mut gentity_t) {
 }
 
 fn goto_tryJetPack(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    const HI_JETPACK: c_int = 2;
-    const HI_AMMODISP: c_int = 1;
-    const ENTITYNUM_NONE: c_int = 1023;
-
+    // HI_JETPACK (7), HI_AMMODISP (9) and ENTITYNUM_NONE (1023) resolve to the
+    // port's canonical constants via the prelude glob (mp_bg::public::holdable,
+    // mp_qshared::shared::limits) so the STAT_HOLDABLE_ITEMS bit tests and the
+    // ItemUse_UseDisp / EV_USE_ITEM0 dispType all use the real values.
     unsafe {
         let world = &mut *ctx.world;
         let client = (*ent).client as *mut gclient_t;

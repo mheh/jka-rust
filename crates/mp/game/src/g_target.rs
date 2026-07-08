@@ -156,7 +156,11 @@ pub fn Use_Target_Delay(
             + (((*ent).wait + (*ent).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0)
                 as c_int;
         (*ent).think = Some(EntThink::Think_Target_Delay).into();
-        (*ent).activator = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), activator));
+        // NULL-safe: C stores the raw `activator` pointer (NULL stays NULL and
+        // Think_Target_Delay's G_UseTargets tolerates a NULL activator). `ent_id`
+        // would run `null.offset_from(base)` (UB) and store `Some(garbage)`; use
+        // `ent_id_opt` like every other Use handler so NULL maps to `None`.
+        (*ent).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
     }
 }
 
