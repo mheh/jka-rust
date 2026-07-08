@@ -194,14 +194,44 @@ pub fn RandFloat(ctx: GameContext<'_>, min: f32, max: f32) -> f32 {
 
 /// Raven `G_DebugBoxLines`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_saber.c:46-78`
+/// `DEBUG_SABER_BOX` is `#define`d unconditionally at `g_local.h:82`, so this
+/// compiles into every oracle game TU; every call site is further gated at
+/// runtime behind the `g_saberDebugBox` `CVAR_CHEAT` cvar (default `"0"`),
+/// which is why normal play — including the combat corpus — never draws
+/// these lines.
 ///
-/// Debug-only visualization: the oracle body compiles only under
-/// `DEBUG_SABER_BOX`, and every call site sits under the same guard. Per
-/// porting-rules §20 (drop dead surface with a note), this ships as a no-op —
-/// `mins`/`maxs` are never written, so the out-param reshape does not apply.
+/// Source: `oracle/oracle/codemp/game/w_saber.c:46-78`
 pub fn G_DebugBoxLines(ctx: GameContext<'_>, mins: vec3_t, maxs: vec3_t, duration: c_int) {
-    let _ = (ctx, mins, maxs, duration);
+    let mut start: vec3_t = [0.0; 3];
+    let mut end: vec3_t = [0.0; 3];
+
+    let x = maxs[0] - mins[0];
+    let y = maxs[1] - mins[1];
+
+    // top of box
+    _VectorCopy(maxs, &mut start);
+    _VectorCopy(maxs, &mut end);
+    start[0] -= x;
+    G_TestLine(ctx, start, end, 0x00000ff, duration);
+    end[0] = start[0];
+    end[1] -= y;
+    G_TestLine(ctx, start, end, 0x00000ff, duration);
+    start[1] = end[1];
+    start[0] += x;
+    G_TestLine(ctx, start, end, 0x00000ff, duration);
+    G_TestLine(ctx, start, maxs, 0x00000ff, duration);
+    // bottom of box
+    _VectorCopy(mins, &mut start);
+    _VectorCopy(mins, &mut end);
+    start[0] += x;
+    G_TestLine(ctx, start, end, 0x00000ff, duration);
+    end[0] = start[0];
+    end[1] += y;
+    G_TestLine(ctx, start, end, 0x00000ff, duration);
+    start[1] = end[1];
+    start[0] -= x;
+    G_TestLine(ctx, start, end, 0x00000ff, duration);
+    G_TestLine(ctx, start, mins, 0x00000ff, duration);
 }
 
 /// Raven `G_CanBeEnemy`.
@@ -454,6 +484,22 @@ pub fn SaberUpdateSelf(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).clipmask = 0;
         } else {
             // Standard contents (saber is active)
+            if (*ctx.world).cvars.g_saberDebugBox.integer == 1
+                || (*ctx.world).cvars.g_saberDebugBox.integer == 4
+            {
+                let mut dbgMins: vec3_t = [0.0; 3];
+                let mut dbgMaxs: vec3_t = [0.0; 3];
+
+                _VectorAdd((*ent).r.currentOrigin, (*ent).r.mins, &mut dbgMins);
+                _VectorAdd((*ent).r.currentOrigin, (*ent).r.maxs, &mut dbgMaxs);
+
+                G_DebugBoxLines(
+                    ctx,
+                    dbgMins,
+                    dbgMaxs,
+                    ((10.0f32 / (*ctx.world).cvars.g_svfps.integer as f32) * 100.0) as c_int,
+                );
+            }
             if (*ent).r.contents != CONTENTS_LIGHTSABER {
                 if (level_time - (*oc).lastSaberStorageTime) <= 200 {
                     // Only go back to solid once we're sure our owner has updated recently
@@ -3373,7 +3419,59 @@ pub fn WP_SabersIntersect(
                             }
                         }
 
-                        // DEBUG_SABER_BOX visualization dropped (porting-rules §20).
+                        if (*ctx.world).cvars.g_saberDebugBox.integer == 2
+                            || (*ctx.world).cvars.g_saberDebugBox.integer == 4
+                        {
+                            G_TestLine(
+                                ctx,
+                                saberBase1,
+                                saberTip1,
+                                (*ec1).saber[ent1SaberNum as usize].blade[ent1BladeNum as usize]
+                                    .color,
+                                500,
+                            );
+                            G_TestLine(
+                                ctx,
+                                saberTip1,
+                                saberTipNext1,
+                                (*ec1).saber[ent1SaberNum as usize].blade[ent1BladeNum as usize]
+                                    .color,
+                                500,
+                            );
+                            G_TestLine(
+                                ctx,
+                                saberTipNext1,
+                                saberBase1,
+                                (*ec1).saber[ent1SaberNum as usize].blade[ent1BladeNum as usize]
+                                    .color,
+                                500,
+                            );
+
+                            G_TestLine(
+                                ctx,
+                                saberBase2,
+                                saberTip2,
+                                (*ec2).saber[ent2SaberNum as usize].blade[ent2BladeNum as usize]
+                                    .color,
+                                500,
+                            );
+                            G_TestLine(
+                                ctx,
+                                saberTip2,
+                                saberTipNext2,
+                                (*ec2).saber[ent2SaberNum as usize].blade[ent2BladeNum as usize]
+                                    .color,
+                                500,
+                            );
+                            G_TestLine(
+                                ctx,
+                                saberTipNext2,
+                                saberBase2,
+                                (*ec2).saber[ent2SaberNum as usize].blade[ent2BladeNum as usize]
+                                    .color,
+                                500,
+                            );
+                        }
 
                         if tri_tri_intersect(
                             saberBase1,
@@ -4724,6 +4822,11 @@ pub fn CheckSaberDamage(
                         //fractional hit, the sooner you hit in the trace, the more damage you did
                         dmg = (fDmg * traceLength * (1.0f32 - tr.fraction) * 0.1f32 * 0.33f32)
                             .ceil() as c_int;
+                    }
+                    if (*ctx.world).cvars.g_saberDebugBox.integer == 3
+                        || (*ctx.world).cvars.g_saberDebugBox.integer == 4
+                    {
+                        G_TestLine(ctx, saberStart, saberEnd, 0x0000ff, 50);
                     }
                 }
                 if (*sc).ps.torsoAnim == BOTH_A1_SPECIAL as c_int
