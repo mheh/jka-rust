@@ -13,9 +13,7 @@
 //! `PORT-NOTE`/`todo!()`) — notably: several `(*world).bg_state.<table>`
 //! fields this pass assumes exist (`bgSiegeClasses`, `bg_itemlist`, `animTable`,
 //! `saberMoveData`, `bg_customSiegeSoundNames`, `gc_orders`, `gameNames`,
-//! `concat_args_line`) but are not yet confirmed landed on `BgState`; siege-team
-//! consts (`SIEGETEAM_TEAM1`/`_TEAM2`/`MAX_SIEGE_CLASSES`) used as literals
-//! pending the ported enum; and a scope cut
+//! `concat_args_line`) but are not yet confirmed landed on `BgState`; and a scope cut
 //! in `ClientCommand`'s `_DEBUG`/`VM_MEMALLOC_DEBUG`/most-of-`!FINAL_BUILD`
 //! debug-command branches (not transcribed this pass — see the PORT-NOTE at
 //! the `ClientCommand` dispatch tail).
@@ -196,8 +194,11 @@ pub fn DeathmatchScoreboardMessage(ctx: GameContext<'_>, ent: *mut gentity_t) {
 }
 
 /// Raven `MAX_CLIENT_SCORE_SEND`.
-/// Source: `oracle/oracle/codemp/game/g_cmds.c`
-const MAX_CLIENT_SCORE_SEND: c_int = 32;
+///
+/// No workspace canonical exists yet (belongs in `mp_bg` from `bg_public.h`);
+/// kept local at the oracle value. Consolidation candidate.
+/// Source: `oracle/oracle/codemp/game/bg_public.h:51`
+const MAX_CLIENT_SCORE_SEND: c_int = 20;
 
 /// Raven `Cmd_Score_f`.
 ///
@@ -765,7 +766,9 @@ pub fn Cmd_LevelShot_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
 // calls `trap_Argc`/`trap_Argv`/`trap_GetUserinfo`/`trap_SetUserinfo`; no
 // GameWorld/engine handle reachable here.
 pub fn Cmd_TeamTask_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    const MAX_INFO_STRING: usize = 1024; // Source: `oracle/oracle/codemp/qcommon/q_shared.h`
+    // Canonical in `mp_qshared::shared::limits` (value 1024).
+    // Source: `oracle/oracle/codemp/game/q_shared.h:384`
+    use mp_qshared::shared::limits::MAX_INFO_STRING;
 
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -1717,22 +1720,13 @@ pub fn Cmd_DuelTeam_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `G_TeamForSiegeClass`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:1206-1244`
-// PORT-NOTE(unresolved-siege-team-consts): needs `SIEGETEAM_TEAM1`/
-// `SIEGETEAM_TEAM2` (siege-team-id constants distinct from the `TEAM_RED`/
-// `TEAM_BLUE` used elsewhere in this file) and `MAX_SIEGE_CLASSES`; neither is in
-// the packet's resolved out-of-file call surface or the landed `mp_bg::saga`
-// types (only `MAX_SIEGE_CLASSES_PER_TEAM` and `duelTeam_t` are ported so far).
-// Which type/const carries the siege *team* id (as opposed to `team_t`
-// RED/BLUE), and what is `MAX_SIEGE_CLASSES` named once ported?
 pub fn G_TeamForSiegeClass(ctx: GameContext<'_>, clName: *const c_char) -> c_int {
-    // PORT-NOTE(siege-team-consts): `SIEGETEAM_TEAM1`/`SIEGETEAM_TEAM2`/
-    // `MAX_SIEGE_CLASSES` are not yet resolved in the landed `mp_bg::saga`
-    // surface (only `MAX_SIEGE_CLASSES_PER_TEAM` is ported); using Raven's
-    // literal siegeTeam_t discriminants (1/2) and per-team class cap here —
-    // report/verify against the ported enum once it lands.
-    const SIEGETEAM_TEAM1: c_int = 1;
-    const SIEGETEAM_TEAM2: c_int = 2;
-    const MAX_SIEGE_CLASSES: c_int = 12;
+    // Siege team ids (distinct from `team_t` RED/BLUE) and the 128-class cap,
+    // canonical in `mp_bg::saga`. The former local `MAX_SIEGE_CLASSES` was
+    // wrongly 12 (oracle is 128).
+    // Source: `oracle/oracle/codemp/game/bg_saga.h:3-4,12`
+    use mp_bg::saga::siege_class_t::MAX_SIEGE_CLASSES;
+    use mp_bg::saga::siege_team_t::{SIEGETEAM_TEAM1, SIEGETEAM_TEAM2};
 
     unsafe {
         let bg = &(*ctx.world).bg_state;
@@ -1754,7 +1748,7 @@ pub fn G_TeamForSiegeClass(ctx: GameContext<'_>, clName: *const c_char) -> c_int
             }
 
             i += 1;
-            if i >= MAX_SIEGE_CLASSES || i >= (*stm).numClasses {
+            if i >= MAX_SIEGE_CLASSES as c_int || i >= (*stm).numClasses {
                 if team == SIEGETEAM_TEAM2 {
                     break;
                 }
@@ -2515,7 +2509,12 @@ pub fn Cmd_Tell_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
 pub fn Cmd_VoiceCommand_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_TEAM;
 
-    const MAX_CUSTOM_SIEGE_SOUNDS: usize = 32; // Source: `oracle/oracle/codemp/game/bg_public.h`
+    // Oracle value is 30 (was wrongly 32, which could index past the 30-entry
+    // `bg_customSiegeSoundNames`). No legal workspace canonical (the `mp_cgame`
+    // copy is off-limits; `mp_bg` has only the array, not a const). Consolidation
+    // candidate for `mp_bg`.
+    // Source: `oracle/oracle/codemp/game/bg_public.h:140`
+    const MAX_CUSTOM_SIEGE_SOUNDS: usize = 30;
 
     unsafe {
         let world = ctx.world;
@@ -2766,7 +2765,9 @@ pub fn Cmd_CallVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
         GT_DUEL, GT_FFA, GT_MAX_GAME_TYPE, GT_POWERDUEL, GT_SINGLE_PLAYER,
     };
 
-    const MAX_VOTE_COUNT: c_int = 5; // Source: `oracle/oracle/codemp/game/g_local.h`
+    // Oracle `MAX_VOTE_COUNT` is 3 (was wrongly 5), canonical in
+    // `client_persistant`. Source: `oracle/oracle/codemp/game/g_local.h:439`
+    use crate::client::client_persistant::MAX_VOTE_COUNT;
     const MAX_STRING_TOKENS: usize = 1024;
 
     unsafe {
@@ -3257,9 +3258,11 @@ pub fn Cmd_CallTeamVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_TEAM;
 
     const MAX_STRING_TOKENS: usize = 1024;
-    const MAX_NETNAME: usize = 36; // Source: `oracle/oracle/codemp/game/g_local.h`
-    const MAX_VOTE_COUNT: c_int = 5;
-    const ENTITYNUM_NONE: c_int = 1023;
+    // `MAX_NETNAME`/`MAX_VOTE_COUNT` canonical in `client_persistant`;
+    // `ENTITYNUM_NONE` in `mp_qshared::shared::limits` (all value-correct here).
+    // Sources: `oracle/oracle/codemp/game/g_local.h:438-439`, `q_shared.h:2014`
+    use crate::client::client_persistant::{MAX_NETNAME, MAX_VOTE_COUNT};
+    use mp_qshared::shared::limits::ENTITYNUM_NONE;
 
     unsafe {
         let world = ctx.world;
@@ -4634,8 +4637,10 @@ pub fn Cmd_DebugSetBodyAnim_f(ctx: GameContext<'_>, self_: *mut gentity_t, flags
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:3114-3117`
 pub fn StandardSetBodyAnim(ctx: GameContext<'_>, self_: *mut gentity_t, anim: c_int, flags: c_int) {
-    // Raven `SETANIM_BOTH` (`bg_public.h`), passed as a literal at the call site.
-    const SETANIM_BOTH: c_int = 2;
+    // Raven `SETANIM_BOTH` == `SETANIM_TORSO|SETANIM_LEGS` == 3 (was wrongly 2),
+    // canonical in `mp_bg::public::set_anim`.
+    // Source: `oracle/oracle/codemp/game/bg_public.h:500`
+    use mp_bg::public::set_anim::SETANIM_BOTH;
     crate::g_utils::G_SetAnim(
         ctx,
         self_,
@@ -5047,8 +5052,9 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
         else if cmd_s.eq_ignore_ascii_case("debugSetSaberMove") {
             Cmd_DebugSetSaberMove_f(ctx, ent);
         } else if cmd_s.eq_ignore_ascii_case("debugSetBodyAnim") {
-            const SETANIM_FLAG_OVERRIDE: c_int = 1 << 0;
-            const SETANIM_FLAG_HOLD: c_int = 1 << 1;
+            // Canonical in `mp_bg::public::set_anim` (values match: 1, 2).
+            // Source: `oracle/oracle/codemp/game/bg_public.h:503-504`
+            use mp_bg::public::set_anim::{SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
             Cmd_DebugSetBodyAnim_f(ctx, ent, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
         } else if cmd_s.eq_ignore_ascii_case("debugDismemberment") {
             Cmd_Kill_f(ctx, ent);

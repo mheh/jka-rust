@@ -55,17 +55,18 @@ const TEAM_RED: c_int = 1;
 const TEAM_BLUE: c_int = 2;
 const TEAM_SPECTATOR: c_int = 3;
 
-// Siege team indices (oracle/oracle/codemp/game/g_team.c)
-const SIEGETEAM_TEAM1: c_int = 0;
-const SIEGETEAM_TEAM2: c_int = 1;
+// Siege team indices — canonical `#define`s in bg_saga.h (SIEGETEAM_TEAM1==1,
+// SIEGETEAM_TEAM2==2). Local decls were off-by-one (0/1), breaking the
+// `team == SIEGETEAM_TEAM1` spawn-class selection in SelectRandomTeamSpawnPoint.
+// Source: `oracle/oracle/codemp/game/bg_saga.h:3-4`
+use mp_bg::saga::siege_team_t::{SIEGETEAM_TEAM1, SIEGETEAM_TEAM2};
 
 // Game state constant (oracle/oracle/codemp/game/g_team.c:974)
 const TEAM_BEGIN: c_int = 0;
 
-// `SVF_BROADCAST` (svflags #define) is not yet ported anywhere in the crate
-// graph; defined locally, verbatim, following the `ai_wpnav.rs` precedent.
+// `SVF_BROADCAST` (svflags #define) is canonical in `g_public_consts` and
+// reaches here via the prelude glob (`pub use crate::g_public_consts::*`).
 // Source: `oracle/oracle/codemp/game/g_public.h:20`
-const SVF_BROADCAST: c_int = 0x00000020;
 
 // CTF scoring bonuses (porting-rules §C8: `#define` -> `const`).
 // Source: `oracle/oracle/codemp/game/g_team.h:4-15`

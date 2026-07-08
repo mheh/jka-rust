@@ -106,8 +106,11 @@ const BSET_SPAWN: c_int = 0;
 const LS_STYLES_START: c_int = 0;
 const LS_NUM_STYLES: c_int = 32;
 
-// Entity number constants
-const ENTITYNUM_WORLD: c_int = 0;
+// `ENTITYNUM_WORLD` (== MAX_GENTITIES-2 == 1022) is canonical in
+// `mp_qshared::shared::limits` and reaches here via the prelude glob. The
+// former local decl was wrongly 0, which indexed g_entities[0] (a client slot)
+// instead of the world entity in SP_worldspawn / worldspawn behaviorSet setup.
+// Source: `oracle/oracle/codemp/game/q_shared.h:2015`
 
 /// Raven `G_SpawnString`.
 ///
@@ -1062,7 +1065,9 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:1018-1067`
 pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
     unsafe {
-        const MAX_TOKEN_CHARS: usize = 1024;
+        // `MAX_TOKEN_CHARS` (value 1024) is re-exported from `g_cmds` via the
+        // prelude; imported explicitly here. Source: `oracle/oracle/codemp/game/q_shared.h:369`
+        use crate::g_cmds::MAX_TOKEN_CHARS;
         let mut keyname = [0 as c_char; MAX_TOKEN_CHARS];
         let mut com_token = [0 as c_char; MAX_TOKEN_CHARS];
 

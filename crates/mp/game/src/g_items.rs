@@ -74,10 +74,9 @@ use mp_qshared::shared::mdxaBone_t;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2.
-const PITCH: usize = 0;
-const YAW: usize = 1;
-const ROLL: usize = 2;
+// Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2. Canonical
+// in `crate::q_math`. Source: `oracle/oracle/codemp/game/q_shared.h:374-376`
+use crate::q_math::{PITCH, ROLL, YAW};
 
 // `ITMSF_ALLOWNPC` — item spawnflag defined above with the other `ITMSF_*`
 // spawnflags (g_items.c:32); duplicate file-scope const removed at integration.
@@ -105,43 +104,29 @@ pub const TOSSED_ITEM_OWNER_NOTOUCH_DUR: c_int = 1000;
 // Raven `g_items.c:1333-1334` dispenser item classnames.
 // (referenced from `G_PrecacheDispensers`)
 
-// Raven `surfaceflags.h`/`bg_public.h` CONTENTS_*/MASK_* #defines — transcribed
-// locally (not yet ported to `mp_qshared::shared::surface_flags`), matching the
-// `SVF_BROADCAST` local-transcription precedent (`g_combat.rs:876`).
+// Raven `surfaceflags.h`/`bg_public.h` CONTENTS_*/MASK_* #defines, canonical in
+// `mp_qshared::shared::surface_flags`. Imported explicitly (they also reach here
+// via the prelude glob); the former local transcriptions were redundant.
 // Source: `oracle/oracle/codemp/game/surfaceflags.h:10-36`, `bg_public.h:1172-1177`
-const CONTENTS_TRIGGER: c_int = 0x0000_0400;
-const CONTENTS_NODROP: c_int = 0x0000_0800;
-const CONTENTS_WATER: c_int = 0x0000_0004;
-const CONTENTS_PLAYERCLIP: c_int = 0x0000_0010;
-const CONTENTS_SHOTCLIP: c_int = 0x0000_0080;
-const CONTENTS_LIGHTSABER: c_int = 0x0004_0000;
-const MASK_PLAYERSOLID: c_int = CONTENTS_SOLID
-    | CONTENTS_PLAYERCLIP
-    | CONTENTS_BODY
-    | mp_qshared::shared::surface_flags::CONTENTS_TERRAIN;
-const MASK_SHOT: c_int = CONTENTS_SOLID
-    | CONTENTS_BODY
-    | mp_qshared::shared::surface_flags::CONTENTS_CORPSE
-    | mp_qshared::shared::surface_flags::CONTENTS_TERRAIN;
+use mp_qshared::shared::surface_flags::{
+    CONTENTS_LIGHTSABER, CONTENTS_NODROP, CONTENTS_PLAYERCLIP, CONTENTS_SHOTCLIP, CONTENTS_TRIGGER,
+    CONTENTS_WATER, MASK_PLAYERSOLID, MASK_SHOT,
+};
 
-// Raven `g_local.h` SVF_* svflags #defines — transcribed locally per the
-// `g_combat.rs:876` precedent (not yet ported).
-// Source: `oracle/oracle/codemp/game/g_local.h`
-// SVF_NOCLIENT canonicalized to `g_public_consts::SVF_NOCLIENT` (dedupe:
-// glob-import ambiguity, ruling per porting-rules known-debt list).
-use crate::g_public_consts::SVF_NOCLIENT;
-const SVF_BROADCAST: c_int = 0x0000_0020;
-const SVF_SINGLECLIENT: c_int = 0x0000_0040;
+// Raven `g_public.h` svflags #defines, canonical in `g_public_consts`.
+// SVF_SINGLECLIENT was wrongly transcribed locally as 0x40 (that is SVF_PORTAL);
+// the correct value is 0x100, so temp-entity item pickups were tagged with the
+// wrong svFlag bit. Import fixes it.
+// Source: `oracle/oracle/codemp/game/g_public.h:22,25`
+use crate::g_public_consts::{SVF_BROADCAST, SVF_NOCLIENT, SVF_SINGLECLIENT};
 
 // Raven `bg_public.h:82` `CS_ITEMS`.
 pub const CS_ITEMS: c_int = 27;
 
-// Raven `bg_public.h` `EF_ITEMPLACEHOLDER`/`EF_CLIENTSMOOTH`/`EF_G2ANIMATING`
-// (not yet ported to `mp_bg::public::entity_effects`).
+// Raven `bg_public.h` `EF_ITEMPLACEHOLDER`/`EF_CLIENTSMOOTH`/`EF_G2ANIMATING`,
+// canonical in `mp_bg::public::entity_flags`.
 // Source: `oracle/oracle/codemp/game/bg_public.h:560,601,607`
-const EF_ITEMPLACEHOLDER: c_int = 1 << 23;
-const EF_CLIENTSMOOTH: c_int = 1 << 28;
-const EF_G2ANIMATING: c_int = 1 << 0;
+use mp_bg::public::entity_flags::{EF_CLIENTSMOOTH, EF_G2ANIMATING, EF_ITEMPLACEHOLDER};
 
 // Raven `ITEM_RADIUS` (`bg_public.h:35`).
 pub const ITEM_RADIUS: f32 = 15.0;
@@ -2026,9 +2011,11 @@ pub fn EWeb_SetBoneAngles(
     bone: *mut c_char,
     angles: vec3_t,
 ) {
-    // Raven `BONE_ANGLES_POSTMULT` (`ghoul2/G2.h:9`) — not yet ported; transcribed
-    // locally. Orientations (`POSITIVE_Y`/`NEGATIVE_Z`/`NEGATIVE_X`) come from
-    // the already-ported `Eorientations` enum (prelude glob import).
+    // Raven `BONE_ANGLES_POSTMULT` (`ghoul2/G2.h:9`). The ghoul2 G2.h flags have
+    // no shared workspace module yet (a private copy also lives in `NPC_utils`);
+    // kept local at the verified value. Consolidation candidate.
+    // Orientations (`POSITIVE_Y`/`NEGATIVE_Z`/`NEGATIVE_X`) come from the
+    // already-ported `Eorientations` enum (prelude glob import).
     const BONE_ANGLES_POSTMULT: c_int = 0x0002;
 
     unsafe {
@@ -2137,7 +2124,9 @@ pub fn EWeb_SetBoneAnim(
             (*eweb).s.legsAnim = endFrame;
         }
 
-        // Raven `ghoul2/G2.h:22-25` bone-anim flags — not yet ported; transcribed locally.
+        // Raven `ghoul2/G2.h:21-24` bone-anim flags. No shared workspace module
+        // for the ghoul2 G2.h flags yet; kept local at verified values.
+        // Consolidation candidate.
         const BONE_ANIM_OVERRIDE: c_int = 0x0008;
         pub const BONE_ANIM_OVERRIDE_FREEZE: c_int = 0x0040 + BONE_ANIM_OVERRIDE;
         pub const BONE_ANIM_BLEND: c_int = 0x0080;
@@ -2171,8 +2160,11 @@ pub fn EWeb_SetBoneAnim(
 pub fn EWebFire(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_t) {
     // Raven `#define EWEB_MISSILE_DAMAGE 20` (`g_items.c:1623`).
     pub const EWEB_MISSILE_DAMAGE: c_int = 20;
-    // Raven `DAMAGE_DEATH_KNOCKBACK` (`g_local.h`) — not yet ported; transcribed locally.
-    const DAMAGE_DEATH_KNOCKBACK: c_int = 0x00000008;
+    // Raven `DAMAGE_DEATH_KNOCKBACK` == 0x80, canonical in `crate::level::damage_flags`.
+    // The former local value 0x08 was wrong (that bit is `DAMAGE_NO_PROTECTION`),
+    // so the e-web missile's dflags were set incorrectly.
+    // Source: `oracle/oracle/codemp/game/g_local.h:1178`
+    use crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
 
     unsafe {
         if (*eweb).genericValue10 == -1 {
@@ -3209,8 +3201,9 @@ pub fn CheckItemCanBePickedUpByNPC(
     item: *mut gentity_t,
     pickerupper: *mut gentity_t,
 ) -> qboolean {
-    // Raven `SCF_FORCED_MARCH` (`b_public.h:43`) — not yet ported; transcribed locally.
-    const SCF_FORCED_MARCH: c_int = 0x00010000;
+    // Raven `SCF_FORCED_MARCH` (`b_public.h:43`), canonical in
+    // `crate::npc::script_flags`. Source: `oracle/oracle/codemp/game/b_public.h:43`
+    use crate::npc::script_flags::SCF_FORCED_MARCH;
 
     unsafe {
         let npc = (*pickerupper).NPC as *mut gNPC_t;
