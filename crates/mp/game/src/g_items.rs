@@ -1761,7 +1761,7 @@ pub fn G_SpecialSpawnItem(ctx: GameContext<'_>, ent: *mut gentity_t, item: *mut 
         (*ent).clipmask = MASK_SOLID;
 
         (*ent).physicsBounce = 0.50; // items are bouncy
-        (*ent).r.mins = [-8.0, -8.0, -0.0];
+        (*ent).r.mins = [-8.0, -8.0, 0.0];
         (*ent).r.maxs = [8.0, 8.0, 16.0];
 
         (*ent).s.eType = ET_ITEM as c_int;
@@ -3793,7 +3793,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
         }
 
-        (*ent).r.mins = [-8.0, -8.0, -0.0];
+        (*ent).r.mins = [-8.0, -8.0, 0.0];
         (*ent).r.maxs = [8.0, 8.0, 16.0];
 
         (*ent).s.eType = ET_ITEM as c_int;
