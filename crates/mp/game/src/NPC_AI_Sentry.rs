@@ -490,7 +490,7 @@ pub fn Sentry_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
             (*NPCInfo).goalRadius = 12;
 
             // Get our direction from the navigator if we can't see our target
-            if crate::NPC_move::NPC_GetMoveDirection(ctx, forward, &mut distance) == qfalse {
+            if crate::NPC_move::NPC_GetMoveDirection(ctx, &mut forward, &mut distance) == qfalse {
                 return;
             }
         } else {

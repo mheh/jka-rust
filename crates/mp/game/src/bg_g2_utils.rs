@@ -17,8 +17,8 @@ pub fn BG_AttachToRancor(
     modelList: *mut qhandle_t,
     modelScale: vec3_t,
     inMouth: qboolean,
-    mut out_origin: vec3_t,
-    mut out_angles: vec3_t,
+    out_origin: &mut vec3_t,
+    out_angles: &mut vec3_t,
     out_axis: *mut vec3_t,
     bg: &BgState,
     traps: &dyn BgTraps,
@@ -51,18 +51,15 @@ pub fn BG_AttachToRancor(
         &modelScale,
     );
 
-    // Storing ent position, bolt position, and bolt axis
-    // PORT-NOTE(vec3-outparam): out_origin/out_angles are by-value vec3_t in resolved
-    // signature but C semantics require writing through pointers; treating as nullable pointers
-    // (checking against zero/null for safety; addresses alignment concerns).
-    if &out_origin as *const vec3_t as usize != 0 {
-        let mut local_origin: vec3_t = [0.0, 0.0, 0.0];
+    // Storing ent position, bolt position, and bolt axis.
+    // out_origin/out_angles are C `vec3_t` out-params (nullable in C, but the sole
+    // live caller G_HeldByMonster always passes non-NULL), ported as `&mut vec3_t`.
+    {
         BG_GiveMeVectorFromMatrix(
             &boltMatrix as *const mdxaBone_t,
             Eorientations::ORIGIN as c_int,
-            &mut local_origin,
+            out_origin,
         );
-        out_origin = local_origin;
     }
 
     if !out_axis.is_null() {
@@ -103,14 +100,12 @@ pub fn BG_AttachToRancor(
         }
 
         // FIXME: this is messing up our axis and turning us inside-out?
-        if &out_angles as *const vec3_t as usize != 0 {
-            let mut local_angles: vec3_t = [0.0, 0.0, 0.0];
-            vectoangles(unsafe { *out_axis.add(0) }, &mut local_angles);
+        {
+            vectoangles(unsafe { *out_axis.add(0) }, out_angles);
             vectoangles(unsafe { *out_axis.add(2) }, &mut temp_angles);
-            local_angles[2] = -temp_angles[0]; // ROLL = -PITCH
-            out_angles = local_angles;
+            out_angles[2] = -temp_angles[0]; // ROLL = -PITCH
         }
-    } else if &out_angles as *const vec3_t as usize != 0 {
+    } else {
         let mut temp_axis: [vec3_t; 3] = [[0.0, 0.0, 0.0]; 3];
         if inMouth != 0 {
             // in mouth
@@ -139,11 +134,9 @@ pub fn BG_AttachToRancor(
         }
 
         // FIXME: this is messing up our axis and turning us inside-out?
-        let mut local_angles: vec3_t = [0.0, 0.0, 0.0];
-        vectoangles(temp_axis[0], &mut local_angles);
+        vectoangles(temp_axis[0], out_angles);
         vectoangles(temp_axis[2], &mut temp_angles);
-        local_angles[2] = -temp_angles[0]; // ROLL = -PITCH
-        out_angles = local_angles;
+        out_angles[2] = -temp_angles[0]; // ROLL = -PITCH
     }
 }
 

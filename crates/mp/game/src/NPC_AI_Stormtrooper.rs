@@ -1264,7 +1264,7 @@ pub fn NPC_ST_InvestigateEvent(
 /// Raven `ST_OffsetLook`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:927-938`
-pub fn ST_OffsetLook(ctx: GameContext<'_>, offset: f32, mut out: vec3_t) {
+pub fn ST_OffsetLook(ctx: GameContext<'_>, offset: f32, out: &mut vec3_t) {
     unsafe {
         let world = &mut *ctx.world;
         let NPC = world.globals.NPC as *mut gentity_t;
@@ -1287,11 +1287,6 @@ pub fn ST_OffsetLook(ctx: GameContext<'_>, offset: f32, mut out: vec3_t) {
         let mut temp: vec3_t = [0.0; 3];
         CalcEntitySpot(ctx, NPC, SPOT_HEAD, &mut temp);
         out[2] = temp[2];
-        // PORT-NOTE(vec3-out-param): the packet's resolved LAW signature takes
-        // `out` by value (no `&mut`/write-back channel) though it should be an
-        // out-param, `&mut [f32;3]`, here — reported as a shape_mismatch. Kept the faithful
-        // arithmetic so the fix is a pure signature change, not a rewrite.
-        let _ = out;
     }
 }
 
@@ -1313,13 +1308,13 @@ pub fn ST_LookAround(ctx: GameContext<'_>) {
             lookPos = (*NPCInfo).investigateGoal;
         } else if perc < 0.5 {
             // Look up but straight ahead
-            ST_OffsetLook(ctx, 0.0, lookPos);
+            ST_OffsetLook(ctx, 0.0, &mut lookPos);
         } else if perc < 0.75 {
             // Look right
-            ST_OffsetLook(ctx, 45.0, lookPos);
+            ST_OffsetLook(ctx, 45.0, &mut lookPos);
         } else {
             // Look left
-            ST_OffsetLook(ctx, -45.0, lookPos);
+            ST_OffsetLook(ctx, -45.0, &mut lookPos);
         }
 
         NPC_FacePosition(ctx, lookPos, QTRUE);

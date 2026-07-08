@@ -237,18 +237,17 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_pitch_roll_for_slope`.
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:346-439`
-    // PORT-NOTE(law-signature-by-value): the resolved LAW signature keeps `storeAngles` by value, so
-    // writes into it are lost to the caller; the Raven `if (storeAngles)` NULL test is
-    // always-true here (only live caller PM_SetVehicleAngles passes a non-NULL buffer),
-    // so the else (viewangles) branch is unreachable. Reported as a shape_mismatch.
+    // PORT-NOTE: `storeAngles` is a `vec3_t` out-param in C; ported as `&mut vec3_t`.
+    // The Raven `if (storeAngles)` NULL test is always-true here (only live caller
+    // PM_SetVehicleAngles passes a non-NULL buffer), so the else (viewangles) branch
+    // is unreachable and not ported. Early returns leave the buffer untouched, matching C.
     pub fn PM_pitch_roll_for_slope(
         &mut self,
         forwhom: *mut bgEntity_t,
         pass_slope: vec3_t,
-        storeAngles: vec3_t,
+        storeAngles: &mut vec3_t,
     ) {
         unsafe {
-            let mut storeAngles = storeAngles;
             let mut slope: vec3_t = [0.0; 3];
             let mut nvf: vec3_t = [0.0; 3];
             let mut ovf: vec3_t = [0.0; 3];
@@ -323,10 +322,9 @@ impl PmoveContext<'_> {
 
             let dot = nvf[0] * ovf[0] + nvf[1] * ovf[1] + nvf[2] * ovf[2];
 
-            // storeAngles is always "present" under the by-value LAW signature.
+            // storeAngles is always "present" (non-NULL &mut) for the live caller.
             storeAngles[PITCH] = dot * pitch;
             storeAngles[ROLL] = (1.0 - Q_fabs(dot)) * pitch * r#mod;
-            let _ = &mut storeAngles;
         }
     }
 
@@ -399,7 +397,7 @@ impl PmoveContext<'_> {
                     + (pitchBias as f64 * 0.5) as f32;
             } else {
                 //have a valid surface below me (normal is always present under LAW)
-                self.PM_pitch_roll_for_slope(pEnt, normal, vAngles);
+                self.PM_pitch_roll_for_slope(pEnt, normal, &mut vAngles);
                 if self.pml.groundTrace.contents & (CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA)
                     != 0
                 {

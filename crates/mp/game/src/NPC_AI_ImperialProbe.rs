@@ -267,7 +267,7 @@ pub fn ImperialProbe_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboo
             (*npc_info).goalRadius = 12;
 
             // Get our direction from the navigator if we can't see our target
-            if NPC_GetMoveDirection(ctx, forward, &mut distance as *mut f32) == 0 {
+            if NPC_GetMoveDirection(ctx, &mut forward, &mut distance as *mut f32) == 0 {
                 return;
             }
         } else {

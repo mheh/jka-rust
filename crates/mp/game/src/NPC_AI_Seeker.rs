@@ -405,7 +405,7 @@ pub fn Seeker_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
             // Get our direction from the navigator if we can't see our target
             let mut forward: vec3_t = [0.0f32; 3];
             let mut distance: f32 = 0.0f32;
-            if crate::NPC_move::NPC_GetMoveDirection(ctx, forward, &mut distance) == qfalse {
+            if crate::NPC_move::NPC_GetMoveDirection(ctx, &mut forward, &mut distance) == qfalse {
                 return;
             }
 

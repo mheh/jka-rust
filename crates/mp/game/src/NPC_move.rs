@@ -174,7 +174,7 @@ pub fn NAV_GetLastMove(ctx: GameContext<'_>, info: *mut navInfo_t) {
 /// Raven `NPC_GetMoveDirection`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:160-230`
-pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, mut out: vec3_t, distance: *mut f32) -> qboolean {
+pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, out: &mut vec3_t, distance: *mut f32) -> qboolean {
     unsafe {
         let world = &mut *ctx.world;
         let npc = (*ctx.world).globals.NPC;
@@ -221,7 +221,7 @@ pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, mut out: vec3_t, distance: *mu
                     // Can't reach goal, just face
                     vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
                     npc_info.desiredYaw = AngleNormalize360(angles[1]);
-                    _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+                    _VectorCopy(world.globals.frameNavInfo.0.direction, out);
                     *distance = world.globals.frameNavInfo.0.distance;
                     return qfalse;
                 }
@@ -243,7 +243,7 @@ pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, mut out: vec3_t, distance: *mu
                         // Can't reach goal, just face
                         vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
                         npc_info.desiredYaw = AngleNormalize360(angles[1]);
-                        _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+                        _VectorCopy(world.globals.frameNavInfo.0.direction, out);
                         *distance = world.globals.frameNavInfo.0.distance;
                         return qfalse;
                     }
@@ -254,7 +254,7 @@ pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, mut out: vec3_t, distance: *mu
         }
 
         // Setup the return values
-        _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+        _VectorCopy(world.globals.frameNavInfo.0.direction, out);
         *distance = world.globals.frameNavInfo.0.distance;
 
         return qtrue;
@@ -266,7 +266,7 @@ pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, mut out: vec3_t, distance: *mu
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:239-322`
 pub fn NPC_GetMoveDirectionAltRoute(
     ctx: GameContext<'_>,
-    mut out: vec3_t,
+    out: &mut vec3_t,
     distance: *mut f32,
     tryStraight: qboolean,
 ) -> qboolean {
@@ -318,7 +318,7 @@ pub fn NPC_GetMoveDirectionAltRoute(
                     // Can't reach goal, just face
                     vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
                     npc_info.desiredYaw = AngleNormalize360(angles[1]);
-                    _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+                    _VectorCopy(world.globals.frameNavInfo.0.direction, out);
                     *distance = world.globals.frameNavInfo.0.distance;
                     return qfalse;
                 }
@@ -339,7 +339,7 @@ pub fn NPC_GetMoveDirectionAltRoute(
                             // Can't reach goal, just face
                             vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
                             npc_info.desiredYaw = AngleNormalize360(angles[1]);
-                            _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+                            _VectorCopy(world.globals.frameNavInfo.0.direction, out);
                             *distance = world.globals.frameNavInfo.0.distance;
                             return qfalse;
                         }
@@ -368,7 +368,7 @@ pub fn NPC_GetMoveDirectionAltRoute(
         }
 
         // Setup the return values
-        _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+        _VectorCopy(world.globals.frameNavInfo.0.direction, out);
         *distance = world.globals.frameNavInfo.0.distance;
 
         return qtrue;
@@ -457,7 +457,7 @@ pub fn NPC_MoveToGoal(ctx: GameContext<'_>, tryStraight: qboolean) -> qboolean {
         }
 
         // Get our movement direction
-        if NPC_GetMoveDirectionAltRoute(ctx, dir, &mut distance, tryStraight) == qfalse {
+        if NPC_GetMoveDirectionAltRoute(ctx, &mut dir, &mut distance, tryStraight) == qfalse {
             return qfalse;
         }
 
