@@ -60,7 +60,7 @@ const ARMOR_REDUCTION_FACTOR: f32 = 0.50;
 /// MOD_TEAM_CHANGE) are NULL — the bounds check and the null-print site below
 /// preserve that.
 /// Source: `oracle/oracle/codemp/game/g_combat.c:755-797`
-const modNames: [*const c_char; meansOfDeath_t::MOD_MAX as usize] = [
+pub(crate) const modNames: [*const c_char; meansOfDeath_t::MOD_MAX as usize] = [
     c"MOD_UNKNOWN".as_ptr(),
     c"MOD_STUN_BATON".as_ptr(),
     c"MOD_MELEE".as_ptr(),
