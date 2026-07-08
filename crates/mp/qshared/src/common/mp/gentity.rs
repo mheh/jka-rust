@@ -500,4 +500,40 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, moverState) == 1176);
 // all-zero bytes are a valid gentity_t — the same property the layout asserts above
 // pin and Raven's memset/static zero-init relies on.
 // Source: oracle/oracle/codemp/game/g_shared.h (all-zero-valid #[repr(C)]; Raven memsets g_entities, g_main.c:978)
+//
+// CAVEAT (niche-layout hazard): "valid" here means "not UB" — every field holds
+// a legal bit pattern. It does NOT mean "semantically NULL" for the seven
+// `Option<EntXxx>` fn-ID dispatch fields: those enums reserve no 0 value, so
+// rustc places `Option`'s `None` niche at the discriminant AFTER the last
+// variant, and all-zero bytes decode as `Some(variant 0)` (e.g. `touch ==
+// Some(EntTouch::HolocronTouch)`), not `None`. Every byte-wise zeroing of a
+// whole gentity_t must be followed by [`gentity_t::reset_fn_ids_after_zero`].
+
+impl gentity_t {
+    /// Interim niche-layout fixup — call immediately after any byte-wise
+    /// zeroing of a whole `gentity_t` (`core::ptr::write_bytes`, `memset`-style
+    /// resets, `zeroed_box` construction).
+    ///
+    /// WHY: the `EntXxx` fn-ID enums (`ent_fn_ids.rs`) have no reserved 0
+    /// variant, so `Option<EntXxx>`'s `None` niche is the discriminant value
+    /// AFTER the last variant. All-zero bytes therefore decode as
+    /// `Some(variant 0)` — e.g. `touch == Some(EntTouch::HolocronTouch)`,
+    /// `think == Some(EntThink::AimAtTarget)` — where Raven's C stored a
+    /// nullable fn pointer whose zeroed bytes meant NULL ("no handler").
+    /// This restores the C NULL semantics by explicitly assigning `None`.
+    ///
+    /// Interim fix pending a type-level solution (e.g. `NonZero`-backed
+    /// handler ids with a guaranteed 0 == `None` niche, so zeroed bytes are
+    /// `None` by construction). Keep this list in sync with every
+    /// `Option<EntXxx>` dispatch field in the struct above.
+    pub fn reset_fn_ids_after_zero(&mut self) {
+        self.think = None;
+        self.reached = None;
+        self.blocked = None;
+        self.touch = None;
+        self.use_ = None;
+        self.pain = None;
+        self.die = None;
+    }
+}
 unsafe impl native_platform::ZeroValid for gentity_t {}

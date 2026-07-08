@@ -723,7 +723,7 @@ pub fn target_relay_use(
         if (*self_).spawnflags & 4 != 0 {
             let ent = G_PickTarget(ctx, (*self_).target);
             if !ent.is_null() && (*ent).use_.is_some() {
-                GlobalUse(ent, self_, activator);
+                GlobalUse(ctx, ent, self_, activator);
             }
             return;
         }
@@ -990,7 +990,7 @@ pub fn target_random_use(
             } else if t_count == pick {
                 if (*t).use_.is_some() {
                     // check can be omitted
-                    GlobalUse(t, self_, activator);
+                    GlobalUse(ctx, t, self_, activator);
                     return;
                 }
             }

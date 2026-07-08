@@ -3139,7 +3139,7 @@ pub fn GEntity_UseFunc(
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    GlobalUse(self_, other, activator);
+    GlobalUse(ctx, self_, other, activator);
 }
 
 /// Raven `CanCounterThrow`.

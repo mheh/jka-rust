@@ -189,6 +189,15 @@ pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
 
         // initialize all entities for this game
         core::ptr::write_bytes(world.g_entities.as_mut_ptr(), 0, MAX_GENTITIES);
+        // Niche-layout fixup (interim, see gentity_t::reset_fn_ids_after_zero):
+        // the byte-wise zero above (Raven `memset(g_entities, 0, ...)`,
+        // g_main.c) leaves each entity's Option<EntXxx> fn-ID fields decoding
+        // as Some(variant 0) instead of None (no reserved 0 in those enums;
+        // Option's None niche sits AFTER the last variant). C NULL-fn-pointer
+        // semantics require None; assign it explicitly on every slot.
+        for ent in world.g_entities.iter_mut() {
+            ent.reset_fn_ids_after_zero();
+        }
         world.level.gentities = world.g_entities.as_mut_ptr();
 
         // initialize all clients for this game

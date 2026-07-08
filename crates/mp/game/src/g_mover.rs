@@ -3524,9 +3524,14 @@ pub fn func_usable_use(
 /// Raven `func_usable_pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3108-3111`
-pub fn func_usable_pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
+pub fn func_usable_pain(
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    attacker: *mut gentity_t,
+    damage: c_int,
+) {
     unsafe {
-        GlobalUse(self_, attacker, attacker);
+        GlobalUse(ctx, self_, attacker, attacker);
     }
 }
 
@@ -3534,6 +3539,7 @@ pub fn func_usable_pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage:
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3113-3117`
 pub fn func_usable_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -3542,7 +3548,7 @@ pub fn func_usable_die(
 ) {
     unsafe {
         (*self_).takedamage = qfalse;
-        GlobalUse(self_, inflictor, attacker);
+        GlobalUse(ctx, self_, inflictor, attacker);
     }
 }
 

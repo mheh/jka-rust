@@ -386,7 +386,7 @@ pub fn dispatch_pain(
         EntPain::TurretPain => TurretPain(ctx, self_, attacker, damage),
         EntPain::emplaced_gun_pain => emplaced_gun_pain(ctx, self_, attacker, damage),
         EntPain::funcBBrushPain => funcBBrushPain(ctx, self_, attacker, damage),
-        EntPain::func_usable_pain => func_usable_pain(self_, attacker, damage),
+        EntPain::func_usable_pain => func_usable_pain(ctx, self_, attacker, damage),
     }
 }
 
@@ -416,7 +416,7 @@ pub fn dispatch_die(
             emplaced_gun_die(ctx, self_, inflictor, attacker, damage, r#mod)
         }
         EntDie::funcBBrushDie => funcBBrushDie(ctx, self_, inflictor, attacker, damage, r#mod),
-        EntDie::func_usable_die => func_usable_die(self_, inflictor, attacker, damage, r#mod),
+        EntDie::func_usable_die => func_usable_die(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::laserTrapDelayedExplode => {
             laserTrapDelayedExplode(ctx, self_, inflictor, attacker, damage, r#mod)
         }

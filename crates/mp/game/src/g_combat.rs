@@ -4795,7 +4795,7 @@ pub fn G_Damage(
         // shootable doors / buttons don't actually have any health
         if (*targ).s.eType == entityType_t::ET_MOVER as c_int && (*targ).genericValue4 != 1 {
             if (*targ).use_.is_some() && (*targ).moverState == MOVER_POS1 {
-                crate::g_utils::GlobalUse(targ, inflictor, attacker);
+                crate::g_utils::GlobalUse(ctx, targ, inflictor, attacker);
             }
             return;
         }

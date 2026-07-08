@@ -765,7 +765,7 @@ pub fn UseSiegeTarget(
                     b"WARNING: Entity used itself.\n\0".as_ptr() as *const c_char,
                 );
             } else if !(*t).use_.is_none() {
-                GlobalUse(t, ent, ent);
+                GlobalUse(ctx, t, ent, ent);
             }
             if (*ent).inuse == 0 {
                 crate::g_main::G_Printf(
