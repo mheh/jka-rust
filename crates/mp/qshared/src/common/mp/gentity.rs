@@ -8,7 +8,7 @@
 use core::ffi::{c_char, c_int, c_void};
 
 use crate::common::mp::ent_fn_ids::{
-    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse,
+    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse, FnId,
 };
 use crate::common::mp::entity_id::EntityId;
 use crate::common::mp::qcommon::{entityState_t, gitem_t, parms_t, playerState_t};
@@ -345,20 +345,20 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:283`
     pub nextthink: c_int,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:284`
-    pub think: Option<EntThink>,
+    pub think: FnId<EntThink>,
     /// Movers call this when hitting endpoint.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:285`
-    pub reached: Option<EntReached>,
+    pub reached: FnId<EntReached>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:286`
-    pub blocked: Option<EntBlocked>,
+    pub blocked: FnId<EntBlocked>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:287`
-    pub touch: Option<EntTouch>,
+    pub touch: FnId<EntTouch>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:288`
-    pub use_: Option<EntUse>,
+    pub use_: FnId<EntUse>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:289`
-    pub pain: Option<EntPain>,
+    pub pain: FnId<EntPain>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:290`
-    pub die: Option<EntDie>,
+    pub die: FnId<EntDie>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:292`
     pub pain_debounce_time: c_int,
     /// Wind tunnel.
@@ -501,39 +501,53 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, moverState) == 1176);
 // pin and Raven's memset/static zero-init relies on.
 // Source: oracle/oracle/codemp/game/g_shared.h (all-zero-valid #[repr(C)]; Raven memsets g_entities, g_main.c:978)
 //
-// CAVEAT (niche-layout hazard): "valid" here means "not UB" — every field holds
-// a legal bit pattern. It does NOT mean "semantically NULL" for the seven
-// `Option<EntXxx>` fn-ID dispatch fields: those enums reserve no 0 value, so
-// rustc places `Option`'s `None` niche at the discriminant AFTER the last
-// variant, and all-zero bytes decode as `Some(variant 0)` (e.g. `touch ==
-// Some(EntTouch::HolocronTouch)`), not `None`. Every byte-wise zeroing of a
-// whole gentity_t must be followed by [`gentity_t::reset_fn_ids_after_zero`].
+// The seven fn-ID dispatch fields (`think`, `reached`, `blocked`, `touch`,
+// `use_`, `pain`, `die`) are `FnId<EntXxx>` — a `#[repr(transparent)]` wrapper
+// over `Option<NonZeroU8>` (`ent_fn_ids.rs`). std guarantees `Option<NonZero*>`
+// (and transparent structs around it) encode `None` as the all-zero bit
+// pattern, so zeroed bytes decode as `None` ("no handler") *by construction*,
+// matching Raven's C NULL-fn-pointer semantics. There is therefore no post-zero
+// fixup: the earlier niche hazard (a bare `Option<EntXxx>` enum, whose `None`
+// niche sat AFTER the last variant, so zeroed `touch` read as
+// `Some(EntTouch::HolocronTouch)`) is now structurally impossible. The
+// `fn_id_niche_tests` module below is the regression lock.
+unsafe impl native_platform::ZeroValid for gentity_t {}
 
-impl gentity_t {
-    /// Interim niche-layout fixup — call immediately after any byte-wise
-    /// zeroing of a whole `gentity_t` (`core::ptr::write_bytes`, `memset`-style
-    /// resets, `zeroed_box` construction).
-    ///
-    /// WHY: the `EntXxx` fn-ID enums (`ent_fn_ids.rs`) have no reserved 0
-    /// variant, so `Option<EntXxx>`'s `None` niche is the discriminant value
-    /// AFTER the last variant. All-zero bytes therefore decode as
-    /// `Some(variant 0)` — e.g. `touch == Some(EntTouch::HolocronTouch)`,
-    /// `think == Some(EntThink::AimAtTarget)` — where Raven's C stored a
-    /// nullable fn pointer whose zeroed bytes meant NULL ("no handler").
-    /// This restores the C NULL semantics by explicitly assigning `None`.
-    ///
-    /// Interim fix pending a type-level solution (e.g. `NonZero`-backed
-    /// handler ids with a guaranteed 0 == `None` niche, so zeroed bytes are
-    /// `None` by construction). Keep this list in sync with every
-    /// `Option<EntXxx>` dispatch field in the struct above.
-    pub fn reset_fn_ids_after_zero(&mut self) {
-        self.think = None;
-        self.reached = None;
-        self.blocked = None;
-        self.touch = None;
-        self.use_ = None;
-        self.pain = None;
-        self.die = None;
+#[cfg(test)]
+mod fn_id_niche_tests {
+    use super::*;
+    use core::mem::{align_of, size_of, MaybeUninit};
+
+    /// The `FnId<EntXxx>` handler fields must stay 1 byte / align 1 — the same
+    /// size the legacy `Option<EntThink>` fields had — so `gentity_t`'s layout
+    /// is unchanged. (`Option<NonZeroU8>` is 1 byte via the niche.)
+    #[test]
+    fn handler_field_size_matches_legacy_one_byte() {
+        assert_eq!(size_of::<FnId<EntThink>>(), 1);
+        assert_eq!(align_of::<FnId<EntThink>>(), 1);
+        assert_eq!(size_of::<FnId<EntReached>>(), 1);
+        assert_eq!(size_of::<FnId<EntBlocked>>(), 1);
+        assert_eq!(size_of::<FnId<EntTouch>>(), 1);
+        assert_eq!(size_of::<FnId<EntUse>>(), 1);
+        assert_eq!(size_of::<FnId<EntPain>>(), 1);
+        assert_eq!(size_of::<FnId<EntDie>>(), 1);
+    }
+
+    /// The whole-bug-class regression lock: a fully byte-zeroed `gentity_t`
+    /// reads all seven handler fields as `None`. Before the `FnId` refactor
+    /// this decoded as `Some(variant 0)` (e.g. `touch == HolocronTouch`).
+    #[test]
+    fn zeroed_gentity_reads_all_handlers_none() {
+        // SAFETY: `gentity_t: ZeroValid` — all-zero bytes are a valid value;
+        // it holds no `Drop` types, so `forget` is a formality.
+        let z: gentity_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        assert!(z.think.is_none());
+        assert!(z.reached.is_none());
+        assert!(z.blocked.is_none());
+        assert!(z.touch.is_none());
+        assert!(z.use_.is_none());
+        assert!(z.pain.is_none());
+        assert!(z.die.is_none());
+        core::mem::forget(z);
     }
 }
-unsafe impl native_platform::ZeroValid for gentity_t {}

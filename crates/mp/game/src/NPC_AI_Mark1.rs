@@ -1097,7 +1097,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
                 // It should never get here, but just in case
                 (*npc).health = 0;
                 (*((*npc).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] = 0;
-                if let Some(die_fn) = (*npc).die {
+                if let Some(die_fn) = (*npc).die.get() {
                     crate::ent_fn_enums::dispatch_die(ctx, die_fn, npc, npc, npc, 100, MOD_UNKNOWN as c_int);
                 }
                 // C does not return here: it falls through to NPC_FaceEnemy and the

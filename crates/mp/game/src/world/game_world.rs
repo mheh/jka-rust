@@ -93,13 +93,10 @@ impl GameWorld {
         // level.gentities/clients + entities[i].client back-pointers alias them
         // AFTER they exist, in G_InitGame's dispatched arm (g_main.c:978-988) —
         // not here.
-        let mut g_entities = native_platform::zeroed_box::<[gentity_t; MAX_GENTITIES]>();
-        // Niche-layout fixup (interim, see gentity_t::reset_fn_ids_after_zero):
-        // zeroed bytes decode the Option<EntXxx> fn-ID fields as Some(variant 0),
-        // not None (no reserved 0 in those enums). Re-assert C NULL semantics.
-        for ent in g_entities.iter_mut() {
-            ent.reset_fn_ids_after_zero();
-        }
+        let g_entities = native_platform::zeroed_box::<[gentity_t; MAX_GENTITIES]>();
+        // The zeroed bytes leave each entity's FnId<EntXxx> handler fields as
+        // None by construction (zero == None, std-guaranteed via
+        // Option<NonZeroU8>) — no post-zero fixup needed.
         let clients = native_platform::zeroed_box::<[gclient_t; MAX_CLIENTS]>();
         let level = *native_platform::zeroed_box::<level_locals_t>();
         let memoryPool = native_platform::zeroed_box::<[u8; 262144]>();
@@ -159,13 +156,9 @@ impl GameWorld {
             use core::ptr::addr_of_mut;
             addr_of_mut!((*p).level).write(*native_platform::zeroed_box::<level_locals_t>());
             addr_of_mut!((*p).g_entities).write(native_platform::zeroed_box());
-            // Niche-layout fixup (interim, see gentity_t::reset_fn_ids_after_zero):
-            // zeroed bytes decode the Option<EntXxx> fn-ID fields as
-            // Some(variant 0), not None. The field is initialized just above,
-            // so re-borrowing it alone (not the whole GameWorld) is sound.
-            for ent in (*addr_of_mut!((*p).g_entities)).iter_mut() {
-                ent.reset_fn_ids_after_zero();
-            }
+            // The zeroed bytes leave each entity's FnId<EntXxx> handler fields as
+            // None by construction (zero == None, std-guaranteed via
+            // Option<NonZeroU8>) — no post-zero fixup needed.
             addr_of_mut!((*p).clients).write(native_platform::zeroed_box());
             addr_of_mut!((*p).cvars).write(GameCvars::default());
             addr_of_mut!((*p).globals).write(crate::game_globals::GameGlobals::default());

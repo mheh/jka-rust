@@ -144,7 +144,7 @@ pub fn multi_wait(ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:32-94`
 pub fn multi_trigger_run(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        (*ent).think = None;
+        (*ent).think = FnId::NONE;
 
         G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
 
@@ -183,7 +183,7 @@ pub fn multi_trigger_run(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if !(*ent).target2.is_null() && *(*ent).target2 != 0 && (*ent).wait >= 0.0 {
-            (*ent).think = Some(EntThink::trigger_cleared_fire);
+            (*ent).think = Some(EntThink::trigger_cleared_fire).into();
             (*ent).nextthink = (*ctx.world).level.time + (*ent).speed as c_int;
         } else if (*ent).wait > 0.0 {
             if (*ent).painDebounceTime != (*ctx.world).level.time {
@@ -197,8 +197,8 @@ pub fn multi_trigger_run(ctx: GameContext<'_>, ent: *mut gentity_t) {
             // we can't just remove (self) here, because this is a touch function
             // called while looping through area links...
             (*ent).r.contents &= !CONTENTS_TRIGGER; // so the EntityContact trace doesn't have to be done against me
-            (*ent).think = None;
-            (*ent).use_ = None;
+            (*ent).think = FnId::NONE;
+            (*ent).use_ = FnId::NONE;
             // Don't remove, Icarus may barf?
         }
 
@@ -251,7 +251,7 @@ pub fn multi_trigger(ctx: GameContext<'_>, ent: *mut gentity_t, activator: *mut 
     unsafe {
         let mut halt_trigger = false;
 
-        if (*ent).think == Some(EntThink::multi_trigger_run) {
+        if (*ent).think.get() == Some(EntThink::multi_trigger_run) {
             // already triggered, just waiting to run
             return;
         }
@@ -471,7 +471,7 @@ pub fn multi_trigger(ctx: GameContext<'_>, ent: *mut gentity_t, activator: *mut 
 
         if (*ent).delay != 0 && (*ent).painDebounceTime < ((*ctx.world).level.time + (*ent).delay) {
             // delay before firing trigger
-            (*ent).think = Some(EntThink::multi_trigger_run);
+            (*ent).think = Some(EntThink::multi_trigger_run).into();
             (*ent).nextthink = (*ctx.world).level.time + (*ent).delay;
             (*ent).painDebounceTime = (*ctx.world).level.time;
         } else {
@@ -698,7 +698,7 @@ pub fn Touch_Multi(
             (*other_client).ps.weaponTime = (*other_client).ps.torsoTimer;
         }
 
-        if (*self_).think == Some(EntThink::trigger_cleared_fire) {
+        if (*self_).think.get() == Some(EntThink::trigger_cleared_fire) {
             // We're waiting to fire our target2 first
             (*self_).nextthink = (*ctx.world).level.time + (*self_).speed as c_int;
             return;
@@ -715,7 +715,7 @@ pub fn trigger_cleared_fire(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let activator_ptr = ent_resolve_opt(ctx, (*self_).activator);
         G_UseTargets2(ctx, self_, activator_ptr, (*self_).target2);
-        (*self_).think = None;
+        (*self_).think = FnId::NONE;
         // should start the wait timer now, because the trigger's just been
         // cleared, so we must "wait" from this point
         if (*self_).wait > 0.0 {
@@ -784,8 +784,8 @@ pub fn SP_trigger_multiple(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).speed *= 1000.0;
         }
 
-        (*ent).touch = Some(EntTouch::Touch_Multi);
-        (*ent).use_ = Some(EntUse::Use_Multi);
+        (*ent).touch = Some(EntTouch::Touch_Multi).into();
+        (*ent).use_ = Some(EntUse::Use_Multi).into();
 
         if !(*ent).team.is_null() && *(*ent).team != 0 {
             (*ent).alliedTeam = atoi((*ent).team);
@@ -836,8 +836,8 @@ pub fn SP_trigger_once(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         (*ent).wait = -1.0;
 
-        (*ent).touch = Some(EntTouch::Touch_Multi);
-        (*ent).use_ = Some(EntUse::Use_Multi);
+        (*ent).touch = Some(EntTouch::Touch_Multi).into();
+        (*ent).use_ = Some(EntUse::Use_Multi).into();
 
         if !(*ent).team.is_null() && *(*ent).team != 0 {
             (*ent).alliedTeam = atoi((*ent).team);
@@ -981,8 +981,8 @@ pub fn Use_Strike(
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:824-861`
 pub fn SP_trigger_lightningstrike(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        (*ent).use_ = Some(EntUse::Use_Strike);
-        (*ent).think = Some(EntThink::Think_Strike);
+        (*ent).use_ = Some(EntUse::Use_Strike).into();
+        (*ent).think = Some(EntThink::Think_Strike).into();
         (*ent).nextthink = (*ctx.world).level.time + 500;
 
         let mut s: *mut c_char = core::ptr::null_mut();
@@ -1039,7 +1039,7 @@ pub fn SP_trigger_always(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // we must have some delay to make sure our use targets are present
         (*ent).nextthink = (*ctx.world).level.time + 300;
-        (*ent).think = Some(EntThink::trigger_always_think);
+        (*ent).think = Some(EntThink::trigger_always_think).into();
     }
 }
 
@@ -1143,7 +1143,7 @@ pub fn trigger_push_touch(
         // commented out — dead code kept commented in the oracle source.)
 
         if (*self_).wait == -1.0 {
-            (*self_).touch = None;
+            (*self_).touch = FnId::NONE;
         } else if (*self_).wait > 0.0 {
             (*self_).painDebounceTime = (*ctx.world).level.time;
         }
@@ -1258,7 +1258,7 @@ pub fn SP_trigger_push(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         if (*self_).spawnflags & 2 == 0 {
             // start on
-            (*self_).touch = Some(EntTouch::trigger_push_touch);
+            (*self_).touch = Some(EntTouch::trigger_push_touch).into();
         }
 
         if (*self_).spawnflags & 4 != 0 {
@@ -1266,7 +1266,7 @@ pub fn SP_trigger_push(ctx: GameContext<'_>, self_: *mut gentity_t) {
             (*self_).speed = 1000.0;
         }
 
-        (*self_).think = Some(EntThink::AimAtTarget);
+        (*self_).think = Some(EntThink::AimAtTarget).into();
         (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
     }
@@ -1330,10 +1330,10 @@ pub fn SP_target_push(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if !(*self_).target.is_null() {
             (*self_).r.absmin = (*self_).s.origin;
             (*self_).r.absmax = (*self_).s.origin;
-            (*self_).think = Some(EntThink::AimAtTarget);
+            (*self_).think = Some(EntThink::AimAtTarget).into();
             (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
         }
-        (*self_).use_ = Some(EntUse::Use_target_push);
+        (*self_).use_ = Some(EntUse::Use_target_push).into();
     }
 }
 
@@ -1398,7 +1398,7 @@ pub fn SP_trigger_teleport(ctx: GameContext<'_>, self_: *mut gentity_t) {
         G_SoundIndex(c"sound/weapons/force/speed.wav".as_ptr());
 
         (*self_).s.eType = ET_TELEPORT_TRIGGER as c_int;
-        (*self_).touch = Some(EntTouch::trigger_teleporter_touch);
+        (*self_).touch = Some(EntTouch::trigger_teleporter_touch).into();
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
     }
@@ -1608,7 +1608,7 @@ pub fn SP_trigger_hurt(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*ctx.world).globals.gTrigFallSound = G_SoundIndex(c"*falling1.wav".as_ptr());
 
         (*self_).noise_index = G_SoundIndex(c"sound/weapons/force/speed.wav".as_ptr());
-        (*self_).touch = Some(EntTouch::hurt_touch);
+        (*self_).touch = Some(EntTouch::hurt_touch).into();
 
         if (*self_).damage == 0 {
             (*self_).damage = 5;
@@ -1617,7 +1617,7 @@ pub fn SP_trigger_hurt(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*self_).r.contents = CONTENTS_TRIGGER;
 
         if (*self_).spawnflags & 2 != 0 {
-            (*self_).use_ = Some(EntUse::hurt_use);
+            (*self_).use_ = Some(EntUse::hurt_use).into();
         }
 
         // link in to the world if starting active
@@ -1698,7 +1698,7 @@ pub fn SP_trigger_space(ctx: GameContext<'_>, self_: *mut gentity_t) {
         InitTrigger(ctx, self_);
         (*self_).r.contents = CONTENTS_TRIGGER;
 
-        (*self_).touch = Some(EntTouch::space_touch);
+        (*self_).touch = Some(EntTouch::space_touch).into();
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
     }
@@ -1850,9 +1850,9 @@ pub fn SP_trigger_shipboundary(ctx: GameContext<'_>, self_: *mut gentity_t) {
             G_Error(ctx, c"trigger_shipboundary without traveltime.".as_ptr());
         }
 
-        (*self_).think = Some(EntThink::shipboundary_think);
+        (*self_).think = Some(EntThink::shipboundary_think).into();
         (*self_).nextthink = (*ctx.world).level.time + 500;
-        (*self_).touch = Some(EntTouch::shipboundary_touch);
+        (*self_).touch = Some(EntTouch::shipboundary_touch).into();
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
     }
@@ -2066,7 +2066,7 @@ pub fn SP_trigger_hyperspace(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         (*self_).delay = Distance((*self_).r.absmax, (*self_).r.absmin) as c_int; // my size
 
-        (*self_).touch = Some(EntTouch::hyperspace_touch);
+        (*self_).touch = Some(EntTouch::hyperspace_touch).into();
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
 
@@ -2125,8 +2125,8 @@ pub fn SP_func_timer(ctx: GameContext<'_>, self_: *mut gentity_t) {
         G_SpawnFloat(ctx, c"random".as_ptr(), c"1".as_ptr(), &mut (*self_).random);
         G_SpawnFloat(ctx, c"wait".as_ptr(), c"1".as_ptr(), &mut (*self_).wait);
 
-        (*self_).use_ = Some(EntUse::func_timer_use);
-        (*self_).think = Some(EntThink::func_timer_think);
+        (*self_).use_ = Some(EntUse::func_timer_use).into();
+        (*self_).think = Some(EntThink::func_timer_think).into();
 
         if (*self_).random >= (*self_).wait {
             (*self_).random = (*self_).wait - 1.0; // NOTE: was - FRAMETIME, but FRAMETIME is
@@ -2302,11 +2302,11 @@ pub fn asteroid_move_to_start2(
             (*self_).s.apos.trTime = (*ctx.world).level.time;
             (*self_).s.apos.trType = TR_LINEAR;
             // move it back to a new start when done
-            (*self_).think = Some(EntThink::asteroid_move_to_start);
+            (*self_).think = Some(EntThink::asteroid_move_to_start).into();
             (*self_).nextthink = (*ctx.world).level.time + time;
         } else {
             // crap, go bye-bye
-            (*self_).think = Some(EntThink::G_FreeEntity);
+            (*self_).think = Some(EntThink::G_FreeEntity).into();
             (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
         }
     }
@@ -2399,7 +2399,7 @@ pub fn SP_trigger_asteroid_field(ctx: GameContext<'_>, self_: *mut gentity_t) {
             (*self_).speed = 10000.0;
         }
 
-        (*self_).think = Some(EntThink::asteroid_field_think);
+        (*self_).think = Some(EntThink::asteroid_field_think).into();
         (*self_).nextthink = (*ctx.world).level.time + 100;
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));

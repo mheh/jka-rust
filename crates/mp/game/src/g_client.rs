@@ -321,7 +321,7 @@ pub fn SP_info_player_siegeteam1(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).genericValue1 = 1;
         }
 
-        (*ent).use_ = Some(EntUse::SiegePointUse);
+        (*ent).use_ = Some(EntUse::SiegePointUse).into();
     }
 }
 
@@ -355,7 +355,7 @@ pub fn SP_info_player_siegeteam2(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).genericValue1 = 1;
         }
 
-        (*ent).use_ = Some(EntUse::SiegePointUse);
+        (*ent).use_ = Some(EntUse::SiegePointUse).into();
     }
 }
 
@@ -670,11 +670,11 @@ pub fn SP_info_jedimaster_start(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // remember the spawn spot
         crate::q_math::_VectorCopy((*ent).s.pos.trBase, &mut (*ent).s.origin2);
 
-        (*ent).touch = Some(EntTouch::JMSaberTouch);
+        (*ent).touch = Some(EntTouch::JMSaberTouch).into();
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
-        (*ent).think = Some(EntThink::JMSaberThink);
+        (*ent).think = Some(EntThink::JMSaberThink).into();
         (*ent).nextthink = (*ctx.world).level.time + 50;
     }
 }
@@ -1340,9 +1340,9 @@ pub fn CopyToBodyQue(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
         (*body).r.ownerNum = (*ent).s.number;
 
         (*body).nextthink = (*ctx.world).level.time + BODY_SINK_TIME;
-        (*body).think = Some(EntThink::BodySink);
+        (*body).think = Some(EntThink::BodySink).into();
 
-        (*body).die = Some(EntDie::body_die);
+        (*body).die = Some(EntDie::body_die).into();
 
         // don't take more damage if already gibbed
         if (*ent).health <= GIB_HEALTH {
@@ -2020,8 +2020,8 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
             trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
         }
         crate::g_utils::G_InitGentity(ctx, ent);
-        (*ent).touch = None;
-        (*ent).pain = None;
+        (*ent).touch = FnId::NONE;
+        (*ent).pain = FnId::NONE;
         (*ent).client = client as *mut c_void;
 
         // assign the pointer for bg entity access
@@ -2942,7 +2942,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).classname = b"player\0".as_ptr() as *mut c_char;
         (*ent).r.contents = CONTENTS_BODY;
         (*ent).clipmask = MASK_PLAYERSOLID;
-        (*ent).die = Some(EntDie::player_die);
+        (*ent).die = Some(EntDie::player_die).into();
         (*ent).waterlevel = 0;
         (*ent).watertype = 0;
         (*ent).flags = 0;

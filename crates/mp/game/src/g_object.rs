@@ -250,7 +250,7 @@ pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 
     // call touch func
-    if let Some(touch_fn) = unsafe { (*ent).touch } {
+    if let Some(touch_fn) = unsafe { (*ent).touch.get() } {
         crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, trace_ent, unsafe {
             &tr as *const trace_t as *mut trace_t
         });
@@ -306,7 +306,7 @@ pub fn G_StartObjectMoving(
     // FIXME: make these objects go through G_RunObject automatically, like missiles do
     if unsafe { (*object).think.is_none() } {
         unsafe { (*object).nextthink = world.level.time + FRAMETIME as c_int };
-        unsafe { (*object).think = Some(EntThink::G_RunObject) };
+        unsafe { (*object).think = Some(EntThink::G_RunObject).into() };
     } else {
         // You're responsible for calling RunObject
     }

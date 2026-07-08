@@ -110,7 +110,7 @@ use crate::WalkerNPC::*;
 // `crate::ent_fn_enums::EntXxx` imports keep resolving.
 // Source: `crates/mp/qshared/src/common/mp/ent_fn_ids.rs`
 pub use mp_qshared::common::mp::ent_fn_ids::{
-    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse,
+    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse, FnId,
 };
 
 /// Central `think` dispatch (replaces `ent->think(...)`).

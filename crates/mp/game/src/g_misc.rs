@@ -260,7 +260,7 @@ pub fn SP_light(ctx: GameContext<'_>, self_: *mut gentity_t) {
         G_SetOrigin(self_, (*self_).s.origin);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
 
-        (*self_).use_ = Some(EntUse::misc_dlight_use);
+        (*self_).use_ = Some(EntUse::misc_dlight_use).into();
 
         (*self_).s.eType = entityType_t::ET_GENERAL as c_int;
         (*self_).alt_fire = qfalse;
@@ -454,7 +454,7 @@ pub fn SP_misc_portal_surface(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ent).target.is_null() {
             crate::q_math::_VectorCopy((*ent).s.origin, &mut (*ent).s.origin2);
         } else {
-            (*ent).think = Some(EntThink::locateCamera);
+            (*ent).think = Some(EntThink::locateCamera).into();
             (*ent).nextthink = (*ctx.world).level.time + 100;
         }
     }
@@ -829,7 +829,7 @@ pub fn G_PortalifyEntities(ctx: GameContext<'_>, ent: *mut gentity_t) {
             i += 1;
         }
 
-        (*ent).think = Some(EntThink::G_FreeEntity);
+        (*ent).think = Some(EntThink::G_FreeEntity).into();
         (*ent).nextthink = (*ctx.world).level.time;
     }
 }
@@ -892,7 +892,7 @@ pub fn SP_misc_skyportal(ctx: GameContext<'_>, ent: *mut gentity_t) {
             GSetConfigstringArgs::new(CS_SKYBOXORG, cstr(&s)),
         );
 
-        (*ent).think = Some(EntThink::G_PortalifyEntities);
+        (*ent).think = Some(EntThink::G_PortalifyEntities).into();
         (*ent).nextthink = (*ctx.world).level.time + 1050; // give it some time first so that all other entities are spawned.
     }
 }
@@ -1310,11 +1310,11 @@ pub fn SP_misc_holocron(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         crate::q_math::_VectorCopy((*ent).s.pos.trBase, &mut (*ent).s.origin2); // remember the spawn spot
 
-        (*ent).touch = Some(EntTouch::HolocronTouch);
+        (*ent).touch = Some(EntTouch::HolocronTouch).into();
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
-        (*ent).think = Some(EntThink::HolocronThink);
+        (*ent).think = Some(EntThink::HolocronThink).into();
         (*ent).nextthink = (*ctx.world).level.time + 50;
     }
 }
@@ -1383,7 +1383,7 @@ pub fn InitShooter_Finish(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ctx.world).g_entities.as_mut_ptr(),
             G_PickTarget(ctx, (*ent).target),
         );
-        (*ent).think = None;
+        (*ent).think = FnId::NONE;
         (*ent).nextthink = 0;
     }
 }
@@ -1393,7 +1393,7 @@ pub fn InitShooter_Finish(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1148-1166`
 pub fn InitShooter(ctx: GameContext<'_>, ent: *mut gentity_t, weapon: c_int) {
     unsafe {
-        (*ent).use_ = Some(EntUse::Use_Shooter);
+        (*ent).use_ = Some(EntUse::Use_Shooter).into();
         (*ent).s.weapon = weapon;
 
         crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForWeapon(weapon));
@@ -1408,7 +1408,7 @@ pub fn InitShooter(ctx: GameContext<'_>, ent: *mut gentity_t, weapon: c_int) {
         (*ent).random = (std::f64::consts::PI * (*ent).random as f64 / 180.0).sin() as f32;
         // target might be a moving object, so we can't set movedir for it
         if !(*ent).target.is_null() {
-            (*ent).think = Some(EntThink::InitShooter_Finish);
+            (*ent).think = Some(EntThink::InitShooter_Finish).into();
             (*ent).nextthink = (*ctx.world).level.time + 500;
         }
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
@@ -1795,7 +1795,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
         EnergyShieldStationSettings(ctx, ent);
 
         (*ent).genericValue4 = (*ent).count; // initial value
-        (*ent).think = Some(EntThink::check_recharge);
+        (*ent).think = Some(EntThink::check_recharge).into();
 
         G_SpawnInt(
             ctx,
@@ -1814,7 +1814,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         (*ent).nextthink = (*ctx.world).level.time + 200; // + STATION_RECHARGE_TIME
 
-        (*ent).use_ = Some(EntUse::ammo_generic_power_converter_use);
+        (*ent).use_ = Some(EntUse::ammo_generic_power_converter_use).into();
 
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
@@ -1913,7 +1913,7 @@ pub fn SP_misc_shield_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
         EnergyShieldStationSettings(ctx, ent);
 
         (*ent).genericValue4 = (*ent).count;
-        (*ent).think = Some(EntThink::check_recharge);
+        (*ent).think = Some(EntThink::check_recharge).into();
 
         G_SpawnInt(
             ctx,
@@ -1932,7 +1932,7 @@ pub fn SP_misc_shield_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         (*ent).nextthink = (*ctx.world).level.time + 200;
 
-        (*ent).use_ = Some(EntUse::shield_power_converter_use);
+        (*ent).use_ = Some(EntUse::shield_power_converter_use).into();
 
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
@@ -1973,7 +1973,7 @@ pub fn SP_misc_model_shield_power_converter(ctx: GameContext<'_>, ent: *mut gent
         EnergyShieldStationSettings(ctx, ent);
 
         (*ent).genericValue4 = (*ent).count;
-        (*ent).think = Some(EntThink::check_recharge);
+        (*ent).think = Some(EntThink::check_recharge).into();
 
         (*ent).s.maxhealth = (*ent).count;
         (*ent).s.health = (*ent).count;
@@ -1983,7 +1983,7 @@ pub fn SP_misc_model_shield_power_converter(ctx: GameContext<'_>, ent: *mut gent
 
         (*ent).nextthink = (*ctx.world).level.time + 200;
 
-        (*ent).use_ = Some(EntUse::shield_power_converter_use);
+        (*ent).use_ = Some(EntUse::shield_power_converter_use).into();
 
         G_SetOrigin(ent, (*ent).s.origin);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
@@ -2102,12 +2102,12 @@ pub fn SP_misc_model_ammo_power_converter(ctx: GameContext<'_>, ent: *mut gentit
             c"0".as_ptr(),
             &mut (*ent).genericValue12 as *mut c_int,
         );
-        (*ent).use_ = Some(EntUse::ammo_power_converter_use);
+        (*ent).use_ = Some(EntUse::ammo_power_converter_use).into();
 
         EnergyAmmoStationSettings(ctx, ent);
 
         (*ent).genericValue4 = (*ent).count;
-        (*ent).think = Some(EntThink::check_recharge);
+        (*ent).think = Some(EntThink::check_recharge).into();
 
         if (*ent).genericValue12 == 0 {
             (*ent).s.maxhealth = (*ent).count;
@@ -2215,12 +2215,12 @@ pub fn SP_misc_model_health_power_converter(ctx: GameContext<'_>, ent: *mut gent
         (*ent).r.contents = CONTENTS_SOLID;
         (*ent).clipmask = MASK_SOLID;
 
-        (*ent).use_ = Some(EntUse::health_power_converter_use);
+        (*ent).use_ = Some(EntUse::health_power_converter_use).into();
 
         EnergyHealthStationSettings(ctx, ent);
 
         (*ent).genericValue4 = (*ent).count;
-        (*ent).think = Some(EntThink::check_recharge);
+        (*ent).think = Some(EntThink::check_recharge).into();
 
         //ent->s.maxhealth = ent->s.health = ent->count;
         (*ent).s.shouldtarget = qtrue;
@@ -2354,7 +2354,7 @@ pub fn fx_runner_use(
             }
         } else {
             // ensure we are working with the right think function
-            (*self_).think = Some(EntThink::fx_runner_think);
+            (*self_).think = Some(EntThink::fx_runner_think).into();
 
             // toggle our state
             if (*self_).nextthink == -1 {
@@ -2464,13 +2464,13 @@ pub fn fx_runner_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
 
             // Let's get to work right now!
-            (*ent).think = Some(EntThink::fx_runner_think);
+            (*ent).think = Some(EntThink::fx_runner_think).into();
             (*ent).nextthink = (*ctx.world).level.time + 200; // wait a small bit, then start working
         }
 
         // make us useable if we can be targeted
         if !(*ent).targetname.is_null() && *(*ent).targetname != 0 {
-            (*ent).use_ = Some(EntUse::fx_runner_use);
+            (*ent).use_ = Some(EntUse::fx_runner_use).into();
         }
     }
 }
@@ -2538,7 +2538,7 @@ pub fn SP_fx_runner(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).s.modelindex2 = FX_STATE_OFF;
 
         // Give us a bit of time to spawn in the other entities, since we may have to target one of 'em
-        (*ent).think = Some(EntThink::fx_runner_link);
+        (*ent).think = Some(EntThink::fx_runner_link).into();
         (*ent).nextthink = (*ctx.world).level.time + 400;
 
         // Save our position and link us up!
@@ -2633,7 +2633,7 @@ pub fn SP_target_screenshake(ctx: GameContext<'_>, ent: *mut gentity_t) {
             &mut (*ent).genericValue6 as *mut c_int,
         );
 
-        (*ent).use_ = Some(EntUse::Use_Target_Screenshake);
+        (*ent).use_ = Some(EntUse::Use_Target_Screenshake).into();
     }
 }
 
@@ -2710,7 +2710,7 @@ pub fn SP_target_escapetrig(ctx: GameContext<'_>, ent: *mut gentity_t) {
             &mut (*ent).genericValue6 as *mut c_int,
         );
 
-        (*ent).use_ = Some(EntUse::Use_Target_Escapetrig);
+        (*ent).use_ = Some(EntUse::Use_Target_Escapetrig).into();
     }
 }
 
@@ -2757,7 +2757,7 @@ pub fn SP_misc_maglock(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         G_SetOrigin(self_, (*self_).s.origin);
 
-        (*self_).think = Some(EntThink::maglock_link);
+        (*self_).think = Some(EntThink::maglock_link).into();
         //FIXME: for some reason, when you re-load a level, these fail to find their doors...?  Random?  Testing an additional 200ms after the START_TIME_FIND_LINKS
         (*self_).nextthink = (*ctx.world).level.time + START_TIME_FIND_LINKS + 200;
         //because we need to let the doors link up and spawn their triggers first!
@@ -2808,7 +2808,7 @@ pub fn maglock_link(ctx: GameContext<'_>, self_: *mut gentity_t) {
             return;
         }
         if trace.fraction == 1.0 {
-            (*self_).think = Some(EntThink::maglock_link);
+            (*self_).think = Some(EntThink::maglock_link).into();
             (*self_).nextthink = (*ctx.world).level.time + 100;
             return;
         }
@@ -2817,7 +2817,7 @@ pub fn maglock_link(ctx: GameContext<'_>, self_: *mut gentity_t) {
             || trace_ent.is_null()
             || Q_stricmp(c"func_door".as_ptr(), (*trace_ent).classname) != 0
         {
-            (*self_).think = Some(EntThink::maglock_link);
+            (*self_).think = Some(EntThink::maglock_link).into();
             (*self_).nextthink = (*ctx.world).level.time + 100;
             return;
         }
@@ -2851,7 +2851,7 @@ pub fn maglock_link(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*self_).flags |= FL_SHIELDED; // only damagable by lightsabers
         (*self_).takedamage = qtrue;
         (*self_).health = 10;
-        (*self_).die = Some(EntDie::maglock_die);
+        (*self_).die = Some(EntDie::maglock_die).into();
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
     }
@@ -2902,7 +2902,7 @@ pub fn faller_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let bounce: f32 = 1.1;
 
         if (*ent).genericValue6 < (*ctx.world).level.time {
-            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = (*ctx.world).level.time;
             return;
         }
@@ -2973,10 +2973,10 @@ pub fn misc_faller_create(
 
         (*faller).s.eFlags = EF_RAG | EF_CLIENTSMOOTH;
 
-        (*faller).think = Some(EntThink::faller_think);
+        (*faller).think = Some(EntThink::faller_think).into();
         (*faller).nextthink = (*ctx.world).level.time;
 
-        (*faller).touch = Some(EntTouch::faller_touch);
+        (*faller).touch = Some(EntTouch::faller_touch).into();
 
         (*faller).epVelocity[0] = (*ctx.world).bg_state.rng.flrand(-256.0, 256.0);
         (*faller).epVelocity[1] = (*ctx.world).bg_state.rng.flrand(-256.0, 256.0);
@@ -3026,12 +3026,12 @@ pub fn SP_misc_faller(ctx: GameContext<'_>, ent: *mut gentity_t) {
         );
 
         if (*ent).targetname.is_null() || *(*ent).targetname == 0 {
-            (*ent).think = Some(EntThink::misc_faller_think);
+            (*ent).think = Some(EntThink::misc_faller_think).into();
             (*ent).nextthink = (*ctx.world).level.time
                 + (*ent).genericValue1
                 + (*ctx.world).bg_state.rng.Q_irand(0, (*ent).genericValue2);
         } else {
-            (*ent).use_ = Some(EntUse::misc_faller_create);
+            (*ent).use_ = Some(EntUse::misc_faller_create).into();
         }
     }
 }
@@ -3428,7 +3428,7 @@ pub fn SP_reference_tag(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if !(*ent).target.is_null() {
             // Init cannot occur until all entities have been spawned
-            (*ent).think = Some(EntThink::ref_link);
+            (*ent).think = Some(EntThink::ref_link).into();
             (*ent).nextthink = (*ctx.world).level.time + START_TIME_LINK_ENTS;
         } else {
             ref_link(ctx, ent);
@@ -3492,7 +3492,7 @@ pub fn misc_weapon_shooter_fire(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         FireWeapon(ctx, self_, (((*self_).spawnflags & 1) != 0) as qboolean);
         if (*self_).spawnflags & 2 != 0 {
-            (*self_).think = Some(EntThink::misc_weapon_shooter_fire);
+            (*self_).think = Some(EntThink::misc_weapon_shooter_fire).into();
             (*self_).nextthink = (*ctx.world).level.time + (*self_).wait as c_int;
         }
     }
@@ -3508,7 +3508,7 @@ pub fn misc_weapon_shooter_use(
     activator: *mut gentity_t,
 ) {
     unsafe {
-        if (*self_).think == Some(EntThink::misc_weapon_shooter_fire) {
+        if (*self_).think.get() == Some(EntThink::misc_weapon_shooter_fire) {
             // repeating fire, stop
             /*
             G_FreeClientForShooter(self->client);
@@ -3594,7 +3594,7 @@ pub fn SP_misc_weapon_shooter(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         // set up to link
         if !(*self_).target.is_null() {
-            (*self_).think = Some(EntThink::misc_weapon_shooter_aim);
+            (*self_).think = Some(EntThink::misc_weapon_shooter_aim).into();
             (*self_).nextthink = (*ctx.world).level.time + START_TIME_LINK_ENTS;
         } else {
             // just set aim angles
@@ -3606,7 +3606,7 @@ pub fn SP_misc_weapon_shooter(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         // set up to fire when used
-        (*self_).use_ = Some(EntUse::misc_weapon_shooter_use);
+        (*self_).use_ = Some(EntUse::misc_weapon_shooter_use).into();
 
         if (*self_).wait == 0.0 {
             (*self_).wait = 500.0;

@@ -466,7 +466,7 @@ pub fn WP_FireTurboLaserMissile(
         (*missile).s.owner = (*ent).s.number;
 
         // don't let them last forever (at 20000 speed, more than enough)
-        (*missile).think = Some(EntThink::G_FreeEntity);
+        (*missile).think = Some(EntThink::G_FreeEntity).into();
         (*missile).nextthink = (*ctx.world).level.time + 5000;
     }
 }
@@ -1411,7 +1411,7 @@ pub fn DEMP2_AltRadiusDamage(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if myOwner.is_null() || (*myOwner).inuse == 0 || (*myOwner).client.is_null() {
-            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = (*ctx.world).level.time;
             return;
         }
@@ -1550,7 +1550,7 @@ pub fn DEMP2_AltRadiusDamage(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).nextthink = (*ctx.world).level.time + 50;
         } else {
             // don't just leave the entity around
-            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = (*ctx.world).level.time;
         }
     }
@@ -1581,7 +1581,7 @@ pub fn DEMP2_AltDetonate(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).genericValue5 = (*ctx.world).level.time;
         (*ent).genericValue6 = 0;
         (*ent).nextthink = (*ctx.world).level.time + 50;
-        (*ent).think = Some(EntThink::DEMP2_AltRadiusDamage);
+        (*ent).think = Some(EntThink::DEMP2_AltRadiusDamage).into();
         (*ent).s.eType = entityType_t::ET_GENERAL as c_int; // make us a missile no longer
     }
 }
@@ -1654,7 +1654,7 @@ pub fn WP_DEMP2_AltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*missile).classname = c"demp2_alt_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_DEMP2;
 
-        (*missile).think = Some(EntThink::DEMP2_AltDetonate);
+        (*missile).think = Some(EntThink::DEMP2_AltDetonate).into();
         (*missile).nextthink = (*ctx.world).level.time;
 
         (*missile).splashDamage = damage;
@@ -1781,7 +1781,7 @@ pub fn prox_mine_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if blow != qfalse {
-            (*ent).think = Some(EntThink::laserTrapExplode);
+            (*ent).think = Some(EntThink::laserTrapExplode).into();
             (*ent).nextthink = (*ctx.world).level.time + 200;
         } else {
             // we probably don't need to do this thinking logic very often...maybe this is fast enough?
@@ -1888,7 +1888,7 @@ pub fn WP_CreateFlechetteBouncyThing(
         let missile =
             crate::g_missile::CreateMissile(ctx, start, fwd, vel, life as c_int, self_, qtrue);
 
-        (*missile).think = Some(EntThink::WP_flechette_alt_blow);
+        (*missile).think = Some(EntThink::WP_flechette_alt_blow).into();
 
         (*missile).activator = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), self_));
 
@@ -1901,7 +1901,7 @@ pub fn WP_CreateFlechetteBouncyThing(
         (*missile).r.maxs = [3.0, 3.0, 3.0];
         (*missile).clipmask = MASK_SHOT;
 
-        (*missile).touch = Some(EntTouch::touch_NULL);
+        (*missile).touch = Some(EntTouch::touch_NULL).into();
 
         // normal ones bounce, alt ones explode on impact
         (*missile).s.pos.trType = TR_GRAVITY;
@@ -2008,7 +2008,7 @@ pub fn rocketThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if (*ent).genericValue1 == 0 {
                 // doesn't have its own self-kill time
                 (*ent).nextthink = (*ctx.world).level.time + 10000;
-                (*ent).think = Some(EntThink::G_FreeEntity);
+                (*ent).think = Some(EntThink::G_FreeEntity).into();
             }
             return;
         }
@@ -2138,12 +2138,12 @@ pub fn RocketDie(
     r#mod: c_int,
 ) {
     unsafe {
-        (*self_).die = None;
+        (*self_).die = FnId::NONE;
         (*self_).r.contents = 0;
 
         crate::g_missile::G_ExplodeMissile(ctx, self_);
 
-        (*self_).think = Some(EntThink::G_FreeEntity);
+        (*self_).think = Some(EntThink::G_FreeEntity).into();
         (*self_).nextthink = (*ctx.world).level.time;
     }
 }
@@ -2206,7 +2206,7 @@ pub fn WP_FireRocket(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolea
                 {
                     // if enemy became invalid, died, or is on the same team, then don't seek it
                     (*missile).angle = 0.5;
-                    (*missile).think = Some(EntThink::rocketThink);
+                    (*missile).think = Some(EntThink::rocketThink).into();
                     (*missile).nextthink = (*ctx.world).level.time + ROCKET_ALT_THINK_TIME;
                 }
             }
@@ -2242,7 +2242,7 @@ pub fn WP_FireRocket(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolea
         (*missile).health = 10;
         (*missile).takedamage = qtrue;
         (*missile).r.contents = MASK_SHOT;
-        (*missile).die = Some(EntDie::RocketDie);
+        (*missile).die = Some(EntDie::RocketDie).into();
         //===testing being able to shoot rockets out of the air==================================
 
         (*missile).clipmask = MASK_SHOT;
@@ -2269,7 +2269,7 @@ pub fn thermalDetonatorExplode(ctx: GameContext<'_>, ent: *mut gentity_t) {
             );
             (*ent).count = 1;
             (*ent).genericValue5 = (*ctx.world).level.time + 500;
-            (*ent).think = Some(EntThink::thermalThinkStandard);
+            (*ent).think = Some(EntThink::thermalThinkStandard).into();
             (*ent).nextthink = (*ctx.world).level.time;
             (*ent).r.svFlags |= SVF_BROADCAST; // so everyone hears/sees the explosion?
         } else {
@@ -2327,7 +2327,7 @@ pub fn thermalDetonatorExplode(ctx: GameContext<'_>, ent: *mut gentity_t) {
 pub fn thermalThinkStandard(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ent).genericValue5 < (*ctx.world).level.time {
-            (*ent).think = Some(EntThink::thermalDetonatorExplode);
+            (*ent).think = Some(EntThink::thermalDetonatorExplode).into();
             (*ent).nextthink = (*ctx.world).level.time;
             return;
         }
@@ -2357,9 +2357,9 @@ pub fn WP_FireThermalDetonator(
         (*bolt).physicsObject = qtrue;
 
         (*bolt).classname = c"thermal_detonator".as_ptr() as *mut c_char;
-        (*bolt).think = Some(EntThink::thermalThinkStandard);
+        (*bolt).think = Some(EntThink::thermalThinkStandard).into();
         (*bolt).nextthink = (*ctx.world).level.time;
-        (*bolt).touch = Some(EntTouch::touch_NULL);
+        (*bolt).touch = Some(EntTouch::touch_NULL).into();
 
         // How 'bout we give this thing a size...
         (*bolt).r.mins = [-3.0, -3.0, -3.0];
@@ -2691,7 +2691,7 @@ pub fn laserTrapExplode(ctx: GameContext<'_>, self_: *mut gentity_t) {
             );
         }
 
-        (*self_).think = Some(EntThink::G_FreeEntity);
+        (*self_).think = Some(EntThink::G_FreeEntity).into();
         (*self_).nextthink = (*ctx.world).level.time;
     }
 }
@@ -2710,7 +2710,7 @@ pub fn laserTrapDelayedExplode(
 ) {
     unsafe {
         (*self_).enemy = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), attacker));
-        (*self_).think = Some(EntThink::laserTrapExplode);
+        (*self_).think = Some(EntThink::laserTrapExplode).into();
         (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
         (*self_).takedamage = qfalse;
         if !attacker.is_null() && (*attacker).s.number == 0 {
@@ -2747,13 +2747,13 @@ pub fn touchLaserTrap(
             // happening like tripmines floating in the air after getting stuck
             // to a moving door
             if (*ent).activator != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other)) {
-                (*ent).touch = None;
+                (*ent).touch = FnId::NONE;
                 (*ent).nextthink = (*ctx.world).level.time + FRAMETIME;
-                (*ent).think = Some(EntThink::laserTrapExplode);
+                (*ent).think = Some(EntThink::laserTrapExplode).into();
                 (*ent).s.pos.trDelta = (*trace).plane.normal;
             }
         } else {
-            (*ent).touch = None;
+            (*ent).touch = FnId::NONE;
             if (*trace).entityNum != ENTITYNUM_NONE as i16 {
                 (*ent).enemy = Some(ent_id(
                     (*ctx.world).g_entities.as_mut_ptr(),
@@ -2788,7 +2788,7 @@ pub fn proxMineThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 != crate::client::client_connected::CON_CONNECTED
         {
             // time to die!
-            (*ent).think = Some(EntThink::laserTrapExplode);
+            (*ent).think = Some(EntThink::laserTrapExplode).into();
             return;
         }
 
@@ -2817,7 +2817,7 @@ pub fn proxMineThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         &mut v,
                     );
                     if crate::q_math::VectorLength(v) < (*ent).splashRadius as f32 / 2.0f32 {
-                        (*ent).think = Some(EntThink::laserTrapExplode);
+                        (*ent).think = Some(EntThink::laserTrapExplode).into();
                         return;
                     }
                 }
@@ -2850,7 +2850,7 @@ pub fn laserTrapThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
             );
             (*ent).s.eFlags |= EF_FIRING;
         }
-        (*ent).think = Some(EntThink::laserTrapThink);
+        (*ent).think = Some(EntThink::laserTrapThink).into();
         (*ent).nextthink = (*ctx.world).level.time + FRAMETIME;
 
         // Find the main impact point
@@ -2876,9 +2876,9 @@ pub fn laserTrapThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if !(*traceEnt).client.is_null() || tr.startsolid != 0 {
             // go boom
-            (*ent).touch = None;
+            (*ent).touch = FnId::NONE;
             (*ent).nextthink = (*ctx.world).level.time + LT_DELAY_TIME;
-            (*ent).think = Some(EntThink::laserTrapExplode);
+            (*ent).think = Some(EntThink::laserTrapExplode).into();
         }
     }
 }
@@ -2916,13 +2916,13 @@ pub fn laserTrapStick(ctx: GameContext<'_>, ent: *mut gentity_t, endpos: vec3_t,
             // a tripwire
             // add draw line flag
             (*ent).movedir = normal;
-            (*ent).think = Some(EntThink::laserTrapThink);
+            (*ent).think = Some(EntThink::laserTrapThink).into();
             (*ent).nextthink = (*ctx.world).level.time + LT_ACTIVATION_DELAY; // delay the activation
-            (*ent).touch = Some(EntTouch::touch_NULL);
+            (*ent).touch = Some(EntTouch::touch_NULL).into();
             // make it shootable
             (*ent).takedamage = qtrue;
             (*ent).health = 5;
-            (*ent).die = Some(EntDie::laserTrapDelayedExplode);
+            (*ent).die = Some(EntDie::laserTrapDelayedExplode).into();
 
             // shove the box through the wall
             (*ent).r.mins = [-LT_SIZE * 2.0, -LT_SIZE * 2.0, -LT_SIZE * 2.0];
@@ -2931,15 +2931,15 @@ pub fn laserTrapStick(ctx: GameContext<'_>, ent: *mut gentity_t, endpos: vec3_t,
             // so that the owner can blow it up with projectiles
             (*ent).r.svFlags |= SVF_OWNERNOTSHARED;
         } else {
-            (*ent).touch = Some(EntTouch::touchLaserTrap);
-            (*ent).think = Some(EntThink::proxMineThink); // laserTrapExplode
+            (*ent).touch = Some(EntTouch::touchLaserTrap).into();
+            (*ent).think = Some(EntThink::proxMineThink).into(); // laserTrapExplode
             (*ent).genericValue15 = (*ctx.world).level.time + 30000; // auto-explode after 30 seconds.
             (*ent).nextthink = (*ctx.world).level.time + LT_ALT_TIME; // How long 'til she blows
 
             // make it shootable
             (*ent).takedamage = qtrue;
             (*ent).health = 5;
-            (*ent).die = Some(EntDie::laserTrapDelayedExplode);
+            (*ent).die = Some(EntDie::laserTrapDelayedExplode).into();
 
             // shove the box through the wall
             (*ent).r.mins = [-LT_SIZE * 2.0, -LT_SIZE * 2.0, -LT_SIZE * 2.0];
@@ -3047,8 +3047,8 @@ pub fn CreateLaserTrap(
         }
 
         (*laserTrap).pos2 = start;
-        (*laserTrap).touch = Some(EntTouch::touchLaserTrap);
-        (*laserTrap).think = Some(EntThink::TrapThink);
+        (*laserTrap).touch = Some(EntTouch::touchLaserTrap).into();
+        (*laserTrap).think = Some(EntThink::TrapThink).into();
         (*laserTrap).nextthink = (*ctx.world).level.time + 50;
     }
 }
@@ -3195,14 +3195,14 @@ pub fn charge_stick(
             let mut apos_base: vec3_t = [0.0; 3];
             crate::q_math::vectoangles(vNor, &mut apos_base);
             (*self_).s.apos.trBase = apos_base;
-            (*self_).touch = Some(EntTouch::charge_stick);
+            (*self_).touch = Some(EntTouch::charge_stick).into();
             return;
         } else if !other.is_null() && ((*other).s.number as u32) < (ENTITYNUM_WORLD) as u32 {
             // hit an entity that we just want to explode on (probably another projectile or something)
             let v: vec3_t;
 
-            (*self_).touch = None;
-            (*self_).think = None;
+            (*self_).touch = FnId::NONE;
+            (*self_).think = FnId::NONE;
             (*self_).nextthink = 0;
 
             (*self_).takedamage = qfalse;
@@ -3231,15 +3231,15 @@ pub fn charge_stick(
                 v,
             );
 
-            (*self_).think = Some(EntThink::G_FreeEntity);
+            (*self_).think = Some(EntThink::G_FreeEntity).into();
             (*self_).nextthink = (*ctx.world).level.time;
             return;
         }
 
         // if we get here I guess we hit the world so we can stick to it
 
-        (*self_).touch = None;
-        (*self_).think = Some(EntThink::DetPackBlow);
+        (*self_).touch = FnId::NONE;
+        (*self_).think = Some(EntThink::DetPackBlow).into();
         (*self_).nextthink = (*ctx.world).level.time + 30000;
 
         (*self_).s.apos.trDelta = [0.0, 0.0, 0.0];
@@ -3289,8 +3289,8 @@ pub fn DetPackBlow(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let mut v: vec3_t;
 
-        (*self_).pain = None;
-        (*self_).die = None;
+        (*self_).pain = FnId::NONE;
+        (*self_).die = FnId::NONE;
         (*self_).takedamage = qfalse;
 
         if let Some(target_id) = (*self_).target_ent {
@@ -3336,7 +3336,7 @@ pub fn DetPackBlow(ctx: GameContext<'_>, self_: *mut gentity_t) {
             v,
         );
 
-        (*self_).think = Some(EntThink::G_FreeEntity);
+        (*self_).think = Some(EntThink::G_FreeEntity).into();
         (*self_).nextthink = (*ctx.world).level.time;
     }
 }
@@ -3351,7 +3351,7 @@ pub fn DetPackPain(
     damage: c_int,
 ) {
     unsafe {
-        (*self_).think = Some(EntThink::DetPackBlow);
+        (*self_).think = Some(EntThink::DetPackBlow).into();
         (*self_).nextthink = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(50, 100);
         (*self_).takedamage = qfalse;
     }
@@ -3369,7 +3369,7 @@ pub fn DetPackDie(
     r#mod: c_int,
 ) {
     unsafe {
-        (*self_).think = Some(EntThink::DetPackBlow);
+        (*self_).think = Some(EntThink::DetPackBlow).into();
         (*self_).nextthink = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(50, 100);
         (*self_).takedamage = qfalse;
     }
@@ -3387,7 +3387,7 @@ pub fn drop_charge(ctx: GameContext<'_>, self_: *mut gentity_t, start: vec3_t, d
         let bolt = crate::g_utils::G_Spawn(ctx);
         (*bolt).classname = c"detpack".as_ptr() as *mut c_char;
         (*bolt).nextthink = (*ctx.world).level.time + FRAMETIME;
-        (*bolt).think = Some(EntThink::G_RunObject);
+        (*bolt).think = Some(EntThink::G_RunObject).into();
         (*bolt).s.eType = (ET_GENERAL) as i32;
         (*bolt).s.g2radius = 100;
         (*bolt).s.modelGhoul2 = 1;
@@ -3404,7 +3404,7 @@ pub fn drop_charge(ctx: GameContext<'_>, self_: *mut gentity_t, start: vec3_t, d
         (*bolt).clipmask = MASK_SHOT;
         (*bolt).s.solid = 2;
         (*bolt).r.contents = MASK_SHOT;
-        (*bolt).touch = Some(EntTouch::charge_stick);
+        (*bolt).touch = Some(EntTouch::charge_stick).into();
 
         (*bolt).physicsObject = qtrue;
 
@@ -3416,8 +3416,8 @@ pub fn drop_charge(ctx: GameContext<'_>, self_: *mut gentity_t, start: vec3_t, d
 
         (*bolt).health = 1;
         (*bolt).takedamage = qtrue;
-        (*bolt).pain = Some(EntPain::DetPackPain);
-        (*bolt).die = Some(EntDie::DetPackDie);
+        (*bolt).pain = Some(EntPain::DetPackPain).into();
+        (*bolt).die = Some(EntDie::DetPackDie).into();
 
         (*bolt).s.weapon = WP_DET_PACK;
 
@@ -3470,7 +3470,7 @@ pub fn BlowDetpacks(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 // loop through all ents and blow the crap out of them!
                 if (*found).parent == Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), ent)) {
                     (*found).s.origin = (*found).r.currentOrigin;
-                    (*found).think = Some(EntThink::DetPackBlow);
+                    (*found).think = Some(EntThink::DetPackBlow).into();
                     (*found).nextthink = (*ctx.world).level.time
                         + 100
                         + ((*ctx.world).bg_state.rng.random() * 200.0) as c_int;
@@ -4379,10 +4379,10 @@ pub fn WP_VehWeapSetSolidToOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
             // expire after a time
             if (*self_).genericValue2 != 0 {
                 // blow up when your lifetime is up
-                (*self_).think = Some(EntThink::G_ExplodeMissile); // FIXME: custom func?
+                (*self_).think = Some(EntThink::G_ExplodeMissile).into(); // FIXME: custom func?
             } else {
                 // just remove yourself
-                (*self_).think = Some(EntThink::G_FreeEntity); // FIXME: custom func?
+                (*self_).think = Some(EntThink::G_FreeEntity).into(); // FIXME: custom func?
             }
             (*self_).nextthink = (*ctx.world).level.time + (*self_).genericValue1;
         }
@@ -4515,10 +4515,10 @@ pub fn WP_FireVehicleWeapon(
                 // expire after a time
                 if (*vehWeapon).bExplodeOnExpire != qfalse {
                     // blow up when your lifetime is up
-                    (*missile).think = Some(EntThink::G_ExplodeMissile); // FIXME: custom func?
+                    (*missile).think = Some(EntThink::G_ExplodeMissile).into(); // FIXME: custom func?
                 } else {
                     // just remove yourself
-                    (*missile).think = Some(EntThink::G_FreeEntity); // FIXME: custom func?
+                    (*missile).think = Some(EntThink::G_FreeEntity).into(); // FIXME: custom func?
                 }
                 (*missile).nextthink = (*ctx.world).level.time + (*vehWeapon).iLifeTime;
             }
@@ -4582,7 +4582,7 @@ pub fn WP_FireVehicleWeapon(
                                 (*missile).genericValue2 = (*vehWeapon).bExplodeOnExpire as c_int;
                             }
                             // now go ahead and use the rocketThink func
-                            (*missile).think = Some(EntThink::rocketThink); // FIXME: custom func?
+                            (*missile).think = Some(EntThink::rocketThink).into(); // FIXME: custom func?
                             (*missile).nextthink =
                                 (*ctx.world).level.time + VEH_HOMING_MISSILE_THINK_TIME;
                             (*missile).s.eFlags |= EF_RADAROBJECT; // FIXME: externalize
@@ -4604,12 +4604,12 @@ pub fn WP_FireVehicleWeapon(
                     (*missile).health = (*vehWeapon).iHealth;
                     (*missile).takedamage = qtrue;
                     (*missile).r.contents = MASK_SHOT;
-                    (*missile).die = Some(EntDie::RocketDie);
+                    (*missile).die = Some(EntDie::RocketDie).into();
                 }
                 // only do damage when someone touches us
                 (*missile).s.weapon = WP_THERMAL; // does this really matter?
                 crate::g_utils::G_SetOrigin(missile, start);
-                (*missile).touch = Some(EntTouch::WP_TouchVehMissile);
+                (*missile).touch = Some(EntTouch::WP_TouchVehMissile).into();
                 (*missile).s.eFlags |= EF_RADAROBJECT; // FIXME: externalize
                                                        // crap, if we have a lifetime, need to store that somewhere else on ent
                                                        // and have rocketThink func check it every frame...
@@ -4619,7 +4619,7 @@ pub fn WP_FireVehicleWeapon(
                     (*missile).genericValue2 = (*vehWeapon).bExplodeOnExpire as c_int;
                 }
                 // now go ahead and use the setsolidtoowner func
-                (*missile).think = Some(EntThink::WP_VehWeapSetSolidToOwner);
+                (*missile).think = Some(EntThink::WP_VehWeapSetSolidToOwner).into();
                 (*missile).nextthink = (*ctx.world).level.time + 3000;
             }
         } else {
@@ -5993,8 +5993,8 @@ pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).genericValue4 = 0;
 
         (*ent).takedamage = qtrue;
-        (*ent).pain = Some(EntPain::emplaced_gun_pain);
-        (*ent).die = Some(EntDie::emplaced_gun_die);
+        (*ent).pain = Some(EntPain::emplaced_gun_pain).into();
+        (*ent).die = Some(EntDie::emplaced_gun_die).into();
 
         (*ent).splashDamage = 80;
         (*ent).splashRadius = 128;
@@ -6025,10 +6025,10 @@ pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: *mut gentity_t) {
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).r.currentAngles);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
 
-        (*ent).think = Some(EntThink::emplaced_gun_update);
+        (*ent).think = Some(EntThink::emplaced_gun_update).into();
         (*ent).nextthink = (*ctx.world).level.time + 50;
 
-        (*ent).use_ = Some(EntUse::emplaced_gun_realuse);
+        (*ent).use_ = Some(EntUse::emplaced_gun_realuse).into();
 
         (*ent).r.svFlags |= (SVF_PLAYER_USABLE as u32) as i32;
 

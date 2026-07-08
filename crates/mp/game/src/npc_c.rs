@@ -590,7 +590,7 @@ pub fn DeadThink(ctx: GameContext<'_>) {
                 ) == 0
                 {
                     //if ( !NPC->taskManager || !NPC->taskManager->IsRunning() )
-                    (*npc_ent).think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity);
+                    (*npc_ent).think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity).into();
                     (*npc_ent).nextthink = world.level.time + FRAMETIME;
                 }
             } else {
@@ -598,7 +598,7 @@ pub fn DeadThink(ctx: GameContext<'_>) {
                 NPC_RemoveBodyEffect(ctx);
 
                 //FIXME: keep it running through physics somehow?
-                (*npc_ent).think = Some(crate::ent_fn_enums::EntThink::NPC_RemoveBody);
+                (*npc_ent).think = Some(crate::ent_fn_enums::EntThink::NPC_RemoveBody).into();
                 (*npc_ent).nextthink = world.level.time + FRAMETIME;
                 let npc_class = (*client).NPC_class;
                 // check for droids

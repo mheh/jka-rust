@@ -328,11 +328,11 @@ pub fn turretG2_die(
 
         // Turn off the thinking of the base & use it's targets
         // self->think = NULL;
-        (*self_).use_ = None;
+        (*self_).use_ = FnId::NONE;
 
         // clear my data
-        (*self_).die = None;
-        (*self_).pain = None;
+        (*self_).die = FnId::NONE;
+        (*self_).pain = FnId::NONE;
         (*self_).takedamage = qfalse;
         (*self_).s.health = 0;
         (*self_).health = 0;
@@ -505,7 +505,7 @@ pub fn turretG2_fire(ctx: GameContext<'_>, ent: *mut gentity_t, start: vec3_t, d
 
             (*bolt).classname = c"turret_proj".as_ptr() as *mut c_char;
             (*bolt).nextthink = (*ctx.world).level.time + 10000;
-            (*bolt).think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity);
+            (*bolt).think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity).into();
             (*bolt).s.eType = ET_MISSILE as c_int;
             (*bolt).s.weapon = WP_BLASTER as c_int;
             (*bolt).r.ownerNum = (*ent).s.number;
@@ -544,9 +544,9 @@ pub fn turretG2_fire(ctx: GameContext<'_>, ent: *mut gentity_t, start: vec3_t, d
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:414-434`
 pub fn turretG2_respawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).use_ = Some(crate::ent_fn_enums::EntUse::turretG2_base_use);
-        (*self_).pain = Some(crate::ent_fn_enums::EntPain::TurretG2Pain);
-        (*self_).die = Some(crate::ent_fn_enums::EntDie::turretG2_die);
+        (*self_).use_ = Some(crate::ent_fn_enums::EntUse::turretG2_base_use).into();
+        (*self_).pain = Some(crate::ent_fn_enums::EntPain::TurretG2Pain).into();
+        (*self_).die = Some(crate::ent_fn_enums::EntDie::turretG2_die).into();
         (*self_).takedamage = qtrue;
         (*self_).s.shouldtarget = qtrue;
 
@@ -1277,11 +1277,11 @@ pub fn finish_spawning_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
         G_EffectIndex(c"sparks/spark_exp_nosnd".as_ptr());
 
         // Set up callbacks
-        (*base).use_ = Some(crate::ent_fn_enums::EntUse::turretG2_base_use);
-        (*base).pain = Some(crate::ent_fn_enums::EntPain::TurretG2Pain);
+        (*base).use_ = Some(crate::ent_fn_enums::EntUse::turretG2_base_use).into();
+        (*base).pain = Some(crate::ent_fn_enums::EntPain::TurretG2Pain).into();
 
         // Don't start working right away
-        (*base).think = Some(crate::ent_fn_enums::EntThink::turretG2_base_think);
+        (*base).think = Some(crate::ent_fn_enums::EntThink::turretG2_base_think).into();
         (*base).nextthink = (*ctx.world).level.time + FRAMETIME * 5;
 
         // Pitch angle
@@ -1438,7 +1438,7 @@ pub fn finish_spawning_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
             CONTENTS_BODY | CONTENTS_PLAYERCLIP | CONTENTS_MONSTERCLIP | CONTENTS_SHOTCLIP;
 
         (*base).takedamage = qtrue;
-        (*base).die = Some(crate::ent_fn_enums::EntDie::turretG2_die);
+        (*base).die = Some(crate::ent_fn_enums::EntDie::turretG2_die).into();
 
         (*base).material = MAT_METAL;
 

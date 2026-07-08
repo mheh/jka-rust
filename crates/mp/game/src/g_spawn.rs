@@ -1498,7 +1498,7 @@ pub fn G_SpawnEntitiesFromString(ctx: GameContext<'_>, inSubBSP: qboolean) {
                 (*script_runner).behaviorSet[1] = (*ctx.world).g_entities[ENTITYNUM_WORLD as usize]
                     .behaviorSet[BSET_SPAWN as usize];
                 (*script_runner).count = 1;
-                (*script_runner).think = Some(EntThink::scriptrunner_run);
+                (*script_runner).think = Some(EntThink::scriptrunner_run).into();
                 (*script_runner).nextthink = (*ctx.world).level.time + 100;
 
                 if (*script_runner).inuse != QFALSE {

@@ -670,7 +670,7 @@ pub fn G_MoverTeam(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
 
             // if the pusher has a "blocked" function, call it
-            if let Some(blocked) = (*ent).blocked {
+            if let Some(blocked) = (*ent).blocked.get() {
                 crate::ent_fn_enums::dispatch_blocked(ctx, blocked, ent, obstacle);
             }
             return;
@@ -684,7 +684,7 @@ pub fn G_MoverTeam(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 || (*p).s.pos.trType == trType_t::TR_NONLINEAR_STOP
             {
                 if (*ctx.world).level.time >= (*p).s.pos.trTime + (*p).s.pos.trDuration {
-                    if let Some(reached) = (*p).reached {
+                    if let Some(reached) = (*p).reached.get() {
                         crate::ent_fn_enums::dispatch_reached(ctx, reached, p);
                     }
                 }
@@ -838,7 +838,7 @@ pub fn MatchTeam(ctx: GameContext<'_>, teamLeader: *mut gentity_t, moverState: c
 /// Source: `oracle/oracle/codemp/game/g_mover.c:615-625`
 pub fn ReturnToPos1(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        (*ent).think = None;
+        (*ent).think = FnId::NONE;
         (*ent).nextthink = 0;
         (*ent).s.time = (*ctx.world).level.time;
 
@@ -869,12 +869,12 @@ pub fn Reached_BinaryMover(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
             if (*ent).wait < 0.0 {
                 // done for good
-                (*ent).think = None;
+                (*ent).think = FnId::NONE;
                 (*ent).nextthink = 0;
-                (*ent).use_ = None;
+                (*ent).use_ = FnId::NONE;
             } else {
                 // return to pos1 after a delay
-                (*ent).think = Some(EntThink::ReturnToPos1);
+                (*ent).think = Some(EntThink::ReturnToPos1).into();
                 if (*ent).spawnflags & 8 != 0 {
                     // toggle, keep think, wait for next use
                     (*ent).nextthink = -1;
@@ -965,7 +965,7 @@ pub fn Use_BinaryMover_Go(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // if all the way up, just delay before coming down
         if (*ent).moverState == MOVER_POS2 {
             // have to do this because the delay sets our think to Use_BinaryMover_Go
-            (*ent).think = Some(EntThink::ReturnToPos1);
+            (*ent).think = Some(EntThink::ReturnToPos1).into();
             if (*ent).spawnflags & 8 != 0 {
                 // TOGGLE doors don't use wait!
                 (*ent).nextthink = (*ctx.world).level.time + FRAMETIME;
@@ -1142,7 +1142,7 @@ pub fn Use_BinaryMover(
         (*ent).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), other);
         (*ent).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
         if (*ent).delay != 0 {
-            (*ent).think = Some(EntThink::Use_BinaryMover_Go);
+            (*ent).think = Some(EntThink::Use_BinaryMover_Go).into();
             (*ent).nextthink = (*ctx.world).level.time + (*ent).delay;
         } else {
             Use_BinaryMover_Go(ctx, ent);
@@ -1234,8 +1234,8 @@ pub fn InitMover(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.constantLight = r | (g << 8) | (b << 16) | (i << 24);
         }
 
-        (*ent).use_ = Some(EntUse::Use_BinaryMover);
-        (*ent).reached = Some(EntReached::Reached_BinaryMover);
+        (*ent).use_ = Some(EntUse::Use_BinaryMover).into();
+        (*ent).reached = Some(EntReached::Reached_BinaryMover).into();
 
         (*ent).moverState = MOVER_POS1;
         (*ent).r.svFlags = SVF_USE_CURRENT_ORIGIN;
@@ -1492,7 +1492,7 @@ pub fn Think_SpawnNewDoorTrigger(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*other).r.maxs = maxs;
         (*other).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
         (*other).r.contents = CONTENTS_TRIGGER;
-        (*other).touch = Some(EntTouch::Touch_DoorTrigger);
+        (*other).touch = Some(EntTouch::Touch_DoorTrigger).into();
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(other));
         (*other).classname = c"trigger_door".as_ptr() as *mut c_char;
         // remember the thinnest axis
@@ -1696,7 +1696,7 @@ pub fn SP_func_door(ctx: GameContext<'_>, ent: *mut gentity_t) {
             &mut (*ent).genericValue14 as *mut c_int,
         );
 
-        (*ent).blocked = Some(EntBlocked::Blocked_Door);
+        (*ent).blocked = Some(EntBlocked::Blocked_Door).into();
 
         // default speed of 400
         if (*ent).speed == 0.0 {
@@ -1794,7 +1794,7 @@ pub fn SP_func_door(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     || (*ent).spawnflags & MOVER_FORCE_ACTIVATE != 0)
             {
                 // non touch/shoot doors
-                (*ent).think = Some(EntThink::Think_MatchTeam);
+                (*ent).think = Some(EntThink::Think_MatchTeam).into();
 
                 if (*ent).spawnflags & MOVER_FORCE_ACTIVATE != 0 {
                     // so we know it's push/pullable on the client
@@ -1802,7 +1802,7 @@ pub fn SP_func_door(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 }
             } else {
                 // locked doors still spawn a trigger
-                (*ent).think = Some(EntThink::Think_SpawnNewDoorTrigger);
+                (*ent).think = Some(EntThink::Think_SpawnNewDoorTrigger).into();
             }
         }
     }
@@ -1874,7 +1874,7 @@ pub fn SpawnPlatTrigger(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // the middle trigger will be a thin trigger just above the starting
         // position
         let trigger = G_Spawn(ctx);
-        (*trigger).touch = Some(EntTouch::Touch_PlatCenterTrigger);
+        (*trigger).touch = Some(EntTouch::Touch_PlatCenterTrigger).into();
         (*trigger).r.contents = CONTENTS_TRIGGER;
         (*trigger).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
 
@@ -1960,9 +1960,9 @@ pub fn SP_func_plat(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         // touch function keeps the plat from returning while a live player
         // is standing on it
-        (*ent).touch = Some(EntTouch::Touch_Plat);
+        (*ent).touch = Some(EntTouch::Touch_Plat).into();
 
-        (*ent).blocked = Some(EntBlocked::Blocked_Door);
+        (*ent).blocked = Some(EntBlocked::Blocked_Door).into();
 
         (*ent).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent); // so it can be treated as a door
 
@@ -2041,7 +2041,7 @@ pub fn SP_func_button(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).takedamage = qtrue;
         } else {
             // touchable button
-            (*ent).touch = Some(EntTouch::Touch_Button);
+            (*ent).touch = Some(EntTouch::Touch_Button).into();
         }
 
         InitMover(ctx, ent);
@@ -2116,7 +2116,7 @@ pub fn Reached_Train(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.loopSound = 0;
             (*ent).s.loopIsSoundset = qfalse;
             (*ent).nextthink = (*ctx.world).level.time + ((*next).wait * 1000.0) as c_int;
-            (*ent).think = Some(EntThink::Think_BeginMoving);
+            (*ent).think = Some(EntThink::Think_BeginMoving).into();
             (*ent).s.pos.trType = trType_t::TR_STATIONARY;
         } else {
             G_PlayDoorLoopSound(ctx, ent);
@@ -2257,12 +2257,12 @@ pub fn SP_func_train(ctx: GameContext<'_>, self_: *mut gentity_t) {
         );
         InitMover(ctx, self_);
 
-        (*self_).reached = Some(EntReached::Reached_Train);
+        (*self_).reached = Some(EntReached::Reached_Train).into();
 
         // start trains on the second frame, to make sure their targets have
         // had a chance to spawn
         (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
-        (*self_).think = Some(EntThink::Think_SetupTrainTargets);
+        (*self_).think = Some(EntThink::Think_SetupTrainTargets).into();
     }
 }
 
@@ -2281,8 +2281,8 @@ pub fn SP_func_static(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         InitMover(ctx, ent);
 
-        (*ent).use_ = Some(EntUse::func_static_use);
-        (*ent).reached = None;
+        (*ent).use_ = Some(EntUse::func_static_use).into();
+        (*ent).reached = FnId::NONE;
 
         G_SetOrigin(ent, (*ent).s.origin);
         G_SetAngles(ent, (*ent).s.angles);
@@ -2836,7 +2836,7 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: *mut gentity_t) {
         );
 
         trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(self_, qtrue));
-        (*self_).think = Some(EntThink::G_FreeEntity);
+        (*self_).think = Some(EntThink::G_FreeEntity).into();
         (*self_).nextthink = (*ctx.world).level.time + 50;
     }
 }
@@ -2857,7 +2857,7 @@ pub fn funcBBrushDie(
         (*self_).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), attacker);
 
         if (*self_).delay != 0 {
-            (*self_).think = Some(EntThink::funcBBrushDieGo);
+            (*self_).think = Some(EntThink::funcBBrushDieGo).into();
             (*self_).nextthink =
                 (*ctx.world).level.time + ((*self_).delay as f32 * 1000.0).floor() as c_int;
             return;
@@ -2995,7 +2995,7 @@ pub fn funcBBrushPain(
         }
 
         if (*self_).wait == 0.0 {
-            (*self_).pain = None;
+            (*self_).pain = FnId::NONE;
             return;
         }
 
@@ -3015,7 +3015,7 @@ pub fn InitBBrush(ctx: GameContext<'_>, ent: *mut gentity_t) {
             GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
         );
 
-        (*ent).die = Some(EntDie::funcBBrushDie);
+        (*ent).die = Some(EntDie::funcBBrushDie).into();
         (*ent).flags |= crate::entity::flags::FL_BBRUSH;
 
         // if the "model2" key is set, use a separate model for drawing, but
@@ -3157,10 +3157,10 @@ pub fn SP_func_breakable(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         CacheChunkEffects(ctx, (*self_).material);
 
-        (*self_).use_ = Some(EntUse::funcBBrushUse);
+        (*self_).use_ = Some(EntUse::funcBBrushUse).into();
 
-        (*self_).pain = Some(EntPain::funcBBrushPain);
-        (*self_).touch = Some(EntTouch::funcBBrushTouch);
+        (*self_).pain = Some(EntPain::funcBBrushPain).into();
+        (*self_).touch = Some(EntTouch::funcBBrushTouch).into();
 
         if !(*self_).team.is_null()
             && *(*self_).team != 0
@@ -3383,9 +3383,9 @@ pub fn SP_func_glass(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).takedamage = qtrue;
         }
 
-        (*ent).die = Some(EntDie::GlassDie);
-        (*ent).use_ = Some(EntUse::GlassUse);
-        (*ent).pain = Some(EntPain::GlassPain);
+        (*ent).die = Some(EntDie::GlassDie).into();
+        (*ent).use_ = Some(EntUse::GlassUse).into();
+        (*ent).pain = Some(EntPain::GlassPain).into();
     }
 }
 
@@ -3406,7 +3406,7 @@ pub fn func_wait_return_solid(ctx: GameContext<'_>, self_: *mut gentity_t) {
             (*self_).r.currentOrigin = (*self_).s.origin;
             (*self_).r.svFlags &= !SVF_NOCLIENT;
             (*self_).s.eFlags &= !EF_NODRAW;
-            (*self_).use_ = Some(EntUse::func_usable_use);
+            (*self_).use_ = Some(EntUse::func_usable_use).into();
             (*self_).clipmask = 0;
             if !(*self_).target2.is_null() && *(*self_).target2 != 0 {
                 G_UseTargets2(
@@ -3421,7 +3421,7 @@ pub fn func_wait_return_solid(ctx: GameContext<'_>, self_: *mut gentity_t) {
             }
         } else {
             (*self_).clipmask = 0;
-            (*self_).think = Some(EntThink::func_wait_return_solid);
+            (*self_).think = Some(EntThink::func_wait_return_solid).into();
             (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
         }
     }
@@ -3434,8 +3434,8 @@ pub fn func_usable_think(self_: *mut gentity_t) {
     unsafe {
         if (*self_).spawnflags & 8 != 0 {
             (*self_).r.svFlags |= SVF_PLAYER_USABLE; // replace the usable flag
-            (*self_).use_ = Some(EntUse::func_usable_use);
-            (*self_).think = None;
+            (*self_).use_ = Some(EntUse::func_usable_use).into();
+            (*self_).think = FnId::NONE;
         }
     }
 }
@@ -3488,14 +3488,14 @@ pub fn func_usable_use(
             // Remove the ability to use the entity directly
             (*self_).r.svFlags &= !SVF_PLAYER_USABLE;
             // also remove ability to call any use func at all!
-            (*self_).use_ = None;
+            (*self_).use_ = FnId::NONE;
 
             if !(*self_).target.is_null() && *(*self_).target != 0 {
                 G_UseTargets(ctx, self_, activator);
             }
 
             if (*self_).wait != 0.0 {
-                (*self_).think = Some(EntThink::func_usable_think);
+                (*self_).think = Some(EntThink::func_usable_think).into();
                 (*self_).nextthink = (*ctx.world).level.time + ((*self_).wait * 1000.0) as c_int;
             }
 
@@ -3515,7 +3515,7 @@ pub fn func_usable_use(
             if !(*self_).target.is_null() && *(*self_).target != 0 {
                 G_UseTargets(ctx, self_, activator);
             }
-            (*self_).think = None;
+            (*self_).think = FnId::NONE;
             (*self_).nextthink = -1;
         }
     }
@@ -3598,12 +3598,12 @@ pub fn SP_func_usable(ctx: GameContext<'_>, self_: *mut gentity_t) {
             (*self_).count = 0;
         }
 
-        (*self_).use_ = Some(EntUse::func_usable_use);
+        (*self_).use_ = Some(EntUse::func_usable_use).into();
 
         if (*self_).health != 0 {
             (*self_).takedamage = qtrue;
-            (*self_).die = Some(EntDie::func_usable_die);
-            (*self_).pain = Some(EntPain::func_usable_pain);
+            (*self_).die = Some(EntDie::func_usable_die).into();
+            (*self_).pain = Some(EntPain::func_usable_pain).into();
         }
 
         if (*self_).genericValue5 > 0 {
@@ -3680,7 +3680,7 @@ pub fn SP_func_wall(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.eFlags |= EF_NODRAW;
         }
 
-        (*ent).use_ = Some(EntUse::use_wall);
+        (*ent).use_ = Some(EntUse::use_wall).into();
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }

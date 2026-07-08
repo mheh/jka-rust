@@ -96,7 +96,7 @@ pub fn G_RunExPhys(
                     ),
                 );
                 if tr.startsolid != 0 || tr.allsolid != 0 {
-                    if let Some(touch_fn) = (*ent).touch {
+                    if let Some(touch_fn) = (*ent).touch.get() {
                         crate::ent_fn_enums::dispatch_touch(
                             ctx,
                             touch_fn,
@@ -236,7 +236,7 @@ pub fn G_RunExPhys(
 
         if tr.startsolid != 0 || tr.allsolid != 0 {
             if autoKill != qfalse {
-                (*ent).think = Some(EntThink::G_FreeEntity);
+                (*ent).think = Some(EntThink::G_FreeEntity).into();
                 (*ent).nextthink = (*ctx.world).level.time;
             }
             return;
@@ -262,7 +262,7 @@ pub fn G_RunExPhys(
             }
 
             if tr.entityNum as c_int != ENTITYNUM_NONE && (*ent).touch.is_some() {
-                if let Some(touch_fn) = (*ent).touch {
+                if let Some(touch_fn) = (*ent).touch.get() {
                     crate::ent_fn_enums::dispatch_touch(
                         ctx,
                         touch_fn,

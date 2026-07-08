@@ -124,7 +124,7 @@ pub fn G_ReflectMissile(
         }
 
         if (*missile).s.weapon == WP_ROCKET_LAUNCHER {
-            (*missile).think = None;
+            (*missile).think = FnId::NONE;
             (*missile).nextthink = 0;
         }
     }
@@ -183,7 +183,7 @@ pub fn G_DeflectMissile(
         }
 
         if (*missile).s.weapon == WP_ROCKET_LAUNCHER {
-            (*missile).think = None;
+            (*missile).think = FnId::NONE;
             (*missile).nextthink = 0;
         }
     }
@@ -412,7 +412,7 @@ pub fn CreateMissile(
         let missile = G_Spawn(ctx);
 
         (*missile).nextthink = (*ctx.world).level.time + life;
-        (*missile).think = Some(EntThink::G_FreeEntity);
+        (*missile).think = Some(EntThink::G_FreeEntity).into();
         (*missile).s.eType = ET_MISSILE as c_int;
         (*missile).r.svFlags = SVF_USE_CURRENT_ORIGIN;
         (*missile).parent = Some(ent_id(ent_base(ctx), owner));
@@ -899,7 +899,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut tr
                     || (*ent).s.weapon == WP_ROCKET_LAUNCHER
                 {
                     if (*ent).s.weapon == WP_FLECHETTE && (((*ent).s.eFlags & EF_ALT_FIRING) != 0) {
-                        if let Some(think_fn) = (*ent).think {
+                        if let Some(think_fn) = (*ent).think.get() {
                             // Call the think function
                             crate::ent_fn_enums::dispatch_think(ctx, think_fn, ent);
                         }

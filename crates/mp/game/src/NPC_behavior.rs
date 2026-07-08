@@ -271,7 +271,7 @@ pub fn Disappear(self_: *mut gentity_t) {
     unsafe {
         // ClientDisconnect(self); (Raven: commented out)
         (*self_).s.eFlags |= EF_NODRAW;
-        (*self_).think = None;
+        (*self_).think = FnId::NONE;
         (*self_).nextthink = -1;
     }
 }
@@ -288,7 +288,7 @@ pub fn BeamOut(ctx: GameContext<'_>, self_: *mut gentity_t) {
         // declared type is still the raw `unsafe extern "C" fn` pointer in this
         // worktree, not `Option<EntThink>` — writing the enum assignment anyway
         // per the settled rule; see shape_mismatches in the port report).
-        (*self_).think = Some(EntThink::Disappear);
+        (*self_).think = Some(EntThink::Disappear).into();
         let client = (*self_).client as *mut gclient_t;
         (*client).squadname = core::ptr::null_mut();
         (*client).playerTeam = TEAM_FREE;
@@ -917,7 +917,7 @@ pub fn NPC_BSRemove(ctx: GameContext<'_>) {
 
             // Disappear in half a second.
             // (shape mismatch, see BeamOut note above.)
-            (*NPC).think = Some(EntThink::G_FreeEntity);
+            (*NPC).think = Some(EntThink::G_FreeEntity).into();
             (*NPC).nextthink = world.level.time + FRAMETIME;
         }
     }

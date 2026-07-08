@@ -226,7 +226,7 @@ pub fn adjustRespawnTime(
 /// Source: `oracle/oracle/codemp/game/g_items.c:108-119`
 pub fn ShieldRemove(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).think = Some(EntThink::G_FreeEntity);
+        (*self_).think = Some(EntThink::G_FreeEntity).into();
         (*self_).nextthink = (*ctx.world).level.time + 100;
 
         // Play kill sound...
@@ -303,7 +303,7 @@ pub fn ShieldPain(
 ) {
     unsafe {
         // Set the itemplaceholder flag to indicate the the shield drawing that the shield pain should be drawn.
-        (*self_).think = Some(EntThink::ShieldThink);
+        (*self_).think = Some(EntThink::ShieldThink).into();
         (*self_).nextthink = (*ctx.world).level.time + 400;
 
         // Play damaging sound...
@@ -349,7 +349,7 @@ pub fn ShieldGoSolid(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if tr.startsolid != 0 {
             // gah, we can't activate yet
             (*self_).nextthink = (*ctx.world).level.time + 200;
-            (*self_).think = Some(EntThink::ShieldGoSolid);
+            (*self_).think = Some(EntThink::ShieldGoSolid).into();
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
         } else {
             // get hard... huh-huh...
@@ -357,7 +357,7 @@ pub fn ShieldGoSolid(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
             (*self_).r.contents = CONTENTS_SOLID;
             (*self_).nextthink = (*ctx.world).level.time + 1000;
-            (*self_).think = Some(EntThink::ShieldThink);
+            (*self_).think = Some(EntThink::ShieldThink).into();
             (*self_).takedamage = qtrue;
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
 
@@ -385,7 +385,7 @@ pub fn ShieldGoNotSolid(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*self_).s.eFlags |= EF_NODRAW;
         // nextthink needs to have a large enough interval to avoid excess accumulation of Activate messages
         (*self_).nextthink = (*ctx.world).level.time + 200;
-        (*self_).think = Some(EntThink::ShieldGoSolid);
+        (*self_).think = Some(EntThink::ShieldGoSolid).into();
         (*self_).takedamage = qfalse;
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
 
@@ -563,9 +563,9 @@ pub fn CreateShield(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         (*ent).s.time = (*ent).health; // ???
-        (*ent).pain = Some(EntPain::ShieldPain);
-        (*ent).die = Some(EntDie::ShieldDie);
-        (*ent).touch = Some(EntTouch::ShieldTouch);
+        (*ent).pain = Some(EntPain::ShieldPain).into();
+        (*ent).die = Some(EntDie::ShieldDie).into();
+        (*ent).touch = Some(EntTouch::ShieldTouch).into();
 
         // see if we're valid
         trap::Trace(
@@ -588,7 +588,7 @@ pub fn CreateShield(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.eFlags |= EF_NODRAW;
             // nextthink needs to have a large enough interval to avoid excess accumulation of Activate messages
             (*ent).nextthink = (*ctx.world).level.time + 200;
-            (*ent).think = Some(EntThink::ShieldGoSolid);
+            (*ent).think = Some(EntThink::ShieldGoSolid).into();
             (*ent).takedamage = qfalse;
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
         } else {
@@ -596,7 +596,7 @@ pub fn CreateShield(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).r.contents = CONTENTS_PLAYERCLIP | CONTENTS_SHOTCLIP; //CONTENTS_SOLID;
 
             (*ent).nextthink = (*ctx.world).level.time;
-            (*ent).think = Some(EntThink::ShieldThink);
+            (*ent).think = Some(EntThink::ShieldThink).into();
 
             (*ent).takedamage = qtrue;
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
@@ -704,7 +704,7 @@ pub fn PlaceShield(ctx: GameContext<'_>, playerent: *mut gentity_t) -> qboolean 
                     // shield is along the east/west axis, facing north
                     (*shield).s.angles[YAW] = 90.0;
                 }
-                (*shield).think = Some(EntThink::CreateShield);
+                (*shield).think = Some(EntThink::CreateShield).into();
                 (*shield).nextthink = (*ctx.world).level.time + 500; // power up after .5 seconds
                 (*shield).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), playerent);
 
@@ -718,9 +718,9 @@ pub fn PlaceShield(ctx: GameContext<'_>, playerent: *mut gentity_t) -> qboolean 
 
                 (*shield).r.contents = CONTENTS_TRIGGER;
 
-                (*shield).touch = None;
+                (*shield).touch = FnId::NONE;
                 // using an item causes it to respawn
-                (*shield).use_ = None; //Use_Item;
+                (*shield).use_ = FnId::NONE; //Use_Item;
 
                 // allow to ride movers
                 (*shield).s.groundEntityNum = tr.entityNum as c_int;
@@ -1143,7 +1143,7 @@ pub fn pas_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 .sessionTeam
                 != (*ent).genericValue2
         {
-            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = (*ctx.world).level.time;
             return;
         }
@@ -1166,7 +1166,7 @@ pub fn pas_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.bolt2 = ENTITYNUM_NONE;
             (*ent).s.fireflag = 2;
 
-            (*ent).think = Some(EntThink::sentryExpire);
+            (*ent).think = Some(EntThink::sentryExpire).into();
             (*ent).nextthink = (*ctx.world).level.time + TURRET_DEATH_DELAY;
             return;
         }
@@ -1310,8 +1310,8 @@ pub fn turret_die(
 ) {
     unsafe {
         // Turn off the thinking of the base & use it's targets
-        (*self_).think = None;
-        (*self_).use_ = None;
+        (*self_).think = FnId::NONE;
+        (*self_).use_ = FnId::NONE;
 
         if !(*self_).target.is_null() {
             G_UseTargets(ctx, self_, attacker);
@@ -1324,7 +1324,7 @@ pub fn turret_die(
         }
 
         // clear my data
-        (*self_).die = None;
+        (*self_).die = FnId::NONE;
         (*self_).takedamage = qfalse;
         (*self_).health = 0;
 
@@ -1379,7 +1379,7 @@ pub fn SP_PAS(ctx: GameContext<'_>, base: *mut gentity_t) {
 
         G_RunObject(ctx, base);
 
-        (*base).think = Some(EntThink::pas_think);
+        (*base).think = Some(EntThink::pas_think).into();
         (*base).nextthink = (*ctx.world).level.time + FRAMETIME;
 
         if (*base).health == 0 {
@@ -1387,7 +1387,7 @@ pub fn SP_PAS(ctx: GameContext<'_>, base: *mut gentity_t) {
         }
 
         (*base).takedamage = qtrue;
-        (*base).die = Some(EntDie::turret_die);
+        (*base).die = Some(EntDie::turret_die).into();
 
         (*base).physicsObject = qtrue;
 
@@ -1454,7 +1454,7 @@ pub fn ItemUse_Sentry(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*sentry).s.eType = ET_GENERAL as c_int;
         (*sentry).s.pos.trType = trType_t::TR_GRAVITY; //STATIONARY;
         (*sentry).s.pos.trTime = (*ctx.world).level.time;
-        (*sentry).touch = Some(EntTouch::SentryTouch);
+        (*sentry).touch = Some(EntTouch::SentryTouch).into();
         (*sentry).nextthink = (*ctx.world).level.time;
         (*sentry).genericValue4 = ENTITYNUM_NONE; // genericValue4 used as enemy index
 
@@ -1720,7 +1720,7 @@ pub fn SpecialItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
     unsafe {
         if (*ent).genericValue5 < (*ctx.world).level.time {
-            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = (*ctx.world).level.time;
             return;
         }
@@ -1756,7 +1756,7 @@ pub fn G_SpecialSpawnItem(ctx: GameContext<'_>, ent: *mut gentity_t, item: *mut 
 
         // go away if no one wants me
         (*ent).genericValue5 = (*ctx.world).level.time + TOSSED_ITEM_STAY_PERIOD;
-        (*ent).think = Some(EntThink::SpecialItemThink);
+        (*ent).think = Some(EntThink::SpecialItemThink).into();
         (*ent).nextthink = (*ctx.world).level.time + 50;
         (*ent).clipmask = MASK_SOLID;
 
@@ -1769,7 +1769,7 @@ pub fn G_SpecialSpawnItem(ctx: GameContext<'_>, ent: *mut gentity_t, item: *mut 
         (*ent).s.modelindex = item.offset_from(bg_itemlist.as_ptr()) as c_int;
 
         (*ent).r.contents = CONTENTS_TRIGGER;
-        (*ent).touch = Some(EntTouch::Touch_Item);
+        (*ent).touch = Some(EntTouch::Touch_Item).into();
 
         // can't touch owner for x seconds
         (*ent).genericValue11 = (*ent).r.ownerNum;
@@ -1898,7 +1898,7 @@ pub fn EWebDisattach(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gen
         } else {
             (*((*owner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 0;
         }
-        (*eweb).think = Some(EntThink::G_FreeEntity);
+        (*eweb).think = Some(EntThink::G_FreeEntity).into();
         (*eweb).nextthink = (*ctx.world).level.time;
     }
 }
@@ -2628,10 +2628,10 @@ pub fn EWeb_Create(ctx: GameContext<'_>, spawner: *mut gentity_t) -> *mut gentit
         (*ent).health = (*((*spawner).client as *mut gclient_t)).ewebHealth;
         G_ScaleNetHealth(ent);
 
-        (*ent).die = Some(EntDie::EWebDie);
-        (*ent).pain = Some(EntPain::EWebPain);
+        (*ent).die = Some(EntDie::EWebDie).into();
+        (*ent).pain = Some(EntPain::EWebPain).into();
 
-        (*ent).think = Some(EntThink::EWebThink);
+        (*ent).think = Some(EntThink::EWebThink).into();
         (*ent).nextthink = (*ctx.world).level.time;
 
         // set up the g2 model info
@@ -3544,7 +3544,7 @@ pub fn Touch_Item(
 
         if (*ent).genericValue9 != 0 {
             // dropped item, should be removed when picked up
-            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = (*ctx.world).level.time;
             return;
         }
@@ -3555,10 +3555,10 @@ pub fn Touch_Item(
         // events such as ctf flags
         if respawn <= 0 {
             (*ent).nextthink = 0;
-            (*ent).think = None;
+            (*ent).think = FnId::NONE;
         } else {
             (*ent).nextthink = (*ctx.world).level.time + respawn * 1000;
-            (*ent).think = Some(EntThink::RespawnItem);
+            (*ent).think = Some(EntThink::RespawnItem).into();
         }
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -3593,7 +3593,7 @@ pub fn LaunchItem(
 
         (*dropped).r.contents = CONTENTS_TRIGGER;
 
-        (*dropped).touch = Some(EntTouch::Touch_Item);
+        (*dropped).touch = Some(EntTouch::Touch_Item).into();
 
         G_SetOrigin(dropped, origin);
         (*dropped).s.pos.trType = trType_t::TR_GRAVITY;
@@ -3606,7 +3606,7 @@ pub fn LaunchItem(
             && (*item).giType == IT_TEAM
         {
             // Special case for CTF flags
-            (*dropped).think = Some(EntThink::Team_DroppedFlagThink);
+            (*dropped).think = Some(EntThink::Team_DroppedFlagThink).into();
             (*dropped).nextthink = (*ctx.world).level.time + 30000;
             Team_CheckDroppedItem(ctx, dropped);
 
@@ -3619,7 +3619,7 @@ pub fn LaunchItem(
             }
         } else {
             // auto-remove after 30 seconds
-            (*dropped).think = Some(EntThink::G_FreeEntity);
+            (*dropped).think = Some(EntThink::G_FreeEntity).into();
             (*dropped).nextthink = (*ctx.world).level.time + 30000;
         }
 
@@ -3801,9 +3801,9 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).s.modelindex2 = 0; // zero indicates this isn't a dropped item
 
         (*ent).r.contents = CONTENTS_TRIGGER;
-        (*ent).touch = Some(EntTouch::Touch_Item);
+        (*ent).touch = Some(EntTouch::Touch_Item).into();
         // useing an item causes it to respawn
-        (*ent).use_ = Some(EntUse::Use_Item);
+        (*ent).use_ = Some(EntUse::Use_Item).into();
 
         if ((*ent).spawnflags & ITMSF_SUSPEND) != 0 {
             // suspended
@@ -4021,7 +4021,7 @@ pub fn G_SpawnItem(ctx: GameContext<'_>, ent: *mut gentity_t, item: *mut gitem_t
         // some movers spawn on the second frame, so delay item
         // spawns until the third frame so they can ride trains
         (*ent).nextthink = (*ctx.world).level.time + FRAMETIME * 2;
-        (*ent).think = Some(EntThink::FinishSpawningItem);
+        (*ent).think = Some(EntThink::FinishSpawningItem).into();
 
         (*ent).physicsBounce = 0.50; // items are bouncy
 
@@ -4071,7 +4071,7 @@ pub fn G_BounceItem(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut trace
             && (*ent).physicsObject != 0
         {
             // detpacks only
-            if let Some(touch) = (*ent).touch {
+            if let Some(touch) = (*ent).touch.get() {
                 crate::ent_fn_enums::dispatch_touch(
                     ctx,
                     touch,
@@ -4111,7 +4111,7 @@ pub fn G_BounceItem(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut trace
                 && (*ent).physicsObject != 0)
         {
             // holocrons and sentry guns
-            if let Some(touch) = (*ent).touch {
+            if let Some(touch) = (*ent).touch.get() {
                 crate::ent_fn_enums::dispatch_touch(
                     ctx,
                     touch,

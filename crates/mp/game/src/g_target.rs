@@ -87,7 +87,7 @@ pub fn Use_Target_Give(
 /// Source: `oracle/oracle/codemp/game/g_target.c:36-38`
 pub fn SP_target_give(ent: *mut gentity_t) {
     unsafe {
-        (*ent).use_ = Some(EntUse::Use_Target_Give);
+        (*ent).use_ = Some(EntUse::Use_Target_Give).into();
     }
 }
 
@@ -121,7 +121,7 @@ pub fn Use_target_remove_powerups(
 /// Source: `oracle/oracle/codemp/game/g_target.c:63-65`
 pub fn SP_target_remove_powerups(ent: *mut gentity_t) {
     unsafe {
-        (*ent).use_ = Some(EntUse::Use_target_remove_powerups);
+        (*ent).use_ = Some(EntUse::Use_target_remove_powerups).into();
     }
 }
 
@@ -155,7 +155,7 @@ pub fn Use_Target_Delay(
         (*ent).nextthink = (*ctx.world).level.time
             + (((*ent).wait + (*ent).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0)
                 as c_int;
-        (*ent).think = Some(EntThink::Think_Target_Delay);
+        (*ent).think = Some(EntThink::Think_Target_Delay).into();
         (*ent).activator = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), activator));
     }
 }
@@ -184,7 +184,7 @@ pub fn SP_target_delay(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ent).wait == 0.0 {
             (*ent).wait = 1.0;
         }
-        (*ent).use_ = Some(EntUse::Use_Target_Delay);
+        (*ent).use_ = Some(EntUse::Use_Target_Delay).into();
     }
 }
 
@@ -210,7 +210,7 @@ pub fn SP_target_score(ent: *mut gentity_t) {
         if (*ent).count == 0 {
             (*ent).count = 1;
         }
-        (*ent).use_ = Some(EntUse::Use_Target_Score);
+        (*ent).use_ = Some(EntUse::Use_Target_Score).into();
     }
 }
 
@@ -342,7 +342,7 @@ pub fn Use_Target_Print(
 /// Source: `oracle/oracle/codemp/game/g_target.c:239-241`
 pub fn SP_target_print(ent: *mut gentity_t) {
     unsafe {
-        (*ent).use_ = Some(EntUse::Use_Target_Print);
+        (*ent).use_ = Some(EntUse::Use_Target_Print).into();
     }
 }
 
@@ -462,7 +462,7 @@ pub fn SP_target_speaker(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.loopIsSoundset = qfalse;
         }
 
-        (*ent).use_ = Some(EntUse::Use_Target_Speaker);
+        (*ent).use_ = Some(EntUse::Use_Target_Speaker).into();
 
         if (*ent).spawnflags & 4 != 0 {
             (*ent).r.svFlags |= SVF_BROADCAST;
@@ -612,8 +612,8 @@ pub fn target_laser_start(ctx: GameContext<'_>, self_: *mut gentity_t) {
             G_SetMovedir(&mut (*self_).s.angles, &mut (*self_).movedir);
         }
 
-        (*self_).use_ = Some(EntUse::target_laser_use);
-        (*self_).think = Some(EntThink::target_laser_think);
+        (*self_).use_ = Some(EntUse::target_laser_use).into();
+        (*self_).think = Some(EntThink::target_laser_think).into();
 
         if (*self_).damage == 0 {
             (*self_).damage = 1;
@@ -633,7 +633,7 @@ pub fn target_laser_start(ctx: GameContext<'_>, self_: *mut gentity_t) {
 pub fn SP_target_laser(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         // let everything else get spawned before we start firing
-        (*self_).think = Some(EntThink::target_laser_start);
+        (*self_).think = Some(EntThink::target_laser_start).into();
         (*self_).nextthink = (*ctx.world).level.time + crate::g_items::FRAMETIME;
     }
 }
@@ -675,7 +675,7 @@ pub fn SP_target_teleporter(ctx: GameContext<'_>, self_: *mut gentity_t) {
             // Informational print; dropped.
         }
 
-        (*self_).use_ = Some(EntUse::target_teleporter_use);
+        (*self_).use_ = Some(EntUse::target_teleporter_use).into();
     }
 }
 
@@ -712,10 +712,10 @@ pub fn target_relay_use(
             // never use again
             if ranscript != 0 {
                 // crap, can't remove!
-                (*self_).use_ = None;
+                (*self_).use_ = FnId::NONE;
             } else {
                 // remove
-                (*self_).think = Some(EntThink::G_FreeEntity);
+                (*self_).think = Some(EntThink::G_FreeEntity).into();
                 (*self_).nextthink = (*ctx.world).level.time + crate::g_items::FRAMETIME;
             }
         }
@@ -737,7 +737,7 @@ pub fn target_relay_use(
 /// Source: `oracle/oracle/codemp/game/g_target.c:520-526`
 pub fn SP_target_relay(self_: *mut gentity_t) {
     unsafe {
-        (*self_).use_ = Some(EntUse::target_relay_use);
+        (*self_).use_ = Some(EntUse::target_relay_use).into();
         if (*self_).spawnflags & 128 != 0 {
             (*self_).flags |= FL_INACTIVE;
         }
@@ -775,7 +775,7 @@ pub fn target_kill_use(
 /// Source: `oracle/oracle/codemp/game/g_target.c:539-541`
 pub fn SP_target_kill(self_: *mut gentity_t) {
     unsafe {
-        (*self_).use_ = Some(EntUse::target_kill_use);
+        (*self_).use_ = Some(EntUse::target_kill_use).into();
     }
 }
 
@@ -848,7 +848,7 @@ pub fn target_location_linkup(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_target.c:592-597`
 pub fn SP_target_location(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        (*self_).think = Some(EntThink::target_location_linkup);
+        (*self_).think = Some(EntThink::target_location_linkup).into();
         (*self_).nextthink = (*ctx.world).level.time + 200; // Let them all spawn first
 
         G_SetOrigin(self_, (*self_).s.origin);
@@ -917,7 +917,7 @@ pub fn SP_target_counter(self_: *mut gentity_t) {
         // we will reset when we use up our count, remember our initial count
         (*self_).genericValue1 = (*self_).count;
 
-        (*self_).use_ = Some(EntUse::target_counter_use);
+        (*self_).use_ = Some(EntUse::target_counter_use).into();
     }
 }
 
@@ -937,7 +937,7 @@ pub fn target_random_use(
         G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
 
         if (*self_).spawnflags & 1 != 0 {
-            (*self_).use_ = None;
+            (*self_).use_ = FnId::NONE;
         }
 
         // Count matching targets
@@ -1008,7 +1008,7 @@ pub fn target_random_use(
 /// Source: `oracle/oracle/codemp/game/g_target.c:748-751`
 pub fn SP_target_random(self_: *mut gentity_t) {
     unsafe {
-        (*self_).use_ = Some(EntUse::target_random_use);
+        (*self_).use_ = Some(EntUse::target_random_use).into();
     }
 }
 
@@ -1020,7 +1020,7 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).count != -1 {
             if (*self_).count <= 0 {
-                (*self_).use_ = None;
+                (*self_).use_ = FnId::NONE;
                 (*self_).behaviorSet[bSet_t::BSET_USE as usize] = core::ptr::null_mut();
                 return;
             } else {
@@ -1112,7 +1112,7 @@ pub fn target_scriptrunner_use(
         (*self_).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), other);
         if (*self_).delay != (0.0) as i32 {
             // delay before firing scriptrunner
-            (*self_).think = Some(EntThink::scriptrunner_run);
+            (*self_).think = Some(EntThink::scriptrunner_run).into();
             (*self_).nextthink = (*ctx.world).level.time + (*self_).delay;
         } else {
             scriptrunner_run(ctx, self_);
@@ -1144,7 +1144,7 @@ pub fn SP_target_scriptrunner(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*self_).wait *= 1000.0; // sec to ms
 
         G_SetOrigin(self_, (*self_).s.origin);
-        (*self_).use_ = Some(EntUse::target_scriptrunner_use);
+        (*self_).use_ = Some(EntUse::target_scriptrunner_use).into();
     }
 }
 
@@ -1209,7 +1209,7 @@ pub fn target_deactivate_use(
 pub fn SP_target_activate(self_: *mut gentity_t) {
     unsafe {
         G_SetOrigin(self_, (*self_).s.origin);
-        (*self_).use_ = Some(EntUse::target_activate_use);
+        (*self_).use_ = Some(EntUse::target_activate_use).into();
     }
 }
 
@@ -1219,7 +1219,7 @@ pub fn SP_target_activate(self_: *mut gentity_t) {
 pub fn SP_target_deactivate(self_: *mut gentity_t) {
     unsafe {
         G_SetOrigin(self_, (*self_).s.origin);
-        (*self_).use_ = Some(EntUse::target_deactivate_use);
+        (*self_).use_ = Some(EntUse::target_deactivate_use).into();
     }
 }
 
@@ -1265,7 +1265,7 @@ pub fn SP_target_level_change(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         G_SetOrigin(self_, (*self_).s.origin);
-        (*self_).use_ = Some(EntUse::target_level_change_use);
+        (*self_).use_ = Some(EntUse::target_level_change_use).into();
     }
 }
 
@@ -1310,6 +1310,6 @@ pub fn SP_target_play_music(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         (*self_).message = G_NewString(ctx, s);
 
-        (*self_).use_ = Some(EntUse::target_play_music_use);
+        (*self_).use_ = Some(EntUse::target_play_music_use).into();
     }
 }

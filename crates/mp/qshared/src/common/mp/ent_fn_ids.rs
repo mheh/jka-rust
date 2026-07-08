@@ -15,11 +15,154 @@
 //! Field signatures source: `oracle/oracle/codemp/game/g_local.h:284-290`
 #![allow(non_camel_case_types)]
 
+use core::marker::PhantomData;
+use core::num::NonZeroU8;
+
+/// Maps a `#[repr(u8)]` fieldless fn-ID enum to/from a 0-based index (its
+/// discriminant). Implemented for every `EntXxx` enum below via
+/// [`impl_ent_fn!`]; consumed by [`FnId`] to store the id as a `NonZeroU8`.
+pub trait EntFn: Copy {
+    /// The enum's discriminant, `0..N`.
+    fn to_index(self) -> u8;
+    /// Reverse of [`to_index`](EntFn::to_index).
+    ///
+    /// # Safety
+    /// `i` must be a discriminant produced by `to_index` (i.e. `i < N`), so the
+    /// `#[repr(u8)]` transmute lands on a real variant.
+    unsafe fn from_index(i: u8) -> Self;
+}
+
+macro_rules! impl_ent_fn {
+    ($ty:ty) => {
+        impl EntFn for $ty {
+            #[inline]
+            fn to_index(self) -> u8 {
+                self as u8
+            }
+            #[inline]
+            unsafe fn from_index(i: u8) -> Self {
+                // SAFETY: `$ty` is a `#[repr(u8)]` fieldless enum with contiguous
+                // discriminants `0..N` (both are 1 byte); the caller guarantees
+                // `i` is such a discriminant.
+                unsafe { core::mem::transmute::<u8, Self>(i) }
+            }
+        }
+    };
+}
+
+/// Niche-guaranteed handle to a `#[repr(u8)]` fn-ID enum `E`, stored where Raven
+/// stored a nullable fn pointer (`gentity_t.think`, `.touch`, …).
+///
+/// The storage is `Option<NonZeroU8>` holding `discriminant + 1`, so `None`
+/// (no handler) is the **all-zero** bit pattern — std guarantees this for
+/// `Option<NonZero*>` and for `#[repr(transparent)]` structs around it (see
+/// `core::option` "Representation"). Byte-wise zeroing a `gentity_t`
+/// (`write_bytes`, `zeroed_box`, `memset`) therefore yields `None` handlers by
+/// construction, matching Raven's C NULL-fn-pointer semantics with no post-zero
+/// fixup. This makes the historic "zeroed `touch` == `Some(HolocronTouch)`"
+/// niche hazard structurally impossible.
+#[repr(transparent)]
+pub struct FnId<E: EntFn> {
+    raw: Option<NonZeroU8>,
+    _marker: PhantomData<E>,
+}
+
+impl<E: EntFn> FnId<E> {
+    /// The "no handler" value; its bit pattern is all-zero (see type docs).
+    pub const NONE: Self = Self {
+        raw: None,
+        _marker: PhantomData,
+    };
+
+    /// Wraps a handler id.
+    #[inline]
+    pub fn some(e: E) -> Self {
+        // `to_index()` is `0..N`, so `+ 1` is `1..=N` — always nonzero.
+        let id = e.to_index() + 1;
+        Self {
+            raw: Some(unsafe { NonZeroU8::new_unchecked(id) }),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Recovers the handler enum, or `None` for the no-handler value.
+    #[inline]
+    pub fn get(self) -> Option<E> {
+        // SAFETY: `raw` was built by `some` from a real discriminant, so
+        // `nz.get() - 1` is a valid index for `E::from_index`.
+        self.raw.map(|nz| unsafe { E::from_index(nz.get() - 1) })
+    }
+
+    #[inline]
+    pub const fn is_some(self) -> bool {
+        self.raw.is_some()
+    }
+
+    #[inline]
+    pub const fn is_none(self) -> bool {
+        self.raw.is_none()
+    }
+
+    /// Panics if this is [`NONE`](FnId::NONE) — mirrors `Option::unwrap`.
+    #[inline]
+    #[track_caller]
+    pub fn unwrap(self) -> E {
+        self.get().unwrap()
+    }
+}
+
+impl<E: EntFn> Clone for FnId<E> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<E: EntFn> Copy for FnId<E> {}
+
+impl<E: EntFn> Default for FnId<E> {
+    #[inline]
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
+impl<E: EntFn> PartialEq for FnId<E> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.raw == other.raw
+    }
+}
+impl<E: EntFn> Eq for FnId<E> {}
+
+impl<E: EntFn + core::fmt::Debug> core::fmt::Debug for FnId<E> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.get().fmt(f)
+    }
+}
+
+impl<E: EntFn> From<E> for FnId<E> {
+    #[inline]
+    fn from(e: E) -> Self {
+        Self::some(e)
+    }
+}
+
+impl<E: EntFn> From<Option<E>> for FnId<E> {
+    #[inline]
+    fn from(o: Option<E>) -> Self {
+        match o {
+            Some(e) => Self::some(e),
+            None => Self::NONE,
+        }
+    }
+}
+
 /// Raven `think` fn-pointer targets (84 distinct assigns
 /// in game/*.c bodies).
 ///
 /// Source: `oracle/oracle/codemp/game/g_local.h:285-291`
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
 pub enum EntThink {
     /// `oracle/oracle/codemp/game/g_trigger.c:1039`
     AimAtTarget,
@@ -196,6 +339,7 @@ pub enum EntThink {
 ///
 /// Source: `oracle/oracle/codemp/game/g_local.h:285-291`
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
 pub enum EntReached {
     /// `oracle/oracle/codemp/game/g_mover.c:634`
     Reached_BinaryMover,
@@ -212,6 +356,7 @@ pub enum EntReached {
 ///
 /// Source: `oracle/oracle/codemp/game/g_local.h:285-291`
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
 pub enum EntBlocked {
     /// `oracle/oracle/codemp/game/g_mover.c:1018`
     Blocked_Door,
@@ -224,6 +369,7 @@ pub enum EntBlocked {
 ///
 /// Source: `oracle/oracle/codemp/game/g_local.h:285-291`
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
 pub enum EntTouch {
     /// `oracle/oracle/codemp/game/g_misc.c:786`
     HolocronTouch,
@@ -289,6 +435,7 @@ pub enum EntTouch {
 ///
 /// Source: `oracle/oracle/codemp/game/g_local.h:285-291`
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
 pub enum EntUse {
     /// `oracle/oracle/codemp/game/g_mover.c:2930`
     GlassUse,
@@ -404,6 +551,7 @@ pub enum EntUse {
 ///
 /// Source: `oracle/oracle/codemp/game/g_local.h:285-291`
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
 pub enum EntPain {
     /// `oracle/oracle/codemp/game/g_weapon.c:2768`
     DetPackPain,
@@ -479,6 +627,7 @@ pub enum EntPain {
 ///
 /// Source: `oracle/oracle/codemp/game/g_local.h:285-291`
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
 pub enum EntDie {
     /// `oracle/oracle/codemp/game/g_weapon.c:2775`
     DetPackDie,
@@ -515,3 +664,11 @@ pub enum EntDie {
     /// `oracle/oracle/codemp/game/g_items.c:940`
     turret_die,
 }
+
+impl_ent_fn!(EntThink);
+impl_ent_fn!(EntReached);
+impl_ent_fn!(EntBlocked);
+impl_ent_fn!(EntTouch);
+impl_ent_fn!(EntUse);
+impl_ent_fn!(EntPain);
+impl_ent_fn!(EntDie);

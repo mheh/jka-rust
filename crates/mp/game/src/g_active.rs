@@ -595,7 +595,7 @@ pub fn ClientImpacts(ctx: GameContext<'_>, ent: *mut gentity_t, pm: *mut pmove_t
                 as *mut gentity_t;
 
             if (*ent).r.svFlags & SVF_BOT != 0 {
-                if let Some(t) = (*ent).touch {
+                if let Some(t) = (*ent).touch.get() {
                     crate::ent_fn_enums::dispatch_touch(
                         ctx,
                         t,
@@ -606,7 +606,7 @@ pub fn ClientImpacts(ctx: GameContext<'_>, ent: *mut gentity_t, pm: *mut pmove_t
                 }
             }
 
-            let other_touch = (*other).touch;
+            let other_touch = (*other).touch.get();
             let Some(other_touch) = other_touch else {
                 i += 1;
                 continue;
@@ -684,7 +684,7 @@ pub fn G_TouchTriggers(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*hit).s.eType != ET_TELEPORT_TRIGGER as c_int
                     // this is ugly but adding a new ET_? type will
                     // most likely cause network incompatibilities
-                    && (*hit).touch != Some(EntTouch::Touch_DoorTrigger)
+                    && (*hit).touch.get() != Some(EntTouch::Touch_DoorTrigger)
                 {
                     i += 1;
                     continue;
@@ -715,12 +715,12 @@ pub fn G_TouchTriggers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
             trace = core::mem::zeroed();
 
-            if let Some(t) = (*hit).touch {
+            if let Some(t) = (*hit).touch.get() {
                 crate::ent_fn_enums::dispatch_touch(ctx, t, hit, ent, &mut trace as *mut trace_t);
             }
 
             if (*ent).r.svFlags & SVF_BOT != 0 {
-                if let Some(t) = (*ent).touch {
+                if let Some(t) = (*ent).touch.get() {
                     crate::ent_fn_enums::dispatch_touch(
                         ctx,
                         t,
@@ -829,7 +829,7 @@ pub fn G_MoverTouchPushTriggers(ctx: GameContext<'_>, ent: *mut gentity_t, oldOr
 
                 trace = core::mem::zeroed();
 
-                if let Some(t) = (*hit).touch {
+                if let Some(t) = (*hit).touch.get() {
                     crate::ent_fn_enums::dispatch_touch(
                         ctx,
                         t,

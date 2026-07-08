@@ -416,7 +416,7 @@ pub fn SaberUpdateSelf(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let owner_num = (*ent).r.ownerNum;
 
         if owner_num == ENTITYNUM_NONE {
-            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = level_time;
             return;
         }
@@ -424,7 +424,7 @@ pub fn SaberUpdateSelf(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let owner = &mut (*ctx.world).g_entities[owner_num as usize] as *mut gentity_t;
 
         if (*owner).inuse == 0 || (*owner).client.is_null() {
-            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = level_time;
             return;
         }
@@ -699,7 +699,7 @@ pub fn WP_SaberInitBladeData(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if !saberent.is_null() {
                     // already have one
                     (*checkEnt).neverFree = qfalse;
-                    (*checkEnt).think = Some(EntThink::G_FreeEntity);
+                    (*checkEnt).think = Some(EntThink::G_FreeEntity).into();
                     (*checkEnt).nextthink = level_time;
                 } else {
                     // take it as my own; free but don't issue a kg2.
@@ -741,9 +741,9 @@ pub fn WP_SaberInitBladeData(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         (*saberent).s.modelGhoul2 = 1;
 
-        (*saberent).touch = Some(EntTouch::SaberGotHit);
+        (*saberent).touch = Some(EntTouch::SaberGotHit).into();
 
-        (*saberent).think = Some(EntThink::SaberUpdateSelf);
+        (*saberent).think = Some(EntThink::SaberUpdateSelf).into();
         (*saberent).genericValue5 = 0;
         (*saberent).nextthink = level_time + 50;
 
@@ -7052,7 +7052,7 @@ pub fn SaberBounceSound(self_: *mut gentity_t, other: *mut gentity_t, trace: *mu
 pub fn DeadSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
     unsafe {
         if (*saberent).speed < ((*ctx.world).level.time) as f32 {
-            (*saberent).think = Some(EntThink::G_FreeEntity);
+            (*saberent).think = Some(EntThink::G_FreeEntity).into();
             (*saberent).nextthink = (*ctx.world).level.time;
             return;
         }
@@ -7090,9 +7090,9 @@ pub fn MakeDeadSaber(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*saberent).r.mins = [-3.0, -3.0, -1.5];
         (*saberent).r.maxs = [3.0, 3.0, 1.5];
 
-        (*saberent).touch = Some(EntTouch::SaberBounceSound);
+        (*saberent).touch = Some(EntTouch::SaberBounceSound).into();
 
-        (*saberent).think = Some(EntThink::DeadSaberThink);
+        (*saberent).think = Some(EntThink::DeadSaberThink).into();
         (*saberent).nextthink = (*ctx.world).level.time;
 
         (*saberent).s.pos.trBase = startorg;
@@ -7172,7 +7172,7 @@ pub fn DownedSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
         if (*saberent).r.ownerNum == ENTITYNUM_NONE {
             MakeDeadSaber(ctx, saberent);
 
-            (*saberent).think = Some(EntThink::G_FreeEntity);
+            (*saberent).think = Some(EntThink::G_FreeEntity).into();
             (*saberent).nextthink = level_time;
             return;
         }
@@ -7187,7 +7187,7 @@ pub fn DownedSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
         {
             MakeDeadSaber(ctx, saberent);
 
-            (*saberent).think = Some(EntThink::G_FreeEntity);
+            (*saberent).think = Some(EntThink::G_FreeEntity).into();
             (*saberent).nextthink = level_time;
             return;
         }
@@ -7203,7 +7203,7 @@ pub fn DownedSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
                 debug_assert!(false, "ULTRA BAD THING");
                 MakeDeadSaber(ctx, saberent);
 
-                (*saberent).think = Some(EntThink::G_FreeEntity);
+                (*saberent).think = Some(EntThink::G_FreeEntity).into();
                 (*saberent).nextthink = level_time;
                 return;
             }
@@ -7223,8 +7223,8 @@ pub fn DownedSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
                 MakeDeadSaber(ctx, saberent);
             }
 
-            (*saberent).touch = Some(EntTouch::SaberGotHit);
-            (*saberent).think = Some(EntThink::SaberUpdateSelf);
+            (*saberent).touch = Some(EntTouch::SaberGotHit).into();
+            (*saberent).think = Some(EntThink::SaberUpdateSelf).into();
             (*saberent).genericValue5 = 0;
             (*saberent).nextthink = level_time;
 
@@ -7258,9 +7258,9 @@ pub fn DownedSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
 
             saberReactivate(ctx, saberent, saberOwn);
 
-            (*saberent).touch = Some(EntTouch::SaberGotHit);
+            (*saberent).touch = Some(EntTouch::SaberGotHit).into();
 
-            (*saberent).think = Some(EntThink::saberBackToOwner);
+            (*saberent).think = Some(EntThink::saberBackToOwner).into();
             (*saberent).speed = (0) as f32;
             (*saberent).genericValue5 = 0;
             (*saberent).nextthink = level_time;
@@ -7310,7 +7310,7 @@ pub fn saberReactivate(ctx: GameContext<'_>, saberent: *mut gentity_t, saberOwne
 
         SetSaberBoxSize(ctx, saberent);
 
-        (*saberent).touch = Some(EntTouch::thrownSaberTouch);
+        (*saberent).touch = Some(EntTouch::thrownSaberTouch).into();
 
         (*saberent).s.weapon = WP_SABER as c_int;
 
@@ -7382,8 +7382,8 @@ pub fn saberKnockDown(
 
         (*saberent).r.svFlags &= !SVF_NOCLIENT;
 
-        (*saberent).touch = Some(EntTouch::SaberBounceSound);
-        (*saberent).think = Some(EntThink::DownedSaberThink);
+        (*saberent).touch = Some(EntTouch::SaberBounceSound).into();
+        (*saberent).think = Some(EntThink::DownedSaberThink).into();
         (*saberent).nextthink = level_time;
 
         if saberOwner != other {
@@ -7903,7 +7903,7 @@ pub fn saberBackToOwner(ctx: GameContext<'_>, saberent: *mut gentity_t) {
 
         if (*saberent).r.ownerNum == ENTITYNUM_NONE {
             MakeDeadSaber(ctx, saberent);
-            (*saberent).think = Some(EntThink::G_FreeEntity);
+            (*saberent).think = Some(EntThink::G_FreeEntity).into();
             (*saberent).nextthink = level_time;
             return;
         }
@@ -7913,7 +7913,7 @@ pub fn saberBackToOwner(ctx: GameContext<'_>, saberent: *mut gentity_t) {
             || (*((*saberOwner).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
         {
             MakeDeadSaber(ctx, saberent);
-            (*saberent).think = Some(EntThink::G_FreeEntity);
+            (*saberent).think = Some(EntThink::G_FreeEntity).into();
             (*saberent).nextthink = level_time;
             return;
         }
@@ -7923,8 +7923,8 @@ pub fn saberBackToOwner(ctx: GameContext<'_>, saberent: *mut gentity_t) {
         if (*saberOwner).health < 1 || (*soc).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] == 0
         {
             // He's dead, just go back to our normal saber status
-            (*saberent).touch = Some(EntTouch::SaberGotHit);
-            (*saberent).think = Some(EntThink::SaberUpdateSelf);
+            (*saberent).touch = Some(EntTouch::SaberGotHit).into();
+            (*saberent).think = Some(EntThink::SaberUpdateSelf).into();
             (*saberent).genericValue5 = 0;
             (*saberent).nextthink = level_time;
 
@@ -8011,9 +8011,9 @@ pub fn saberBackToOwner(ctx: GameContext<'_>, saberent: *mut gentity_t) {
                 (*soc).ps.saberCanThrow = qfalse;
                 (*soc).ps.saberThrowDelay = level_time + 300;
 
-                (*saberent).touch = Some(EntTouch::SaberGotHit);
+                (*saberent).touch = Some(EntTouch::SaberGotHit).into();
 
-                (*saberent).think = Some(EntThink::SaberUpdateSelf);
+                (*saberent).think = Some(EntThink::SaberUpdateSelf).into();
                 (*saberent).genericValue5 = 0;
                 (*saberent).nextthink = level_time + 50;
                 WP_SaberRemoveG2Model(ctx, saberent);
@@ -8061,7 +8061,7 @@ pub fn thrownSaberTouch(
 
         (*saberent).s.pos.trBase = (*saberent).r.currentOrigin;
 
-        (*saberent).think = Some(EntThink::saberBackToOwner);
+        (*saberent).think = Some(EntThink::saberBackToOwner).into();
         (*saberent).nextthink = level_time;
 
         if !other.is_null()
@@ -8095,7 +8095,7 @@ pub fn saberFirstThrown(ctx: GameContext<'_>, saberent: *mut gentity_t) {
 
         if (*saberent).r.ownerNum == ENTITYNUM_NONE {
             MakeDeadSaber(ctx, saberent);
-            (*saberent).think = Some(EntThink::G_FreeEntity);
+            (*saberent).think = Some(EntThink::G_FreeEntity).into();
             (*saberent).nextthink = level_time;
             return;
         }
@@ -8105,7 +8105,7 @@ pub fn saberFirstThrown(ctx: GameContext<'_>, saberent: *mut gentity_t) {
             || (*((*saberOwn).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
         {
             MakeDeadSaber(ctx, saberent);
-            (*saberent).think = Some(EntThink::G_FreeEntity);
+            (*saberent).think = Some(EntThink::G_FreeEntity).into();
             (*saberent).nextthink = level_time;
             return;
         }
@@ -8114,8 +8114,8 @@ pub fn saberFirstThrown(ctx: GameContext<'_>, saberent: *mut gentity_t) {
 
         if (*saberOwn).health < 1 || (*soc).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] == 0 {
             // He's dead, just go back to our normal saber status
-            (*saberent).touch = Some(EntTouch::SaberGotHit);
-            (*saberent).think = Some(EntThink::SaberUpdateSelf);
+            (*saberent).touch = Some(EntTouch::SaberGotHit).into();
+            (*saberent).think = Some(EntThink::SaberUpdateSelf).into();
             (*saberent).genericValue5 = 0;
             (*saberent).nextthink = level_time;
 
@@ -10129,7 +10129,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                         AngleVectors((*client).ps.viewangles, Some(&mut dir), None, None);
 
                         (*saberent).nextthink = (*ctx.world).level.time + FRAMETIME;
-                        (*saberent).think = Some(EntThink::saberFirstThrown);
+                        (*saberent).think = Some(EntThink::saberFirstThrown).into();
 
                         (*saberent).damage = SABER_THROWN_HIT_DAMAGE;
                         (*saberent).methodOfDeath = MOD_SABER as c_int;
@@ -10154,7 +10154,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
 
                         (*saberent).s.genericenemyindex = (*self_).s.number + 1024;
 
-                        (*saberent).touch = Some(EntTouch::thrownSaberTouch);
+                        (*saberent).touch = Some(EntTouch::thrownSaberTouch).into();
 
                         (*saberent).s.weapon = WP_SABER as c_int;
 
@@ -10189,7 +10189,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                         if (*saberent).genericValue5 == PROPER_THROWN_VALUE {
                             // return to the owner now, this is a bad state to be in for here..
                             (*saberent).genericValue5 = 0;
-                            (*saberent).think = Some(EntThink::SaberUpdateSelf);
+                            (*saberent).think = Some(EntThink::SaberUpdateSelf).into();
                             (*saberent).nextthink = (*ctx.world).level.time;
                             WP_SaberRemoveG2Model(ctx, saberent);
 

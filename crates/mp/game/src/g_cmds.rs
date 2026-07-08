@@ -4877,7 +4877,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                 );
 
                 while !targ.is_null() {
-                    if let Some(use_fn) = (*targ).use_ {
+                    if let Some(use_fn) = (*targ).use_.get() {
                         crate::ent_fn_enums::dispatch_use(ctx, use_fn, targ, ent, ent);
                     }
                     targ = crate::g_utils::G_Find(ctx, targ, targetname_ofs, sArg.as_ptr());

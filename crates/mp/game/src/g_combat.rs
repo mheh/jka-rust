@@ -701,7 +701,7 @@ pub fn body_die(
                     || meansOfDeath == meansOfDeath_t::MOD_TARGET_LASER as c_int
                     || meansOfDeath == meansOfDeath_t::MOD_TRIGGER_HURT as c_int)
             {
-                (*self_).think = Some(EntThink::G_FreeEntity);
+                (*self_).think = Some(EntThink::G_FreeEntity).into();
                 (*self_).nextthink = (*ctx.world).level.time;
             }
             return;
@@ -734,7 +734,7 @@ pub fn body_die(
                 crate::q_math::_VectorCopy((*self_).r.currentOrigin, &mut (*self_).s.origin2);
 
                 // since it's the corpse entity, tell it to "remove" itself
-                (*self_).think = Some(EntThink::BodyRid);
+                (*self_).think = Some(EntThink::BodyRid).into();
                 (*self_).nextthink = (*ctx.world).level.time + 1000;
             }
             return;
@@ -2054,7 +2054,7 @@ pub fn player_die(
                 &mut (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize] as *mut gentity_t;
 
             if (*objectiveItem).inuse != qfalse {
-                if let Some(think_fn) = (*objectiveItem).think {
+                if let Some(think_fn) = (*objectiveItem).think.get() {
                     crate::ent_fn_enums::dispatch_think(ctx, think_fn, objectiveItem);
                 }
             }
@@ -2693,7 +2693,7 @@ pub fn player_die(
                 && (*cl).NPC_class != class_t::CLASS_VEHICLE
             {
                 // in this case if we're an NPC it's my guess that we want to get removed straight away.
-                (*self_).think = Some(EntThink::G_FreeEntity);
+                (*self_).think = Some(EntThink::G_FreeEntity).into();
                 (*self_).nextthink = (*ctx.world).level.time;
             }
 
@@ -2711,7 +2711,7 @@ pub fn player_die(
             // the body can still be gibbed
             if (*self_).NPC.is_null() {
                 // don't remove NPCs like this!
-                (*self_).die = Some(EntDie::body_die);
+                (*self_).die = Some(EntDie::body_die).into();
             }
 
             // It won't gib, it will disintegrate (because this is Star Wars).
@@ -3210,7 +3210,7 @@ pub fn LimbThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // G2_MODELPART_LARM/RARM/RHAND/LLEG/RLEG/default: leave defaults
 
         if (*ent).speed < (*ctx.world).level.time as f32 {
-            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = (*ctx.world).level.time;
             return;
         }
@@ -3416,8 +3416,8 @@ pub fn G_Dismember(
 
         crate::g_utils::G_SetOrigin(limb, newPoint);
         crate::q_math::_VectorCopy(newPoint, &mut (*limb).s.pos.trBase);
-        (*limb).think = Some(EntThink::LimbThink);
-        (*limb).touch = Some(EntTouch::LimbTouch);
+        (*limb).think = Some(EntThink::LimbThink).into();
+        (*limb).touch = Some(EntTouch::LimbTouch).into();
         (*limb).speed =
             ((*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(8000, 16000)) as f32;
         (*limb).nextthink = (*ctx.world).level.time + FRAMETIME;
@@ -5748,7 +5748,7 @@ pub fn G_Damage(
                 }
 
                 (*targ).enemy = Some(ent_id(base, attacker));
-                if let Some(die_fn) = (*targ).die {
+                if let Some(die_fn) = (*targ).die.get() {
                     crate::ent_fn_enums::dispatch_die(
                         ctx, die_fn, targ, inflictor, attacker, take, r#mod,
                     );
@@ -5774,7 +5774,7 @@ pub fn G_Damage(
                         (*ctx.world).globals.gPainMOD = r#mod;
                         // PORT-NOTE(point-null): point is a non-null value; copy it.
                         crate::q_math::_VectorCopy(point, &mut (*ctx.world).globals.gPainPoint);
-                        if let Some(pain_fn) = (*targ).pain {
+                        if let Some(pain_fn) = (*targ).pain.get() {
                             crate::ent_fn_enums::dispatch_pain(ctx, pain_fn, targ, attacker, take);
                         }
                     }

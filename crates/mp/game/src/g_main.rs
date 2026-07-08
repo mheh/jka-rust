@@ -3344,7 +3344,7 @@ pub fn G_RunThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
 
             (*ent).nextthink = 0;
-            if let Some(think_fn) = (*ent).think {
+            if let Some(think_fn) = (*ent).think.get() {
                 dispatch_think(ctx, think_fn, ent);
             } else {
                 // G_Error("NULL ent->think") — commented out in oracle.

@@ -708,7 +708,7 @@ pub fn NPC_BSSentry_Default(ctx: GameContext<'_>) {
         let NPCInfo = world.globals.NPCInfo;
 
         if !(*NPC).targetname.is_null() {
-            (*NPC).use_ = Some(crate::ent_fn_enums::EntUse::sentry_use);
+            (*NPC).use_ = Some(crate::ent_fn_enums::EntUse::sentry_use).into();
         }
 
         if (*NPC).enemy.is_some() && (*NPCInfo).localState != LSTATE_WAKEUP {

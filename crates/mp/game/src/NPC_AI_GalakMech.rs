@@ -466,7 +466,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
             // G_PlayEffect( "small_chunks", self->r.currentOrigin );
             // G_PlayEffect( "env/exp_trail_comp", self->r.currentOrigin, self->currentAngles );
             (*self_).nextthink = level_time + FRAMETIME;
-            (*self_).think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity);
+            (*self_).think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity).into();
         }
     }
 }

@@ -191,7 +191,7 @@ pub use crate::trap::TrueMalloc as trap_TrueMalloc;
 // The entity fn-ID dispatch enums (`ent_fn_enums`), named bare in the
 // spawn/think/touch/… assignment sites.
 pub use crate::ent_fn_enums::{
-    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse,
+    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse, FnId,
 };
 
 pub use crate::ai::group_info::AIGroupInfo_t;

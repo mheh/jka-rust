@@ -364,14 +364,14 @@ pub fn anglerCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).s.apos.trTime = (*ctx.world).level.time;
 
         // Stop thinking.
-        (*ent).reached = None;
+        (*ent).reached = FnId::NONE;
         // Raven compares `ent->think == anglerCallback` by address (fn-ID
         // enums replace address compares) before clearing it; the
         // `gentity_t.think` field is not yet retrofitted from a raw fn-ptr to
         // `Option<EntThink>` so the compare itself can't be reproduced here.
         // This callback is only ever assigned as its own think, so
         // unconditionally clearing is behaviorally equivalent.
-        (*ent).think = None;
+        (*ent).think = FnId::NONE;
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -399,8 +399,8 @@ pub fn moverCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
             MatchTeam(ctx, ent, MOVER_POS1 as c_int, (*ctx.world).level.time);
         }
 
-        if (*ent).blocked == Some(EntBlocked::Blocked_Mover) {
-            (*ent).blocked = None;
+        if (*ent).blocked.get() == Some(EntBlocked::Blocked_Mover) {
+            (*ent).blocked = FnId::NONE;
         }
     }
 }
@@ -486,9 +486,9 @@ pub fn Q3_Lerp2Start(ctx: GameContext<'_>, entID: c_int, taskID: c_int, duration
 
         (*ent).moverState = MOVER_2TO1;
         (*ent).s.eType = entityType_t::ET_MOVER as c_int;
-        (*ent).reached = Some(EntReached::moverCallback);
+        (*ent).reached = Some(EntReached::moverCallback).into();
         if (*ent).damage != 0 {
-            (*ent).blocked = Some(EntBlocked::Blocked_Mover);
+            (*ent).blocked = Some(EntBlocked::Blocked_Mover).into();
         }
 
         (*ent).s.pos.trDuration = (duration * 10.0) as c_int;
@@ -532,9 +532,9 @@ pub fn Q3_Lerp2End(ctx: GameContext<'_>, entID: c_int, taskID: c_int, duration: 
 
         (*ent).moverState = MOVER_1TO2;
         (*ent).s.eType = entityType_t::ET_MOVER as c_int;
-        (*ent).reached = Some(EntReached::moverCallback);
+        (*ent).reached = Some(EntReached::moverCallback).into();
         if (*ent).damage != 0 {
-            (*ent).blocked = Some(EntBlocked::Blocked_Mover);
+            (*ent).blocked = Some(EntBlocked::Blocked_Mover).into();
         }
 
         (*ent).s.pos.trDuration = (duration * 10.0) as c_int;
@@ -624,17 +624,17 @@ pub fn Q3_Lerp2Pos(
             (*ent).s.apos.trDuration = duration as c_int;
             (*ent).s.apos.trTime = (*ctx.world).level.time;
 
-            (*ent).reached = Some(EntReached::moveAndRotateCallback);
+            (*ent).reached = Some(EntReached::moveAndRotateCallback).into();
             trap::ICARUS_TaskIDSet(
                 ctx.engine,
                 GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
             );
         } else {
-            (*ent).reached = Some(EntReached::moverCallback);
+            (*ent).reached = Some(EntReached::moverCallback).into();
         }
 
         if (*ent).damage != 0 {
-            (*ent).blocked = Some(EntBlocked::Blocked_Mover);
+            (*ent).blocked = Some(EntBlocked::Blocked_Mover).into();
         }
 
         trap::ICARUS_TaskIDSet(
@@ -687,7 +687,7 @@ pub fn Q3_Lerp2Angles(
             GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
         );
 
-        (*ent).think = Some(EntThink::anglerCallback);
+        (*ent).think = Some(EntThink::anglerCallback).into();
         (*ent).nextthink = (*ctx.world).level.time + duration as c_int;
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
@@ -797,7 +797,7 @@ pub fn Q3_Kill(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
             (*victim).flags |= FL_NO_KNOCKBACK;
         }
 
-        if let Some(die_fn) = (*victim).die {
+        if let Some(die_fn) = (*victim).die.get() {
             crate::ent_fn_enums::dispatch_die(
                 ctx,
                 die_fn,
@@ -833,11 +833,11 @@ pub fn Q3_RemoveEnt(ctx: GameContext<'_>, victim: *mut gentity_t) {
                     // C++-track (icarus/vehicle) surface — not transcribed here; see
                     // porting-rules §F (idiomatic C++ reimplementation, not yet ported).
                 }
-                (*victim).think = Some(EntThink::G_FreeEntity);
+                (*victim).think = Some(EntThink::G_FreeEntity).into();
                 (*victim).nextthink = (*ctx.world).level.time + 100;
             }
         } else {
-            (*victim).think = Some(EntThink::G_FreeEntity);
+            (*victim).think = Some(EntThink::G_FreeEntity).into();
             (*victim).nextthink = (*ctx.world).level.time + 100;
         }
     }
@@ -1523,14 +1523,14 @@ pub fn MoveOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
         let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
         (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
-        (*self_).think = Some(EntThink::G_FreeEntity);
+        (*self_).think = Some(EntThink::G_FreeEntity).into();
 
         if owner.is_null() || (*owner).inuse == 0 {
             return;
         }
 
         if SpotWouldTelefrag2(ctx, owner, (*self_).r.currentOrigin) != 0 {
-            (*self_).think = Some(EntThink::MoveOwner);
+            (*self_).think = Some(EntThink::MoveOwner).into();
         } else {
             G_SetOrigin(owner, (*self_).r.currentOrigin);
             trap::ICARUS_TaskIDComplete(
@@ -1555,7 +1555,7 @@ pub fn Q3_SetTeleportDest(ctx: GameContext<'_>, entID: c_int, org: vec3_t) -> qb
             G_SetOrigin(teleporter, org);
             (*teleporter).r.ownerNum = (*tele_ent).s.number;
 
-            (*teleporter).think = Some(EntThink::MoveOwner);
+            (*teleporter).think = Some(EntThink::MoveOwner).into();
             (*teleporter).nextthink = (*ctx.world).level.time + FRAMETIME;
 
             qfalse
@@ -1715,9 +1715,9 @@ pub fn Q3_Lerp2Origin(
 
         MatchTeam(ctx, ent, moverState as c_int, (*ctx.world).level.time);
 
-        (*ent).reached = Some(EntReached::moverCallback);
+        (*ent).reached = Some(EntReached::moverCallback).into();
         if (*ent).damage != 0 {
-            (*ent).blocked = Some(EntBlocked::Blocked_Mover);
+            (*ent).blocked = Some(EntBlocked::Blocked_Mover).into();
         }
         if taskID != -1 {
             trap::ICARUS_TaskIDSet(
@@ -3472,7 +3472,7 @@ pub fn SolidifyOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
         let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
         (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
-        (*self_).think = Some(EntThink::G_FreeEntity);
+        (*self_).think = Some(EntThink::G_FreeEntity).into();
 
         if owner.is_null() || (*owner).inuse == 0 {
             return;
@@ -3482,7 +3482,7 @@ pub fn SolidifyOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*owner).r.contents = CONTENTS_BODY;
         if SpotWouldTelefrag2(ctx, owner, (*owner).r.currentOrigin) != qfalse {
             (*owner).r.contents = oldContents;
-            (*self_).think = Some(EntThink::SolidifyOwner);
+            (*self_).think = Some(EntThink::SolidifyOwner).into();
         } else {
             trap::ICARUS_TaskIDComplete(
                 ctx.engine,
@@ -3517,7 +3517,7 @@ pub fn Q3_SetSolid(ctx: GameContext<'_>, entID: c_int, solid: qboolean) -> qbool
 
                 (*solidifier).r.ownerNum = (*ent).s.number;
 
-                (*solidifier).think = Some(EntThink::SolidifyOwner);
+                (*solidifier).think = Some(EntThink::SolidifyOwner).into();
                 (*solidifier).nextthink = (*ctx.world).level.time + FRAMETIME;
 
                 (*ent).r.contents = oldContents;

@@ -2795,7 +2795,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     );
                 }
 
-                (*parent).think = Some(EntThink::G_FreeEntity);
+                (*parent).think = Some(EntThink::G_FreeEntity).into();
                 (*parent).nextthink = (*ctx.world).level.time + FRAMETIME;
             }
         }

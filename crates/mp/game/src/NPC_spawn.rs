@@ -136,7 +136,7 @@ pub fn NPC_SetMiscDefaultData(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type == VH_WALKER {
                 (*ent).mass = 2000.0;
                 (*ent).flags |= FL_SHIELDED | FL_NO_KNOCKBACK;
-                (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_ATST_Pain);
+                (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_ATST_Pain).into();
             }
             let surf = cstr("head_hatchcover");
             trap::G2API_SetSurfaceOnOff(
@@ -154,14 +154,14 @@ pub fn NPC_SetMiscDefaultData(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.g2radius = 80;
             (*ent).mass = 300.0;
             (*ent).flags |= FL_NO_KNOCKBACK;
-            (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Wampa_Pain);
+            (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Wampa_Pain).into();
         }
         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_RANCOR {
             crate::NPC_AI_Rancor::Rancor_SetBolts(ctx, ent);
             (*ent).s.g2radius = 255;
             (*ent).mass = 1000.0;
             (*ent).flags |= FL_NO_KNOCKBACK;
-            (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Rancor_Pain);
+            (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Rancor_Pain).into();
             (*ent).health *= 4;
         }
         let yoda = cstr("Yoda");
@@ -595,7 +595,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         .as_ptr(),
                     );
                     crate::g_utils::G_UseTargets2(ctx, ent, ent, (*ent).target3 as *const c_char);
-                    (*ent).think = Some(EntThink::G_FreeEntity);
+                    (*ent).think = Some(EntThink::G_FreeEntity).into();
                     (*ent).nextthink = (*ctx.world).level.time + 100;
                 } else {
                     let tn = if (*ent).targetname.is_null() {
@@ -613,7 +613,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         ))
                         .as_ptr(),
                     );
-                    (*ent).think = Some(EntThink::NPC_Begin);
+                    (*ent).think = Some(EntThink::NPC_Begin).into();
                     (*ent).nextthink = (((*ctx.world).level.time as f32) + (*ent).wait) as i32;
                 }
                 return;
@@ -722,7 +722,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).clipmask = MASK_NPCSOLID & !CONTENTS_BODY;
         }
 
-        (*ent).die = Some(EntDie::player_die);
+        (*ent).die = Some(EntDie::player_die).into();
         (*ent).waterlevel = 0;
         (*ent).watertype = 0;
         (*client).ps.rocketLockIndex = ENTITYNUM_NONE;
@@ -812,11 +812,11 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
         crate::NPC_goal::NPC_ClearGoal(ctx);
         NPC_ChangeWeapon((*client).ps.weapon);
 
-        (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Pain);
+        (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Pain).into();
         // pain/touch fn-ID enums assigned straight from the selector
         // fns (no *mut c_void encode/transmute round-trip).
-        (*ent).pain = NPC_PainFunc(ent);
-        (*ent).touch = NPC_TouchFunc(ent);
+        (*ent).pain = NPC_PainFunc(ent).into();
+        (*ent).touch = NPC_TouchFunc(ent).into();
 
         (*client).ps.ping = (*((*ent).NPC as *mut gNPC_t)).stats.reactions * 50;
 
@@ -826,8 +826,8 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*client).ps.persistant[PERS_TEAM as usize] = (*client).playerTeam;
         }
 
-        (*ent).use_ = Some(EntUse::NPC_Use);
-        (*ent).think = Some(EntThink::NPC_Think);
+        (*ent).use_ = Some(EntUse::NPC_Use).into();
+        (*ent).think = Some(EntThink::NPC_Think).into();
         (*ent).nextthink =
             (*ctx.world).level.time + FRAMETIME + (*ctx.world).bg_state.rng.Q_irand(0, 100);
 
@@ -1046,7 +1046,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
         if (*ent).count != -1 {
             (*ent).count -= 1;
             if (*ent).count <= 0 {
-                (*ent).use_ = None;
+                (*ent).use_ = FnId::NONE;
             }
         }
 
@@ -1394,7 +1394,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
         (*newent).flags |= FL_NOTARGET;
         (*newent).s.eFlags |= EF_NODRAW;
 
-        (*newent).think = Some(EntThink::NPC_Begin);
+        (*newent).think = Some(EntThink::NPC_Begin).into();
         (*newent).nextthink = (*ctx.world).level.time + FRAMETIME;
         NPC_DefaultScriptFlags(newent);
 
@@ -1454,7 +1454,7 @@ pub fn NPC_Spawn_Go(ctx: GameContext<'_>, ent: *mut gentity_t) {
 pub fn NPC_ShySpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).nextthink = (*ctx.world).level.time + SHY_THINK_TIME;
-        (*ent).think = Some(EntThink::NPC_ShySpawn);
+        (*ent).think = Some(EntThink::NPC_ShySpawn).into();
 
         let base = (*ctx.world).g_entities.as_mut_ptr();
         let player0 = base;
@@ -1470,7 +1470,7 @@ pub fn NPC_ShySpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
         }
 
-        (*ent).think = None;
+        (*ent).think = FnId::NONE;
         (*ent).nextthink = 0;
 
         NPC_Spawn_Go(ctx, ent);
@@ -1489,9 +1489,9 @@ pub fn NPC_Spawn(
     unsafe {
         if (*ent).delay != 0 {
             if (*ent).spawnflags & 2048 != 0 {
-                (*ent).think = Some(EntThink::NPC_ShySpawn);
+                (*ent).think = Some(EntThink::NPC_ShySpawn).into();
             } else {
-                (*ent).think = Some(EntThink::NPC_Spawn_Go);
+                (*ent).think = Some(EntThink::NPC_Spawn_Go).into();
             }
             (*ent).nextthink = (*ctx.world).level.time + (*ent).delay;
         } else {
@@ -1526,7 +1526,7 @@ pub fn SP_NPC_spawner(ctx: GameContext<'_>, self_: *mut gentity_t) {
         let mut t: c_int = 0;
 
         if (*ctx.world).cvars.g_allowNPC.integer == 0 {
-            (*self_).think = Some(EntThink::G_FreeEntity);
+            (*self_).think = Some(EntThink::G_FreeEntity).into();
             (*self_).nextthink = (*ctx.world).level.time;
             return;
         }
@@ -1578,9 +1578,9 @@ pub fn SP_NPC_spawner(ctx: GameContext<'_>, self_: *mut gentity_t) {
         crate::NPC_stats::NPC_Precache(ctx, self_);
 
         if !(*self_).targetname.is_null() {
-            (*self_).use_ = Some(EntUse::NPC_Spawn);
+            (*self_).use_ = Some(EntUse::NPC_Spawn).into();
         } else {
-            (*self_).think = Some(EntThink::NPC_Spawn_Go);
+            (*self_).think = Some(EntThink::NPC_Spawn_Go).into();
             (*self_).nextthink = (*ctx.world).level.time + START_TIME_REMOVE_ENTS + 50;
         }
     }
@@ -1721,7 +1721,7 @@ pub fn NPC_VehicleSpawnUse(
 ) {
     unsafe {
         if (*self_).delay != 0 {
-            (*self_).think = Some(EntThink::G_VehicleSpawn);
+            (*self_).think = Some(EntThink::G_VehicleSpawn).into();
             (*self_).nextthink = (*ctx.world).level.time + (*self_).delay;
         } else {
             crate::g_vehicles::G_VehicleSpawn(ctx, self_);
@@ -1772,14 +1772,14 @@ pub fn SP_NPC_Vehicle(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 crate::g_utils::G_FreeEntity(ctx, self_);
                 return;
             }
-            (*self_).use_ = Some(EntUse::NPC_VehicleSpawnUse);
+            (*self_).use_ = Some(EntUse::NPC_VehicleSpawnUse).into();
         } else {
             if (*self_).delay != 0 {
                 if NPC_VehiclePrecache(ctx, self_) == qfalse {
                     crate::g_utils::G_FreeEntity(ctx, self_);
                     return;
                 }
-                (*self_).think = Some(EntThink::G_VehicleSpawn);
+                (*self_).think = Some(EntThink::G_VehicleSpawn).into();
                 (*self_).nextthink = (*ctx.world).level.time + (*self_).delay;
             } else {
                 crate::g_vehicles::G_VehicleSpawn(ctx, self_);
@@ -2723,7 +2723,7 @@ pub fn NPC_SpawnType(
     }
 
     unsafe {
-        (*npc_spawner).think = Some(EntThink::G_FreeEntity);
+        (*npc_spawner).think = Some(EntThink::G_FreeEntity).into();
         (*npc_spawner).nextthink = (*ctx.world).level.time + 50; // FRAMETIME
     }
 
@@ -3046,7 +3046,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                     );
                     player.health = 0;
 
-                    if let Some(die_fn) = player.die {
+                    if let Some(die_fn) = player.die.get() {
                         if !player.client.is_null() {
                             let health =
                                 unsafe { (*(player.client as *mut gclient_t)).pers.maxHealth };
@@ -3093,7 +3093,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                         .as_ptr(),
                     );
                     player.health = 0;
-                    if let Some(die_fn) = player.die {
+                    if let Some(die_fn) = player.die.get() {
                         let health = unsafe { (*(player.client as *mut gclient_t)).pers.maxHealth };
                         let self_ = player as *mut gentity_t;
                         dispatch_die(
@@ -3126,7 +3126,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                 unsafe {
                     (*(player.client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] = 0;
                 }
-                if let Some(die_fn) = player.die {
+                if let Some(die_fn) = player.die.get() {
                     let self_ = player as *mut gentity_t;
                     dispatch_die(ctx, die_fn, self_, self_, self_, 100, MOD_UNKNOWN as c_int);
                 }

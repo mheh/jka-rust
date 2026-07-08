@@ -677,7 +677,7 @@ pub fn GlobalUse(
         }
 
         // Oracle: self->use(self, other, activator); (g_utils.c:563)
-        if let Some(use_fn) = (*self_).use_ {
+        if let Some(use_fn) = (*self_).use_.get() {
             crate::ent_fn_enums::dispatch_use(ctx, use_fn, self_, other, activator);
         }
     }
@@ -831,14 +831,6 @@ pub fn G_InitGentity(ctx: GameContext<'_>, e: *mut gentity_t) {
         (*e).s.number = e.offset_from(base) as c_int;
         (*e).r.ownerNum = mp_qshared::shared::ENTITYNUM_NONE;
         (*e).s.modelGhoul2 = 0; // assume not
-
-        // Niche-layout fixup (interim, see gentity_t::reset_fn_ids_after_zero):
-        // every slot handed to G_InitGentity was byte-zeroed (G_FreeEntity's
-        // write_bytes, or the G_InitGame / GameWorld construction array zeroing),
-        // and zeroed bytes decode the Option<EntXxx> fn-ID fields as
-        // Some(variant 0), not None. Raven's C relied on memset leaving these
-        // fn pointers NULL; re-assert None so a fresh entity has no handlers.
-        (*e).reset_fn_ids_after_zero();
 
         trap::ICARUS_FreeEnt(ctx.engine, GIcarusFreeentArgs::new(e)); // ICARUS information must be added after this point
     }
@@ -1127,14 +1119,9 @@ pub fn G_FreeEntity(ctx: GameContext<'_>, ed: *mut gentity_t) {
         }
 
         core::ptr::write_bytes(ed, 0, 1);
-        // Niche-layout fixup (interim, see gentity_t::reset_fn_ids_after_zero):
-        // the byte-wise zero above (Raven `memset(ed, 0, sizeof(*ed))`) leaves
-        // the Option<EntXxx> fn-ID fields decoding as Some(variant 0) — e.g.
-        // touch == Some(EntTouch::HolocronTouch) — because those enums have no
-        // reserved 0 and Option's None niche sits AFTER the last variant. C's
-        // NULL-fn-pointer semantics require None; assign it explicitly.
-        // Pending a type-level fix (NonZero-backed handler ids, 0 == None).
-        (*ed).reset_fn_ids_after_zero();
+        // The byte-wise zero above (Raven `memset(ed, 0, sizeof(*ed))`) leaves
+        // the FnId<EntXxx> handler fields as None by construction (zero == None,
+        // std-guaranteed via Option<NonZeroU8>), matching Raven's NULL fn ptrs.
         (*ed).classname = b"freed\0".as_ptr() as *mut c_char;
         (*ed).freetime = (*ctx.world).level.time;
         (*ed).inuse = qfalse;

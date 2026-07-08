@@ -117,14 +117,14 @@ pub fn auto_turret_die(
         let owner_num = (*self_).r.ownerNum as usize;
         if owner_num < (*ctx.world).g_entities.len() {
             let owner = &mut (*ctx.world).g_entities[owner_num];
-            owner.think = None;
-            owner.use_ = None;
+            owner.think = FnId::NONE;
+            owner.use_ = FnId::NONE;
         }
 
         let mut forward = [0.0, 0.0, 1.0];
         let mut pos = [0.0, 0.0, 0.0];
 
-        (*self_).die = None;
+        (*self_).die = FnId::NONE;
         (*self_).takedamage = qfalse;
         (*self_).s.health = 0;
         (*self_).health = 0;
@@ -246,7 +246,7 @@ pub fn turret_fire(ctx: GameContext<'_>, ent: *mut gentity_t, start: vec3_t, dir
 
         (*bolt).classname = c"turret_proj".as_ptr() as *mut c_char;
         (*bolt).nextthink = (*ctx.world).level.time + 10000;
-        (*bolt).think = Some(EntThink::G_FreeEntity);
+        (*bolt).think = Some(EntThink::G_FreeEntity).into();
         (*bolt).s.eType = ET_MISSILE as c_int;
         (*bolt).s.weapon = WP_EMPLACED_GUN;
         (*bolt).r.ownerNum = (*ent).s.number;
@@ -856,8 +856,8 @@ pub fn SP_misc_turret(ctx: GameContext<'_>, base: *mut gentity_t) {
         (*base).r.mins[1] = -32.0;
         (*base).r.mins[2] = 0.0;
 
-        (*base).use_ = Some(EntUse::turret_base_use);
-        (*base).think = Some(EntThink::turret_base_think);
+        (*base).use_ = Some(EntUse::turret_base_use).into();
+        (*base).think = Some(EntThink::turret_base_think).into();
         (*base).nextthink = (*ctx.world).level.time + FRAMETIME * 5;
 
         trap::LinkEntity(
@@ -933,8 +933,8 @@ pub fn turret_base_spawn_top(ctx: GameContext<'_>, base: *mut gentity_t) -> qboo
         }
 
         (*base).takedamage = qtrue;
-        (*base).pain = Some(EntPain::TurretBasePain);
-        (*base).die = Some(EntDie::bottom_die);
+        (*base).pain = Some(EntPain::TurretBasePain).into();
+        (*base).die = Some(EntDie::bottom_die).into();
 
         // Shot speed
         G_SpawnFloat(
@@ -1012,8 +1012,8 @@ pub fn turret_base_spawn_top(ctx: GameContext<'_>, base: *mut gentity_t) -> qboo
         (*top).r.contents = CONTENTS_BODY;
 
         (*top).takedamage = qtrue;
-        (*top).pain = Some(EntPain::TurretPain);
-        (*top).die = Some(EntDie::auto_turret_die);
+        (*top).pain = Some(EntPain::TurretPain).into();
+        (*top).die = Some(EntDie::auto_turret_die).into();
 
         (*top).material = MAT_METAL;
 

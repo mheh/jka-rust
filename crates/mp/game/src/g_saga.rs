@@ -1670,7 +1670,7 @@ pub fn SP_info_siege_objective(ctx: GameContext<'_>, ent: *mut gentity_t) {
             return;
         }
 
-        (*ent).use_ = Some(EntUse::siegeTriggerUse);
+        (*ent).use_ = Some(EntUse::siegeTriggerUse).into();
         G_SpawnInt(
             ctx,
             b"objective\0".as_ptr() as *const c_char,
@@ -1792,7 +1792,7 @@ pub fn SP_info_siege_radaricon(ctx: GameContext<'_>, ent: *mut gentity_t) {
             return;
         }
 
-        (*ent).use_ = Some(EntUse::SiegeIconUse);
+        (*ent).use_ = Some(EntUse::SiegeIconUse).into();
 
         (*ent).s.genericenemyindex = G_IconIndex(ctx, s as *const c_char);
 
@@ -1896,7 +1896,7 @@ pub fn SP_info_siege_decomplete(ctx: GameContext<'_>, ent: *mut gentity_t) {
             return;
         }
 
-        (*ent).use_ = Some(EntUse::decompTriggerUse);
+        (*ent).use_ = Some(EntUse::decompTriggerUse).into();
         G_SpawnInt(
             ctx,
             b"objective\0".as_ptr() as *const c_char,
@@ -1949,7 +1949,7 @@ pub fn SP_target_siege_end(ctx: GameContext<'_>, ent: *mut gentity_t) {
             return;
         }
 
-        (*ent).use_ = Some(EntUse::siegeEndUse);
+        (*ent).use_ = Some(EntUse::siegeEndUse).into();
     }
 }
 
@@ -2257,7 +2257,7 @@ pub fn SiegeItemDie(
         }
 
         (*self_).neverFree = qfalse;
-        (*self_).think = Some(EntThink::G_FreeEntity);
+        (*self_).think = Some(EntThink::G_FreeEntity).into();
         (*self_).nextthink = (*ctx.world).level.time;
 
         // Fire off the death target if we've got one.
@@ -2299,7 +2299,7 @@ pub fn SiegeItemUse(
             (*ent).r.contents = CONTENTS_TRIGGER;
             (*ent).clipmask = CONTENTS_SOLID | CONTENTS_TERRAIN;
             if (*ent).genericValue11 != 0 {
-                (*ent).touch = Some(EntTouch::SiegeItemTouch);
+                (*ent).touch = Some(EntTouch::SiegeItemTouch).into();
             }
         } else {
             // Make it solid.
@@ -2307,7 +2307,7 @@ pub fn SiegeItemUse(
             (*ent).clipmask = MASK_PLAYERSOLID;
         }
 
-        (*ent).think = Some(EntThink::SiegeItemThink);
+        (*ent).think = Some(EntThink::SiegeItemThink).into();
         (*ent).nextthink = (*ctx.world).level.time + FRAMETIME / 2;
 
         // take off nodraw
@@ -2532,8 +2532,8 @@ pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
             // If it has health, it can be killed.
             let mut t: c_int = 0;
 
-            (*ent).pain = Some(EntPain::SiegeItemPain);
-            (*ent).die = Some(EntDie::SiegeItemDie);
+            (*ent).pain = Some(EntPain::SiegeItemPain).into();
+            (*ent).die = Some(EntDie::SiegeItemDie).into();
             (*ent).takedamage = qtrue;
 
             G_SpawnInt(
@@ -2567,11 +2567,11 @@ pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if (*ent).spawnflags & SIEGEITEM_STARTOFFRADAR != 0 {
-            (*ent).use_ = Some(EntUse::SiegeItemUse);
+            (*ent).use_ = Some(EntUse::SiegeItemUse).into();
         } else if !(*ent).targetname.is_null() && *(*ent).targetname != 0 {
             (*ent).s.eFlags |= EF_NODRAW; // kind of hacky, but whatever
             (*ent).genericValue11 = canpickup;
-            (*ent).use_ = Some(EntUse::SiegeItemUse);
+            (*ent).use_ = Some(EntUse::SiegeItemUse).into();
             (*ent).s.eFlags &= !EF_RADAROBJECT;
         }
 
@@ -2583,7 +2583,7 @@ pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 (*ent).r.contents = CONTENTS_TRIGGER;
                 (*ent).clipmask = CONTENTS_SOLID | CONTENTS_TERRAIN;
                 if canpickup != 0 {
-                    (*ent).touch = Some(EntTouch::SiegeItemTouch);
+                    (*ent).touch = Some(EntTouch::SiegeItemTouch).into();
                 }
             } else {
                 // Make it solid.
@@ -2591,7 +2591,7 @@ pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 (*ent).clipmask = MASK_PLAYERSOLID;
             }
 
-            (*ent).think = Some(EntThink::SiegeItemThink);
+            (*ent).think = Some(EntThink::SiegeItemThink).into();
             (*ent).nextthink = (*ctx.world).level.time + FRAMETIME / 2;
         }
 
