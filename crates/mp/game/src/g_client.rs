@@ -3741,6 +3741,8 @@ pub fn SetupGameGhoul2Model(
                                 skin.as_mut_ptr(),
                                 (*((*ent).client as *mut gclient_t)).sess.sessionTeam,
                                 core::ptr::null_mut(),
+                                &(*ctx.world).bg_state,
+                                &crate::bg_channel::GameBgTraps::new(ctx.engine),
                             );
                         } else if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
                             // force skin for class if appropriate

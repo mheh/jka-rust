@@ -1593,12 +1593,19 @@ pub fn G_UseDispenserOn(
         } else if dispType == HI_AMMODISP {
             let client = (*ent).client as *mut gclient_t;
             if (*client).medSupplyDebounce < level_time {
-                // PORT-NOTE(missing-weapondata-table): weaponData and ammoData tables are not ported.
-                // The oracle uses them to index ammunition and get weapon properties. Cannot complete
-                // without these tables. Ammo increment logic deferred.
+                // do the next increment; based on the amount of ammo used per normal shot.
+                let tclient = (*target).client as *mut gclient_t;
+                let weap = (*tclient).ps.weapon as usize;
+                let ammo_index = weaponData[weap].ammoIndex as usize;
+                (*tclient).ps.ammo[ammo_index] += weaponData[weap].energyPerShot;
 
-                // Placeholder: skip ammo increment until weaponData/ammoData are available
-                (*client).medSupplyDebounce = level_time + 1000; // default delay
+                if (*tclient).ps.ammo[ammo_index] > ammoData[ammo_index].max {
+                    // cap it off
+                    (*tclient).ps.ammo[ammo_index] = ammoData[ammo_index].max;
+                }
+
+                // base the next supply time on how long the weapon takes to fire.
+                (*client).medSupplyDebounce = level_time + weaponData[weap].fireTime;
             }
             let client = (*target).client as *mut gclient_t;
             (*client).isMedSupplied = level_time + 500;
@@ -1616,7 +1623,8 @@ pub fn G_CanUseDispOn(ctx: GameContext<'_>, ent: *mut gentity_t, dispType: c_int
         const STAT_HEALTH: usize = 0;
         const STAT_MAX_HEALTH: usize = 1;
         const WP_NONE: c_int = 0;
-        const LAST_USEABLE_WEAPON: c_int = 16; // placeholder
+        // Raven `LAST_USEABLE_WEAPON` == `WP_BRYAR_OLD` (q_shared.h).
+        const LAST_USEABLE_WEAPON: c_int = WP_BRYAR_OLD;
 
         //dead or invalid
         if ent.is_null()
@@ -1637,11 +1645,18 @@ pub fn G_CanUseDispOn(ctx: GameContext<'_>, ent: *mut gentity_t, dispType: c_int
         } else if dispType == HI_AMMODISP {
             let client = (*ent).client as *mut gclient_t;
             if (*client).ps.weapon <= WP_NONE || (*client).ps.weapon > LAST_USEABLE_WEAPON {
+                // not a player-useable weapon
                 return 0;
             }
 
-            // PORT-NOTE(missing-weapondata-table): weaponData and ammoData tables not available.
-            // Cannot complete ammo check without these tables. Returning 0 as placeholder.
+            let weap = (*client).ps.weapon as usize;
+            let ammo_index = weaponData[weap].ammoIndex as usize;
+            if (*client).ps.ammo[ammo_index] < ammoData[ammo_index].max {
+                // needs more ammo for current weapon
+                return 1;
+            }
+
+            // needs none
             return 0;
         }
 
@@ -1653,14 +1668,13 @@ pub fn G_CanUseDispOn(ctx: GameContext<'_>, ent: *mut gentity_t, dispType: c_int
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1546-1602`
 pub fn TryHeal(ctx: GameContext<'_>, ent: *mut gentity_t, target: *mut gentity_t) -> qboolean {
-    const GT_SIEGE: c_int = 4; // placeholder
-    const SOLID_BMODEL: c_int = 3; // placeholder
-    const CHAN_AUTO: c_int = 0; // placeholder
-    const BOTH_BUTTON_HOLD: c_int = 0; // placeholder
-    const BOTH_CONSOLE1: c_int = 0; // placeholder
-    const SETANIM_TORSO: c_int = 2; // placeholder
-    const SETANIM_FLAG_OVERRIDE: c_int = 1; // placeholder
-    const SETANIM_FLAG_HOLD: c_int = 2; // placeholder
+    use mp_bg::public::anim_number::animNumber_t;
+    use mp_bg::public::gametype::GT_SIEGE;
+    use mp_bg::public::set_anim::{SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE, SETANIM_TORSO};
+    use mp_qshared::shared::sound_channel::CHAN_AUTO;
+    const SOLID_BMODEL: c_int = crate::bg_slidemove::SOLID_BMODEL;
+    const BOTH_BUTTON_HOLD: c_int = animNumber_t::BOTH_BUTTON_HOLD as c_int;
+    const BOTH_CONSOLE1: c_int = animNumber_t::BOTH_CONSOLE1 as c_int;
 
     unsafe {
         let world = &*ctx.world;
@@ -1670,7 +1684,7 @@ pub fn TryHeal(ctx: GameContext<'_>, ent: *mut gentity_t, target: *mut gentity_t
         }
 
         let client = (*ent).client as *mut gclient_t;
-        if world.cvars.g_gametype.value as c_int != GT_SIEGE
+        if world.cvars.g_gametype.integer != GT_SIEGE
             || (*client).siegeClass == -1
             || target.is_null()
             || (*target).inuse == qfalse
@@ -1680,44 +1694,76 @@ pub fn TryHeal(ctx: GameContext<'_>, ent: *mut gentity_t, target: *mut gentity_t
             || (*target).health <= 0
             || (*target).health >= (*target).maxHealth
         {
+            // it's not dead yet...
             return qfalse;
         }
 
-        // PORT-NOTE(missing-bgSiegeClasses): bgSiegeClasses table is not ported.
-        // Cannot access siege class data. Returning false as placeholder.
-        // The oracle body accesses: siegeClass_t *scl = &bgSiegeClasses[ent->client->siegeClass];
-        // and then checks: if (!Q_stricmp(scl->name, target->healingclass))
-        return qfalse;
+        let scl = &world.bg_state.bgSiegeClasses[(*client).siegeClass as usize];
 
-        // Deferred logic (waiting for bgSiegeClasses):
-        // if (!Q_stricmp(scl->name, target->healingclass)) {
-        //     if (target->healingDebounce < level.time) {
-        //         target->health += 10;
-        //         if (target->health > target->maxHealth) {
-        //             target->health = target->maxHealth;
-        //         }
-        //         target->healingDebounce = level.time + target->healingrate;
-        //         if (target->healingsound && target->healingsound[0]) {
-        //             if (target->s.solid == SOLID_BMODEL) {
-        //                 G_Sound(ent, CHAN_AUTO, G_SoundIndex(target->healingsound));
-        //             } else {
-        //                 G_Sound(target, CHAN_AUTO, G_SoundIndex(target->healingsound));
-        //             }
-        //         }
-        //         G_ScaleNetHealth(target);
-        //         if (target->target_ent && (*target->target_ent).maxHealth > 0) {
-        //             (*target->target_ent).health = target->health;
-        //             G_ScaleNetHealth(target->target_ent);
-        //         }
-        //     }
-        //     if (client->ps.torsoAnim == BOTH_BUTTON_HOLD || client->ps.torsoAnim == BOTH_CONSOLE1) {
-        //         client->ps.torsoTimer = 500;
-        //     } else {
-        //         G_SetAnim(ent, NULL, SETANIM_TORSO, BOTH_BUTTON_HOLD, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0);
-        //     }
-        //     return qtrue;
-        // }
-        // return qfalse;
+        if Q_stricmp(scl.name.as_ptr(), (*target).healingclass) == 0 {
+            // this thing can be healed by the class this player is using
+            if (*target).healingDebounce < world.level.time {
+                // do the actual heal
+                (*target).health += 10;
+                if (*target).health > (*target).maxHealth {
+                    // don't go too high
+                    (*target).health = (*target).maxHealth;
+                }
+                (*target).healingDebounce = world.level.time + (*target).healingrate;
+                if !(*target).healingsound.is_null() && *(*target).healingsound != 0 {
+                    // play it
+                    if (*target).s.solid == SOLID_BMODEL {
+                        // ok, well, just play it on the client then.
+                        G_Sound(
+                            ctx,
+                            ent,
+                            CHAN_AUTO as c_int,
+                            G_SoundIndex((*target).healingsound),
+                        );
+                    } else {
+                        G_Sound(
+                            ctx,
+                            target,
+                            CHAN_AUTO as c_int,
+                            G_SoundIndex((*target).healingsound),
+                        );
+                    }
+                }
+
+                // update net health for bar
+                G_ScaleNetHealth(target);
+                let target_ent = match (*target).target_ent {
+                    Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+                    None => core::ptr::null_mut(),
+                };
+                if !target_ent.is_null() && (*target_ent).maxHealth != 0 {
+                    (*target_ent).health = (*target).health;
+                    G_ScaleNetHealth(target_ent);
+                }
+            }
+
+            // keep them in the healing anim even when the healing debounce is not yet expired
+            if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD
+                || (*client).ps.torsoAnim == BOTH_CONSOLE1
+            {
+                // extend the time
+                (*client).ps.torsoTimer = 500;
+            } else {
+                G_SetAnim(
+                    ctx,
+                    ent,
+                    core::ptr::null_mut(),
+                    SETANIM_TORSO,
+                    BOTH_BUTTON_HOLD,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    0,
+                );
+            }
+
+            return qtrue;
+        }
+
+        qfalse
     }
 }
 

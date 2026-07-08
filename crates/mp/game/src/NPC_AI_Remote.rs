@@ -313,12 +313,19 @@ pub fn Remote_Fire(ctx: GameContext<'_>) {
     let mut vright: vec3_t = [0.0; 3];
     let mut up: vec3_t = [0.0; 3];
 
-    // PORT-NOTE(static-vec3-locals): Raven used static vec3_t arrays for caching; using local vars here
+    // PORT-NOTE(static-vec3-locals): the oracle's `static vec3_t forward, vright, up`
+    // / `muzzle` carry no meaningful cross-call state — `forward/vright/up` are fully
+    // rewritten by `AngleVectors` every call and `muzzle` is unused — so plain locals
+    // are byte-faithful. `enemy_org1` is a plain local in the oracle too (not static).
+    // The oracle calls `CalcEntitySpot(NPC->enemy, ...)` unconditionally; `CalcEntitySpot`
+    // early-returns on a null `ent`, leaving `enemy_org1` untouched, so mirror that with
+    // an unconditional call passing a null pointer when there is no enemy.
     unsafe {
-        if let Some(enemy_id) = (*npc).enemy {
-            let enemy_ent = &mut (*ctx.world).g_entities[enemy_id.0 as usize] as *mut gentity_t;
-            crate::NPC_utils::CalcEntitySpot(ctx, enemy_ent, SPOT_HEAD, &mut enemy_org1);
-        }
+        let enemy_ent: *const gentity_t = match (*npc).enemy {
+            Some(enemy_id) => &(*ctx.world).g_entities[enemy_id.0 as usize] as *const gentity_t,
+            None => core::ptr::null(),
+        };
+        crate::NPC_utils::CalcEntitySpot(ctx, enemy_ent, SPOT_HEAD, &mut enemy_org1);
     }
 
     crate::q_math::_VectorCopy(unsafe { (*npc).r.currentOrigin }, &mut muzzle1);

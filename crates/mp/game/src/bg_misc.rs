@@ -1403,6 +1403,8 @@ pub fn BG_ValidateSkinForTeam(
     skinName: *mut c_char,
     team: c_int,
     colors: *mut f32,
+    bg: &BgState,
+    traps: &dyn BgTraps,
 ) -> qboolean {
     unsafe {
         let model_name = cstr_to_string(modelName);
@@ -1453,10 +1455,14 @@ pub fn BG_ValidateSkinForTeam(
                     }
                     write_cstr_truncated(skinName, max_qpath, &skin);
                     // if file does not exist, set to "red"
-                    // PORT-NOTE(escalation-resolution): BG_FileExists requires &dyn BgTraps
-                    // which this function signature cannot carry.
-                    // Conservatively assume file does not exist and fall back to "red".
-                    write_cstr_truncated(skinName, max_qpath, "red");
+                    let path = format!(
+                        "models/players/{}/model_{}.skin",
+                        model_name,
+                        skin
+                    );
+                    if BG_FileExists(cstr(&path).as_ptr(), bg, traps) == qfalse {
+                        write_cstr_truncated(skinName, max_qpath, "red");
+                    }
                     return qfalse;
                 }
             }
@@ -1484,10 +1490,15 @@ pub fn BG_ValidateSkinForTeam(
                         }
                     }
                     write_cstr_truncated(skinName, max_qpath, &skin);
-                    // PORT-NOTE(escalation-resolution): BG_FileExists requires &dyn BgTraps
-                    // which this function signature cannot carry.
-                    // Conservatively assume file does not exist and fall back to "blue".
-                    write_cstr_truncated(skinName, max_qpath, "blue");
+                    // if file does not exist, set to "blue"
+                    let path = format!(
+                        "models/players/{}/model_{}.skin",
+                        model_name,
+                        skin
+                    );
+                    if BG_FileExists(cstr(&path).as_ptr(), bg, traps) == qfalse {
+                        write_cstr_truncated(skinName, max_qpath, "blue");
+                    }
                     return qfalse;
                 }
             }

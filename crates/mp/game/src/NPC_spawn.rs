@@ -2936,6 +2936,9 @@ pub fn NPC_Spawn_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:4045-4170`
 pub fn NPC_Kill_f(ctx: GameContext<'_>) {
+    // Raven `TeamNames[TEAM_NUM_TEAMS]` (NPC_stats.c:133), the NPC team_t names
+    // (the many commented-out Trek-era entries collapse to these three).
+    const TEAM_NAMES: [&str; TEAM_NUM_TEAMS as usize] = ["", "player", "enemy", "neutral"];
     let mut name: [u8; 1024] = [0; 1024];
     let mut kill_team: team_t = TEAM_FREE;
     let mut kill_non_sf = 0u32;
@@ -2979,8 +2982,10 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
             );
             Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
             for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
-                // PORT-NOTE(unresolved): TeamNames array access
-                // Com_Printf(c"%s\n".as_ptr() as *const c_char, TeamNames[n]);
+                // Raven `TeamNames[]` (NPC_stats.c:133) — the NPC team_t names.
+                Com_Printf(
+                    cstr(&format!("{}\n", TEAM_NAMES[n as usize])).as_ptr(),
+                );
             }
             Com_Printf(c"nonally - kills all but your teammates\n".as_ptr() as *const c_char);
             return;
@@ -3006,7 +3011,10 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                 );
                 Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
                 for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
-                    // PORT-NOTE(unresolved): TeamNames array access
+                    // Raven `TeamNames[]` (NPC_stats.c:133) — the NPC team_t names.
+                    Com_Printf(
+                        cstr(&format!("{}\n", TEAM_NAMES[n as usize])).as_ptr(),
+                    );
                 }
                 Com_Printf(c"nonally - kills all but your teammates\n".as_ptr() as *const c_char);
                 return;

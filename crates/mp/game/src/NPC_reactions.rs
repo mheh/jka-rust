@@ -390,11 +390,15 @@ pub fn NPC_ChoosePainAnimation(
             // Setup the timing for it
             let local_anim_index = (*self_).localAnimIndex;
             let num_frames = if pain_anim >= 0 {
-                // PORT-NOTE(bgAllAnims-access): accessing global bgAllAnims/bgHumanoidAnimations
-                // arrays through raw pointer arithmetic; these should be threaded via BgState
-                let anim_length = 30; // Placeholder; would need bgAllAnims[local_anim_index].anims[pain_anim].numFrames
-                let frame_lerp = 1; // Placeholder; would need bgHumanoidAnimations[pain_anim].frameLerp
-                anim_length * frame_lerp
+                // Oracle: animLength = bgAllAnims[self->localAnimIndex].anims[pain_anim].numFrames
+                //   * fabs((float)(bgHumanoidAnimations[pain_anim].frameLerp));
+                // numFrames comes from the skeleton-specific table, frameLerp from the
+                // humanoid table (they are intentionally different tables in the C source).
+                let bg = &(*ctx.world).bg_state;
+                let anims = bg.bgAllAnims[local_anim_index as usize].anims;
+                ((*anims.offset(pain_anim as isize)).numFrames as f32
+                    * (bg.bgHumanoidAnimations[pain_anim as usize].frameLerp as f32).abs())
+                    as c_int
             } else {
                 0
             };

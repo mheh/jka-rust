@@ -2809,9 +2809,9 @@ impl PmoveContext<'_> {
                     || anim == BOTH_WALKBACK2 as c_int
                     || anim == BOTH_WALK1 as c_int
                 {
-                    // PORT-NOTE(faithful-empty-branch): the oracle's `if`
-                    // (bg_saber.c:3950-3953) has an empty body here — transcribed
-                    // faithfully (no-op), not a missing case.
+                    // normal stance when walking backward so saber doesn't
+                    // look like it's cutting through leg (bg_saber.c:3950-3953)
+                    anim = self.PM_GetSaberStance();
                 }
                 if BG_InSlopeAnim(anim) != 0 {
                     anim = self.PM_GetSaberStance();
