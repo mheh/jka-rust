@@ -185,19 +185,21 @@ these; the linker demands them):
 ## Normalizations (documented divergences — porting-rules §19)
 
 - **Sound-index return values are 0 on both sides; only the registration
-  *names* are observable.** The port's `G_SoundIndex` is a documented
-  placeholder returning 0 (the configstring architecture is unwired), so every
-  `saberInfo_t` sound field (`soundOn`, `swingSound[]`, `hitSound[]`, …) is 0.
-  The oracle dumper's `G_SoundIndex` stub matches (returns 0). What *is*
-  pinned is the sequence of names `BG_SoundIndex` is called with (the `regsound`
-  log) — real parser behavior, identical on both sides. The port exposes this
-  order through a dormant thread-local observation seam (`saber_snd_tape_*` in
-  `bg_saberLoad.rs`); it only *observes* (return value unchanged), so production
-  behavior is byte-identical whether or not the tape is installed. Skins, by
-  contrast, cross the real `BgTraps` seam and so carry a genuine per-saber
-  counter (`skin` field + `regskin` log). This asymmetry — skins observable via
-  the wired seam, sounds only name-observable pending `G_SoundIndex` — is itself
-  the surfaced divergence.
+  *names* are observable.** The golden was authored when the port's
+  `G_SoundIndex` was a placeholder returning 0; the oracle dumper's stub
+  matches (returns 0), so every `saberInfo_t` sound field (`soundOn`,
+  `swingSound[]`, `hitSound[]`, …) is 0. The port's `G_SoundIndex` has since
+  been wired to real configstring registration, so `BG_SoundIndex` now pins
+  the normalized 0 **only while the test tape is installed** (`saber_snd_tape_*`
+  in `bg_saberLoad.rs`); production (tape `None`) takes the real path
+  untouched. What *is* pinned is the sequence of names `BG_SoundIndex` is
+  called with (the `regsound` log) — real parser behavior, identical on both
+  sides. Regenerating the golden against real indices (dumper stub registers
+  configstrings too) is a queued follow-up. Skins, by contrast, cross the real
+  `BgTraps` seam and so carry a genuine per-saber counter (`skin` field +
+  `regskin` log). This asymmetry — skins observable via the wired seam, sounds
+  only name-observable pending the golden regen — is itself the surfaced
+  divergence.
 - **The unclosed `broken_saber` block poisons not-found searches.** In the
   concatenated `SaberParms` buffer the truncated block has no closing `}`, so
   any full traversal (`SkipBracedSection`) runs `p` to `NULL` and the search

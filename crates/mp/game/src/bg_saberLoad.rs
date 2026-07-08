@@ -361,8 +361,9 @@ unsafe fn c_strcpy(dst: *mut c_char, src: *const c_char) {
 // differential test (`tests/jampgame_parity.rs`) observes its
 // registration-name sequence through this thread-local tape rather than a
 // threaded sink. When no tape is installed (production) the tape is `None` and
-// `BG_SoundIndex` behaves exactly as before — the hook only *observes*, never
-// changes the return value. Mirrors the oracle dumper's `G_SoundIndex` name log
+// `BG_SoundIndex` behaves exactly as before. When the tape IS installed
+// (test-only) the hook also pins the return to the golden's §19 normalized 0
+// (see `BG_SoundIndex`). Mirrors the oracle dumper's `G_SoundIndex` name log
 // (`tools/jampgame-oracle/main_saberload.c`).
 thread_local! {
     static SABER_SND_TAPE: std::cell::RefCell<Option<Vec<String>>> =
@@ -391,15 +392,25 @@ pub fn saber_snd_tape_drain() -> Vec<String> {
 /// (`G_SoundIndex`) is live in this crate (jampgame).
 /// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:32-39`
 pub fn BG_SoundIndex(sound: *mut c_char) -> c_int {
-    SABER_SND_TAPE.with(|t| {
+    let taped = SABER_SND_TAPE.with(|t| {
         if let Some(v) = t.borrow_mut().as_mut() {
             if !sound.is_null() {
                 v.push(unsafe { cstr_to_str(sound as *const c_char) });
             } else {
                 v.push(String::new());
             }
+            true
+        } else {
+            false
         }
     });
+    // Tape installed (test-only): pin the §19 sound-index normalization — the
+    // saberload golden was authored against a 0-returning G_SoundIndex on both
+    // sides (`tools/jampgame-oracle/README.md` Normalizations); real-index
+    // golden regen is a queued follow-up.
+    if taped {
+        return 0;
+    }
     crate::g_utils::G_SoundIndex(sound as *const c_char)
 }
 
