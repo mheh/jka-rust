@@ -61,28 +61,8 @@ use mp_bg::public::entity_event::entity_event_t::{
 };
 use mp_bg::public::weaponstate::weaponstate_t::WEAPON_READY;
 
-// Combat point search flags (file-scope consts, mirroring the
-// NPC_AI_Sniper.rs precedent — each AI file replicates its own copy of
-// these #defines).
-// Source: `oracle/oracle/codemp/game/b_local.h:243-263`
-pub const CP_ANY: c_int = 0x0000_0000;
-pub const CP_COVER: c_int = 0x0000_0001;
-const CP_CLEAR: c_int = 0x0000_0002;
-pub const CP_FLEE: c_int = 0x0000_0004;
-pub const CP_DUCK: c_int = 0x0000_0008;
-const CP_NEAREST: c_int = 0x0000_0010;
-pub const CP_AVOID_ENEMY: c_int = 0x0000_0020;
-pub const CP_INVESTIGATE: c_int = 0x0000_0040;
-pub const CP_SQUAD: c_int = 0x0000_0080;
-pub const CP_AVOID: c_int = 0x0000_0100;
-const CP_APPROACH_ENEMY: c_int = 0x0000_0200;
-const CP_CLOSEST: c_int = 0x0000_0400;
-const CP_FLANK: c_int = 0x0000_0800;
-const CP_HAS_ROUTE: c_int = 0x0000_1000;
-pub const CP_SAFE: c_int = 0x0000_4000;
-const CP_HORZ_DIST_COLL: c_int = 0x0000_8000;
-pub const CP_RETREAT: c_int = 0x0002_0000;
-pub const CPF_DUCK: c_int = 0x0000_0001;
+// Combat point search flags: `crate::npc::combat_point_flags`
+// (`b_local.h:243-264`).
 
 // File-scope constants (`#define`).
 // Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:19-34`

@@ -94,6 +94,7 @@ pub use crate::g_target::Q3_SCRIPT_DIR;
 pub use crate::level::damage_flags::*;
 pub use crate::npc::ai_flags::*;
 pub use crate::npc::check_flags::*;
+pub use crate::npc::combat_point_flags::*;
 pub use crate::npc::script_flags::*;
 pub use crate::npc::squad_state::*;
 pub use crate::q_math::{
@@ -448,7 +449,6 @@ pub use mp_qshared::shared::wpobject::MAX_NEIGHBOR_SIZE; // .claude/worktrees/ag
 // two modules (same values) so the glob re-exports above are unambiguous, until
 // the duplicate-const consolidation sweep removes one copy of each.
 pub use crate::npc::squad_state::NUM_SQUAD_STATES;
-pub use crate::NPC_AI_Stormtrooper::CPF_DUCK;
 pub use mp_bg::public::configstring::{CS_CLIENT_JEDIMASTER, CS_ITEMS};
 pub use mp_qshared::common::mp::qcommon::task_id_t::taskID_t::NUM_TIDS;
 

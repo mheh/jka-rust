@@ -2346,24 +2346,8 @@ pub fn CP_FindCombatPointWaypoints(ctx: GameContext<'_>) {
     }
 }
 
-// Raven `CP_*` request-flag bits (`b_local.h:244-261`) — not yet ported as a
-// central const family; inlined here from the header values (per-file
-// precedent, `NPC_AI_Stormtrooper.rs` keeps its own private copy too).
-const CP_COVER: c_int = 0x0000_0001;
-const CP_CLEAR: c_int = 0x0000_0002;
-const CP_FLEE: c_int = 0x0000_0004;
-const CP_DUCK: c_int = 0x0000_0008;
-const CP_NEAREST: c_int = 0x0000_0010;
-const CP_AVOID_ENEMY: c_int = 0x0000_0020;
-const CP_INVESTIGATE: c_int = 0x0000_0040;
-const CP_SQUAD: c_int = 0x0000_0080;
-const CP_AVOID: c_int = 0x0000_0100;
-const CP_APPROACH_ENEMY: c_int = 0x0000_0200;
-const CP_FLANK: c_int = 0x0000_0800;
-const CP_HAS_ROUTE: c_int = 0x0000_1000;
-const CP_HORZ_DIST_COLL: c_int = 0x0000_8000;
-const CP_NO_PVS: c_int = 0x0001_0000;
-const CP_RETREAT: c_int = 0x0002_0000;
+// Raven `CP_*` request-flag bits: `crate::npc::combat_point_flags`
+// (`b_local.h:243-261`).
 
 /// `combatPt_t` — local mirror of the oracle's file-local `typedef struct
 /// { float dist; int index; } combatPt_t` used only as the collector's
@@ -2725,13 +2709,8 @@ pub fn NPC_FindCombatPoint(
 const ENTITYNUM_NONE_LOCAL: c_int = mp_qshared::shared::ENTITYNUM_NONE;
 
 // Raven `CPF_DUCK`/`CPF_FLEE`/`CPF_INVESTIGATE`/`CPF_SQUAD`
-// (`combatPoint_t::flags` bits) — not yet ported as central consts; inlined
-// here from the header values (per-file-copy precedent, `NPC_AI_Stormtrooper.rs`).
-// Source: `oracle/oracle/codemp/game/b_local.h:264-267`
-pub const CPF_DUCK: c_int = 0x00000001;
-pub const CPF_FLEE: c_int = 0x00000002;
-pub const CPF_INVESTIGATE: c_int = 0x00000004;
-pub const CPF_SQUAD: c_int = 0x00000008;
+// (`combatPoint_t::flags` bits): `crate::npc::combat_point_flags`
+// (`b_local.h:264-267`).
 
 // `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
 // via the prelude glob (no per-file copy).

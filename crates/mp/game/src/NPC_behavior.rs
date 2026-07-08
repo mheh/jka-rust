@@ -54,13 +54,8 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::common::mp::entity_id::ent_id_opt;
 use mp_qshared::shared::MASK_SHOT;
 
-// Combat point search flags (per-file-scope-copy convention, matching the
-// `NPC_AI_Stormtrooper.rs`/`NPC_combat.rs` precedent).
-// Source: `oracle/oracle/codemp/game/b_local.h:244-260`
-const CP_COVER: c_int = 0x0000_0001;
-const CP_AVOID: c_int = 0x0000_0100;
-const CP_HAS_ROUTE: c_int = 0x0000_1000;
-const CP_NO_PVS: c_int = 0x0001_0000;
+// Combat point search flags: `crate::npc::combat_point_flags`
+// (`b_local.h:244-260`).
 
 // Raven `MIN_ANGLE_ERROR` (`b_local.h`, the facing gate in `NPC_BSJump`).
 // Source: `oracle/oracle/codemp/game/b_local.h:29`

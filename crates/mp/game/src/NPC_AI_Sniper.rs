@@ -60,17 +60,8 @@ const SQUAD_TRANSITION: i32 = 4;
 const SQUAD_POINT: i32 = 5;
 const SQUAD_SCOUT: i32 = 6;
 
-// Combat point search flags (`combatPoint_t` request bits) — shared
-// `b_local.h` family scattered across NPC files; kept file-local pending a
-// shared home.
-// Source: `oracle/oracle/codemp/game/b_local.h:244-259`
-const CP_CLEAR: c_int = 0x00000002; // Has a clear shot to the enemy
-const CP_NEAREST: c_int = 0x00000010; // Find the nearest combat point
-const CP_APPROACH_ENEMY: c_int = 0x00000200; // Try to get closer to enemy
-const CP_CLOSEST: c_int = 0x00000400; // Take closest to enemy
-const CP_FLANK: c_int = 0x00000800; // Pick a combatPoint behind enemy
-const CP_HAS_ROUTE: c_int = 0x00001000; // We have a route to this point
-const CP_HORZ_DIST_COLL: c_int = 0x00008000; // Collect within horizontal dist
+// Combat point search flags (`combatPoint_t` request bits):
+// `crate::npc::combat_point_flags` (`b_local.h:244-259`).
 
 // Enemy position lagging for sniper targeting. MAX_ENEMY_POS_LAG /
 // ENEMY_POS_LAG_INTERVAL imported from `crate::npc::g_npc_t`. STEPS is kept
