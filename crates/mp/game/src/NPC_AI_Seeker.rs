@@ -15,10 +15,12 @@ use mp_qshared::shared::{CONTENTS_LIGHTSABER, MASK_SHOT};
 const VELOCITY_DECAY: f32 = 0.7f32;
 
 // Raven `#define MIN_MELEE_RANGE 320` / `MIN_MELEE_RANGE_SQR`.
+// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:10-11`
 const MIN_MELEE_RANGE: c_int = 320;
 const MIN_MELEE_RANGE_SQR: c_int = MIN_MELEE_RANGE * MIN_MELEE_RANGE;
 
 // Raven `#define MIN_DISTANCE 80` / `MIN_DISTANCE_SQR`.
+// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:13-14`
 const MIN_DISTANCE: c_int = 80;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 

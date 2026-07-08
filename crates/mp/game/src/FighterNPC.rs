@@ -39,14 +39,14 @@ use crate::q_math::{AngleNormalize180, AngleNormalize360, AngleSubtract};
 // depend on scattered cross-module imports.
 // Source: `oracle/oracle/codemp/game/{bg_public.h,bg_vehicles.h,FighterNPC.c}`.
 const HYPERSPACE_SPEED: f32 = 10000.0; // bg_public.h:1681
-const HYPERSPACE_TELEPORT_FRAC: f32 = 0.75; // bg_public.h
+const HYPERSPACE_TELEPORT_FRAC: f32 = 0.75; // bg_public.h:1680
 const HYPERSPACE_TIME: c_int = 4000; // bg_public.h:1679
 const FIGHTER_MIN_TAKEOFF_FRACTION: f32 = 0.7; // FighterNPC.c:369
-const MIN_LANDING_SLOPE: f32 = 0.8; // bg_vehicles.h
-const MIN_LANDING_SPEED: f32 = 200.0; // bg_public.h
-const MAX_STRAFE_TIME: f32 = 2000.0; // q_shared.h
-const EF2_HYPERSPACE: c_int = 1 << 5;
-const EF_JETPACK_ACTIVE: c_int = 1 << 11;
+const MIN_LANDING_SLOPE: f32 = 0.8; // bg_vehicles.h:400
+const MIN_LANDING_SPEED: f32 = 200.0; // bg_vehicles.h:399
+const MAX_STRAFE_TIME: f32 = 2000.0; // bg_vehicles.h:398
+const EF2_HYPERSPACE: c_int = 1 << 5; // bg_public.h:621
+const EF_JETPACK_ACTIVE: c_int = 1 << 11; // bg_public.h:584
 const EF_DEAD: c_int = 1 << 1; // bg_public.h:561
 const CHAN_AUTO: c_int = 0; // soundChannel_t CHAN_AUTO
                             // `vehFlags_t` masks as `u64` for `Vehicle_t::m_ulFlags`. Source: `bg_vehicles.h:417`.

@@ -38,8 +38,8 @@ use crate::entity::hit_location::HL_GENERIC1;
 // SCF_DONT_FIRE 0x800, SCF_FIRE_WEAPON 0x1000 vs the real 0x400/0x4000/0x40000),
 // which masked the wrong scriptFlags bits — a live bug — so they were removed.
 
-// Raven `FRAMETIME` (`bg_public.h`) = 100. Kept local (no central definition
-// exists yet; see consolidation note) — value matches the oracle.
+// Raven `FRAMETIME` (`g_local.h:37`) = 100. Kept local (single-owner header,
+// deliberately not consolidated; see consolidation note) — value matches the oracle.
 const FRAMETIME: c_int = 100;
 
 // Raven `NIF_COLLISION` (`navInfo_t::flags` bit) resolves to the canonical

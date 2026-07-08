@@ -21,7 +21,9 @@ const SENTRY_STRAFE_VEL: f32 = 256.0f32;
 const SENTRY_UPWARD_PUSH: f32 = 32.0f32;
 const SENTRY_FORWARD_BASE_SPEED: f32 = 10.0f32;
 const SENTRY_FORWARD_MULTIPLIER: f32 = 5.0f32;
-// MIN_DISTANCE 256; MIN_DISTANCE_SQR = 256*256.
+/// `MIN_DISTANCE` 256; `MIN_DISTANCE_SQR` = 256*256 (no separate `MIN_DISTANCE`
+/// const ported — only the squared form is used at call sites).
+/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:9-10`
 const MIN_DISTANCE_SQR: f32 = 65536.0f32;
 
 /// Sentry `localState` enum (anonymous enum local to this TU).

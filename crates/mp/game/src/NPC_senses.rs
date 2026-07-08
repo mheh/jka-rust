@@ -874,6 +874,9 @@ pub fn AddSightEvent(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:660-693`
 pub fn ClearPlayerAlertEvents(ctx: GameContext<'_>) {
+    // Raven `ALERT_CLEAR_TIME` — single-owner header, deliberately kept local
+    // (not consolidated; fn-local, not importable from here).
+    // Source: `oracle/oracle/codemp/game/b_local.h:164`
     pub const ALERT_CLEAR_TIME: c_int = 200;
 
     let world = unsafe { (&mut *ctx.world) };

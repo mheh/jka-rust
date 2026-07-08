@@ -32,6 +32,7 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 const MAX_DISTANCE: c_int = 1024;
 const MAX_DISTANCE_SQR: c_int = MAX_DISTANCE * MAX_DISTANCE;
 
+// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:11-12`
 const LSTATE_CLEAR: c_int = 0;
 const LSTATE_WAITING: c_int = 1;
 

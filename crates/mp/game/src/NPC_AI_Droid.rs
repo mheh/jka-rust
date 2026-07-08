@@ -27,17 +27,17 @@ use std::ffi::CStr;
 /// Local state enums.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:10-17`
 pub const LSTATE_NONE: c_int = 0;
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:12`
-pub const LSTATE_BACKINGUP: c_int = 1;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:13`
-pub const LSTATE_SPINNING: c_int = 2;
+pub const LSTATE_BACKINGUP: c_int = 1;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:14`
-pub const LSTATE_PAIN: c_int = 3;
+pub const LSTATE_SPINNING: c_int = 2;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:15`
+pub const LSTATE_PAIN: c_int = 3;
+/// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:16`
 pub const LSTATE_DROP: c_int = 4;
 
 /// Surface render status flag: turn off.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:84`
+/// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:7`
 const TURN_OFF: c_int = 0x00000100;
 
 /// Raven `R2D2_PartsMove`.

@@ -49,9 +49,9 @@ const qfalse: qboolean = 0;
 pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
     // `EF_DISINTEGRATION` (entity_effects) and `CONTENTS_TRIGGER` (surface_flags)
     // resolve to their canonical workspace consts through the prelude glob.
-    // `ALERT_CLEAR_TIME` (b_local.h = 200) has no importable module-level home
-    // yet (the peer copy in NPC_senses.rs is fn-local), so it stays local.
-    // Source: oracle/oracle/codemp/game/b_local.h
+    // `ALERT_CLEAR_TIME` — single-owner header, deliberately kept local (not
+    // consolidated; the peer copy in NPC_senses.rs is fn-local too).
+    // Source: `oracle/oracle/codemp/game/b_local.h:164`
     const ALERT_CLEAR_TIME: c_int = 200;
 
     unsafe {
@@ -132,8 +132,8 @@ pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC.c:115-223`
 pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: *mut gentity_t) {
     // `EF_DISINTEGRATION` (entity_effects) resolves via the prelude glob.
-    // Raven `bg_public.h`: `#define FRAMETIME 100` — no central const yet, kept
-    // local (consolidation candidate).
+    // Raven `g_local.h:37`: `#define FRAMETIME 100` — single-owner header,
+    // deliberately kept local (not consolidated).
     const FRAMETIME: c_int = 100;
     // Raven `entity_effects.rs` doesn't yet re-export `EF2_HELD_BY_MONSTER`
     // through the prelude glob — imported explicitly below.
@@ -477,7 +477,8 @@ pub fn pitch_roll_for_slope(
 /// Source: `oracle/oracle/codemp/game/NPC.c:478-607`
 pub fn DeadThink(ctx: GameContext<'_>) {
     // `CONTENTS_NODROP` (surface_flags) resolves via the prelude glob.
-    // `FRAMETIME` (bg_public.h = 100) kept local — no central const (consolidation candidate).
+    // `FRAMETIME` (`g_local.h:37` = 100) — single-owner header, deliberately
+    // kept local (not consolidated).
     const FRAMETIME: c_int = 100;
 
     unsafe {
@@ -1694,7 +1695,8 @@ pub fn G_DroidSounds(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC.c:1826-1979`
 pub fn NPC_Think(ctx: GameContext<'_>, self_: *mut gentity_t) {
     // `PMF_FOLLOW` (pm_flags) resolves to its canonical const via the prelude glob.
-    // `FRAMETIME` (bg_public.h = 100) kept local — no central const (consolidation candidate).
+    // `FRAMETIME` (`g_local.h:37` = 100) — single-owner header, deliberately
+    // kept local (not consolidated).
     const FRAMETIME: c_int = 100;
     use mp_bg::vehicles::vehicle_s::Vehicle_t;
 
