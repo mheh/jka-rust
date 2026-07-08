@@ -2,10 +2,9 @@
 
 use mp_qshared::shared::vec3_t;
 
-/// Light Style Constants.
-///
-/// Source: `oracle/oracle/codemp/qcommon/qfiles.h:497`
-const MAXLIGHTMAPS: usize = 4;
+// `MAXLIGHTMAPS` (`qfiles.h:500`) imported from its canonical home on
+// `drawVert_t` in the same crate.
+use super::draw_vert_t::MAXLIGHTMAPS;
 
 /// Raven `dsurface_t` — on-disk BSP surface (drawsurface) record.
 ///

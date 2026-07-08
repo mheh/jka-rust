@@ -4,7 +4,7 @@ use std::os::raw::c_char;
 
 use mp_engine_qcommon::qcommon::netadr_t::netadr_t;
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
-use mp_qshared::shared::{fileHandle_t, qboolean, MAX_QPATH, MAX_STRING_CHARS};
+use mp_qshared::shared::{fileHandle_t, qboolean, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS};
 
 use super::rm_automap_symbol_t::rmAutomapSymbol_t;
 
@@ -22,10 +22,8 @@ const MAX_RELIABLE_COMMANDS: usize = 128;
 // Source: oracle/oracle/codemp/game/q_shared.h:395
 const MAX_OSPATH: usize = 1024;
 
-/// Raven `MAX_INFO_STRING`.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:384`
-const MAX_INFO_STRING: usize = 1024;
+// `MAX_INFO_STRING` (`q_shared.h:384`) imported from its canonical home in
+// `mp_qshared::shared`.
 
 /// Raven `MAX_HEIGHTMAP_SIZE`.
 ///

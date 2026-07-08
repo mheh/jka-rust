@@ -1,7 +1,8 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-// Source: oracle/oracle/codemp/qcommon/qfiles.h:310
-const MAXLIGHTMAPS: usize = 4;
+// `MAXLIGHTMAPS` (`qfiles.h:310`) imported from its canonical home on
+// `drawVert_t` in `mp_engine_qcommon`.
+use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
 
 /// Raven `mgrid_t` — per-vertex light-grid sample (ambient/direct light,
 /// styles, direction).

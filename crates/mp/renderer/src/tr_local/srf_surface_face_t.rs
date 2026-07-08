@@ -6,7 +6,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// `VERTEXSIZE` — non-`_XBOX` build: `6 + (MAXLIGHTMAPS * 3)` = 18 floats per point.
 ///
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:729`
+/// Source: `oracle/oracle/codemp/renderer/tr_local.h:730`
 const VERTEXSIZE: usize = 18;
 
 /// Raven `srfSurfaceFace_t` — planar surface (Q3 "face"), variable-sized.

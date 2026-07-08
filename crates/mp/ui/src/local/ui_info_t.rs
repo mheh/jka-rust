@@ -43,32 +43,32 @@ const MAX_MAPS: usize = 128;
 
 /// `MAX_TIERS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:590`
+/// Source: `oracle/oracle/codemp/ui/ui_local.h:589`
 const MAX_TIERS: usize = 16;
 
 /// `MAX_MODS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:591`
+/// Source: `oracle/oracle/codemp/ui/ui_local.h:590`
 const MAX_MODS: usize = 64;
 
 /// `MAX_DEMOS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:592`
+/// Source: `oracle/oracle/codemp/ui/ui_local.h:591`
 const MAX_DEMOS: usize = 256;
 
 /// `MAX_MOVIES`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:593`
+/// Source: `oracle/oracle/codemp/ui/ui_local.h:592`
 const MAX_MOVIES: usize = 256;
 
 /// `MAX_SCROLLTEXT_SIZE`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:597`
+/// Source: `oracle/oracle/codemp/ui/ui_local.h:596`
 const MAX_SCROLLTEXT_SIZE: usize = 4096;
 
 /// `MAX_SCROLLTEXT_LINES`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:598`
+/// Source: `oracle/oracle/codemp/ui/ui_local.h:597`
 const MAX_SCROLLTEXT_LINES: usize = 64;
 
 /// `MAX_ADDRESSLENGTH`.
@@ -78,7 +78,7 @@ const MAX_ADDRESSLENGTH: usize = 64;
 
 /// `MAX_FOUNDPLAYER_SERVERS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:576`
+/// Source: `oracle/oracle/codemp/ui/ui_local.h:580`
 const MAX_FOUNDPLAYER_SERVERS: usize = 16;
 
 /// `MAX_Q3PLAYERMODELS`.

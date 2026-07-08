@@ -2,6 +2,9 @@
 
 use core::ffi::c_char;
 
+// `MAXLIGHTMAPS` (`qfiles.h`) imported from its canonical home on `drawVert_t`
+// in `mp_engine_qcommon`.
+use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
 use mp_qshared::shared::{vec3_t, MAX_QPATH};
 
 use super::cull_type_t::cullType_t;
@@ -11,7 +14,9 @@ use super::fog_pass_t::fogPass_t;
 use super::shader_stage_t::shaderStage_t;
 use super::sky_parms_t::skyParms_t;
 
-const MAXLIGHTMAPS: usize = 4;
+/// Raven `MAX_SHADER_DEFORMS`.
+///
+/// Source: `oracle/oracle/codemp/renderer/tr_local.h:309`
 const MAX_SHADER_DEFORMS: usize = 3;
 
 /// Raven `shader_t` — compiled shader definition.

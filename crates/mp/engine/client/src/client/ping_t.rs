@@ -3,9 +3,7 @@
 use std::os::raw::c_char;
 
 use mp_engine_qcommon::qcommon::netadr_t::netadr_t;
-
-/// Raven `MAX_INFO_STRING`.
-const MAX_INFO_STRING: usize = 1024;
+use mp_qshared::shared::MAX_INFO_STRING;
 
 /// Raven `ping_t` — a pending server ping request/response record.
 ///

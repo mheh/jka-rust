@@ -5,15 +5,13 @@ use core::ffi::c_char;
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
-use mp_qshared::shared::{fileHandle_t, qboolean, MAX_QPATH, MAX_STRING_CHARS};
+use mp_qshared::shared::{fileHandle_t, qboolean, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS};
 
 use super::client_snapshot_t::clientSnapshot_t;
 use super::client_state_t::clientState_t;
 
-/// Raven `MAX_INFO_STRING`.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:384`
-const MAX_INFO_STRING: usize = 1024;
+// `MAX_INFO_STRING` (`q_shared.h:384`) imported from its canonical home in
+// `mp_qshared::shared`.
 
 /// Raven `MAX_RELIABLE_COMMANDS` — max string commands buffered for retransmit.
 ///

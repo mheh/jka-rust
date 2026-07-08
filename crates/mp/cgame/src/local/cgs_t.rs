@@ -3,6 +3,7 @@
 use core::ffi::c_char;
 use core::ffi::c_void;
 
+use mp_bg::public::configstring::{MAX_FX, MAX_ICONS, MAX_MODELS, MAX_SOUNDS};
 use mp_bg::public::gametype::gametype_t;
 use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
 use mp_qshared::shared::{
@@ -13,25 +14,9 @@ use super::cg_effects_t::cgEffects_t;
 use super::cg_media_t::cgMedia_t;
 use super::client_info_t::clientInfo_t;
 
-/// Raven `MAX_MODELS` — sent over the net as -12 bits, so cannot be blindly increased.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2020`
-pub const MAX_MODELS: usize = 512;
-
-/// Raven `MAX_SOUNDS`.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2021`
-pub const MAX_SOUNDS: usize = 256;
-
-/// Raven `MAX_ICONS` — max registered icons you can have per map.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2022`
-pub const MAX_ICONS: usize = 64;
-
-/// Raven `MAX_FX` — max effects strings, I'm hoping that 64 will be plenty.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2023`
-pub const MAX_FX: usize = 64;
+// `MAX_MODELS`/`MAX_SOUNDS`/`MAX_ICONS`/`MAX_FX` are the shared configstring
+// limits (`q_shared.h:2020-2023`); imported from their canonical home in
+// `mp_bg::public::configstring` (`c_int`, cast to `usize` at the array sites).
 
 /// Raven `MAX_STRING_TOKENS` — max tokens resulting from Cmd_TokenizeString.
 ///
@@ -122,14 +107,14 @@ pub struct cgs_t {
     //
     // locally derived information from gamestate
     //
-    pub gameModels: [qhandle_t; MAX_MODELS],
-    pub gameSounds: [sfxHandle_t; MAX_SOUNDS],
-    pub gameEffects: [fxHandle_t; MAX_FX],
-    pub gameIcons: [qhandle_t; MAX_ICONS],
+    pub gameModels: [qhandle_t; MAX_MODELS as usize],
+    pub gameSounds: [sfxHandle_t; MAX_SOUNDS as usize],
+    pub gameEffects: [fxHandle_t; MAX_FX as usize],
+    pub gameIcons: [qhandle_t; MAX_ICONS as usize],
 
     pub numInlineModels: i32,
-    pub inlineDrawModel: [qhandle_t; MAX_MODELS],
-    pub inlineModelMidpoints: [vec3_t; MAX_MODELS],
+    pub inlineDrawModel: [qhandle_t; MAX_MODELS as usize],
+    pub inlineModelMidpoints: [vec3_t; MAX_MODELS as usize],
 
     pub clientinfo: [clientInfo_t; MAX_CLIENTS],
 
