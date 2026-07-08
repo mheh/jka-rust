@@ -78,6 +78,57 @@ RAVEN_MODULES = {
                            "codemp/qcommon/timing.h", "codemp/server/server.h"],
         includes=["codemp/qcommon", "codemp/game", "codemp/server", "codemp"],
         defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
+    # DEDICATED-SERVER function sweep (WinDed.vcproj Release). Unlike mp-engine
+    # (header-only type sweep), this carries a srcglob so fnsweep.py can unity-
+    # parse whole-subsystem .cpp bodies. Defines mirror WinDed Release exactly:
+    #   WIN32,NDEBUG,_CONSOLE,DEDICATED,BOTLIB,_WINDOWS
+    # WIN32/_CONSOLE/_WINDOWS dropped per NOTES decision #1 (gate macros/asm,
+    # not layouts/bodies); DEDICATED+BOTLIB kept — DEDICATED is the whole point
+    # (it #ifndef's out the client/GL/sound halves of qcommon/server/renderer,
+    # leaving exactly the headless host + server-side model/G2 loading). NB the
+    # WinDed *Release* config oddly omits _JK2/MISSIONPACK (its Debug config has
+    # _JK2); kept faithful. The whole engine is C++ (.cpp), so lang=c++.
+    # srcglob is the WinDed compile set minus win32/null-device/vendored:
+    #   qcommon+server+ghoul2+botlib+icarus+RMG in full, plus the 9 renderer
+    #   sources WinDed links for server-side G2/model/shader loading
+    #   (tr_model/mesh/ghoul2/image/shader/init/main/backend + matcomp), which
+    #   compile down to their non-DEDICATED remainder. null_renderer/null_*
+    #   are the stub device layer (our Rust host supplies its own) — excluded.
+    # Renderer files pull tr_local.h->qgl.h->GL, so the glshim include dir +
+    # GL/win32 scalar-typedef defines from mp-renderer are merged in; -fdeclspec
+    # for tr_local's __declspec(align), -fno-operator-names for its `or` fields.
+    "mp-engine-ded": dict(
+        lang="c++", entry="codemp/qcommon/qcommon.h",
+        includes=["codemp/qcommon", "codemp/server", "codemp/botlib",
+                  "codemp/ghoul2", "codemp/icarus", "codemp/RMG",
+                  "codemp/renderer", "codemp/cgame", "codemp/game", "codemp",
+                  "../../tools/closure-prototype/glshim"],
+        defines=["NDEBUG", "DEDICATED", "BOTLIB",
+                 # win32 spellings the headers assume from an active platform
+                 # section (icarus tokenizer.h, RMG). Pointer-size handles keep
+                 # layout correct; only used where the sweep reads bodies.
+                 "LPCTSTR=const char *", "COLORREF=unsigned int",
+                 "DWORD=unsigned int", "WORD=unsigned short",
+                 "BYTE=unsigned char", "HANDLE=void *", "LPVOID=void *",
+                 # Raven leans on the MSVC case-insensitive str* spellings;
+                 # POSIX names them strcasecmp/strncasecmp (rescues RMG/icarus).
+                 "stricmp=strcasecmp", "strnicmp=strncasecmp",
+                 "USHORT=unsigned short", "BOOL=int", "UINT=unsigned int",
+                 "FLOAT=float", "HDC=void *", "HGLRC=void *",
+                 "DECLARE_HANDLE(name)=typedef void *name"],
+        # -fdeclspec for __declspec(align); -fno-operator-names for `or` fields.
+        # (q_shared SnapVector's MSVC __asm{} can't parse on an arm64 host —
+        # -fasm-blocks needs an x86 target which would break 64-bit layout
+        # parity — so clang drops that one header-inline and recovers; benign.)
+        flags=["-fdeclspec", "-fno-operator-names"],
+        srcglob=["codemp/qcommon/*.cpp", "codemp/server/*.cpp",
+                 "codemp/ghoul2/*.cpp", "codemp/botlib/*.cpp",
+                 "codemp/icarus/*.cpp", "codemp/RMG/*.cpp",
+                 "codemp/renderer/tr_model.cpp", "codemp/renderer/tr_mesh.cpp",
+                 "codemp/renderer/tr_ghoul2.cpp", "codemp/renderer/tr_image.cpp",
+                 "codemp/renderer/tr_shader.cpp", "codemp/renderer/tr_init.cpp",
+                 "codemp/renderer/tr_main.cpp", "codemp/renderer/tr_backend.cpp",
+                 "codemp/renderer/matcomp.c"]),
     # botlib headers assume the classic Q3 include order (q_shared -> l_* ->
     # aasfile -> botlib -> be_*); the entry list reproduces it.
     # NB: the botlib interface header is codemp/game/botlib.h (there is no
