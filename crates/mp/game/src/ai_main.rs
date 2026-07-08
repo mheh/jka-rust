@@ -6517,8 +6517,10 @@ pub fn Bot_SetForcedMovement(
 /// Raven `StandardBotAI`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5931-7483`
-// PORT-NOTE(preproc): FORCEJUMP_INSTANTMETHOD/BOT_STRAFE_AVOIDANCE undefined,
-// FINAL_BUILD undefined (the `bot_getinthecarrr` debug block is ported, matching
+// PORT-NOTE(preproc): FORCEJUMP_INSTANTMETHOD undefined (`ai_main.h:5` keeps it
+// commented out); BOT_STRAFE_AVOIDANCE IS defined (`ai_main.c:1548`) and its
+// gated block is ported (see `BotTrace_Strafe` call below). FINAL_BUILD
+// undefined (the `bot_getinthecarrr` debug block is ported, matching
 pub fn StandardBotAI(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32) {
     unsafe {
         let world = ctx.world;
@@ -7879,8 +7881,15 @@ pub fn StandardBotAI(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32)
                 (*bs).jumpTime = (lt + 100) as f32;
             } else if BotTrace_Duck(ctx, bs, (*bs).goalPosition) != 0 {
                 (*bs).duckTime = (lt + 100) as f32;
+            } else {
+                let strafeAround = BotTrace_Strafe(ctx, bs, (*bs).goalPosition);
+
+                if strafeAround == STRAFEAROUND_RIGHT {
+                    trap::EA_MoveRight(ctx.engine, BotlibEaMoveRightArgs::new((*bs).client));
+                } else if strafeAround == STRAFEAROUND_LEFT {
+                    trap::EA_MoveLeft(ctx.engine, BotlibEaMoveLeftArgs::new((*bs).client));
+                }
             }
-            // #ifdef BOT_STRAFE_AVOIDANCE block dropped (undefined)
         }
 
         // #ifndef FORCEJUMP_INSTANTMETHOD
