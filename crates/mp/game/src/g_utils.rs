@@ -59,17 +59,13 @@ use std::ffi::{CStr, CString};
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// Raven `#define PMF_TIME_KNOCKBACK 64` (`bg_public.h:409`) — the `pmFlags_t`
-// bitfield is not yet ported anywhere in the crate graph; defined locally
-// (house pattern, see `qtrue`/`qfalse` above) pending that backfill.
-// Source: `oracle/oracle/codemp/game/bg_public.h:409`
-const PMF_TIME_KNOCKBACK: c_int = 64;
-
-// Raven `#define SVF_BROADCAST 0x00000020` (`g_local.h`) — not yet ported as
-// a shared const (see `g_mover.rs:68` for the same local-const house pattern).
-// Source: `oracle/oracle/codemp/game/g_local.h`
-const SVF_BROADCAST: c_int = 0x0000_0020;
-
+// Raven `#define PMF_TIME_KNOCKBACK 64` (`bg_public.h:409`) and
+// `#define SVF_BROADCAST 0x00000020` (`g_local.h`) both resolve through the
+// prelude glob now — `PMF_TIME_KNOCKBACK` from
+// `mp_qshared::common::mp::qcommon::pm_flags` (`=64`) and `SVF_BROADCAST` from
+// `crate::g_public_consts` (`=0x0000_0020`); the earlier local shadow consts
+// (which claimed no canonical existed) are dropped in favor of those.
+// Source: `oracle/oracle/codemp/game/bg_public.h:409`, `g_local.h`
 use crate::game_globals::MAX_SHADER_REMAPS;
 
 /// Raven `strcpy(dest, src)` into a fixed-size `[c_char; N]` field — copies
