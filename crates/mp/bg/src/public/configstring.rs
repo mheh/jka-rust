@@ -145,6 +145,21 @@ pub const CS_BSP_MODELS: c_int = CS_TERRAINS + 1;
 
 pub const CS_MAX: c_int = CS_BSP_MODELS + 32;
 
+/// Raven `MAX_MODELS` — these are sent over the net as -12 bits.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:2020`
+pub const MAX_MODELS: c_int = 512;
+
+/// Raven `MAX_SOUNDS` — so they cannot be blindly increased.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:2021`
+pub const MAX_SOUNDS: c_int = 256;
+
+/// Raven `MAX_FX` — max effects strings.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:2023`
+pub const MAX_FX: c_int = 64;
+
 /// Raven `MAX_ICONS` — max registered icons you can have per map.
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.h:2022`

@@ -223,19 +223,16 @@ pub fn G_BoneIndex(ctx: GameContext<'_>, name: *const c_char) -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:108-130`
 pub fn G_ModelIndex(name: *const c_char) -> c_int {
-    // PORT-NOTE(ctx-free-boundary-callee-mismatch): This function is part of the bg-callable
-    // boundary set and has no ctx parameter, but the oracle body calls G_FindConfigstringIndex
-    // which requires ctx in the Rust port. The architectural resolution (either adding ctx to
-    // this signature, or providing a no-ctx variant of G_FindConfigstringIndex) is out of scope
-    // for this transcription. Faithful transcription would be impossible without either a
-    // signature change or an alternate implementation path.
-    unsafe {
-        // The oracle body (omitting the #ifdef debug section):
-        // return G_FindConfigstringIndex(name, CS_MODELS, MAX_MODELS, qtrue);
-        // Without ctx available, this cannot be completed as faithfully as the oracle.
-        // Placeholder: return 0 to allow compilation pending architectural resolution.
-        0
-    }
+    // Ctx-less bg-callable boundary fn (Raven reaches the engine through the
+    // global syscall pointer); engine via the `g_strap` seam cell, world left
+    // null — `G_FindConfigstringIndex` only issues trap syscalls (the
+    // `GameBgTraps::new` null-world precedent). Oracle body omits the
+    // `#ifdef _DEBUG_MODEL_PATH_ON_SERVER` section (not compiled in release).
+    let ctx = GameContext {
+        world: core::ptr::null_mut(),
+        engine: crate::g_strap::strap_engine(),
+    };
+    G_FindConfigstringIndex(ctx, name, CS_MODELS, MAX_MODELS, qtrue)
 }
 
 /// Raven `G_IconIndex`.
@@ -250,11 +247,13 @@ pub fn G_IconIndex(ctx: GameContext<'_>, name: *const c_char) -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:138-141`
 pub fn G_SoundIndex(name: *const c_char) -> c_int {
-    // PORT-NOTE(ctx-free-boundary-callee-mismatch): Same issue as G_ModelIndex - this function
-    // is ctx-free but needs ctx to call G_FindConfigstringIndex. See G_ModelIndex for details.
+    // Ctx-less boundary fn; engine via the `g_strap` seam cell (see G_ModelIndex).
     debug_assert!(!name.is_null() && unsafe { *name != 0 });
-    // Placeholder pending architectural resolution:
-    0
+    let ctx = GameContext {
+        world: core::ptr::null_mut(),
+        engine: crate::g_strap::strap_engine(),
+    };
+    G_FindConfigstringIndex(ctx, name, CS_SOUNDS, MAX_SOUNDS, qtrue)
 }
 
 /// Raven `G_SoundSetIndex`.
@@ -268,9 +267,12 @@ pub fn G_SoundSetIndex(ctx: GameContext<'_>, name: *const c_char) -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:148-151`
 pub fn G_EffectIndex(name: *const c_char) -> c_int {
-    // PORT-NOTE(ctx-free-boundary-callee-mismatch): Same issue as G_ModelIndex and G_SoundIndex.
-    // Placeholder pending architectural resolution:
-    0
+    // Ctx-less boundary fn; engine via the `g_strap` seam cell (see G_ModelIndex).
+    let ctx = GameContext {
+        world: core::ptr::null_mut(),
+        engine: crate::g_strap::strap_engine(),
+    };
+    G_FindConfigstringIndex(ctx, name, CS_EFFECTS, MAX_FX, qtrue)
 }
 
 /// Raven `G_BSPIndex`.

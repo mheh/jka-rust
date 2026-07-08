@@ -43,8 +43,10 @@ pub fn init_strap_engine(engine: &Engine) {
 }
 
 /// Read the seam engine handle; panics loudly (house stub style) if a `strap_*`
-/// wrapper runs before GAME_INIT armed the cell.
-fn strap_engine() -> &'static Engine {
+/// wrapper runs before GAME_INIT armed the cell. Also used by the ctx-less
+/// `G_ModelIndex`/`G_SoundIndex`/`G_EffectIndex` boundary fns (`g_utils.rs`),
+/// which mirror Raven's global-syscall-pointer reach the same way.
+pub(crate) fn strap_engine() -> &'static Engine {
     match STRAP_ENGINE.get() {
         // SAFETY: the pointer was taken from a live `&Engine` at GAME_INIT and the
         // engine outlives the module (mirrors Raven's global syscall pointer).
