@@ -360,3 +360,14 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     belongs to the DEC-settled WASM-transport track, outside the WinDed
     parity scope.
     **RULING: no port later — the marker inventory is the work list (user, 2026-07-09)**
+
+35. **WASM dropped entirely (user, 2026-07-09; supersedes ruling 34's
+    wasm-host exception and REVERSES DEC-05 item 5).** WebAssembly is not a
+    goal of this project in any direction — not as a module transport, not
+    as an engine target, not as a scripting sandbox. Remove all plumbing:
+    the `Wasm` ModuleTransport variant, `WasmPtr<T>` design text,
+    `WasmInPlaceReset`, the `mp_engine_wasm_host` crate, and any wasm
+    feature gates. Transports become `NativeDll | Static`. Historical
+    audits/dossiers keep their point-in-time references; living docs are
+    scrubbed. DEC-05 gets a dated reversal amendment, not a rewrite.
+    **RULING: drop wasm, remove all of it (user, 2026-07-09)**
