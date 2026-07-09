@@ -2988,7 +2988,7 @@ pub fn funcBBrushPain(
             );
         }
 
-        if (*self_).wait == 0.0 {
+        if (*self_).wait == -1.0 {
             (*self_).pain = FnId::NONE;
             return;
         }
