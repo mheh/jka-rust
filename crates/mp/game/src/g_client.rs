@@ -3939,7 +3939,14 @@ pub fn SetupGameGhoul2Model(
                 // it doesn't use humanoid anims.
                 let slash = crate::q_shared::Q_strrchr(GLAName.as_ptr(), '/' as c_int);
                 if !slash.is_null() {
-                    write_cstr_field(&mut GLAName, "/animation.cfg");
+                    // Raven: `strcpy(slash, "/animation.cfg")` — overwrites from
+                    // the last '/' onward (e.g. `models/players/swoop/foo` ->
+                    // `models/players/swoop/animation.cfg`), NOT the buffer start.
+                    // Source: `oracle/codemp/game/g_client.c:1741`
+                    let repl = b"/animation.cfg\0";
+                    for (k, &c) in repl.iter().enumerate() {
+                        *slash.add(k) = c as c_char;
+                    }
 
                     (*ent).localAnimIndex = crate::bg_panimate::BG_ParseAnimationFile(
                         &mut (*ctx.world).bg_state,

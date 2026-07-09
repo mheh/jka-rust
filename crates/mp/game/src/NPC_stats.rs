@@ -2072,9 +2072,6 @@ pub fn NPC_ParseParms(
                 //we put the $ in front to indicate a name and not a model
                 write_cstr_field(&mut playerModel, &format!("${}", cstr_to_str(NPCName)));
             }
-            // PORT-NOTE(unported-fn): `SetupGameGhoul2Model` (`g_client.rs`)
-            // has no body yet anywhere in the worktree — called per its LAW
-            // resolved signature; see missing_symbols.
             crate::g_client::SetupGameGhoul2Model(
                 ctx,
                 NPC,
