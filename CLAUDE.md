@@ -39,7 +39,7 @@ rust-analyzer is stale in this workspace — **always confirm compilation with
   (`docs/architecture/`, `docs/modules/`, `docs/subsystems/`).
 - `docs/GOAL.md` — project goal (drop-in ABI compatibility checklists).
 - `docs/abi-traps.md` — generated trap_* signature reference.
-- `docs/audits/marker-inventory-2026-07-05.md` — validated open-work inventory
+- `docs/audits/marker-inventory-2026-07-08.md` — validated open-work inventory
   (`TODO: Port` by verdict + PORT-NOTE re-grep); regenerated, never hand-edited.
 - `docs/roadmap-final-stages.md` — ordered post-parity roadmap (referee gates
   everything; then safe-state migration and beyond).

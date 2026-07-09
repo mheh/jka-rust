@@ -182,9 +182,8 @@ Initial test suite:
 
 ## Current state at time of writing
 
-- Branch `skeleton` clean except: batch-1 fix written but UNVERIFIED/UNCOMMITTED
-  (`g_strap.rs` STRAP_WORLD, `g_init_game.rs` arming, `g_utils.rs` G_AddEvent/G_PlayEffect/
-  G_PlayEffectID) — verification blocked on this plan.
+- Batch-1 fix (`g_strap.rs` STRAP_WORLD, `g_init_game.rs` arming, `g_utils.rs`
+  G_AddEvent/G_PlayEffect/G_PlayEffectID) landed as commit `4f65a23e`.
 - Committed and rig-verified: GlobalUse fix, handler-id reset, index fns, −0.0
   (`95e14541`, `79be9e66`, `1f1d9c97`).
 - Python rig + corpora at `~/Developer/jka/seam-test/referee/`; all engine processes down.

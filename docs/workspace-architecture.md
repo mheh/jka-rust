@@ -52,6 +52,12 @@ crates/
     math/                    #   vec3/matrix/angles (q_math is identical math)
     platform/                #   OS/threads/paths (replaces win32/unix/mac + sys)
     containers/              #   Rust-native stand-ins for Ratl/Ravl/Rufl/Ragl
+    types/                   #   native_types: cross-mode Raven scalar/handle
+                             #   primitives byte-identical across SP/MP
+                             #   q_shared.h (qboolean + lowercase qtrue/qfalse,
+                             #   fileHandle_t/clipHandle_t/qhandle_t/etc.,
+                             #   byte/word/ulong, mdxaBone_t, MAX_QPATH),
+                             #   re-exported by each mode's qshared umbrella
 
   abi-transport/             # cross-mode ABI transport: OutboundSysCall,
                              #   InboundVmCall, Encode/Decode, vmMain word packing,
@@ -115,7 +121,7 @@ crates/
 
 | Tier | Crate(s) | Raven source | Compiled/used by |
 | --- | --- | --- | --- |
-| -1 native | `native/{math,platform,containers}` | q_math (math only), platform dirs, Ra* template libs | everything, cross-mode |
+| -1 native | `native/{math,platform,containers,types}` | q_math (math only), platform dirs, Ra* template libs, cross-mode `q_shared.h` scalar/handle primitives | everything, cross-mode |
 | transport | `abi-transport` | QVM word ABI + `GetGameAPI` table shape | both `*/abi`, both engines |
 | 0 qshared | `mp/qshared`, `sp/qshared` | `q_shared.{h,c}` | engine + game + cgame + ui (per mode) |
 | 1 bg | `mp/bg`, `sp/bg` | `bg_*` (pmove, weapons, saber, panimate, saga, vehicles) | game + cgame + ui (per mode) |

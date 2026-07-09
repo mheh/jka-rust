@@ -1,5 +1,5 @@
 # Engine Seam Design
-Status: FROZEN (user sign-off 2026-07-03)     Supersedes: docs/engine-plan.md
+Status: FROZEN (user sign-off 2026-07-03)     Supersedes: docs/engine-plan.md (removed; git history)
 Decision prefix: SEAM     Ledger deps: DEC-04, DEC-05, DEC-07, DEC-08, DEC-09
 
 ## Standing context
@@ -19,9 +19,9 @@ Links only — never restated here:
   artifact; STATE-D3 (seam entrypoints/dispatchers are `extern "C-unwind"`) is
   adopted here by SEAM-D12; STATE-D2 (multi-world: engine holds *a* registration,
   not one global) constrains the per-slot trampoline cell (SEAM-D11).
-- Sibling docs this one forward-references (pending): `docs/architecture/
-  lifecycle.md`, `docs/architecture/module-loading.md`,
-  `docs/architecture/state-ownership.md`, `docs/subsystems/*`.
+- Sibling docs this one forward-references: `docs/architecture/lifecycle.md`,
+  `docs/architecture/module-loading.md`, `docs/architecture/state-ownership.md`
+  — all FROZEN (2026-07-03); `docs/subsystems/*`.
 
 ## Scope & non-goals
 

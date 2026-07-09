@@ -42,7 +42,7 @@ Links only — never restated here:
   settled shape; lifecycle.md's earlier receiver-ful
   `com_error(engine, …)` is superseded by STATE-D7 and is **not** the one LOAD-D11
   uses.
-- `docs/architecture/lifecycle.md` (DRAFT — **exists on disk**, not "pending") —
+- `docs/architecture/lifecycle.md` (FROZEN, 2026-07-03) —
   LIFE-D3 (`pub type ErrorLevel = errorParm_t`, `lifecycle.md:662`; per-mode MP-5 /
   SP-4 `errorParm_t`) and the module-load **trigger points**: the empty
   `ModuleRegistry` is default-constructed at `Com_Init` step-30 `VM_Init`
@@ -75,7 +75,7 @@ Non-goals (punted, each with its owning doc):
   decides which trap words get read through them.
 - **Lifecycle / boot / frame ordering** — *when* a load, restart, or unload
   fires during boot, connect, map change, or `vid_restart` →
-  `docs/architecture/lifecycle.md` (**DRAFT — exists**; it fixes the trigger
+  `docs/architecture/lifecycle.md` (**FROZEN, 2026-07-03**; it fixes the trigger
   points: the empty `ModuleRegistry` at `Com_Init` step-30 `VM_Init`, and the
   game-module load at map spawn via `SV_SpawnServer → SV_InitGameProgs`,
   post-Slice-0, `lifecycle.md:82,187-215,222`). This doc records the Raven
@@ -1652,7 +1652,7 @@ This doc's matrix and seam depend on those resolutions but does not settle them.
 The **load call site** — where `ModuleRegistry::load_module` is actually invoked
 (the `SV_InitGameProgs`-equiv function, `oracle/oracle/codemp/server/sv_game.cpp:1750`)
 — splits into a *settled* and an *unsettled* half. Its **trigger** is settled by
-lifecycle.md (DRAFT, exists): the game module loads at **map spawn**
+lifecycle.md (FROZEN, 2026-07-03): the game module loads at **map spawn**
 (`SV_SpawnServer → SV_InitGameProgs`, **post-Slice-0**), not at engine boot — Slice-0
 `Com_Init` only default-constructs the empty registry at step-30 `VM_Init`
 (`lifecycle.md:82,187-215,222`). Its **crate/signature** (and where the `None`-match

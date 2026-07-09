@@ -1,5 +1,15 @@
 # Marker triage: aggregated findings (2026-07-07)
 
+## Resolution status (2026-07-08)
+
+The top Class A findings below were fixed by commits `4f65a23e`
+(G_AddEvent/G_PlayEffect), `f1fa7cb1` (vec3 out-param cluster), `3dbede1b`
+(vehicle dispatch/Vehicle_SetAnim/PM_SetVehicleAngles), `09afce35`
+(NPC_Pain/BG_ValidateSkinForTeam/PM_SetSaberMove/TryHeal/dispenser), and
+`72c25697` + `8e0cf1aa` (TryUse + g_utils placeholder consts). Still open: the
+ForceThrow/ForceGrip vehicle-vtable Eject gap (`w_force.rs:3304`), the four
+`boot_stubs.rs` no-ops, and the Class B host-side/SP `todo!()` list.
+
 ## 1. Scope, method, motivation
 
 **Scope**: every `PORT-NOTE` / `TODO` / `FIXME` / `todo!()` / `XXX` marker across
@@ -135,7 +145,7 @@ Every vehicle interaction path found by these agents has a live gap.
   implemented. [Using/interacting with a vehicle NPC entity (self-use to
   eject all, use-while-riding to eject, use-to-board) is a complete no-op;
   using a Gonk droid to recharge battery charge is also a no-op.]
-- **C** `crates/mp/game/src/w_force.rs:3895` `ForceThrow` — force-push/pull
+- **C** `crates/mp/game/src/w_force.rs:3304` `ForceThrow` — force-push/pull
   against a vehicle-mounted player skips
   `vehEnt->m_pVehicle->m_pVehicleInfo->Eject(...)` (vehicle vtable dispatch
   unresolved); left as a no-op instead of ejecting the rider. [runtime
@@ -143,7 +153,7 @@ Every vehicle interaction path found by these agents has a live gap.
   triggers the knockdown/vehicle branch but never ejects them — vehicle
   riders are immune to force-push ejection] *(filed as Class C by its
   source report, but part of this cluster.)*
-- **C** `crates/mp/game/src/w_force.rs:1601` `ForceGrip` — same vehicle
+- **C** `crates/mp/game/src/w_force.rs:1508` `ForceGrip` — same vehicle
   vtable Eject() gap: gripping a vehicle-mounted target enters the vehicle
   branch but performs no eject action (silent no-op inside an otherwise
   faithful branch). [runtime effect: Force Grip cannot pull vehicle riders
@@ -363,7 +373,7 @@ MP-shipping:
 - **C** `crates/mp/game/src/g_utils.rs:1906` `TryUse` — touch-pointer
   identity comparison can't be reproduced faithfully after the
   fn-pointer-to-enum port. [known parked item, previously ruled on]
-- (ForceThrow/ForceGrip vehicle-eject gaps at `w_force.rs:3895`/`1601` are
+- (ForceThrow/ForceGrip vehicle-eject gaps at `w_force.rs:3304`/`1508` are
   filed as Class C but listed above under the vehicle cluster, section 3.)
 
 MP-host-side:

@@ -66,7 +66,8 @@ gSharedBuffer typed structs (SEAM-D4's known high-arity escape).
 ## Post-mega-pass rulings (2026-07-03, pass-1 escalation triage — accepted-for-now, user)
 
 Pass 1 (wf_55d03832-2c3): 88 files, 717 fns ported, 1,875 parked, 619
-escalations (clustered in `docs/handoffs/jampgame-escalations.json`). ~95% of
+escalations (clustered in `docs/handoffs/jampgame-escalations.json`, removed
+2026-07-08; see git history). ~95% of
 parks trace to the generated signatures not carrying already-settled rulings.
 
 8. **Context threading in generated signatures** (~450 escalations:

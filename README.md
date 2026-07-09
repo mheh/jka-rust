@@ -22,7 +22,7 @@ the exact symbols the engines load. See
 crate graph and [`docs/porting-rules.md`](docs/porting-rules.md) for how code
 is ported.
 
-## Status (2026-07-06)
+## Status (2026-07-08)
 
 - **Type port: complete** (Waves 0–7, both trees). Every ABI-crossing struct
   carries `size_of`/`offset_of!` static-asserts — a green build is the layout
@@ -41,8 +41,12 @@ is ported.
   become the ground truth, followed by the safe-state migration that retires
   the transcription's raw-pointer scaffolding.
 - Remaining port surface is tracked in
-  [`docs/audits/marker-inventory-2026-07-05.md`](docs/audits/marker-inventory-2026-07-05.md);
-  architectural decisions live in [`docs/decisions.md`](docs/decisions.md).
+  [`docs/audits/marker-inventory-2026-07-08.md`](docs/audits/marker-inventory-2026-07-08.md),
+  [`docs/audits/2026-07-07-marker-triage.md`](docs/audits/2026-07-07-marker-triage.md) (open-work
+  enumeration), [`docs/audits/const-sweep-2026-07-08.md`](docs/audits/const-sweep-2026-07-08.md),
+  [`docs/audits/gatesweep-2026-07-08.md`](docs/audits/gatesweep-2026-07-08.md), and
+  [`docs/audits/per-file-oracle-audit.md`](docs/audits/per-file-oracle-audit.md); architectural
+  decisions live in [`docs/decisions.md`](docs/decisions.md).
 
 ## Ship targets
 

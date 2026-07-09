@@ -16,6 +16,13 @@ same FP regime (no fast-math/FMA contraction; parity defined against oracle
 built under OUR FP regime — 2003 x87 is unmatchable and not the target), same
 iteration order. An hour of recorded dueling replaying byte-identical ≈ proof.
 
+> Status (2026-07-08): the in-repo mock-engine referee is live
+> (`crates/jampgame/tests/referee.rs`, landed 6c34b9d8+) and is a local gate on
+> the dev platform; its CI job was removed by user ruling (b91ee8b6) due to
+> cross-host gcc-vs-LLVM float divergence, not a regression. The external
+> engine-vs-engine variant described above is parked
+> (`docs/plans/2026-07-07-rust-referee.md`).
+
 ## Stage W — Wiring to runnable (partly pre-parity)
 
 Remaining Dispatch impls (~25), cdylib + dllEntry/vmMain C exports, spawns[]
@@ -23,6 +30,10 @@ dispatch live, ICARUS boot no-op, i686 cross-target with per-arch layout
 asserts → boot under stock jampded (drop-in `jampgamex86.dll`). 64-bit build
 of the same source targets our engine later (registers/SSE2/addr-space wins;
 32-bit stays for stock interop).
+
+> Status (2026-07-08): essentially done except the i686/ILP32 layout-assert
+> pass — CI's 32-bit lanes are allowed-failure pending it
+> (`.github/workflows/build.yml`).
 
 ## Stage 1 — Safe-state migration (post-parity, mechanical, behind green diff)
 

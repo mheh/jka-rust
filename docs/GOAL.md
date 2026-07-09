@@ -71,7 +71,10 @@ Raven's `jampgamex86.dll`:
   load, frame loop, client connect, and shutdown.
 - [ ] Referee replay gate (Stage R, `docs/roadmap-final-stages.md`): recorded
   usercmd streams replayed through oracle DLL and Rust DLL under the same
-  harness, byte-diffing every playerState/entityState per frame.
+  harness, byte-diffing every playerState/entityState per frame. The in-repo
+  mock-engine referee (`crates/jampgame/tests/referee.rs`) is live locally;
+  what remains is the external real-engine variant (parked plan,
+  `docs/plans/2026-07-07-rust-referee.md`).
 
 So the ABI target is:
 

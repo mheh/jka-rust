@@ -480,7 +480,7 @@ These four engine subcrates exist in the crate graph (`mp/engine/{botlib,ghoul2,
 | Raven global | oracle cite | Rust owner | constructed by | threaded via |
 |---|---|---|---|---|
 | `level` (`level_locals_t`) | `g_main.c:9` | `GameWorld.level: mp_game::level::level_locals_t` | `G_InitGame` | `(world, id)` re-borrow |
-| `g_entities[MAX_GENTITIES]` | `g_main.c:27` | `GameWorld.entities: Box<[mp_qshared::common::mp::gentity_t; MAX_GENTITIES]>` (contiguous `#[repr(C)]`, size-asserted 1832B — reuse the existing type, §D12) | `G_InitGame` | `EntityId(u32)` index |
+| `g_entities[MAX_GENTITIES]` | `g_main.c:27` | `GameWorld.g_entities: Box<[mp_qshared::common::mp::gentity_t; MAX_GENTITIES]>` (contiguous `#[repr(C)]`, size-asserted 1832B — reuse the existing type, §D12) | `G_InitGame` | `EntityId(u32)` index |
 | `MAX_GENTITIES` (sizes the array above) | `q_shared.h:1996` | **`mp_qshared`** const per its oracle home + workspace-architecture tier table (Tier 0 qshared) — GameWorld needs it, so it **now also lives in `mp_qshared`**; the existing `mp_engine_server` copy (`crates/mp/engine/server/src/server/server_t.rs:21`) **and its size-asserts stand**. The dedupe (server re-importing the `mp_qshared` const) is a **deferred mechanical sweep** (skeleton finding 5, 2026-07-03), no behavioral change — the value is identical | (compile-time const) | referenced, not threaded |
 | `g_clients[MAX_CLIENTS]` (reached as `level.clients`) | `g_main.c:28` | `GameWorld.clients: Box<[mp_game::client::gclient_t; MAX_CLIENTS]>` (`gclient_t` = `gclient_s`, asserted 7344B; **MP only**) | `G_InitGame` | index |
 | `trap_LocateGameData` registration | `g_main.c:997` | registers `GameWorld` base+stride into the engine's `SharedGameData` (§Seam) | `G_InitGame` | raw seam (§D11) |
@@ -734,7 +734,7 @@ pub fn com_error(level: ErrorLevel, msg: String) -> !;
 pub struct GameWorld {
     pub level: level_locals_t,                        // mp_game::level::level_locals_t
                                                       //   (game/src/level/level_locals.rs:29)
-    pub entities: Box<[gentity_t; MAX_GENTITIES]>,    // mp_qshared::common::mp::gentity_t
+    pub g_entities: Box<[gentity_t; MAX_GENTITIES]>,  // mp_qshared::common::mp::gentity_t
                                                       //   (qshared/.../gentity.rs:50; size-asserted 1832B :456).
                                                       //   MAX_GENTITIES is referenced from mp_qshared (below).
     pub clients: Box<[gclient_t; MAX_CLIENTS]>,       // mp_game::client::gclient_t (= gclient_s;

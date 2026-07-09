@@ -186,6 +186,10 @@ answers traces/pointcontents/configstrings — enough to reproduce the referee
 rig's `ab_idle_baseline` and re-verify game fix batches 1–4 against a **pure-Rust**
 host instead of the patched C engine. **No net, bots stubbed, Ghoul2 stubbed.**
 
+Input dossiers (unresolved design forks for this tier):
+`docs/dossiers/B1-cvar-cmd.md`, `docs/dossiers/B2-filesystem.md`,
+`docs/dossiers/B3-collision.md`, `docs/dossiers/B5-server.md`.
+
 In-scope subsystems, leaf-first within qcommon's 12 waves:
 - **Filesystem/pk3** (`files.cpp`, `unzip`): `FS_*`, pk3/zip mounting, the pure-
   server pak list. The largest single function is `FS_FOpenFileRead` (324 LOC).
@@ -221,14 +225,17 @@ matrix welds ghoul2 to the renderer G2/model loader, this tier is
 carries **40 function-scope statics** (the most of any subsystem — the RagDoll
 solver is riddled with them), so it is the highest-effort-per-LOC tier.
 
-### Tier 3 — real networking (+ msg/huffman/netchan/net_ip + sv_snapshot/sv_client)
+### Tier 3 — real networking (+ msg/huffman/netchan/win_net.cpp+unix_net.c + sv_snapshot/sv_client)
 The wire. `msg.cpp` (`MSG_ReadDeltaPlayerstate` 238, delta entity/playerstate
 encode/decode), `huffman.cpp` (the `msgHuff` 102KB static table), `net_chan.cpp`,
-`net_ip.cpp`, and the server snapshot/client half (`sv_snapshot.cpp`
+`win_net.cpp`/`unix_net.c`, and the server snapshot/client half (`sv_snapshot.cpp`
 `SV_BuildClientSnapshot`, `sv_client.cpp` `SV_DirectConnect` 348, `SV_ExecuteClientMessage`).
 Unlocks a real network client (`taystjk`) connecting to a pure-Rust server. This
 is where the SnapVector/`MSG_WriteDeltaPlayerstate` byte-faithfulness lessons from
 the handoff become load-bearing again.
+
+Input dossier (unresolved design forks for this tier): `docs/dossiers/B4-network.md`
+(+ `docs/dossiers/B5-server.md`'s snapshot/client half).
 
 ### Tier 4 — botlib / icarus / RMG (each independently deferrable)
 Per the matrix, nothing below calls up into these, so each ships on its own

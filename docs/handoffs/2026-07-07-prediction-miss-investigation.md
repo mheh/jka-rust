@@ -1,5 +1,7 @@
 # Handoff: constant prediction-miss investigation (2026-07-07)
 
+Status: CLOSED (2026-07-08) — see the closure note at the end of this doc.
+
 Resume point for the client-prediction bug. Read this plus `docs/audits/clientthink-parity-audit-2026-07-07.md` (the prior session's audit) and you have the full state. This session was **investigation only** — no code, test, or doc changes besides this file.
 
 ## Symptom
@@ -218,7 +220,7 @@ Pushed to origin (origin/skeleton = de0bb6bd):
   std-guaranteed; reset_fn_ids_after_zero DELETED; zeroed-gentity unit test)
 - de0bb6bd panic policy: catch_unwind at vmMain → Com_Error path; panic hook at dllEntry;
   panic="unwind" pinned in workspace profiles (pre-change: panics unwound into C = UB)
-LOCAL ONLY, NOT PUSHED:
+Also pushed (72c25697, 8e0cf1aa — landed after this session, no longer local-only):
 - 72c25697 TryUse real consts (GT_SIEGE 4→7, SETANIM_TORSO 2→1, CLASS_VEHICLE 0→real,
   STAT_MAX_HEALTH 1→8, HI_JETPACK 2→7, PMF_FOLLOW 0→4096, content masks 0→real, .value→.integer)
   + Use_Target_Delay null-activator UB fix (ent_id→ent_id_opt)
@@ -229,8 +231,9 @@ LOCAL ONLY, NOT PUSHED:
 - Rig regression: PASS corpus-ffa1 2400/2400 AND corpus-ffa1-combat 4800/4800 vs oracle dylib
   (also re-run after 72c25697: PASS).
 - User's live taystjk retest (task #10): "Everything runs fine" — original bug CLOSED.
-- Static review of newly-live code: docs/audits/2026-07-08-newly-live-code-review.md
-  (4/5 clusters clean; all confirmed bugs were TryUse consts, fixed above).
+- Static review of newly-live code (4/5 clusters clean; all confirmed bugs were
+  TryUse consts, fixed above) — findings folded in above; doc removed, see git
+  history.
 
 ### Rig now scratchpad-independent
 ~/Developer/jka/seam-test/referee/artifacts/ holds openjkded.arm64 (patched engine),
@@ -244,18 +247,7 @@ patch series incl. untracked sv_referee.cpp/.h). run-ab.sh repointed there.
   DAG: 20 waves, 1389 leaves; ghoul2⇄renderer welded → one tier; botlib/icarus near-isolates →
   tier 4; C++ subsystems need object-model port, invisible to call graph). Walker gained
   mp-engine-ded profile + enginesweep.py (uncommitted in tools/closure-prototype/).
-- 2026-07-08-placeholder-const-sweep.md — task #18 process; phases 1-3 EXECUTING at session end.
-
-### Task #18 state — RESUME HERE NEXT SESSION
-Unmarked-placeholder-const sweep (bug class: skeleton-phase local consts with guessed values, no
-markers; evaded 3 manual passes; caught only by user diff review). Phases 1-3 (enumerate crates/mp
-consts, libclang oracle NAME→value dump, workspace canonical extraction, 5-bucket mechanical join)
-were dispatched to a background agent at session end. Deliverable:
-tools/closure-prototype/out/constsweep/worklist.md (+ 3 json tables) — self-contained dispatch
-source for phase 4. NEXT STEP: read worklist.md, report bucket counts to user, then dispatch
-phase-4 judgment agents (parallel opus, disjoint files, fix WRONG-VALUE + re-review surrounding
-logic, adjudicate HOUSE-NAMED, check lying comments, targeted bare-literal patterns) → phase 5
-integrate (build, both corpora, chunked commits). STOP marker + full spec in the plan doc.
+- task #18 process (unmarked-placeholder-const sweep); doc removed, see git history.
 
 ### Standing rules added this session (memories + global CLAUDE.md)
 - Subagents ALWAYS on explicit opus/sonnet/haiku (never inherit session model) — global.
@@ -263,7 +255,7 @@ integrate (build, both corpora, chunked commits). STOP marker + full spec in the
   crates (memory: agent-prompts-check-placeholder-consts).
 - FnId pattern replaces the Option<enum> memset hazard (memory updated).
 
-### Open decisions for the user
-- Commit + push docs/ (2 audits, this handoff, 3 plans) and walker tooling? (Asked; unanswered.)
-- Push 72c25697 + 8e0cf1aa.
-- Engine build-out plan awaits user read — it gates un-parking referee (#17).
+### Closure note (2026-07-08)
+Task #18 (unmarked-placeholder-const sweep) completed — see
+`docs/audits/const-sweep-2026-07-08.md` and `docs/audits/gatesweep-2026-07-08.md`.
+This investigation is CLOSED.

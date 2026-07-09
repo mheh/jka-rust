@@ -25,7 +25,7 @@ port (`oracle/`) by differential testing (`--features oracle`).
    `EntityId(u32)` into an owned arena; no aliasing raw pointers in safe code.
 6. **One owned instance per logical singleton.** Where Raven truly had one global
    (the engine), model it as one owned object reached through a single controlled
-   accessor — not scattered statics. (See `src/engine/PLAN.md`.)
+   accessor — not scattered statics. (See `docs/architecture/state-ownership.md`.)
 
 ## C. C -> Rust idiom translation
 

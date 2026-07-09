@@ -48,7 +48,7 @@ Links only — never restated here. MP tree = `oracle/oracle/codemp/`, SP tree =
   aggregate `Engine` type — and the per-mode facade crate that defines it,
   `crates/{mp,sp}/engine/core` = `mp_engine_core`/`sp_engine_core`; the former
   STATE-Q1, resolved 2026-07-02).
-- `docs/dossiers/A3-lifecycle.md` — the survey this doc renders.
+- `docs/dossiers/A3-lifecycle.md` — the survey this doc renders (removed 2026-07-08; see git history).
 
 ## Scope & non-goals
 

@@ -67,7 +67,7 @@ never clears ps.velocity in the ps the engine snapshots.
 1. The harness mock trap_Trace always returns fraction 1.0 — the player
    is never grounded, so ground/walk pmove has NEVER been diffed
    in-harness (air-only coverage). A ground-returning mock would make the
-   walking/spawn path bisectable offline. (tests/common/mod.rs:463-489
+   walking/spawn path bisectable offline. (crates/jampgame/tests/common/mod.rs:463-489
    documents the uninitialized-bytes caveat.)
 2. Scenarios run g_synchronousClients 1 only — the async
    GAME_CLIENT_THINK ordering (the live mode) is never exercised.
