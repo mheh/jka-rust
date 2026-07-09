@@ -211,3 +211,38 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     InitROFF-failure fallthrough (`map::find(0)` end-deref, oracle UB) →
     guard-and-return per §19 with a 2-line note.
     **RULING: bless all five (user, 2026-07-09)**
+
+## §F doc-session rulings, round 3 (user, 2026-07-09 — fourth session)
+
+23. **Ruling-19 CORRECTION (premise was wrong, reviewer-proven from
+    sv_game.cpp:740-807):** the entity-field G_ICARUS_* arms pass
+    `(sharedEntity_t *)VMA(1)` through `ConvertedEntity()` — a pointer, not
+    an entnum. The inbound icarus seam CARRIES THE POINTER
+    (`*mut sharedEntity_t`) exactly as the trap does; ConvertedEntity's
+    VM-shuffle is a documented no-op in the native-dylib model. The 3
+    presence-check arms keep their int entID. The `gentity()` EngineHost
+    service remains for genuinely index-based access.
+    **RULING: carry the pointer (user, 2026-07-09)**
+24. **ICARUS shapes:** the ~194 `m_ie->I_*` dispatch sites become free fns
+    taking `(&mut <icarus state>, &mut dyn EngineHost)`; `InterfaceExport`
+    slots are fn pointers taking `&mut dyn EngineHost` (dyn at the table
+    boundary). The Stage-0 crate is PINNED: `crates/mp/host-interface`,
+    package `mp_host_interface` — docs cite real paths from now on.
+    **RULING: free fns + &mut dyn; crate pinned (user, 2026-07-09)**
+25. **RMG generation is dead under DEDICATED in Raven itself**
+    (`CreateRandomTerrain`'s only call site is in the `#else` of
+    `#ifdef DEDICATED`, cm_terrain.cpp:167-186; LoadMission early-outs, the
+    mission never spawns). Accept Raven: §20-drop the generation path
+    (CreateRandomTerrain, CRandomTerrain::Generate, CRMMission::Spawn/
+    PreSpawn/Smooth/PlaceBridges, heightmap goldens); the live surface is
+    the reachable syscall arms + LoadMission's early-out behavior, refereed
+    as such. Making generation live is a post-parity feature branch.
+    **RULING: accept Raven, §20-drop generation (user, 2026-07-09)**
+26. **G2/NAV corrections:** `DestroyGoreTexCoordinates` and
+    `DeleteGoreRecord` move to the LIVE gore bucket (called from
+    `~CGoreSet`, reachable via `DeleteGoreSet` — implicit destructor calls
+    are a documented engineorder graph blind spot). npcnav equal-cost heap
+    tie-order is pinned to the oracle-harness toolchain (Homebrew
+    g++-16/libstdc++), the same reference every golden uses; retail-MSVC
+    tie-order divergence accepted exactly as for FP parity.
+    **RULING: bless both (user, 2026-07-09)**
