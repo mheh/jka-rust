@@ -129,10 +129,15 @@ pub fn BG_ParseVehWeaponParm(
                     VF_SHADER | VF_SHADER_NOMIP => {
                         // QAGAME: neither `WE_ARE_IN_THE_UI` nor `CGAME`; dead here.
                     }
-                    VF_SOUND | VF_SOUND_CLIENT => {
+                    VF_SOUND => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
                             G_SoundIndex(cstr(&value).as_ptr());
                     }
+                    // `VF_SOUND_CLIENT` (MP cgame only): the `#elif QAGAME` branch
+                    // comments out the `G_SoundIndex` — the game module leaves the
+                    // field untouched (cgame registers it via `trap_S_RegisterSound`).
+                    // Source: `oracle/codemp/game/bg_vehicleLoad.c:282-290`
+                    VF_SOUND_CLIENT => {}
                     _ => return qfalse,
                 }
                 break;
@@ -456,10 +461,15 @@ pub fn BG_ParseVehicleParm(
                     VF_SHADER | VF_SHADER_NOMIP => {
                         // QAGAME: dead (neither WE_ARE_IN_THE_UI nor CGAME).
                     }
-                    VF_SOUND | VF_SOUND_CLIENT => {
+                    VF_SOUND => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
                             G_SoundIndex(cstr(&value).as_ptr());
                     }
+                    // `VF_SOUND_CLIENT` (MP cgame only): the `#elif QAGAME` branch
+                    // comments out the `G_SoundIndex` — the game module leaves the
+                    // field untouched (cgame registers it via `trap_S_RegisterSound`).
+                    // Source: `oracle/codemp/game/bg_vehicleLoad.c:956-964`
+                    VF_SOUND_CLIENT => {}
                     _ => return qfalse,
                 }
                 break;
