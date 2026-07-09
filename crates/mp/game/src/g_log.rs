@@ -74,6 +74,12 @@ pub fn G_LogWeaponInit(ctx: GameContext<'_>) {
 /// Raven `G_LogWeaponPickup`.
 /// Source: `oracle/codemp/game/g_log.c:123-129`
 pub fn G_LogWeaponPickup(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
+    // Raven has no guard here and writes `G_WeaponLogPickups[client]` out of
+    // bounds for NPC entity numbers (>= MAX_CLIENTS) — UB. Defined behavior:
+    // skip logging (porting-rules §19).
+    if client >= MAX_CLIENTS as c_int {
+        return;
+    }
     unsafe {
         let g = &mut (*ctx.world).globals;
         g.G_WeaponLogPickups[client as usize][weaponid as usize] += 1;
@@ -85,6 +91,12 @@ pub fn G_LogWeaponPickup(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
 /// this client's last logged weapon action.
 /// Source: `oracle/codemp/game/g_log.c:131-145`
 pub fn G_LogWeaponFire(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
+    // Raven has no guard here and writes `G_WeaponLogFired[client]` out of
+    // bounds for NPC entity numbers (>= MAX_CLIENTS) — UB. Defined behavior:
+    // skip logging (porting-rules §19).
+    if client >= MAX_CLIENTS as c_int {
+        return;
+    }
     unsafe {
         let time = (*ctx.world).level.time;
         let g = &mut (*ctx.world).globals;
