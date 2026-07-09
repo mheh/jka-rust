@@ -333,10 +333,10 @@ that is actually alive:
   `ref_trace`, FNV-1a per-frame checksum) runs our Rust host and the C engine on
   the *same* dylib — the discipline that verified the game port (SESSION 3: PASS
   2400/2400). This is the ultimate acceptance test (real engine vs Rust engine),
-  but its worktree (`scratchpad/openjk-seam`) is **currently gone** (session-
-  ephemeral scratchpad) and must be reconstituted into a permanent home before it
-  can gate anything — see risk #7. Until then, the in-repo Rust referee is the
-  gate.
+  but its worktree (`scratchpad/openjk-seam`) was session-ephemeral. As of
+  2026-07-08 it has been reconstituted into a permanent home — see risk #7 —
+  so this path can gate work again; the in-repo Rust referee remains the gate
+  for anything not yet covered by the reconstituted rig.
 
 Concretely: as each subsystem lands it is swapped into the Rust host while the
 rest stay trusted (mock, or later real C engine), and the A/B must be byte-
@@ -423,18 +423,20 @@ subsystem, plus green oracle goldens (3a) and replay fixtures (3b) for it.
 6. **Open: where does the interface crate's boundary sit** relative to the
    existing `crates/mp/engine/qcommon` trampoline seed — extend that crate or
    supersede it? (Resolve against the seeds map before M0.)
-7. **The external openjkded rig is already gone.** The engine-vs-engine lockstep
-   (3c, richer path) and the captured trace fixtures (3b) both depend on the
-   patched `openjkded`/`sv_referee.cpp` in `scratchpad/openjk-seam` — which is
-   **no longer on disk** (session-ephemeral scratchpad, per the seeds map). Its
-   patch series must be reconstituted into a permanent home
-   (`tools/openjk-referee/` or a documented patch set) before 3b/3c-external can
-   gate anything. Near-term this is **not blocking**: the in-repo Rust referee
-   (mock-vs-oracle, live) gates Tiers 1–2, and the captured `.reflog` fixtures in
-   `tools/referee-oracle/logs/` already give directed input streams. But real-
-   network acceptance (M4) and large-scale trace replay (3b at thousands-of-
-   vectors scale) do need the C engine rig rebuilt — schedule that reconstitution
-   before Tier 3.
+7. **RESOLVED 2026-07-08: the external openjkded rig has a permanent home.**
+   The engine-vs-engine lockstep (3c, richer path) and the captured trace
+   fixtures (3b) depend on the patched `openjkded`/`sv_referee.cpp`, previously
+   in the session-ephemeral `scratchpad/openjk-seam`. The patch series is now
+   maintained at github.com/mheh/OpenJK branch `referee` (commit f6d2875e
+   "sv_referee: A/B module-parity referee layer" + 35e4184f temporary debug
+   probes), cloned at ~/Developer/Milo/OpenJK. Phase 0 (rebuild + re-verify)
+   completed 2026-07-08: engine rebuilt via `cmake -B build-referee`
+   (BuildMPDed only); corpus-ffa1 PASS 4000 frames and corpus-ffa1-combat PASS
+   5000 frames, zero divergence, oracle-built Raven dylib vs Rust jampgame
+   dylib. `~/Developer/jka/seam-test/referee/run-ab.sh` now points ENGINE at
+   the from-source build; the old preserved binary is retired. 3b/3c-external
+   can gate work again; scenario-matrix expansion beyond the two re-verified
+   corpora remains open before Tier 3 / M4 real-network acceptance.
 
 ---
 

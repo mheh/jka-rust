@@ -1,6 +1,18 @@
 # Referee plan: Rust A/B referee as a test target of `jampgame`
 
-Status: PARKED 2026-07-07 (user decision: forgo this testing until later). Nothing here is built.
+Status: PARTIALLY PARKED. The external engine-vs-engine rig (in-crate work below is
+still parked 2026-07-07 pending resumption) has a permanent home again as of
+2026-07-08: patched engine source is github.com/mheh/OpenJK branch `referee`
+(commit f6d2875e "sv_referee: A/B module-parity referee layer" + 35e4184f
+temporary debug probes), cloned at ~/Developer/Milo/OpenJK. Phase 0 completed
+2026-07-08: engine rebuilt from that branch (`cmake -B build-referee`,
+BuildMPDed only); both corpora re-verified — corpus-ffa1 PASS 4000 frames,
+corpus-ffa1-combat PASS 5000 frames, zero divergence, oracle-built Raven dylib
+vs Rust jampgame dylib. The driver (`~/Developer/jka/seam-test/referee/run-ab.sh`)
+now points ENGINE at the from-source build; the old preserved binary is
+retired. Scenario-matrix expansion beyond the two re-verified corpora remains
+open. The in-crate rewrite described below (`crates/referee`) is still
+unstarted.
 Design discussion since writing superseded parts of this doc — capture before resuming:
 - Rewrite around the EXISTING in-crate referee (`crates/jampgame/tests/referee.rs` + mock
   engine in `tests/common/`), not the external openjkded rig: referee becomes a lib+bin crate
