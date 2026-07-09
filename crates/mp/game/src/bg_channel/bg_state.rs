@@ -40,7 +40,9 @@ pub struct BgState {
     /// sets, each pointing at a heap `animation_t` array.
     /// Source: `oracle/codemp/game/bg_panimate.c:1702`
     pub bgAllAnims: Vec<bgLoadedAnim_t>,
-    /// Raven `int bgNumAllAnims` — count of loaded entries in `bgAllAnims`.
+    /// Raven `int bgNumAllAnims = 2` — next free slot in `bgAllAnims` (0 is
+    /// always humanoid, 1 always rockettrooper; see `new()` for why the init
+    /// value matters).
     /// Source: `oracle/codemp/game/bg_panimate.c:1703`
     pub bgNumAllAnims: c_int,
     /// Raven `bgLoadedEvents_t bgAllEvents[MAX_ANIM_FILES]`.
@@ -174,7 +176,14 @@ impl BgState {
             // `bgLoadedEvents_t bgAllEvents[MAX_ANIM_FILES]` zeroed statics
             // (loaders index them directly rather than push/grow).
             bgAllAnims: vec![unsafe { core::mem::zeroed() }; MAX_ANIM_FILES as usize],
-            bgNumAllAnims: 0,
+            // Raven initialises this to 2: slot 0 is always the humanoid set and
+            // slot 1 always rockettrooper, so dynamically-parsed sets start at 2
+            // (`BG_ParseAnimationFile`'s `nextIndex = bgNumAllAnims`). Starting at
+            // 0 lets the first non-humanoid parse (e.g. a t2_trip swoop, which
+            // spawns during map load before any player humanoid) grab slot 0,
+            // overwrite the humanoid set, and latch `BGPAFtextLoaded`, breaking
+            // every player's animations.
+            bgNumAllAnims: 2,
             bgAllEvents: vec![unsafe { core::mem::zeroed() }; MAX_ANIM_FILES as usize],
             // Raven initialises this to 1 (first entry is the null/default).
             bgNumAnimEvents: 1,

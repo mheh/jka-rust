@@ -932,15 +932,28 @@ pub fn Initialize(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
         {
             let iFlags = SETANIM_FLAG_NORMAL;
             let iBlend = 300;
-            let _ = (iFlags, iBlend);
             (*pVeh).m_ulFlags |= (VEH_GEARSOPEN as u64); // MP
-                                                         // PORT-NOTE(bg-channel): MP path is
-                                                         //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
-                                                         //              bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
-                                                         //              SETANIM_BOTH, BOTH_VS_IDLE, iFlags, iBlend)
-                                                         // BG_SetAnim is a `PmoveContext<'_>` method (bgAllAnims off BgState +
-                                                         // receiver); no PmoveContext is constructed in this game-tier fn, so the
-                                                         // call is staged pending the bg-channel retrofit.
+            // MP `_JK2MP` path:
+            //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
+            //              bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
+            //              SETANIM_BOTH, BOTH_VS_IDLE, iFlags, iBlend)
+            // `BG_SetAnim` is a `PmoveContext<'_>` method (bgAllAnims off BgState +
+            // receiver); build a pm-null per-call context from `ctx`, matching the
+            // `Vehicle_SetAnim` precedent above.
+            let ps = &mut (*pc).ps as *mut playerState_t;
+            let anims =
+                (*ctx.world).bg_state.bgAllAnims[(*parent).localAnimIndex as usize].anims;
+            let traps = GameBgTraps::new(ctx.engine);
+            let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                world: ctx.world,
+                engine: ctx.engine,
+            };
+            let mut pmc = crate::bg_channel::PmoveContext::new(
+                &mut (*ctx.world).bg_state,
+                &traps,
+                &mut callbacks,
+            );
+            pmc.BG_SetAnim(ps, anims, SETANIM_BOTH, BOTH_VS_IDLE as c_int, iFlags, iBlend);
         }
 
         qtrue
