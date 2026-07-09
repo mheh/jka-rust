@@ -407,7 +407,7 @@ pub fn G_ParseAnimFileSet(
     // unused by the live body (matches oracle — it is only forwarded by the
     // (disabled) caller, not read here).
     let _ = animCFG;
-    const qfalse: qboolean = 0;
+    
     unsafe {
         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {

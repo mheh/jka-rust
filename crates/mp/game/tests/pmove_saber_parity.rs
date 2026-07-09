@@ -932,7 +932,7 @@ fn run_scenario(name: &str) -> String {
         &mut cb,
         c"models/players/_humanoid/animation.cfg".as_ptr(),
         animset,
-        QTRUE,
+        qtrue,
     );
     assert_ne!(rc, -1, "failed to load synthetic animation.cfg");
 

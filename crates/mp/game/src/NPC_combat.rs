@@ -1194,19 +1194,19 @@ pub fn ValidEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
         let npc = (*ctx.world).globals.NPC;
 
         if ent.is_null() {
-            return QFALSE;
+            return qfalse;
         }
         if ent == npc {
-            return QFALSE;
+            return qfalse;
         }
 
         if ((*ent).flags & FL_NOTARGET) == 0 && (*ent).health > 0 {
             let ent_client = (*ent).client as *mut gclient_t;
             if ent_client.is_null() {
-                return QTRUE;
+                return qtrue;
             } else if (*ent_client).sess.sessionTeam == TEAM_SPECTATOR {
                 //don't go after spectators
-                return QFALSE;
+                return qfalse;
             } else {
                 let mut entTeam: c_int = NPCTEAM_FREE;
                 let ent_npc = (*ent).NPC as *mut gNPC_t;
@@ -1227,13 +1227,13 @@ pub fn ValidEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
                     || entTeam == (*npc_client).enemyTeam
                 {
                     if entTeam != (*npc_client).playerTeam {
-                        return QTRUE;
+                        return qtrue;
                     }
                 }
             }
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -1250,12 +1250,12 @@ pub fn NPC_EnemyTooFar(
         let npc = (*ctx.world).globals.NPC;
         let mut dist = dist;
 
-        if toShoot == QFALSE {
+        if toShoot == qfalse {
             //Not trying to actually press fire button with this check
             let npc_client = (*npc).client as *mut gclient_t;
             if (*npc_client).ps.weapon == WP_SABER {
                 //Just have to get to him
-                return QFALSE;
+                return qfalse;
             }
         }
 
@@ -1266,10 +1266,10 @@ pub fn NPC_EnemyTooFar(
         }
 
         if dist > NPC_MaxDistSquaredForWeapon(ctx) {
-            return QTRUE;
+            return qtrue;
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -1314,14 +1314,14 @@ pub fn NPC_PickEnemy(
             minVis = visibility_t::VIS_360;
         }
 
-        if findPlayersFirst != QFALSE {
+        if findPlayersFirst != qfalse {
             //try to find a player first
             let newenemy = &mut world.g_entities[0] as *mut gentity_t;
             if !(*newenemy).client.is_null()
                 && ((*newenemy).flags & FL_NOTARGET) == 0
                 && ((*newenemy).s.eFlags & EF_NODRAW) == 0
                 && (*newenemy).health > 0
-                && NPC_ValidEnemy(ctx, newenemy) != QFALSE
+                && NPC_ValidEnemy(ctx, newenemy) != qfalse
                 && ent_id_opt(base, newenemy) != (*npc).lastEnemy
                 && trap::InPVS(
                     ctx.engine,
@@ -1329,14 +1329,14 @@ pub fn NPC_PickEnemy(
                         &(*newenemy).r.currentOrigin as *const vec3_t,
                         &(*npc).r.currentOrigin as *const vec3_t,
                     ),
-                ) != QFALSE
+                ) != qfalse
             {
                 failed = false;
                 if ((*npc_info).behaviorState == bState_t::BS_INVESTIGATE
                     || (*npc_info).behaviorState == bState_t::BS_PATROL)
                     && (*npc).enemy.is_none()
                 {
-                    if InVisrange(ctx, newenemy) == QFALSE {
+                    if InVisrange(ctx, newenemy) == qfalse {
                         failed = true;
                     } else if NPC_CheckVisibility(
                         ctx,
@@ -1408,11 +1408,11 @@ pub fn NPC_PickEnemy(
                     }
 
                     if !failed {
-                        if findClosest != QFALSE {
+                        if findClosest != qfalse {
                             if relDist < bestDist
-                                && NPC_EnemyTooFar(ctx, newenemy, relDist, QFALSE) == QFALSE
+                                && NPC_EnemyTooFar(ctx, newenemy, relDist, qfalse) == qfalse
                             {
-                                if checkVis != QFALSE {
+                                if checkVis != qfalse {
                                     if NPC_CheckVisibility(ctx, newenemy, visChecks) == minVis {
                                         bestDist = relDist;
                                         closestEnemy = newenemy;
@@ -1422,8 +1422,8 @@ pub fn NPC_PickEnemy(
                                     closestEnemy = newenemy;
                                 }
                             }
-                        } else if NPC_EnemyTooFar(ctx, newenemy, 0.0, QFALSE) == QFALSE {
-                            if checkVis != QFALSE {
+                        } else if NPC_EnemyTooFar(ctx, newenemy, 0.0, qfalse) == qfalse {
+                            if checkVis != qfalse {
                                 if NPC_CheckVisibility(
                                     ctx,
                                     newenemy,
@@ -1443,7 +1443,7 @@ pub fn NPC_PickEnemy(
             }
         }
 
-        if findClosest != QFALSE && !closestEnemy.is_null() {
+        if findClosest != qfalse && !closestEnemy.is_null() {
             return closestEnemy;
         }
 
@@ -1469,7 +1469,7 @@ pub fn NPC_PickEnemy(
             }
 
             let newenemy_client = (*newenemy).client as *mut gclient_t;
-            let ok = (!newenemy_client.is_null() && NPC_ValidEnemy(ctx, newenemy) != QFALSE)
+            let ok = (!newenemy_client.is_null() && NPC_ValidEnemy(ctx, newenemy) != qfalse)
                 || (newenemy_client.is_null() && (*newenemy).alliedTeam == enemyTeam);
             if !ok {
                 continue;
@@ -1495,7 +1495,7 @@ pub fn NPC_PickEnemy(
                     &(*newenemy).r.currentOrigin as *const vec3_t,
                     &(*npc).r.currentOrigin as *const vec3_t,
                 ),
-            ) == QFALSE
+            ) == qfalse
             {
                 continue;
             }
@@ -1504,7 +1504,7 @@ pub fn NPC_PickEnemy(
                 || (*npc_info).behaviorState == bState_t::BS_PATROL)
                 && (*npc).enemy.is_none()
             {
-                if InVisrange(ctx, newenemy) == QFALSE {
+                if InVisrange(ctx, newenemy) == qfalse {
                     continue;
                 } else if NPC_CheckVisibility(ctx, newenemy, CHECK_360 | CHECK_FOV | CHECK_VISRANGE)
                     != visibility_t::VIS_FOV
@@ -1567,9 +1567,9 @@ pub fn NPC_PickEnemy(
                 }
             }
 
-            if findClosest != QFALSE {
-                if relDist < bestDist && NPC_EnemyTooFar(ctx, newenemy, relDist, QFALSE) == QFALSE {
-                    if checkVis != QFALSE {
+            if findClosest != qfalse {
+                if relDist < bestDist && NPC_EnemyTooFar(ctx, newenemy, relDist, qfalse) == qfalse {
+                    if checkVis != qfalse {
                         //FIXME: NPCs need to be able to pick up other NPCs behind them,
                         //but for now, commented out because it was picking up enemies it shouldn't
                         if NPC_CheckVisibility(ctx, newenemy, visChecks) == minVis {
@@ -1581,8 +1581,8 @@ pub fn NPC_PickEnemy(
                         closestEnemy = newenemy;
                     }
                 }
-            } else if NPC_EnemyTooFar(ctx, newenemy, 0.0, QFALSE) == QFALSE {
-                if checkVis != QFALSE {
+            } else if NPC_EnemyTooFar(ctx, newenemy, 0.0, qfalse) == qfalse {
+                if checkVis != qfalse {
                     if NPC_CheckVisibility(ctx, newenemy, CHECK_360 | CHECK_VISRANGE) as i32
                         >= visibility_t::VIS_360 as i32
                     {
@@ -1596,7 +1596,7 @@ pub fn NPC_PickEnemy(
             }
         }
 
-        if findClosest != QFALSE {
+        if findClosest != qfalse {
             //FIXME: you can pick up an enemy around a corner this way.
             return closestEnemy;
         }
@@ -1641,7 +1641,7 @@ pub fn NPC_PickAlly(
                 || (*npc_client).playerTeam == NPCTEAM_ENEMY
             {
                 //if on same team or if player is disguised as your team
-                if ignoreGroup != QFALSE {
+                if ignoreGroup != qfalse {
                     if ent_id_opt(base, ally) == (*npc_client).leader {
                         //reject
                         continue;
@@ -1660,12 +1660,12 @@ pub fn NPC_PickAlly(
                         &(*ally).r.currentOrigin as *const vec3_t,
                         &(*npc).r.currentOrigin as *const vec3_t,
                     ),
-                ) == QFALSE
+                ) == qfalse
                 {
                     continue;
                 }
 
-                if movingOnly != QFALSE {
+                if movingOnly != qfalse {
                     //They have to be moving relative to each other
                     if DistanceSquared((*ally_client).ps.velocity, (*npc_client).ps.velocity) == 0.0
                     {
@@ -1677,7 +1677,7 @@ pub fn NPC_PickAlly(
                 _VectorSubtract((*npc).r.currentOrigin, (*ally).r.currentOrigin, &mut diff);
                 let relDist = VectorNormalize(&mut diff);
                 if relDist < bestDist {
-                    if facingEachOther != QFALSE {
+                    if facingEachOther != qfalse {
                         let mut vf: vec3_t = [0.0; 3];
                         AngleVectors((*ally_client).ps.viewangles, Some(&mut vf), None, None);
                         VectorNormalize(&mut vf);
@@ -1728,13 +1728,13 @@ pub fn NPC_CheckEnemy(
         let npc_info = world.globals.NPCInfo;
         let base = ent_base(ctx);
 
-        let mut forcefindNew = QFALSE;
+        let mut forcefindNew = qfalse;
         let mut newEnemy: *mut gentity_t = core::ptr::null_mut();
 
         if !(*npc).enemy.is_none() {
             let enemy = ent_ptr(ctx, (*npc).enemy);
             if (*enemy).inuse == 0 {
-                if setEnemy != QFALSE {
+                if setEnemy != qfalse {
                     G_ClearEnemy(ctx, npc);
                 }
             }
@@ -1745,12 +1745,12 @@ pub fn NPC_CheckEnemy(
 
         if !(*npc).enemy.is_none() {
             let enemy = ent_ptr(ctx, (*npc).enemy);
-            if NPC_EnemyTooFar(ctx, enemy, 0.0, QFALSE) != QFALSE {
-                if findNew != QFALSE {
+            if NPC_EnemyTooFar(ctx, enemy, 0.0, qfalse) != qfalse {
+                if findNew != qfalse {
                     //See if there is a close one and take it if so, else keep this one
-                    forcefindNew = QTRUE;
-                } else if tooFarOk == QFALSE {
-                    if setEnemy != QFALSE {
+                    forcefindNew = qtrue;
+                } else if tooFarOk == qfalse {
+                    if setEnemy != qfalse {
                         G_ClearEnemy(ctx, npc);
                     }
                 }
@@ -1760,7 +1760,7 @@ pub fn NPC_CheckEnemy(
                     &(*npc).r.currentOrigin as *const vec3_t,
                     &(*enemy).r.currentOrigin as *const vec3_t,
                 ),
-            ) == QFALSE
+            ) == qfalse
             {
                 //FIXME: should this be a line-of site check?
                 let enemy_client = (*enemy).client as *mut gclient_t;
@@ -1775,7 +1775,7 @@ pub fn NPC_CheckEnemy(
         if !(*npc).enemy.is_none() {
             let enemy = ent_ptr(ctx, (*npc).enemy);
             if (*enemy).health <= 0 || ((*enemy).flags & FL_NOTARGET) != 0 {
-                if setEnemy != QFALSE {
+                if setEnemy != qfalse {
                     G_ClearEnemy(ctx, npc);
                 }
             }
@@ -1794,7 +1794,7 @@ pub fn NPC_CheckEnemy(
                     if (*npc).enemy != (*defendEnt).enemy {
                         //They have a different enemy, take it!
                         newEnemy = ent_ptr(ctx, (*defendEnt).enemy);
-                        if setEnemy != QFALSE {
+                        if setEnemy != qfalse {
                             G_SetEnemy(ctx, npc, newEnemy);
                         }
                     }
@@ -1806,12 +1806,12 @@ pub fn NPC_CheckEnemy(
         }
 
         let enemy_dead = (*npc).enemy.is_some() && (*ent_ptr(ctx, (*npc).enemy)).health <= 0;
-        if (*npc).enemy.is_none() || enemy_dead || forcefindNew != QFALSE {
+        if (*npc).enemy.is_none() || enemy_dead || forcefindNew != qfalse {
             //FIXME: NPCs that are moving after an enemy should ignore the can't hit enemy counter- that should only be for NPCs that are standing still
-            let mut foundenemy = QFALSE;
+            let mut foundenemy = qfalse;
 
-            if findNew == QFALSE {
-                if setEnemy != QFALSE {
+            if findNew == qfalse {
+                if setEnemy != qfalse {
                     (*npc).lastEnemy = (*npc).enemy;
                     G_ClearEnemy(ctx, npc);
                 }
@@ -1828,21 +1828,21 @@ pub fn NPC_CheckEnemy(
                     ctx,
                     closestTo,
                     (*npc_client).enemyTeam,
-                    QTRUE,
-                    QFALSE,
-                    QTRUE,
+                    qtrue,
+                    qfalse,
+                    qtrue,
                 );
                 if !newEnemy.is_null() {
-                    foundenemy = QTRUE;
-                    if setEnemy != QFALSE {
+                    foundenemy = qtrue;
+                    if setEnemy != qfalse {
                         G_SetEnemy(ctx, npc, newEnemy);
                     }
                 }
             }
 
-            if forcefindNew == QFALSE {
-                if foundenemy == QFALSE {
-                    if setEnemy != QFALSE {
+            if forcefindNew == qfalse {
+                if foundenemy == qfalse {
+                    if setEnemy != qfalse {
                         (*npc).lastEnemy = (*npc).enemy;
                         G_ClearEnemy(ctx, npc);
                     }
@@ -1875,7 +1875,7 @@ pub fn NPC_ClearShot(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         if npc.is_null() || ent.is_null() {
-            return QFALSE;
+            return qfalse;
         }
 
         let mut muzzle: vec3_t = [0.0; 3];
@@ -1915,14 +1915,14 @@ pub fn NPC_ClearShot(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
         }
 
         if tr.startsolid != 0 || tr.allsolid != 0 {
-            return QFALSE;
+            return qfalse;
         }
 
         if tr.entityNum as c_int == (*ent).s.number {
-            return QTRUE;
+            return qtrue;
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -1941,7 +1941,7 @@ pub fn NPC_ShotEntity(
         let mut tr: trace_t = std::mem::zeroed();
 
         if npc.is_null() || ent.is_null() {
-            return QFALSE as c_int;
+            return qfalse as c_int;
         }
 
         if (*npc).s.weapon == WP_THERMAL {
@@ -2020,7 +2020,7 @@ pub fn NPC_EvaluateShot(ctx: GameContext<'_>, hit: c_int, glassOK: qboolean) -> 
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         if (*npc).enemy.is_none() {
-            return QFALSE;
+            return qfalse;
         }
 
         let enemy = ent_ptr(ctx, (*npc).enemy);
@@ -2029,9 +2029,9 @@ pub fn NPC_EvaluateShot(ctx: GameContext<'_>, hit: c_int, glassOK: qboolean) -> 
             || ((*hitEnt).r.svFlags & crate::g_public_consts::SVF_GLASS_BRUSH) != 0
         {
             //can hit enemy or will hit glass, so shoot anyway
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -2048,14 +2048,14 @@ pub fn NPC_CheckAttack(ctx: GameContext<'_>, scale: f32) -> qboolean {
         }
 
         if ((*npc_info).stats.aggression as f32) * scale < world.bg_state.rng.flrand(0.0, 4.0) {
-            return QFALSE;
+            return qfalse;
         }
 
         if (*npc_info).shotTime > world.level.time {
-            return QFALSE;
+            return qfalse;
         }
 
-        QTRUE
+        qtrue
     }
 }
 
@@ -2072,10 +2072,10 @@ pub fn NPC_CheckDefend(ctx: GameContext<'_>, scale: f32) -> qboolean {
         }
 
         if (*npc_info).stats.evasion as f32 > world.bg_state.rng.random() * 4.0 * scale {
-            return QTRUE;
+            return qtrue;
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -2094,13 +2094,13 @@ pub fn NPC_CheckCanAttack(
         let client = world.globals.client;
 
         let mut attack_scale = attack_scale;
-        let mut attack_ok = QFALSE;
-        let mut dead_on = QFALSE;
+        let mut attack_ok = qfalse;
+        let mut dead_on = qfalse;
         let max_aim_off = 128.0 - (16.0 * (*npc_info).stats.aim as f32);
 
         let enemy = ent_ptr(ctx, (*npc).enemy);
         if ((*enemy).flags & FL_NOTARGET) != 0 {
-            return QFALSE;
+            return qfalse;
         }
 
         //FIXME: only check to see if should duck if that provides cover from the
@@ -2125,22 +2125,22 @@ pub fn NPC_CheckCanAttack(
 
         let npc_npc = (*npc).NPC as *mut gNPC_t;
         (*npc_npc).desiredYaw = angleToEnemy[YAW];
-        NPC_UpdateFiringAngles(ctx, QFALSE, QTRUE);
+        NPC_UpdateFiringAngles(ctx, qfalse, qtrue);
 
-        if NPC_EnemyTooFar(ctx, enemy, distanceToEnemy * distanceToEnemy, QTRUE) != QFALSE {
+        if NPC_EnemyTooFar(ctx, enemy, distanceToEnemy * distanceToEnemy, qtrue) != qfalse {
             //Too far away?  Do not attack
-            return QFALSE;
+            return qfalse;
         }
 
         if (*client).ps.weaponTime > 0 {
             //already waiting for a shot to fire
             (*npc_npc).desiredPitch = angleToEnemy[PITCH];
-            NPC_UpdateFiringAngles(ctx, QTRUE, QFALSE);
-            return QFALSE;
+            NPC_UpdateFiringAngles(ctx, qtrue, qfalse);
+            return qfalse;
         }
 
         if ((*npc_info).scriptFlags & SCF_DONT_FIRE) != 0 {
-            return QFALSE;
+            return qfalse;
         }
 
         (*npc_info).enemyLastVisibility = world.globals.enemyVisibility;
@@ -2149,7 +2149,7 @@ pub fn NPC_CheckCanAttack(
 
         if world.globals.enemyVisibility as c_int >= visibility_t::VIS_FOV as c_int {
             //He's in our FOV
-            attack_ok = QTRUE;
+            attack_ok = qtrue;
 
             //Check to duck
             let enemy_client = (*enemy).client as *mut gclient_t;
@@ -2157,9 +2157,9 @@ pub fn NPC_CheckCanAttack(
                 if (*enemy).enemy == ent_id_opt(ent_base(ctx), npc) {
                     if ((*enemy_client).buttons & BUTTON_ATTACK) != 0 {
                         //FIXME: determine if enemy fire angles would hit me or get close
-                        if NPC_CheckDefend(ctx, 1.0) != QFALSE {
+                        if NPC_CheckDefend(ctx, 1.0) != qfalse {
                             //duck and don't shoot
-                            attack_ok = QFALSE;
+                            attack_ok = qfalse;
                             world.globals.ucmd.upmove = -127;
                         }
                     }
@@ -2169,7 +2169,7 @@ pub fn NPC_CheckCanAttack(
             let mut hitspot: vec3_t = [0.0; 3];
             let mut traceEnt: *mut gentity_t = core::ptr::null_mut();
             let mut tr: trace_t = std::mem::zeroed();
-            if attack_ok != QFALSE {
+            if attack_ok != qfalse {
                 //are we gonna hit him
                 //NEW: use actual forward facing
                 let mut forward: vec3_t = [0.0; 3];
@@ -2201,7 +2201,7 @@ pub fn NPC_CheckCanAttack(
                         && (*npc_client).enemyTeam != 0
                         && (*npc_client).enemyTeam == (*traceEnt_client).playerTeam)
                 {
-                    dead_on = QTRUE;
+                    dead_on = qtrue;
                 } else {
                     attack_scale *= 0.5;
                     if (*npc_client).playerTeam != 0
@@ -2211,19 +2211,19 @@ pub fn NPC_CheckCanAttack(
                         && (*npc_client).playerTeam == (*traceEnt_client).playerTeam
                     {
                         //Don't shoot our own team
-                        attack_ok = QFALSE;
+                        attack_ok = qfalse;
                     }
                 }
             }
 
-            if attack_ok != QFALSE {
+            if attack_ok != qfalse {
                 //ok, now adjust pitch aim
                 _VectorSubtract(hitspot, muzzle, &mut delta);
                 vectoangles(delta, &mut angleToEnemy);
                 (*npc_npc).desiredPitch = angleToEnemy[PITCH];
-                NPC_UpdateFiringAngles(ctx, QTRUE, QFALSE);
+                NPC_UpdateFiringAngles(ctx, qtrue, qfalse);
 
-                if dead_on == QFALSE {
+                if dead_on == qfalse {
                     //We're not going to hit him directly, try a suppressing fire
                     //see if where we're going to shoot is too far from his origin
                     if !traceEnt.is_null()
@@ -2245,7 +2245,7 @@ pub fn NPC_CheckCanAttack(
                             _VectorSubtract(hitspot, enemy_org, &mut diff);
                             aim_off = VectorLength(diff);
                             if aim_off > world.bg_state.rng.random() * max_aim_off {
-                                attack_ok = QFALSE;
+                                attack_ok = qfalse;
                             }
                         }
                         attack_scale *= (max_aim_off - aim_off + 1.0) / max_aim_off;
@@ -2255,16 +2255,16 @@ pub fn NPC_CheckCanAttack(
         } else {
             //Update pitch anyway
             (*npc_npc).desiredPitch = angleToEnemy[PITCH];
-            NPC_UpdateFiringAngles(ctx, QTRUE, QFALSE);
+            NPC_UpdateFiringAngles(ctx, qtrue, qfalse);
         }
 
-        if attack_ok != QFALSE {
-            if NPC_CheckAttack(ctx, attack_scale) != QFALSE {
+        if attack_ok != qfalse {
+            if NPC_CheckAttack(ctx, attack_scale) != qfalse {
                 //check aggression to decide if we should shoot
                 world.globals.enemyVisibility = visibility_t::VIS_SHOOT;
-                WeaponThink(ctx, QTRUE);
+                WeaponThink(ctx, qtrue);
             } else {
-                attack_ok = QFALSE;
+                attack_ok = qfalse;
             }
         }
 
@@ -2438,7 +2438,7 @@ pub fn NPC_CollectCombatPoints(
                         &origin as *const vec3_t,
                         &world.level.combatPoints[i].origin as *const vec3_t,
                     ),
-                ) != QFALSE
+                ) != qfalse
                 {
                     continue;
                 }
@@ -2539,7 +2539,7 @@ pub fn NPC_FindCombatPoint(
             //FIXME: able to mark certain ones as too dangerous to go to for now?  Like a tripmine/thermal/detpack is near or something?
             //If we need a cover point, check this point
             if (flags & CP_COVER) != 0
-                && NPC_ClearLOS(ctx, world.level.combatPoints[i].origin, enemyPosition) != QFALSE
+                && NPC_ClearLOS(ctx, world.level.combatPoints[i].origin, enemyPosition) != qfalse
             {
                 continue;
             }
@@ -2547,7 +2547,7 @@ pub fn NPC_FindCombatPoint(
             //Need a clear LOS to our target... and be within shot range to enemy position (FIXME: make this a separate CS_ flag? and pass in a range?)
             if (flags & CP_CLEAR) != 0 {
                 let enemy = ent_ptr(ctx, (*npc).enemy);
-                if NPC_ClearLOS3(ctx, world.level.combatPoints[i].origin, enemy) == QFALSE {
+                if NPC_ClearLOS3(ctx, world.level.combatPoints[i].origin, enemy) == qfalse {
                     continue;
                 }
                 let dist = if (*npc).s.weapon == WP_THERMAL {
@@ -2684,7 +2684,7 @@ pub fn NPC_FindCombatPoint(
                         world.level.combatPoints[i].origin,
                         (*npc).clipmask,
                         ENTITYNUM_NONE_LOCAL,
-                    ) == QFALSE
+                    ) == qfalse
                     {
                         //don't even have a clear straight path to this one
                         continue;
@@ -2808,24 +2808,24 @@ pub fn NPC_FreeCombatPoint(
         let world = &mut *ctx.world;
         let npc_info = world.globals.NPCInfo;
 
-        if failed != QFALSE {
+        if failed != qfalse {
             //remember that this one failed for us
             (*npc_info).lastFailedCombatPoint = combatPointID;
         }
         //Make sure it's valid
         if combatPointID > world.level.numCombatPoints {
-            return QFALSE;
+            return qfalse;
         }
 
         //Make sure it's currently occupied
-        if world.level.combatPoints[combatPointID as usize].occupied == QFALSE {
-            return QFALSE;
+        if world.level.combatPoints[combatPointID as usize].occupied == qfalse {
+            return qfalse;
         }
 
         //Free it
-        world.level.combatPoints[combatPointID as usize].occupied = QFALSE;
+        world.level.combatPoints[combatPointID as usize].occupied = qfalse;
 
-        QTRUE
+        qtrue
     }
 }
 
@@ -2838,16 +2838,16 @@ pub fn NPC_SetCombatPoint(ctx: GameContext<'_>, combatPointID: c_int) -> qboolea
 
         //Free a combat point if we already have one
         if (*npc_info).combatPoint != -1 {
-            NPC_FreeCombatPoint(ctx, (*npc_info).combatPoint, QFALSE);
+            NPC_FreeCombatPoint(ctx, (*npc_info).combatPoint, qfalse);
         }
 
-        if NPC_ReserveCombatPoint(ctx, combatPointID) == QFALSE {
-            return QFALSE;
+        if NPC_ReserveCombatPoint(ctx, combatPointID) == qfalse {
+            return qfalse;
         }
 
         (*npc_info).combatPoint = combatPointID;
 
-        QTRUE
+        qtrue
     }
 }
 
@@ -2880,21 +2880,21 @@ pub fn NPC_SearchForWeapons(ctx: GameContext<'_>) -> *mut gentity_t {
             if ((*found).s.eFlags & EF_NODRAW) != 0 {
                 continue;
             }
-            if CheckItemCanBePickedUpByNPC(ctx, found, npc) != QFALSE {
+            if CheckItemCanBePickedUpByNPC(ctx, found, npc) != qfalse {
                 if trap::InPVS(
                     ctx.engine,
                     GInPvsArgs::new(
                         &(*found).r.currentOrigin as *const vec3_t,
                         &(*npc).r.currentOrigin as *const vec3_t,
                     ),
-                ) != QFALSE
+                ) != qfalse
                 {
                     let dist = DistanceSquared((*found).r.currentOrigin, (*npc).r.currentOrigin);
                     if dist < bestDist {
                         if trap::Nav_GetBestPathBetweenEnts(
                             ctx.engine,
                             GNavGetbestpathbetweenentsArgs::new(npc, found, NF_CLEAR_PATH_LOCAL),
-                        ) == QFALSE as c_int
+                        ) == qfalse as c_int
                             || trap::Nav_GetBestNodeAltRoute2(
                                 ctx.engine,
                                 GNavGetbestnodealt2Args::new(
@@ -2913,7 +2913,7 @@ pub fn NPC_SearchForWeapons(ctx: GameContext<'_>) -> *mut gentity_t {
                                 (*found).r.currentOrigin,
                                 (*npc).clipmask,
                                 ENTITYNUM_NONE_LOCAL,
-                            ) != QFALSE
+                            ) != qfalse
                             {
                                 //have a clear straight path to this one
                                 bestDist = dist;
@@ -2955,7 +2955,7 @@ pub fn NPC_SetPickUpGoal(ctx: GameContext<'_>, foundWeap: *mut gentity_t) {
             npc,
             org,
             ((*foundWeap).r.maxs[0] * 0.75) as c_int,
-            QFALSE,
+            qfalse,
             -1,
             foundWeap,
         );
@@ -2991,7 +2991,7 @@ pub fn NPC_CheckGetNewWeapon(ctx: GameContext<'_>) {
                     }
                 }
             }
-            if TIMER_Done(ctx, npc, c"panic".as_ptr() as *const c_char) != QFALSE
+            if TIMER_Done(ctx, npc, c"panic".as_ptr() as *const c_char) != qfalse
                 && (*npc_info).goalEntity.is_none()
             {
                 //need a weapon, any lying around?
@@ -3015,7 +3015,7 @@ pub fn NPC_AimAdjust(ctx: GameContext<'_>, change: c_int) {
         let npc_info = world.globals.NPCInfo;
         let g_spskill = world.cvars.g_spskill.integer;
 
-        if TIMER_Exists(ctx, npc, c"aimDebounce".as_ptr() as *const c_char) == QFALSE {
+        if TIMER_Exists(ctx, npc, c"aimDebounce".as_ptr() as *const c_char) == qfalse {
             let debounce = 500 + (3 - g_spskill) * 100;
             TIMER_Set(
                 ctx,
@@ -3025,7 +3025,7 @@ pub fn NPC_AimAdjust(ctx: GameContext<'_>, change: c_int) {
             );
             return;
         }
-        if TIMER_Done(ctx, npc, c"aimDebounce".as_ptr() as *const c_char) != QFALSE {
+        if TIMER_Done(ctx, npc, c"aimDebounce".as_ptr() as *const c_char) != qfalse {
             (*npc_info).currentAim += change;
             if (*npc_info).currentAim > (*npc_info).stats.aim {
                 //can never be better than max aim

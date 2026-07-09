@@ -22,8 +22,8 @@ use crate::level::damage_flags::{
 };
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // `MASK_SHOT` resolves via the prelude's `surface_flags` re-export (canonical
 // `mp_qshared::shared::surface_flags::MASK_SHOT`,

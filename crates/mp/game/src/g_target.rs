@@ -33,8 +33,8 @@ use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED};
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 use mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS;
 
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 /// Raven `#define Q3_SCRIPT_DIR "scripts"`.
 /// Source: `oracle/oracle/codemp/game/q_shared.h:10`

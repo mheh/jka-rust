@@ -134,8 +134,8 @@ pub use vector::{vec2_t, vec3_t, vec3pair_t, vec4_t, vec5_t, vec_t};
 
 // Migration bridge: cross-mode scalar/handle primitives now live in `native_types`.
 pub use native_types::{
-    clipHandle_t, fileHandle_t, fxHandle_t, mdxaBone_t, qboolean, qhandle_t, sfxHandle_t,
-    MAX_QPATH, QFALSE, QTRUE,
+    clipHandle_t, fileHandle_t, fxHandle_t, mdxaBone_t, qboolean, qfalse, qhandle_t, qtrue,
+    sfxHandle_t, MAX_QPATH,
 };
 
 pub use native_math::eorientations::Eorientations;

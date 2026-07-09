@@ -83,8 +83,8 @@ unsafe fn cstr_eq(mut a: *const c_char, mut b: *const c_char) -> bool {
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 /// `ent - g_entities` — the entity's slot index (client number for players).
 #[inline]

@@ -30,6 +30,16 @@ pub type ulong = c_ulong;
 /// Type definition source: `oracle/oracle/codemp/game/q_shared.h`
 pub type qboolean = c_int;
 
+/// Raven `qfalse`/`qtrue` — the `qboolean` enum values, in Raven's lowercase
+/// spelling.
+///
+/// Definition source: `oracle/oracle/code/game/q_shared.h`
+/// Definition source: `oracle/oracle/codemp/game/q_shared.h`
+#[allow(non_upper_case_globals)]
+pub const qfalse: qboolean = 0;
+#[allow(non_upper_case_globals)]
+pub const qtrue: qboolean = 1;
+
 /// Raven `fileHandle_t`.
 ///
 /// Type definition source: `oracle/oracle/code/game/q_shared.h:187`
@@ -79,9 +89,6 @@ pub struct mdxaBone_t {
 
 const _: () = assert!(core::mem::size_of::<mdxaBone_t>() == 48);
 const _: () = assert!(core::mem::offset_of!(mdxaBone_t, matrix) == 0);
-
-pub const QFALSE: qboolean = 0;
-pub const QTRUE: qboolean = 1;
 
 /// Raven `MAX_QPATH`.
 ///

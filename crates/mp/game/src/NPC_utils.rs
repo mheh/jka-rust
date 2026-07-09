@@ -307,24 +307,24 @@ pub fn NPC_UpdateAngles(ctx: GameContext<'_>, doPitch: qboolean, doYaw: qboolean
 
         let mut target_pitch: f32 = 0.0;
         let mut target_yaw: f32 = 0.0;
-        let mut exact = QTRUE;
+        let mut exact = qtrue;
 
         // if angle changes are locked; just keep the current angles
         // aimTime isn't even set anymore... so this code was never reached, but I need a way to lock NPC's yaw, so instead of making a new SCF_ flag, just use the existing render flag... - dmv
         if (*npc).enemy.is_none() && (*ctx.world).level.time < (*npc_info).aimTime {
-            if doPitch != QFALSE {
+            if doPitch != qfalse {
                 target_pitch = (*npc_info).lockedDesiredPitch;
             }
-            if doYaw != QFALSE {
+            if doYaw != qfalse {
                 target_yaw = (*npc_info).lockedDesiredYaw;
             }
         } else {
             // we're changing the lockedDesired Pitch/Yaw below so it's lost it's original meaning, get rid of the lock flag
-            if doPitch != QFALSE {
+            if doPitch != qfalse {
                 target_pitch = (*npc_info).desiredPitch;
                 (*npc_info).lockedDesiredPitch = (*npc_info).desiredPitch;
             }
-            if doYaw != QFALSE {
+            if doYaw != qfalse {
                 target_yaw = (*npc_info).desiredYaw;
                 (*npc_info).lockedDesiredYaw = (*npc_info).desiredYaw;
             }
@@ -355,12 +355,12 @@ pub fn NPC_UpdateAngles(ctx: GameContext<'_>, doPitch: qboolean, doYaw: qboolean
             yaw_speed *= 1.0 / (t_f_val as f32);
         }
 
-        if doYaw != QFALSE {
+        if doYaw != qfalse {
             // decay yaw error
             let mut error = AngleDelta((*npc_client).ps.viewangles[YAW], target_yaw);
             if error.abs() > MIN_ANGLE_ERROR {
                 if error != 0.0 {
-                    exact = QFALSE;
+                    exact = qfalse;
 
                     let mut decay = 60.0 + yaw_speed * 3.0;
                     decay *= 50.0 / 1000.0; //msec
@@ -384,12 +384,12 @@ pub fn NPC_UpdateAngles(ctx: GameContext<'_>, doPitch: qboolean, doYaw: qboolean
         }
 
         //FIXME: have a pitchSpeed?
-        if doPitch != QFALSE {
+        if doPitch != qfalse {
             // decay pitch error
             let mut error = AngleDelta((*npc_client).ps.viewangles[PITCH], target_pitch);
             if error.abs() > MIN_ANGLE_ERROR {
                 if error != 0.0 {
-                    exact = QFALSE;
+                    exact = qfalse;
 
                     let mut decay = 60.0 + yaw_speed * 3.0;
                     decay *= 50.0 / 1000.0; //msec
@@ -415,7 +415,7 @@ pub fn NPC_UpdateAngles(ctx: GameContext<'_>, doPitch: qboolean, doYaw: qboolean
         (*ctx.world).globals.ucmd.angles[ROLL] =
             ANGLE2SHORT((*npc_client).ps.viewangles[ROLL]) - (*client).ps.delta_angles[ROLL];
 
-        if exact != QFALSE
+        if exact != qfalse
             && trap::ICARUS_TaskIDPending(
                 ctx.engine,
                 GIcarusTaskidpendingArgs::new(npc, taskID_t::TID_ANGLE_FACE as c_int),
@@ -492,28 +492,28 @@ pub fn NPC_UpdateFiringAngles(
 
         let mut target_pitch: f32 = 0.0;
         let mut target_yaw: f32 = 0.0;
-        let mut exact = QTRUE;
+        let mut exact = qtrue;
 
         // if angle changes are locked; just keep the current angles
         if (*ctx.world).level.time < (*npc_info).aimTime {
-            if doPitch != QFALSE {
+            if doPitch != qfalse {
                 target_pitch = (*npc_info).lockedDesiredPitch;
             }
-            if doYaw != QFALSE {
+            if doYaw != qfalse {
                 target_yaw = (*npc_info).lockedDesiredYaw;
             }
         } else {
-            if doPitch != QFALSE {
+            if doPitch != qfalse {
                 target_pitch = (*npc_info).desiredPitch;
             }
-            if doYaw != QFALSE {
+            if doYaw != qfalse {
                 target_yaw = (*npc_info).desiredYaw;
             }
 
-            if doPitch != QFALSE {
+            if doPitch != qfalse {
                 (*npc_info).lockedDesiredPitch = (*npc_info).desiredPitch;
             }
-            if doYaw != QFALSE {
+            if doYaw != qfalse {
                 (*npc_info).lockedDesiredYaw = (*npc_info).desiredYaw;
             }
         }
@@ -533,12 +533,12 @@ pub fn NPC_UpdateFiringAngles(
 
         let npc_client = (*npc).client as *mut gclient_t;
 
-        if doYaw != QFALSE {
+        if doYaw != qfalse {
             // decay yaw diff
             let mut diff = AngleDelta((*npc_client).ps.viewangles[YAW], target_yaw);
 
             if diff != 0.0 {
-                exact = QFALSE;
+                exact = qfalse;
 
                 let mut decay = 60.0 + 80.0;
                 decay *= 50.0 / 1000.0; //msec
@@ -562,11 +562,11 @@ pub fn NPC_UpdateFiringAngles(
                 ANGLE2SHORT(target_yaw + diff + error) - (*client).ps.delta_angles[YAW];
         }
 
-        if doPitch != QFALSE {
+        if doPitch != qfalse {
             // decay pitch diff
             let mut diff = AngleDelta((*npc_client).ps.viewangles[PITCH], target_pitch);
             if diff != 0.0 {
-                exact = QFALSE;
+                exact = qfalse;
 
                 let mut decay = 60.0 + 80.0;
                 decay *= 50.0 / 1000.0; //msec
@@ -615,14 +615,14 @@ pub fn NPC_UpdateShootAngles(
         let mut target_pitch: f32 = 0.0;
         let mut target_yaw: f32 = 0.0;
 
-        if doPitch != QFALSE {
+        if doPitch != qfalse {
             target_pitch = angles[PITCH];
         }
-        if doYaw != QFALSE {
+        if doYaw != qfalse {
             target_yaw = angles[YAW];
         }
 
-        if doYaw != QFALSE {
+        if doYaw != qfalse {
             // decay yaw error
             let mut error = AngleDelta((*npc_info).shootAngles[YAW], target_yaw);
             if error != 0.0 {
@@ -643,7 +643,7 @@ pub fn NPC_UpdateShootAngles(
             (*npc_info).shootAngles[YAW] = target_yaw + error;
         }
 
-        if doPitch != QFALSE {
+        if doPitch != qfalse {
             // decay pitch error
             let mut error = AngleDelta((*npc_info).shootAngles[PITCH], target_pitch);
             if error != 0.0 {
@@ -713,13 +713,13 @@ pub fn SetTeamNumbers(ctx: GameContext<'_>) {
 pub fn G_ActivateBehavior(ctx: GameContext<'_>, self_: *mut gentity_t, bset: c_int) -> qboolean {
     unsafe {
         if self_.is_null() {
-            return QFALSE;
+            return qfalse;
         }
 
         let bs_name = (*self_).behaviorSet[bset as usize];
 
         if !VALIDSTRING(bs_name) {
-            return QFALSE;
+            return qfalse;
         }
 
         let mut bSID: c_int = -1;
@@ -744,7 +744,7 @@ pub fn G_ActivateBehavior(ctx: GameContext<'_>, self_: *mut gentity_t, bset: c_i
                 GIcarusRunscriptArgs::new(self_, script_path_c.as_ptr()),
             );
         }
-        QTRUE
+        qtrue
     }
 }
 
@@ -873,12 +873,12 @@ pub fn NPC_SetSurfaceOnOff(
 ) {
     unsafe {
         let mut i: c_int = 0;
-        let mut foundIt = QFALSE;
+        let mut foundIt = qfalse;
 
         while i < BG_NUM_TOGGLEABLE_SURFACES {
             if let Some(surf_name) = bgToggleableSurfaces[i as usize] {
                 if Q_stricmp(surfaceName, surf_name.as_ptr()) == 0 {
-                    foundIt = QTRUE;
+                    foundIt = qtrue;
                     break;
                 }
             } else {
@@ -887,7 +887,7 @@ pub fn NPC_SetSurfaceOnOff(
             i += 1;
         }
 
-        if foundIt == QFALSE {
+        if foundIt == qfalse {
             let msg = format!(
                 "WARNING: Tried to toggle NPC surface that isn't in toggleable surface list ({})\n",
                 cstr_to_str(surfaceName)
@@ -928,7 +928,7 @@ pub fn NPC_SomeoneLookingAtMe(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
             let pEnt = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
 
             let eligible =
-                !pEnt.is_null() && (*pEnt).inuse != QFALSE && !(*pEnt).client.is_null() && {
+                !pEnt.is_null() && (*pEnt).inuse != qfalse && !(*pEnt).client.is_null() && {
                     let cl = (*pEnt).client as *mut gclient_t;
                     (*cl).sess.sessionTeam != TEAM_SPECTATOR
                         && ((*cl).ps.pm_flags & PMF_FOLLOW) == 0
@@ -946,13 +946,13 @@ pub fn NPC_SomeoneLookingAtMe(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
                 //I'm in a 30 fov or so cone from this player.. that's enough I guess.
                 && InFOV(ctx, ent, pEnt, 30, 30) != 0
             {
-                return QTRUE;
+                return qtrue;
             }
 
             i += 1;
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -1001,27 +1001,27 @@ pub fn NPC_ValidEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 
         //Must be a valid pointer
         if ent.is_null() {
-            return QFALSE;
+            return qfalse;
         }
 
         //Must not be me
         if ent == npc {
-            return QFALSE;
+            return qfalse;
         }
 
         //Must not be deleted
-        if (*ent).inuse == QFALSE {
-            return QFALSE;
+        if (*ent).inuse == qfalse {
+            return qfalse;
         }
 
         //Must be alive
         if (*ent).health <= 0 {
-            return QFALSE;
+            return qfalse;
         }
 
         //In case they're in notarget mode
         if ((*ent).flags & FL_NOTARGET) != 0 {
-            return QFALSE;
+            return qfalse;
         }
 
         let npc_client = (*npc).client as *mut gclient_t;
@@ -1032,16 +1032,16 @@ pub fn NPC_ValidEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
             if (*ent).s.eType != ET_NPC as c_int {
                 //still potentially valid
                 if (*ent).alliedTeam == (*npc_client).playerTeam as c_int {
-                    return QFALSE;
+                    return qfalse;
                 } else {
-                    return QTRUE;
+                    return qtrue;
                 }
             } else {
-                return QFALSE;
+                return qfalse;
             }
         } else if (*(((*ent).client) as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR {
             //don't go after spectators
-            return QFALSE;
+            return qfalse;
         }
 
         let ent_client = (*ent).client as *mut gclient_t;
@@ -1064,7 +1064,7 @@ pub fn NPC_ValidEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 
         //Can't be on the same team
         if (*ent_client).playerTeam == (*npc_client).playerTeam {
-            return QFALSE;
+            return qfalse;
         }
 
         let ent_enemy = match (*ent).enemy {
@@ -1089,10 +1089,10 @@ pub fn NPC_ValidEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
                 }))
         //enemy is a rampaging non-aligned creature who is attacking someone on our team or a non-enemy (this last condition is used only if we're a good guy - in effect, we protect the innocent)
         {
-            return QTRUE;
+            return qtrue;
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -1108,7 +1108,7 @@ pub fn NPC_TargetVisible(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean 
         if DistanceSquared((*ent).r.currentOrigin, (*npc).r.currentOrigin)
             > (*npc_info).stats.visrange * (*npc_info).stats.visrange
         {
-            return QFALSE;
+            return qfalse;
         }
 
         //Check our FOV
@@ -1118,17 +1118,17 @@ pub fn NPC_TargetVisible(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean 
             npc,
             (*npc_info).stats.hfov,
             (*npc_info).stats.vfov,
-        ) == QFALSE
+        ) == qfalse
         {
-            return QFALSE;
+            return qfalse;
         }
 
         //Check for sight
-        if NPC_ClearLOS4(ctx, ent) == QFALSE {
-            return QFALSE;
+        if NPC_ClearLOS4(ctx, ent) == qfalse {
+            return qfalse;
         }
 
-        QTRUE
+        qtrue
     }
 }
 
@@ -1174,13 +1174,13 @@ pub fn NPC_FindNearestEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int 
             }
 
             //Must be valid
-            if NPC_ValidEnemy(ctx, rad_ent) == QFALSE {
+            if NPC_ValidEnemy(ctx, rad_ent) == qfalse {
                 i += 1;
                 continue;
             }
 
             //Must be visible
-            if NPC_TargetVisible(ctx, rad_ent) == QFALSE {
+            if NPC_TargetVisible(ctx, rad_ent) == qfalse {
                 i += 1;
                 continue;
             }
@@ -1218,9 +1218,9 @@ pub fn NPC_PickEnemyExt(ctx: GameContext<'_>, checkAlerts: qboolean) -> *mut gen
             return &mut (*ctx.world).g_entities[ent_id as usize] as *mut gentity_t;
         }
 
-        if checkAlerts != QFALSE {
+        if checkAlerts != qfalse {
             let alert_event =
-                NPC_CheckAlertEvents(ctx, QTRUE, QTRUE, -1, QTRUE, AEL_DISCOVERED as c_int);
+                NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qtrue, AEL_DISCOVERED as c_int);
 
             //There is an event to look at
             if alert_event >= 0 {
@@ -1275,7 +1275,7 @@ pub fn NPC_FindPlayer(ctx: GameContext<'_>) -> qboolean {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1367-1399`
 fn NPC_CheckPlayerDistance() -> qboolean {
-    QFALSE
+    qfalse
 }
 
 /// Raven `NPC_FindEnemy`.
@@ -1295,20 +1295,20 @@ pub fn NPC_FindEnemy(ctx: GameContext<'_>, checkAlerts: qboolean) -> qboolean {
         if false {
             //rwwFIXMEFIXME: support for flag
             G_ClearEnemy(ctx, npc);
-            return QFALSE;
+            return qfalse;
         }
 
         //we can't pick up any enemies for now
         if (*npc_info).confusionTime > (*ctx.world).level.time {
-            return QFALSE;
+            return qfalse;
         }
 
         //Don't want a new enemy
         //rwwFIXMEFIXME: support for locked enemy
 
         //See if the player is closer than our current enemy
-        if NPC_CheckPlayerDistance() != QFALSE {
-            return QTRUE;
+        if NPC_CheckPlayerDistance() != qfalse {
+            return qtrue;
         }
 
         //Otherwise, turn off the flag
@@ -1316,10 +1316,10 @@ pub fn NPC_FindEnemy(ctx: GameContext<'_>, checkAlerts: qboolean) -> qboolean {
         let npc_client = (*npc).client as *mut gclient_t;
         if (*npc_client).NPC_class != CLASS_RANCOR
             && (*npc_client).NPC_class != CLASS_WAMPA
-            && NPC_CheckPlayerDistance() != QFALSE
+            && NPC_CheckPlayerDistance() != qfalse
         {
             //rancors, wampas & sand creatures don't care if player is closer, they always go with closest
-            return QTRUE;
+            return qtrue;
         }
 
         //If we've gotten here alright, then our target it still valid
@@ -1327,19 +1327,19 @@ pub fn NPC_FindEnemy(ctx: GameContext<'_>, checkAlerts: qboolean) -> qboolean {
             Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
-        if NPC_ValidEnemy(ctx, npc_enemy) != QFALSE {
-            return QTRUE;
+        if NPC_ValidEnemy(ctx, npc_enemy) != qfalse {
+            return qtrue;
         }
 
         let newenemy = NPC_PickEnemyExt(ctx, checkAlerts);
 
         //if we found one, take it as the enemy
-        if NPC_ValidEnemy(ctx, newenemy) != QFALSE {
+        if NPC_ValidEnemy(ctx, newenemy) != qfalse {
             G_SetEnemy(ctx, npc, newenemy);
-            return QTRUE;
+            return qtrue;
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -1361,7 +1361,7 @@ pub fn NPC_FacePosition(ctx: GameContext<'_>, position: vec3_t, doPitch: qboolea
 
         let mut muzzle: vec3_t = [0.0; 3];
         let mut angles: vec3_t = [0.0; 3];
-        let mut facing = QTRUE;
+        let mut facing = qtrue;
 
         let npc_client = (*npc).client as *mut gclient_t;
 
@@ -1415,7 +1415,7 @@ pub fn NPC_FacePosition(ctx: GameContext<'_>, position: vec3_t, doPitch: qboolea
             }
         }
         //Face that yaw
-        NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+        NPC_UpdateAngles(ctx, qtrue, qtrue);
 
         //Find the delta between our goal and our current facing
         let yaw_delta = AngleNormalize360(
@@ -1427,10 +1427,10 @@ pub fn NPC_FacePosition(ctx: GameContext<'_>, position: vec3_t, doPitch: qboolea
 
         //See if we are facing properly
         if yaw_delta.abs() > VALID_ATTACK_CONE {
-            facing = QFALSE;
+            facing = qfalse;
         }
 
-        if doPitch != QFALSE {
+        if doPitch != qfalse {
             //Find the delta between our goal and our current facing
             let current_angles = SHORT2ANGLE(
                 (*ctx.world).globals.ucmd.angles[PITCH] + (*client).ps.delta_angles[PITCH],
@@ -1439,7 +1439,7 @@ pub fn NPC_FacePosition(ctx: GameContext<'_>, position: vec3_t, doPitch: qboolea
 
             //See if we are facing properly
             if pitch_delta.abs() > VALID_ATTACK_CONE {
-                facing = QFALSE;
+                facing = qfalse;
             }
         }
 
@@ -1469,12 +1469,12 @@ pub fn NPC_FaceEnemy(ctx: GameContext<'_>, doPitch: qboolean) -> qboolean {
         let npc = (*ctx.world).globals.NPC;
 
         if npc.is_null() {
-            return QFALSE;
+            return qfalse;
         }
 
         let enemy_id = match (*npc).enemy {
             Some(id) => id,
-            None => return QFALSE,
+            None => return qfalse,
         };
         let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
 
@@ -1492,12 +1492,12 @@ pub fn NPC_CheckCanAttackExt(ctx: GameContext<'_>) -> qboolean {
 
         //We don't want them to shoot
         if ((*npc_info).scriptFlags & SCF_DONT_FIRE) != 0 {
-            return QFALSE;
+            return qfalse;
         }
 
         //Turn to face
-        if NPC_FaceEnemy(ctx, QTRUE) == QFALSE {
-            return QFALSE;
+        if NPC_FaceEnemy(ctx, qtrue) == qfalse {
+            return qfalse;
         }
 
         //Must have a clear line of sight to the target
@@ -1505,11 +1505,11 @@ pub fn NPC_CheckCanAttackExt(ctx: GameContext<'_>) -> qboolean {
             Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
-        if NPC_ClearShot(ctx, npc_enemy) == QFALSE {
-            return QFALSE;
+        if NPC_ClearShot(ctx, npc_enemy) == qfalse {
+            return qfalse;
         }
 
-        QTRUE
+        qtrue
     }
 }
 
@@ -1567,7 +1567,7 @@ pub fn NPC_CheckLookTarget(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
             if lookTarget >= 0 && lookTarget < ENTITYNUM_WORLD {
                 //within valid range
                 let target = &mut (*ctx.world).g_entities[lookTarget as usize] as *mut gentity_t;
-                if (target.is_null()) || (*target).inuse == QFALSE {
+                if (target.is_null()) || (*target).inuse == qfalse {
                     //lookTarget not inuse or not valid anymore
                     NPC_ClearLookTarget(self_);
                 } else if (*client).renderInfo.lookTargetClearTime != 0
@@ -1584,12 +1584,12 @@ pub fn NPC_CheckLookTarget(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
                     //lookTargets...???
                     NPC_ClearLookTarget(self_);
                 } else {
-                    return QTRUE;
+                    return qtrue;
                 }
             }
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -1645,7 +1645,7 @@ pub fn G_GetBoltPosition(
     modelIndex: c_int,
 ) {
     unsafe {
-        if self_.is_null() || (*self_).inuse == QFALSE {
+        if self_.is_null() || (*self_).inuse == qfalse {
             return;
         }
 

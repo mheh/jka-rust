@@ -31,8 +31,8 @@ use mp_qshared::shared::trajectory::trType_t::*; // TR_GRAVITY
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites
 // (same convention as `g_combat.rs`).
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // `PITCH`/`YAW`/`ROLL` (`crate::q_math`), `PMF_FOLLOW`
 // (`mp_qshared::…::pm_flags`) and `MASK_PLAYERSOLID`

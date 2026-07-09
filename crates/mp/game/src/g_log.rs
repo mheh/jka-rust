@@ -77,7 +77,7 @@ pub fn G_LogWeaponPickup(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
     unsafe {
         let g = &mut (*ctx.world).globals;
         g.G_WeaponLogPickups[client as usize][weaponid as usize] += 1;
-        g.G_WeaponLogClientTouch[client as usize] = QTRUE;
+        g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
 }
 
@@ -97,7 +97,7 @@ pub fn G_LogWeaponFire(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
             g.G_WeaponLogTime[client as usize][weaponid as usize] += dur;
         }
         g.G_WeaponLogLastTime[client as usize] = time;
-        g.G_WeaponLogClientTouch[client as usize] = QTRUE;
+        g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
 }
 
@@ -110,7 +110,7 @@ pub fn G_LogWeaponDamage(ctx: GameContext<'_>, client: c_int, r#mod: c_int, amou
     unsafe {
         let g = &mut (*ctx.world).globals;
         g.G_WeaponLogDamage.0[client as usize][r#mod as usize] += amount;
-        g.G_WeaponLogClientTouch[client as usize] = QTRUE;
+        g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
 }
 
@@ -123,7 +123,7 @@ pub fn G_LogWeaponKill(ctx: GameContext<'_>, client: c_int, r#mod: c_int) {
     unsafe {
         let g = &mut (*ctx.world).globals;
         g.G_WeaponLogKills.0[client as usize][r#mod as usize] += 1;
-        g.G_WeaponLogClientTouch[client as usize] = QTRUE;
+        g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
 }
 
@@ -136,7 +136,7 @@ pub fn G_LogWeaponFrag(ctx: GameContext<'_>, attacker: c_int, deadguy: c_int) {
     unsafe {
         let g = &mut (*ctx.world).globals;
         g.G_WeaponLogFrags[attacker as usize][deadguy as usize] += 1;
-        g.G_WeaponLogClientTouch[attacker as usize] = QTRUE;
+        g.G_WeaponLogClientTouch[attacker as usize] = qtrue;
     }
 }
 
@@ -149,7 +149,7 @@ pub fn G_LogWeaponDeath(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
     unsafe {
         let g = &mut (*ctx.world).globals;
         g.G_WeaponLogDeaths[client as usize][weaponid as usize] += 1;
-        g.G_WeaponLogClientTouch[client as usize] = QTRUE;
+        g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
 }
 
@@ -162,7 +162,7 @@ pub fn G_LogWeaponPowerup(ctx: GameContext<'_>, client: c_int, powerupid: c_int)
     unsafe {
         let g = &mut (*ctx.world).globals;
         g.G_WeaponLogPowerups[client as usize][powerupid as usize] += 1;
-        g.G_WeaponLogClientTouch[client as usize] = QTRUE;
+        g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
 }
 
@@ -175,7 +175,7 @@ pub fn G_LogWeaponItem(ctx: GameContext<'_>, client: c_int, itemid: c_int) {
     unsafe {
         let g = &mut (*ctx.world).globals;
         g.G_WeaponLogItems[client as usize][itemid as usize] += 1;
-        g.G_WeaponLogClientTouch[client as usize] = QTRUE;
+        g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
 }
 
@@ -206,7 +206,7 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         let mut totalshots = [0i32; WPN];
 
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != QFALSE {
+            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 // Ignore any entity/clients we don't care about!
                 for j in 0..WPN {
                     totalpickups[j] += (*ctx.world).globals.G_WeaponLogPickups[i][j];
@@ -326,7 +326,7 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != QFALSE {
+            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
                     write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogPickups[i][j]));
@@ -348,7 +348,7 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != QFALSE {
+            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
                     write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogFired[i][j]));
@@ -370,7 +370,7 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != QFALSE {
+            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
                     write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogTime[i][j]));
@@ -392,7 +392,7 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != QFALSE {
+            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
                     write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogDeaths[i][j]));
@@ -414,7 +414,7 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != QFALSE {
+            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 // Grab the totals from the damage types for the player and map them to the weapons.
                 let mut percharacter = [0i32; WPN];
                 for j in 0..MODN {
@@ -444,7 +444,7 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != QFALSE {
+            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 let mut percharacter = [0i32; WPN];
                 for j in 0..MODN {
                     if j <= MOD_SENTRY as usize {
@@ -473,7 +473,7 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != QFALSE {
+            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..MODN {
                     write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogDamage.0[i][j]));
@@ -495,7 +495,7 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != QFALSE {
+            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..MODN {
                     write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogKills.0[i][j]));
@@ -549,7 +549,7 @@ pub fn CalculateEfficiency(
         let mut n_best_player: c_int = -1;
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
-            if player.inuse == QFALSE {
+            if player.inuse == qfalse {
                 continue;
             }
             let pc = player.client as *mut gclient_t;
@@ -562,17 +562,17 @@ pub fn CalculateEfficiency(
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
             let temp_eff = (100.0 * f_best_ratio) as c_int;
             if temp_eff > 50 {
                 *efficiency = temp_eff;
-                return QTRUE;
+                return qtrue;
             }
-            return QFALSE;
+            return qfalse;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -593,7 +593,7 @@ pub fn CalculateSharpshooter(
         let my_kills = (*ctx.world).globals.G_WeaponLogKills.0[ent_idx]
             [meansOfDeath_t::MOD_DISRUPTOR_SNIPER as usize];
         if (my_kills as f32) / (play_time as f32) < 1.0 {
-            return QFALSE;
+            return qfalse;
         }
 
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
@@ -601,7 +601,7 @@ pub fn CalculateSharpshooter(
         let mut n_best_player: c_int = -1;
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
-            if player.inuse == QFALSE {
+            if player.inuse == qfalse {
                 continue;
             }
             let n_kills = (*ctx.world).globals.G_WeaponLogKills.0[i as usize]
@@ -612,13 +612,13 @@ pub fn CalculateSharpshooter(
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
             *frags = n_most_kills;
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -630,22 +630,22 @@ pub fn CalculateUntouchable(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
         let ec = (*ent).client as *mut gclient_t;
         let play_time = ((*ctx.world).level.time - (*ec).pers.enterTime) / 60000;
 
-        if (*ctx.world).cvars.g_gametype.integer == GT_JEDIMASTER && (*ec).ps.isJediMaster != QFALSE
+        if (*ctx.world).cvars.g_gametype.integer == GT_JEDIMASTER && (*ec).ps.isJediMaster != qfalse
         {
             // Jedi Master (was Borg queen) can only be killed once anyway
-            return QFALSE;
+            return qfalse;
         }
         // MUST HAVE ACHIEVED 2 KILLS PER MINUTE
         if ((*ec).ps.persistant[persEnum_t::PERS_SCORE as usize] as f32) / (play_time as f32) < 2.0
             || play_time == 0
         {
-            return QFALSE;
+            return qfalse;
         }
         // if this guy was never killed... Award Away!!!
         if (*ec).ps.persistant[persEnum_t::PERS_KILLED as usize] == 0 {
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -664,7 +664,7 @@ pub fn CalculateLogistics(
         let mut n_most_different: c_int = 0;
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
-            if player.inuse == QFALSE {
+            if player.inuse == qfalse {
                 continue;
             }
             let mut n_stuff_used: c_int = 0;
@@ -689,13 +689,13 @@ pub fn CalculateLogistics(
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
             *stuffUsed = n_most_different;
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -712,21 +712,21 @@ pub fn CalculateTactician(
         let ec = (*ent).client as *mut gclient_t;
         let play_time = ((*ctx.world).level.time - (*ec).pers.enterTime) / 60000;
 
-        if HasSetSaberOnly(ctx) != QFALSE {
+        if HasSetSaberOnly(ctx) != qfalse {
             // duh, only 1 weapon
-            return QFALSE;
+            return qfalse;
         }
-        if (*ctx.world).cvars.g_gametype.integer == GT_JEDIMASTER && (*ec).ps.isJediMaster != QFALSE
+        if (*ctx.world).cvars.g_gametype.integer == GT_JEDIMASTER && (*ec).ps.isJediMaster != qfalse
         {
             // Jedi Master (was Borg queen) has only 1 weapon
-            return QFALSE;
+            return qfalse;
         }
         // MUST HAVE ACHIEVED 2 KILLS PER MINUTE
         if (play_time as f32) < 0.3 {
-            return QFALSE;
+            return qfalse;
         }
         if ((*ec).ps.persistant[persEnum_t::PERS_SCORE as usize] as f32) / (play_time as f32) < 2.0 {
-            return QFALSE;
+            return qfalse;
         }
 
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
@@ -747,7 +747,7 @@ pub fn CalculateTactician(
         // FOR EVERY PERSON, CHECK FOR CANDIDATE
         for person in 0..maxclients {
             let player = &(*ctx.world).g_entities[person as usize];
-            if player.inuse == QFALSE {
+            if player.inuse == qfalse {
                 continue;
             }
             let mut n_kills: c_int = 0;
@@ -776,9 +776,9 @@ pub fn CalculateTactician(
 
         if n_best_player == (*ent).s.number {
             *kills = n_most_kills;
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -799,7 +799,7 @@ pub fn CalculateDemolitionist(
         let mut n_best_player: c_int = -1;
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
-            if player.inuse == QFALSE {
+            if player.inuse == qfalse {
                 continue;
             }
             let k = (*ctx.world).globals.G_WeaponLogKills.0[i as usize];
@@ -823,13 +823,13 @@ pub fn CalculateDemolitionist(
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
             *kills = n_most_kills;
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -856,7 +856,7 @@ pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
             }
@@ -867,12 +867,12 @@ pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -892,7 +892,7 @@ pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
-            if player.inuse == QFALSE {
+            if player.inuse == qfalse {
                 continue;
             }
             let pc = player.client as *mut gclient_t;
@@ -906,12 +906,12 @@ pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -930,7 +930,7 @@ pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
             }
@@ -941,12 +941,12 @@ pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -965,7 +965,7 @@ pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
             }
@@ -976,12 +976,12 @@ pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -1000,7 +1000,7 @@ pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
             }
@@ -1011,12 +1011,12 @@ pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -1035,7 +1035,7 @@ pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: *mut gentity_t) -> qb
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
             }
@@ -1047,12 +1047,12 @@ pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: *mut gentity_t) -> qb
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -1071,7 +1071,7 @@ pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
             }
@@ -1084,12 +1084,12 @@ pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
             }
         }
         if n_best_player == -1 {
-            return QFALSE;
+            return qfalse;
         }
         if n_best_player == (*ent).s.number {
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -1121,26 +1121,26 @@ pub fn CalculateTeamAward(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int {
     unsafe {
         let mut team_awards: c_int = 0;
 
-        if CalculateTeamMVP(ctx, ent) != QFALSE {
+        if CalculateTeamMVP(ctx, ent) != qfalse {
             team_awards |= 1 << TeamAward_e::TeamMvp as i32;
         }
         if (*ctx.world).cvars.g_gametype.integer == GT_CTF
             || (*ctx.world).cvars.g_gametype.integer == GT_CTY
         {
-            if CalculateTeamDefender(ctx, ent) != QFALSE {
+            if CalculateTeamDefender(ctx, ent) != qfalse {
                 team_awards |= 1 << TeamAward_e::TeamDefender as i32;
             }
-            if CalculateTeamWarrior(ctx, ent) != QFALSE {
+            if CalculateTeamWarrior(ctx, ent) != qfalse {
                 team_awards |= 1 << TeamAward_e::TeamWarrior as i32;
             }
-            if CalculateTeamCarrier(ctx, ent) != QFALSE {
+            if CalculateTeamCarrier(ctx, ent) != qfalse {
                 team_awards |= 1 << TeamAward_e::TeamCarrier as i32;
             }
-            if CalculateTeamInterceptor(ctx, ent) != QFALSE {
+            if CalculateTeamInterceptor(ctx, ent) != qfalse {
                 team_awards |= 1 << TeamAward_e::TeamInterceptor as i32;
             }
         }
-        if team_awards == 0 && CalculateTeamRedShirt(ctx, ent) != QFALSE {
+        if team_awards == 0 && CalculateTeamRedShirt(ctx, ent) != qfalse {
             // if you got nothing else and died a lot, at least get bravery
             team_awards |= 1 << TeamAward_e::TeamBravery as i32;
         }
@@ -1158,19 +1158,19 @@ pub fn CalculateSection31Award(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbo
         let mut frags: c_int = 0;
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
-            if player.inuse == QFALSE {
+            if player.inuse == qfalse {
                 continue;
             }
             CalculateEfficiency(ctx, ent, &mut efficiency);
-            if CalculateSharpshooter(ctx, ent, &mut frags) == QFALSE
-                || CalculateUntouchable(ctx, ent) == QFALSE
+            if CalculateSharpshooter(ctx, ent, &mut frags) == qfalse
+                || CalculateUntouchable(ctx, ent) == qfalse
                 || efficiency < 75
             {
                 continue;
             }
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -1209,27 +1209,27 @@ pub fn CalculateAwards(ctx: GameContext<'_>, ent: *mut gentity_t, msg: *mut c_ch
         let mut stuff_used: c_int = 0;
         let mut kills: c_int = 0;
 
-        if CalculateEfficiency(ctx, ent, &mut efficiency) != QFALSE {
+        if CalculateEfficiency(ctx, ent, &mut efficiency) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_EFFICIENCY as i32;
             buf1 = format!(" {}", efficiency);
         }
-        if CalculateSharpshooter(ctx, ent, &mut kills) != QFALSE {
+        if CalculateSharpshooter(ctx, ent, &mut kills) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_SHARPSHOOTER as i32;
             buf1 = format!("{} {}", buf1, kills);
         }
-        if CalculateUntouchable(ctx, ent) != QFALSE {
+        if CalculateUntouchable(ctx, ent) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_UNTOUCHABLE as i32;
             buf1 = format!("{} {}", buf1, 0);
         }
-        if CalculateLogistics(ctx, ent, &mut stuff_used) != QFALSE {
+        if CalculateLogistics(ctx, ent, &mut stuff_used) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_LOGISTICS as i32;
             buf1 = format!("{} {}", buf1, stuff_used);
         }
-        if CalculateTactician(ctx, ent, &mut kills) != QFALSE {
+        if CalculateTactician(ctx, ent, &mut kills) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_TACTICIAN as i32;
             buf1 = format!("{} {}", buf1, kills);
         }
-        if CalculateDemolitionist(ctx, ent, &mut kills) != QFALSE {
+        if CalculateDemolitionist(ctx, ent, &mut kills) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_DEMOLITIONIST as i32;
             buf1 = format!("{} {}", buf1, kills);
         }
@@ -1245,7 +1245,7 @@ pub fn CalculateAwards(ctx: GameContext<'_>, ent: *mut gentity_t, msg: *mut c_ch
                 buf1 = format!("{} {}", buf1, team_awards);
             }
         }
-        if CalculateSection31Award(ctx, ent) != QFALSE {
+        if CalculateSection31Award(ctx, ent) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_SECTION31 as i32;
             buf1 = format!("{} {}", buf1, 0);
         }
@@ -1474,7 +1474,7 @@ pub fn G_ClearClientLog(ctx: GameContext<'_>, client: c_int) {
             g.G_WeaponLogTime[c][i] = 0;
         }
         g.G_WeaponLogLastTime[c] = 0;
-        g.G_WeaponLogClientTouch[c] = QFALSE;
+        g.G_WeaponLogClientTouch[c] = qfalse;
         for i in 0..HI_NUM_HOLDABLE as usize {
             g.G_WeaponLogPowerups[c][i] = 0;
         }

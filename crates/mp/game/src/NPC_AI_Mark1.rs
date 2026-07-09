@@ -248,7 +248,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
             BOWCASTER_VELOCITY as f32,
             10000,
             npc,
-            QFALSE,
+            qfalse,
         );
 
         if !missile.is_null() {
@@ -329,7 +329,7 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
         );
 
         let missile =
-            crate::g_missile::CreateMissile(ctx, muzzle1, muzzle_dir, 1600.0, 10000, npc, QFALSE);
+            crate::g_missile::CreateMissile(ctx, muzzle1, muzzle_dir, 1600.0, 10000, npc, qfalse);
 
         crate::g_utils::G_Sound(
             ctx,
@@ -644,12 +644,12 @@ pub fn Mark1_Hunt(ctx: GameContext<'_>) {
             }
         }
 
-        crate::NPC_utils::NPC_FaceEnemy(ctx, QTRUE);
+        crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
 
         if !npc_info.is_null() {
-            (*npc_info).combatMove = QTRUE;
+            (*npc_info).combatMove = qtrue;
         }
-        crate::NPC_move::NPC_MoveToGoal(ctx, QTRUE);
+        crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
     }
 }
 
@@ -780,7 +780,7 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
         );
 
         let missile =
-            crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc, QFALSE);
+            crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc, qfalse);
 
         if !missile.is_null() {
             (*missile).classname = c"bryar_proj".as_ptr().cast_mut();
@@ -945,7 +945,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
             BOWCASTER_VELOCITY as f32,
             10000,
             npc,
-            QFALSE,
+            qfalse,
         );
 
         if !missile.is_null() {
@@ -1033,7 +1033,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
 
         // Enemy is dead or he has no enemy.
         let npc_enemy = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
-        if (*npc_enemy).health < 1 || crate::NPC_utils::NPC_CheckEnemyExt(ctx, QFALSE) == QFALSE {
+        if (*npc_enemy).health < 1 || crate::NPC_utils::NPC_CheckEnemyExt(ctx, qfalse) == qfalse {
             (*npc).enemy = None;
             return;
         }
@@ -1053,13 +1053,13 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
             crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy),
         );
         let advance = if distance > MIN_DISTANCE_SQR {
-            QTRUE
+            qtrue
         } else {
-            QFALSE
+            qfalse
         };
 
         // If we cannot see our target, move to see it
-        if visible == QFALSE || crate::NPC_utils::NPC_FaceEnemy(ctx, QTRUE) == QFALSE {
+        if visible == qfalse || crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue) == qfalse {
             Mark1_Hunt(ctx);
             return;
         }
@@ -1106,7 +1106,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
             };
 
         // We can see enemy so shoot him if timers let you.
-        crate::NPC_utils::NPC_FaceEnemy(ctx, QTRUE);
+        crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
 
         if final_distRate == DIST_MELEE {
             Mark1_BlasterAttack(ctx, advance);
@@ -1135,7 +1135,7 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
                 CHAN_AUTO,
                 crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_wakeup".as_ptr()),
             );
-            crate::NPC_utils::NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+            crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
             return;
         }
 
@@ -1144,8 +1144,8 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
             let goal = crate::NPC_goal::UpdateGoal(ctx);
             if !goal.is_null() {
                 (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
-                crate::NPC_move::NPC_MoveToGoal(ctx, QTRUE);
-                crate::NPC_utils::NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+                crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
+                crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
             }
         }
     }

@@ -54,7 +54,7 @@ impl PmoveContext<'_> {
             let ps = (*self.pm).ps;
             let velocity = (*ps).velocity;
             let mut magnitude = VectorLength(velocity) * (*pSelfVehInfo).mass as f32 / 50.0;
-            let mut forceSurfDestruction: qboolean = QFALSE;
+            let mut forceSurfDestruction: qboolean = qfalse;
 
             let hitEnt: *mut bgEntity_t = if !trace.is_null() {
                 self.PM_BGEntForNum((*trace).entityNum as c_int)
@@ -135,7 +135,7 @@ impl PmoveContext<'_> {
                 ) == 0
             {
                 // hit a func_rotating that is supposed to destroy anything it touches!
-                forceSurfDestruction = QTRUE;
+                forceSurfDestruction = qtrue;
             } else if (Q_fabs((*ps).velocity[0]) + Q_fabs((*ps).velocity[1])) < 100.0
                 && (*ps).velocity[2] > -100.0
             {
@@ -158,14 +158,14 @@ impl PmoveContext<'_> {
                     < (*self.pm).cmd.serverTime
                     || forceSurfDestruction != 0
                 {
-                    let mut noDamage: qboolean = QFALSE;
+                    let mut noDamage: qboolean = qfalse;
 
                     if !trace.is_null()
                         && (*pSelfVeh).m_iRemovedSurfaces == 0
                         && forceSurfDestruction == 0
                     {
-                        let mut turnFromImpact: qboolean = QFALSE;
-                        let mut turnHitEnt: qboolean = QFALSE;
+                        let mut turnFromImpact: qboolean = qfalse;
+                        let mut turnHitEnt: qboolean = qfalse;
                         let l0 = (*ps).speed * 0.5;
                         let mut bounceDir: vec3_t = [0.0; 3];
 
@@ -185,7 +185,7 @@ impl PmoveContext<'_> {
                                 return;
                             } else {
                                 if (*pSelfVehInfo).r#type as c_int == VH_FIGHTER as c_int {
-                                    turnFromImpact = QTRUE;
+                                    turnFromImpact = qtrue;
                                 }
                                 bounceDir = (*trace).plane.normal;
                             }
@@ -201,8 +201,8 @@ impl PmoveContext<'_> {
                                     == VH_FIGHTER as c_int
                             {
                                 // two vehicles hit each other, turn away from the impact
-                                turnFromImpact = QTRUE;
-                                turnHitEnt = QTRUE;
+                                turnFromImpact = qtrue;
+                                turnHitEnt = qtrue;
                                 for i in 0..3 {
                                     bounceDir[i] = (*ps).origin[i] - (*hitEnt).r.currentOrigin[i];
                                 }
@@ -451,7 +451,7 @@ impl PmoveContext<'_> {
                         (*pSelfVeh).m_iLastImpactDmg = magnitude as c_int;
                         if (*hitEnt).s.eType == ET_MISSILE as c_int {
                             // FIX: NEVER do or take impact damage from a missile...
-                            noDamage = QTRUE;
+                            noDamage = qtrue;
                             if ((*hitEnt).s.eFlags & EF_JETPACK_ACTIVE) != 0
                                 && (*hitEnt).r.ownerNum < MAX_CLIENTS as c_int
                             {
@@ -604,10 +604,10 @@ impl PmoveContext<'_> {
                     || legsAnim == BOTH_FORCELONGLEAP_LAND as c_int
                     || BG_InReboundJump(legsAnim) != 0
                 {
-                    return QFALSE;
+                    return qfalse;
                 }
             }
-            QTRUE
+            qtrue
         }
     }
 
@@ -619,11 +619,11 @@ impl PmoveContext<'_> {
             let otherEntityNum = (*trace).entityNum as c_int;
 
             if self.pm_entSelf.is_null() {
-                return QFALSE;
+                return qfalse;
             }
 
             if otherEntityNum >= ENTITYNUM_WORLD as c_int {
-                return QFALSE;
+                return qfalse;
             }
 
             let ps = &*(*self.pm).ps;
@@ -641,10 +641,10 @@ impl PmoveContext<'_> {
             let traceEnt = self.PM_BGEntForNum(otherEntityNum);
             if traceEnt.is_null() || ((*traceEnt).r.contents & (*self.pm).tracemask) == 0 {
                 // it's dead or not in my way anymore, don't clip against it
-                return QTRUE;
+                return qtrue;
             }
 
-            QFALSE
+            qfalse
         }
     }
 
@@ -718,7 +718,7 @@ impl PmoveContext<'_> {
                 if trace.allsolid != 0 {
                     // entity is completely trapped in another solid
                     (*ps).velocity[2] = 0.0; // don't build up falling damage, but allow sideways acceleration
-                    return QTRUE;
+                    return qtrue;
                 }
 
                 if trace.fraction > 0.0 {
@@ -753,7 +753,7 @@ impl PmoveContext<'_> {
                 if numplanes >= MAX_CLIP_PLANES {
                     // this shouldn't really happen
                     (*ps).velocity = [0.0; 3];
-                    return QTRUE;
+                    return qtrue;
                 }
 
                 let mut normal = trace.plane.normal;
@@ -895,7 +895,7 @@ impl PmoveContext<'_> {
                         j += 1;
                     }
                     if triple_stop {
-                        return QTRUE;
+                        return qtrue;
                     }
 
                     // if we have fixed all interactions, try another move
@@ -917,9 +917,9 @@ impl PmoveContext<'_> {
             }
 
             if bumpcount != 0 {
-                QTRUE
+                qtrue
             } else {
-                QFALSE
+                qfalse
             }
         }
     }
@@ -934,7 +934,7 @@ impl PmoveContext<'_> {
             let start_v = (*ps).velocity;
 
             if BG_InReboundHold((*ps).legsAnim) != 0 {
-                gravity = QFALSE;
+                gravity = qfalse;
             }
 
             if self.PM_SlideMove(gravity) == 0 {
@@ -981,7 +981,7 @@ impl PmoveContext<'_> {
 
             let mut up = start_o;
 
-            let mut isGiant: qboolean = QFALSE;
+            let mut isGiant: qboolean = qfalse;
             if (*ps).clientNum >= MAX_CLIENTS as c_int {
                 // apply ground friction, even if on ladder
                 // Raven's `&&`-over-`||` precedence leaves the CLASS_VEHICLE clause
@@ -997,11 +997,11 @@ impl PmoveContext<'_> {
                 {
                     // AT-STs can step high
                     up[2] += 66.0;
-                    isGiant = QTRUE;
+                    isGiant = qtrue;
                 } else if !pEnt.is_null() && (*pEnt).s.NPC_class == CLASS_RANCOR as c_int {
                     // also can step up high
                     up[2] += 64.0;
-                    isGiant = QTRUE;
+                    isGiant = qtrue;
                 } else {
                     up[2] += STEPSIZE;
                 }
@@ -1048,7 +1048,7 @@ impl PmoveContext<'_> {
                 (*self.pm).tracemask,
             );
 
-            let mut skipStep: qboolean = QFALSE;
+            let mut skipStep: qboolean = qfalse;
             if (*self.pm).stepSlideFix != 0
                 && (*ps).clientNum < MAX_CLIENTS as c_int
                 && trace.plane.normal[2] < MIN_WALK_NORMAL
@@ -1062,7 +1062,7 @@ impl PmoveContext<'_> {
                 }
                 VectorNormalize(&mut stepVec);
                 if stepVec[2] > (1.0 - MIN_WALK_NORMAL) {
-                    skipStep = QTRUE;
+                    skipStep = qtrue;
                 }
             }
 

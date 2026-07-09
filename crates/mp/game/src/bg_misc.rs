@@ -40,8 +40,8 @@ use mp_bg::public::fieldtype::fieldtype_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::player_state::{MAX_POWERUPS, MAX_PS_EVENTS};
 
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2. Local
 // shadows removed in the const sweep — the `q_math` canonicals reach this file

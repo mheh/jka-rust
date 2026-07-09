@@ -2489,7 +2489,7 @@ pub fn SavePathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
             return 0;
         }
 
-        if RepairPaths(ctx, QFALSE) == 0 {
+        if RepairPaths(ctx, qfalse) == 0 {
             // check if we can see all waypoints from the last. If not, try to branch over.
             trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(f));
             return 0;
@@ -2893,7 +2893,7 @@ pub fn G_BackwardAttachment(
                     CreateNewWP_InsertUnder(ctx, a, 0, insertAfter);
                     let b = (*w).globals.nodetable.0[d as usize].origin;
                     CreateNewWP_InsertUnder(ctx, b, 0, insertAfter);
-                    return QTRUE;
+                    return qtrue;
                 }
 
                 let nt = &(*w).globals.nodetable.0[d as usize];
@@ -2911,14 +2911,14 @@ pub fn G_BackwardAttachment(
                 let a = (*w).globals.nodetable.0[start as usize].origin;
                 CreateNewWP_InsertUnder(ctx, a, 0, insertAfter);
             } else {
-                return QFALSE;
+                return qfalse;
             }
 
             (*w).globals.nodetable.0[start as usize].flags = 1;
             return G_BackwardAttachment(ctx, desired_index, finalDestination, insertAfter);
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -3054,7 +3054,7 @@ pub fn G_RMGPathing(ctx: GameContext<'_>) {
                 nearest_index,
                 nearest_index_for_next,
                 0,
-                QTRUE,
+                qtrue,
                 (*terrain).r.absmin[2],
             ) != nearest_index_for_next
             {
@@ -3066,7 +3066,7 @@ pub fn G_RMGPathing(ctx: GameContext<'_>) {
                     nearest_index,
                     nearest_index_for_next,
                     0,
-                    QFALSE,
+                    qfalse,
                     (*terrain).r.absmin[2],
                 ) != nearest_index_for_next
                 {
@@ -3109,7 +3109,7 @@ pub fn G_RMGPathing(ctx: GameContext<'_>) {
             i += 1;
         }
 
-        RepairPaths(ctx, QTRUE); // this has different behaviour for RMG and will just flag all points one way that don't trace to each other.
+        RepairPaths(ctx, qtrue); // this has different behaviour for RMG and will just flag all points one way that don't trace to each other.
     }
 }
 

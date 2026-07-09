@@ -27,8 +27,8 @@ use mp_qshared::shared::flag_status::{FLAG_ATBASE, FLAG_DROPPED};
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // Raven color escape `#define`s (porting-rules §C8: `#define` -> `const`).
 // Source: `oracle/oracle/codemp/game/q_shared.h:1145-1167`

@@ -34,8 +34,8 @@ use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 /// Per-file `g_entities` base-pointer helper for `EntityId` arena resolution
 /// (matches the `g_missile.rs`/`g_trigger.rs`/`NPC_combat.rs` precedent).

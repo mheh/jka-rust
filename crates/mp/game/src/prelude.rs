@@ -24,13 +24,6 @@ pub use core::ffi::{
 // Source: `oracle/oracle/codemp/game/q_shared.h:349`
 pub type byte = c_uchar;
 
-// Raven `qtrue`/`qfalse` bare spellings (`q_shared.h` `qboolean` enum values,
-// pass-3 symbol backfill). The canonical port lives as `QTRUE`/`QFALSE` in
-// `native_types`; skeleton bodies transcribe Raven's exact lowercase macro
-// names, so both spellings are provided.
-pub const qtrue: qboolean = QTRUE;
-pub const qfalse: qboolean = QFALSE;
-
 // Integration round-1 addendum: the fnskel packets transcribe Raven constant
 // spellings verbatim (per each file's own "integration-deferred" note) without
 // enumerating their owning module's `use`; these glob-imports resolve them
@@ -287,8 +280,7 @@ pub use mp_qshared::shared::trajectory::{trType_t, trajectory_t};
 pub use mp_qshared::shared::wpobject::wpobject_t;
 pub use mp_qshared::shared::Eorientations::*;
 pub use mp_qshared::shared::{
-    fileHandle_t, mdxaBone_t, qboolean, qhandle_t, vec3_t, vec4_t, vec_t, Eorientations, MAX_QPATH,
-    QFALSE, QTRUE,
+    fileHandle_t, mdxaBone_t, qboolean, qtrue, qfalse, qhandle_t, vec3_t, vec4_t, vec_t, Eorientations, MAX_QPATH
 };
 
 // Pass-3 prep C1 (agenda B6/B10): batch re-export of game-crate-local fns

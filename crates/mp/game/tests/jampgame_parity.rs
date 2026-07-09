@@ -1048,7 +1048,7 @@ mod saberload {
             };
 
             let _ = writeln!(o, "saber \"{name}\"");
-            pi(&mut o, "ret", if ret != QFALSE { 1 } else { 0 });
+            pi(&mut o, "ret", if ret != qfalse { 1 } else { 0 });
             qstr(&mut o, "name", &field_str(&saber.name));
             qstr(&mut o, "fullName", &field_str(&saber.fullName));
             pi(&mut o, "type", saber.r#type as c_int);

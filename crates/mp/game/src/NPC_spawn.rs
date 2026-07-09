@@ -1670,7 +1670,7 @@ pub fn NPC_VehiclePrecache(ctx: GameContext<'_>, spawner: *mut gentity_t) -> qbo
                             &mut callbacks,
                             gla_name.as_ptr(),
                             core::ptr::null_mut(),
-                            QFALSE,
+                            qfalse,
                         );
                     }
                 }

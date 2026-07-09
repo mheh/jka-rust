@@ -45,8 +45,8 @@ use mp_qshared::shared::trajectory::trType_t::TR_LINEAR;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // `CONTENTS_PLAYERCLIP`/`MASK_PLAYERSOLID` (`mp_qshared::shared::surface_flags`)
 // and `FRAMETIME` (`crate::g_items`) resolve via the crate prelude glob; the

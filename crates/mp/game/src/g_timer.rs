@@ -13,8 +13,8 @@ use mp_qshared::shared::MAX_GENTITIES;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // PORT-COMPLETE: g_timer.c 12/0
 

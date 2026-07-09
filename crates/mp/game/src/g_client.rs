@@ -107,8 +107,8 @@ const S_COLOR_WHITE: &str = "^7";
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 /// Raven `playerMins` — the standard player bounding-box mins.
 /// Source: `oracle/oracle/codemp/game/g_client.c:9`

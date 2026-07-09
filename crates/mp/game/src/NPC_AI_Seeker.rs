@@ -37,8 +37,8 @@ pub const SEEKER_FORWARD_MULTIPLIER: f32 = 2.0f32;
 pub const SEEKER_SEEK_RADIUS: f32 = 1024.0f32;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // Local constants for Seeker AI.
 // Source: oracle/oracle/codemp/game/NPC_AI_Seeker.c / g_local.h

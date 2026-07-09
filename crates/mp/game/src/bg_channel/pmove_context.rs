@@ -74,8 +74,8 @@ impl<'a> PmoveContext<'a> {
             pm_entSelf: core::ptr::null_mut(),
             pm_entVeh: core::ptr::null_mut(),
             pm_flying: 0, // FLY_NONE
-            gPMDoSlowFall: QFALSE,
-            pm_cancelOutZoom: QFALSE,
+            gPMDoSlowFall: qfalse,
+            pm_cancelOutZoom: qfalse,
             bg,
             traps,
             callbacks,

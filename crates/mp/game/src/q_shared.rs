@@ -19,7 +19,7 @@
 
 use crate::prelude::*;
 use crate::c_format::{c_vsprintf, FmtArg};
-use mp_qshared::shared::{BIG_INFO_STRING, MAX_INFO_STRING, QFALSE, QTRUE};
+use mp_qshared::shared::{BIG_INFO_STRING, MAX_INFO_STRING};
 
 // Parse-session state (cross-frame state -> GameWorld fields, pending full threading).
 // These are module-level statics mimicking Raven's file-static globals in q_shared.c.
@@ -343,7 +343,7 @@ pub fn COM_GetCurrentParseLine() -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.c:295-298`
 pub fn COM_Parse(data_p: *mut *const c_char) -> *mut c_char {
-    crate::q_shared::COM_ParseExt(data_p, QTRUE)
+    crate::q_shared::COM_ParseExt(data_p, qtrue)
 }
 
 /// Raven `COM_ParseError`.
@@ -404,7 +404,7 @@ pub fn SkipWhitespace(data: *const c_char, hasNewLines: *mut qboolean) -> *const
             }
             if c == b'\n' as c_int {
                 COM_LINES += 1;
-                *hasNewLines = QTRUE;
+                *hasNewLines = qtrue;
             }
             p = p.offset(1);
         }
@@ -500,7 +500,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
     unsafe {
         let mut c: c_int = 0;
         let mut len: c_int;
-        let mut hasNewLines = QFALSE;
+        let mut hasNewLines = qfalse;
         let mut data = *data_p;
 
         len = 0;
@@ -519,7 +519,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
                 *data_p = std::ptr::null();
                 return (&raw mut COM_TOKEN).cast::<c_char>();
             }
-            if hasNewLines == QTRUE && allowLineBreaks == QFALSE {
+            if hasNewLines == qtrue && allowLineBreaks == qfalse {
                 *data_p = data;
                 return (&raw mut COM_TOKEN).cast::<c_char>();
             }
@@ -599,7 +599,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
 /// Source: `oracle/oracle/codemp/game/q_shared.c:588-598`
 pub fn COM_ParseString(data: *mut *const c_char, s: *mut *const c_char) -> qboolean {
     unsafe {
-        let token = crate::q_shared::COM_ParseExt(data, QFALSE);
+        let token = crate::q_shared::COM_ParseExt(data, qfalse);
         *s = token as *const c_char;
         // Raven's guard is literally `if ( s[0] == 0 )` — `s` is `const
         // char **`, so `s[0]` is the token pointer itself, not `*token`.
@@ -608,9 +608,9 @@ pub fn COM_ParseString(data: *mut *const c_char, s: *mut *const c_char) -> qbool
         // as a null-pointer check rather than silently "fixed" to `*token`.
         if (*s).is_null() {
             com_printf_lit("unexpected EOF\n");
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -619,13 +619,13 @@ pub fn COM_ParseString(data: *mut *const c_char, s: *mut *const c_char) -> qbool
 /// Source: `oracle/oracle/codemp/game/q_shared.c:605-618`
 pub fn COM_ParseInt(data: *mut *const c_char, i: *mut c_int) -> qboolean {
     unsafe {
-        let token = crate::q_shared::COM_ParseExt(data, QFALSE);
+        let token = crate::q_shared::COM_ParseExt(data, qfalse);
         if *token == 0 {
             com_printf_lit("unexpected EOF\n");
-            return QTRUE;
+            return qtrue;
         }
         *i = atoi(token as *const c_char);
-        QFALSE
+        qfalse
     }
 }
 
@@ -634,13 +634,13 @@ pub fn COM_ParseInt(data: *mut *const c_char, i: *mut c_int) -> qboolean {
 /// Source: `oracle/oracle/codemp/game/q_shared.c:625-638`
 pub fn COM_ParseFloat(data: *mut *const c_char, f: *mut f32) -> qboolean {
     unsafe {
-        let token = crate::q_shared::COM_ParseExt(data, QFALSE);
+        let token = crate::q_shared::COM_ParseExt(data, qfalse);
         if *token == 0 {
             com_printf_lit("unexpected EOF\n");
-            return QTRUE;
+            return qtrue;
         }
         *f = crate::bg_lib::atof(token as *const c_char) as f32;
-        QFALSE
+        qfalse
     }
 }
 
@@ -651,12 +651,12 @@ pub fn COM_ParseVec4(buffer: *mut *const c_char, c: *mut vec4_t) -> qboolean {
     unsafe {
         for i in 0..4usize {
             let mut f = 0.0f32;
-            if crate::q_shared::COM_ParseFloat(buffer, &mut f) == QTRUE {
-                return QTRUE;
+            if crate::q_shared::COM_ParseFloat(buffer, &mut f) == qtrue {
+                return qtrue;
             }
             (*c)[i] = f;
         }
-        QFALSE
+        qfalse
     }
 }
 
@@ -682,7 +682,7 @@ pub fn SkipBracedSection(program: *mut *const c_char) {
     unsafe {
         let mut depth: c_int = 0;
         loop {
-            let token = crate::q_shared::COM_ParseExt(program, QTRUE);
+            let token = crate::q_shared::COM_ParseExt(program, qtrue);
             if *token.offset(1) == 0 {
                 if *token == b'{' as c_char {
                     depth += 1;
@@ -1447,12 +1447,12 @@ pub fn Info_RemoveKey_Big(s: *mut c_char, key: *const c_char) {
 pub fn Info_Validate(s: *const c_char) -> qboolean {
     unsafe {
         if !c_strchr(s, b'"' as c_char).is_null() {
-            return QFALSE;
+            return qfalse;
         }
         if !c_strchr(s, b';' as c_char).is_null() {
-            return QFALSE;
+            return qfalse;
         }
-        QTRUE
+        qtrue
     }
 }
 

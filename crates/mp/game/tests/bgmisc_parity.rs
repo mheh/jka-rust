@@ -446,7 +446,7 @@ fn sec_ps2es(o: &mut String) {
             "ps" => ps_set(&mut ps, &tok[1..]),
             "run" => {
                 let mut s: entityState_t = unsafe { core::mem::zeroed() };
-                BG_PlayerStateToEntityState(&mut ps, &mut s, if snap != 0 { QTRUE } else { QFALSE });
+                BG_PlayerStateToEntityState(&mut ps, &mut s, if snap != 0 { qtrue } else { qfalse });
                 dump_es(o, tok[1], &ps, &s);
             }
             c => panic!("ps2es: unknown cmd '{c}'"),
@@ -473,7 +473,7 @@ fn sec_ps2esxp(o: &mut String) {
             "ps" => ps_set(&mut ps, &tok[1..]),
             "run" => {
                 let mut s: entityState_t = unsafe { core::mem::zeroed() };
-                BG_PlayerStateToEntityStateExtraPolate(&mut ps, &mut s, XP_TIME, QFALSE);
+                BG_PlayerStateToEntityStateExtraPolate(&mut ps, &mut s, XP_TIME, qfalse);
                 dump_es(o, tok[1], &ps, &s);
                 pI(o, " pos.trTime", s.pos.trTime);
                 pI(o, " pos.trDuration", s.pos.trDuration);

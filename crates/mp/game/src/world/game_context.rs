@@ -33,7 +33,9 @@ pub struct GameContext<'e> {
 use core::ffi::{c_char, c_int};
 
 use mp_qshared::common::mp::gentity::gentity_t;
-use mp_qshared::shared::{qboolean, vec3_t, QFALSE, QTRUE};
+use mp_qshared::shared::{qboolean, vec3_t};
+
+use crate::prelude::*;
 
 use mp_abi::game::vmcalls::BOTAI_START_FRAME::{BotAiStartFrame, BotAiStartFrameArgs};
 use mp_abi::game::vmcalls::GAME_CLIENT_BEGIN::{GameClientBegin, GameClientBeginArgs};
@@ -177,7 +179,7 @@ impl Dispatch<GameClientDisconnect> for GameContext<'_> {
 /// `GAME_CLIENT_BEGIN` → `ClientBegin( arg0, qtrue )` (`g_main.c:534-536`).
 impl Dispatch<GameClientBegin> for GameContext<'_> {
     fn dispatch(&self, args: GameClientBeginArgs) {
-        crate::g_client::ClientBegin(*self, args.client_num(), QTRUE)
+        crate::g_client::ClientBegin(*self, args.client_num(), qtrue)
     }
 }
 
@@ -226,8 +228,8 @@ impl Dispatch<GameRoffNotetrackCallback> for GameContext<'_> {
 /// (`g_main.c:550-555`).
 impl Dispatch<GameSpawnRmgEntity> for GameContext<'_> {
     fn dispatch(&self, _args: ()) {
-        if crate::g_spawn::G_ParseSpawnVars(*self, QFALSE) != QFALSE {
-            crate::g_spawn::G_SpawnGEntityFromSpawnVars(*self, QFALSE);
+        if crate::g_spawn::G_ParseSpawnVars(*self, qfalse) != qfalse {
+            crate::g_spawn::G_SpawnGEntityFromSpawnVars(*self, qfalse);
         }
     }
 }
@@ -423,7 +425,7 @@ impl Dispatch<GameIcarusLerp2Pos> for GameContext<'_> {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2POS)
         };
         let (task_id, ent_id, duration) = (m.taskID, m.entID, m.duration);
-        if m.nullAngles != QFALSE {
+        if m.nullAngles != qfalse {
             Q3_Lerp2Pos(*self, task_id, ent_id, &mut m.origin, None, duration);
         } else {
             Q3_Lerp2Pos(

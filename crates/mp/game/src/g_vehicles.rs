@@ -102,8 +102,8 @@ const TURN_OFF: c_int = 0x0000_0100;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // `PITCH`/`YAW`/`ROLL` resolve via the crate prelude glob (`crate::q_math`);
 // the shadowing local copies were removed by the placeholder-const sweep.

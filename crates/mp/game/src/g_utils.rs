@@ -59,8 +59,8 @@ use std::ffi::{CStr, CString};
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // Raven `#define PMF_TIME_KNOCKBACK 64` (`bg_public.h:409`) and
 // `#define SVF_BROADCAST 0x00000020` (`g_local.h`) both resolve through the

@@ -65,8 +65,8 @@ pub const FUNC_WALL_OFF: c_int = 1;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // Raven file-scope `#define`s (this file's own bitflags on `ent->spawnflags`).
 // Source: `oracle/oracle/codemp/game/g_mover.c:26-33`

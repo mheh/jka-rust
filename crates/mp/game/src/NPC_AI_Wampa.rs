@@ -22,8 +22,8 @@ use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // These define the working combat range for these suckers
 // Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:5-9`

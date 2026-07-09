@@ -125,8 +125,8 @@ use mp_qshared::shared::cvar::vmCvar_t;
 
 // Raven `qboolean` is `c_int`; keep the source `qtrue`/`qfalse` spelling at
 // return sites (house style, mirrors `g_items.rs`).
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // Unported types referenced in this file (need porting before this compiles):
 // bot_settings_s

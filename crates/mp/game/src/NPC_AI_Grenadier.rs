@@ -137,7 +137,7 @@ pub fn Grenadier_HoldPosition(ctx: GameContext<'_>) {
         let npc_info_ptr = world.globals.NPCInfo;
 
         if !npc_info_ptr.is_null() {
-            NPC_FreeCombatPoint(ctx, (*npc_info_ptr).combatPoint, QTRUE);
+            NPC_FreeCombatPoint(ctx, (*npc_info_ptr).combatPoint, qtrue);
             (*npc_info_ptr).goalEntity = None;
         }
     }
@@ -153,11 +153,11 @@ pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
         let npc_info_ptr = world.globals.NPCInfo;
 
         if npc_info_ptr.is_null() || npc_ptr.is_null() {
-            return QFALSE;
+            return qfalse;
         }
 
-        (*npc_info_ptr).combatMove = QTRUE;
-        let moved = NPC_MoveToGoal(ctx, QTRUE);
+        (*npc_info_ptr).combatMove = qtrue;
+        let moved = NPC_MoveToGoal(ctx, qtrue);
 
         // Get the move info
         let mut info: navInfo_t = core::mem::zeroed();
@@ -171,7 +171,7 @@ pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
         }
 
         // If our move failed, then reset
-        if moved == QFALSE {
+        if moved == qfalse {
             // couldn't get to enemy
             if ((*npc_info_ptr).scriptFlags & SCF_CHASE_ENEMIES) != 0
                 && (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_THERMAL
@@ -223,7 +223,7 @@ pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
                         npc_ptr,
                         world.level.combatPoints[cp as usize].origin,
                         8,
-                        QTRUE,
+                        qtrue,
                         cp,
                         core::ptr::null_mut(),
                     );
@@ -254,8 +254,8 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
         if (*npc_info_ptr).confusionTime < world.level.time {
             // Look for any enemies
             if ((*npc_info_ptr).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
-                if NPC_CheckPlayerTeamStealth(ctx) != QFALSE {
-                    NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+                if NPC_CheckPlayerTeamStealth(ctx) != qfalse {
+                    NPC_UpdateAngles(ctx, qtrue, qtrue);
                     return;
                 }
             }
@@ -264,14 +264,14 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
                 // Is there danger nearby
                 let alertEvent = NPC_CheckAlertEvents(
                     ctx,
-                    QTRUE,
-                    QTRUE,
+                    qtrue,
+                    qtrue,
                     -1,
-                    QFALSE,
+                    qfalse,
                     alertEventLevel_e::AEL_SUSPICIOUS as c_int,
                 );
-                if NPC_CheckForDanger(ctx, alertEvent) != QFALSE {
-                    NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+                if NPC_CheckForDanger(ctx, alertEvent) != qfalse {
+                    NPC_UpdateAngles(ctx, qtrue, qtrue);
                     return;
                 } else {
                     // check for other alert events
@@ -345,7 +345,7 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
                     (*npc_info_ptr).desiredYaw = angles[YAW];
                     (*npc_info_ptr).desiredPitch = angles[PITCH];
 
-                    NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+                    NPC_UpdateAngles(ctx, qtrue, qtrue);
 
                     (*npc_info_ptr).desiredYaw = o_yaw;
                     (*npc_info_ptr).desiredPitch = o_pitch;
@@ -358,10 +358,10 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
         if !UpdateGoal(ctx).is_null() {
             world.globals.ucmd.buttons |=
                 mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING as c_int;
-            NPC_MoveToGoal(ctx, QTRUE);
+            NPC_MoveToGoal(ctx, qtrue);
         }
 
-        NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+        NPC_UpdateAngles(ctx, qtrue, qtrue);
     }
 }
 
@@ -381,16 +381,16 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
         // See if we're a scout
         if ((*npc_info_ptr).scriptFlags & SCF_CHASE_ENEMIES) == 0 {
             if (*npc_info_ptr).goalEntity == (*npc_ptr).enemy {
-                world.globals.move3 = QFALSE;
+                world.globals.move3 = qfalse;
                 return;
             }
         }
         // See if we're running away
         else if (*npc_info_ptr).squadState == SQUAD_RETREAT {
-            if TIMER_Done(ctx, npc_ptr, c"flee".as_ptr() as *const c_char) != QFALSE {
+            if TIMER_Done(ctx, npc_ptr, c"flee".as_ptr() as *const c_char) != qfalse {
                 (*npc_info_ptr).squadState = SQUAD_IDLE;
             } else {
-                world.globals.faceEnemy3 = QFALSE;
+                world.globals.faceEnemy3 = qfalse;
             }
         }
 
@@ -407,9 +407,9 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                     .currentOrigin,
                 16,
                 FlyingCreature(npc_ptr),
-            ) != QFALSE
+            ) != qfalse
                 || ((*npc_info_ptr).squadState == SQUAD_SCOUT
-                    && world.globals.enemyLOS3 != QFALSE
+                    && world.globals.enemyLOS3 != qfalse
                     && world.globals.enemyDist3 <= 10000.0)
             {
                 // Oracle assigns the dead local `newSquadState` here (never written back
@@ -504,7 +504,7 @@ pub fn Grenadier_CheckFireState(ctx: GameContext<'_>) {
         let world = &*ctx.world;
         let npc_ptr = world.globals.NPC;
 
-        if world.globals.enemyCS3 != QFALSE {
+        if world.globals.enemyCS3 != qfalse {
             // if have a clear shot, always try
             return;
         }
@@ -525,7 +525,7 @@ pub fn Grenadier_CheckFireState(ctx: GameContext<'_>) {
         if crate::q_math::VectorCompare(
             (*((*npc_ptr).client as *mut gclient_t)).ps.velocity,
             crate::q_math::vec3_origin,
-        ) == QFALSE
+        ) == qfalse
         {
             // if moving at all, don't do this
             return;
@@ -542,23 +542,23 @@ pub fn Grenadier_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
         let npc_ptr = world.globals.NPC;
 
         if npc_ptr.is_null() || (*npc_ptr).enemy.is_none() {
-            return QFALSE;
+            return qfalse;
         }
 
         if hit == world.g_entities[(*npc_ptr).enemy.unwrap().index()].s.number {
             // can hit enemy
-            return QTRUE;
+            return qtrue;
         }
 
         if hit >= 0 && (hit as usize) < mp_qshared::shared::MAX_GENTITIES {
             let hit_ent = &world.g_entities[hit as usize];
             if (hit_ent.r.svFlags & SVF_GLASS_BRUSH as i32) != 0 {
                 // will hit glass, so shoot anyway
-                return QTRUE;
+                return qtrue;
             }
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -577,32 +577,32 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
 
         // Don't do anything if we're hurt
         if (*npc_ptr).painDebounceTime > world.level.time {
-            NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+            NPC_UpdateAngles(ctx, qtrue, qtrue);
             return;
         }
 
         // If we don't have an enemy, just idle
-        if NPC_CheckEnemyExt(ctx, QFALSE) == QFALSE {
+        if NPC_CheckEnemyExt(ctx, qfalse) == qfalse {
             (*npc_ptr).enemy = None;
             NPC_BSGrenadier_Patrol(ctx);
             return;
         }
 
-        if TIMER_Done(ctx, npc_ptr, c"flee".as_ptr() as *const c_char) != QFALSE
+        if TIMER_Done(ctx, npc_ptr, c"flee".as_ptr() as *const c_char) != qfalse
             && NPC_CheckForDanger(
                 ctx,
                 NPC_CheckAlertEvents(
                     ctx,
-                    QTRUE,
-                    QTRUE,
+                    qtrue,
+                    qtrue,
                     -1,
-                    QFALSE,
+                    qfalse,
                     alertEventLevel_e::AEL_DANGER as c_int,
                 ),
-            ) != QFALSE
+            ) != qfalse
         {
             // going to run
-            NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+            NPC_UpdateAngles(ctx, qtrue, qtrue);
             return;
         }
 
@@ -616,11 +616,11 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
         let enemy_ent =
             &mut (*ctx.world).g_entities[(*npc_ptr).enemy.unwrap().index()] as *mut gentity_t;
 
-        world.globals.enemyLOS3 = QFALSE;
-        world.globals.enemyCS3 = QFALSE;
-        world.globals.move3 = QTRUE;
-        world.globals.faceEnemy3 = QFALSE;
-        world.globals.shoot3 = QFALSE;
+        world.globals.enemyLOS3 = qfalse;
+        world.globals.enemyCS3 = qfalse;
+        world.globals.move3 = qtrue;
+        world.globals.faceEnemy3 = qfalse;
+        world.globals.shoot3 = qfalse;
         world.globals.enemyDist3 =
             DistanceSquared((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin);
 
@@ -629,7 +629,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
             && ((*enemy_ent).client.is_null()
                 || (*((*enemy_ent).client as *mut gclient_t)).ps.weapon
                     != mp_bg::weapons::weapon_t::WP_SABER
-                || BG_SabersOff(&mut (*((*enemy_ent).client as *mut gclient_t)).ps) != QFALSE)
+                || BG_SabersOff(&mut (*((*enemy_ent).client as *mut gclient_t)).ps) != qfalse)
         {
             // enemy is close and not using saber
             if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_THERMAL {
@@ -678,9 +678,9 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
         }
 
         // can we see our target?
-        if NPC_ClearLOS4(ctx, enemy_ent) != QFALSE {
+        if NPC_ClearLOS4(ctx, enemy_ent) != qfalse {
             (*npc_info_ptr).enemyLastSeenTime = world.level.time;
-            world.globals.enemyLOS3 = QTRUE;
+            world.globals.enemyLOS3 = qtrue;
 
             if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_STUN_BATON {
                 if world.globals.enemyDist3 <= 4096.0
@@ -690,14 +690,14 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
                         (*((*npc_ptr).client as *mut gclient_t)).ps.viewangles,
                         90,
                         45,
-                    ) != QFALSE
+                    ) != qfalse
                 {
                     // within 64 & infront
                     crate::q_math::_VectorCopy(
                         (*enemy_ent).r.currentOrigin,
                         &mut (*npc_info_ptr).enemyLastSeenLocation,
                     );
-                    world.globals.enemyCS3 = QTRUE;
+                    world.globals.enemyCS3 = qtrue;
                 }
             } else if InFOV3(
                 (*enemy_ent).r.currentOrigin,
@@ -705,7 +705,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
                 (*((*npc_ptr).client as *mut gclient_t)).ps.viewangles,
                 45,
                 90,
-            ) != QFALSE
+            ) != qfalse
             {
                 // in front of me
                 // can we shoot our target?
@@ -727,7 +727,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
 
                     if enemyHorzDist < 1048576.0 {
                         // within 1024
-                        world.globals.enemyCS3 = QTRUE;
+                        world.globals.enemyCS3 = qtrue;
                         NPC_AimAdjust(ctx, 2); // adjust aim better longer we have clear shot at enemy
                     } else {
                         NPC_AimAdjust(ctx, 1); // adjust aim better longer we can see enemy
@@ -738,23 +738,23 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
             NPC_AimAdjust(ctx, -1); // adjust aim worse longer we cannot see enemy
         }
 
-        if world.globals.enemyLOS3 != QFALSE {
+        if world.globals.enemyLOS3 != qfalse {
             // FIXME: no need to face enemy if we're moving to some other goal and he's too far away to shoot?
-            world.globals.faceEnemy3 = QTRUE;
+            world.globals.faceEnemy3 = qtrue;
         }
 
-        if world.globals.enemyCS3 != QFALSE {
-            world.globals.shoot3 = QTRUE;
+        if world.globals.enemyCS3 != qfalse {
+            world.globals.shoot3 = qtrue;
             if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_THERMAL {
                 // don't chase and throw
-                world.globals.move3 = QFALSE;
+                world.globals.move3 = qfalse;
             } else if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_STUN_BATON
                 && world.globals.enemyDist3
                     < (((*npc_ptr).r.maxs[0] + (*enemy_ent).r.maxs[0] + 16.0)
                         * ((*npc_ptr).r.maxs[0] + (*enemy_ent).r.maxs[0] + 16.0))
             {
                 // close enough
-                world.globals.move3 = QFALSE;
+                world.globals.move3 = qfalse;
             }
         }
 
@@ -764,17 +764,17 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
         // See if we should override shooting decision with any special considerations
         Grenadier_CheckFireState(ctx);
 
-        if world.globals.move3 != QFALSE {
+        if world.globals.move3 != qfalse {
             // move toward goal
             if !(*npc_info_ptr).goalEntity.is_none() {
                 world.globals.move3 = Grenadier_Move(ctx);
             } else {
-                world.globals.move3 = QFALSE;
+                world.globals.move3 = qfalse;
             }
         }
 
-        if world.globals.move3 == QFALSE {
-            if TIMER_Done(ctx, npc_ptr, c"duck".as_ptr() as *const c_char) == QFALSE {
+        if world.globals.move3 == qfalse {
+            if TIMER_Done(ctx, npc_ptr, c"duck".as_ptr() as *const c_char) == qfalse {
                 world.globals.ucmd.upmove = -127;
             }
         } else {
@@ -782,31 +782,31 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
             TIMER_Set(ctx, npc_ptr, c"duck".as_ptr() as *const c_char, -1);
         }
 
-        if world.globals.faceEnemy3 == QFALSE {
+        if world.globals.faceEnemy3 == qfalse {
             // we want to face in the dir we're running
-            if world.globals.move3 != QFALSE {
+            if world.globals.move3 != qfalse {
                 // don't run away and shoot
                 (*npc_info_ptr).desiredYaw = (*npc_info_ptr).lastPathAngles[YAW];
                 (*npc_info_ptr).desiredPitch = 0.0;
-                world.globals.shoot3 = QFALSE;
+                world.globals.shoot3 = qfalse;
             }
-            NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+            NPC_UpdateAngles(ctx, qtrue, qtrue);
         } else {
             // face the enemy
-            NPC_FaceEnemy(ctx, QTRUE);
+            NPC_FaceEnemy(ctx, qtrue);
         }
 
         if ((*npc_info_ptr).scriptFlags & SCF_DONT_FIRE) != 0 {
-            world.globals.shoot3 = QFALSE;
+            world.globals.shoot3 = qfalse;
         }
 
         // FIXME: don't shoot right away!
-        if world.globals.shoot3 != QFALSE {
+        if world.globals.shoot3 != qfalse {
             // try to shoot if it's time
-            if TIMER_Done(ctx, npc_ptr, c"attackDelay".as_ptr() as *const c_char) != QFALSE {
+            if TIMER_Done(ctx, npc_ptr, c"attackDelay".as_ptr() as *const c_char) != qfalse {
                 if ((*npc_info_ptr).scriptFlags & SCF_FIRE_WEAPON) == 0 {
                     // we've already fired, no need to do it again here
-                    WeaponThink(ctx, QTRUE);
+                    WeaponThink(ctx, qtrue);
                     TIMER_Set(
                         ctx,
                         npc_ptr,
@@ -833,7 +833,7 @@ pub fn NPC_BSGrenadier_Default(ctx: GameContext<'_>) {
         }
 
         if ((*npc_info_ptr).scriptFlags & SCF_FIRE_WEAPON) != 0 {
-            WeaponThink(ctx, QTRUE);
+            WeaponThink(ctx, qtrue);
         }
 
         if (*npc_ptr).enemy.is_none() {

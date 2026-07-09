@@ -36,8 +36,8 @@ use mp_qshared::shared::MAX_CLIENTS;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // `PITCH`/`YAW`/`ROLL` (`crate::q_math`) and `SVF_BROADCAST`
 // (`crate::g_public_consts`) resolve via the crate prelude glob

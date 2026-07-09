@@ -51,8 +51,6 @@ use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
 
-use mp_qshared::shared::{QFALSE, QTRUE};
-
 use crate::bg_misc::{BG_FindItem, BG_ParseField};
 use crate::bg_panimate::BG_ParseAnimationFile;
 use crate::g_items::G_SpawnItem;
@@ -130,7 +128,7 @@ pub fn G_SpawnString(
     unsafe {
         let level = &(*ctx.world).level;
 
-        if level.spawning == QFALSE {
+        if level.spawning == qfalse {
             *out = defaultString as *mut c_char;
             // G_Error(ctx,  "G_SpawnString(ctx) called while not spawning" ) — commented
             // out in Raven itself; preserved as a no-op per the source.
@@ -139,12 +137,12 @@ pub fn G_SpawnString(
         for i in 0..level.numSpawnVars {
             if Q_stricmp(key, level.spawnVars[i as usize][0]) == 0 {
                 *out = level.spawnVars[i as usize][1];
-                return QTRUE;
+                return qtrue;
             }
         }
 
         *out = defaultString as *mut c_char;
-        QFALSE
+        qfalse
     }
 }
 
@@ -303,7 +301,7 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         if (*ent).classname.is_null() {
             G_Printf(ctx, c"G_CallSpawn: NULL classname\n".as_ptr());
-            return QFALSE;
+            return qfalse;
         }
 
         // check item spawn functions
@@ -312,7 +310,7 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
             // Raven matches items with case-sensitive `strcmp`, not `Q_stricmp`.
             if CStr::from_ptr((*item).classname) == CStr::from_ptr((*ent).classname) {
                 G_SpawnItem(ctx, ent, item);
-                return QTRUE;
+                return qtrue;
             }
             item = item.add(1);
         }
@@ -325,7 +323,7 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
                 G_SoundIndex((*ent).healingsound);
             }
             crate::ent_fn_enums::dispatch_spawn(ctx, sp, ent);
-            return QTRUE;
+            return qtrue;
         }
         let classname_disp = CStr::from_ptr((*ent).classname).to_string_lossy();
         G_Printf(
@@ -336,7 +334,7 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
             ))
             .as_ptr(),
         );
-        QFALSE
+        qfalse
     }
 }
 
@@ -835,7 +833,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
         }
 
         let mut value: *mut c_char = std::ptr::null_mut();
-        if G_SpawnString(ctx, c"gametype".as_ptr(), std::ptr::null(), &mut value) != QFALSE {
+        if G_SpawnString(ctx, c"gametype".as_ptr(), std::ptr::null(), &mut value) != qfalse {
             let gt = (*ctx.world).cvars.g_gametype.integer;
             if gt >= GT_FFA && gt < GT_MAX_GAME_TYPE {
                 let gametype_name = GAMETYPE_NAMES[gt as usize];
@@ -852,12 +850,12 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
         (*ent).r.currentOrigin = (*ent).s.origin;
 
         // if we didn't get a classname, don't bother spawning anything
-        if G_CallSpawn(ctx, ent) == QFALSE {
+        if G_CallSpawn(ctx, ent) == qfalse {
             G_FreeEntity(ctx, ent);
         }
 
         // Tag on the ICARUS scripting information only to valid recipients
-        if trap::ICARUS_ValidEnt(ctx.engine, GIcarusValidentArgs::new(ent)) != QFALSE {
+        if trap::ICARUS_ValidEnt(ctx.engine, GIcarusValidentArgs::new(ent)) != qfalse {
             trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(ent));
 
             if !(*ent).classname.is_null() && *(*ent).classname != 0 {
@@ -1077,10 +1075,10 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
         if trap::GetEntityToken(
             ctx.engine,
             GGetEntityTokenArgs::new(com_token.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
-        ) == QFALSE
+        ) == qfalse
         {
             // end of spawn string
-            return QFALSE;
+            return qfalse;
         }
         if com_token[0] != b'{' as c_char {
             panic!("G_ParseSpawnVars: found {{ ... }} mismatch"); // G_Error -> panic (frozen Group A)
@@ -1092,7 +1090,7 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
             if trap::GetEntityToken(
                 ctx.engine,
                 GGetEntityTokenArgs::new(keyname.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
-            ) == QFALSE
+            ) == qfalse
             {
                 panic!("G_ParseSpawnVars: EOF without closing brace");
             }
@@ -1105,7 +1103,7 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
             if trap::GetEntityToken(
                 ctx.engine,
                 GGetEntityTokenArgs::new(com_token.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
-            ) == QFALSE
+            ) == qfalse
             {
                 panic!("G_ParseSpawnVars: EOF without closing brace");
             }
@@ -1124,11 +1122,11 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
             (*ctx.world).level.numSpawnVars += 1;
         }
 
-        if inSubBSP != QFALSE {
+        if inSubBSP != qfalse {
             HandleEntityAdjustment(ctx);
         }
 
-        QTRUE
+        qtrue
     }
 }
 
@@ -1188,7 +1186,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         // when the first client connects.
         // PORT-NOTE(bg-panimate-method): BG_ParseAnimationFile is a PmoveContext method in the ported codebase,
         // but needs to be called from game-tier SP_worldspawn; using the resolved freestanding signature.
-        if (*ctx.world).bg_state.BGPAFtextLoaded == QFALSE {
+        if (*ctx.world).bg_state.BGPAFtextLoaded == qfalse {
             let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
                 world: ctx.world,
@@ -1200,7 +1198,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 &mut callbacks,
                 c"models/players/_humanoid/animation.cfg".as_ptr(),
                 (*ctx.world).bg_state.bgHumanoidAnimations.as_mut_ptr(),
-                QTRUE,
+                qtrue,
             );
         }
 
@@ -1433,7 +1431,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:1389-1392`
 pub fn SP_bsp_worldspawn() -> qboolean {
-    QTRUE
+    qtrue
 }
 
 /// Raven `G_PrecacheSoundsets`.
@@ -1446,7 +1444,7 @@ pub fn G_PrecacheSoundsets(ctx: GameContext<'_>) {
         for i in 0..(mp_qshared::shared::MAX_GENTITIES as usize) {
             let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
 
-            if (*ent).inuse != QFALSE && !(*ent).soundSet.is_null() && *(*ent).soundSet != 0 {
+            if (*ent).inuse != qfalse && !(*ent).soundSet.is_null() && *(*ent).soundSet != 0 {
                 if counted_sets >= MAX_AMBIENT_SETS {
                     panic!("MAX_AMBIENT_SETS was exceeded! (too many soundsets)\n");
                     // Com_Error(ERR_DROP, ...) -> panic
@@ -1466,27 +1464,27 @@ pub fn G_PrecacheSoundsets(ctx: GameContext<'_>) {
 pub fn G_SpawnEntitiesFromString(ctx: GameContext<'_>, inSubBSP: qboolean) {
     unsafe {
         // allow calls to G_Spawn*()
-        (*ctx.world).level.spawning = QTRUE;
+        (*ctx.world).level.spawning = qtrue;
         (*ctx.world).level.numSpawnVars = 0;
 
         // the worldspawn is not an actual entity, but it still
         // has a "spawn" function to perform any global setup
         // needed by a level (setting configstrings or cvars, etc)
-        if G_ParseSpawnVars(ctx, QFALSE) == QFALSE {
+        if G_ParseSpawnVars(ctx, qfalse) == qfalse {
             G_Error(ctx, c"SpawnEntities: no entities".as_ptr());
         }
 
-        if inSubBSP == QFALSE {
+        if inSubBSP == qfalse {
             SP_worldspawn(ctx);
         } else {
             // Skip this guy if its worldspawn fails
-            if SP_bsp_worldspawn() == QFALSE {
+            if SP_bsp_worldspawn() == qfalse {
                 return;
             }
         }
 
         // parse ents
-        while G_ParseSpawnVars(ctx, inSubBSP) != QFALSE {
+        while G_ParseSpawnVars(ctx, inSubBSP) != qfalse {
             G_SpawnGEntityFromSpawnVars(ctx, inSubBSP);
         }
 
@@ -1505,14 +1503,14 @@ pub fn G_SpawnEntitiesFromString(ctx: GameContext<'_>, inSubBSP: qboolean) {
                 (*script_runner).think = Some(EntThink::scriptrunner_run).into();
                 (*script_runner).nextthink = (*ctx.world).level.time + 100;
 
-                if (*script_runner).inuse != QFALSE {
+                if (*script_runner).inuse != qfalse {
                     trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(script_runner));
                 }
             }
         }
 
-        if inSubBSP == QFALSE {
-            (*ctx.world).level.spawning = QFALSE; // any future calls to G_Spawn*() will be errors
+        if inSubBSP == qfalse {
+            (*ctx.world).level.spawning = qfalse; // any future calls to G_Spawn*() will be errors
         }
 
         G_PrecacheSoundsets(ctx);

@@ -71,8 +71,8 @@ use mp_qshared::shared::mdxaBone_t;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+
+
 
 // Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2. Canonical
 // in `crate::q_math`. Source: `oracle/oracle/codemp/game/q_shared.h:374-376`
