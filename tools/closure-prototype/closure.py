@@ -23,7 +23,7 @@ import clang.cindex as ci
 from clang.cindex import CursorKind, TypeKind
 
 REPO = Path(__file__).resolve().parents[2]
-ORACLE = REPO / "oracle" / "oracle"
+ORACLE = REPO / "oracle"
 CRATES = REPO / "crates"
 SRC_ROOT = ORACLE  # reassigned by --root for non-oracle trees (e.g. OpenJK)
 
