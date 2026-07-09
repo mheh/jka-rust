@@ -82,10 +82,10 @@ crates/
     uishared/                # Tier 2: codemp/ui/ui_shared
     abi/                     # MP engine<->module seam (dllEntry/vmMain surfaces)
     engine-select/           # mp_engine_select binding leaf: the one cfg'd
-                             #   `pub type Engine` alias (wasm32 by target_arch;
-                             #   Static by feature "static"; default CEngine/
-                             #   NativeDll). Logic crates import it so `mod trap`
-                             #   stays non-generic and cfg-free (SEAM-D13).
+                             #   `pub type Engine` alias (Static by feature
+                             #   "static"; default CEngine/NativeDll). Logic
+                             #   crates import it so `mod trap` stays
+                             #   non-generic and cfg-free (SEAM-D13).
     game/                    # mp_game logic (transport-agnostic; jampgame shell wraps it)
     cgame/                   # mp_cgame logic (transport-agnostic; cgame shell wraps it)
     ui/                      # mp_ui logic (transport-agnostic; ui shell wraps it)
@@ -94,11 +94,6 @@ crates/
                              #   com_init/com_frame/com_shutdown (+ com_error
                              #   *recovery*; com_error itself is defined one tier
                              #   lower in qcommon, state-ownership.md STATE-D7)
-      wasm-host/             # mp_engine_wasm_host: host-side wasm module
-                             #   types (WasmPtr<T>, ModuleMemory) + the
-                             #   wasmtime dep, isolated here; qcommon's
-                             #   ModuleTransport::Wasm arm is feature-gated
-                             #   on it (LOAD-Q5 resolution, 2026-07-02)
       qcommon/  server/  client/  botlib/  ghoul2/  icarus/  rmg/
     renderer/                # codemp/renderer (per-mode, split for authenticity)
     app/                     # openjk (client) + openjkded (dedicated); thin
@@ -172,16 +167,15 @@ SP `cgame`/`ui` have no separate shell — they are statically linked into
 
 > **Two types named `Engine` exist, on opposite islands, never co-scoped**
 > (disambiguation, 2026-07-03): `mp_engine_select::Engine` is the module-side
-> cfg'd transport-backend alias (CEngine/Static/wasm) that `mod trap` wrappers
+> cfg'd transport-backend alias (CEngine/Static) that `mod trap` wrappers
 > take as `engine: &Engine`; `mp_engine_core::Engine` is the engine-island
 > aggregate struct (`{common, sv, cl, cm, snd}`, state-ownership.md STATE-D5).
 > Module crates cannot reach core; engine crates do not import select. Doc text
 > must always crate-qualify the two.
 
 Per-build transport selection (SEAM-D13): `mp/engine-select` owns the single
-cfg'd `pub type Engine` alias — `cfg(target_arch = "wasm32")` picks the wasm
-backend, Cargo feature `static` picks `Static`, default is `CEngine`
-(`NativeDll`); shells select it (`jampgame` et al. take the default, a
+cfg'd `pub type Engine` alias — Cargo feature `static` picks `Static`, default
+is `CEngine` (`NativeDll`); shells select it (`jampgame` et al. take the default, a
 static-linking engine build enables `static`). Known cost: NativeDll and Static
 shells on the same host triple cannot share one feature-unified
 `cargo build --workspace` graph — those builds go per-package. SP needs no
@@ -197,10 +191,7 @@ facade: it depends on the other `mp/engine/*` subcrates, defines the aggregate
 `com_error`'s recovery; `com_error` itself is defined one tier lower in
 `mp/engine/qcommon` — state-ownership.md STATE-D7).
 `mp/app` is a thin bin shell depending only on `mp/engine/core` and hosts the
-module cdylib shells. `mp/engine/wasm-host` (package `mp_engine_wasm_host`)
-isolates the host-side wasm types (`WasmPtr<T>`, `ModuleMemory`) and the
-`wasmtime` dependency; `mp/engine/qcommon`'s `ModuleTransport::Wasm` arm is
-feature-gated on it, so native-only builds carry no wasm toolchain. SP mirrors the same edges via `sp/engine/core` (package
+module cdylib shells. SP mirrors the same edges via `sp/engine/core` (package
 `sp_engine_core`); SP `game` uses the `GetGameAPI` table half of
 `abi-transport` instead of `dllEntry`/`vmMain`.
 

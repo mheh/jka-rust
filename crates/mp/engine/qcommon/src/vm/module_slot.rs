@@ -14,7 +14,7 @@ pub struct ModuleSlot {
     /// `load_module`'s scan compares case-insensitively. `pub(crate)` (LOAD-D12f).
     pub(crate) name: String,
     /// The loaded native artifact (lib + `vmMain` entry). NativeDll-only today;
-    /// transport-polymorphic content for Static/Wasm is LOAD-Q9 (open).
+    /// transport-polymorphic content for `Static` is LOAD-Q9 (open).
     pub(crate) module: LoadedModule,
     /// SEAM-D11's per-slot engine syscall target the inbound trampoline forwards
     /// to — the injected ctx + `system_calls` pair (`vm->systemCall`,

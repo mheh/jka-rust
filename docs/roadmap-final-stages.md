@@ -80,7 +80,7 @@ serialization happens on the sidecar thread). This unlocks, in rough order:
   tiered per-identity permissions; audit log free — every mutation is a
   serialized command). Mailbox is a whitelist: no variant, no capability.
 - **External NPC brains / director mode**: snapshot eyes + fn-ID goal
-  injection via mailbox; WASM sandboxed mods per the DEC WASM-transport track.
+  injection via mailbox.
 
 ## Stage 4 — Performance (only after parity locks "correct")
 

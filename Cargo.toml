@@ -19,7 +19,6 @@ members = [
     "crates/mp/ui",
     "crates/mp/engine/qcommon",
     "crates/mp/engine/core",
-    "crates/mp/engine/wasm-host",
     "crates/mp/engine/server",
     "crates/mp/engine/client",
     "crates/mp/engine/botlib",

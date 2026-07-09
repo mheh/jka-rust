@@ -35,7 +35,7 @@ rust-analyzer is stale in this workspace — **always confirm compilation with
 - `docs/workspace-architecture.md` — crate graph and dependency tiers
   (native < qshared < bg < game; qshared → abi → game).
 - `docs/decisions.md` — the DEC-xx ledger: user-settled architectural choices
-  (renderer deferral, WASM transport, wire compat, …). Cite, never re-litigate.
+  (renderer deferral, wasm dropped per ruling 35, wire compat, …). Cite, never re-litigate.
 - `docs/doc-standards.md` — template + gates for logic-port design docs
   (`docs/architecture/`, `docs/modules/`, `docs/subsystems/`).
 - `docs/GOAL.md` — project goal (drop-in ABI compatibility checklists).

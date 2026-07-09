@@ -65,7 +65,7 @@ signature (LIFE-D4b), and the `SysEventQueue` surface.
 **Non-goals** (each punted to its owning doc):
 
 - **Seam mechanics** — how a trap/`vmMain` crosses, dispatcher routing, transport
-  (`NativeDll|Static|Wasm`) → `docs/architecture/engine-seam.md`.
+  (`NativeDll|Static`) → `docs/architecture/engine-seam.md`.
 - **Module load / restart mechanics** — `SV_InitGameProgs`, DLL/`GetGameAPI`
   loading, `vm_restart`, VM table → `docs/architecture/module-loading.md`.
 - **Subsystem internals** — cvar parse tables, filesystem search paths, sound

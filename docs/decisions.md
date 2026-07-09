@@ -82,6 +82,11 @@ In scope:
    never regresses. The wasmtime host itself lands **after** native-DLL parity
    is proven (a sandbox is no place to debug parity).
 
+**AMENDED 2026-07-09 (ruling 35, engine-fork-discovery):** item 5 **REVERSED** —
+WASM dropped entirely (no module transport, no engine target, no scripting
+sandbox); `Wasm` variant, `WasmPtr`, `wasm-host` crate, and wasm32 CI ambitions
+all removed. Transports: `NativeDll | Static`.
+
 ## DEC-06 — Network: full 1.01 wire compatibility
 
 Exact protocol 26 on the wire — huffman coding, delta snapshots,
@@ -175,8 +180,8 @@ and semantics of Raven behavior are what matter most during this process.
 Sequenced strictly after per-subsystem parity (porting-rules §A2's
 faithful-first rule); fits DEC-04's arc (unify only after porting). Precedents
 already inside the settled decisions: DEC-07's dropped word-packing round-trip
-(internal plumbing, no observable behavior) and DEC-05's wasm transport (the
-generic layer is already the true call in one mode).
+(internal plumbing, no observable behavior) and DEC-05's since-reversed wasm
+transport (the generic layer is already the true call in one mode).
 
 ## DEC-12 — Ctx-free boundaries route via narrow capability sinks (user, 2026-07-06)
 
