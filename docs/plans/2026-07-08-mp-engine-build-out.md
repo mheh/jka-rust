@@ -238,6 +238,14 @@ contains complete, verified functions.
   reordering. If the order looks wrong, fix the tool and regenerate — never
   the artifact by hand. It runs with the pinned parse configuration in the
   appendix; regenerating with different flags invalidates the artifact.
+- **Transcription-first: no safety refactoring during the port.** Faithful
+  port, parity green, refactor behind the passing diff (porting-rules §A2) —
+  pointer-style Rust where the C demands it, exactly as the game module was
+  landed. The safe-state migration is a separate post-parity phase, as it is
+  for `mp_game`. The §3 heading "build it safe" means the three structural
+  conventions decided at port time — globals → host-struct fields (never
+  `static mut`), §F design-first shape for the C++-track subsystems, `unsafe`
+  confined to the ABI seam — not safety idiom conversion.
 
 ### Stage 0 (prerequisite, from the referee plan) — the game-host interface crate
 Not engine code; the contract. A `crates/mp/host-interface` (name TBD) crate of
