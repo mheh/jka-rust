@@ -2,7 +2,7 @@
 //! the Raven oracle. Reproduces `tools/jampgame-oracle/`'s canonical bit-exact
 //! dumps by calling the PORTED functions (`mp_game::q_math`,
 //! `mp_game::bg_lib`, `mp_game::bg_channel::Rng`) and byte-compares to the
-//! committed goldens under `tools/jampgame-oracle/golden/`.
+//! committed goldens under `tests/oracle/golden/`.
 //!
 //! Single-threaded by construction: the oracle keeps its RNG in file statics
 //! (a fresh dumper process per family); the Rust side mirrors that with ONE
@@ -20,7 +20,7 @@ use mp_game::q_math::*;
 use mp_game::shared::cplane_t;
 
 fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tools/jampgame-oracle")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
 }
 
 fn compare(name: &str, got: &str) {
@@ -592,7 +592,7 @@ fn bglib_parity() {
 
 // ============================ bg_saberLoad family ============================
 //
-// Reproduces `tools/jampgame-oracle/golden/saberload.txt` by driving the
+// Reproduces `tests/oracle/golden/saberload.txt` by driving the
 // PORTED `WP_SaberLoadParms` + `WP_SaberParseParms` over the same
 // `fixtures/sabers/*.sab`. A tiny `TestTraps` serves the fixtures dir through
 // the real `BgTraps` FS seam and mints deterministic skin handles; the

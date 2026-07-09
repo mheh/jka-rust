@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build the pmove SABER differential dumper from the UNMODIFIED Raven sources and
-# check (or, with --regen, regenerate) golden/pmove_saber.txt.
+# check (or, with --regen, regenerate)
+# crates/mp/game/tests/oracle/golden/pmove_saber.txt.
 #
 # This is a self-contained sibling of run.sh's pmove slice: it uses its OWN build
 # directory (build-pmove-saber/) and touches nothing run.sh owns. It follows the
@@ -11,6 +12,10 @@
 # main_pmove.c. oracle/ is never edited (sources are copied into build-pmove-saber/).
 set -eu
 cd "$(dirname "$0")"
+
+# Committed parity data (fixtures + goldens) lives inside the mp_game crate so
+# the crate is self-contained; this harness only generates/checks it.
+DATA=../../crates/mp/game/tests/oracle
 
 ORACLE=../../oracle/oracle
 G=$ORACLE/codemp/game
@@ -61,7 +66,7 @@ cc $PMCFLAGS -c main_pmove_saber.c -o "$B/pm_main.o"
 # shellcheck disable=SC2086
 cc "$B/pm_main.o" $PMOBJS "$B/pm_q_math.o" -lm -o "$B/pmove_saber_dump"
 
-mkdir -p golden
+mkdir -p "$DATA/golden"
 status=0
 
 # The dumper runs over all saber scenarios, concatenated (with a per-scenario
@@ -70,14 +75,14 @@ status=0
 SABER_SCENARIOS="saber-idle saber-walk saber-attack-stand saber-attack-run saber-attack-strafe saber-jump"
 out=$( for s in $SABER_SCENARIOS; do
 	echo "-- scenario $s --"
-	"$B/pmove_saber_dump" "fixtures/pmove_saber/$s.txt" fixtures/pmove_saber
+	"$B/pmove_saber_dump" "$DATA/fixtures/pmove_saber/$s.txt" "$DATA/fixtures/pmove_saber"
 done )
 
 if [ "${1:-}" = "--regen" ]; then
-	printf '%s\n' "$out" > golden/pmove_saber.txt
+	printf '%s\n' "$out" > "$DATA/golden/pmove_saber.txt"
 	echo "regenerated pmove_saber"
 else
-	printf '%s\n' "$out" | diff -u golden/pmove_saber.txt - || status=1
+	printf '%s\n' "$out" | diff -u "$DATA/golden/pmove_saber.txt" - || status=1
 	[ "$status" -eq 0 ] && echo "pmove-saber-oracle: OK"
 fi
 

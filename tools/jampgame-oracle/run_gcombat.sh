@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build the jampgame "gcombat" oracle dumper from the UNMODIFIED Raven sources
-# and check (or, with --regen, regenerate) the golden dump golden/gcombat.txt.
+# and check (or, with --regen, regenerate) the golden dump
+# crates/mp/game/tests/oracle/golden/gcombat.txt.
 #
 # The dumper drives THREE pure-ish leaf functions of g_combat.c —
 # RaySphereIntersections, G_GetHitLocation, CheckArmor — linked against the
@@ -15,6 +16,10 @@
 # is never touched.
 set -eu
 cd "$(dirname "$0")"
+
+# Committed parity data (fixtures + goldens) lives inside the mp_game crate so
+# the crate is self-contained; this harness only generates/checks it.
+DATA=../../crates/mp/game/tests/oracle
 
 ORACLE=../../oracle/oracle
 G=$ORACLE/codemp/game
@@ -62,13 +67,13 @@ cc -w -std=gnu11 -c stubs_gcombat.c -o "$B/stubs.o"
 # shellcheck disable=SC2086
 cc "$B/main.o" $OBJS "$B/stubs.o" -lm -o "$B/gcombat_dump"
 
-mkdir -p golden
+mkdir -p "$DATA/golden"
 status=0
 if [ "${1:-}" = "--regen" ]; then
-	"$B/gcombat_dump" fixtures/gcombat > golden/gcombat.txt
+	"$B/gcombat_dump" "$DATA/fixtures/gcombat" > "$DATA/golden/gcombat.txt"
 	echo "regenerated gcombat"
 else
-	"$B/gcombat_dump" fixtures/gcombat | diff -u golden/gcombat.txt - || status=1
+	"$B/gcombat_dump" "$DATA/fixtures/gcombat" | diff -u "$DATA/golden/gcombat.txt" - || status=1
 fi
 
 [ "$status" -eq 0 ] && echo "jampgame-oracle gcombat: OK"

@@ -1,6 +1,6 @@
 //! Differential parity test for two pure integer `w_saber.c` leaf functions —
 //! `G_SaberLockAnim` and `G_KnockawayForParry` — against the Raven oracle.
-//! Reproduces `tools/jampgame-oracle/golden/wsaber.txt` (generated exclusively
+//! Reproduces `tests/oracle/golden/wsaber.txt` (generated exclusively
 //! by `main_wsaber.c` over the committed `fixtures/wsaber/` sweep bounds) by
 //! driving the PORTED functions over the identical integer sweeps and
 //! byte-comparing to the committed golden.
@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use mp_game::w_saber::{G_KnockawayForParry, G_SaberLockAnim};
 
 fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tools/jampgame-oracle")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
 }
 
 fn fixtures_dir() -> PathBuf {

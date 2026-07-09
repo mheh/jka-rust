@@ -1,5 +1,5 @@
 //! Differential parity test for the jampgame `bg_misc` / `bg_weapons` ports
-//! against the Raven oracle. Reproduces `tools/jampgame-oracle/golden/bgmisc.txt`
+//! against the Raven oracle. Reproduces `tests/oracle/golden/bgmisc.txt`
 //! (generated exclusively by `main_bgmisc.c` over the committed
 //! `fixtures/bgmisc/` inputs) by driving the PORTED functions and tables and
 //! byte-comparing to the committed golden.
@@ -25,7 +25,7 @@ use mp_game::bg_misc::{
 use mp_game::prelude::*;
 
 fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tools/jampgame-oracle")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
 }
 
 fn fixtures_dir() -> PathBuf {

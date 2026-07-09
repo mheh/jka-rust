@@ -6,6 +6,12 @@ canonical bit-exact dumps under `golden/`. The Rust ports
 (`crates/mp/game/src/q_math.rs`, `bg_lib.rs`, `bg_channel/rng.rs`) must reproduce
 the goldens byte-for-byte via `crates/mp/game/tests/jampgame_parity.rs`.
 
+The committed parity data lives **inside the `mp_game` crate** —
+`crates/mp/game/tests/oracle/{fixtures,golden}/` — so the crate (and its
+`cargo test`) is self-contained; this directory holds only the generator.
+`fixtures/` and `golden/` throughout this README refer to that data root
+(`$DATA` in the run scripts).
+
 Every float is dumped as its IEEE-754 **bit pattern** (`%08x` for `f32`,
 `%016llx` for `f64`) — no textual float rounding is ever involved on either side;
 the Rust test uses `f32::to_bits()` / `f64::to_bits()`.

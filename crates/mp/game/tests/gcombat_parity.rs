@@ -1,6 +1,6 @@
 //! Differential parity test for three pure-ish `g_combat.c` leaf functions —
 //! `RaySphereIntersections`, `G_GetHitLocation`, `CheckArmor` — against the
-//! Raven oracle. Reproduces `tools/jampgame-oracle/golden/gcombat.txt`
+//! Raven oracle. Reproduces `tests/oracle/golden/gcombat.txt`
 //! (generated exclusively by `main_gcombat.c` over the committed
 //! `fixtures/gcombat/` inputs) by driving the PORTED functions and
 //! byte-comparing to the committed golden.
@@ -26,7 +26,7 @@ use mp_game::world::{GameContext, GameWorld};
 // via the glob); no test-local shadow needed.
 
 fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tools/jampgame-oracle")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
 }
 
 fn fixtures_dir() -> PathBuf {

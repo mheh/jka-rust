@@ -25,7 +25,7 @@ use mp_game::bg_pmove::Pmove;
 use mp_game::prelude::*;
 
 fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tools/jampgame-oracle")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
 }
 
 fn fixture_dir() -> PathBuf {

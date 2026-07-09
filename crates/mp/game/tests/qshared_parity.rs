@@ -1,5 +1,5 @@
 //! Differential parity test for the jampgame `q_shared` port against the Raven
-//! oracle. Reproduces `tools/jampgame-oracle/golden/qshared.txt` (generated
+//! oracle. Reproduces `tests/oracle/golden/qshared.txt` (generated
 //! only by the C dumper `main_qshared.c` over the committed
 //! `fixtures/qshared/`) by calling the PORTED `mp_game::q_shared` functions and
 //! byte-comparing to the golden.
@@ -33,7 +33,7 @@ use mp_game::q_shared::{
 };
 
 fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tools/jampgame-oracle")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
 }
 
 fn read_fixture(name: &str) -> Vec<u8> {
