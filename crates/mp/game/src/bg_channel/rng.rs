@@ -9,11 +9,9 @@
 //! Source: `oracle/codemp/game/q_math.c:1425-1474`
 #![allow(non_snake_case)]
 
-use core::ffi::{c_int, c_uint};
+use core::ffi::{c_int, c_uint, c_ulong};
 
-/// Raven's `holdrand` seed plus the VC-libc `rand()` LCG. On the shipping
-/// 32-bit `jampded` target `unsigned long` is 32-bit, so the state is a `u32`
-/// and every step uses wrapping arithmetic to reproduce the truncation exactly.
+/// Raven's `holdrand` seed plus the VC-libc `rand()` LCG.
 ///
 /// Raven kept two independent generator states — this file-static `holdrand`
 /// (`q_math.c:1432`) and `bg_lib.c`'s file-static `randSeed` (`bg_lib.c:763`)
@@ -21,9 +19,12 @@ use core::ffi::{c_int, c_uint};
 ///
 /// Source: `oracle/codemp/game/q_math.c:1432`
 pub struct Rng {
-    /// Raven `static unsigned long holdrand = 0x89abcdef;`.
+    /// Raven `static unsigned long holdrand = 0x89abcdef;` — platform-width
+    /// `c_ulong` by ruling (2026-07-09, reversing the earlier u32
+    /// normalization): 32-bit on the retail i686 ship, 64-bit on LP64
+    /// referee/native builds, exactly as Raven's `unsigned long` compiles.
     /// Source: `oracle/codemp/game/q_math.c:1432`
-    holdrand: u32,
+    holdrand: c_ulong,
 
     /// Raven `bg_lib.c`'s `static int randSeed = 0;` — the independent LCG
     /// state backing `bg_lib.c`'s `rand`/`srand` and the `q_shared.h`
@@ -36,7 +37,7 @@ impl Rng {
     /// The initial `holdrand` value (`0x89abcdef`) — the state a fresh zeroed
     /// `BgState` must carry, so this is what `Default`/`new` install.
     /// Source: `oracle/codemp/game/q_math.c:1432`
-    const HOLDRAND_INIT: u32 = 0x89ab_cdef;
+    const HOLDRAND_INIT: c_ulong = 0x89ab_cdef;
 
     /// Fresh generator seeded with Raven's compile-time `holdrand` value and
     /// `bg_lib.c`'s compile-time `randSeed = 0`.
@@ -51,14 +52,15 @@ impl Rng {
     /// tripwire dumped as `rng=%08x` by the pmove differential (a mid-Pmove draw
     /// moves it). Observes only; production behavior is unchanged.
     /// Source: `oracle/codemp/game/q_math.c:1432`
-    pub fn holdrand(&self) -> u32 {
+    pub fn holdrand(&self) -> c_ulong {
         self.holdrand
     }
 
-    /// Raven `Rand_Init` — reseed the generator.
+    /// Raven `Rand_Init` — reseed the generator (`int` → `unsigned long`
+    /// conversion; Rust's sign-extending `as` cast matches C's value-mod-2^N).
     /// Source: `oracle/codemp/game/q_math.c:1434-1437`
     pub fn Rand_Init(&mut self, seed: c_int) {
-        self.holdrand = seed as u32;
+        self.holdrand = seed as c_ulong;
     }
 
     /// Raven `flrand` — returns a float `min <= x < max` (exclusive; will get
@@ -66,7 +68,8 @@ impl Rng {
     /// Source: `oracle/codemp/game/q_math.c:1441-1450`
     pub fn flrand(&mut self, min: f32, max: f32) -> f32 {
         self.holdrand = self.holdrand.wrapping_mul(214013).wrapping_add(2531011);
-        // 0 - 32767 range.
+        // Raven: `(float)(holdrand >> 17)` — full unsigned-long width, so on
+        // LP64 this is NOT confined to 0-32767 (referee-proven behavior).
         let result = (self.holdrand >> 17) as f32;
         ((result * (max - min)) / 32768.0f32) + min
     }
@@ -80,7 +83,9 @@ impl Rng {
     /// Raven `irand` — returns an integer `min <= x <= max` (inclusive).
     ///
     /// Raven asserts `(max - min) < 32768`; we preserve the wrapping integer
-    /// arithmetic rather than the debug assert.
+    /// arithmetic rather than the debug assert. `result = holdrand >> 17` is
+    /// an `int`, i.e. the shift happens at `unsigned long` width and then
+    /// truncates to 32 bits (arm64 disasm: `lsr x2,x2,#17; madd w2,...`).
     /// Source: `oracle/codemp/game/q_math.c:1458-1469`
     pub fn irand(&mut self, min: c_int, max: c_int) -> c_int {
         debug_assert!((max - min) < 32768);
@@ -129,14 +134,11 @@ impl Default for Rng {
     }
 }
 
-// Parity is bit-exact ONLY for a 32-bit `unsigned long` (the shipping
-// `jampded`/i686 target). `holdrand` is modelled as `u32` and every step uses
-// wrapping arithmetic to reproduce the truncation; this assert pins that the
-// state width has not silently widened. On an LP64 host `unsigned long` is
-// 64-bit, so the faithful `>> 17` masking would diverge — the `u32` model is
-// what keeps host `cargo check` and the boot target in agreement.
+// Ruling (2026-07-09): `holdrand` is `c_ulong` — platform-width, exactly as
+// Raven's `unsigned long` compiles per target (retail i686 ship = 32-bit,
+// LP64 referee/native = 64-bit). This reverses the 2026-07 u32 normalization:
+// the referee A/B oracle proved the 64-bit stream is the ground truth on
+// LP64 (t2_wedge `Q_irand` NPC-type picks diverge under a u32 model even
+// though the low 32 bits of the stream agree). Goldens for this family are
+// regenerated per host width by `tools/jampgame-oracle/run.sh`.
 // Source: `oracle/codemp/game/q_math.c:1432` (holdrand*214013+2531011 >>17)
-const _: () = assert!(
-    core::mem::size_of::<u32>() == 4,
-    "LCG parity requires a 32-bit holdrand state"
-);

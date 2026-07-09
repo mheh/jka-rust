@@ -57,15 +57,16 @@ cat > build/codemp/game/shim.h <<'EOF'
 EOF
 
 # raven_rng.c: Raven's holdrand LCG (q_math.c:1432-1474) extracted verbatim,
-# with `unsigned long holdrand` normalized to `unsigned int` (the 32-bit i686
-# ship target the port models; on this LP64 host `unsigned long` is 64-bit and
-# `>>17` would diverge). Functions renamed r_* so they don't clash with the
-# 64-bit copies still living in q_math.c.
+# `unsigned long holdrand` kept at NATIVE width (ruling 2026-07-09, reversing
+# the earlier 32-bit normalization: the port's `c_ulong` model is
+# platform-faithful — 32-bit on the i686 ship, 64-bit on this LP64 host — so
+# the golden is generated at host width, matching the referee A/B oracle).
+# Functions renamed r_* so they don't clash with the copies still living in
+# q_math.c.
 {
 	echo '#include <assert.h>'
 	sed -n '1432,1474p' build/codemp/game/q_math.c \
-	  | sed -E -e 's/unsigned long[[:space:]]+holdrand/unsigned int holdrand/' \
-	           -e 's/[[:<:]]Rand_Init[[:>:]]/r_Rand_Init/g' \
+	  | sed -E -e 's/[[:<:]]Rand_Init[[:>:]]/r_Rand_Init/g' \
 	           -e 's/[[:<:]]Q_flrand[[:>:]]/r_Q_flrand/g' \
 	           -e 's/[[:<:]]Q_irand[[:>:]]/r_Q_irand/g' \
 	           -e 's/[[:<:]]flrand[[:>:]]/r_flrand/g' \

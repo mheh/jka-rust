@@ -1,13 +1,14 @@
 // q_math differential-oracle dumper. Compiled against the UNMODIFIED Raven
 // q_math.c (copied into build/ by run.sh) plus raven_rng.c (Raven's LCG
-// extracted verbatim, holdrand width normalized to the 32-bit i686 ship
-// target — see run.sh / README). Prints a canonical bit-exact dump the Rust
-// parity test (crates/mp/game/tests/jampgame_parity.rs) reproduces via the
-// ported crate::q_math + bg_channel::rng::Rng.
+// extracted verbatim, holdrand at NATIVE `unsigned long` width — ruling
+// 2026-07-09, reversing the 32-bit normalization; see run.sh / README).
+// Prints a canonical bit-exact dump the Rust parity test
+// (crates/mp/game/tests/jampgame_parity.rs) reproduces via the ported
+// crate::q_math + bg_channel::rng::Rng (platform-width `c_ulong` holdrand).
 #include "q_shared.h"
 #include "dumpcommon.h"
 
-// Raven's LCG, extracted+renamed by run.sh (r_ prefix, 32-bit holdrand).
+// Raven's LCG, extracted+renamed by run.sh (r_ prefix, native-width holdrand).
 void  r_Rand_Init(int seed);
 float r_flrand(float min, float max);
 float r_Q_flrand(float min, float max);

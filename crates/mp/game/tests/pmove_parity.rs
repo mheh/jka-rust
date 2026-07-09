@@ -944,7 +944,7 @@ fn run_scenario(name: &str) -> String {
                 // pm.ps / baseEnt must point at the live ps / arena for the dump.
                 pm.ps = &mut ps as *mut playerState_t;
                 pm.baseEnt = arena.as_mut_ptr() as *mut _;
-                let rng = bg.rng.holdrand();
+                let rng = bg.rng.holdrand() as u32; // 32-bit tripwire (fixtures draw nothing)
                 dump_step(&mut o, step, &pm, &ps, traps.trace_count.get(), rng);
                 step += 1;
             }
@@ -971,7 +971,7 @@ fn run_scenario(name: &str) -> String {
                     cb.legs_mirror = ps.legsAnim;
                     cb.torso_mirror = ps.torsoAnim;
 
-                    let rng = bg.rng.holdrand();
+                    let rng = bg.rng.holdrand() as u32; // 32-bit tripwire (fixtures draw nothing)
                     dump_step(&mut o, step, &pm, &ps, traps.trace_count.get(), rng);
                     step += 1;
                 }

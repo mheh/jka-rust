@@ -229,6 +229,20 @@ mirror wherever it registers/refreshes the cvar (`g_main.rs:198,268`); bg reads
 any future bg-visible cvar: game-tier `vmCvar_t` + a `BgState` mirror updated at
 register/update time.
 
+## Referee-era rulings (post-integration)
+
+**holdrand width = `c_ulong` (platform-faithful).** RULING (user, 2026-07-09):
+`Rng::holdrand` is `core::ffi::c_ulong`, matching Raven's
+`static unsigned long holdrand` (`oracle/codemp/game/q_math.c:1432`) at
+whatever width the target compiles it — 32-bit on the retail i686 ship
+(retail parity kept), 64-bit on LP64 referee/native builds (referee parity
+gained). Reverses the 2026-07 u32 normalization (rng.rs assert + the
+jampgame-oracle `unsigned int` rewrite): the referee A/B oracle proved the
+64-bit stream is ground truth on LP64 — t2_wedge `Q_irand` NPC-type picks
+diverged under the u32 model even though the low 32 bits of the stream
+agreed. `tools/jampgame-oracle/run.sh` now extracts the LCG at native width;
+the qmath golden's rng section is host-width by construction.
+
 ## Already covered — no decision (bless-the-rule appendix)
 
 vec3_t out-params (§C7; VectorCopy ×1358), qboolean returns → bool ×652
