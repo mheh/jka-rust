@@ -6,10 +6,10 @@ use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, Vm
 /// `CG_CROSSHAIR_PLAYER` MP cgame exports vmMain ABI token.
 ///
 /// Raven: int (*CG_CrosshairPlayer)( void );
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:378-379`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:204-205`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:204-205`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_console.cpp:76-85`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:378-379`
+/// Args source: `oracle/codemp/cgame/cg_main.c:204-205`
+/// Output source: `oracle/codemp/cgame/cg_main.c:204-205`
+/// Transport/call-site source: `oracle/codemp/client/cl_console.cpp:76-85`
 pub struct CgCrosshairPlayer;
 
 impl InboundVmCall for CgCrosshairPlayer {

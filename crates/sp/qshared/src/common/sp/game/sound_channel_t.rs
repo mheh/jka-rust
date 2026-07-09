@@ -6,7 +6,7 @@
 ///
 /// Raven: these entries are now also duplicated in ModView; note that the
 /// order is ok to change, I only read/write text strings of them anyway. - Ste.
-/// Type definition source: `oracle/oracle/code/game/channels.h:8-21`
+/// Type definition source: `oracle/code/game/channels.h:8-21`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum soundChannel_t {

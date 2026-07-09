@@ -10,7 +10,7 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_GETGLCONFIG, glconfig );`
 /// Raven transport: `CL_GetGlconfig( (glconfig_t *)VMA(1) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:262-263`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:262-263`
 #[derive(Debug)]
 pub struct UiGetglconfigArgs {
     glconfig: *mut c_void,
@@ -31,10 +31,10 @@ impl UiGetglconfigArgs {
 /// Raven wrapper: `syscall( UI_GETGLCONFIG, glconfig );`
 /// Raven transport: `CL_GetGlconfig( (glconfig_t *)VMA(1) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:62`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:262-263`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:962`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1048-1050`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:62`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:262-263`
+/// Output source: `oracle/codemp/ui/ui_local.h:962`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1048-1050`
 pub struct UiGetglconfig;
 
 impl OutboundSysCall for UiGetglconfig {

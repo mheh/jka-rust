@@ -6,10 +6,10 @@ use abi_transport::pass_float;
 ///
 /// Raven's engine switch reads one float word with `VMF(1)`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:677`
-/// Transport source: `oracle/oracle/codemp/ui/ui_syscalls.c:15`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:676`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:293`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:677`
+/// Transport source: `oracle/codemp/ui/ui_syscalls.c:15`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:676`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:293`
 #[derive(Debug)]
 pub struct UiCeilArgs {
     value: f32,
@@ -27,10 +27,10 @@ impl UiCeilArgs {
 
 /// `UI_CEIL` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:141`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:677`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:676`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:293`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:141`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:677`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:676`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:293`
 pub struct UiCeil;
 
 impl OutboundSysCall for UiCeil {

@@ -1,6 +1,6 @@
 //! MP `bg_public.h` item-type definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:1103-1116`
+//! Type definition source: `oracle/codemp/game/bg_public.h:1103-1116`
 
 #![allow(non_camel_case_types)]
 
@@ -12,7 +12,7 @@ use core::ffi::c_int;
 /// anonymous enum, so the alias stays an int and the enumerators are
 /// `const`s (enum-vs-alias fidelity rule).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:1103-1116`
+/// Type definition source: `oracle/codemp/game/bg_public.h:1103-1116`
 pub type itemType_t = c_int;
 
 pub const IT_BAD: itemType_t = 0;

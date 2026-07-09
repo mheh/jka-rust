@@ -12,7 +12,7 @@ pub type ErrorLevel = errorParm_t;
 /// `last_error_time`/`error_count` are the MP-only rapid-error statics
 /// (`common.cpp:251-252`, hoisted off a `static` per §B3).
 ///
-/// Source: `oracle/oracle/codemp/qcommon/common.cpp:83,86,251-252`
+/// Source: `oracle/codemp/qcommon/common.cpp:83,86,251-252`
 pub struct ErrorState {
     /// `com_errorEntered` (`common.cpp:83`) — the re-entry guard.
     pub entered: bool,
@@ -28,7 +28,7 @@ pub struct ErrorState {
 /// (the whole payload the catch-side recovery reads); needs no derive — a
 /// `panic_any`/`downcast` payload only requires `Any + Send + 'static`.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/common.cpp:249`
+/// Source: `oracle/codemp/qcommon/common.cpp:249`
 pub struct ComError {
     pub level: ErrorLevel,
     pub msg: String,
@@ -41,7 +41,7 @@ pub struct ComError {
 /// `com_frame`/`com_init` (in `mp_engine_core`). Lives in `mp_engine_qcommon`
 /// so leaf throw sites (e.g. `mp_engine_server`) can raise it. `-> !`.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/common.cpp:249`
+/// Source: `oracle/codemp/qcommon/common.cpp:249`
 pub fn com_error(level: errorParm_t, msg: String) -> ! {
     // Pure format + diverge (STATE-D7): the varargs formatting is caller-side
     // (msg arrives formatted, mirroring vsprintf into com_errorMessage,

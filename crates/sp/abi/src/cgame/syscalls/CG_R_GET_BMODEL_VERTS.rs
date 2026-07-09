@@ -11,8 +11,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_R_GET_BMODEL_VERTS, bmodelIndex, verts, normal );`
 /// Raven transport writes selected model vertices to `VMA(2)` and normal to `VMA(3)`.
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:509-511`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:809-811`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:509-511`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:809-811`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRGetBmodelVertsArgs {
     bmodel_index: c_int,
@@ -32,10 +32,10 @@ impl CgRGetBmodelVertsArgs {
 
 /// `CG_R_GET_BMODEL_VERTS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:182`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:509-511`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:809-811`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:809-811`
+/// Enum value source: `oracle/code/cgame/cg_public.h:182`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:509-511`
+/// Output source: `oracle/code/client/cl_cgame.cpp:809-811`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:809-811`
 pub struct CgRGetBmodelVerts;
 
 impl OutboundSysCall for CgRGetBmodelVerts {

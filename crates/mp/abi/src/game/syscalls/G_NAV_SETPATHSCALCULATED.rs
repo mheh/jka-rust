@@ -21,7 +21,7 @@ impl GNavSetpathscalculatedArgs {
 /// `G_NAV_SETPATHSCALCULATED` MP game imports syscall ABI token.
 ///
 /// Raven: rww - END NPC NAV TRAPS
-/// Source: `oracle/oracle/codemp/game/g_public.h:339`
+/// Source: `oracle/codemp/game/g_public.h:339`
 pub struct GNavSetpathscalculated;
 
 impl OutboundSysCall for GNavSetpathscalculated {

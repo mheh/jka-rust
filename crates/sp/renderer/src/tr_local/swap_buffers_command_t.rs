@@ -3,7 +3,7 @@
 /// Raven `swapBuffersCommand_t` — render-command to swap the front/back
 /// buffers.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:2000-2002`
+/// Type definition source: `oracle/code/renderer/tr_local.h:2000-2002`
 #[repr(C)]
 pub struct swapBuffersCommand_t {
     pub commandId: i32,

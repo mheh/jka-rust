@@ -1,6 +1,6 @@
 //! SP Ghoul2 collision record type copied from Raven `code/game/ghoul2_shared.h`.
 //!
-//! Source: `oracle/oracle/code/game/ghoul2_shared.h:456-486`
+//! Source: `oracle/code/game/ghoul2_shared.h:456-486`
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -24,7 +24,7 @@ pub const G2_BACKFACE: c_int = 0;
 
 /// SP Raven constructor defaults for `CCollisionRecord`.
 ///
-/// Constructor source: `oracle/oracle/code/game/ghoul2_shared.h:477-481`
+/// Constructor source: `oracle/code/game/ghoul2_shared.h:477-481`
 pub const fn new_ccollision_record() -> CCollisionRecord {
     CCollisionRecord {
         mDistance: 100000.0,

@@ -2,7 +2,7 @@
 
 /// Raven `otherhudbits_t` — HUD display element type enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_media.h:61-75`
+/// Type definition source: `oracle/code/cgame/cg_media.h:61-75`
 #[repr(i32)]
 pub enum otherhudbits_t {
     OHB_HEALTHAMOUNT = 0,

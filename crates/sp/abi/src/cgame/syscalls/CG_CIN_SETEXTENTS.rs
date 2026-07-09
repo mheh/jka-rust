@@ -9,9 +9,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall(CG_CIN_SETEXTENTS, handle, x, y, w, h);`
 /// Raven transport: `CIN_SetExtents(args[1], args[2], args[3], args[4], args[5]); return 0;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:543-545`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:830-832`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:830-832`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:543-545`
+/// Output source: `oracle/code/client/cl_cgame.cpp:830-832`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:830-832`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCinSetextentsArgs {
     handle: c_int,
@@ -49,10 +49,10 @@ impl CgCinSetextentsArgs {
 
 /// `CG_CIN_SETEXTENTS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:189`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:543-545`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:830-832`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:830-832`
+/// Enum value source: `oracle/code/cgame/cg_public.h:189`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:543-545`
+/// Output source: `oracle/code/client/cl_cgame.cpp:830-832`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:830-832`
 pub struct CgCinSetextents;
 
 impl OutboundSysCall for CgCinSetextents {

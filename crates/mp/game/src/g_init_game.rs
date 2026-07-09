@@ -54,7 +54,7 @@ use mp_abi::game::syscalls::G_SET_SHARED_BUFFER::GSetSharedBufferArgs;
 
 /// Raven `void G_InitGame( int levelTime, int randomSeed, int restart )`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_main.c:897-1118`
+/// Source: `oracle/codemp/game/g_main.c:897-1118`
 pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
     // Arm the ctx-less `strap_*` seam engine cell from the GAME_INIT
     // entrypoint that owns the engine, before any bg logic can call `strap_*`.

@@ -2,7 +2,7 @@
 //!
 //! //TODO: Port module mp_bg::local — subsystem dir only; porters add flat
 //! `<type>.rs` files here as types are ported.
-//! Source: `oracle/oracle/codemp/game/bg_local.h`
+//! Source: `oracle/codemp/game/bg_local.h`
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
 pub mod bg_custom_siege_sound_names;

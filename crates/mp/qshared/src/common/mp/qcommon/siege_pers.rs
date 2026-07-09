@@ -1,6 +1,6 @@
 //! MP `siegePers_t` copied from Raven `codemp/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/q_shared.h:2437-2442`
+//! Source: `oracle/codemp/game/q_shared.h:2437-2442`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -10,7 +10,7 @@ use crate::shared::qboolean;
 
 /// Raven `siegePers_t` persistent Siege state.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2437-2442`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2437-2442`
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct siegePers_t {

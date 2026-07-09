@@ -1,7 +1,7 @@
 //! SP `gentity_t` copied from Raven `code/game/g_shared.h`.
 //!
-//! Type declaration source: `oracle/oracle/code/game/g_public.h:51`
-//! Full struct layout source: `oracle/oracle/code/game/g_shared.h:514-825`
+//! Type declaration source: `oracle/code/game/g_public.h:51`
+//! Full struct layout source: `oracle/code/game/g_shared.h:514-825`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -13,22 +13,22 @@ use crate::shared::{qboolean, qhandle_t, vec3_t, vec4_t};
 
 /// Raven SP `NUM_TIDS` (from `taskID_e`).
 ///
-/// Definition source: `oracle/oracle/code/game/g_shared.h:20-34`
+/// Definition source: `oracle/code/game/g_shared.h:20-34`
 pub const NUM_TIDS: usize = 10;
 
 /// Raven SP `NUM_BSETS` (from `bSet_e`).
 ///
-/// Definition source: `oracle/oracle/code/game/bset.h:1-24`
+/// Definition source: `oracle/code/game/bset.h:1-24`
 pub const NUM_BSETS: usize = 17;
 
 /// Raven SP `HL_MAX` (from `hitloc_e`).
 ///
-/// Definition source: `oracle/oracle/code/game/hitlocs.h:4-31`
+/// Definition source: `oracle/code/game/hitlocs.h:4-31`
 pub const HL_MAX: usize = 23;
 
 /// Raven SP `MAX_INHAND_WEAPONS`.
 ///
-/// Definition source: `oracle/oracle/code/game/g_shared.h:509`
+/// Definition source: `oracle/code/game/g_shared.h:509`
 pub const MAX_INHAND_WEAPONS: usize = 2;
 
 // Raven's `#ifdef GAME_INCLUDE` block (g_shared.h:497-506) `#define`s
@@ -43,7 +43,7 @@ pub const MAX_INHAND_WEAPONS: usize = 2;
 /// The real named enum already exists (`sp_game::shared::mover_state_t`), but
 /// `gentity_t` lives in `sp_qshared`, below the game tier in the crate graph, so
 /// it cannot be referenced here. `c_int` is ABI-identical (both 4 bytes).
-/// Type definition source: `oracle/oracle/code/game/g_local.h`
+/// Type definition source: `oracle/code/game/g_local.h`
 //TODO: Port moverState_t (cross-tier: real enum lives in sp_game)
 pub type moverState_t = c_int;
 
@@ -52,7 +52,7 @@ pub type moverState_t = c_int;
 /// The real named enum already exists (`sp_game::shared::material_t`), but
 /// `gentity_t` lives in `sp_qshared`, below the game tier in the crate graph, so
 /// it cannot be referenced here. `c_int` is ABI-identical (both 4 bytes).
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:37-58`
+/// Type definition source: `oracle/code/game/g_shared.h:37-58`
 //TODO: Port material_t (cross-tier: real enum lives in sp_game)
 pub type material_t = c_int;
 
@@ -61,7 +61,7 @@ pub type material_t = c_int;
 /// The real named enum already exists (`sp_game::teams::team_t`), but
 /// `gentity_t` lives in `sp_qshared`, below the game tier in the crate graph, so
 /// it cannot be referenced here. `c_int` is ABI-identical (both 4 bytes).
-/// Type definition source: `oracle/oracle/code/game/teams.h:4-13`
+/// Type definition source: `oracle/code/game/teams.h:4-13`
 //TODO: Port team_t (cross-tier: real enum lives in sp_game)
 pub type team_t = c_int;
 
@@ -69,7 +69,7 @@ pub type team_t = c_int;
 /// — anonymous in the header, needs a field name to exist in Rust).
 ///
 /// Raven: the roff file to use, if there is one / name of the external effect file.
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:607-611`
+/// Type definition source: `oracle/code/game/g_shared.h:607-611`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union gentity_t_uRoff {
@@ -80,7 +80,7 @@ pub union gentity_t_uRoff {
 /// Anonymous union for `gentity_t` (Raven: `union { qboolean trigger_formation;
 /// qboolean misc_dlight_active; qboolean has_bounced; };`).
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:668-673`
+/// Type definition source: `oracle/code/game/g_shared.h:668-673`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union gentity_t_uTriggerFormation {
@@ -93,7 +93,7 @@ pub union gentity_t_uTriggerFormation {
 
 /// Anonymous union for `gentity_t` (Raven: `union { int wpIndex; int fxID; };`).
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:795-799`
+/// Type definition source: `oracle/code/game/g_shared.h:795-799`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union gentity_t_uWpIndex {
@@ -105,7 +105,7 @@ pub union gentity_t_uWpIndex {
 /// Anonymous union for `gentity_t` (Raven: `union { vec4_t finalRGBA; vec3_t
 /// pos4; vec3_t modelAngles; };`).
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:805-810`
+/// Type definition source: `oracle/code/game/g_shared.h:805-810`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union gentity_t_uFinalRGBA {
@@ -118,8 +118,8 @@ pub union gentity_t_uFinalRGBA {
 
 /// Raven SP `gentity_t`.
 ///
-/// Type declaration source: `oracle/oracle/code/game/g_public.h:51`
-/// Full struct layout source: `oracle/oracle/code/game/g_shared.h:514-825`
+/// Type declaration source: `oracle/code/game/g_public.h:51`
+/// Full struct layout source: `oracle/code/game/g_shared.h:514-825`
 #[repr(C)]
 pub struct gentity_t {
     /// communicated by server to clients
@@ -128,7 +128,7 @@ pub struct gentity_t {
     // the game tier (`sp_game`), which `sp_qshared` cannot depend on. `*mut
     // c_void` is ABI-identical to `*mut gclient_s` (both pointer-sized).
     //TODO: Port gclient_s (cross-tier: real struct lives in sp_game)
-    // Source: oracle/oracle/code/game/g_shared.h:387
+    // Source: oracle/code/game/g_shared.h:387
     /// NULL if not a player (unless it's NPC ( if (this->NPC != NULL) ) <sigh>... -slc)
     pub client: *mut c_void,
     pub inuse: qboolean,
@@ -346,14 +346,14 @@ pub struct gentity_t {
     // game tier (`sp_game`), which `sp_qshared` cannot depend on. `*mut c_void`
     // is ABI-identical to `*mut Vehicle_t` (both pointer-sized).
     //TODO: Port Vehicle_t (cross-tier: real struct lives in sp_game)
-    // Source: oracle/oracle/code/game/G_Vehicles.h:133
+    // Source: oracle/code/game/G_Vehicles.h:133
     /// The vehicle object.
     pub m_pVehicle: *mut c_void,
     // Raven: `gNPC_t *NPC` (g_shared.h:762). `gNPC_t` lives in the game tier
     // (`sp_game`), which `sp_qshared` cannot depend on. `*mut c_void` is
     // ABI-identical to `*mut gNPC_t` (both pointer-sized).
     //TODO: Port gNPC_t (cross-tier: real struct lives in sp_game)
-    // Source: oracle/oracle/code/game/b_public.h:146-313
+    // Source: oracle/code/game/b_public.h:146-313
     /// Only allocated if the entity becomes an NPC
     pub NPC: *mut c_void,
     /// Used by squadpaths to locate owning NPC
@@ -403,7 +403,7 @@ pub struct gentity_t {
 // c_void` placeholders for `client`/`m_pVehicle`/`NPC` occupy the same 8 bytes
 // as their real pointee pointers, so these offsets hold regardless of those
 // types being ported.
-// Source: `oracle/oracle/code/game/g_shared.h:514-825`
+// Source: `oracle/code/game/g_shared.h:514-825`
 const _: () = assert!(core::mem::offset_of!(gentity_t, s) == 0); // arch-independent anchor
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<gentity_t>() == 1496);
@@ -779,5 +779,5 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, forcePuller) == 1488);
 // The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
 // all-zero bytes are a valid gentity_t — the same property the layout asserts above
 // pin and Raven's memset/static zero-init relies on.
-// Source: oracle/oracle/code/game/g_shared.h (all-zero-valid #[repr(C)]; SP InitGame memsets g_entities)
+// Source: oracle/code/game/g_shared.h (all-zero-valid #[repr(C)]; SP InitGame memsets g_entities)
 unsafe impl native_platform::ZeroValid for gentity_t {}

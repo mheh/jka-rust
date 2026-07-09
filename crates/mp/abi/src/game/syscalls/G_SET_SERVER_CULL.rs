@@ -22,7 +22,7 @@ impl GSetServerCullArgs {
 /// `G_SET_SERVER_CULL` MP game imports syscall ABI token.
 ///
 /// Raven: server culling to reduce traffic on open maps -rww
-/// Source: `oracle/oracle/codemp/game/g_public.h:176`
+/// Source: `oracle/codemp/game/g_public.h:176`
 pub struct GSetServerCull;
 
 impl OutboundSysCall for GSetServerCull {

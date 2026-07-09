@@ -2,7 +2,7 @@
 
 /// Raven `shaderSort_t` — shader sorting order for rendering.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:156-187`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:156-187`
 #[repr(i32)]
 pub enum shaderSort_t {
 	SS_BAD = 0,

@@ -6,8 +6,8 @@ use mp_qshared::shared::{qboolean, vec3_t};
 
 /// Raven `SSkinGoreData` — one gore-mark (splotch) request applied to a Ghoul2 skin.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:3112-3144`
-/// (dup: `oracle/oracle/codemp/ghoul2/ghoul2_shared.h:202`)
+/// Type definition source: `oracle/codemp/game/q_shared.h:3112-3144`
+/// (dup: `oracle/codemp/ghoul2/ghoul2_shared.h:202`)
 #[repr(C)]
 pub struct SSkinGoreData {
     pub angles: vec3_t,

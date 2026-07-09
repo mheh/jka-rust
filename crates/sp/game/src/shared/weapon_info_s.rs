@@ -8,7 +8,7 @@ use sp_qshared::shared::{qboolean, qhandle_t, sfxHandle_t, vec3_t};
 
 /// Raven `weaponInfo_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:836-885`
+/// Type definition source: `oracle/code/game/g_shared.h:836-885`
 #[repr(C)]
 pub struct weaponInfo_t {
 	pub registered: qboolean,
@@ -39,13 +39,13 @@ pub struct weaponInfo_t {
 	// sits above this crate in the graph — the callback param stays an opaque
 	// pointer here (ABI-identical).
 	//TODO: Port centity_t
-	// Source: oracle/oracle/code/cgame/cg_local.h:130-174
+	// Source: oracle/code/cgame/cg_local.h:130-174
 	pub missileTrailFunc: Option<unsafe extern "C" fn(cent: *mut c_void, wi: *const weaponInfo_t)>,
 
 	pub alt_missileModel: qhandle_t,
 	pub alt_missileSound: sfxHandle_t,
 	//TODO: Port centity_t
-	// Source: oracle/oracle/code/cgame/cg_local.h:130-176
+	// Source: oracle/code/cgame/cg_local.h:130-176
 	pub alt_missileTrailFunc: Option<unsafe extern "C" fn(cent: *mut c_void, wi: *const weaponInfo_t)>,
 
 	pub firingSound: sfxHandle_t,

@@ -9,9 +9,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven forwards `entityNum` as the only payload word, and the client switch
 /// reads it from `args[1]` as the `s_entityWavVol` index.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2219`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:184-185`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:807-808`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2219`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:184-185`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:807-808`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgSGetvoicevolumeArgs {
     /// Entity number, read by Raven as `args[1]`.
@@ -34,13 +34,13 @@ impl CgSGetvoicevolumeArgs {
 /// Raven wrapper: `return syscall( CG_S_GETVOICEVOLUME, entityNum );`
 /// Raven transport: `return s_entityWavVol[args[1]];`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:95`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2219`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:184-185`
-/// Output source: `oracle/oracle/codemp/cgame/cg_local.h:2219`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:184-185`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:807-808`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:807-808`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:95`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2219`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:184-185`
+/// Output source: `oracle/codemp/cgame/cg_local.h:2219`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:184-185`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:807-808`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:807-808`
 pub struct CgSGetvoicevolume;
 
 impl OutboundSysCall for CgSGetvoicevolume {

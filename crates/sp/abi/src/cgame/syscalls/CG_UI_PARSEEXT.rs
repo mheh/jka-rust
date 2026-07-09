@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `cgi_UI_ParseExt(token);`
 /// Raven transport: `char **holdPtr; holdPtr = (char **) VMA(1); *holdPtr = PC_ParseExt(); return 0;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:603-605`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:876-881`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:603-605`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:876-881`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiParseextArgs {
     token: *mut *mut c_char,
@@ -31,10 +31,10 @@ impl CgUiParseextArgs {
 
 /// `CG_UI_PARSEEXT` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:201`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:603-605`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:876-881`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:876-881`
+/// Enum value source: `oracle/code/cgame/cg_public.h:201`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:603-605`
+/// Output source: `oracle/code/client/cl_cgame.cpp:876-881`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:876-881`
 pub struct CgUiParseext;
 
 impl OutboundSysCall for CgUiParseext {

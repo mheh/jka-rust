@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_G2_LISTBONES, ghlInfo, frame);`
 /// Raven transport: `G2API_ListBones( (CGhoul2Info *) args[1], args[2]);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:776-778`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1300-1302`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:776-778`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1300-1302`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2ListbonesArgs {
     ghl_info: *mut c_void,
@@ -28,10 +28,10 @@ impl CgG2ListbonesArgs {
 ///
 /// Raven transport: `ghlInfo` is passed as a raw `args[1]` pointer word, not VMA.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:257`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:776-778`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1300-1302`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1300-1302`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:257`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:776-778`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1300-1302`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1300-1302`
 pub struct CgG2Listbones;
 
 impl OutboundSysCall for CgG2Listbones {

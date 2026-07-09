@@ -11,7 +11,7 @@ use core::ffi::c_int;
 /// SP-vs-MP: SP has no `FP_TEAM_HEAL`/`FP_TEAM_FORCE`, orders the saber powers
 /// differently, and ends at `NUM_FORCE_POWERS == 16` (MP: 18).
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1538-1559`
+/// Type definition source: `oracle/code/game/q_shared.h:1538-1559`
 pub type forcePowers_t = c_int;
 
 pub const FP_FIRST: forcePowers_t = 0; // marker

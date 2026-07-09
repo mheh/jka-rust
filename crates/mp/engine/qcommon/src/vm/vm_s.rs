@@ -6,7 +6,7 @@ use mp_qshared::shared::{qboolean, MAX_QPATH};
 ///
 /// Raven: DO NOT MOVE OR CHANGE THESE WITHOUT CHANGING THE VM_OFFSET_* DEFINES
 /// USED BY THE ASM CODE.
-/// Type definition source: `oracle/oracle/codemp/qcommon/vm_local.h:111-146`
+/// Type definition source: `oracle/codemp/qcommon/vm_local.h:111-146`
 #[repr(C)]
 pub struct vm_t {
 	// the vm may be recursively entered

@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall(CG_G2_GETSURFACENAME, ghoul2, surfNumber, modelIndex, fillBuf);`
 /// Raven transport copies `G2API_GetSurfaceName` into the caller-provided buffer.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1080-1082`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2592`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1637-1655`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1080-1082`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2592`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1637-1655`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2GetsurfacenameArgs {
     ghoul2: *mut c_void,
@@ -40,10 +40,10 @@ impl CgG2GetsurfacenameArgs {
 /// `CG_G2_GETSURFACENAME` MP cgame imports syscall ABI token.
 ///
 /// Raven: returning a pointer across the VM caused failure, so Raven shoves data into caller storage.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:326`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1080-1082`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1637-1655`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1637-1655`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:326`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1080-1082`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1637-1655`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1637-1655`
 pub struct CgG2Getsurfacename;
 
 impl OutboundSysCall for CgG2Getsurfacename {

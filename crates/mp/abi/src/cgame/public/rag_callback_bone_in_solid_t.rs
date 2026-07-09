@@ -4,7 +4,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `ragCallbackBoneInSolid_t` — ragdoll bone-in-solid callback payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:574-579`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:574-579`
 #[repr(C)]
 pub struct ragCallbackBoneInSolid_t {
 	pub bonePos: vec3_t, //world coordinate position of the bone

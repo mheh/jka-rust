@@ -8,9 +8,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven's `trap_Argc` forwards only the syscall token, so this call has no
 /// transport payload.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:71`
-/// Transport source: `oracle/oracle/codemp/cgame/cg_syscalls.c:72`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:728`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:71`
+/// Transport source: `oracle/codemp/cgame/cg_syscalls.c:72`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:728`
 #[derive(Debug, Default)]
 pub struct CgArgcArgs;
 
@@ -28,9 +28,9 @@ impl CgArgcArgs {
 /// Raven: ( void );
 /// Raven: ClientCommand and ServerCommand parameter access
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:70`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:729`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:728`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:70`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:729`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:728`
 pub struct CgArgc;
 
 impl OutboundSysCall for CgArgc {

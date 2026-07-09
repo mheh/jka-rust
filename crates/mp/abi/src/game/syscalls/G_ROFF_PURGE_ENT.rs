@@ -23,7 +23,7 @@ impl GRoffPurgeEntArgs {
 ///
 /// Raven: qboolean ROFF_PurgeEnt( int entID )
 /// Raven: rww - dynamic vm memory allocation!
-/// Source: `oracle/oracle/codemp/game/g_public.h:245`
+/// Source: `oracle/codemp/game/g_public.h:245`
 pub struct GRoffPurgeEnt;
 
 impl OutboundSysCall for GRoffPurgeEnt {

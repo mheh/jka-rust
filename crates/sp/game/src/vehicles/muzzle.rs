@@ -4,7 +4,7 @@ use sp_qshared::shared::vec3_t;
 
 /// Raven `Muzzle` — per-muzzle runtime firing position/direction/timing state.
 ///
-/// Type definition source: `oracle/oracle/code/game/G_Vehicles.h:443-456`
+/// Type definition source: `oracle/code/game/G_Vehicles.h:443-456`
 #[repr(C)]
 pub struct Muzzle {
 	// These are updated every frame and represent the current position and direction for the specific muzzle.

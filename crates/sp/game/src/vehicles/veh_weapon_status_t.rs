@@ -4,7 +4,7 @@ use sp_qshared::shared::qboolean;
 
 /// Raven `vehWeaponStatus_t` — per-weapon-slot runtime vehicle weapon state.
 ///
-/// Type definition source: `oracle/oracle/code/game/G_Vehicles.h:481-491`
+/// Type definition source: `oracle/code/game/G_Vehicles.h:481-491`
 #[repr(C)]
 pub struct vehWeaponStatus_t {
 	//linked firing mode

@@ -1,6 +1,6 @@
 //! MP `bg_public.h` game-type definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:183-199`
+//! Type definition source: `oracle/codemp/game/bg_public.h:183-199`
 
 #![allow(non_camel_case_types)]
 
@@ -10,7 +10,7 @@ use core::ffi::c_int;
 ///
 /// Raven names the game types via an anonymous `enum { GT_FFA..GT_MAX_GAME_TYPE }`,
 /// then `typedef int gametype_t` for storage.
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:183-199`
+/// Type definition source: `oracle/codemp/game/bg_public.h:183-199`
 pub type gametype_t = c_int;
 
 /// free for all

@@ -2,7 +2,7 @@
 
 /// Raven `fogPass_t` — fog rendering passes.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:442-447`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:442-447`
 #[repr(i32)]
 pub enum fogPass_t {
 	FP_NONE,  // surface is translucent and will just be adjusted properly

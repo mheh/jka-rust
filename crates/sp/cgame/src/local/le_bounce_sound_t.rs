@@ -3,7 +3,7 @@
 /// Raven `leBounceSound_t` — bounce sound types for fragment local entities.
 ///
 /// Raven: fragment local entities can make sounds on impacts.
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:215-220`
+/// Type definition source: `oracle/code/cgame/cg_local.h:215-220`
 #[repr(i32)]
 pub enum leBounceSound_t {
     LEBS_NONE = 0,

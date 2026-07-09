@@ -14,18 +14,18 @@ use super::server_info_t::serverInfo_t;
 
 /// Raven `MAX_OSPATH` — max length of an OS filesystem path.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/qcommon.h`
+/// Source: `oracle/codemp/qcommon/qcommon.h`
 const MAX_OSPATH: usize = 1024;
 
 /// Raven `MAX_OTHER_SERVERS` — max entries in the local/favorites/mplayer server
 /// lists.
 ///
-/// Source: `oracle/oracle/codemp/client/client.h`
+/// Source: `oracle/codemp/client/client.h`
 const MAX_OTHER_SERVERS: usize = 128;
 
 /// Raven `MAX_GLOBAL_SERVERS` — max entries in the global server list.
 ///
-/// Source: `oracle/oracle/codemp/client/client.h`
+/// Source: `oracle/codemp/client/client.h`
 const MAX_GLOBAL_SERVERS: usize = 2048;
 
 // `MAX_INFO_STRING` (`q_shared.h`) imported from its canonical home in
@@ -34,7 +34,7 @@ const MAX_GLOBAL_SERVERS: usize = 2048;
 /// Raven `clientStatic_t` — client state not wiped across level loads; the
 /// only persistent client state.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/client.h:295-349`
+/// Type definition source: `oracle/codemp/client/client.h:295-349`
 #[repr(C)]
 pub struct clientStatic_t {
 	/// Raven: connection status

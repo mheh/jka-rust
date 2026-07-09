@@ -18,10 +18,10 @@ use mp_qshared::shared::vec3_t;
 /// pointer-shaped words through `VMA`, calls `CM_BoxTrace(..., qfalse)`, writes
 /// the trace through `results`, and returns `0`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:148-154`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2203-2205`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:793-795`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:793-795`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:148-154`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2203-2205`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:793-795`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:793-795`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmBoxtraceArgs {
     /// Caller-owned trace output, decoded by Raven as `(trace_t *)VMA(1)`.
@@ -103,11 +103,11 @@ impl CgCmBoxtraceArgs {
 /// (const float *)VMA(3), (const float *)VMA(4), (const float *)VMA(5),
 /// args[6], args[7], qfalse); return 0;`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:90`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:148-154`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2203-2205`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:793-795`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:793-795`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:90`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:148-154`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2203-2205`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:793-795`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:793-795`
 pub struct CgCmBoxtrace;
 
 impl OutboundSysCall for CgCmBoxtrace {

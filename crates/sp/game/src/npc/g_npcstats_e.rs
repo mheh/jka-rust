@@ -5,7 +5,7 @@ use super::sex_type_t::sexType_t;
 /// Raven `gNPCstats_t` — NPC AI/movement stats, loaded in and settable by scripts.
 ///
 /// Raven: !!!!!!!!!! LOADSAVE-affecting structure !!!!!!!!!!
-/// Type definition source: `oracle/oracle/code/game/b_public.h:115-138`
+/// Type definition source: `oracle/code/game/b_public.h:115-138`
 #[repr(C)]
 pub struct gNPCstats_t {
 	//AI

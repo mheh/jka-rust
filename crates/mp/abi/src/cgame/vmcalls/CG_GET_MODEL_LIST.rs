@@ -4,9 +4,9 @@ use mp_qshared::shared::qhandle_t;
 
 /// `CG_GET_MODEL_LIST` MP cgame exports vmMain ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:400`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:236-237`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:236-237`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:400`
+/// Args source: `oracle/codemp/cgame/cg_main.c:236-237`
+/// Output source: `oracle/codemp/cgame/cg_main.c:236-237`
 /// Transport/call-site source: no engine call-site found in initial search; module vmMain switch proves no arg slots.
 pub struct CgGetModelList;
 

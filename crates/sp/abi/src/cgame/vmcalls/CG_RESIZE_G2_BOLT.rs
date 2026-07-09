@@ -10,8 +10,8 @@ use abi_transport::generic::{
 ///
 /// Raven vmMain: `CG_ResizeG2Bolt((boltInfo_v *)arg0, arg1);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:122`
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:203`
+/// Args source: `oracle/code/cgame/cg_main.cpp:122`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:203`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgResizeG2BoltArgs {
     bolt: *mut boltInfo_v,
@@ -36,10 +36,10 @@ impl CgResizeG2BoltArgs {
 ///
 /// Raven: Ghoul2 Insert Start
 /// Raven: `void CG_ResizeG2Bolt( boltInfo_v *bolt, int newCount );`
-/// Enum value source: `oracle/oracle/code/client/vmachine.h:25`
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:40`, `oracle/oracle/code/cgame/cg_main.cpp:122`
-/// Output source: `oracle/oracle/code/cgame/cg_main.cpp:122`
-/// VM_Main switch source: `oracle/oracle/code/cgame/cg_main.cpp:118-130`
+/// Enum value source: `oracle/code/client/vmachine.h:25`
+/// Args source: `oracle/code/cgame/cg_main.cpp:40`, `oracle/code/cgame/cg_main.cpp:122`
+/// Output source: `oracle/code/cgame/cg_main.cpp:122`
+/// VM_Main switch source: `oracle/code/cgame/cg_main.cpp:118-130`
 /// Raven: `boltInfo_v` is a vector type in `game/ghoul2_shared.h:203`.
 pub struct CgResizeG2Bolt;
 

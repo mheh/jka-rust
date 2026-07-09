@@ -1,5 +1,5 @@
 // PORT-COMPLETE: g_active.c 31/5
-//! Port of `oracle/oracle/codemp/game/g_active.c` (jampgame pass 2).
+//! Port of `oracle/codemp/game/g_active.c` (jampgame pass 2).
 //!
 //! State reached through `ctx.world` (STATE-D6 leaf reborrows), traps through
 //! `trap::X(ctx.engine, …)`, file-scope globals/cvars via the pre-merged
@@ -40,7 +40,7 @@ use mp_qshared::shared::trajectory::trType_t::*; // TR_GRAVITY
 // (placeholder-const sweep: removed the shadowing local copies).
 
 // Raven `#define FALL_FADE_TIME 3000` (q_shared.h).
-// Source: `oracle/oracle/codemp/game/q_shared.h:2148`
+// Source: `oracle/codemp/game/q_shared.h:2148`
 pub const FALL_FADE_TIME: c_int = 3000;
 
 // MAT_*/SVF_*/PMF_SCOREBOARD now resolve via the crate prelude (pass-3 symbol
@@ -49,7 +49,7 @@ pub const FALL_FADE_TIME: c_int = 3000;
 
 // Raven `#define MAX_SIGHT_DISTANCE`/`MAX_SIGHT_FOV`/`MAX_JEDIMASTER_DISTANCE`/
 // `MAX_JEDIMASTER_FOV` — file-scope in `g_active.c` (not referenced elsewhere).
-// Source: `oracle/oracle/codemp/game/g_active.c:1097-1101`
+// Source: `oracle/codemp/game/g_active.c:1097-1101`
 pub const MAX_SIGHT_DISTANCE: c_float = 1500.0;
 pub const MAX_SIGHT_FOV: c_float = 100.0;
 pub const MAX_JEDIMASTER_DISTANCE: c_float = 2500.0;
@@ -59,7 +59,7 @@ pub const MAX_JEDIMASTER_FOV: c_float = 100.0;
 // TAUNT_BOW, TAUNT_MEDITATE, TAUNT_FLOURISH, TAUNT_GLOAT };` in `g_active.c`
 // (no typedef name), so per enum-vs-alias fidelity these are plain `c_int`
 // consts, private to this file like the Raven original.
-// Source: `oracle/oracle/codemp/game/g_active.c:1652-1659`
+// Source: `oracle/codemp/game/g_active.c:1652-1659`
 pub const TAUNT_TAUNT: c_int = 0;
 pub const TAUNT_BOW: c_int = 1;
 pub const TAUNT_MEDITATE: c_int = 2;
@@ -117,7 +117,7 @@ use mp_bg::public::dm_flags::DF_NO_FOOTSTEPS;
 
 /// Raven `P_SetTwitchInfo`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:20-24`
+/// Source: `oracle/codemp/game/g_active.c:20-24`
 pub fn P_SetTwitchInfo(ctx: GameContext<'_>, client: *mut gclient_t) {
     unsafe {
         (*client).ps.painTime = (*ctx.world).level.time;
@@ -127,7 +127,7 @@ pub fn P_SetTwitchInfo(ctx: GameContext<'_>, client: *mut gclient_t) {
 
 /// Raven `P_DamageFeedback` — send the damage-blend/pain feedback for a frame.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:36-118`
+/// Source: `oracle/codemp/game/g_active.c:36-118`
 pub fn P_DamageFeedback(ctx: GameContext<'_>, player: *mut gentity_t) {
     unsafe {
         let client = (*player).client as *mut gclient_t;
@@ -203,7 +203,7 @@ pub fn P_DamageFeedback(ctx: GameContext<'_>, player: *mut gentity_t) {
 
 /// Raven `P_WorldEffects` — drowning + lava/slime sizzle damage.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:129-205`
+/// Source: `oracle/codemp/game/g_active.c:129-205`
 pub fn P_WorldEffects(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -321,7 +321,7 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `DoImpact` — collision impact damage (crush/fall).
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:213-405`
+/// Source: `oracle/codemp/game/g_active.c:213-405`
 pub fn DoImpact(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -487,7 +487,7 @@ pub fn DoImpact(
 
 /// Raven `Client_CheckImpactBBrush` — clients only do impact damage vs easy-break breakables.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:407-436`
+/// Source: `oracle/codemp/game/g_active.c:407-436`
 pub fn Client_CheckImpactBBrush(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -527,7 +527,7 @@ pub fn Client_CheckImpactBBrush(
 
 /// Raven `G_SetClientSound` — loop-sound selection (hack/heal/supply/lava).
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:444-467`
+/// Source: `oracle/codemp/game/g_active.c:444-467`
 pub fn G_SetClientSound(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -558,10 +558,10 @@ pub fn G_SetClientSound(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `ClientImpacts` — dispatch `touch` for pmove touch-ents.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:478-506`
+/// Source: `oracle/codemp/game/g_active.c:478-506`
 /// Raven `ClientImpacts` — bot/other touch dispatch over `pm->touchents`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:478-506`
+/// Source: `oracle/codemp/game/g_active.c:478-506`
 pub fn ClientImpacts(ctx: GameContext<'_>, ent: *mut gentity_t, pm: *mut pmove_t) {
     unsafe {
         let mut trace: trace_t = core::mem::zeroed();
@@ -613,10 +613,10 @@ pub fn ClientImpacts(ctx: GameContext<'_>, ent: *mut gentity_t, pm: *mut pmove_t
 
 /// Raven `G_TouchTriggers` — fire trigger `touch` handlers around a client.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:516-590`
+/// Source: `oracle/codemp/game/g_active.c:516-590`
 /// Raven `G_TouchTriggers` — check nearby trigger volumes against `ent`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:516-590`
+/// Source: `oracle/codemp/game/g_active.c:516-590`
 pub fn G_TouchTriggers(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ent).client.is_null() {
@@ -731,10 +731,10 @@ pub fn G_TouchTriggers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `G_MoverTouchPushTriggers` — fire push-trigger `touch` along a mover's path.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:601-671`
+/// Source: `oracle/codemp/game/g_active.c:601-671`
 /// Raven `G_MoverTouchPushTriggers` — sweep a mover's motion against push triggers.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:601-671`
+/// Source: `oracle/codemp/game/g_active.c:601-671`
 pub fn G_MoverTouchPushTriggers(ctx: GameContext<'_>, ent: *mut gentity_t, oldOrg: vec3_t) {
     unsafe {
         // non-moving movers don't hit triggers!
@@ -836,10 +836,10 @@ pub fn G_MoverTouchPushTriggers(ctx: GameContext<'_>, ent: *mut gentity_t, oldOr
 
 /// Raven `SpectatorThink`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:678-740`
+/// Source: `oracle/codemp/game/g_active.c:678-740`
 /// Raven `SpectatorThink`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:678-740`
+/// Source: `oracle/codemp/game/g_active.c:678-740`
 pub fn SpectatorThink(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut usercmd_t) {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -917,7 +917,7 @@ pub fn SpectatorThink(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut user
 
 /// Raven `ClientInactivityTimer`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:751-774`
+/// Source: `oracle/codemp/game/g_active.c:751-774`
 pub fn ClientInactivityTimer(ctx: GameContext<'_>, client: *mut gclient_t) -> qboolean {
     unsafe {
         let level_time = (*ctx.world).level.time;
@@ -963,7 +963,7 @@ pub fn ClientInactivityTimer(ctx: GameContext<'_>, client: *mut gclient_t) -> qb
 
 /// Raven `ClientTimerActions` — once-a-second health/armor decay over max.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:783-803`
+/// Source: `oracle/codemp/game/g_active.c:783-803`
 pub fn ClientTimerActions(ent: *mut gentity_t, msec: c_int) {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -989,7 +989,7 @@ pub fn ClientTimerActions(ent: *mut gentity_t, msec: c_int) {
 
 /// Raven `ClientIntermissionThink`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:810-823`
+/// Source: `oracle/codemp/game/g_active.c:810-823`
 pub fn ClientIntermissionThink(client: *mut gclient_t) {
     unsafe {
         (*client).ps.eFlags &= !EF_TALK;
@@ -1011,7 +1011,7 @@ pub fn ClientIntermissionThink(client: *mut gclient_t) {
 
 /// Raven `G_VehicleAttachDroidUnit` — snap a droid unit to its vehicle bolt.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:826-854`
+/// Source: `oracle/codemp/game/g_active.c:826-854`
 pub fn G_VehicleAttachDroidUnit(ctx: GameContext<'_>, vehEnt: *mut gentity_t) {
     unsafe {
         let veh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
@@ -1069,7 +1069,7 @@ pub fn G_VehicleAttachDroidUnit(ctx: GameContext<'_>, vehEnt: *mut gentity_t) {
 
 /// Raven `G_CheapWeaponFire` — server-driven weapon fire event (with speeder gate).
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:857-895`
+/// Source: `oracle/codemp/game/g_active.c:857-895`
 pub fn G_CheapWeaponFire(ctx: GameContext<'_>, entNum: c_int, ev: c_int) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entNum as usize] as *mut gentity_t;
@@ -1116,7 +1116,7 @@ pub fn G_CheapWeaponFire(ctx: GameContext<'_>, entNum: c_int, ev: c_int) {
 
 /// Raven `ClientEvents` — process predictable client events for the frame.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:909-1052`
+/// Source: `oracle/codemp/game/g_active.c:909-1052`
 pub fn ClientEvents(ctx: GameContext<'_>, ent: *mut gentity_t, oldEventSequence: c_int) {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -1247,7 +1247,7 @@ pub fn ClientEvents(ctx: GameContext<'_>, ent: *mut gentity_t, oldEventSequence:
 
 /// Raven `SendPendingPredictableEvents` — spawn a temp-ent for a pending event.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1059-1087`
+/// Source: `oracle/codemp/game/g_active.c:1059-1087`
 pub fn SendPendingPredictableEvents(ctx: GameContext<'_>, ps: *mut playerState_t) {
     unsafe {
         // if there are still events pending
@@ -1278,7 +1278,7 @@ pub fn SendPendingPredictableEvents(ctx: GameContext<'_>, ps: *mut playerState_t
 
 /// Raven `G_UpdateForceSightBroadcasts` — broadcast this client to force-sight viewers.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1103-1147`
+/// Source: `oracle/codemp/game/g_active.c:1103-1147`
 pub fn G_UpdateForceSightBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         // Any clients with force sight on should see this client
@@ -1330,7 +1330,7 @@ pub fn G_UpdateForceSightBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t)
 
 /// Raven `G_UpdateJediMasterBroadcasts` — broadcast the Jedi Master to nearby clients.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1149-1197`
+/// Source: `oracle/codemp/game/g_active.c:1149-1197`
 pub fn G_UpdateJediMasterBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let selfCl = (*self_).client as *mut gclient_t;
@@ -1386,7 +1386,7 @@ pub fn G_UpdateJediMasterBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t)
 
 /// Raven `G_UpdateClientBroadcasts`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1199-1209`
+/// Source: `oracle/codemp/game/g_active.c:1199-1209`
 pub fn G_UpdateClientBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         // Clear all the broadcast bits for this client
@@ -1402,7 +1402,7 @@ pub fn G_UpdateClientBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `G_AddPushVecToUcmd` — fold a client's push vector into its ucmd.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1211-1244`
+/// Source: `oracle/codemp/game/g_active.c:1211-1244`
 pub fn G_AddPushVecToUcmd(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut usercmd_t) {
     unsafe {
         let mut forward: vec3_t = [0.0; 3];
@@ -1453,7 +1453,7 @@ pub fn G_AddPushVecToUcmd(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mu
 
 /// Raven `G_StandingAnim` — is this a plain standing anim? (not idles/cinematics).
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1246-1258`
+/// Source: `oracle/codemp/game/g_active.c:1246-1258`
 pub fn G_StandingAnim(anim: c_int) -> qboolean {
     if anim == BOTH_STAND1 as c_int
         || anim == BOTH_STAND2 as c_int
@@ -1467,7 +1467,7 @@ pub fn G_StandingAnim(anim: c_int) -> qboolean {
 
 /// Raven `G_ActionButtonPressed`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1260-1300`
+/// Source: `oracle/codemp/game/g_active.c:1260-1300`
 pub fn G_ActionButtonPressed(buttons: c_int) -> qboolean {
     if buttons & BUTTON_ATTACK != 0 {
         qtrue
@@ -1494,7 +1494,7 @@ pub fn G_ActionButtonPressed(buttons: c_int) -> qboolean {
 
 /// Raven `G_CheckClientIdle` — enter/exit idle animations after inactivity.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1302-1430`
+/// Source: `oracle/codemp/game/g_active.c:1302-1430`
 pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut usercmd_t) {
     unsafe {
         let mut viewChange: vec3_t = [0.0; 3];
@@ -1649,7 +1649,7 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
 
 /// Raven `NPC_Accelerate`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1432-1486`
+/// Source: `oracle/codemp/game/g_active.c:1432-1486`
 pub fn NPC_Accelerate(ent: *mut gentity_t, fullWalkAcc: qboolean, fullRunAcc: qboolean) {
     unsafe {
         if (*ent).client.is_null() || (*ent).NPC.is_null() {
@@ -1700,7 +1700,7 @@ pub fn NPC_Accelerate(ent: *mut gentity_t, fullWalkAcc: qboolean, fullRunAcc: qb
 
 /// Raven `NPC_GetWalkSpeed`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1494-1510`
+/// Source: `oracle/codemp/game/g_active.c:1494-1510`
 pub fn NPC_GetWalkSpeed(ent: *mut gentity_t) -> c_int {
     unsafe {
         if (*ent).client.is_null() || (*ent).NPC.is_null() {
@@ -1715,7 +1715,7 @@ pub fn NPC_GetWalkSpeed(ent: *mut gentity_t) -> c_int {
 
 /// Raven `NPC_GetRunSpeed`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1517-1573`
+/// Source: `oracle/codemp/game/g_active.c:1517-1573`
 pub fn NPC_GetRunSpeed(ent: *mut gentity_t) -> c_int {
     unsafe {
         if (*ent).client.is_null() || (*ent).NPC.is_null() {
@@ -1739,7 +1739,7 @@ pub fn NPC_GetRunSpeed(ent: *mut gentity_t) -> c_int {
 
 /// Raven `G_CheckMovingLoopingSounds` — NPC movement loop-sounds.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1577-1614`
+/// Source: `oracle/codemp/game/g_active.c:1577-1614`
 pub fn G_CheckMovingLoopingSounds(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut usercmd_t) {
     unsafe {
         let cl = (*ent).client as *mut gclient_t;
@@ -1793,7 +1793,7 @@ pub fn G_CheckMovingLoopingSounds(ctx: GameContext<'_>, ent: *mut gentity_t, ucm
 
 /// Raven `G_HeldByMonster` — clamp a player being held by a monster (Rancor).
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1616-1651`
+/// Source: `oracle/codemp/game/g_active.c:1616-1651`
 pub fn G_HeldByMonster(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut *mut usercmd_t) {
     unsafe {
         let cl = if ent.is_null() {
@@ -1846,7 +1846,7 @@ pub fn G_HeldByMonster(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut *mu
 
 /// Raven `G_SetTauntAnim` — play a taunt/bow/meditate/flourish/gloat animation.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1662-1926`
+/// Source: `oracle/codemp/game/g_active.c:1662-1926`
 pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: *mut gentity_t, taunt: c_int) {
     unsafe {
         let cl = (*ent).client as *mut gclient_t;
@@ -2043,10 +2043,10 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: *mut gentity_t, taunt: c_int) {
 
 /// Raven `ClientThink_real` — the per-frame client/NPC think core.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1939-3611`
+/// Source: `oracle/codemp/game/g_active.c:1939-3611`
 /// Raven `ClientThink_real` — the per-client server-side think/Pmove driver.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:1939-3611`
+/// Source: `oracle/codemp/game/g_active.c:1939-3611`
 pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_qshared::shared::gen_cmds::genCmds_t::{self, *};
     unsafe {
@@ -3757,7 +3757,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `G_CheckClientTimeouts` — force idle clients to spectator.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:3620-3640`
+/// Source: `oracle/codemp/game/g_active.c:3620-3640`
 pub fn G_CheckClientTimeouts(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let cl = (*ent).client as *mut gclient_t;
@@ -3785,7 +3785,7 @@ pub fn G_CheckClientTimeouts(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `ClientThink` — vmMain client-think entry.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:3649-3720`
+/// Source: `oracle/codemp/game/g_active.c:3649-3720`
 pub fn ClientThink(ctx: GameContext<'_>, clientNum: c_int, ucmd: *mut usercmd_t) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[clientNum as usize] as *mut gentity_t;
@@ -3821,7 +3821,7 @@ pub fn ClientThink(ctx: GameContext<'_>, clientNum: c_int, ucmd: *mut usercmd_t)
 
 /// Raven `G_RunClient`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:3723-3729`
+/// Source: `oracle/codemp/game/g_active.c:3723-3729`
 pub fn G_RunClient(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ent).r.svFlags & SVF_BOT == 0 && (*ctx.world).cvars.g_synchronousClients.integer == 0 {
@@ -3835,7 +3835,7 @@ pub fn G_RunClient(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `SpectatorClientEndFrame` — follow-cam / scoreboard bookkeeping.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:3738-3783`
+/// Source: `oracle/codemp/game/g_active.c:3738-3783`
 pub fn SpectatorClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let entCl = (*ent).client as *mut gclient_t;
@@ -3885,7 +3885,7 @@ pub fn SpectatorClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `ClientEndFrame` — end-of-frame per-client fixups.
 ///
-/// Source: `oracle/oracle/codemp/game/g_active.c:3794-3874`
+/// Source: `oracle/codemp/game/g_active.c:3794-3874`
 pub fn ClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut isNPC: qboolean = qfalse;

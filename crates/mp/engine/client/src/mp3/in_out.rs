@@ -2,7 +2,7 @@
 
 /// Raven `IN_OUT` — byte-counter pair for an MP3-decoder call.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/../mp3code/small_header.h:18-22`
+/// Type definition source: `oracle/codemp/client/../mp3code/small_header.h:18-22`
 #[repr(C)]
 pub struct IN_OUT {
     pub in_bytes: i32,

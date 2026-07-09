@@ -30,7 +30,7 @@ impl GG2SetragdollArgs {
 
 /// `G_G2_SETRAGDOLL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:544`
+/// Source: `oracle/codemp/game/g_public.h:544`
 pub struct GG2Setragdoll;
 
 impl OutboundSysCall for GG2Setragdoll {

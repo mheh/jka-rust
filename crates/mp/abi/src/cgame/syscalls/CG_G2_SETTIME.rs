@@ -8,8 +8,8 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall(CG_G2_SETTIME, time, clock);`
 /// Raven transport: `G2API_SetTime(args[1], args[2]);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:986-988`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1523-1525`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:986-988`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1523-1525`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SettimeArgs {
     time: c_int,
@@ -24,10 +24,10 @@ impl CgG2SettimeArgs {
 
 /// `CG_G2_SETTIME` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:293`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:986-988`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1523-1525`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1523-1525`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:293`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:986-988`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1523-1525`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1523-1525`
 pub struct CgG2Settime;
 
 impl OutboundSysCall for CgG2Settime {

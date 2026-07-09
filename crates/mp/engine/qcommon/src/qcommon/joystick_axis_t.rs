@@ -2,7 +2,7 @@
 
 /// Raven `joystickAxis_t` — joystick axis indices.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:913-921`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:913-921`
 #[repr(i32)]
 pub enum joystickAxis_t {
     AXIS_SIDE = 0,

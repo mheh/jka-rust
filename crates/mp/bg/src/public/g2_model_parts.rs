@@ -1,12 +1,12 @@
 //! MP `bg_public.h` Ghoul2 model parts definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:126-134`
+//! Type definition source: `oracle/codemp/game/bg_public.h:126-134`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `g2ModelParts_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:126-134`
+/// Type definition source: `oracle/codemp/game/bg_public.h:126-134`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum g2ModelParts_t {
@@ -24,5 +24,5 @@ use core::ffi::c_int;
 /// Raven `G2_MODEL_PART` — sentinel weapon index meaning "use the Ghoul2 model
 /// part", distinct from the `g2ModelParts_t` enum above.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:136`
+/// Source: `oracle/codemp/game/bg_public.h:136`
 pub const G2_MODEL_PART: c_int = 50;

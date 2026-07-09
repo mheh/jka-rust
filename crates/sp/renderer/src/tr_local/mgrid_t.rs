@@ -1,12 +1,12 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-// Source: oracle/oracle/code/qcommon/qfiles.h:310
+// Source: oracle/code/qcommon/qfiles.h:310
 const MAXLIGHTMAPS: usize = 4;
 
 /// Raven `mgrid_t` — per-vertex light-grid sample (ambient/direct light,
 /// styles, direction).
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:883-888`
+/// Type definition source: `oracle/code/renderer/tr_local.h:883-888`
 #[repr(C)]
 pub struct mgrid_t {
     pub ambientLight: [[u8; 3]; MAXLIGHTMAPS],

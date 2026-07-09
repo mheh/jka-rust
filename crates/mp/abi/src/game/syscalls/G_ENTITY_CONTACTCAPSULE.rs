@@ -39,7 +39,7 @@ impl GEntityContactcapsuleArgs {
 ///
 /// Raven: ( const vec3_t mins, const vec3_t maxs, const gentity_t *ent );
 /// Raven: SP_REGISTER_SERVER_CMD,
-/// Source: `oracle/oracle/codemp/game/g_public.h:236`
+/// Source: `oracle/codemp/game/g_public.h:236`
 pub struct GEntityContactcapsule;
 
 impl OutboundSysCall for GEntityContactcapsule {

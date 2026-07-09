@@ -2,7 +2,7 @@
 
 /// Raven `vehTurretStatus_t` — per-turret runtime firing/targeting state.
 ///
-/// Type definition source: `oracle/oracle/code/game/G_Vehicles.h:493-505`
+/// Type definition source: `oracle/code/game/G_Vehicles.h:493-505`
 #[repr(C)]
 pub struct vehTurretStatus_t {
 	//current weapon ammo

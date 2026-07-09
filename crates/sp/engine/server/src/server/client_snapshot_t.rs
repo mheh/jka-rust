@@ -7,7 +7,7 @@ use sp_qshared::common::sp::renderer::refdef_t::MAX_MAP_AREA_BYTES;
 
 /// Raven `clientSnapshot_t` — per-client server-side snapshot bookkeeping.
 ///
-/// Type definition source: `oracle/oracle/code/server/server.h:76-87`
+/// Type definition source: `oracle/code/server/server.h:76-87`
 #[repr(C)]
 pub struct clientSnapshot_t {
     pub areabytes: c_int,

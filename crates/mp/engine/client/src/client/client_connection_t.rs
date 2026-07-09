@@ -11,11 +11,11 @@ use super::rm_automap_symbol_t::rmAutomapSymbol_t;
 
 /// Raven `MAX_RELIABLE_COMMANDS` — max string commands buffered for retransmit.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/qcommon.h:106`
+/// Source: `oracle/codemp/qcommon/qcommon.h:106`
 const MAX_RELIABLE_COMMANDS: usize = 128;
 
 // Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching other ports of this const).
-// Source: oracle/oracle/codemp/game/q_shared.h:395
+// Source: oracle/codemp/game/q_shared.h:395
 const MAX_OSPATH: usize = 1024;
 
 // `MAX_INFO_STRING` (`q_shared.h:384`) imported from its canonical home in
@@ -23,19 +23,19 @@ const MAX_OSPATH: usize = 1024;
 
 /// Raven `MAX_HEIGHTMAP_SIZE`.
 ///
-/// Source: `oracle/oracle/codemp/client/client.h:141`
+/// Source: `oracle/codemp/client/client.h:141`
 const MAX_HEIGHTMAP_SIZE: usize = 16000;
 
 /// Raven `MAX_AUTOMAP_SYMBOLS`.
 ///
-/// Source: `oracle/oracle/codemp/client/client.h:151`
+/// Source: `oracle/codemp/client/client.h:151`
 const MAX_AUTOMAP_SYMBOLS: usize = 512;
 
 /// Raven `clientConnection_t` — client's connection state to the current server.
 ///
 /// Raven: state for reconnecting/downloading/demo playback, cleared each time
 /// a server connection is established or dropped.
-/// Type definition source: `oracle/oracle/codemp/client/client.h:166-234`
+/// Type definition source: `oracle/codemp/client/client.h:166-234`
 #[repr(C)]
 pub struct clientConnection_t {
 	pub clientNum: i32,

@@ -12,9 +12,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven transport writes the chosen brush-model face into `VMA(2)` and reads
 /// the view normal from `VMA(3)`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:421-423`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2299`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1054-1056`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:421-423`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2299`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1054-1056`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRGetBmodelVertsArgs {
     bmodel_index: c_int,
@@ -34,10 +34,10 @@ impl CgRGetBmodelVertsArgs {
 
 /// `CG_R_GET_BMODEL_VERTS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:170`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:421-423`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1054-1056`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1054-1056`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:170`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:421-423`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1054-1056`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1054-1056`
 pub struct CgRGetBmodelVerts;
 
 impl OutboundSysCall for CgRGetBmodelVerts {

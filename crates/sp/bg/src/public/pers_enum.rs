@@ -1,12 +1,12 @@
 //! SP `bg_public.h` player persistence enumeration.
 //!
-//! Type definition source: `oracle/oracle/code/game/bg_public.h:195-208`
+//! Type definition source: `oracle/code/game/bg_public.h:195-208`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `persEnum_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/bg_public.h:195-208`
+/// Type definition source: `oracle/code/game/bg_public.h:195-208`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum persEnum_t {

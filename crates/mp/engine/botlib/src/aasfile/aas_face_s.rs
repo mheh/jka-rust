@@ -3,7 +3,7 @@
 /// Raven `aas_face_s` — an AAS face bounding an area, with plane and edge-index info.
 ///
 /// Raven: none.
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:174-182`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:174-182`
 #[repr(C)]
 pub struct aas_face_t {
     /// number of the plane this face is in

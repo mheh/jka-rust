@@ -9,7 +9,7 @@ use super::player_team_state_t::playerTeamState_t;
 
 /// Raven `clientPersistant_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:341-350`
+/// Type definition source: `oracle/code/game/g_shared.h:341-350`
 #[repr(C)]
 pub struct clientPersistant_t {
     pub connected: clientConnected_t,

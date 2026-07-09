@@ -112,7 +112,7 @@ impl BotlibAasPredictClientMovementArgs {
 
 /// `BOTLIB_AAS_PREDICT_CLIENT_MOVEMENT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:380`
+/// Source: `oracle/codemp/game/g_public.h:380`
 pub struct BotlibAasPredictClientMovement;
 
 impl OutboundSysCall for BotlibAasPredictClientMovement {

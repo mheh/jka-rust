@@ -6,17 +6,17 @@ use sp_engine_qcommon::qcommon::netadr_t::netadr_t;
 use sp_engine_qcommon::qcommon::netchan_t::netchan_t;
 
 // Raven `#define MAX_OSPATH 260` (max length of a filesystem pathname).
-// Source: oracle/oracle/code/game/q_shared.h (see crates/sp/engine/qcommon/src/files/directory_t.rs)
+// Source: oracle/code/game/q_shared.h (see crates/sp/engine/qcommon/src/files/directory_t.rs)
 const MAX_OSPATH: usize = 260;
 
 /// Raven `MAX_RELIABLE_COMMANDS` — max string commands buffered for retransmit.
 ///
-/// Source: `oracle/oracle/code/qcommon/qcommon.h`
+/// Source: `oracle/code/qcommon/qcommon.h`
 const MAX_RELIABLE_COMMANDS: usize = 64;
 
 /// Raven `clientConnection_t`.
 ///
-/// Type definition source: `oracle/oracle/code/client/client.h:127-147`
+/// Type definition source: `oracle/code/client/client.h:127-147`
 #[repr(C)]
 pub struct clientConnection_t {
 	pub lastPacketSentTime: i32, // for retransmits

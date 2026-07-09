@@ -9,9 +9,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall( CG_S_MUTESOUND, entityNum, entchannel );`
 /// Raven transport: `S_MuteSound( args[1], args[2] );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2220`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:188-189`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:809-811`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2220`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:188-189`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:809-811`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgSMutesoundArgs {
     /// Entity number forwarded as Raven `args[1]`.
@@ -45,13 +45,13 @@ impl CgSMutesoundArgs {
 /// Raven wrapper: `syscall( CG_S_MUTESOUND, entityNum, entchannel );`
 /// Raven transport: `S_MuteSound( args[1], args[2] ); return 0;`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:96`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2220`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:188-189`
-/// Output source: `oracle/oracle/codemp/cgame/cg_local.h:2220`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:188-189`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:809-811`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:809-811`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:96`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2220`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:188-189`
+/// Output source: `oracle/codemp/cgame/cg_local.h:2220`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:188-189`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:809-811`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:809-811`
 pub struct CgSMutesound;
 
 impl OutboundSysCall for CgSMutesound {

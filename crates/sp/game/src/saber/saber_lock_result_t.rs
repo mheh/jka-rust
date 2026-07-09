@@ -2,7 +2,7 @@
 
 /// Raven `saberLockResult_t` — saber lock result.
 ///
-/// Type definition source: `oracle/oracle/code/game/wp_saber.h:37-42`
+/// Type definition source: `oracle/code/game/wp_saber.h:37-42`
 #[repr(i32)]
 pub enum saberLockResult_t {
 	LOCK_VICTORY = 0, // one side won

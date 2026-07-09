@@ -70,7 +70,7 @@ impl BotlibAasAlternativeRouteGoalArgs {
 
 /// `BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:494`
+/// Source: `oracle/codemp/game/g_public.h:494`
 pub struct BotlibAasAlternativeRouteGoal;
 
 impl OutboundSysCall for BotlibAasAlternativeRouteGoal {

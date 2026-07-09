@@ -37,7 +37,7 @@ Links only — never restated here:
   `com_shutdown`/`com_error` entry points, cite `state-ownership.md:719`) that
   LOAD-D11 calls directly, and the `ErrorLevel` taxonomy — concretely the fatal
   variant `ErrorLevel::ERR_FATAL`, the ported `errorParm_t` enum's first member
-  (`oracle/oracle/codemp/game/q_shared.h:451-457`; state-ownership STATE-D7 /
+  (`oracle/codemp/game/q_shared.h:451-457`; state-ownership STATE-D7 /
   lifecycle LIFE-D3 name the `ErrorLevel = errorParm_t` alias). This is the
   settled shape; lifecycle.md's earlier receiver-ful
   `com_error(engine, …)` is superseded by STATE-D7 and is **not** the one LOAD-D11
@@ -98,7 +98,7 @@ Non-goals (punted, each with its owning doc):
 ### MP native-DLL load chain
 
 `vm_t *VM_Create( const char *module, systemCalls, vmInterpret_t interpret )`
-(`oracle/oracle/codemp/qcommon/vm.cpp:471-472`) is the entry. It first guards
+(`oracle/codemp/qcommon/vm.cpp:471-472`) is the entry. It first guards
 its parameters — `if ( !module || !module[0] || !systemCalls ) Com_Error(
 ERR_FATAL, "VM_Create: bad parms" )` (`vm.cpp:480-482`), the earliest of the
 function's two `ERR_FATAL`s. It then reuses a live slot whose stored `name`
@@ -121,7 +121,7 @@ resolving LOAD-Q10).** `VM_Create` **never fatals on load-not-found** — with t
 fallback out of scope, the observable native outcome is a `NULL` return, and
 **each caller decides** the disposition, *differently per mode*:
 `SV_InitGameProgs` → `if (!gvm) Com_Error(ERR_FATAL, "VM_Create on game failed")`
-(`oracle/oracle/codemp/server/sv_game.cpp:1750-1752`, two lines below the
+(`oracle/codemp/server/sv_game.cpp:1750-1752`, two lines below the
 `VM_Create("jampgame", …)` call); `CL_InitCGame` → `Com_Error(ERR_DROP,
 "VM_Create on cgame failed")` (`client/cl_cgame.cpp:1772-1774`); `CL_InitUI` →
 `Com_Error(ERR_FATAL, "VM_Create on UI failed")` (`client/cl_ui.cpp:1479-1481`).
@@ -129,7 +129,7 @@ The split is **not uniform** — game and ui are `ERR_FATAL`, cgame is `ERR_DROP
 so no single in-`VM_Create` fatal reproduces it; the fatal-vs-drop choice lives at
 the caller.
 
-`Sys_LoadDll` (Win32, `oracle/oracle/codemp/win32/win_main.cpp:811-887`):
+`Sys_LoadDll` (Win32, `oracle/codemp/win32/win_main.cpp:811-887`):
 
 1. **Filename** — `Com_sprintf(filename, ..., "%sx86.dll", name)`
    (`win_main.cpp:826`): `"jampgame"→jampgamex86.dll`, `"cgame"→cgamex86.dll`,
@@ -154,7 +154,7 @@ the caller.
    `FS_BuildOSPath(fs_cdpath, fs_game, filename)` **only if `fs_cdpath[0]`**
    (`:866-869`); else `return NULL` (`:871-873`). **No `fs_homepath`
    fallback.** `FS_BuildOSPath` builds `"<base>/<game>/<qpath>"`
-   (`oracle/oracle/codemp/qcommon/files.cpp:479-498`). **Win32-only direct
+   (`oracle/codemp/qcommon/files.cpp:479-498`). **Win32-only direct
    probe:** the bare `LoadLibrary(filename)` first step is Win32-specific — Unix
    `Sys_LoadDll` `#if 0`s its equivalent cwd `dlopen` (`unix_main.c:361-373`,
    *"do not load from installdir"*) and searches `fs_basepath/fs_game`
@@ -165,32 +165,32 @@ the caller.
    "dllEntry")` and `*entryPoint = GetProcAddress(lib, "vmMain")`; if either is
    null the library is freed and `NULL` returned; else `dllEntry(systemcalls)`
    hands the module the engine syscall trampoline (`win_main.cpp:879-887`). Unix
-   mirrors this with `dlopen`/`dlsym` (`oracle/oracle/codemp/unix/unix_main.c:
+   mirrors this with `dlopen`/`dlsym` (`oracle/codemp/unix/unix_main.c:
    384,421,428,444`), filename `"%si386.so"` (`unix_main.c:346`; `ppc`/`axp`/
    `mips` variants, `-debug` infix in debug builds).
 
 **macOS reality:** no `codemp/mac/` directory exists — **MP has no Mac
 dynamic-loading backend in oracle** (dossier §3). SP's
-`oracle/oracle/code/mac/mac_main.c:65-73` `Sys_LoadDll` is a hard-linked no-op
+`oracle/code/mac/mac_main.c:65-73` `Sys_LoadDll` is a hard-linked no-op
 stub (`*entryPoint = vmMain; return (void*)1;`).
 
 ### MP create/destroy cadence (ground truth for restart, not lifecycle)
 
 - **jampgame** — `SV_InitGameProgs` creates `VM_Create("jampgame", ...)`
-  (`oracle/oracle/codemp/server/sv_game.cpp:1750`); `SV_ShutdownGameProgs`
+  (`oracle/codemp/server/sv_game.cpp:1750`); `SV_ShutdownGameProgs`
   `VM_Call(GAME_SHUTDOWN); VM_Free(gvm)` (`sv_game.cpp:1666-1673`). Every normal
   map change **destroys+recreates**: `SV_ShutdownGameProgs()` (`sv_init.cpp:484`)
   then `SV_InitGameProgs()` (`sv_init.cpp:662`). Only `map_restart` uses the
   in-place `VM_Restart` via `SV_RestartGameProgs` (`sv_game.cpp:1712-1715`,
   `sv_ccmds.cpp:296`). Torn down for good at `SV_Shutdown` (`sv_init.cpp:946`).
 - **cgame** — `CL_InitCGame` `VM_Create("cgame", ...)`
-  (`oracle/oracle/codemp/client/cl_cgame.cpp:1771`); `CL_ShutdownCGame`
+  (`oracle/codemp/client/cl_cgame.cpp:1771`); `CL_ShutdownCGame`
   `VM_Free(cgvm)` (`cl_cgame.cpp:601-603`). Destroyed+recreated on every map
   load via `CL_DownloadsComplete → CL_FlushMemory → CL_ShutdownAll /
   CL_InitCGame` (`cl_main.cpp:1497,1501`), and on `vid_restart`
   (`cl_main.cpp:1322,1324,1362`). Not freed by plain disconnect.
 - **ui** — `CL_InitUI` `VM_Create("ui", ...)`
-  (`oracle/oracle/codemp/client/cl_ui.cpp:1478`), version-checked against
+  (`oracle/codemp/client/cl_ui.cpp:1478`), version-checked against
   `UI_API_VERSION` (`cl_ui.cpp:1484-1487`); `CL_ShutdownUI` `VM_Free(uivm)`
   (`cl_ui.cpp:1444-1453`). **UI is NOT session-persistent:** `CL_FlushMemory`
   runs `CL_ShutdownAll` (frees `uivm`, clears `cls.uiStarted`,
@@ -209,7 +209,7 @@ QVM-only, out of scope. `VM_Free` unconditionally clears the **global**
 ### SP three-way linkage
 
 SP loads exactly one module. `Sys_GetGameAPI`
-(`oracle/oracle/code/win32/win_main.cpp:478-547`) loads `"jagamex86.dll"`
+(`oracle/code/win32/win_main.cpp:478-547`) loads `"jagamex86.dll"`
 (`:489`) — search is **narrower than MP's**: `<cwd>/<debugdir>/jagamex86.dll`
 (`:515`) then `<cwd>/jagamex86.dll` (`:524`), no `fs_*` cvars; both fail →
 `Com_Error(ERR_FATAL, "Couldn't load game")` (`:536`). Symbol:
@@ -220,7 +220,7 @@ engine-side (`sv_game.cpp:682-684`).
 
 Immediately after, `SV_InitGameProgs` fakes `VM_Create("cl")`
 (`code/server/sv_game.cpp:676-679`) — **not a second DLL**. That is SP's
-fake-VM shim `oracle/oracle/code/client/vmachine.h:72-84`: for module `"cl"` it
+fake-VM shim `oracle/code/client/vmachine.h:72-84`: for module `"cl"` it
 calls `Sys_LoadCgame(&cgvm.entryPoint, VM_DllSyscall)`, which
 `GetProcAddress`es `dllEntry`/`vmMain` on the **same** `game_library` handle
 already holding `jagamex86.dll` (`win_main.cpp:557-570`) — cgame logic is
@@ -546,7 +546,7 @@ export, release builds).** The `sys_load_dll` handshake step above ("`dlsym`
 are missing** to `None` — the debug-build behavior. Raven's Unix loader, however, is
 **per-build**: on a missing `vmMain`/`dllEntry` it does `#ifdef NDEBUG` →
 `Com_Error(ERR_FATAL, "Sys_LoadDll(%s) failed dlsym(vmMain): …")`, `#else` →
-`Com_Printf(…)` then `return NULL` (`oracle/oracle/codemp/unix/unix_main.c:431-436`;
+`Com_Printf(…)` then `return NULL` (`oracle/codemp/unix/unix_main.c:431-436`;
 note the semantics — `NDEBUG` = **release** takes the fatal, debug takes the print).
 The port reproduces this faithfully (porting-rules §20 — preserve per-mode quirks):
 the missing-export arm gains a `cfg(not(debug_assertions))` branch that raises the
@@ -1288,7 +1288,7 @@ shape is superseded), `ModuleRegistry::load_module` reproduces Raven's slot-full
 `pub fn com_error(level: ErrorLevel, msg: String) -> !` (state-ownership STATE-D7,
 `state-ownership.md:719`), invoked with the concrete fatal variant
 `ErrorLevel::ERR_FATAL` — `ErrorLevel` aliases the ported `errorParm_t` enum whose
-first member is `ERR_FATAL` (`oracle/oracle/codemp/game/q_shared.h:451-457`;
+first member is `ERR_FATAL` (`oracle/codemp/game/q_shared.h:451-457`;
 state-ownership STATE-D7 / lifecycle LIFE-D3 name the alias) — and a formatted `String`.
 `ModuleRegistry` lives in the same crate, so this is exactly Raven-shaped call
 geometry — a diverging `-> !` panic that unwinds to the `mp_engine_core` catch
@@ -1650,7 +1650,7 @@ identity + dependency edges (**SEAM-Q8**) is **resolved** upstream as **SEAM-D10
 This doc's matrix and seam depend on those resolutions but does not settle them.
 
 The **load call site** — where `ModuleRegistry::load_module` is actually invoked
-(the `SV_InitGameProgs`-equiv function, `oracle/oracle/codemp/server/sv_game.cpp:1750`)
+(the `SV_InitGameProgs`-equiv function, `oracle/codemp/server/sv_game.cpp:1750`)
 — splits into a *settled* and an *unsettled* half. Its **trigger** is settled by
 lifecycle.md (FROZEN, 2026-07-03): the game module loads at **map spawn**
 (`SV_SpawnServer → SV_InitGameProgs`, **post-Slice-0**), not at engine boot — Slice-0

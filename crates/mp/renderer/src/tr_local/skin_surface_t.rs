@@ -8,7 +8,7 @@ use super::shader_s::shader_s;
 
 /// Raven `skinSurface_t` — per-surface shader mapping within a `skin_s`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:604-607`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:604-607`
 #[repr(C)]
 pub struct skinSurface_t {
     pub name: [c_char; MAX_QPATH as usize],

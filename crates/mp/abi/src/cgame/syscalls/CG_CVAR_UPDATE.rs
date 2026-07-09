@@ -27,10 +27,10 @@ impl CgCvarUpdateArgs {
 /// `CG_CVAR_UPDATE` MP cgame imports syscall ABI token.
 ///
 /// Raven: ( vmCvar_t *vmCvar );
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:66`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:54-55`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:54`
-/// Transport source: `oracle/oracle/codemp/client/cl_cgame.cpp:717-719`
+/// Source: `oracle/codemp/cgame/cg_public.h:66`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:54-55`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:54`
+/// Transport source: `oracle/codemp/client/cl_cgame.cpp:717-719`
 pub struct CgCvarUpdate;
 
 impl OutboundSysCall for CgCvarUpdate {

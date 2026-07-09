@@ -4,7 +4,7 @@ use core::ffi::c_char;
 
 /// Raven `T_G_ICARUS_GETSETIDFORSTRING`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:920-923`
+/// Type definition source: `oracle/codemp/game/g_public.h:920-923`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct T_G_ICARUS_GETSETIDFORSTRING {

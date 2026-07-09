@@ -12,7 +12,7 @@ use super::ref_entity_type_t::refEntityType_t;
 
 /// Anonymous struct for `refEntity_t::uRefEnt::uMini` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:191-195`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:191-195`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct refEntity_t_uMini {
@@ -24,7 +24,7 @@ pub struct refEntity_t_uMini {
 ///
 /// Raven: only the `uMini` member is live; `skinNum`/`terxelCoords` alternatives are
 /// commented out in the source.
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:187-196`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:187-196`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union refEntity_t_uRefEnt {
@@ -33,7 +33,7 @@ pub union refEntity_t_uRefEnt {
 
 /// Anonymous struct for `refEntity_t::data::sprite` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:200-205`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:200-205`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct refEntity_t_sprite {
@@ -44,7 +44,7 @@ pub struct refEntity_t_sprite {
 
 /// Anonymous struct for `refEntity_t::data::line` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:206-211`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:206-211`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct refEntity_t_line {
@@ -57,7 +57,7 @@ pub struct refEntity_t_line {
 ///
 /// Raven: that whole put-the-opening-brace-on-the-same-line-as-the-beginning-of-the-definition
 /// coding style is fecal.
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:212-217`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:212-217`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct refEntity_t_bezier {
@@ -68,7 +68,7 @@ pub struct refEntity_t_bezier {
 
 /// Anonymous struct for `refEntity_t::data::cylinder` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:218-226`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:218-226`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct refEntity_t_cylinder {
@@ -82,7 +82,7 @@ pub struct refEntity_t_cylinder {
 
 /// Anonymous struct for `refEntity_t::data::electricity` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:227-234`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:227-234`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct refEntity_t_electricity {
@@ -95,7 +95,7 @@ pub struct refEntity_t_electricity {
 
 /// Anonymous union for `refEntity_t::data` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:199-235`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:199-235`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union refEntity_t_data {
@@ -110,7 +110,7 @@ pub union refEntity_t_data {
 ///
 /// Raven: this stucture must remain identical as the miniRefEntity_t (comment mirrored
 /// from `miniRefEntity_t`, whose head this struct's layout matches).
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:133-251`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:133-251`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct refEntity_t {

@@ -7,7 +7,7 @@ use mp_qshared::shared::vec3_t;
 /// Raven `orientationr_t` — a resolved render-time orientation (origin, axis,
 /// view-relative origin, and model matrix).
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:109-114`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:109-114`
 #[repr(C)]
 pub struct orientationr_t {
     /// in world coordinates

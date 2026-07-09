@@ -2,7 +2,7 @@
 
 /// Raven `errorParm_t` parameters to the main Error routine.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:451-457`
+/// Type definition source: `oracle/codemp/game/q_shared.h:451-457`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum errorParm_t {

@@ -4,7 +4,7 @@ use crate::shared::{qboolean, vec3_t};
 
 /// Raven `aas_trace_t` — result of an AAS trace.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_aas.h:68-77`
+/// Type definition source: `oracle/codemp/game/be_aas.h:68-77`
 #[repr(C)]
 pub struct aas_trace_t {
 	pub startsolid: qboolean, // if true, the initial point was in a solid area

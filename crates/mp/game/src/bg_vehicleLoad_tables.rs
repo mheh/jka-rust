@@ -15,7 +15,7 @@
 //! the live one; the SP `#else` branch (bare `radarIcon`/`armorLowFX`/
 //! `armorGoneFX`) is dropped per porting-rules §20.
 //!
-//! Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:66-671`
+//! Source: `oracle/codemp/game/bg_vehicleLoad.c:66-671`
 #![allow(non_upper_case_globals, non_snake_case)]
 
 use mp_bg::vehicles::{
@@ -24,16 +24,16 @@ use mp_bg::vehicles::{
 use mp_qshared::shared::string_id_table::stringID_table_t;
 
 /// Raven `MAX_VEH_WEAPON_DATA_SIZE` — `VehWeaponParms` scratch-buffer size.
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:66`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:66`
 pub const MAX_VEH_WEAPON_DATA_SIZE: usize = 0x20000;
 /// Raven `MAX_VEHICLE_DATA_SIZE` — `VehicleParms` scratch-buffer size.
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:67`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:67`
 pub const MAX_VEHICLE_DATA_SIZE: usize = 0x80000;
 
 /// Raven `NUM_VWEAP_PARMS` — entry count of `vehWeaponFields` (must match the
 /// number of parseable `vehWeaponStats_t` fields, per the oracle's own
 /// "*** IMPORTANT!!! ***" comment).
-/// Source: `oracle/oracle/codemp/game/bg_vehicles.h:66`
+/// Source: `oracle/codemp/game/bg_vehicles.h:66`
 pub const NUM_VWEAP_PARMS: usize = 25;
 
 // Byte-offset helpers for the array-of-struct fields (`weapon[n].x`,
@@ -46,7 +46,7 @@ const OFS_TURRET: usize = core::mem::offset_of!(vehicleInfo_t, turret);
 const SZ_TURRET: usize = core::mem::size_of::<turretStats_t>();
 
 /// Raven `vehField_t vehWeaponFields[NUM_VWEAP_PARMS]`.
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:138-164`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:138-164`
 pub const vehWeaponFields: [vehField_t; NUM_VWEAP_PARMS] = [
     vehField_t {
         name: c"name".as_ptr(),
@@ -176,7 +176,7 @@ pub const vehWeaponFields: [vehField_t; NUM_VWEAP_PARMS] = [
 ];
 
 /// Raven `vehField_t vehicleFields[]` — sentinel-terminated (`.ofs == -1`).
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:445-668`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:445-668`
 pub const vehicleFields: [vehField_t; 175] = [
     vehField_t {
         name: c"name".as_ptr(),
@@ -1078,7 +1078,7 @@ pub const vehicleFields: [vehField_t; 175] = [
 ];
 
 /// Raven `stringID_table_t VehicleTable[VH_NUM_VEHICLES+1]`.
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:671-679`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:671-679`
 pub const VehicleTable: [stringID_table_t; 7] = [
     stringID_table_t {
         name: c"VH_NONE".as_ptr() as *mut core::ffi::c_char,

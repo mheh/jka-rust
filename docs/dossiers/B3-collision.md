@@ -15,13 +15,13 @@ lines; the rest is terrain/RMG (C++-track) and cm_draw (debug drawing).
 
 ### 1a. CM_LoadMap / CM_LoadMap_Actual
 
-MP `CM_LoadMap` (`oracle/oracle/codemp/qcommon/cm_load.cpp:775-782`) sets
+MP `CM_LoadMap` (`oracle/codemp/qcommon/cm_load.cpp:775-782`) sets
 `gbUsingCachedMapDataRightNow = qtrue`, calls the static
 `CM_LoadMap_Actual(name, clientload, checksum, cmg)` (:779, defined :605-770),
 clears the flag. `CM_LoadMap_Actual` takes a `clipMap_t&` — the same function
 loads the main map (`cmg`) and every sub-BSP (§1c).
 
-SP `CM_LoadMap` (`oracle/oracle/code/qcommon/cm_load.cpp:814-836`) adds a
+SP `CM_LoadMap` (`oracle/code/qcommon/cm_load.cpp:814-836`) adds a
 `qboolean subBSP` param: if set, it reroutes to
 `CM_LoadSubBSP(va("maps/%s.bsp", name+1), qfalse)` (:818) instead of loading
 into `cmg`; otherwise same pattern (:823-827). MP has no combined entrypoint —
@@ -109,7 +109,7 @@ cm_trace/cm_patch/cm_polylib/cm_load logic is entirely greenfield.
 
 Globals: `clipMap_t SubBSP[MAX_SUB_BSP=32]`, `int NumSubBSP, TotalSubModels`
 (MP cm_load.cpp:60-61, SP :57; `MAX_SUB_BSP` at
-`oracle/oracle/codemp/game/q_shared.h:2025` / `code/game/q_shared.h:1464`).
+`oracle/codemp/game/q_shared.h:2025` / `code/game/q_shared.h:1464`).
 
 The handle scheme is **cumulative-sum offset ranges, no bit packing**:
 
@@ -152,7 +152,7 @@ reset at :872.
 
 ## 2. Query API surface
 
-Declared in `oracle/oracle/codemp/qcommon/cm_public.h` (74 lines) / SP
+Declared in `oracle/codemp/qcommon/cm_public.h` (74 lines) / SP
 `cm_public.h` (72 lines). Semantics + definitions + primary call sites (MP
 unless noted):
 
@@ -190,11 +190,11 @@ MP-only: the `int capsule` param on `CM_BoxTrace`/`CM_TransformedBoxTrace`/
 
 - MP: `crates/mp/qshared/src/common/mp/trace_t.rs` — size 48, fields
   `allsolid, startsolid, entityNum, fraction, endpos, plane, surfaceFlags,
-  contents`; matches `oracle/oracle/codemp/game/q_shared.h:1894-1912` (Raven
+  contents`; matches `oracle/codemp/game/q_shared.h:1894-1912` (Raven
   commented out `G2CollisionMap` in MP — "wasting space").
 - SP: `crates/sp/qshared/src/common/sp/trace_t.rs` — size 1080; the
   `G2CollisionMap` field is live at offset 56
-  (`oracle/oracle/code/game/q_shared.h:1395` region).
+  (`oracle/code/game/q_shared.h:1395` region).
 - `traceWork_t` convention: `trace_t` is deliberately the **last** field so
   Ghoul2 code can treat memory past it as the collision map
   (`crates/sp/engine/qcommon/src/cm/trace_work_s.rs:56` comment; Raven's
@@ -341,7 +341,7 @@ Beyond A2 §1m (`CM_OrOfAllContentsFlagsInMap` `code/qcommon/cm_load.cpp:50`,
 | `G_AREAS_CONNECTED` | :627-628 → `CM_AreasConnected` direct, no wrapper |
 
 **MP client-cgame** (`cl_cgame.cpp` dispatcher calls CM directly, in-process;
-trap enums `oracle/oracle/codemp/cgame/cg_public.h:83-94`): `CG_CM_LOADMAP` →
+trap enums `oracle/codemp/cgame/cg_public.h:83-94`): `CG_CM_LOADMAP` →
 `CL_CM_LoadMap` (:583) → `CM_LoadMap`, plus `CM_LoadSubBSP` (:771-778);
 `CG_CM_NUMINLINEMODELS` :781-782; `CG_CM_POINTCONTENTS` :789-790;
 `CG_CM_TRANSFORMEDPOINTCONTENTS` :791-792; `CG_CM_BOXTRACE`/`CAPSULETRACE` →
@@ -350,7 +350,7 @@ trap enums `oracle/oracle/codemp/cgame/cg_public.h:83-94`): `CG_CM_LOADMAP` →
 `CG_CM_MARKFRAGMENTS` → `re.MarkFragments` (renderer, **not** CM) :805-806.
 
 **SP seam** (per DEC-07, statically linked): `SV_InitGameProgs`
-(`oracle/oracle/code/server/sv_game.cpp:477`) fills a `game_import_t` function
+(`oracle/code/server/sv_game.cpp:477`) fills a `game_import_t` function
 pointer table handed over via `Sys_GetGameAPI` (:669): `import.trace =
 SV_Trace` (:507), `import.pointcontents = SV_PointContents` (:508),
 `import.totalMapContents = CM_TotalMapContents` (:509, SP-only),
@@ -358,7 +358,7 @@ SV_Trace` (:507), `import.pointcontents = SV_PointContents` (:508),
 `import.AdjustAreaPortalState = SV_AdjustAreaPortalState` (:546),
 `import.AreasConnected = CM_AreasConnected` (:547 — CM wired directly, no SV
 wrapper). Game code calls through `gi.trace(...)` (e.g.
-`oracle/oracle/code/game/g_vehicles.c:102`). One indirection vs MP's
+`oracle/code/game/g_vehicles.c:102`). One indirection vs MP's
 opcode+VMA marshalling — matches the existing `game_import_t` port at
 `crates/sp/abi/src/game/public/game_import_t.rs`.
 

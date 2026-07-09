@@ -6,7 +6,7 @@ use mp_qshared::shared::{qboolean, vec3_t};
 /// Raven `pml_t` — pmove-local scratch state (not part of the wire-visible
 /// `playerState_t`).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_local.h:15-31`
+/// Type definition source: `oracle/codemp/game/bg_local.h:15-31`
 #[repr(C)]
 pub struct pml_t {
 	pub forward: vec3_t,

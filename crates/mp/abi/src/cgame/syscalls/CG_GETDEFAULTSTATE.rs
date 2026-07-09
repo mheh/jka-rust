@@ -13,9 +13,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( CG_GETDEFAULTSTATE, entityIndex, state );`
 /// Raven transport: `return CL_GetDefaultState(args[1], (entityState_t *)VMA(2));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:476-479`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2332`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:965-966`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:476-479`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2332`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:965-966`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgGetdefaultstateArgs {
     entity_index: c_int,
@@ -33,10 +33,10 @@ impl CgGetdefaultstateArgs {
 
 /// `CG_GETDEFAULTSTATE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:183`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:476-479`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:965-966`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:965-966`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:183`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:476-479`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:965-966`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:965-966`
 pub struct CgGetdefaultstate;
 
 impl OutboundSysCall for CgGetdefaultstate {

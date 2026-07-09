@@ -2,7 +2,7 @@
 
 /// Raven `solid_t` — object collision classification.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_aas.h:59-65`
+/// Type definition source: `oracle/codemp/game/be_aas.h:59-65`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum solid_t {

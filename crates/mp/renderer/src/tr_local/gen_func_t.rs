@@ -2,7 +2,7 @@
 
 /// Raven `genFunc_t` — generator function type for waveforms.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:192-204`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:192-204`
 #[repr(i32)]
 pub enum genFunc_t {
 	GF_NONE = 0,

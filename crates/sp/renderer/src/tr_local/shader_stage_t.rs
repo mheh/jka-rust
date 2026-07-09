@@ -10,12 +10,12 @@ use super::wave_form_t::waveForm_t;
 
 /// Number of texture bundles per shader stage.
 ///
-/// Source: `oracle/oracle/code/renderer/tr_local.h:378` (`NUM_TEXTURE_BUNDLES`)
+/// Source: `oracle/code/renderer/tr_local.h:378` (`NUM_TEXTURE_BUNDLES`)
 pub const NUM_TEXTURE_BUNDLES: usize = 2;
 
 /// Raven `shaderStage_t`.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:380-413`
+/// Type definition source: `oracle/code/renderer/tr_local.h:380-413`
 #[repr(C)]
 pub struct shaderStage_t {
 	pub active: bool,

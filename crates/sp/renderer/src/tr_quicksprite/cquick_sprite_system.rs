@@ -8,13 +8,13 @@ use crate::tr_local::texture_bundle_t::textureBundle_t;
 
 /// Raven `SHADER_MAX_VERTEXES` — max verts a `CQuickSpriteSystem` batch can hold.
 ///
-/// Source: `oracle/oracle/code/renderer/tr_local.h`
+/// Source: `oracle/code/renderer/tr_local.h`
 pub const SHADER_MAX_VERTEXES: usize = 1000;
 
 /// Raven `CQuickSpriteSystem` — batches quad "sprites" (particles, marks, etc.)
 /// sharing a texture bundle/GL state into a single flush, with optional fog.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_quicksprite.h:16-41`
+/// Type definition source: `oracle/code/renderer/tr_quicksprite.h:16-41`
 #[repr(C)]
 pub struct CQuickSpriteSystem {
     mTexBundle: *mut textureBundle_t,

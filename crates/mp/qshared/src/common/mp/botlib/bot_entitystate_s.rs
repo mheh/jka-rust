@@ -6,7 +6,7 @@ use crate::shared::vec3_t;
 
 /// Raven `bot_entitystate_t` — a snapshot of an entity's state as seen by the bot AI.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/botlib.h:134-154`
+/// Type definition source: `oracle/codemp/game/botlib.h:134-154`
 #[repr(C)]
 pub struct bot_entitystate_t {
 	/// entity type

@@ -1,9 +1,9 @@
 # B5 — Server Dossier (ground truth for design session)
 
-Scope: MP `oracle/oracle/codemp/server/` in full (sv_main, sv_init, sv_client,
+Scope: MP `oracle/codemp/server/` in full (sv_main, sv_init, sv_client,
 sv_snapshot, sv_world, sv_ccmds, sv_game beyond A1 §1.5, sv_bot/NPCNav
-headline), SP `oracle/oracle/code/server/` as a diff (incl. sv_savegame
-headline). Every claim cites `oracle/oracle/<path>:<line>`. Companion dossiers:
+headline), SP `oracle/code/server/` as a diff (incl. sv_savegame
+headline). Every claim cites `oracle/<path>:<line>`. Companion dossiers:
 A2 (sv/svs census §1h, LocateGameData deep dive, Chain-A reentrancy trace),
 A1 §1.5 (SV_GameSystemCalls dispatch). Slice 0 = MP dedicated boot:
 `main → Com_Init(dedicated) → SV_Init → SV_Frame idle`; this doc is its core.
@@ -14,18 +14,18 @@ Status: complete.
 
 ## 1. SV_Init — cvars, commands, initial state
 
-`SV_Init` — `oracle/oracle/codemp/server/sv_init.cpp:803-886`. Order: calls
+`SV_Init` — `oracle/codemp/server/sv_init.cpp:803-886`. Order: calls
 `SV_AddOperatorCommands()` first (`sv_init.cpp:804`), registers cvars, then
 `SV_BotInitCvars()` (`sv_init.cpp:875`) and `SV_BotInitBotLib()`
 (`sv_init.cpp:877-878`).
 
-CVAR_* flag values (`oracle/oracle/codemp/game/q_shared.h:1782-1799`):
+CVAR_* flag values (`oracle/codemp/game/q_shared.h:1782-1799`):
 ARCHIVE=0x1, USERINFO=0x2, SERVERINFO=0x4, SYSTEMINFO=0x8, INIT=0x10,
 LATCH=0x20, ROM=0x40, TEMP=0x100, CHEAT=0x200, NORESTART=0x400.
 
 ### 1.1 Cvar registration table
 
-All lines `oracle/oracle/codemp/server/sv_init.cpp`:
+All lines `oracle/codemp/server/sv_init.cpp`:
 
 | cvar | default | flags | purpose | line |
 |---|---|---|---|---|
@@ -81,7 +81,7 @@ API postdates this codebase's use here).
 
 ### 1.2 Command registration
 
-`SV_AddOperatorCommands` — `oracle/oracle/codemp/server/sv_ccmds.cpp:958-996`,
+`SV_AddOperatorCommands` — `oracle/codemp/server/sv_ccmds.cpp:958-996`,
 idempotent via `static qboolean initialized` (`sv_ccmds.cpp:958-964`).
 `SV_RemoveOperatorCommands` is entirely `#if 0`'d — "removing these won't let
 the server start again" (`sv_ccmds.cpp:1003-1018`).
@@ -118,7 +118,7 @@ the server start again" (`sv_ccmds.cpp:1003-1018`).
 ## 2. SV_SpawnServer end-to-end — THE slice-1 script
 
 `void SV_SpawnServer(char *server, qboolean killBots, ForceReload_e
-eForceReload)` — `oracle/oracle/codemp/server/sv_init.cpp:472-791`.
+eForceReload)` — `oracle/codemp/server/sv_init.cpp:472-791`.
 
 `sv.state` machine first: `serverState_t` = `SS_DEAD` (no map), `SS_LOADING`
 (spawning level entities), `SS_GAME` (running) — `server.h:47-51`, field
@@ -246,7 +246,7 @@ the new gamestate lazily via the serverId-mismatch path (§4.7), and the 5
 
 ### 2.1 SV_Map_f — what happens *before* SV_SpawnServer
 
-`SV_Map_f` — `oracle/oracle/codemp/server/sv_ccmds.cpp:138-223`:
+`SV_Map_f` — `oracle/codemp/server/sv_ccmds.cpp:138-223`:
 1. `map = Cmd_Argv(1)`, bail if absent (`sv_ccmds.cpp:145-148`); reject `\` in
    name (`:152-155`).
 2. Pre-flight `FS_ReadFile("maps/<map>.bsp")` existence check — bail with
@@ -287,9 +287,9 @@ force-active at `:335`, enter-world at `:337`).
 
 ## 3. SV_Frame anatomy
 
-`void SV_Frame(int msec)` — `oracle/oracle/codemp/server/sv_main.cpp:826-937`.
+`void SV_Frame(int msec)` — `oracle/codemp/server/sv_main.cpp:826-937`.
 Called unconditionally each `Com_Frame` iteration
-(`oracle/oracle/codemp/qcommon/common.cpp:1669`; dedicated `minMsec = 1`,
+(`oracle/codemp/qcommon/common.cpp:1669`; dedicated `minMsec = 1`,
 `common.cpp:1645` — outer loop never paces the sim, `NET_Sleep` does).
 
 1. Early-outs: `sv_killserver` set → `SV_Shutdown("Server was killed.\n")` +
@@ -304,7 +304,7 @@ Called unconditionally each `Com_Frame` iteration
    frameMsec && (!com_timescale || com_timescale->value >= 1)) {
    NET_Sleep(frameMsec - sv.timeResidual); return; }` (`:856-861`).
    `NET_Sleep` = `select()` on UDP socket + stdin with that timeout
-   (`oracle/oracle/codemp/unix/unix_net.c:582-598`; win32
+   (`oracle/codemp/unix/unix_net.c:582-598`; win32
    `win32/win_net.cpp:1211`) — wakes early on packet/console input. This is
    the entire idle-loop story for slice 0.
 6. Wrap guards: `svs.time > 0x70000000` → `SV_Shutdown("Restarting server due
@@ -345,7 +345,7 @@ sim stepping via timeResidual.
 
 ### 4.1 clientState_t
 
-`oracle/oracle/codemp/server/server.h:114-121`:
+`oracle/codemp/server/server.h:114-121`:
 
 | Value | Meaning |
 |---|---|
@@ -492,7 +492,7 @@ client!")`, `:1724-1729`).
 ### 4.9 Reliable-command delivery
 
 - Ring: `reliableCommands[MAX_RELIABLE_COMMANDS = 128][MAX_STRING_CHARS]`
-  (`server.h:130`; constant `oracle/oracle/codemp/qcommon/qcommon.h:106`).
+  (`server.h:130`; constant `oracle/codemp/qcommon/qcommon.h:106`).
 - Enqueue `SV_AddServerCommand` (`sv_main.cpp:116-141`): `++reliableSequence`,
   index `seq & (MAX_RELIABLE_COMMANDS-1)` (`:125,139-140`). Overflow check
   `reliableSequence - reliableAcknowledge == MAX_RELIABLE_COMMANDS + 1` →
@@ -516,7 +516,7 @@ client!")`, `:1724-1729`).
 
 `static void SV_AddEntitiesVisibleFromPoint(vec3_t origin, clientSnapshot_t
 *frame, snapshotEntityNumbers_t *eNums, qboolean portal)` —
-`oracle/oracle/codemp/server/sv_snapshot.cpp:301-498`. Called from
+`oracle/codemp/server/sv_snapshot.cpp:301-498`. Called from
 `SV_BuildClientSnapshot` (`:582`) and recursively for portals (`:490`).
 **Linear scan of `sv.num_entities`, not a worldSector walk** — the area tree
 is collision-only (§6); snapshot visibility is pure PVS/area data cached on
@@ -827,11 +827,11 @@ Builds on A2 §1m (SP server-global census); differences only.
 
 ### 9.1 server.h struct diffs
 
-- **`server_t`**: SP (`oracle/oracle/code/server/server.h:48-72`) has no
+- **`server_t`**: SP (`oracle/code/server/server.h:48-72`) has no
   `restarting`/`restartedServerId`/`checksumFeed` and — critically — none of
   MP's VM-handoff fields `gentities`/`gentitySize`/`num_entities`/
   `gameClients`/`gameClientSize`/`mSharedMemory`
-  (`oracle/oracle/codemp/server/server.h:72-87`): SP's game is statically
+  (`oracle/codemp/server/server.h:72-87`): SP's game is statically
   linked, nothing to LocateGameData. SP adds `timeResidualFraction` +
   `nextFrameTime` (`code/server/server.h:57-58`) for its sub-ms clock.
 - **`serverStatic_t`**: SP (`code/server/server.h:142-149`) drops the whole
@@ -943,7 +943,7 @@ sessions against retail/OpenJK, diffing observable behavior.
 |---|---|---|
 | `clientState_t` transition machine | 5 states driven by DirectConnect/DropClient/CheckTimeouts; mock `client_t[]` + fake `svs.time`, no sockets | `codemp/server/server.h:114-121`, §4 |
 | `SV_SetConfigstring` bookkeeping | strcmp change-detect, Z_Free/CopyString swap, bcs0/1/2 chunking threshold — string logic over an array; only the broadcast tail needs a client fixture | `sv_init.cpp:25-91` |
-| `Cvar_InfoString(bit)` filtering | pure list filter (`!(CVAR_INTERNAL) && (flags & bit)`); feeds serverinfo/systeminfo/getstatus — golden-diff the byte-exact info string from a canned cvar set | `oracle/oracle/codemp/qcommon/cvar.cpp:811-824` |
+| `Cvar_InfoString(bit)` filtering | pure list filter (`!(CVAR_INTERNAL) && (flags & bit)`); feeds serverinfo/systeminfo/getstatus — golden-diff the byte-exact info string from a canned cvar set | `oracle/codemp/qcommon/cvar.cpp:811-824` |
 | `SV_RateMsec` + nextSnapshotTime math | pure arithmetic (size clamp, sv_maxRate override, 48-byte header, snaps-vs-rate max) | `sv_snapshot.cpp:622-643,684-692` |
 | `SV_CalcPings` | arithmetic over synthetic `frames[]` (`messageAcked - messageSent`, clamp 999) | `sv_main.cpp:659-704` |
 | `SV_EmitPacketEntities` parallel-walk | old/new list merge → delta/baseline/remove decisions; feed canned `clientSnapshot_t` pairs + msg goldens (pairs with the existing msg/huffman harness plan, engine-seam.md) | `sv_snapshot.cpp:36-94` |

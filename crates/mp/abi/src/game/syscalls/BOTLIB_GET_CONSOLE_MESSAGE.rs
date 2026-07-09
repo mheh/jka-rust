@@ -39,7 +39,7 @@ impl BotlibGetConsoleMessageArgs {
 /// `BOTLIB_GET_CONSOLE_MESSAGE` MP game imports syscall ABI token.
 ///
 /// Raven: ( int client, char *message, int size );
-/// Source: `oracle/oracle/codemp/game/g_public.h:353`
+/// Source: `oracle/codemp/game/g_public.h:353`
 pub struct BotlibGetConsoleMessage;
 
 impl OutboundSysCall for BotlibGetConsoleMessage {

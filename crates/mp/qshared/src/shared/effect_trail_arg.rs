@@ -6,7 +6,7 @@ use native_types::qhandle_t;
 
 /// Raven `effectTrailArgStruct_t` (`effectTrailArgStruct_s`) — `CG_ADDTRAIL` VM args.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2615-2620`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2615-2620`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct effectTrailArgStruct_t {

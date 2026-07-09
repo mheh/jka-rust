@@ -10,7 +10,7 @@ use super::poly_vert_t::polyVert_t;
 
 /// Raven `poly_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:77-81`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:77-81`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct poly_t {

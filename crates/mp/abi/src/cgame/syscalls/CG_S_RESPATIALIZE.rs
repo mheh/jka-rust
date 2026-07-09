@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_S_RESPATIALIZE, entityNum, origin, axis, inwater );`
 /// Raven transport: `S_Respatialize( args[1], (const float *)VMA(2), (vec3_t *)VMA(3), args[4] ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:220-221`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2230`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:834-836`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:220-221`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2230`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:834-836`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSRespatializeArgs {
     entity_num: c_int,
@@ -40,10 +40,10 @@ impl CgSRespatializeArgs {
 
 /// `CG_S_RESPATIALIZE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:104`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:220-221`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:834-836`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:834-836`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:104`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:220-221`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:834-836`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:834-836`
 pub struct CgSRespatialize;
 
 impl OutboundSysCall for CgSRespatialize {

@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall(CG_RE_INIT_RENDERER_TERRAIN, terrainInfo);`
 /// Raven transport: `RE_InitRendererTerrain((const char *)VMA(1));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:125-128`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:517-519`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:125-128`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:517-519`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgReInitRendererTerrainArgs {
     terrain_info: *const c_char,
@@ -26,10 +26,10 @@ impl CgReInitRendererTerrainArgs {
 /// `CG_RE_INIT_RENDERER_TERRAIN` SP cgame imports syscall ABI token.
 ///
 /// Raven: RMG END
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:80`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:125-128`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:517-519`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:517-519`
+/// Enum value source: `oracle/code/cgame/cg_public.h:80`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:125-128`
+/// Output source: `oracle/code/client/cl_cgame.cpp:517-519`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:517-519`
 pub struct CgReInitRendererTerrain;
 
 impl OutboundSysCall for CgReInitRendererTerrain {

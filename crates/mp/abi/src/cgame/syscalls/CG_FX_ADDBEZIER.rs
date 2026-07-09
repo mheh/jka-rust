@@ -10,10 +10,10 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_FX_ADDBEZIER, p );`
 /// Raven transport opens `addbezierArgStruct_t` from `VMA(1)`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:700-703`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2413`
-/// Args struct source: `oracle/oracle/codemp/game/q_shared.h:2558-2577`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1182-1195`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:700-703`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2413`
+/// Args struct source: `oracle/codemp/game/q_shared.h:2558-2577`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1182-1195`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxAddbezierArgs {
     p: *mut c_void,
@@ -28,10 +28,10 @@ impl CgFxAddbezierArgs {
 /// `CG_FX_ADDBEZIER` MP cgame imports syscall ABI token.
 ///
 /// Raven: additional funcs for adding custom incode stuff.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:234`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:700-703`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1182-1195`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1182-1195`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:234`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:700-703`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1182-1195`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1182-1195`
 pub struct CgFxAddbezier;
 
 impl OutboundSysCall for CgFxAddbezier {

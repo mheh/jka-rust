@@ -2,7 +2,7 @@
 
 /// Raven `sharedTraps_t` — shared VM trap opcode indices.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:281-300`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:281-300`
 #[repr(i32)]
 pub enum sharedTraps_t {
     TRAP_MEMSET = 100,

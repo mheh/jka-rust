@@ -2,5 +2,5 @@
 
 /// Raven `crc_t` — Cyclic redundancy check value type.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/l_crc.h:10-10`
+/// Type definition source: `oracle/codemp/botlib/l_crc.h:10-10`
 pub type crc_t = ::core::ffi::c_ushort;

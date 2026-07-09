@@ -37,7 +37,7 @@ impl BotlibAiLoadChatFileArgs {
 
 /// `BOTLIB_AI_LOAD_CHAT_FILE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:436`
+/// Source: `oracle/codemp/game/g_public.h:436`
 pub struct BotlibAiLoadChatFile;
 
 impl OutboundSysCall for BotlibAiLoadChatFile {

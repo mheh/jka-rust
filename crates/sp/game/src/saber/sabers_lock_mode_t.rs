@@ -2,7 +2,7 @@
 
 /// Raven `sabersLockMode_t` — sabers lock mode.
 ///
-/// Type definition source: `oracle/oracle/code/game/wp_saber.h:44-59`
+/// Type definition source: `oracle/code/game/wp_saber.h:44-59`
 #[repr(i32)]
 pub enum sabersLockMode_t {
 	LOCK_FIRST = 0,

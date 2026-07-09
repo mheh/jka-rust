@@ -13,17 +13,17 @@ use super::botskills_s::botskills_t;
 
 /// Raven MP `MAX_CHAT_LINE_SIZE`.
 ///
-/// Source: `oracle/oracle/codemp/game/ai_main.h:12`
+/// Source: `oracle/codemp/game/ai_main.h:12`
 pub const MAX_CHAT_LINE_SIZE: usize = 128;
 
 /// Raven MP `MAX_LOVED_ONES`.
 ///
-/// Source: `oracle/oracle/codemp/game/ai_main.h:17`
+/// Source: `oracle/codemp/game/ai_main.h:17`
 pub const MAX_LOVED_ONES: usize = 4;
 
 /// Raven MP `MAX_FORCE_INFO_SIZE`.
 ///
-/// Source: `oracle/oracle/codemp/game/ai_main.h:20`
+/// Source: `oracle/codemp/game/ai_main.h:20`
 pub const MAX_FORCE_INFO_SIZE: usize = 2048;
 
 /// Raven `bot_state_t` — per-bot AI state (goals, waypoints, timers, chat, saber
@@ -32,7 +32,7 @@ pub const MAX_FORCE_INFO_SIZE: usize = 2048;
 /// Raven: `FORCEJUMP_INSTANTMETHOD` is commented out at `ai_main.h:5`, so the
 /// `#ifndef FORCEJUMP_INSTANTMETHOD` branch is always active and
 /// `forceJumpChargeTime` is always present in this build.
-/// Type definition source: `oracle/oracle/codemp/game/ai_main.h:148-342`
+/// Type definition source: `oracle/codemp/game/ai_main.h:148-342`
 #[repr(C)]
 pub struct bot_state_t {
     pub inuse: c_int,             // true if this state is used by a bot client

@@ -10,7 +10,7 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_LAN_GETSERVERINFO, source, n, buf, buflen );`
 /// Raven transport: `LAN_GetServerInfo( args[1], args[2], (char *)VMA(3), args[4] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:278-279`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:278-279`
 #[derive(Debug)]
 pub struct UiLanGetserverinfoArgs {
     source: c_int,
@@ -51,10 +51,10 @@ impl UiLanGetserverinfoArgs {
 /// Raven wrapper: `syscall( UI_LAN_GETSERVERINFO, source, n, buf, buflen );`
 /// Raven transport: `LAN_GetServerInfo( args[1], args[2], (char *)VMA(3), args[4] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:97`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:278-279`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:966`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1092-1094`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:97`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:278-279`
+/// Output source: `oracle/codemp/ui/ui_local.h:966`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1092-1094`
 pub struct UiLanGetserverinfo;
 
 impl OutboundSysCall for UiLanGetserverinfo {

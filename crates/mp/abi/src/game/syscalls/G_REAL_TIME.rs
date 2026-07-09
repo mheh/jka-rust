@@ -27,7 +27,7 @@ impl GRealTimeArgs {
 
 /// `G_REAL_TIME` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:232`
+/// Source: `oracle/codemp/game/g_public.h:232`
 pub struct GRealTime;
 
 impl OutboundSysCall for GRealTime {

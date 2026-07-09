@@ -3,7 +3,7 @@
 /// Raven `portable_samplepair_t` — a mixed stereo sample pair.
 ///
 /// Raven: the final values will be clamped to +/- 0x00ffff00 and shifted down.
-/// Type definition source: `oracle/oracle/codemp/client/snd_local.h:30-33`
+/// Type definition source: `oracle/codemp/client/snd_local.h:30-33`
 #[repr(C)]
 pub struct portable_samplepair_t {
 	pub left: i32,

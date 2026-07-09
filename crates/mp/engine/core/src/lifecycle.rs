@@ -13,7 +13,7 @@ use crate::engine::Engine;
 /// a `ComError` panic during init is caught here and escalated to fatal
 /// (mirrors `catch → Sys_Error`, MP `:1439`, LIFE-D3).
 ///
-/// Source: `oracle/oracle/codemp/qcommon/common.cpp:1216`
+/// Source: `oracle/codemp/qcommon/common.cpp:1216`
 pub fn com_init(engine: &mut Engine, command_line: &str) {
     use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
     match catch_unwind(AssertUnwindSafe(|| com_init_body(&mut *engine, command_line))) {
@@ -41,26 +41,26 @@ fn com_init_body(engine: &mut Engine, command_line: &str) {
     // 1. Version banner (common.cpp:1219): Com_Printf("%s %s %s\n", Q3_VERSION,
     //    CPUSTRING, __DATE__); Q3_VERSION = "JAmp: v1.0.1.0" (game_version.h:9).
     //TODO: Port CPUSTRING/__DATE__ banner fields
-    // Source: oracle/oracle/codemp/qcommon/common.cpp:1219
+    // Source: oracle/codemp/qcommon/common.cpp:1219
     com_printf(&mut engine.common, "JAmp: v1.0.1.0 (jka-rust slice 0)
 ");
     //TODO: Port Com_InitPushEvent — step 2
-    // Source: oracle/oracle/codemp/qcommon/common.cpp:1224
+    // Source: oracle/codemp/qcommon/common.cpp:1224
     cvar_init(); // step 3 (LIFE-Q8 stub; common.cpp:1226)
     //TODO: Port Com_ParseCommandLine — step 4
-    // Source: oracle/oracle/codemp/qcommon/common.cpp:1230
+    // Source: oracle/codemp/qcommon/common.cpp:1230
     cbuf_init(); // step 5 (LIFE-Q8 stub; common.cpp:1233)
     // step 6 Com_InitZoneMemory: dropped — Rust ownership replaces TheZone (§C9).
     cmd_init(); // step 7 (LIFE-Q8 stub; common.cpp:1242)
     //TODO: Port Com_StartupVariable/Rand_Init/CL_InitKeyCommands — steps 8-11
-    // Source: oracle/oracle/codemp/qcommon/common.cpp:1245-1254
+    // Source: oracle/codemp/qcommon/common.cpp:1245-1254
     fs_init_filesystem(); // step 12 (LIFE-Q8 stub; common.cpp:1266)
     //TODO: Port Com_InitJournaling + config execs + cvar block — steps 13-29
-    // Source: oracle/oracle/codemp/qcommon/common.cpp:1268-1383
+    // Source: oracle/codemp/qcommon/common.cpp:1268-1383
     // 30. VM_Init: the empty ModuleRegistry — already default-constructed into
     //     Engine.common.modules by Engine::new (LIFE-Q9); nothing to do here.
     //TODO: Port SV_Init + the dedicated/client-init tail — steps 31-39
-    // Source: oracle/oracle/codemp/qcommon/common.cpp:1385-1431
+    // Source: oracle/codemp/qcommon/common.cpp:1385-1431
     // 40. com_fullyInitialized = qtrue (common.cpp:1434).
     engine.common.fully_initialized = true;
     // 41. Completion banner (common.cpp:1435).
@@ -82,7 +82,7 @@ fn com_init_body(engine: &mut Engine, command_line: &str) {
 /// after: {saved msg}")` — reproducing Raven's recursive-error banner + exit
 /// (MP `common.cpp:288`, `Sys_Error("recursive error after: %s", …)`).
 ///
-/// Source: `oracle/oracle/codemp/qcommon/common.cpp:1593`
+/// Source: `oracle/codemp/qcommon/common.cpp:1593`
 pub fn com_frame(engine: &mut Engine) {
     use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
     match catch_unwind(AssertUnwindSafe(|| com_frame_body(&mut *engine))) {
@@ -109,10 +109,10 @@ pub fn com_frame(engine: &mut Engine) {
 
 /// Raven `Com_Shutdown` + `Com_Quit_f` orchestration (MP `common.cpp:356,1785`).
 ///
-/// Source: `oracle/oracle/codemp/qcommon/common.cpp:1785`
+/// Source: `oracle/codemp/qcommon/common.cpp:1785`
 pub fn com_shutdown(engine: &mut Engine) {
     let _ = engine;
-    todo!("Port Com_Shutdown — oracle/oracle/codemp/qcommon/common.cpp:1785")
+    todo!("Port Com_Shutdown — oracle/codemp/qcommon/common.cpp:1785")
 }
 
 /// Raven `Sys_Error` (`win32/win_main.cpp:350`; dedicated `null/win_main.cpp:324`).
@@ -120,11 +120,11 @@ pub fn com_shutdown(engine: &mut Engine) {
 /// recursive-error path. Ported INTO `mp_engine_core` (LIFE-D3, LIFE-Q2 closed),
 /// delegating print+exit to `native/platform` (a downhill call).
 ///
-/// Source: `oracle/oracle/codemp/win32/win_main.cpp:350`
+/// Source: `oracle/codemp/win32/win_main.cpp:350`
 pub fn sys_error(engine: &mut Engine, msg: &str) -> ! {
     let _ = engine;
     //TODO: Port Sys_Error console teardown + IN_Shutdown (client-shell slice)
-    // Source: oracle/oracle/codemp/win32/win_main.cpp:350-389
+    // Source: oracle/codemp/win32/win_main.cpp:350-389
     native_platform::platform::sys_fatal_print_exit(msg)
 }
 
@@ -134,7 +134,7 @@ pub fn sys_error(engine: &mut Engine, msg: &str) -> ! {
 /// `base_time=true` raw variant reads `SystemTime::now()` (unix-epoch ms → i32;
 /// LIFE-Q3). Pure `std`, no platform shell.
 ///
-/// Source: `oracle/oracle/codemp/win32/win_shared.cpp:22-34`
+/// Source: `oracle/codemp/win32/win_shared.cpp:22-34`
 pub fn sys_milliseconds(engine: &Engine, base_time: bool) -> i32 {
     if base_time {
         // The raw absolute variant: SystemTime::now() unix-epoch ms → i32
@@ -153,7 +153,7 @@ pub fn sys_milliseconds(engine: &Engine, base_time: bool) -> i32 {
 /// (not part of the frozen surface); a mechanical §C port of `Com_Frame`'s body.
 fn com_frame_body(engine: &mut Engine) {
     let _ = engine;
-    todo!("Port Com_Frame body — oracle/oracle/codemp/qcommon/common.cpp:1593")
+    todo!("Port Com_Frame body — oracle/codemp/qcommon/common.cpp:1593")
 }
 
 /// Catch-side recovery helper (private, `&mut Engine` in hand): the per-level
@@ -161,5 +161,5 @@ fn com_frame_body(engine: &mut Engine) {
 /// level literal print (LIFE-D2) or, for `ERR_FATAL`/escalated, `sys_error`.
 fn com_error_recover(engine: &mut Engine, err: ComError) {
     let _ = (engine, err);
-    todo!("Port Com_Error catch-side recovery — oracle/oracle/codemp/qcommon/common.cpp:249-345")
+    todo!("Port Com_Error catch-side recovery — oracle/codemp/qcommon/common.cpp:249-345")
 }

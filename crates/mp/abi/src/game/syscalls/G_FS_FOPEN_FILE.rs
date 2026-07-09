@@ -52,7 +52,7 @@ impl GFsFopenFileArgs {
 /// `G_FS_FOPEN_FILE` MP game imports syscall ABI token.
 ///
 /// Raven: ( const char *qpath, fileHandle_t *file, fsMode_t mode );
-/// Source: `oracle/oracle/codemp/game/g_public.h:133`
+/// Source: `oracle/codemp/game/g_public.h:133`
 pub struct GFsFopenFile;
 
 impl OutboundSysCall for GFsFopenFile {

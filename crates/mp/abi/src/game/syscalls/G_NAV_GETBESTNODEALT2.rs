@@ -34,7 +34,7 @@ impl GNavGetbestnodealt2Args {
 
 /// `G_NAV_GETBESTNODEALT2` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:330`
+/// Source: `oracle/codemp/game/g_public.h:330`
 pub struct GNavGetbestnodealt2;
 
 impl OutboundSysCall for GNavGetbestnodealt2 {

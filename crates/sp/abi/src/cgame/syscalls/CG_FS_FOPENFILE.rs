@@ -12,8 +12,8 @@ use sp_qshared::shared::fsMode_t;
 /// Raven wrapper: `return syscall( CG_FS_FOPENFILE, qpath, f, mode );`
 /// Raven transport: `return FS_FOpenFileByMode( (const char *) VMA(1), (int *) VMA(2), (fsMode_t) args[3] );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:82-84`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:462-463`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:82-84`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:462-463`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFsFopenfileArgs {
     qpath: *const c_char,
@@ -31,10 +31,10 @@ impl CgFsFopenfileArgs {
 
 /// `CG_FS_FOPENFILE` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:70`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:82-84`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:462-463`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:462-463`
+/// Enum value source: `oracle/code/cgame/cg_public.h:70`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:82-84`
+/// Output source: `oracle/code/client/cl_cgame.cpp:462-463`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:462-463`
 pub struct CgFsFopenfile;
 
 impl OutboundSysCall for CgFsFopenfile {

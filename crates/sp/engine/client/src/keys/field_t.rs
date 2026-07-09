@@ -2,13 +2,13 @@
 
 /// Raven `field_t` — an editable text field (cursor/scroll/width + buffer).
 ///
-/// Type definition source: `oracle/oracle/code/client/keys.h:12-17`
+/// Type definition source: `oracle/code/client/keys.h:12-17`
 #[repr(C)]
 pub struct field_t {
 	pub cursor: i32,
 	pub scroll: i32,
 	pub widthInChars: i32,
-	// Raven's `#define MAX_EDIT_LINE 256` (oracle/oracle/code/client/keys.h).
+	// Raven's `#define MAX_EDIT_LINE 256` (oracle/code/client/keys.h).
 	pub buffer: [core::ffi::c_char; 256],
 }
 

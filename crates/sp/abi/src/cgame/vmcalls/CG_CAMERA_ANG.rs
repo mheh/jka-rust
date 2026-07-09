@@ -9,12 +9,12 @@ use sp_qshared::shared::vec3_t;
 /// `CG_CAMERA_ANG` SP cgame exports vmMain ABI token.
 ///
 /// Raven: `int CG_GetCameraAng( vec3_t cameraAng );`
-/// Enum value source: `oracle/oracle/code/client/vmachine.h:20`
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:28`, `oracle/oracle/code/cgame/cg_main.cpp:114`,
-/// `oracle/oracle/code/game/q_shared.h:316`
-/// Output source: `oracle/oracle/code/cgame/cg_main.cpp:517`
-/// VM_Call/vmMain switch source: `oracle/oracle/code/server/sv_snapshot.cpp:283`,
-/// `oracle/oracle/code/cgame/cg_main.cpp:94-115`
+/// Enum value source: `oracle/code/client/vmachine.h:20`
+/// Args source: `oracle/code/cgame/cg_main.cpp:28`, `oracle/code/cgame/cg_main.cpp:114`,
+/// `oracle/code/game/q_shared.h:316`
+/// Output source: `oracle/code/cgame/cg_main.cpp:517`
+/// VM_Call/vmMain switch source: `oracle/code/server/sv_snapshot.cpp:283`,
+/// `oracle/code/cgame/cg_main.cpp:94-115`
 pub struct CgCameraAng;
 
 impl InboundVmCall for CgCameraAng {

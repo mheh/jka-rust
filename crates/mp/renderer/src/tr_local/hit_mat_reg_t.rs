@@ -7,7 +7,7 @@ use mp_qshared::shared::MAX_QPATH;
 /// Raven `hitMatReg_t` — hit-material registration entry (raw data blob,
 /// dimensions, source name).
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:544-550`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:544-550`
 #[repr(C)]
 pub struct hitMatReg_t {
     pub loc: *mut u8,

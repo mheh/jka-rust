@@ -6,7 +6,7 @@ use super::weapon_t::WP_NUM_WEAPONS;
 
 /// Raven `weaponData[WP_NUM_WEAPONS]` — per-weapon combat/ammo tuning table.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_weapons.c:31-356`
+/// Source: `oracle/codemp/game/bg_weapons.c:31-356`
 pub static weaponData: [weaponData_t; WP_NUM_WEAPONS as usize] = [
 	weaponData_t {	// WP_NONE
 		//		"No Weapon",			//	char	classname[32];		// Spawning name

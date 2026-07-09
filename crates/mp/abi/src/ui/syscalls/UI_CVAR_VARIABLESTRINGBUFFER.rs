@@ -11,9 +11,9 @@ use abi_transport::generic::{
 /// The client switch decodes `var_name` and `buffer` with `VMA`, reads `bufsize`
 /// directly from `args[3]`, and writes the cvar string into the provided buffer.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:51-52`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:922`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:883-885`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:51-52`
+/// Args source: `oracle/codemp/ui/ui_local.h:922`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:883-885`
 #[derive(Debug)]
 pub struct CgCvarVariablestringbufferArgs {
     var_name: *const c_char,
@@ -52,10 +52,10 @@ impl CgCvarVariablestringbufferArgs {
 /// `UI_CVAR_VARIABLESTRINGBUFFER` MP UI imports syscall ABI token.
 ///
 /// Raven: `( const char *var_name, char *buffer, int bufsize )`.
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:23`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:51-52`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:883-885`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:883-885`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:23`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:51-52`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:883-885`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:883-885`
 pub struct CgCvarVariablestringbuffer;
 
 impl OutboundSysCall for CgCvarVariablestringbuffer {

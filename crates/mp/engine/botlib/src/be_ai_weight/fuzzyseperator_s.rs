@@ -2,7 +2,7 @@
 
 /// Raven `fuzzyseperator_t` — fuzzy logic weight tree separator node.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_ai_weight.h:19-29`
+/// Type definition source: `oracle/codemp/botlib/be_ai_weight.h:19-29`
 #[repr(C)]
 pub struct fuzzyseperator_t {
 	pub index: i32,

@@ -2,7 +2,7 @@
 
 /// Raven `EG2_Collision` — collision type for Ghoul2 bones.
 ///
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:484-489`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:484-489`
 #[repr(i32)]
 pub enum EG2_Collision {
     G2_NOCOLLIDE,

@@ -5,7 +5,7 @@ use std::os::raw::c_int;
 /// Raven `dma_t` — sound DMA buffer descriptor.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/code/client/snd_local.h:67-74`
+/// Type definition source: `oracle/code/client/snd_local.h:67-74`
 #[repr(C)]
 pub struct dma_t {
 	pub channels: c_int,

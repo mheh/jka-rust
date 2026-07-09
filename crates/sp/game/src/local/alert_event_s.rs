@@ -8,7 +8,7 @@ use super::alert_event_type_e::alertEventType_e;
 
 /// Raven `alertEvent_s` — an AI awareness alert event (sight/sound).
 ///
-/// Type definition source: `oracle/oracle/code/game/g_local.h:125-137`
+/// Type definition source: `oracle/code/game/g_local.h:125-137`
 #[repr(C)]
 pub struct alertEvent_t {
 	/// Where the event is located

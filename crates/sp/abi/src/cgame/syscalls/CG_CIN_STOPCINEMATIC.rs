@@ -12,9 +12,9 @@ use crate::cgame::types::e_status;
 /// Raven wrapper: `syscall(CG_CIN_STOPCINEMATIC, handle)`.
 /// Raven transport: `return CIN_StopCinematic(args[1]);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:524-527`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1199`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:820-821`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:524-527`
+/// Args source: `oracle/code/cgame/cg_local.h:1199`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:820-821`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCinStopcinematicArgs {
     handle: c_int,
@@ -33,13 +33,13 @@ impl CgCinStopcinematicArgs {
 /// `CG_CIN_STOPCINEMATIC` SP cgame imports syscall ABI token.
 ///
 /// Raven `e_status` is an integer transport value.
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:186`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:524-527`
-/// Output source: `oracle/oracle/code/cgame/cg_syscalls.cpp:526-528`
-/// Output source: `oracle/oracle/code/cgame/cg_local.h:1199`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:820-821`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:820-821`
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2670-2679`
+/// Enum value source: `oracle/code/cgame/cg_public.h:186`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:524-527`
+/// Output source: `oracle/code/cgame/cg_syscalls.cpp:526-528`
+/// Output source: `oracle/code/cgame/cg_local.h:1199`
+/// Output source: `oracle/code/client/cl_cgame.cpp:820-821`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:820-821`
+/// Type definition source: `oracle/code/game/q_shared.h:2670-2679`
 pub struct CgCinStopcinematic;
 
 impl OutboundSysCall for CgCinStopcinematic {

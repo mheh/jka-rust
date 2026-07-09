@@ -13,8 +13,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_CM_BOXTRACE, results, start, end, mins, maxs, model, brushmask )`
 /// Raven transport: `CM_BoxTrace((trace_t *)VMA(1), ... args[6], args[7])`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:155-159`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:539-541`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:155-159`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:539-541`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmBoxtraceArgs {
     results: *mut trace_t,
@@ -78,10 +78,10 @@ impl CgCmBoxtraceArgs {
 
 /// `CG_CM_BOXTRACE` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:87`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:155-159`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:539-541`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:539-541`
+/// Enum value source: `oracle/code/cgame/cg_public.h:87`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:155-159`
+/// Output source: `oracle/code/client/cl_cgame.cpp:539-541`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:539-541`
 pub struct CgCmBoxtrace;
 
 impl OutboundSysCall for CgCmBoxtrace {

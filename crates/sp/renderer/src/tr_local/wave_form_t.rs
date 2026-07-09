@@ -4,7 +4,7 @@ use super::gen_func_t::genFunc_t;
 
 /// Raven `waveForm_t` — waveform generator parameters.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:276-283`
+/// Type definition source: `oracle/code/renderer/tr_local.h:276-283`
 #[repr(C)]
 pub struct waveForm_t {
     pub func: genFunc_t,

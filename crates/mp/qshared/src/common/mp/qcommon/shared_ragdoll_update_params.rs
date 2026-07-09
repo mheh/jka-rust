@@ -1,6 +1,6 @@
 //! MP `sharedRagDollUpdateParams_t` copied from Raven `codemp/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/q_shared.h:924-933`
+//! Source: `oracle/codemp/game/q_shared.h:924-933`
 
 #![allow(non_camel_case_types)]
 

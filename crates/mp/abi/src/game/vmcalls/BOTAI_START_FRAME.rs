@@ -34,7 +34,7 @@ impl BotAiStartFrameArgs {
 /// `BOTAI_START_FRAME` MP game exports vmMain ABI token.
 ///
 /// Raven: ( int time );
-/// Source: `oracle/oracle/codemp/game/g_public.h:764`
+/// Source: `oracle/codemp/game/g_public.h:764`
 pub struct BotAiStartFrame;
 
 impl InboundVmCall for BotAiStartFrame {

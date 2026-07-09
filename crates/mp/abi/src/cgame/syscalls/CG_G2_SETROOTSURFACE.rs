@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall(CG_G2_SETROOTSURFACE, ghoul2, modelIndex, surfaceName);`
 /// Raven transport: `return G2API_SetRootSurface(*((CGhoul2Info_v *)args[1]), args[2], (const char *)VMA(3));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:955-957`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2559`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1498-1499`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:955-957`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2559`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1498-1499`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SetrootsurfaceArgs {
     ghoul2: *mut c_void,
@@ -33,10 +33,10 @@ impl CgG2SetrootsurfaceArgs {
 
 /// `CG_G2_SETROOTSURFACE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:286`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:955-957`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1498-1499`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1498-1499`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:286`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:955-957`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1498-1499`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1498-1499`
 pub struct CgG2Setrootsurface;
 
 impl OutboundSysCall for CgG2Setrootsurface {

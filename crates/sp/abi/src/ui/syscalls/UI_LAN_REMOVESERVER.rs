@@ -10,11 +10,11 @@ use abi_transport::generic::{
 /// Raven wrapper: `LAN_RemoveServer(source, addr);`
 /// Raven transport: `LAN_RemoveServer(args[1], (const char *)VMA(2));`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:226`
-/// Args source (SP fallback): `oracle/oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_REMOVESERVER`.
-/// Args source (fallback): `oracle/oracle/codemp/ui/ui_local.h:978`
-/// Transport/switch source (fallback): `oracle/oracle/codemp/client/cl_ui.cpp:1066-1067`
-/// Output source fallback: `oracle/oracle/codemp/ui/ui_local.h:978`
+/// Enum source: `oracle/code/ui/ui_public.h:226`
+/// Args source (SP fallback): `oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_REMOVESERVER`.
+/// Args source (fallback): `oracle/codemp/ui/ui_local.h:978`
+/// Transport/switch source (fallback): `oracle/codemp/client/cl_ui.cpp:1066-1067`
+/// Output source fallback: `oracle/codemp/ui/ui_local.h:978`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiLanRemoveserverArgs {
     source: c_int,
@@ -37,7 +37,7 @@ impl UiLanRemoveserverArgs {
 
 /// `UI_LAN_REMOVESERVER` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:226`
+/// Source: `oracle/code/ui/ui_public.h:226`
 pub struct UiLanRemoveserver;
 
 impl OutboundSysCall for UiLanRemoveserver {

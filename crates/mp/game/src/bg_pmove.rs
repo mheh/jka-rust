@@ -1,5 +1,5 @@
 // PORT-COMPLETE: bg_pmove.c 11/91
-//! FAITHFUL signature skeleton for `oracle/oracle/codemp/game/bg_pmove.c`.
+//! FAITHFUL signature skeleton for `oracle/codemp/game/bg_pmove.c`.
 //!
 //! Bodies filled per the settled fork rulings. The vast majority of this file
 //! is built on the file-static pmove working set (`pmove_t *pm`, `pml_t pml`,
@@ -17,12 +17,12 @@ use crate::prelude::*;
 use mp_bg::public::pmove_t::MAXTOUCH;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
-// Source: `oracle/oracle/codemp/game/q_shared.h`
+// Source: `oracle/codemp/game/q_shared.h`
 
 
 
 /// Raven `#define MAX_WEAPON_CHARGE_TIME 5000`.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:16`
+/// Source: `oracle/codemp/game/bg_pmove.c:16`
 const MAX_WEAPON_CHARGE_TIME: c_int = 5000;
 use crate::bg_panimate::{
     BG_InRoll, BG_SaberInAttack, BG_SaberInSpecial, BG_SaberLockBreakAnim, BG_SpinningSaberAnim,
@@ -69,7 +69,7 @@ use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
 
 // --- `bg_pmove.c` file-scope movement parameters (globals 41-55). These are
 // read-only tunables, so they stay module `const`s.
-// Source: `oracle/oracle/codemp/game/bg_pmove.c:41-55`
+// Source: `oracle/codemp/game/bg_pmove.c:41-55`
 pub const pm_stopspeed: f32 = 100.0;
 pub const pm_duckScale: f32 = 0.50;
 pub const pm_swimScale: f32 = 0.50;
@@ -83,7 +83,7 @@ pub const pm_waterfriction: f32 = 1.0;
 pub const pm_spectatorfriction: f32 = 5.0;
 
 // --- `bg_pmove.c` local `FLY_*` enum (bg_pmove.c:441-444). Mirrors `pm_flying`.
-// Source: `oracle/oracle/codemp/game/bg_pmove.c:441-444`
+// Source: `oracle/codemp/game/bg_pmove.c:441-444`
 pub const FLY_NONE: c_int = 0;
 pub const FLY_NORMAL: c_int = 1;
 pub const FLY_VEHICLE: c_int = 2;
@@ -99,24 +99,24 @@ pub const FLY_HOVER: c_int = 3;
 // `pm_flags`, `usercmd_button`) and `BONE_ANGLES_POSTMULT`
 // (`ghoul2::bone_flags`) reach this file identically through
 // `crate::prelude::*`.
-/// `MINS_Z`. Source: `oracle/oracle/codemp/game/bg_public.h:46`
+/// `MINS_Z`. Source: `oracle/codemp/game/bg_public.h:46`
 pub const MINS_Z: c_int = -24;
-/// `MIN_WALK_NORMAL`. Source: `oracle/oracle/codemp/game/bg_local.h:5`
+/// `MIN_WALK_NORMAL`. Source: `oracle/codemp/game/bg_local.h:5`
 pub const MIN_WALK_NORMAL: f32 = 0.7;
-/// `TIMER_LAND`. Source: `oracle/oracle/codemp/game/bg_local.h:7`
+/// `TIMER_LAND`. Source: `oracle/codemp/game/bg_local.h:7`
 pub const TIMER_LAND: c_int = 130;
 /// `USE_DELAY` — local `#define` at its single call site in `PM_Use`.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4557`
+/// Source: `oracle/codemp/game/bg_pmove.c:4557`
 pub const USE_DELAY: c_int = 2000;
 /// `JUMP_OFF_WALL_SPEED` — local `#define` at its single call site in
 /// `PM_AdjustAngleForWallJump`.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1600`
+/// Source: `oracle/codemp/game/bg_pmove.c:1600`
 pub const JUMP_OFF_WALL_SPEED: f32 = 200.0;
 /// `SLOPE_RECALC_INT` — local `#define` at its single call site in
 /// `PM_AdjustStandAnimForSlope`.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4802`
+/// Source: `oracle/codemp/game/bg_pmove.c:4802`
 pub const SLOPE_RECALC_INT: c_int = 100;
-/// `PS_PMOVEFRAMECOUNTBITS`. Source: `oracle/oracle/codemp/game/q_shared.h:2141`
+/// `PS_PMOVEFRAMECOUNTBITS`. Source: `oracle/codemp/game/q_shared.h:2141`
 pub const PS_PMOVEFRAMECOUNTBITS: c_int = 6;
 
 // `PM_BGEntForNum` is a `PmoveContext<'_>` method below (already filled); the stale
@@ -124,7 +124,7 @@ pub const PS_PMOVEFRAMECOUNTBITS: c_int = 6;
 
 /// Raven `BG_SabersOff`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:201-216`
+/// Source: `oracle/codemp/game/bg_pmove.c:201-216`
 pub fn BG_SabersOff(ps: *mut playerState_t) -> qboolean {
     unsafe {
         if (*ps).saberHolstered == 0 {
@@ -143,7 +143,7 @@ pub fn BG_SabersOff(ps: *mut playerState_t) -> qboolean {
 
 /// Raven `BG_KnockDownable`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:218-237`
+/// Source: `oracle/codemp/game/bg_pmove.c:218-237`
 pub fn BG_KnockDownable(ps: *mut playerState_t) -> qboolean {
     unsafe {
         if ps.is_null() {
@@ -167,14 +167,14 @@ pub fn BG_KnockDownable(ps: *mut playerState_t) -> qboolean {
 ///
 /// Raven: hacky assumption check — the humanoid/siege check is commented out in
 /// the oracle; the live path always returns qfalse.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:247-259`
+/// Source: `oracle/codemp/game/bg_pmove.c:247-259`
 pub fn PM_IsRocketTrooper() -> qboolean {
     qfalse
 }
 
 impl PmoveContext<'_> {
     /// Raven `PM_GetSaberStance`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:261-319`
+    /// Source: `oracle/codemp/game/bg_pmove.c:261-319`
     pub fn PM_GetSaberStance(&mut self) -> c_int {
         use animNumber_t::*;
         unsafe {
@@ -225,7 +225,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_pitch_roll_for_slope`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:346-439`
+    /// Source: `oracle/codemp/game/bg_pmove.c:346-439`
     // PORT-NOTE: `storeAngles` is a `vec3_t` out-param in C; ported as `&mut vec3_t`.
     // The Raven `if (storeAngles)` NULL test is always-true here (only live caller
     // PM_SetVehicleAngles passes a non-NULL buffer), so the else (viewangles) branch
@@ -318,7 +318,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SetSpecialMoveValues`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:447-480`
+    /// Source: `oracle/codemp/game/bg_pmove.c:447-480`
     pub fn PM_SetSpecialMoveValues(&mut self) {
         unsafe {
             if (*(*self.pm).ps).clientNum < MAX_CLIENTS as c_int {
@@ -349,7 +349,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SetVehicleAngles`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:482-635`
+    /// Source: `oracle/codemp/game/bg_pmove.c:482-635`
     // The Raven C parameter is `vec3_t normal` (a `float*`), and the body branches
     // on `else if (normal)` vs `else` (NULL == in air). Ported as `Option<vec3_t>`
     // so the NULL test is faithful: `Some` = valid ground surface, `None` = in air.
@@ -468,14 +468,14 @@ impl PmoveContext<'_> {
 ///
 /// Raven: the entire body is commented out in the oracle (a debug-recompile
 /// hook); it is a no-op.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:641-674`
+/// Source: `oracle/codemp/game/bg_pmove.c:641-674`
 pub fn BG_ExternThisSoICanRecompileInDebug(pVeh: *mut Vehicle_t, riderPS: *mut playerState_t) {
     // No-op: the oracle body is entirely `/* ... */`-commented.
 }
 
 /// Raven `BG_VehicleTurnRateForSpeed`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:676-706`
+/// Source: `oracle/codemp/game/bg_pmove.c:676-706`
 pub fn BG_VehicleTurnRateForSpeed(
     pVeh: *mut Vehicle_t,
     speed: f32,
@@ -510,7 +510,7 @@ pub fn BG_VehicleTurnRateForSpeed(
 
 impl PmoveContext<'_> {
     /// Raven `PM_HoverTrace`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:719-901`
+    /// Source: `oracle/codemp/game/bg_pmove.c:719-901`
     pub fn PM_HoverTrace(&mut self) {
         unsafe {
             let pEnt = self.pm_entSelf;
@@ -713,7 +713,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_AddEvent`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:910-912`
+    /// Source: `oracle/codemp/game/bg_pmove.c:910-912`
     pub fn PM_AddEvent(&mut self, newEvent: c_int) {
         unsafe {
             BG_AddPredictableEventToPlayerstate(newEvent, 0, (*self.pm).ps);
@@ -721,7 +721,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_AddEventWithParm`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:914-917`
+    /// Source: `oracle/codemp/game/bg_pmove.c:914-917`
     pub fn PM_AddEventWithParm(&mut self, newEvent: c_int, parm: c_int) {
         unsafe {
             BG_AddPredictableEventToPlayerstate(newEvent, parm, (*self.pm).ps);
@@ -729,7 +729,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_AddTouchEnt`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:924-944`
+    /// Source: `oracle/codemp/game/bg_pmove.c:924-944`
     pub fn PM_AddTouchEnt(&mut self, entityNum: c_int) {
         unsafe {
             let pm = self.pm;
@@ -764,7 +764,7 @@ impl PmoveContext<'_> {
     /// Returns the `bgEntity_t` at index `num` in the base array
     /// the engine handed us. Raven's `assert`s become defensive null/zero
     /// returns (out-of-pmove calls / unset base are the UB cases §19 covers).
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:172-199`
+    /// Source: `oracle/codemp/game/bg_pmove.c:172-199`
     pub fn PM_BGEntForNum(&self, num: c_int) -> *mut bgEntity_t {
         unsafe {
             if self.pm.is_null() {
@@ -789,7 +789,7 @@ impl PmoveContext<'_> {
     /// Raven `PM_ClipVelocity` — slide `in` off the impacting surface `normal`
     /// into `out` (§C7 out-param shape; `in`/`normal` by value permit the
     /// `PM_ClipVelocity(pml.forward, …, pml.forward, …)` self-aliasing callers).
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:954-988`
+    /// Source: `oracle/codemp/game/bg_pmove.c:954-988`
     pub fn PM_ClipVelocity(&self, r#in: vec3_t, normal: vec3_t, out: &mut vec3_t, overbounce: f32) {
         unsafe {
             let ps = &*(*self.pm).ps;
@@ -825,7 +825,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_Friction` — ground + water friction on `pm->ps->velocity`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:998-1123`
+    /// Source: `oracle/codemp/game/bg_pmove.c:998-1123`
     pub fn PM_Friction(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -934,7 +934,7 @@ impl PmoveContext<'_> {
     /// Raven `PM_SetWaterLevel` — set `pm->waterlevel`/`watertype` by sampling
     /// point contents at three heights (accounting for ducking). Exercises the
     /// `BgTraps::pointcontents` seam.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4285-4320`
+    /// Source: `oracle/codemp/game/bg_pmove.c:4285-4320`
     pub fn PM_SetWaterLevel(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -978,7 +978,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_DoSlowFall`.
-    /// Source: oracle/oracle/codemp/game/bg_pmove.c:321-329
+    /// Source: oracle/codemp/game/bg_pmove.c:321-329
     pub fn PM_DoSlowFall(&mut self) -> qboolean {
         use animNumber_t::*;
         unsafe {
@@ -999,7 +999,7 @@ impl PmoveContext<'_> {
     /// (`m_pVehicleInfo->Update`/`Animate`/`UpdateRider`/`AttachRiders`) crosses
     /// the seam via the `GameCallbacks` upcalls (`update_vehicle`/
     /// `pm_animate_vehicle`/`update_rider`/`attach_riders`, by entity number).
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:10174-11157`
+    /// Source: `oracle/codemp/game/bg_pmove.c:10174-11157`
     pub fn PmoveSingle(&mut self, pmove: *mut pmove_t) {
         unsafe {
             self.pm = pmove;
@@ -1670,7 +1670,7 @@ impl PmoveContext<'_> {
                     // no one is driving, just update and get out (QAGAME). The
                     // `Update`/`Animate` virtuals are game-tier; bg reaches them via
                     // the GameCallbacks upcalls (by entity number).
-                    // Source: oracle/oracle/codemp/game/bg_pmove.c:10919-10922
+                    // Source: oracle/codemp/game/bg_pmove.c:10919-10922
                     self.callbacks
                         .update_vehicle((*veh).s.number, &(*self.pm).cmd);
                     self.callbacks.pm_animate_vehicle((*veh).s.number);
@@ -1707,7 +1707,7 @@ impl PmoveContext<'_> {
                     // `m_ucmd`; each passenger's `client->pers.cmd` is game-side, so a
                     // null `ucmd` signals the impl to use the rider's own pers.cmd
                     // (and to guard `inuse && client`).
-                    // Source: oracle/oracle/codemp/game/bg_pmove.c:10944-10961
+                    // Source: oracle/codemp/game/bg_pmove.c:10944-10961
                     self.callbacks
                         .update_vehicle((*veh).s.number, &(*pVeh).m_ucmd);
                     self.callbacks.pm_animate_vehicle((*veh).s.number);
@@ -1852,7 +1852,7 @@ impl PmoveContext<'_> {
                 if !(*veh).m_pVehicle.is_null() && !(*veh).ghoul2.is_null() {
                     // `AttachRiders` is a game-tier virtual; bg reaches it via the
                     // GameCallbacks upcall (by entity number).
-                    // Source: oracle/oracle/codemp/game/bg_pmove.c:11146-11149
+                    // Source: oracle/codemp/game/bg_pmove.c:11146-11149
                     self.callbacks.attach_riders((*veh).s.number);
                 }
             }
@@ -1868,7 +1868,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_Accelerate`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1133-1186`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1133-1186`
     pub fn PM_Accelerate(&mut self, wishdir: vec3_t, wishspeed: f32, accel: f32) {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1925,7 +1925,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CmdScale`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1199-1222`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1199-1222`
     pub fn PM_CmdScale(&mut self, cmd: *mut usercmd_t) -> f32 {
         unsafe {
             let umove: c_int = 0; //cmd->upmove; don't factor upmove into scaling speed
@@ -1955,7 +1955,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SetMovementDir`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1233-1262`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1233-1262`
     pub fn PM_SetMovementDir(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -1991,7 +1991,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_ForceJumpingUp`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1266-1306`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1266-1306`
     pub fn PM_ForceJumpingUp(&mut self) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -2041,7 +2041,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_JumpForDir`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1308-1340`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1308-1340`
     pub fn PM_JumpForDir(&mut self) {
         use animNumber_t::*;
         unsafe {
@@ -2073,7 +2073,7 @@ impl PmoveContext<'_> {
 
 /// Raven `PM_SetPMViewAngle`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1342-1354`
+/// Source: `oracle/codemp/game/bg_pmove.c:1342-1354`
 pub fn PM_SetPMViewAngle(ps: *mut playerState_t, angle: vec3_t, ucmd: *mut usercmd_t) {
     unsafe {
         for i in 0..3 {
@@ -2087,7 +2087,7 @@ pub fn PM_SetPMViewAngle(ps: *mut playerState_t, angle: vec3_t, ucmd: *mut userc
 
 impl PmoveContext<'_> {
     /// Raven `PM_AdjustAngleForWallRun`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1356-1462`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1356-1462`
     pub fn PM_AdjustAngleForWallRun(
         &mut self,
         ps: *mut playerState_t,
@@ -2233,7 +2233,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_AdjustAnglesForWallRunUpFlipAlt`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1464-1470`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1464-1470`
     pub fn PM_AdjustAnglesForWallRunUpFlipAlt(&mut self, ucmd: *mut usercmd_t) -> qboolean {
         unsafe {
             PM_SetPMViewAngle((*self.pm).ps, (*(*self.pm).ps).viewangles, ucmd);
@@ -2242,7 +2242,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_AdjustAngleForWallRunUp`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1472-1598`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1472-1598`
     pub fn PM_AdjustAngleForWallRunUp(
         &mut self,
         ps: *mut playerState_t,
@@ -2394,14 +2394,14 @@ impl PmoveContext<'_> {
 }
 
 /// Raven `BG_ForceWallJumpStrength`.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1602-1605`
+/// Source: `oracle/codemp/game/bg_pmove.c:1602-1605`
 pub fn BG_ForceWallJumpStrength() -> f32 {
     mp_bg::local::forceJumpStrength[FORCE_LEVEL_3 as usize] / 2.5
 }
 
 impl PmoveContext<'_> {
     /// Raven `PM_AdjustAngleForWallJump`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1607-1756`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1607-1756`
     pub fn PM_AdjustAngleForWallJump(
         &mut self,
         ps: *mut playerState_t,
@@ -2567,7 +2567,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SetForceJumpZStart`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1759-1766`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1759-1766`
     pub fn PM_SetForceJumpZStart(&mut self, value: f32) {
         unsafe {
             let ps = (*self.pm).ps;
@@ -2579,7 +2579,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_GrabWallForJump`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1776-1781`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1776-1781`
     //NOTE!!! assumes an appropriate anim is being passed in!!!
     pub fn PM_GrabWallForJump(&mut self, anim: c_int) {
         unsafe {
@@ -2597,7 +2597,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_CheckJump`. `METROID_JUMP` is defined, so that block is compiled.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1788-2775`
+    /// Source: `oracle/codemp/game/bg_pmove.c:1788-2775`
     pub fn PM_CheckJump(&mut self) -> qboolean {
         use crate::saber::saber_flags::*;
         use animNumber_t::*;
@@ -3482,7 +3482,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_CheckWaterJump`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:2781-2821`
+    /// Source: `oracle/codemp/game/bg_pmove.c:2781-2821`
     pub fn PM_CheckWaterJump(&mut self) -> qboolean {
         unsafe {
             let pm = self.pm;
@@ -3533,7 +3533,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_WaterJumpMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:2833-2844`
+    /// Source: `oracle/codemp/game/bg_pmove.c:2833-2844`
     pub fn PM_WaterJumpMove(&mut self) {
         unsafe {
             // waterjump has no control, but falls
@@ -3550,7 +3550,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_WaterMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:2852-2916`
+    /// Source: `oracle/codemp/game/bg_pmove.c:2852-2916`
     pub fn PM_WaterMove(&mut self) {
         use crate::bg_slidemove::OVERCLIP;
         unsafe {
@@ -3612,7 +3612,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_FlyVehicleMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:2924-3012`
+    /// Source: `oracle/codemp/game/bg_pmove.c:2924-3012`
     pub fn PM_FlyVehicleMove(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -3687,7 +3687,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_FlyMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3021-3059`
+    /// Source: `oracle/codemp/game/bg_pmove.c:3021-3059`
     pub fn PM_FlyMove(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -3734,7 +3734,7 @@ impl PmoveContext<'_> {
 impl PmoveContext<'_> {
     /// Raven `PM_AirMove`. `METROID_JUMP` is defined, so the unconditional `PM_CheckJump`
     /// path is compiled. The `#if 0` hover strafe block is dropped (dead).
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3068-3297`
+    /// Source: `oracle/codemp/game/bg_pmove.c:3068-3297`
     pub fn PM_AirMove(&mut self) {
         use crate::bg_slidemove::OVERCLIP;
         unsafe {
@@ -3843,7 +3843,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_WalkMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3305-3484`
+    /// Source: `oracle/codemp/game/bg_pmove.c:3305-3484`
     pub fn PM_WalkMove(&mut self) {
         use crate::bg_slidemove::OVERCLIP;
         unsafe {
@@ -4005,7 +4005,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_DeadMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3492-3509`
+    /// Source: `oracle/codemp/game/bg_pmove.c:3492-3509`
     pub fn PM_DeadMove(&mut self) {
         unsafe {
             let ps = (*self.pm).ps;
@@ -4029,7 +4029,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_NoclipMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3517-3576`
+    /// Source: `oracle/codemp/game/bg_pmove.c:3517-3576`
     pub fn PM_NoclipMove(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -4097,7 +4097,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_FootstepForSurface`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3587-3594`
+    /// Source: `oracle/codemp/game/bg_pmove.c:3587-3594`
     pub fn PM_FootstepForSurface(&mut self) -> c_int {
         if self.pml.groundTrace.surfaceFlags & SURF_NOSTEPS != 0 {
             return 0;
@@ -4106,7 +4106,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_TryRoll`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3597-3681`
+    /// Source: `oracle/codemp/game/bg_pmove.c:3597-3681`
     pub fn PM_TryRoll(&mut self) -> c_int {
         use crate::bg_slidemove::STEPSIZE;
         use crate::saber::saber_flags::*;
@@ -4215,7 +4215,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_CrashLandEffect`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3684-3722`
+    /// Source: `oracle/codemp/game/bg_pmove.c:3684-3722`
     pub fn PM_CrashLandEffect(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -4259,7 +4259,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CrashLand`. `QAGAME` is defined, so the `PM_CrashLandEffect` call is compiled.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3731-4002`
+    /// Source: `oracle/codemp/game/bg_pmove.c:3731-4002`
     pub fn PM_CrashLand(&mut self) {
         use animNumber_t::*;
         unsafe {
@@ -4532,7 +4532,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_CorrectAllSolid`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4009-4044`
+    /// Source: `oracle/codemp/game/bg_pmove.c:4009-4044`
     pub fn PM_CorrectAllSolid(&mut self, trace: *mut trace_t) -> c_int {
         unsafe {
             let pm = self.pm;
@@ -4592,7 +4592,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_GroundTraceMissed`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4053-4133`
+    /// Source: `oracle/codemp/game/bg_pmove.c:4053-4133`
     pub fn PM_GroundTraceMissed(&mut self) {
         use animNumber_t::*;
         unsafe {
@@ -4696,7 +4696,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_GroundTrace`. `QAGAME` is defined, so the vehicle-board block is compiled.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4141-4277`
+    /// Source: `oracle/codemp/game/bg_pmove.c:4141-4277`
     pub fn PM_GroundTrace(&mut self) {
         use animNumber_t::*;
         unsafe {
@@ -4878,7 +4878,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_CheckDualForwardJumpDuck`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4322-4339`
+    /// Source: `oracle/codemp/game/bg_pmove.c:4322-4339`
     pub fn PM_CheckDualForwardJumpDuck(&mut self) -> qboolean {
         use animNumber_t::*;
         unsafe {
@@ -4902,7 +4902,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CheckFixMins`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4341-4401`
+    /// Source: `oracle/codemp/game/bg_pmove.c:4341-4401`
     pub fn PM_CheckFixMins(&mut self) {
         use animNumber_t::*;
         unsafe {
@@ -4989,7 +4989,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CheckDuck`. `QAGAME` is defined, so the solidHack block is compiled.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4410-4542`
+    /// Source: `oracle/codemp/game/bg_pmove.c:4410-4542`
     pub fn PM_CheckDuck(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -5134,7 +5134,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_Use`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4559-4577`
+    /// Source: `oracle/codemp/game/bg_pmove.c:4559-4577`
     pub fn PM_Use(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -5161,7 +5161,7 @@ impl PmoveContext<'_> {
 
 /// Raven `PM_WalkingAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4579-4598`
+/// Source: `oracle/codemp/game/bg_pmove.c:4579-4598`
 pub fn PM_WalkingAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     const ANIMS: &[animNumber_t] = &[
@@ -5186,7 +5186,7 @@ pub fn PM_WalkingAnim(anim: c_int) -> qboolean {
 
 /// Raven `PM_RunningAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4600-4620`
+/// Source: `oracle/codemp/game/bg_pmove.c:4600-4620`
 pub fn PM_RunningAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     const ANIMS: &[animNumber_t] = &[
@@ -5212,7 +5212,7 @@ pub fn PM_RunningAnim(anim: c_int) -> qboolean {
 
 /// Raven `PM_SwimmingAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4622-4633`
+/// Source: `oracle/codemp/game/bg_pmove.c:4622-4633`
 pub fn PM_SwimmingAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     const ANIMS: &[animNumber_t] = &[
@@ -5229,7 +5229,7 @@ pub fn PM_SwimmingAnim(anim: c_int) -> qboolean {
 
 /// Raven `PM_RollingAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4635-4647`
+/// Source: `oracle/codemp/game/bg_pmove.c:4635-4647`
 pub fn PM_RollingAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     const ANIMS: &[animNumber_t] = &[
@@ -5247,7 +5247,7 @@ pub fn PM_RollingAnim(anim: c_int) -> qboolean {
 
 /// Raven `PM_AnglesForSlope`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4649-4675`
+/// Source: `oracle/codemp/game/bg_pmove.c:4649-4675`
 // `angles` is a written-through out-param → `&mut [f32;3]`; `slope` stays a
 // read-only by-value input. Cross-file callers are updated by the fixer.
 pub fn PM_AnglesForSlope(yaw: f32, slope: vec3_t, angles: &mut [f32; 3]) {
@@ -5287,7 +5287,7 @@ pub fn PM_AnglesForSlope(yaw: f32, slope: vec3_t, angles: &mut [f32; 3]) {
 
 impl PmoveContext<'_> {
     /// Raven `PM_FootSlopeTrace`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4677-4740`
+    /// Source: `oracle/codemp/game/bg_pmove.c:4677-4740`
     pub fn PM_FootSlopeTrace(&mut self, pDiff: *mut f32, pInterval: *mut f32) {
         unsafe {
             let pm = self.pm;
@@ -5404,7 +5404,7 @@ impl PmoveContext<'_> {
 
 /// Raven `BG_InSlopeAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4742-4800`
+/// Source: `oracle/codemp/game/bg_pmove.c:4742-4800`
 pub fn BG_InSlopeAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     const ANIMS: &[animNumber_t] = &[
@@ -5468,7 +5468,7 @@ pub fn BG_InSlopeAnim(anim: c_int) -> qboolean {
 
 impl PmoveContext<'_> {
     /// Raven `PM_AdjustStandAnimForSlope`. `SLOPERECALCVAR` = `pm->ps->slopeRecalcTime`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4804-5102`
+    /// Source: `oracle/codemp/game/bg_pmove.c:4804-5102`
     pub fn PM_AdjustStandAnimForSlope(&mut self) -> qboolean {
         use animNumber_t::*;
         unsafe {
@@ -5669,7 +5669,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_LegsSlopeBackTransition`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5107-5168`
+    /// Source: `oracle/codemp/game/bg_pmove.c:5107-5168`
     pub fn PM_LegsSlopeBackTransition(&mut self, desiredAnim: c_int) -> c_int {
         use animNumber_t::*;
         unsafe {
@@ -5706,7 +5706,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_Footsteps`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5175-5661`
+    /// Source: `oracle/codemp/game/bg_pmove.c:5175-5661`
     pub fn PM_Footsteps(&mut self) {
         use animNumber_t::*;
         unsafe {
@@ -6082,7 +6082,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_WaterEvents`. `QAGAME` is defined, so the impact-splash block is compiled.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5670-5748`
+    /// Source: `oracle/codemp/game/bg_pmove.c:5670-5748`
     pub fn PM_WaterEvents(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -6159,7 +6159,7 @@ impl PmoveContext<'_> {
 
 /// Raven `BG_ClearRocketLock`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:5750-5759`
+/// Source: `oracle/codemp/game/bg_pmove.c:5750-5759`
 pub fn BG_ClearRocketLock(ps: *mut playerState_t) {
     unsafe {
         if !ps.is_null() {
@@ -6173,7 +6173,7 @@ pub fn BG_ClearRocketLock(ps: *mut playerState_t) {
 
 impl PmoveContext<'_> {
     /// Raven `PM_BeginWeaponChange`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5766-5793`
+    /// Source: `oracle/codemp/game/bg_pmove.c:5766-5793`
     pub fn PM_BeginWeaponChange(&mut self, weapon: c_int) {
         unsafe {
             let pm = self.pm;
@@ -6211,7 +6211,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_FinishWeaponChange`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5801-5825`
+    /// Source: `oracle/codemp/game/bg_pmove.c:5801-5825`
     pub fn PM_FinishWeaponChange(&mut self) {
         unsafe {
             let pm = self.pm;
@@ -6243,7 +6243,7 @@ impl PmoveContext<'_> {
 }
 
 /// Raven `BG_VehTraceFromCamPos`. `QAGAME` is defined, so the game-side branch is compiled.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:5833-5872`
+/// Source: `oracle/codemp/game/bg_pmove.c:5833-5872`
 pub fn BG_VehTraceFromCamPos(
     camTrace: *mut trace_t,
     bgEnt: *mut bgEntity_t,
@@ -6318,7 +6318,7 @@ pub fn BG_VehTraceFromCamPos(
 
 impl PmoveContext<'_> {
     /// Raven `PM_RocketLock`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5874-5977`
+    /// Source: `oracle/codemp/game/bg_pmove.c:5874-5977`
     pub fn PM_RocketLock(&mut self, lockDist: f32, vehicleLock: qboolean) {
         unsafe {
             let pm = self.pm;
@@ -6458,7 +6458,7 @@ impl PmoveContext<'_> {
 impl PmoveContext<'_> {
     /// Raven `PM_DoChargedWeapons`. `_DEBUG` prints are dropped. The C `goto rest` is
     /// modeled with a labeled block whose value short-circuits the `return qtrue`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5980-6233`
+    /// Source: `oracle/codemp/game/bg_pmove.c:5980-6233`
     pub fn PM_DoChargedWeapons(
         &mut self,
         vehicleRocketLock: qboolean,
@@ -6664,7 +6664,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_ItemUsable`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:6239-6366`
+    /// Source: `oracle/codemp/game/bg_pmove.c:6239-6366`
     pub fn PM_ItemUsable(&mut self, ps: *mut playerState_t, forcedUse: c_int) -> c_int {
         unsafe {
             let mut fwd: vec3_t = [0.0; 3];
@@ -6829,7 +6829,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CanSetWeaponAnims`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:6369-6377`
+    /// Source: `oracle/codemp/game/bg_pmove.c:6369-6377`
     pub fn PM_CanSetWeaponAnims(&mut self) -> qboolean {
         unsafe {
             if (*(*self.pm).ps).m_iVehicleNum != 0 {
@@ -6843,7 +6843,7 @@ impl PmoveContext<'_> {
 impl PmoveContext<'_> {
     /// Raven `PM_VehicleWeaponAnimate`. The `backAgain` goto is a loop; the `VEH_FLYING`/
     /// `VEH_CRASHING` branches are `if (0)` (dead) in the oracle.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:6381-6631`
+    /// Source: `oracle/codemp/game/bg_pmove.c:6381-6631`
     pub fn PM_VehicleWeaponAnimate(&mut self) {
         use animNumber_t::*;
         unsafe {
@@ -7028,7 +7028,7 @@ impl PmoveContext<'_> {
 impl PmoveContext<'_> {
     /// Raven `PM_Weapon`. `QAGAME` is defined (npc/grapple/vehicle-fire branches compiled);
     /// `#if 0` melee-grab and dead alt-fire branches are dropped.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:6641-7672`
+    /// Source: `oracle/codemp/game/bg_pmove.c:6641-7672`
     pub fn PM_Weapon(&mut self) {
         use animNumber_t::*;
         unsafe {
@@ -7846,7 +7846,7 @@ impl PmoveContext<'_> {
 
 impl PmoveContext<'_> {
     /// Raven `PM_Animate`. The `#if 0` TA gesture-button block is dropped.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:7680-7740`
+    /// Source: `oracle/codemp/game/bg_pmove.c:7680-7740`
     pub fn PM_Animate(&mut self) {
         use animNumber_t::*;
         unsafe {
@@ -7879,7 +7879,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_DropTimers`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:7748-7773`
+    /// Source: `oracle/codemp/game/bg_pmove.c:7748-7773`
     pub fn PM_DropTimers(&mut self) {
         unsafe {
             let ps = (*self.pm).ps;
@@ -7912,7 +7912,7 @@ impl PmoveContext<'_> {
 }
 
 /// Raven `BG_UnrestrainedPitchRoll`.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:7784-7798`
+/// Source: `oracle/codemp/game/bg_pmove.c:7784-7798`
 // ESCALATED (worker W4): Raven reads the game-tier `bg_fighterAltControl` cvar
 // (a cached `vmCvar_t` registered in `g_main.c`) as `.integer`. This bg-tier free
 // fn only has `bg: &BgState`; the mirror ladder resolves to a BgState field:
@@ -7924,7 +7924,7 @@ impl PmoveContext<'_> {
 // RECOMMENDED (needs bg_channel owner): add `pub bg_fighterAltControl: c_int` to
 // `BgState`, written from the game-tier cvar-update init (where `g_main.c`
 // registers/refreshes the cvar), and read it here as `bg.bg_fighterAltControl`.
-// Source: oracle/oracle/codemp/game/bg_pmove.c:7783-7798, g_main.c:177,420
+// Source: oracle/codemp/game/bg_pmove.c:7783-7798, g_main.c:177,420
 pub fn BG_UnrestrainedPitchRoll(
     ps: *mut playerState_t,
     pVeh: *mut Vehicle_t,
@@ -7951,7 +7951,7 @@ pub fn BG_UnrestrainedPitchRoll(
 /// `VEH_CONTROL_SCHEME_4` is undefined, so the `#else` branch (the
 /// `BG_UnrestrainedPitchRoll` fighter test whose body is dead code, otherwise
 /// the ±16000 short pitch clamp) is the compiled one.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:7813-7894`
+/// Source: `oracle/codemp/game/bg_pmove.c:7813-7894`
 impl PmoveContext<'_> {
     pub fn PM_UpdateViewAngles(&mut self, ps: *mut playerState_t, cmd: *const usercmd_t) {
         unsafe {
@@ -7999,7 +7999,7 @@ impl PmoveContext<'_> {
 
 /// Raven `PM_AdjustAttackStates` — set the firing eFlags + disruptor zoom state
 /// from the current buttons/ammo.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8031-8199`
+/// Source: `oracle/codemp/game/bg_pmove.c:8031-8199`
 impl PmoveContext<'_> {
     pub fn PM_AdjustAttackStates(&mut self, pm: *mut pmove_t) {
         unsafe {
@@ -8138,7 +8138,7 @@ impl PmoveContext<'_> {
 
 /// Raven `BG_CmdForRoll`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8201-8327`
+/// Source: `oracle/codemp/game/bg_pmove.c:8201-8327`
 pub fn BG_CmdForRoll(
     ps: *mut playerState_t,
     anim: c_int,
@@ -8238,7 +8238,7 @@ pub fn BG_CmdForRoll(
 /// Note: Raven's `float *= <double literal>` promotes to double then narrows;
 /// the `f64` casts below preserve that rounding. `<float>f` literals compute in
 /// f32.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8331-8510`
+/// Source: `oracle/codemp/game/bg_pmove.c:8331-8510`
 impl PmoveContext<'_> {
     pub fn BG_AdjustClientSpeed(
         &mut self,
@@ -8387,7 +8387,7 @@ impl PmoveContext<'_> {
 
 /// Raven `BG_InRollAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8512-8523`
+/// Source: `oracle/codemp/game/bg_pmove.c:8512-8523`
 pub fn BG_InRollAnim(cent: *mut entityState_t) -> qboolean {
     use animNumber_t::*;
     unsafe {
@@ -8405,7 +8405,7 @@ pub fn BG_InRollAnim(cent: *mut entityState_t) -> qboolean {
 
 /// Raven `BG_InKnockDown`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8525-8560`
+/// Source: `oracle/codemp/game/bg_pmove.c:8525-8560`
 pub fn BG_InKnockDown(anim: c_int) -> qboolean {
     use animNumber_t::*;
     if anim == BOTH_KNOCKDOWN1 as c_int
@@ -8444,7 +8444,7 @@ pub fn BG_InKnockDown(anim: c_int) -> qboolean {
 
 /// Raven `BG_InRollES`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8562-8574`
+/// Source: `oracle/codemp/game/bg_pmove.c:8562-8574`
 pub fn BG_InRollES(ps: *mut entityState_t, anim: c_int) -> qboolean {
     use animNumber_t::*;
     // Raven's `ps` param is unreferenced; the switch keys off `anim`.
@@ -8462,7 +8462,7 @@ pub fn BG_InRollES(ps: *mut entityState_t, anim: c_int) -> qboolean {
 /// Raven `BG_IK_MoveArm` — drive the left-arm inverse-kinematics bone chain
 /// toward `desiredPos` (used to fling people in throws). `bgHumanoidAnimations`
 /// is threaded via `bg: &BgState`.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8576-8730`
+/// Source: `oracle/codemp/game/bg_pmove.c:8576-8730`
 pub fn BG_IK_MoveArm(
     ghoul2: *mut c_void,
     lHandBolt: c_int,
@@ -8724,7 +8724,7 @@ pub fn BG_IK_MoveArm(
 
 /// Raven `BG_UpdateLookAngles`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8733-8787`
+/// Source: `oracle/codemp/game/bg_pmove.c:8733-8787`
 // `lastHeadAngles`/`lookAngles` are written in place → `&mut vec3_t`
 // (never NULL in the oracle callers).
 pub fn BG_UpdateLookAngles(
@@ -8792,7 +8792,7 @@ pub fn BG_UpdateLookAngles(
 
 /// Raven `BG_G2ClientNeckAngles`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8790-8866`
+/// Source: `oracle/codemp/game/bg_pmove.c:8790-8866`
 // `headAngles`/`neckAngles`/`thoracicAngles` are written in place → `&mut vec3_t`;
 // `lookAngles`/`headClampMin/MaxAngles` are read-only → keep by-value `vec3_t`.
 pub fn BG_G2ClientNeckAngles(
@@ -8894,7 +8894,7 @@ pub fn BG_G2ClientNeckAngles(
 
 /// Raven `BG_G2ClientSpineAngles`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8869-8990`
+/// Source: `oracle/codemp/game/bg_pmove.c:8869-8990`
 // `viewAngles`/`thoracicAngles`/`ulAngles`/`llAngles` are written in place → `&mut vec3_t`;
 // `cent_lerpOrigin`/`cent_lerpAngles`/`angles`/`modelScale` are read-only → keep by-value `vec3_t`.
 // Only Raven's active `#if 1` correction path is ported (the `#else` branch is dead); with `#if 1`,
@@ -9027,7 +9027,7 @@ pub fn BG_G2ClientSpineAngles(
 ///
 /// Raven: `CG_SwingAngles` — swing an angle towards a destination, modifying
 /// speed by the delta and clamping to tolerance.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:8997-9053`
+/// Source: `oracle/codemp/game/bg_pmove.c:8997-9053`
 pub fn BG_SwingAngles(
     destination: f32,
     swingTolerance: f32,
@@ -9096,7 +9096,7 @@ pub fn BG_SwingAngles(
 
 /// Raven `BG_InRoll2`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9058-9078`
+/// Source: `oracle/codemp/game/bg_pmove.c:9058-9078`
 pub fn BG_InRoll2(es: *mut entityState_t) -> qboolean {
     use animNumber_t::*;
     unsafe {
@@ -9128,7 +9128,7 @@ pub fn BG_InRoll2(es: *mut entityState_t) -> qboolean {
 /// locals. `VEH_CONTROL_SCHEME_4`/`BONE_BASED_LEG_ANGLES` are undefined.
 /// `legsAngles`/`turAngles` are written out-params (`&mut`); `legs` is
 /// the axis matrix out (`*mut vec3_t`).
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9082-9457`
+/// Source: `oracle/codemp/game/bg_pmove.c:9082-9457`
 pub fn BG_G2PlayerAngles(
     ghoul2: *mut c_void,
     motionBolt: c_int,
@@ -9684,7 +9684,7 @@ pub fn BG_G2PlayerAngles(
 
 /// Raven `BG_G2ATSTAngles`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9459-9462`
+/// Source: `oracle/codemp/game/bg_pmove.c:9459-9462`
 pub fn BG_G2ATSTAngles(ghoul2: *mut c_void, time: c_int, cent_lerpAngles: vec3_t) {
     unsafe {
         // up = POSITIVE_X, right = NEGATIVE_Y, fwd = NEGATIVE_Z
@@ -9708,14 +9708,14 @@ pub fn BG_G2ATSTAngles(ghoul2: *mut c_void, time: c_int, cent_lerpAngles: vec3_t
 ///
 /// Raven: the pitch/yaw ucmd override is commented out in the oracle; the live
 /// path unconditionally returns qtrue.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9464-9469`
+/// Source: `oracle/codemp/game/bg_pmove.c:9464-9469`
 pub fn PM_AdjustAnglesForDualJumpAttack(ps: *mut playerState_t, ucmd: *mut usercmd_t) -> qboolean {
     qtrue
 }
 
 /// Raven `PM_CmdForSaberMoves` — force movement/jump commands for the special
 /// dual/staff jump/spin saber attacks.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9474-9639`
+/// Source: `oracle/codemp/game/bg_pmove.c:9474-9639`
 impl PmoveContext<'_> {
     pub fn PM_CmdForSaberMoves(&mut self, ucmd: *mut usercmd_t) {
         unsafe {
@@ -9864,7 +9864,7 @@ impl PmoveContext<'_> {
 /// Raven: constrain the rider's viewangles based on the vehicle's caps (or leave
 /// a turret-operating passenger unclamped). `VEH_CONTROL_SCHEME_4` is undefined,
 /// so the `#else` (BG_UnrestrainedPitchRoll) branch is the compiled one.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9642-9713`
+/// Source: `oracle/codemp/game/bg_pmove.c:9642-9713`
 pub fn PM_VehicleViewAngles(
     ps: *mut playerState_t,
     veh: *mut bgEntity_t,
@@ -9931,7 +9931,7 @@ pub fn PM_VehicleViewAngles(
 
 /// Raven `PM_WeaponOkOnVehicle`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9745-9759`
+/// Source: `oracle/codemp/game/bg_pmove.c:9745-9759`
 pub fn PM_WeaponOkOnVehicle(weapon: c_int) -> qboolean {
     // FIXME (Raven): check g_vehicleInfo for our vehicle?
     if weapon == WP_MELEE as c_int || weapon == WP_SABER as c_int || weapon == WP_BLASTER as c_int {
@@ -9942,7 +9942,7 @@ pub fn PM_WeaponOkOnVehicle(weapon: c_int) -> qboolean {
 
 /// Raven `PM_GetOkWeaponForVehicle` — first weapon the client owns that is
 /// usable on a vehicle, or -1.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9762-9780`
+/// Source: `oracle/codemp/game/bg_pmove.c:9762-9780`
 impl PmoveContext<'_> {
     pub fn PM_GetOkWeaponForVehicle(&mut self) -> c_int {
         unsafe {
@@ -9967,7 +9967,7 @@ impl PmoveContext<'_> {
 
 /// Raven `PM_VehForcedTurning` — steer a vehicle to face its turnaround target.
 /// `VEH_CONTROL_SCHEME_4` is undefined, so the `#else` branch is compiled.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9783-9830`
+/// Source: `oracle/codemp/game/bg_pmove.c:9783-9830`
 impl PmoveContext<'_> {
     pub fn PM_VehForcedTurning(&mut self, veh: *mut bgEntity_t) {
         unsafe {
@@ -10018,7 +10018,7 @@ impl PmoveContext<'_> {
 
 /// Raven `PM_VehFaceHyperspacePoint` — rotate a vehicle to face its hyperspace
 /// angles, flagging it ready to jump once aligned.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9916-9989`
+/// Source: `oracle/codemp/game/bg_pmove.c:9916-9989`
 impl PmoveContext<'_> {
     pub fn PM_VehFaceHyperspacePoint(&mut self, veh: *mut bgEntity_t) {
         unsafe {
@@ -10107,7 +10107,7 @@ impl PmoveContext<'_> {
 /// `BgTraps`). Raven's pmove caller always passes a non-null `pm->trace`, so
 /// the old NULL-`localTrace` "don't care about solids" branch is unreachable and
 /// dropped.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:9993-10076`
+/// Source: `oracle/codemp/game/bg_pmove.c:9993-10076`
 impl PmoveContext<'_> {
     pub fn BG_VehicleAdjustBBoxForOrientation(
         &self,
@@ -10120,7 +10120,7 @@ impl PmoveContext<'_> {
     ) {
         // `DEFAULT_MINS_2` canonical in `mp_bg::public::viewheight` (`c_int`,
         // cast here to match the `vec3_t` component it seeds).
-        // Source: `oracle/oracle/codemp/game/bg_public.h:41`
+        // Source: `oracle/codemp/game/bg_public.h:41`
         const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
 
         unsafe {
@@ -10223,7 +10223,7 @@ impl PmoveContext<'_> {
 
 /// Raven `PM_MoveForKata` — force movement/jump commands during the soulcal and
 /// medium/strong kata special attacks.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:10092-10172`
+/// Source: `oracle/codemp/game/bg_pmove.c:10092-10172`
 impl PmoveContext<'_> {
     pub fn PM_MoveForKata(&mut self, ucmd: *mut usercmd_t) {
         unsafe {
@@ -10293,7 +10293,7 @@ impl PmoveContext<'_> {
 /// Raven `Pmove` — the public pmove entrypoint. Constructs one `PmoveContext`
 /// per call from the bg channel handles the game tier supplies,
 /// then chops the move into fixed timesteps and runs `PmoveSingle` for each.
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:11167-11215`
+/// Source: `oracle/codemp/game/bg_pmove.c:11167-11215`
 pub fn Pmove(
     pmove: *mut pmove_t,
     bg: &mut BgState,

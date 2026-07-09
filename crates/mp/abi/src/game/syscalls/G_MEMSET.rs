@@ -40,7 +40,7 @@ impl GMemsetArgs {
 
 /// `G_MEMSET` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:276`
+/// Source: `oracle/codemp/game/g_public.h:276`
 pub struct GMemset;
 
 impl OutboundSysCall for GMemset {

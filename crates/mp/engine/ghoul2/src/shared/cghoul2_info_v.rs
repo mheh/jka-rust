@@ -4,7 +4,7 @@
 /// indexed into the global `IGhoul2InfoArray`.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/codemp/ghoul2/ghoul2_shared.h:328-457`
+/// Type definition source: `oracle/codemp/ghoul2/ghoul2_shared.h:328-457`
 #[repr(C)]
 pub struct CGhoul2Info_v {
     /// don't be bad and muck with this

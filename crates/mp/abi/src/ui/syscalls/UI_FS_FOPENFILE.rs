@@ -13,8 +13,8 @@ use mp_qshared::shared::fsMode_t;
 /// Raven's client switch decodes `qpath` and `f` through `VMA`, then passes the
 /// raw mode word as `fsMode_t`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:83-84`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:737-738`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:83-84`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:737-738`
 #[derive(Debug)]
 pub struct CgFsFopenfileArgs {
     /// Null-terminated virtual-filesystem path, decoded by Raven as `VMA(1)`.
@@ -53,10 +53,10 @@ impl CgFsFopenfileArgs {
 /// Raven wrapper: `return syscall( UI_FS_FOPENFILE, qpath, f, mode );`
 /// Raven transport: `return FS_FOpenFileByMode( (const char *)VMA(1), (int *)VMA(2), (fsMode_t)args[3] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:73`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:83-84`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:737-738`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:737-738`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:73`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:83-84`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:737-738`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:737-738`
 pub struct CgFsFopenfile;
 
 impl OutboundSysCall for CgFsFopenfile {

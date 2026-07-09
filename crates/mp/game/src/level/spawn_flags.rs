@@ -1,6 +1,6 @@
 //! MP `SPF_*` spawn flags.
 //!
-//! Source: `oracle/oracle/codemp/game/g_local.h:1218-1219`
+//! Source: `oracle/codemp/game/g_local.h:1218-1219`
 
 use core::ffi::c_int;
 

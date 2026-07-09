@@ -29,7 +29,7 @@ impl GG2ListbonesArgs {
 
 /// `G_G2_LISTBONES` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:507`
+/// Source: `oracle/codemp/game/g_public.h:507`
 pub struct GG2Listbones;
 
 impl OutboundSysCall for GG2Listbones {

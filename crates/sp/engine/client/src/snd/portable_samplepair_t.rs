@@ -5,7 +5,7 @@ use std::os::raw::c_int;
 /// Raven `portable_samplepair_t` — a stereo sample pair.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/code/client/snd_local.h:30-33`
+/// Type definition source: `oracle/code/client/snd_local.h:30-33`
 #[repr(C)]
 pub struct portable_samplepair_t {
 	/// the final values will be clamped to +/- 0x00ffff00 and shifted down

@@ -73,7 +73,7 @@ impl CgRFontDrawstringArgs {
 
 /// `CG_R_FONT_DRAWSTRING` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:125`
+/// Source: `oracle/codemp/cgame/cg_public.h:125`
 pub struct CgRFontDrawstring;
 
 impl OutboundSysCall for CgRFontDrawstring {

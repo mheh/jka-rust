@@ -4,7 +4,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `vehWeaponStatus_t` — per-weapon-slot runtime vehicle weapon state.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:450-460`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:450-460`
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct vehWeaponStatus_t {

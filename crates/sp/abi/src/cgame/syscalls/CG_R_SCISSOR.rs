@@ -7,8 +7,8 @@ use abi_transport::pass_float;
 /// Raven wrapper: `syscall( CG_R_SCISSOR, PASSFLOAT(x), PASSFLOAT(y), PASSFLOAT(w), PASSFLOAT(h));`
 /// Raven transport: `re.Scissor(VMF(1), VMF(2), VMF(3), VMF(4));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:437-439`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:746-748`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:437-439`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:746-748`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRScissorArgs {
     x: f32,
@@ -25,10 +25,10 @@ impl CgRScissorArgs {
 
 /// `CG_R_SCISSOR` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:149`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:437-439`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:746-748`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:746-748`
+/// Enum value source: `oracle/code/cgame/cg_public.h:149`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:437-439`
+/// Output source: `oracle/code/client/cl_cgame.cpp:746-748`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:746-748`
 pub struct CgRScissor;
 
 impl OutboundSysCall for CgRScissor {

@@ -8,9 +8,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven's `trap_GetCurrentCmdNumber` forwards only the syscall token, so this
 /// call has no transport payload.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:486`
-/// Transport source: `oracle/oracle/codemp/cgame/cg_syscalls.c:487`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:969`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:486`
+/// Transport source: `oracle/codemp/cgame/cg_syscalls.c:487`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:969`
 #[derive(Debug, Default)]
 pub struct CgGetcurrentcmdnumberArgs;
 
@@ -26,11 +26,11 @@ impl CgGetcurrentcmdnumberArgs {
 /// Raven transport: `return syscall( CG_GETCURRENTCMDNUMBER );`
 /// Raven switch: `return CL_GetCurrentCmdNumber();`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:185`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:486-487`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:486-487`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:970`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:969-970`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:185`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:486-487`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:486-487`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:970`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:969-970`
 pub struct CgGetcurrentcmdnumber;
 
 impl OutboundSysCall for CgGetcurrentcmdnumber {

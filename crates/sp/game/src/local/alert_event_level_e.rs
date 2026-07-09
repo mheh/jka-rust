@@ -2,7 +2,7 @@
 
 /// Raven `alertEventLevel_e` — alert severity level for AI awareness.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_local.h:115-122`
+/// Type definition source: `oracle/code/game/g_local.h:115-122`
 #[repr(i32)]
 pub enum alertEventLevel_e {
 	/// Enemy responds to the sound, but only by looking

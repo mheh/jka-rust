@@ -41,7 +41,7 @@ impl GG2IkmoveArgs {
 
 /// `G_G2_IKMOVE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:560`
+/// Source: `oracle/codemp/game/g_public.h:560`
 pub struct GG2Ikmove;
 
 impl OutboundSysCall for GG2Ikmove {

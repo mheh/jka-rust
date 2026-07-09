@@ -6,12 +6,12 @@ use mp_qshared::shared::{qboolean, qhandle_t};
 
 /// `MAX_GAMETYPES`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:566`
+/// Source: `oracle/codemp/ui/ui_local.h:566`
 const MAX_GAMETYPES: usize = 16;
 
 /// Raven `mapInfo`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:629-640`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:629-640`
 #[repr(C)]
 pub struct mapInfo {
 	pub mapName: *const c_char,

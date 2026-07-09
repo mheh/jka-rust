@@ -10,10 +10,10 @@ use sp_qshared::shared::qhandle_t;
 /// Raven wrapper: `cgi_R_DrawRotatePic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, float a, qhandle_t hShader )`
 /// Raven transport: `re.DrawRotatePic( VMF(1), VMF(2), VMF(3), VMF(4), VMF(5), VMF(6), VMF(7), VMF(8), VMF(9), args[10] );`
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:145`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:414-417`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:726-728`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:726-728`
+/// Enum value source: `oracle/code/cgame/cg_public.h:145`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:414-417`
+/// Output source: `oracle/code/client/cl_cgame.cpp:726-728`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:726-728`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRDrawrotatepicArgs {
     x: f32,
@@ -98,10 +98,10 @@ impl CgRDrawrotatepicArgs {
 
 /// `CG_R_DRAWROTATEPIC` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:145`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:414-417`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:726-728`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:726-728`
+/// Enum value source: `oracle/code/cgame/cg_public.h:145`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:414-417`
+/// Output source: `oracle/code/client/cl_cgame.cpp:726-728`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:726-728`
 pub struct CgRDrawrotatepic;
 
 impl OutboundSysCall for CgRDrawrotatepic {

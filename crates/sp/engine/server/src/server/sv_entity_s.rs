@@ -6,14 +6,14 @@ use super::world_sector_s::worldSector_t;
 
 /// Raven `MAX_ENT_CLUSTERS`.
 ///
-/// Type definition source: `oracle/oracle/code/server/server.h:29`
+/// Type definition source: `oracle/code/server/server.h:29`
 pub const MAX_ENT_CLUSTERS: usize = 16;
 
 /// Raven `svEntity_t` — server-side per-entity bookkeeping (world linkage,
 /// baseline for delta compression, PVS cluster caching).
 ///
 /// Raven: non-Xbox variant (`_XBOX` undefined) is the one this codebase ports.
-/// Type definition source: `oracle/oracle/code/server/server.h:22-40`
+/// Type definition source: `oracle/code/server/server.h:22-40`
 #[repr(C)]
 pub struct svEntity_t {
     pub worldSector: *mut worldSector_t,

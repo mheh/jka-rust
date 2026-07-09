@@ -9,8 +9,8 @@ their `game` / `cgame` / `ui` modules, the engine subsystems (`qcommon`,
 host binaries. The end goal is a drop-in Rust replacement that a real engine can
 load and, eventually, a fully native Rust engine.
 
-Behavior is verified against the faithful 1:1 port under `oracle/` by
-differential testing (`--features oracle`).
+Behavior is verified against the Raven source under `oracle/` by differential
+testing (golden fixtures + the A/B referee).
 
 ## Core idea: sharing is a dependency edge, not a folder
 

@@ -11,10 +11,10 @@ use abi_transport::generic::{
 /// Raven transport: `return G2API_GetNumGoreMarks(&g2[args[2]]);` under `_G2_GORE`,
 /// otherwise the switch returns `0`.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:279`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:920-922`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1450-1457`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1450-1457`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:279`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:920-922`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1450-1457`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1450-1457`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2GetnumgoremarksArgs {
     /// Raw Ghoul2 handle word, decoded by Raven as `args[1]`.
@@ -38,10 +38,10 @@ impl CgG2GetnumgoremarksArgs {
 /// `modelIndex` as raw `args[2]`; the `_G2_GORE` switch arm returns the
 /// int-compatible count, otherwise `0`.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:279`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:920-922`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1450-1457`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1450-1457`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:279`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:920-922`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1450-1457`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1450-1457`
 pub struct CgG2Getnumgoremarks;
 
 impl OutboundSysCall for CgG2Getnumgoremarks {

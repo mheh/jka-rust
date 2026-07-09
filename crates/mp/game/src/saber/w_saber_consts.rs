@@ -1,7 +1,7 @@
 //! MP `w_saber.h` free-standing `#define` constants and the anonymous
 //! force-jump-direction enum.
 //!
-//! Source: `oracle/oracle/codemp/game/w_saber.h`
+//! Source: `oracle/codemp/game/w_saber.h`
 
 use core::ffi::c_int;
 
@@ -12,7 +12,7 @@ pub const SEF_HITWALL: c_int = 0x4; // Hit a wall
 pub const SEF_PARRIED: c_int = 0x8; // Parried a saber swipe
 pub const SEF_DEFLECTED: c_int = 0x10; // Deflected a missile or saberInFlight
 pub const SEF_BLOCKED: c_int = 0x20; // Was blocked by a parry
-/// Raven `SEF_EVENTS`. Source: `oracle/oracle/codemp/game/w_saber.h:10`
+/// Raven `SEF_EVENTS`. Source: `oracle/codemp/game/w_saber.h:10`
 pub const SEF_EVENTS: c_int =
     SEF_HITENEMY | SEF_HITOBJECT | SEF_HITWALL | SEF_PARRIED | SEF_DEFLECTED | SEF_BLOCKED;
 pub const SEF_LOCKED: c_int = 0x40; // Sabers locked with someone else
@@ -45,7 +45,7 @@ pub const MAX_DRAIN_DISTANCE: c_int = 512;
 /// in C), so these are ordinary file-scope enum constants; ported as plain
 /// `c_int` consts per enum-vs-alias fidelity.
 ///
-/// Source: `oracle/oracle/codemp/game/w_saber.h:35-41`
+/// Source: `oracle/codemp/game/w_saber.h:35-41`
 pub const FJ_FORWARD: c_int = 0;
 pub const FJ_BACKWARD: c_int = 1;
 pub const FJ_RIGHT: c_int = 2;

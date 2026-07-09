@@ -24,7 +24,7 @@ impl GBotCalculatepathsArgs {
 /// `G_BOT_CALCULATEPATHS` MP game imports syscall ABI token.
 ///
 /// Raven: Ghoul2 Insert End
-/// Source: `oracle/oracle/codemp/game/g_public.h:576`
+/// Source: `oracle/codemp/game/g_public.h:576`
 pub struct GBotCalculatepaths;
 
 impl OutboundSysCall for GBotCalculatepaths {

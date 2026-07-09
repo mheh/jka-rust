@@ -53,7 +53,7 @@ impl UiG2SetskinArgs {
 
 /// `UI_G2_SETSKIN` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:515`
+/// Source: `oracle/codemp/ui/ui_public.h:515`
 pub struct UiG2Setskin;
 
 impl OutboundSysCall for UiG2Setskin {

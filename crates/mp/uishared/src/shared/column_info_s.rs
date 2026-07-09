@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 /// Raven `columnInfo_s` — a single column layout within a list box.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:166-170`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:166-170`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct columnInfo_s {
@@ -15,7 +15,7 @@ pub struct columnInfo_s {
 
 /// Raven `columnInfo_t` — `typedef struct columnInfo_s columnInfo_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:166-170`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:166-170`
 pub type columnInfo_t = columnInfo_s;
 
 const _: () = assert!(core::mem::size_of::<columnInfo_t>() == 12);

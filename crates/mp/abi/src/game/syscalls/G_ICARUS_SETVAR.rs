@@ -48,7 +48,7 @@ impl GIcarusSetvarArgs {
 
 /// `G_ICARUS_SETVAR` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:267`
+/// Source: `oracle/codemp/game/g_public.h:267`
 pub struct GIcarusSetvar;
 
 impl OutboundSysCall for GIcarusSetvar {

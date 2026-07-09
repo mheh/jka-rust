@@ -21,7 +21,7 @@ impl GSinArgs {
 
 /// `G_SIN` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:279`
+/// Source: `oracle/codemp/game/g_public.h:279`
 pub struct GSin;
 
 impl OutboundSysCall for GSin {

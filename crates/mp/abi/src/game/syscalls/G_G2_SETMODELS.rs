@@ -42,7 +42,7 @@ impl GG2SetmodelsArgs {
 
 /// `G_G2_SETMODELS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:510`
+/// Source: `oracle/codemp/game/g_public.h:510`
 pub struct GG2Setmodels;
 
 impl OutboundSysCall for GG2Setmodels {

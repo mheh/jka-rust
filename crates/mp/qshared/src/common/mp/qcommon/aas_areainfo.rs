@@ -1,6 +1,6 @@
 //! MP `aas_areainfo_t` copied from Raven `codemp/game/be_aas.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/be_aas.h:135-144`
+//! Source: `oracle/codemp/game/be_aas.h:135-144`
 
 #![allow(non_camel_case_types)]
 

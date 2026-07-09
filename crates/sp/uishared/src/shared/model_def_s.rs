@@ -7,7 +7,7 @@ use sp_qshared::shared::vec3_t;
 /// Raven `modelDef_s` (typedef `modelDef_t`) — a 3D model preview definition
 /// used by UI item defs.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_shared.h:350-365`
+/// Type definition source: `oracle/code/ui/ui_shared.h:350-365`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct modelDef_s {

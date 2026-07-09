@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 /// Raven `editFieldDef_s` — edit field limits for a text/numeric field.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_shared.h:71-79`
+/// Type definition source: `oracle/code/ui/ui_shared.h:71-79`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct editFieldDef_s {
@@ -22,7 +22,7 @@ pub struct editFieldDef_s {
 
 /// Raven `editFieldDef_t` — `typedef struct editFieldDef_s editFieldDef_t`.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_shared.h:71-79`
+/// Type definition source: `oracle/code/ui/ui_shared.h:71-79`
 pub type editFieldDef_t = editFieldDef_s;
 
 const _: () = assert!(core::mem::size_of::<editFieldDef_t>() == 28);

@@ -34,7 +34,7 @@ impl GG2Removeghoul2ModelArgs {
 
 /// `G_G2_REMOVEGHOUL2MODEL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:527`
+/// Source: `oracle/codemp/game/g_public.h:527`
 pub struct GG2Removeghoul2Model;
 
 impl OutboundSysCall for GG2Removeghoul2Model {

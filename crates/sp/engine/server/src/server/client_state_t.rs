@@ -3,7 +3,7 @@
 /// Raven `clientState_t` — the state of a client connection.
 ///
 /// Raven: enumerates connection states from free to actively playing.
-/// Type definition source: `oracle/oracle/code/server/server.h:89-96`
+/// Type definition source: `oracle/code/server/server.h:89-96`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum clientState_t {

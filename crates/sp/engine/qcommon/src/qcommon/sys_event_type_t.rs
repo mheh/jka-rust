@@ -3,7 +3,7 @@
 /// Raven `sysEventType_t` — system event type enumeration.
 ///
 /// Raven: .
-/// Type definition source: `oracle/oracle/code/qcommon/qcommon.h:734-742`
+/// Type definition source: `oracle/code/qcommon/qcommon.h:734-742`
 #[repr(i32)]
 pub enum sysEventType_t {
 	SE_NONE,			// evTime is still valid

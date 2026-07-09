@@ -5,7 +5,7 @@ use super::image_s::image_t;
 /// Raven `subImageCommand_t` — render-command to upload a sub-rectangle of
 /// pixel `data` into `image` at `width` x `height`.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:1992-1998`
+/// Type definition source: `oracle/code/renderer/tr_local.h:1992-1998`
 #[repr(C)]
 pub struct subImageCommand_t {
     pub commandId: i32,

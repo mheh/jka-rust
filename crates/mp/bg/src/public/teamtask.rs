@@ -1,6 +1,6 @@
 //! MP `bg_public.h` team objective task enumeration.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:1034-1043`
+//! Type definition source: `oracle/codemp/game/bg_public.h:1034-1043`
 
 #![allow(non_camel_case_types)]
 
@@ -8,7 +8,7 @@
 ///
 /// Raven: Enumeration defining team-oriented objectives and tasks that can be
 /// assigned to players in team-based game modes.
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:1034-1043`
+/// Type definition source: `oracle/codemp/game/bg_public.h:1034-1043`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum teamtask_t {

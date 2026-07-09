@@ -2,7 +2,7 @@
 
 /// Raven `ffFX_e` — force-feedback effect types.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/fffx.h:13-57`
+/// Type definition source: `oracle/codemp/client/fffx.h:13-57`
 #[repr(i32)]
 pub enum ffFX_e {
 	fffx_RandomNoise = 0,

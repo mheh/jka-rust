@@ -4,7 +4,7 @@ use std::ffi::c_int;
 
 /// Raven `weapon_t` — weapon type identifier (int-based alias with enum-like consts).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_weapons.h:8-40`
+/// Type definition source: `oracle/codemp/game/bg_weapons.h:8-40`
 #[allow(non_camel_case_types)]
 pub type weapon_t = c_int;
 

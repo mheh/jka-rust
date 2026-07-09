@@ -15,9 +15,9 @@ use mp_qshared::shared::qhandle_t;
 /// The Raven comment says these polys are intended for simple wall marks, not
 /// significant construction.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:339-340`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2269-2272`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:900-902`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:339-340`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2269-2272`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:900-902`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRAddpolystosceneArgs {
     h_shader: qhandle_t,
@@ -44,10 +44,10 @@ impl CgRAddpolystosceneArgs {
 
 /// `CG_R_ADDPOLYSTOSCENE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:153`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:339-340`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:900-902`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:900-902`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:153`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:339-340`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:900-902`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:900-902`
 pub struct CgRAddpolystoscene;
 
 impl OutboundSysCall for CgRAddpolystoscene {

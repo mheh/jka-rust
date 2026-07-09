@@ -4,10 +4,10 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// `CG_UPDATESCREEN` SP cgame imports syscall ABI token.
 ///
 /// Raven: used during lengthy level loading, so pump message loop.
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:77`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:110-112`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:482-486`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:482-486`
+/// Enum value source: `oracle/code/cgame/cg_public.h:77`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:110-112`
+/// Output source: `oracle/code/client/cl_cgame.cpp:482-486`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:482-486`
 pub struct CgUpdatescreen;
 
 impl OutboundSysCall for CgUpdatescreen {

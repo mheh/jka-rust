@@ -34,7 +34,7 @@ impl GameClientDisconnectArgs {
 /// `GAME_CLIENT_DISCONNECT` MP game exports vmMain ABI token.
 ///
 /// Raven: ( int clientNum );
-/// Source: `oracle/oracle/codemp/game/g_public.h:750`
+/// Source: `oracle/codemp/game/g_public.h:750`
 pub struct GameClientDisconnect;
 
 impl InboundVmCall for GameClientDisconnect {

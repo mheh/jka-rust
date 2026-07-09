@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven's MP client switch reads `dest` with `VMA(1)`, `src` with `VMA(2)`,
 /// and `count` from `args[3]`, then calls C `strncpy`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_cgame.cpp:656`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:655`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:284`
+/// Args source: `oracle/codemp/client/cl_cgame.cpp:656`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:655`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:284`
 #[derive(Debug)]
 pub struct CgameStrncpyArgs {
     dest: *mut c_char,
@@ -46,10 +46,10 @@ impl CgameStrncpyArgs {
 
 /// `CGAME_STRNCPY` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:132`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:656`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:655`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:284`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:132`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:656`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:655`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:284`
 pub struct CgameStrncpy;
 
 impl OutboundSysCall for CgameStrncpy {

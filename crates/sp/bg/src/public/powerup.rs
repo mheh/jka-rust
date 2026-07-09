@@ -1,6 +1,6 @@
 //! SP `bg_public.h` powerup definitions.
 //!
-//! Type definition source: `oracle/oracle/code/game/bg_public.h:248-267`
+//! Type definition source: `oracle/code/game/bg_public.h:248-267`
 
 #![allow(non_camel_case_types)]
 
@@ -11,7 +11,7 @@
 /// (e.g. `PW_HASTE`, `PW_UNCLOAKING`, `PW_DISRUPTION`, `PW_GALAK_SHIELD`,
 /// `PW_SEEKER`, `PW_SHOCKED`, `PW_DRAINED`, `PW_INVINCIBLE`, `PW_FORCE_PUSH*`
 /// replace MP's flag/force-power powerups).
-/// Type definition source: `oracle/oracle/code/game/bg_public.h:248-267`
+/// Type definition source: `oracle/code/game/bg_public.h:248-267`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum powerup_t {

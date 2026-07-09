@@ -8,7 +8,7 @@
 /// comment: "fixme, added a bunch that aren't here!"); the commented-out
 /// `"EV_POWERUP_REGEN"` line is dropped, matching the live C array.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_misc.c:2464-2623`
+/// Source: `oracle/codemp/game/bg_misc.c:2464-2623`
 pub static eventnames: [&str; 116] = [
     "EV_NONE",
     "EV_CLIENTJOIN",

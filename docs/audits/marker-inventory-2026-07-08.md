@@ -80,7 +80,7 @@ PORT-NOTE section is a plain re-grep (not audited); each entry shows its
 
 ### crates/mp/engine/qcommon/src/lib.rs
 - L1: module mp_engine_qcommon
-  - Validator's claim does not hold. The current one-line form `//! \`mp_engine_qcommon\` crate. //TODO: Port module mp_engine_qcommon` (no separate Source line, subject = crate name) is the established, uniformly-replicated house convention for crate-level module docs: grep shows the identical pattern verbatim across the other crates' lib.rs files (mp_ui, mp_renderer, mp_uishared, mp_engine_icarus, mp_engine_ghoul2, mp_engine_server, mp_engine_botlib, mp_engine_client, mp_cgame, sp_ui, sp_renderer, sp_bg, sp_uishared, sp_engine_icarus, sp_engine_ghoul2, sp_engine_server, sp_engine_qcommon, sp_engine_client, sp_cgame, native_containers, plus multi-line variants in mp_bg/sp_game with the same no-Source, crate-name-subject shape). None of these sibling markers carry a `// Source:` line or use an oracle-directory subject like `qcommon`. Rewriting only this file to the validator's proposed 3-line form with subject `qcommon` and a `// Source: oracle/oracle/codemp/qcommon/` line would make it the sole outlier in an otherwise perfectly consistent set — this reads as an intentional crate-level convention (whole-crate placeholder, not a single Raven identifier with a citable source line), not a per-file formatting defect. Fixing it unilaterally in isolation from its siblings would be a systemic style change outside this file's scope, so it is left untouched rather than apply a fix that contradicts the codebase's own established pattern.
+  - Validator's claim does not hold. The current one-line form `//! \`mp_engine_qcommon\` crate. //TODO: Port module mp_engine_qcommon` (no separate Source line, subject = crate name) is the established, uniformly-replicated house convention for crate-level module docs: grep shows the identical pattern verbatim across the other crates' lib.rs files (mp_ui, mp_renderer, mp_uishared, mp_engine_icarus, mp_engine_ghoul2, mp_engine_server, mp_engine_botlib, mp_engine_client, mp_cgame, sp_ui, sp_renderer, sp_bg, sp_uishared, sp_engine_icarus, sp_engine_ghoul2, sp_engine_server, sp_engine_qcommon, sp_engine_client, sp_cgame, native_containers, plus multi-line variants in mp_bg/sp_game with the same no-Source, crate-name-subject shape). None of these sibling markers carry a `// Source:` line or use an oracle-directory subject like `qcommon`. Rewriting only this file to the validator's proposed 3-line form with subject `qcommon` and a `// Source: oracle/codemp/qcommon/` line would make it the sole outlier in an otherwise perfectly consistent set — this reads as an intentional crate-level convention (whole-crate placeholder, not a single Raven identifier with a citable source line), not a per-file formatting defect. Fixing it unilaterally in isolation from its siblings would be a systemic style change outside this file's scope, so it is left untouched rather than apply a fix that contradicts the codebase's own established pattern.
 
 ### crates/mp/engine/server/src/lib.rs
 - L1: module mp_engine_server
@@ -431,16 +431,16 @@ PORT-NOTE section is a plain re-grep (not audited); each entry shows its
 - L13 [LEGIT]: /// TODO: SP transport evidence for float ABI is still missing; this mirrors MP float syscall pattern.
 
 ### crates/sp/abi/src/ui/syscalls/UI_FLOOR.rs
-- L13 [LEGIT]: /// TODO: SP `oracle/oracle/code/client/cl_ui.cpp` does not include a `UI_FLOOR` case in its visible switch
+- L13 [LEGIT]: /// TODO: SP `oracle/code/client/cl_ui.cpp` does not include a `UI_FLOOR` case in its visible switch
 
 ### crates/sp/abi/src/ui/syscalls/UI_FS_FCLOSEFILE.rs
 - L12 [LEGIT]: /// TODO: using MP transport parity until SP table entry is confirmed.
 
 ### crates/sp/abi/src/ui/syscalls/UI_FS_READ.rs
-- L17 [LEGIT]: /// TODO: SP `oracle/oracle/code/client/cl_ui.cpp` has no `UI_FS_READ` case in this branch.
+- L17 [LEGIT]: /// TODO: SP `oracle/code/client/cl_ui.cpp` has no `UI_FS_READ` case in this branch.
 
 ### crates/sp/abi/src/ui/syscalls/UI_FS_WRITE.rs
-- L17 [LEGIT]: /// TODO: SP `oracle/oracle/code/client/cl_ui.cpp` has no `UI_FS_WRITE` case in this branch.
+- L17 [LEGIT]: /// TODO: SP `oracle/code/client/cl_ui.cpp` has no `UI_FS_WRITE` case in this branch.
 
 ### crates/sp/abi/src/ui/syscalls/UI_SIN.rs
 - L13 [LEGIT]: /// TODO: SP UI transport evidence for this call is currently missing in
@@ -452,7 +452,7 @@ PORT-NOTE section is a plain re-grep (not audited); each entry shows its
 - L16 [LEGIT]: /// TODO: SP-side `UI_STRNCPY` transport is known only via fallback (`TRAP_STRNCPY`) evidence.
 
 ### crates/sp/abi/src/ui/syscalls/UI_S_STARTLOCALSOUND.rs
-- L15 [LEGIT]: /// TODO: SP transport path does not provide a direct `UI_S_STARTLOCALSOUND` case in `oracle/oracle/code/client/cl_ui.cpp`.
+- L15 [LEGIT]: /// TODO: SP transport path does not provide a direct `UI_S_STARTLOCALSOUND` case in `oracle/code/client/cl_ui.cpp`.
 
 
 ## NOTE (486)

@@ -19,7 +19,7 @@ use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, Vm
 /// Raven: that is not recognized as a builtin function.
 /// Raven: The game can issue trap_argc() / trap_argv() commands to get the command
 /// Raven: and parameters.  Return qfalse if the game doesn't recognize it as a command.
-/// Source: `oracle/oracle/codemp/game/g_public.h:758`
+/// Source: `oracle/codemp/game/g_public.h:758`
 pub struct GameConsoleCommand;
 
 impl InboundVmCall for GameConsoleCommand {

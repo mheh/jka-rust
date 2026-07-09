@@ -8,18 +8,18 @@ use sp_qshared::shared::{connstate_t, qboolean, qhandle_t};
 
 /// Raven `MAX_OSPATH` — max length of a filesystem pathname.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:216`
+/// Source: `oracle/code/game/q_shared.h:216`
 const MAX_OSPATH: usize = 260;
 
 /// Raven `MAX_INFO_STRING`.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:210`
+/// Source: `oracle/code/game/q_shared.h:210`
 const MAX_INFO_STRING: usize = 1024;
 
 /// Raven `clientStatic_t` — client state not wiped across level loads; the
 /// only persistent client state.
 ///
-/// Type definition source: `oracle/oracle/code/client/client.h:193-229`
+/// Type definition source: `oracle/code/client/client.h:193-229`
 #[repr(C)]
 pub struct clientStatic_t {
 	/// Raven: connection status

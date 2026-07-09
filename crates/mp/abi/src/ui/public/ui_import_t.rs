@@ -3,7 +3,7 @@
 /// Raven `uiImport_t` — UI module import table of engine syscalls.
 ///
 /// Raven: Engine syscall indices for the UI module to call into the engine.
-/// Type definition source: `oracle/oracle/codemp/ui/ui_public.h:17-192`
+/// Type definition source: `oracle/codemp/ui/ui_public.h:17-192`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum uiImport_t {

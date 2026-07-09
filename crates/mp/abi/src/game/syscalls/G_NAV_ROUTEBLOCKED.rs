@@ -40,7 +40,7 @@ impl GNavRouteblockedArgs {
 
 /// `G_NAV_ROUTEBLOCKED` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:328`
+/// Source: `oracle/codemp/game/g_public.h:328`
 pub struct GNavRouteblocked;
 
 impl OutboundSysCall for GNavRouteblocked {

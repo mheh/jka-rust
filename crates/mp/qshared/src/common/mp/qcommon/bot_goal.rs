@@ -1,6 +1,6 @@
 //! MP `bot_goal_t` copied from Raven `codemp/game/be_ai_goal.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/be_ai_goal.h:25-34`
+//! Source: `oracle/codemp/game/be_ai_goal.h:25-34`
 
 #![allow(non_camel_case_types)]
 

@@ -6,7 +6,7 @@ use super::player_team_state_state_t::playerTeamStateState_t;
 
 /// Raven `playerTeamState_t` — status in teamplay games.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:275-289`
+/// Type definition source: `oracle/code/game/g_shared.h:275-289`
 #[repr(C)]
 pub struct playerTeamState_t {
     pub state: playerTeamStateState_t,

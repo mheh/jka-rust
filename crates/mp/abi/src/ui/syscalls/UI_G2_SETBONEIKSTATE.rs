@@ -63,7 +63,7 @@ impl UiG2SetboneikstateArgs {
 
 /// `UI_G2_SETBONEIKSTATE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:559`
+/// Source: `oracle/codemp/ui/ui_public.h:559`
 pub struct UiG2Setboneikstate;
 
 impl OutboundSysCall for UiG2Setboneikstate {

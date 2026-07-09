@@ -12,9 +12,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven transport: forwards `org` through `VMA(1)` and scalar values through
 /// `VMF(2..5)`, then returns 0.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:352-353`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2274`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:908-914`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:352-353`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2274`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:908-914`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRAddlighttosceneArgs {
     org: *const vec3_t,
@@ -38,10 +38,10 @@ impl CgRAddlighttosceneArgs {
 
 /// `CG_R_ADDLIGHTTOSCENE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:156`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:352-353`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:908-914`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:908-914`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:156`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:352-353`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:908-914`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:908-914`
 pub struct CgRAddlighttoscene;
 
 impl OutboundSysCall for CgRAddlighttoscene {

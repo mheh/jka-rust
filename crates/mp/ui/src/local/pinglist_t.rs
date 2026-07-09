@@ -4,7 +4,7 @@ use core::ffi::c_char;
 
 /// Raven `pinglist_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:654-657`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:654-657`
 #[repr(C)]
 pub struct pinglist_t {
 	pub adrstr: [c_char; 64],

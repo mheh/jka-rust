@@ -6,7 +6,7 @@ use super::structdef_s::structdef_t;
 
 /// Raven `fielddef_t` — a single field description in a botlib struct definition.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/l_struct.h:31-40`
+/// Type definition source: `oracle/codemp/botlib/l_struct.h:31-40`
 #[repr(C)]
 pub struct fielddef_t {
 	pub name: *mut c_char, //name of the field

@@ -35,7 +35,7 @@ impl GG2SetneworiginArgs {
 
 /// `G_G2_SETNEWORIGIN` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:535`
+/// Source: `oracle/codemp/game/g_public.h:535`
 pub struct GG2Setneworigin;
 
 impl OutboundSysCall for GG2Setneworigin {

@@ -2,7 +2,7 @@
 
 /// Raven `WL_e` system-wide print levels.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:428-433`
+/// Type definition source: `oracle/codemp/game/q_shared.h:428-433`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WL_e {

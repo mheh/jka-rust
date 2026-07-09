@@ -4,7 +4,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `aas_area_t` — an AAS area.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:188-197`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:188-197`
 #[repr(C)]
 pub struct aas_area_t {
 	/// number of this area

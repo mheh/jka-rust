@@ -5,7 +5,7 @@
 /// SP-vs-MP: SP declares this as a named `typedef enum` (a real enum); MP declares
 /// it as `typedef int` with a separate anonymous enum of constants.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2671-2679`
+/// Type definition source: `oracle/code/game/q_shared.h:2671-2679`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum e_status {

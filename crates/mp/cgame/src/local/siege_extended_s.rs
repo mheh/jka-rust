@@ -2,7 +2,7 @@
 
 /// Raven `siegeExtended_t` — cached siege-mode HUD extras for an entity.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:1611-1618`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:1611-1618`
 #[repr(C)]
 pub struct siegeExtended_t {
 	pub health: i32,

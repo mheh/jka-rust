@@ -25,7 +25,7 @@ impl UiG2CleanmodelsArgs {
 
 /// `UI_G2_CLEANMODELS` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:529`
+/// Source: `oracle/codemp/ui/ui_public.h:529`
 pub struct UiG2Cleanmodels;
 
 impl OutboundSysCall for UiG2Cleanmodels {

@@ -1,6 +1,6 @@
 //! SP qcommon platform API dispatch.
 //!
-//! Source: `oracle/oracle/code/qcommon/platform.h:1-17`
+//! Source: `oracle/code/qcommon/platform.h:1-17`
 //!
 //! NOTE: Platform compatibility aliases (`LPCTSTR`, `LPCSTR`, `DWORD`, `UINT`,
 //! `HANDLE`, `COLORREF`, `BYTE`) moved to `crate::shared::platform`.

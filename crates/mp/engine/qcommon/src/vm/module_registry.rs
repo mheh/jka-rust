@@ -16,7 +16,7 @@ pub const MAX_VM: usize = 3;
 /// The `vmTable[MAX_VM]` replacement — per-slot only, no current-module global
 /// (LOAD-D5). Home crate mirrors `vm.cpp`'s subsystem.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/vm.cpp:28-29`
+/// Source: `oracle/codemp/qcommon/vm.cpp:28-29`
 pub struct ModuleRegistry {
     slots: [Option<ModuleSlot>; MAX_VM],
 }
@@ -63,7 +63,7 @@ impl ModuleRegistry {
     /// `sv_game.cpp:1750-1752`). The slot-full/bad-parms `ERR_FATAL`s stay INSIDE
     /// via the receiverless `com_error` (LOAD-D11).
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:471-524`
+    /// Source: `oracle/codemp/qcommon/vm.cpp:471-524`
     pub fn load_module(
         &mut self,
         policy: &ModuleSearchPolicy,
@@ -112,7 +112,7 @@ impl ModuleRegistry {
     /// `VM_Free` (`vm.cpp:605-610`): `unload_module` the slot's module, clearing
     /// it. No global `currentVM`/`lastVM` clobber (LOAD-D5).
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:605-610`
+    /// Source: `oracle/codemp/qcommon/vm.cpp:605-610`
     pub fn unload(&mut self, slot: SlotId) {
         if let Some(s) = self.slots[slot.0 as usize].take() {
             native_platform::module_loader::unload_module(s.module);
@@ -128,7 +128,7 @@ impl ModuleRegistry {
     ///
     /// PROVISIONAL SIGNATURE (checkpoint-7 finding): no frozen doc pins a
     /// `VM_Call` dual; minimal faithful shape pending its doc home.
-    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:787-819`
+    /// Source: `oracle/codemp/qcommon/vm.cpp:787-819`
     pub fn vm_call(
         &self,
         slot: &SlotId,
@@ -153,7 +153,7 @@ impl ModuleRegistry {
     /// re-running `VM_Create` (`vm.cpp:399-409`) — the frozen signature is
     /// unchanged by resolution 2.
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:391-458`
+    /// Source: `oracle/codemp/qcommon/vm.cpp:391-458`
     pub fn restart(
         &mut self,
         slot: SlotId,
@@ -163,6 +163,6 @@ impl ModuleRegistry {
         syscall: RawSyscall,
     ) {
         let _ = (&self.slots, slot, kind, policy, name, syscall);
-        todo!("Port VM_Restart — oracle/oracle/codemp/qcommon/vm.cpp:391-458")
+        todo!("Port VM_Restart — oracle/codemp/qcommon/vm.cpp:391-458")
     }
 }

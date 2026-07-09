@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_Mark1.c 1/15
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_Mark1.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Mark1.c`.
 //!
 //! Landed from the `fnskel.py` signature skeleton. One function is
 //! transcribed faithfully from packet + prelude alone; the remaining 15 are
@@ -70,7 +70,7 @@ pub const LSTATE_FIRED4: c_int = 7;
 // signature.
 /// Raven `NPC_Mark1_Precache`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:50-74`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:50-74`
 pub fn NPC_Mark1_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_wakeup".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/shutdown".as_ptr());
@@ -113,7 +113,7 @@ pub fn NPC_Mark1_Precache(ctx: GameContext<'_>) {
 // signature.
 /// Raven `NPC_Mark1_Part_Explode`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:81-102`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:81-102`
 pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: *mut gentity_t, bolt: c_int) {
     if bolt >= 0 {
         unsafe {
@@ -162,7 +162,7 @@ pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: *mut gentity_t, bolt:
 // globals; no channel from this context-free faithful signature.
 /// Raven `Mark1_Idle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:109-115`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:109-115`
 pub fn Mark1_Idle(ctx: GameContext<'_>) {
     unsafe {
         crate::NPC_AI_Default::NPC_BSIdle(ctx);
@@ -184,7 +184,7 @@ pub fn Mark1_Idle(ctx: GameContext<'_>) {
 // channel from this context-free faithful signature.
 /// Raven `Mark1Dead_FireRocket`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:123-163`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:123-163`
 pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -279,7 +279,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
 // channel from this context-free faithful signature.
 /// Raven `Mark1Dead_FireBlaster`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:171-202`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:171-202`
 pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -358,7 +358,7 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
 // through it.
 /// Raven `Mark1_die`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:209-243`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:209-243`
 pub fn Mark1_die(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -414,7 +414,7 @@ pub fn Mark1_die(
 // invent a shape the packet doesn't sanction.
 /// Raven `Mark1_dying`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:250-312`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:250-312`
 pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if self_.is_null() {
@@ -493,7 +493,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
 // pointer (needs an EntXxx enum variant).
 /// Raven `NPC_Mark1_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:320-396`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:320-396`
 pub fn NPC_Mark1_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -632,7 +632,7 @@ pub fn NPC_Mark1_Pain(
 // writes `NPCInfo`; no channel from this context-free faithful signature.
 /// Raven `Mark1_Hunt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:404-416`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:404-416`
 pub fn Mark1_Hunt(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -660,7 +660,7 @@ pub fn Mark1_Hunt(ctx: GameContext<'_>) {
 // signature.
 /// Raven `Mark1_FireBlaster`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:424-488`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:424-488`
 pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -798,7 +798,7 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
 // globals; no channel from this context-free faithful signature.
 /// Raven `Mark1_BlasterAttack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:495-548`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:495-548`
 pub fn Mark1_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -870,7 +870,7 @@ pub fn Mark1_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
 // cross-frame state); no channel from this context-free faithful signature.
 /// Raven `Mark1_FireRocket`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:555-599`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:555-599`
 pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -975,7 +975,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
 // from this context-free faithful signature.
 /// Raven `Mark1_RocketAttack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:606-618`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:606-618`
 pub fn Mark1_RocketAttack(ctx: GameContext<'_>, advance: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1009,7 +1009,7 @@ pub fn Mark1_RocketAttack(ctx: GameContext<'_>, advance: qboolean) {
 // from this context-free faithful signature.
 /// Raven `Mark1_AttackDecision`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:625-704`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:625-704`
 pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1120,7 +1120,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
 // `ucmd`; no channel from this context-free faithful signature.
 /// Raven `Mark1_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:711-739`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:711-739`
 pub fn Mark1_Patrol(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1155,7 +1155,7 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
 // writes `NPCInfo`; no channel from this context-free faithful signature.
 /// Raven `NPC_BSMark1_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:747-764`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:747-764`
 pub fn NPC_BSMark1_Default(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;

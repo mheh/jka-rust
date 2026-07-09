@@ -30,7 +30,7 @@ use sp_qshared::shared::{markFragment_t, orientation_t, qboolean, qhandle_t, vec
 /// save-games mainly; `TempRawImage_ReadFromFile` gives access to raw pixels
 /// from a graphics format (TGA/JPG/BMP etc), currently only the save game uses
 /// it (to make raw shots for the autosaves).
-/// Type definition source: `oracle/oracle/code/renderer/tr_public.h:19-139`
+/// Type definition source: `oracle/code/renderer/tr_public.h:19-139`
 #[repr(C)]
 pub struct refexport_t {
     /// called before the library is unloaded

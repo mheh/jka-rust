@@ -20,7 +20,7 @@ impl BotlibAiPopGoalArgs {
 
 /// `BOTLIB_AI_POP_GOAL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:443`
+/// Source: `oracle/codemp/game/g_public.h:443`
 pub struct BotlibAiPopGoal;
 
 impl OutboundSysCall for BotlibAiPopGoal {

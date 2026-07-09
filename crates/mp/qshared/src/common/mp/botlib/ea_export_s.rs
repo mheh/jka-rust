@@ -8,7 +8,7 @@ use super::bot_input_s::bot_input_t;
 
 /// Raven `ea_export_t` — elementary bot action function table.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/botlib.h:255-287`
+/// Type definition source: `oracle/codemp/game/botlib.h:255-287`
 #[repr(C)]
 pub struct ea_export_t {
     // ClientCommand elementary actions

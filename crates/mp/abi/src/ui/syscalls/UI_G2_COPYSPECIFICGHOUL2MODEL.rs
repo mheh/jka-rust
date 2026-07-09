@@ -47,7 +47,7 @@ impl UiG2Copyspecificghoul2ModelArgs {
 
 /// `UI_G2_COPYSPECIFICGHOUL2MODEL` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:524`
+/// Source: `oracle/codemp/ui/ui_public.h:524`
 pub struct UiG2Copyspecificghoul2Model;
 
 impl OutboundSysCall for UiG2Copyspecificghoul2Model {

@@ -8,10 +8,10 @@ use abi_transport::generic::InboundVmCall;
 /// Raven signature in this enum block is shifted; actual signature is
 /// `_UI_MouseEvent( int dx, int dy )`.
 ///
-/// Source (enum): `oracle/oracle/codemp/ui/ui_public.h:228`
-/// Source (args): `oracle/oracle/codemp/ui/ui_main.c:553`
-/// Source (output): `oracle/oracle/codemp/ui/ui_main.c:597` (return 0)
-/// Source (call site/transport): `oracle/oracle/codemp/client/cl_input.cpp:1006`
+/// Source (enum): `oracle/codemp/ui/ui_public.h:228`
+/// Source (args): `oracle/codemp/ui/ui_main.c:553`
+/// Source (output): `oracle/codemp/ui/ui_main.c:597` (return 0)
+/// Source (call site/transport): `oracle/codemp/client/cl_input.cpp:1006`
 pub struct UiMouseEvent;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

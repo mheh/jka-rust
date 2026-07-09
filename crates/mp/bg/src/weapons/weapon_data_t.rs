@@ -2,7 +2,7 @@
 
 /// Raven `weaponData_t` — per-weapon-type data.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_weapons.h:61-84`
+/// Type definition source: `oracle/codemp/game/bg_weapons.h:61-84`
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct weaponData_t {

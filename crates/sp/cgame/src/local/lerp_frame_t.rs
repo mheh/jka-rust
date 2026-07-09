@@ -5,7 +5,7 @@ use sp_qshared::shared::qboolean;
 
 /// Raven `lerpFrame_t` — cgame animation frame interpolation state.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:93-110`
+/// Type definition source: `oracle/code/cgame/cg_local.h:93-110`
 #[repr(C)]
 pub struct lerpFrame_t {
 	pub oldFrame: i32,

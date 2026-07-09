@@ -7,7 +7,7 @@ use crate::l_script::token_s::token_t;
 /// Raven `define_t` — a preprocessor `#define` macro entry.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/codemp/botlib/l_precomp.h:55-66`
+/// Type definition source: `oracle/codemp/botlib/l_precomp.h:55-66`
 #[repr(C)]
 pub struct define_t {
     /// define name

@@ -2,7 +2,7 @@
 
 /// Raven `surfaceType_t` — surface type enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:583-606`
+/// Type definition source: `oracle/code/renderer/tr_local.h:583-606`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum surfaceType_t {

@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// C ABI: `void trap_R_RenderScene(const refdef_t *fd)`.
 /// Raven's client switch forwards the scene description through `VMA(1)`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:186-187`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:186-187`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:976-977`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:186-187`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:186-187`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:976-977`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRRendersceneArgs {
     pub refdef: *const c_void,
@@ -26,7 +26,7 @@ impl UiRRendersceneArgs {
 
 /// `UI_R_RENDERSCENE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:44`
+/// Source: `oracle/codemp/ui/ui_public.h:44`
 pub struct UiRRenderscene;
 
 impl OutboundSysCall for UiRRenderscene {

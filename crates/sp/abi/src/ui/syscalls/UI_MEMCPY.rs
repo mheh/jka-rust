@@ -9,11 +9,11 @@ use abi_transport::generic::{
 ///
 /// Raven transport: `Com_Memcpy(VMA(1), VMA(2), args[3]); return 0;`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:240`
-/// Args source (fallback): `oracle/oracle/code/client/cl_ui.cpp` does not implement `UI_MEMCPY`;
-/// fallback transport: `oracle/oracle/codemp/client/cl_ui.cpp:822-823`
-/// Shared token source: `oracle/oracle/codemp/qcommon/qcommon.h:282-283`
-/// Output source (fallback): `oracle/oracle/codemp/client/cl_ui.cpp:822-823`
+/// Enum source: `oracle/code/ui/ui_public.h:240`
+/// Args source (fallback): `oracle/code/client/cl_ui.cpp` does not implement `UI_MEMCPY`;
+/// fallback transport: `oracle/codemp/client/cl_ui.cpp:822-823`
+/// Shared token source: `oracle/codemp/qcommon/qcommon.h:282-283`
+/// Output source (fallback): `oracle/codemp/client/cl_ui.cpp:822-823`
 #[derive(Debug)]
 pub struct UiMemcpyArgs {
     /// Destination buffer pointer, read from `VMA(1)`.
@@ -44,7 +44,7 @@ impl UiMemcpyArgs {
 
 /// `UI_MEMCPY` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:240`
+/// Source: `oracle/code/ui/ui_public.h:240`
 pub struct UiMemcpy;
 
 impl OutboundSysCall for UiMemcpy {

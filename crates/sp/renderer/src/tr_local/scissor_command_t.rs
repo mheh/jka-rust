@@ -2,7 +2,7 @@
 
 /// Raven `scissorCommand_t` — render-command to set the GL scissor rect.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:2033-2038`
+/// Type definition source: `oracle/code/renderer/tr_local.h:2033-2038`
 #[repr(C)]
 pub struct scissorCommand_t {
     pub commandId: i32,

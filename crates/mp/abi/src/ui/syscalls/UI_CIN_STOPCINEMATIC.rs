@@ -11,9 +11,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall(UI_CIN_STOPCINEMATIC, handle)`.
 /// Raven transport: `return CIN_StopCinematic(args[1]);`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:409-412`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:1003`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1187-1188`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:409-412`
+/// Args source: `oracle/codemp/ui/ui_local.h:1003`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1187-1188`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCinStopcinematicArgs {
     handle: c_int,
@@ -33,12 +33,12 @@ impl UiCinStopcinematicArgs {
 ///
 /// Raven `e_status` is an integer transport value.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:106`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:105-109`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:409-412`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:1003`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1187-1188`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1187-1188`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:106`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:105-109`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:409-412`
+/// Output source: `oracle/codemp/ui/ui_local.h:1003`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1187-1188`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1187-1188`
 pub struct UiCinStopcinematic;
 
 impl OutboundSysCall for UiCinStopcinematic {

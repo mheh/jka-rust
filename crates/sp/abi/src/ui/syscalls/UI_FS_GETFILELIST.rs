@@ -7,12 +7,12 @@ use abi_transport::generic::{
 
 /// `UI_FS_GETFILELIST` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:169`
-/// Args source: `oracle/oracle/code/ui/ui_public.h:40`
-/// Output source: `oracle/oracle/code/ui/ui_public.h:40`
+/// Enum source: `oracle/code/ui/ui_public.h:169`
+/// Args source: `oracle/code/ui/ui_public.h:40`
+/// Output source: `oracle/code/ui/ui_public.h:40`
 /// Transport/switch source:
-/// - SP `oracle/oracle/code/client/cl_ui.cpp:408`
-/// - MP fallback `oracle/oracle/codemp/client/cl_ui.cpp:929-930`
+/// - SP `oracle/code/client/cl_ui.cpp:408`
+/// - MP fallback `oracle/codemp/client/cl_ui.cpp:929-930`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiFsGetfilelistArgs {
     path: *const c_char,

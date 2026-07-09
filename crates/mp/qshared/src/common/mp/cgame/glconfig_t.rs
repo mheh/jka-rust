@@ -10,7 +10,7 @@ use crate::shared::qboolean;
 /// Raven `glconfig_t` — renderer/GL capabilities the engine fills for modules
 /// (`CG_GETGLCONFIG` / `UI_GETGLCONFIG` copy one across the ABI seam).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:299-325`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:299-325`
 #[repr(C)]
 pub struct glconfig_t {
     pub renderer_string: *const c_char,

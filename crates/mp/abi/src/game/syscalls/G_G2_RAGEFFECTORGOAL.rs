@@ -40,7 +40,7 @@ impl GG2RageffectorgoalArgs {
 
 /// `G_G2_RAGEFFECTORGOAL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:552`
+/// Source: `oracle/codemp/game/g_public.h:552`
 pub struct GG2Rageffectorgoal;
 
 impl OutboundSysCall for GG2Rageffectorgoal {

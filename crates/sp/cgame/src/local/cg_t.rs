@@ -12,19 +12,19 @@ use super::overrides_t::overrides_t;
 
 /// Raven `MAX_PRINTTEXT`.
 ///
-/// Source: `oracle/oracle/code/cgame/cg_local.h:64`
+/// Source: `oracle/code/cgame/cg_local.h:64`
 pub const MAX_PRINTTEXT: usize = 128;
 
 /// Raven `MAX_CAPTIONTEXT`.
 ///
 /// Raven: we don't need 64 now since we don't use this for scroll text, and I
 /// needed to change a hardwired 128 to 256, so...
-/// Source: `oracle/oracle/code/cgame/cg_local.h:65`
+/// Source: `oracle/code/cgame/cg_local.h:65`
 pub const MAX_CAPTIONTEXT: usize = 32;
 
 /// Raven `cg_t` — cgame per-frame local state, the "everything" struct.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:297-503`
+/// Type definition source: `oracle/code/cgame/cg_local.h:297-503`
 #[repr(C)]
 pub struct cg_t {
 	/// incremented each frame

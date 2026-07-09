@@ -10,18 +10,18 @@ use super::stage_vars::{stageVars, SHADER_MAX_VERTEXES};
 
 /// `SHADER_MAX_INDEXES`.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/qfiles.h:11`
+/// Source: `oracle/codemp/qcommon/qfiles.h:11`
 pub const SHADER_MAX_INDEXES: usize = 6 * SHADER_MAX_VERTEXES;
 
 /// `NUM_TEX_COORDS` (`MAXLIGHTMAPS+1`).
 ///
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:1842`
+/// Source: `oracle/codemp/renderer/tr_local.h:1842`
 pub const NUM_TEX_COORDS: usize = 5;
 
 /// Raven `shaderCommands_s` — the tess buffer holding the current draw call's
 /// vertex/index data as it's assembled and rendered.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:1844-1883`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:1844-1883`
 #[repr(C)]
 pub struct shaderCommands_s {
 	pub indexes: [glIndex_t; SHADER_MAX_INDEXES],

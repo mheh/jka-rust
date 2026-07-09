@@ -6,7 +6,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `srfFlare_t` — a lens-flare surface.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:643-648`
+/// Type definition source: `oracle/code/renderer/tr_local.h:643-648`
 #[repr(C)]
 pub struct srfFlare_s {
     pub surfaceType: surfaceType_t,

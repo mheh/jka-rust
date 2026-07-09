@@ -1,5 +1,5 @@
 // PORT-COMPLETE: bg_slidemove.c 5/5
-//! Ported `oracle/oracle/codemp/game/bg_slidemove.c` bodies (pass 3).
+//! Ported `oracle/codemp/game/bg_slidemove.c` bodies (pass 3).
 //!
 //! All five functions are built on the pmove working set that `bg_pmove.rs`
 //! threads as `PmoveContext`: `self.pm`/`self.pml`/
@@ -25,17 +25,17 @@ use mp_qshared::shared::trajectory::trType_t;
 // --- file-local `#defines` from `bg_slidemove.c` (porting-rules per-file
 // convention, cf. `bg_pmove.rs`'s `MIN_WALK_NORMAL`/`PMF_STUCK_TO_WALL`). ---
 
-/// `MAX_IMPACT_TURN_ANGLE`. Source: `oracle/oracle/codemp/game/bg_slidemove.c:48`
+/// `MAX_IMPACT_TURN_ANGLE`. Source: `oracle/codemp/game/bg_slidemove.c:48`
 pub const MAX_IMPACT_TURN_ANGLE: f32 = 45.0;
-/// `MAX_CLIP_PLANES`. Source: `oracle/oracle/codemp/game/bg_slidemove.c:633`
+/// `MAX_CLIP_PLANES`. Source: `oracle/codemp/game/bg_slidemove.c:633`
 pub const MAX_CLIP_PLANES: usize = 5;
-/// `MIN_LANDING_SPEED`. Source: `oracle/oracle/codemp/game/bg_vehicles.h:399`
+/// `MIN_LANDING_SPEED`. Source: `oracle/codemp/game/bg_vehicles.h:399`
 pub const MIN_LANDING_SPEED: f32 = 200.0;
-/// `OVERCLIP`. Source: `oracle/oracle/codemp/game/bg_local.h:10`
+/// `OVERCLIP`. Source: `oracle/codemp/game/bg_local.h:10`
 pub const OVERCLIP: f32 = 1.001;
-/// `STEPSIZE`. Source: `oracle/oracle/codemp/game/bg_public.h:22`
+/// `STEPSIZE`. Source: `oracle/codemp/game/bg_public.h:22`
 pub const STEPSIZE: f32 = 18.0;
-/// `MIN_WALK_NORMAL`. Source: `oracle/oracle/codemp/game/bg_local.h:5`
+/// `MIN_WALK_NORMAL`. Source: `oracle/codemp/game/bg_local.h:5`
 const MIN_WALK_NORMAL: f32 = 0.7;
 // `PMF_STUCK_TO_WALL` local shadow removed in the const sweep — the qshared
 // `pm_flags` canonical (value 16384) reaches this file via `crate::prelude::*`.
@@ -46,7 +46,7 @@ impl PmoveContext<'_> {
     /// Raven `PM_VehicleImpact` — vehicle-vs-world/entity impact damage,
     /// bounce and turn-away reaction (`QAGAME` branch only, see module doc).
     ///
-    /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:49-557`
+    /// Source: `oracle/codemp/game/bg_slidemove.c:49-557`
     pub fn PM_VehicleImpact(&mut self, pEnt: *mut bgEntity_t, trace: *mut trace_t) {
         unsafe {
             let pSelfVeh = ((*pEnt).m_pVehicle as *mut Vehicle_t);
@@ -588,7 +588,7 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_GroundSlideOkay`.
     ///
-    /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:559-580`
+    /// Source: `oracle/codemp/game/bg_slidemove.c:559-580`
     pub fn PM_GroundSlideOkay(&self, zNormal: f32) -> qboolean {
         unsafe {
             let ps = &*(*self.pm).ps;
@@ -613,7 +613,7 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_ClientImpact`.
     ///
-    /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:590-623`
+    /// Source: `oracle/codemp/game/bg_slidemove.c:590-623`
     pub fn PM_ClientImpact(&mut self, trace: *mut trace_t) -> qboolean {
         unsafe {
             let otherEntityNum = (*trace).entityNum as c_int;
@@ -650,7 +650,7 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_SlideMove`.
     ///
-    /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:634-853`
+    /// Source: `oracle/codemp/game/bg_slidemove.c:634-853`
     pub fn PM_SlideMove(&mut self, gravity: qboolean) -> qboolean {
         unsafe {
             let numbumps = 4;
@@ -926,7 +926,7 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_StepSlideMove`.
     ///
-    /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:861-1073`
+    /// Source: `oracle/codemp/game/bg_slidemove.c:861-1073`
     pub fn PM_StepSlideMove(&mut self, mut gravity: qboolean) {
         unsafe {
             let ps = (*self.pm).ps;

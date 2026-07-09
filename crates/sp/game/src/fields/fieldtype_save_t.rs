@@ -2,7 +2,7 @@
 
 /// Raven `fieldtypeSAVE_t` — save field type enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/game/fields.h:31-53`
+/// Type definition source: `oracle/code/game/fields.h:31-53`
 #[repr(i32)]
 pub enum fieldtypeSAVE_t {
 	F_STRING = 0,		// string

@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `syscall(CG_G2_ATTACHINSTANCETOENTNUM, ghoul2, entityNum, server);`
 /// Raven transport: `G2API_AttachInstanceToEntNum(*((CGhoul2Info_v *)args[1]), args[2], (qboolean)args[3]); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1060-1062`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2587`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1620-1623`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1060-1062`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2587`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1620-1623`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2AttachinstancetoentnumArgs {
     ghoul2: *mut c_void,
@@ -33,10 +33,10 @@ impl CgG2AttachinstancetoentnumArgs {
 
 /// `CG_G2_ATTACHINSTANCETOENTNUM` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:321`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1060-1062`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1620-1623`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1620-1623`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:321`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1060-1062`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1620-1623`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1620-1623`
 pub struct CgG2Attachinstancetoentnum;
 
 impl OutboundSysCall for CgG2Attachinstancetoentnum {

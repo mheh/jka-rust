@@ -2,7 +2,7 @@
 
 /// Raven `drawBufferCommand_t`.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:1987-1990`
+/// Type definition source: `oracle/code/renderer/tr_local.h:1987-1990`
 #[repr(C)]
 pub struct drawBufferCommand_t {
     pub commandId: i32,

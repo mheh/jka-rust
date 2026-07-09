@@ -128,7 +128,7 @@ impl UiG2CollisiondetectcacheArgs {
 
 /// `UI_G2_COLLISIONDETECTCACHE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:531`
+/// Source: `oracle/codemp/ui/ui_public.h:531`
 pub struct UiG2Collisiondetectcache;
 
 impl OutboundSysCall for UiG2Collisiondetectcache {

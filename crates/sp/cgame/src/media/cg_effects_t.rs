@@ -5,7 +5,7 @@ use sp_qshared::shared::fxHandle_t;
 /// Raven `cgEffects_t` — cached effect handles for weapon, Force power, and
 /// footstep/landing effects.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_media.h:311-362`
+/// Type definition source: `oracle/code/cgame/cg_media.h:311-362`
 #[repr(C)]
 pub struct cgEffects_t {
     // BRYAR PISTOL

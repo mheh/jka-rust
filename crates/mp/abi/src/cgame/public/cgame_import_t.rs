@@ -2,7 +2,7 @@
 
 /// Raven `cgameImport_t` — cgame syscall import indices.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:56-341`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:56-341`
 #[repr(i32)]
 pub enum cgameImport_t {
 	CG_PRINT = 0,

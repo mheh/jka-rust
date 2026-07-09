@@ -1,5 +1,5 @@
 // PORT-COMPLETE: bg_saber.c 11/33
-//! Port of `oracle/oracle/codemp/game/bg_saber.c`.
+//! Port of `oracle/codemp/game/bg_saber.c`.
 //!
 //! Originally generated as a FAITHFUL signature skeleton by
 //! `tools/closure-prototype/fnskel.py` from the fnsweep manifest; bodies have
@@ -63,43 +63,43 @@ use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::*;
 
 // Per-file `#define` consts (porting-rules convention: cite the Raven #define,
 // keep them local since no shared home exists yet).
-/// `BACK_STAB_DISTANCE`. Source: `oracle/oracle/codemp/game/bg_saber.c:1623`
+/// `BACK_STAB_DISTANCE`. Source: `oracle/codemp/game/bg_saber.c:1623`
 pub const BACK_STAB_DISTANCE: f32 = 128.0;
-/// `FLIPHACK_DISTANCE`. Source: `oracle/oracle/codemp/game/bg_saber.c:1802`
+/// `FLIPHACK_DISTANCE`. Source: `oracle/codemp/game/bg_saber.c:1802`
 pub const FLIPHACK_DISTANCE: f32 = 200.0;
-/// `SABER_ALT_ATTACK_POWER`. Source: `oracle/oracle/codemp/game/bg_saber.c:2112`
+/// `SABER_ALT_ATTACK_POWER`. Source: `oracle/codemp/game/bg_saber.c:2112`
 pub const SABER_ALT_ATTACK_POWER: c_int = 50;
-/// `SABER_ALT_ATTACK_POWER_LR`. Source: `oracle/oracle/codemp/game/bg_saber.c:2113`
+/// `SABER_ALT_ATTACK_POWER_LR`. Source: `oracle/codemp/game/bg_saber.c:2113`
 pub const SABER_ALT_ATTACK_POWER_LR: c_int = 10;
-/// `SABER_ALT_ATTACK_POWER_FB`. Source: `oracle/oracle/codemp/game/bg_saber.c:2114`
+/// `SABER_ALT_ATTACK_POWER_FB`. Source: `oracle/codemp/game/bg_saber.c:2114`
 pub const SABER_ALT_ATTACK_POWER_FB: c_int = 25;
-/// `DIR_*`. Source: `oracle/oracle/codemp/game/bg_public.h:220-225`
+/// `DIR_*`. Source: `oracle/codemp/game/bg_public.h:220-225`
 pub const DIR_RIGHT: c_int = 0;
 pub const DIR_LEFT: c_int = 1;
 pub const DIR_FRONT: c_int = 2;
 pub const DIR_BACK: c_int = 3;
 // `SFL_NO_*` saber flags live canonically in `crate::saber::saber_flags`
 // (reached via the prelude glob); the duplicate local defs were removed to
-// resolve the SFL_* import ambiguity (E0659). Source: `oracle/oracle/codemp/game/q_shared.h:703-712`
+// resolve the SFL_* import ambiguity (E0659). Source: `oracle/codemp/game/q_shared.h:703-712`
 
 /// `SFL2_TRANSITION_DAMAGE`. If set, the blade does damage in start, transition and return anims (like strong style does).
-/// Source: `oracle/oracle/codemp/game/q_shared.h:723`
+/// Source: `oracle/codemp/game/q_shared.h:723`
 pub const SFL2_TRANSITION_DAMAGE: c_int = 1 << 8;
 
 /// `SFL2_TRANSITION_DAMAGE2`. If set, the blade does damage in start, transition and return anims (like strong style does).
-/// Source: `oracle/oracle/codemp/game/q_shared.h:733`
+/// Source: `oracle/codemp/game/q_shared.h:733`
 pub const SFL2_TRANSITION_DAMAGE2: c_int = 1 << 17;
 
 /// `SFL2_NO_MANUAL_DEACTIVATE`. If set, the blades cannot manually be toggled on and off.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:722`
+/// Source: `oracle/codemp/game/q_shared.h:722`
 pub const SFL2_NO_MANUAL_DEACTIVATE: c_int = 1 << 7;
 
 /// `SFL2_NO_MANUAL_DEACTIVATE2`. If set, the blades cannot manually be toggled on and off.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:732`
+/// Source: `oracle/codemp/game/q_shared.h:732`
 pub const SFL2_NO_MANUAL_DEACTIVATE2: c_int = 1 << 16;
 
 // Remaining `SFL2_*` primary/secondary blade-style flags.
-// Source: `oracle/oracle/codemp/game/q_shared.h:715-734`
+// Source: `oracle/codemp/game/q_shared.h:715-734`
 /// `SFL2_NO_WALL_MARKS`. Stops the saber from drawing marks on the world.
 pub const SFL2_NO_WALL_MARKS: c_int = 1 << 0;
 /// `SFL2_NO_DLIGHT`. Stops the saber from drawing a dynamic light.
@@ -140,7 +140,7 @@ pub const SFL2_ALWAYS_BLOCK2: c_int = 1 << 15;
 
 /// Raven `BG_ForcePowerDrain`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:27-100`
+/// Source: `oracle/codemp/game/bg_saber.c:27-100`
 pub fn BG_ForcePowerDrain(ps: *mut playerState_t, forcePower: forcePowers_t, overrideAmt: c_int) {
     unsafe {
         // take away the power
@@ -198,7 +198,7 @@ pub fn BG_ForcePowerDrain(ps: *mut playerState_t, forcePower: forcePowers_t, ove
 ///
 /// Raven: maps a saber quadrant to the "instant attack" saber move that
 /// starts from that quadrant.
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:392-420`
+/// Source: `oracle/codemp/game/bg_saber.c:392-420`
 pub fn PM_AttackMoveForQuad(quad: c_int) -> saberMoveName_t {
     if quad == saberQuadrant_t::Q_B as c_int || quad == saberQuadrant_t::Q_BR as c_int {
         return LS_A_BR2TL;
@@ -228,7 +228,7 @@ pub fn PM_AttackMoveForQuad(quad: c_int) -> saberMoveName_t {
 ///
 /// Raven: picks the attack quadrant implied by the player's forward/right
 /// movement command.
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:650-697`
+/// Source: `oracle/codemp/game/bg_saber.c:650-697`
 pub fn PM_SaberMoveQuadrantForMovement(ucmd: *mut usercmd_t) -> c_int {
     unsafe {
         let rightmove = (*ucmd).rightmove;
@@ -275,7 +275,7 @@ pub fn PM_SaberMoveQuadrantForMovement(ucmd: *mut usercmd_t) -> c_int {
 
 /// Raven `PM_SaberInBounce`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:700-711`
+/// Source: `oracle/codemp/game/bg_saber.c:700-711`
 pub fn PM_SaberInBounce(r#move: c_int) -> qboolean {
     if r#move >= LS_B1_BR && r#move <= LS_B1_BL {
         return 1;
@@ -288,7 +288,7 @@ pub fn PM_SaberInBounce(r#move: c_int) -> qboolean {
 
 /// Raven `PM_SaberAttackChainAngle`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:783-790`
+/// Source: `oracle/codemp/game/bg_saber.c:783-790`
 pub fn PM_SaberAttackChainAngle(move1: c_int, move2: c_int) -> c_int {
     if move1 == -1 || move2 == -1 {
         return -1;
@@ -301,7 +301,7 @@ pub fn PM_SaberAttackChainAngle(move1: c_int, move2: c_int) -> c_int {
 ///
 /// Raven: `torso`/`legs` params are unused in the compiled body (only the
 /// saber-lock frame is ever set here).
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:886-889`
+/// Source: `oracle/codemp/game/bg_saber.c:886-889`
 pub fn PM_SetAnimFrame(gent: *mut playerState_t, frame: c_int, torso: qboolean, legs: qboolean) {
     unsafe {
         (*gent).saberLockFrame = frame;
@@ -310,7 +310,7 @@ pub fn PM_SetAnimFrame(gent: *mut playerState_t, frame: c_int, torso: qboolean, 
 
 /// Raven `BG_CheckIncrementLockAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:1342-1398`
+/// Source: `oracle/codemp/game/bg_saber.c:1342-1398`
 pub fn BG_CheckIncrementLockAnim(anim: c_int, winOrLose: c_int) -> qboolean {
     let mut increment: qboolean = 0; // qfalse //???
                                      // RULE: if you are the first style in the lock anim, you advance from LOSING position to WINNING position
@@ -358,7 +358,7 @@ pub fn BG_CheckIncrementLockAnim(anim: c_int, winOrLose: c_int) -> qboolean {
 
 /// Raven `PM_SaberInBrokenParry`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:1583-1594`
+/// Source: `oracle/codemp/game/bg_saber.c:1583-1594`
 pub fn PM_SaberInBrokenParry(r#move: c_int) -> qboolean {
     if r#move >= LS_V1_BR && r#move <= LS_V1_B_ {
         return 1;
@@ -371,7 +371,7 @@ pub fn PM_SaberInBrokenParry(r#move: c_int) -> qboolean {
 
 /// Raven `PM_BrokenParryForParry`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:1597-1621`
+/// Source: `oracle/codemp/game/bg_saber.c:1597-1621`
 pub fn PM_BrokenParryForParry(r#move: c_int) -> c_int {
     if r#move == LS_PARRY_UP {
         return LS_H1_T_;
@@ -398,7 +398,7 @@ pub fn PM_BrokenParryForParry(r#move: c_int) -> c_int {
 ///
 /// Raven: the entire body is `#if 0`-disabled ("disabling these for MP, they
 /// aren't useful") — the compiled function is unconditionally `return LS_NONE;`.
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:2117-2226`
+/// Source: `oracle/codemp/game/bg_saber.c:2117-2226`
 pub fn PM_CheckPullAttack() -> saberMoveName_t {
     LS_NONE
 }
@@ -410,7 +410,7 @@ pub fn PM_CheckPullAttack() -> saberMoveName_t {
 ///
 /// Raven: returns a pointer to the requested saberNum.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:4100-4141`
+/// Source: `oracle/codemp/game/bg_saber.c:4100-4141`
 // The QAGAME branch reads the game-tier `g_entities` arena, which bg code
 // cannot name; callers thread the arena base in — pmove callers from the
 // `pm->baseEnt` overlay, game-tier callers from `(*ctx.world).g_entities`.
@@ -460,7 +460,7 @@ pub fn BG_MySaber(clientNum: c_int, saberNum: c_int, ents: *mut gentity_t) -> *m
 // ============================================================================
 impl PmoveContext<'_> {
     /// Raven `PM_irand_timesync`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:10-25`
+    /// Source: `oracle/codemp/game/bg_saber.c:10-25`
     pub fn PM_irand_timesync(&mut self, val1: c_int, val2: c_int) -> c_int {
         unsafe {
             let seed = &mut (*self.pm).cmd.serverTime;
@@ -476,7 +476,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `BG_EnoughForcePowerForMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:102-111`
+    /// Source: `oracle/codemp/game/bg_saber.c:102-111`
     pub fn BG_EnoughForcePowerForMove(&mut self, cost: c_int) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -489,7 +489,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberAnimTransitionAnim`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:424-581`
+    /// Source: `oracle/codemp/game/bg_saber.c:424-581`
     pub fn PM_SaberAnimTransitionAnim(&mut self, curmove: c_int, newmove: c_int) -> c_int {
         let mut retmove = newmove;
         if curmove == LS_READY {
@@ -554,7 +554,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CheckStabDown`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:584-648`
+    /// Source: `oracle/codemp/game/bg_saber.c:584-648`
     pub fn PM_CheckStabDown(&mut self) -> saberMoveName_t {
         unsafe {
             let ps = (*self.pm).ps;
@@ -620,7 +620,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberKataDone`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:792-884`
+    /// Source: `oracle/codemp/game/bg_saber.c:792-884`
     pub fn PM_SaberKataDone(&mut self, curmove: c_int, newmove: c_int) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -692,7 +692,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberLockWinAnim`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:891-983`
+    /// Source: `oracle/codemp/game/bg_saber.c:891-983`
     pub fn PM_SaberLockWinAnim(&mut self, victory: qboolean, superBreak: qboolean) -> c_int {
         unsafe {
             let ps = (*self.pm).ps;
@@ -758,7 +758,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberLockLoseAnim`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1000-1126`
+    /// Source: `oracle/codemp/game/bg_saber.c:1000-1126`
     pub fn PM_SaberLockLoseAnim(
         &mut self,
         genemy: *mut playerState_t,
@@ -843,7 +843,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberLockResultAnim`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1128-1232`
+    /// Source: `oracle/codemp/game/bg_saber.c:1128-1232`
     pub fn PM_SaberLockResultAnim(
         &mut self,
         duelist: *mut playerState_t,
@@ -905,7 +905,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberLockBreak`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1234-1340`
+    /// Source: `oracle/codemp/game/bg_saber.c:1234-1340`
     pub fn PM_SaberLockBreak(
         &mut self,
         genemy: *mut playerState_t,
@@ -1002,7 +1002,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberLocked`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1401-1581`
+    /// Source: `oracle/codemp/game/bg_saber.c:1401-1581`
     pub fn PM_SaberLocked(&mut self) {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1138,7 +1138,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CanBackstab`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1625-1655`
+    /// Source: `oracle/codemp/game/bg_saber.c:1625-1655`
     pub fn PM_CanBackstab(&mut self) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1185,7 +1185,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberFlipOverAttackMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1657-1753`
+    /// Source: `oracle/codemp/game/bg_saber.c:1657-1753`
     pub fn PM_SaberFlipOverAttackMove(&mut self) -> saberMoveName_t {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1226,7 +1226,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberBackflipAttackMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1755-1791`
+    /// Source: `oracle/codemp/game/bg_saber.c:1755-1791`
     pub fn PM_SaberBackflipAttackMove(&mut self) -> c_int {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1255,7 +1255,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberDualJumpAttackMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1793-1800`
+    /// Source: `oracle/codemp/game/bg_saber.c:1793-1800`
     pub fn PM_SaberDualJumpAttackMove(&mut self) -> c_int {
         unsafe {
             (*self.pm).cmd.upmove = 0;
@@ -1264,7 +1264,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SomeoneInFront`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1804-1833`
+    /// Source: `oracle/codemp/game/bg_saber.c:1804-1833`
     pub fn PM_SomeoneInFront(&mut self, tr: *mut trace_t) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1310,7 +1310,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberLungeAttackMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1835-1889`
+    /// Source: `oracle/codemp/game/bg_saber.c:1835-1889`
     pub fn PM_SaberLungeAttackMove(&mut self, noSpecials: qboolean) -> saberMoveName_t {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1352,7 +1352,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberJumpAttackMove2`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1891-1945`
+    /// Source: `oracle/codemp/game/bg_saber.c:1891-1945`
     pub fn PM_SaberJumpAttackMove2(&mut self) -> saberMoveName_t {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1384,7 +1384,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberJumpAttackMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1947-1993`
+    /// Source: `oracle/codemp/game/bg_saber.c:1947-1993`
     pub fn PM_SaberJumpAttackMove(&mut self) -> saberMoveName_t {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1425,7 +1425,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_GroundDistance`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:1995-2009`
+    /// Source: `oracle/codemp/game/bg_saber.c:1995-2009`
     pub fn PM_GroundDistance(&mut self) -> f32 {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1450,7 +1450,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_WalkableGroundDistance`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2011-2030`
+    /// Source: `oracle/codemp/game/bg_saber.c:2011-2030`
     pub fn PM_WalkableGroundDistance(&mut self) -> f32 {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1479,7 +1479,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CanDoDualDoubleAttacks`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2033-2056`
+    /// Source: `oracle/codemp/game/bg_saber.c:2033-2056`
     pub fn PM_CanDoDualDoubleAttacks(&mut self) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1503,7 +1503,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CheckEnemyPresence`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2058-2110`
+    /// Source: `oracle/codemp/game/bg_saber.c:2058-2110`
     pub fn PM_CheckEnemyPresence(&mut self, dir: c_int, radius: f32) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1568,7 +1568,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_InSecondaryStyle`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2228-2239`
+    /// Source: `oracle/codemp/game/bg_saber.c:2228-2239`
     pub fn PM_InSecondaryStyle(&mut self) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1584,7 +1584,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberAttackForMovement`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2241-2618`
+    /// Source: `oracle/codemp/game/bg_saber.c:2241-2618`
     pub fn PM_SaberAttackForMovement(&mut self, curmove: saberMoveName_t) -> saberMoveName_t {
         unsafe {
             let mut newmove = LS_NONE;
@@ -1850,7 +1850,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_KickMoveForConditions`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2620-2691`
+    /// Source: `oracle/codemp/game/bg_saber.c:2620-2691`
     pub fn PM_KickMoveForConditions(&mut self) -> c_int {
         unsafe {
             let mut kickMove: c_int = -1;
@@ -1877,7 +1877,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberMoveOkayForKata`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2696-2707`
+    /// Source: `oracle/codemp/game/bg_saber.c:2696-2707`
     pub fn PM_SaberMoveOkayForKata(&mut self) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1892,7 +1892,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CanDoKata`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2709-2748`
+    /// Source: `oracle/codemp/game/bg_saber.c:2709-2748`
     pub fn PM_CanDoKata(&mut self) -> qboolean {
         unsafe {
             if self.PM_InSecondaryStyle() != 0 {
@@ -1928,7 +1928,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CheckAltKickAttack`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2750-2775`
+    /// Source: `oracle/codemp/game/bg_saber.c:2750-2775`
     pub fn PM_CheckAltKickAttack(&mut self) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1955,7 +1955,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SaberPowerCheck`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2785-2800`
+    /// Source: `oracle/codemp/game/bg_saber.c:2785-2800`
     pub fn PM_SaberPowerCheck(&mut self) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -1973,7 +1973,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_CanDoRollStab`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2802-2820`
+    /// Source: `oracle/codemp/game/bg_saber.c:2802-2820`
     pub fn PM_CanDoRollStab(&mut self) -> qboolean {
         unsafe {
             let ps = (*self.pm).ps;
@@ -2002,7 +2002,7 @@ impl PmoveContext<'_> {
     /// packet's job to fix. The single `goto weapChecks;` is transcribed as a
     /// `checkOnlyWeap` early-return split (both goto sites jump to the same
     /// point the fallthrough path reaches next).
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:2836-3800`
+    /// Source: `oracle/codemp/game/bg_saber.c:2836-3800`
     pub fn PM_WeaponLightsaber(&mut self) {
         unsafe {
             let ps = (*self.pm).ps;
@@ -2712,7 +2712,7 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PM_SetSaberMove`.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:3802-4098`
+    /// Source: `oracle/codemp/game/bg_saber.c:3802-4098`
     pub fn PM_SetSaberMove(&mut self, newMove: c_short) {
         unsafe {
             let ps = (*self.pm).ps;
@@ -2941,7 +2941,7 @@ impl PmoveContext<'_> {
     /// `g_entities[clientNum].client->saber[saberNum]`. `gclient_t.saber` is
     /// not yet present on the ported struct — referenced here via the entity
     /// overlay idiom; a fixer must land the field.
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:4100-4141`
+    /// Source: `oracle/codemp/game/bg_saber.c:4100-4141`
     pub fn BG_MySaber(&mut self, clientNum: c_int, saberNum: c_int) -> *mut saberInfo_t {
         unsafe {
             let ent = self.PM_BGEntForNum(clientNum) as *mut gentity_t;

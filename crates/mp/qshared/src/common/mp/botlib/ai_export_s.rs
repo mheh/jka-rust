@@ -15,7 +15,7 @@ use super::weaponinfo_s::weaponinfo_s;
 /// exports) the engine hands to the game module.
 ///
 /// Raven: (unnamed).
-/// Type definition source: `oracle/oracle/codemp/game/botlib.h:289-385`
+/// Type definition source: `oracle/codemp/game/botlib.h:289-385`
 #[repr(C)]
 pub struct ai_export_s {
     //-----------------------------------

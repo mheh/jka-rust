@@ -27,7 +27,7 @@ impl GNavGetedgecostArgs {
 
 /// `G_NAV_GETEDGECOST` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:316`
+/// Source: `oracle/codemp/game/g_public.h:316`
 pub struct GNavGetedgecost;
 
 impl OutboundSysCall for GNavGetedgecost {

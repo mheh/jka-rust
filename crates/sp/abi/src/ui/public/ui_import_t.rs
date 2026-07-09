@@ -2,7 +2,7 @@
 
 /// Raven `uiImport_t` — UI module syscall import enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_public.h:151-248`
+/// Type definition source: `oracle/code/ui/ui_public.h:151-248`
 #[repr(i32)]
 pub enum uiImport_t {
 	UI_ERROR = 0,

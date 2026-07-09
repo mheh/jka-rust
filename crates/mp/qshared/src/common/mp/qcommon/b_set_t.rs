@@ -3,7 +3,7 @@
 /// Raven `bSet_t` — behavior set type for NPC script selection.
 ///
 /// Raven: This should check to matching a behavior state name first, then look for a script.
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:641-664`
+/// Type definition source: `oracle/codemp/game/g_public.h:641-664`
 #[repr(i32)]
 pub enum bSet_t {
 	BSET_INVALID = -1,

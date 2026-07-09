@@ -6,7 +6,7 @@
 /// saber/duel/item commands); it runs `GENCMD_FORCE_HEAL == 1` through
 /// `GENCMD_FORCE_SEEING == 12`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2389-2403`
+/// Type definition source: `oracle/code/game/q_shared.h:2389-2403`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum genCmds_t {

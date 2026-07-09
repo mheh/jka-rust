@@ -3,7 +3,7 @@
 /// Raven `T_G_ICARUS_SET` — ICARUS `set` command payload passed across the
 /// game/engine boundary.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:810-816`
+/// Type definition source: `oracle/codemp/game/g_public.h:810-816`
 #[repr(C)]
 pub struct T_G_ICARUS_SET {
 	pub taskID: i32,

@@ -361,7 +361,7 @@ impl Dispatch<GameGetitemindexbytag> for GameContext<'_> {
 // reads/writes fields in place; the module and engine address the SAME bytes, so
 // out-params (e.g. `GETFLOAT.value`) land back in the engine's view. Each arm
 // reproduces that cast: `&mut gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_X`.
-// Source: `oracle/oracle/codemp/game/g_main.c:557-670`.
+// Source: `oracle/codemp/game/g_main.c:557-670`.
 
 /// libc `strcpy` mirror for the `GAME_ICARUS_GETSTRING` write-back
 /// (`g_main.c:654`, `strcpy(sharedMem->value, crap)`); copies through the NUL.

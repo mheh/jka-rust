@@ -11,8 +11,8 @@ use sp_qshared::shared::qboolean;
 /// Raven wrapper: `qboolean trap_GetSnapshot(int snapshotNumber, snapshot_t *snapshot)`.
 /// SP client switch calls `CL_GetSnapshot(args[1], (snapshot_t *)VMA(2))`.
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:454-455`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:758-759`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:454-455`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:758-759`
 #[derive(Debug)]
 pub struct CgGetsnapshotArgs {
     snapshot_number: c_int,
@@ -43,10 +43,10 @@ impl CgGetsnapshotArgs {
 
 /// `CG_GETSNAPSHOT` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:153`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:454-455`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:758-759`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:758-759`
+/// Enum value source: `oracle/code/cgame/cg_public.h:153`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:454-455`
+/// Output source: `oracle/code/client/cl_cgame.cpp:758-759`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:758-759`
 pub struct CgGetsnapshot;
 
 impl OutboundSysCall for CgGetsnapshot {

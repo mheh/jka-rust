@@ -16,7 +16,7 @@ use crate::vm::module_registry::ModuleRegistry;
 /// Field types below the lifecycle-named set are `common`-module subsystem
 /// detail (state-ownership treats each owned struct's field list as a non-goal).
 ///
-/// Source: `oracle/oracle/codemp/qcommon/common.cpp:22-94`
+/// Source: `oracle/codemp/qcommon/common.cpp:22-94`
 pub struct Common {
     /// `com_frameTime`/`com_frameMsec`/`com_frameNumber` (`common.cpp:79-81`).
     pub frame_time: i32,
@@ -39,7 +39,7 @@ pub struct Common {
     /// captured in `Engine::new()` (LIFE-D4b), read-only afterward.
     pub time_base: Instant,
     //TODO: Port Common cvars/cmd/cbuf/fs/net sub-structs + com_printf print state
-    // Source: oracle/oracle/codemp/qcommon/common.cpp:32-72,128,137-171
+    // Source: oracle/codemp/qcommon/common.cpp:32-72,128,137-171
 }
 
 /// Raven `Com_Printf` (`common.cpp:128`). Threads `&mut Common` and lives in
@@ -48,11 +48,11 @@ pub struct Common {
 /// `Common` state. Reachable from every engine crate; `core` callers pass
 /// `&mut engine.common`.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/common.cpp:128`
+/// Source: `oracle/codemp/qcommon/common.cpp:128`
 pub fn com_printf(common: &mut Common, msg: &str) {
     let _ = common;
     //TODO: Port Com_Printf rd_buffer redirect + logfile + console routing
-    // Source: oracle/oracle/codemp/qcommon/common.cpp:137-181
+    // Source: oracle/codemp/qcommon/common.cpp:137-181
     // Slice-0 minimal sink: the local-console write only (Sys_Print tail,
     // common.cpp:168); redirect/logfile land with their Common fields.
     print!("{msg}");

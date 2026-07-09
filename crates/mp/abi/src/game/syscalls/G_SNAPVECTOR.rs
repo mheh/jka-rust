@@ -27,7 +27,7 @@ impl GSnapvectorArgs {
 
 /// `G_SNAPVECTOR` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:233`
+/// Source: `oracle/codemp/game/g_public.h:233`
 pub struct GSnapvector;
 
 impl OutboundSysCall for GSnapvector {

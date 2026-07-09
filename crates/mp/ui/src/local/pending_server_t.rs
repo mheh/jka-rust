@@ -6,7 +6,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `pendingServer_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:690-696`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:690-696`
 #[repr(C)]
 pub struct pendingServer_t {
 	pub adrstr: [c_char; 64],

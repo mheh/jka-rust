@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_FX_PLAY_EFFECT_ID, id, org, fwd, vol, rad );`
 /// Raven transport: `FX_PlayEffectID(args[1], (float *)VMA(2), (float *)VMA(3), args[4], args[5] ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:637-639`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2401`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1117-1119`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:637-639`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2401`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1117-1119`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxPlayEffectIdArgs {
     id: c_int,
@@ -44,10 +44,10 @@ impl CgFxPlayEffectIdArgs {
 /// `CG_FX_PLAY_EFFECT_ID` MP cgame imports syscall ABI token.
 ///
 /// Raven: builds arbitrary perp. right vector, does a cross product to define up.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:222`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:637-639`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1117-1119`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1117-1119`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:222`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:637-639`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1117-1119`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1117-1119`
 pub struct CgFxPlayEffectId;
 
 impl OutboundSysCall for CgFxPlayEffectId {

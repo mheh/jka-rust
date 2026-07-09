@@ -5,13 +5,13 @@ use abi_transport::generic::OutboundSysCall;
 
 /// `UI_MILLISECONDS` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:154`
+/// Source: `oracle/code/ui/ui_public.h:154`
 pub struct UiMilliseconds;
 
 impl OutboundSysCall for UiMilliseconds {
     type Import = SpUiImport;
     /// `case UI_MILLISECONDS: return Sys_Milliseconds();`
-    /// (`oracle/oracle/code/client/cl_ui.cpp:452`).
+    /// (`oracle/code/client/cl_ui.cpp:452`).
     ///
     /// Args source: none (token-only call).
     type Args = ();

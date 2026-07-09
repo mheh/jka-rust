@@ -3,7 +3,7 @@
 /// Raven `surfaceInfo_t` — per-surface override info for a Ghoul2 model instance.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/code/game/../game/ghoul2_shared.h:33-51`
+/// Type definition source: `oracle/code/game/../game/ghoul2_shared.h:33-51`
 #[repr(C)]
 pub struct surfaceInfo_t {
     /// what the flags are for this model

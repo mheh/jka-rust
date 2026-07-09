@@ -9,8 +9,8 @@ use sp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( CG_GETSERVERCOMMAND, serverCommandNumber );`
 /// Raven transport: `return CL_GetServerCommand(args[1]);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:463-464`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:764-765`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:463-464`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:764-765`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgGetservercommandArgs {
     server_command_number: c_int,
@@ -26,10 +26,10 @@ impl CgGetservercommandArgs {
 
 /// `CG_GETSERVERCOMMAND` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:157`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:463-464`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:764-765`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:764-765`
+/// Enum value source: `oracle/code/cgame/cg_public.h:157`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:463-464`
+/// Output source: `oracle/code/client/cl_cgame.cpp:764-765`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:764-765`
 pub struct CgGetservercommand;
 
 impl OutboundSysCall for CgGetservercommand {

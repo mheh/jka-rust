@@ -4,7 +4,7 @@ use sp_qshared::shared::vec3_t;
 
 /// Raven `dlight_s` (typedef `dlight_t`) — dynamic light.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:43-49`
+/// Type definition source: `oracle/code/renderer/tr_local.h:43-49`
 #[repr(C)]
 pub struct dlight_t {
     pub origin: vec3_t,

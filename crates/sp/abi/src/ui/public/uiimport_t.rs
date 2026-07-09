@@ -17,19 +17,19 @@ use sp_qshared::shared::{
 /// needs from the engine. Unlike MP (which routes UI through a VM syscall table), SP links
 /// its UI code directly into the engine binary, so this is a plain function-pointer struct
 /// rather than a syscall enum.
-/// Type definition source: `oracle/oracle/code/ui/ui_public.h:11-141`
+/// Type definition source: `oracle/code/ui/ui_public.h:11-141`
 #[repr(C)]
 pub struct uiimport_t {
     //============== general Quake services ==================
 
     /// print message on the local console
     //TODO: Port Printf variadic args
-    // Source: oracle/oracle/code/ui/ui_public.h:15
+    // Source: oracle/code/ui/ui_public.h:15
     pub Printf: Option<unsafe extern "C" fn(fmt: *const c_char, ...)>,
 
     /// abort the game
     //TODO: Port Error variadic args
-    // Source: oracle/oracle/code/ui/ui_public.h:18
+    // Source: oracle/code/ui/ui_public.h:18
     pub Error: Option<unsafe extern "C" fn(level: c_int, fmt: *const c_char, ...)>,
 
     // console variable interaction

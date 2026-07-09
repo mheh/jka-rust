@@ -7,13 +7,13 @@ use abi_transport::generic::InboundVmCall;
 /// `CG_POINT_CONTENTS` MP cgame exports vmMain ABI token.
 ///
 /// Raven: int CG_PointContents( const vec3_t point, int passEntityNum );
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:392-393`
-/// Shared-buffer source: `oracle/oracle/codemp/cgame/cg_public.h:451-456`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:220-222`, `oracle/oracle/codemp/cgame/cg_main.c:362-366`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:220-222`, `oracle/oracle/codemp/cgame/cg_main.c:366`
-/// Transport/switch source: `oracle/oracle/codemp/cgame/cg_main.c:220-222`
-/// Transport/call-site source: `oracle/oracle/codemp/client/FxPrimitives.cpp:234-240`
-/// Shared-buffer payload type source: `oracle/oracle/codemp/cgame/cg_public.h:451-456`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:392-393`
+/// Shared-buffer source: `oracle/codemp/cgame/cg_public.h:451-456`
+/// Args source: `oracle/codemp/cgame/cg_main.c:220-222`, `oracle/codemp/cgame/cg_main.c:362-366`
+/// Output source: `oracle/codemp/cgame/cg_main.c:220-222`, `oracle/codemp/cgame/cg_main.c:366`
+/// Transport/switch source: `oracle/codemp/cgame/cg_main.c:220-222`
+/// Transport/call-site source: `oracle/codemp/client/FxPrimitives.cpp:234-240`
+/// Shared-buffer payload type source: `oracle/codemp/cgame/cg_public.h:451-456`
 pub struct CgPointContents;
 
 impl InboundVmCall for CgPointContents {

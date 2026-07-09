@@ -11,8 +11,8 @@ use mp_qshared::shared::pc_token_t;
 /// Raven wrapper: `syscall( UI_PC_READ_TOKEN, handle, pc_token );`
 /// Raven transport: `return botlib_export->PC_ReadTokenHandle( args[1], (struct pc_token_s *)VMA(2) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:374-375`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1163-1164`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:374-375`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1163-1164`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiPcReadTokenArgs {
     handle: c_int,
@@ -38,11 +38,11 @@ impl UiPcReadTokenArgs {
 /// Raven wrapper: `int trap_PC_ReadToken( int handle, pc_token_t *pc_token ) { return syscall( UI_PC_READ_TOKEN, handle, pc_token ); }`
 /// Raven transport: `return botlib_export->PC_ReadTokenHandle( args[1], (struct pc_token_s *)VMA(2) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:87`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:82-90`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:374-375`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1163-1164`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1163-1164`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:87`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:82-90`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:374-375`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1163-1164`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1163-1164`
 pub struct UiPcReadToken;
 
 impl OutboundSysCall for UiPcReadToken {

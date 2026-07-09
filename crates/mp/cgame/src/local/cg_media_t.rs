@@ -14,7 +14,7 @@ use super::footstep_t::footstep_t;
 ///
 /// Raven: Other media that can be tied to clients, weapons, or items are
 /// stored in the clientInfo_t, itemInfo_t, weaponInfo_t, and powerupInfo_t.
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:1067-1380`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:1067-1380`
 #[repr(C)]
 pub struct cgMedia_t {
 	pub charsetShader: qhandle_t,
@@ -55,7 +55,7 @@ pub struct cgMedia_t {
 
 	// Chunks
 	// `[NUM_CHUNK_TYPES][4]` — NUM_CHUNK_TYPES is the 8-entry anonymous enum
-	// terminator at oracle/oracle/codemp/cgame/cg_local.h:1049-1059 (not
+	// terminator at oracle/codemp/cgame/cg_local.h:1049-1059 (not
 	// separately ported; used here only as this array bound).
 	pub chunkModels: [[qhandle_t; 4]; 8],
 	pub chunkSound: sfxHandle_t,

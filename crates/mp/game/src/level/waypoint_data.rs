@@ -1,6 +1,6 @@
 //! MP `waypointData_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/g_local.h:810-818`
+//! Type definition source: `oracle/codemp/game/g_local.h:810-818`
 
 #![allow(non_camel_case_types)]
 
@@ -10,7 +10,7 @@ use mp_qshared::shared::MAX_QPATH;
 
 /// Raven `waypointData_t` — cleared as each map is entered.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:810-818`
+/// Type definition source: `oracle/codemp/game/g_local.h:810-818`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct waypointData_t {

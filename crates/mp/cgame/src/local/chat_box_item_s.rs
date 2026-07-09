@@ -6,7 +6,7 @@ use mp_qshared::shared::limits::MAX_SAY_TEXT;
 
 /// Raven `chatBoxItem_t` — a single line stored in the cgame chat box history.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:748-753`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:748-753`
 #[repr(C)]
 pub struct chatBoxItem_t {
 	pub string: [c_char; MAX_SAY_TEXT],

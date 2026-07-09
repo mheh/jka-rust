@@ -44,7 +44,7 @@ impl GGetEntityTokenArgs {
 /// Raven: Retrieves the next string token from the entity spawn text, returning
 /// Raven: false when all tokens have been parsed.
 /// Raven: This should only be done at GAME_INIT time.
-/// Source: `oracle/oracle/codemp/game/g_public.h:221`
+/// Source: `oracle/codemp/game/g_public.h:221`
 pub struct GGetEntityToken;
 
 impl OutboundSysCall for GGetEntityToken {

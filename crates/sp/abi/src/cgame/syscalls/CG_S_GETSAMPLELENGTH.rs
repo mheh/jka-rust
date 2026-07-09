@@ -8,11 +8,11 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `return syscall( CG_S_GETSAMPLELENGTH, sfx);`
 /// Raven transport: `return S_GetSampleLengthInMilliSeconds(args[1]);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:237-238`
-/// Args source: `oracle/oracle/code/game/q_shared.h:186`
-/// Output source: `oracle/oracle/code/client/snd_public.h:18`
-/// Output source: `oracle/oracle/code/client/snd_dma.cpp:1662-1664`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:610-611`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:237-238`
+/// Args source: `oracle/code/game/q_shared.h:186`
+/// Output source: `oracle/code/client/snd_public.h:18`
+/// Output source: `oracle/code/client/snd_dma.cpp:1662-1664`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:610-611`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSGetsamplelengthArgs {
     sfx: c_int,
@@ -33,13 +33,13 @@ impl CgSGetsamplelengthArgs {
 /// SP's `CL_CgameSystemCalls` returns `int`, so the engine `float` is converted
 /// to an integer syscall word before the cgame wrapper returns it as `float`.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:167`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:237-238`
-/// Args source: `oracle/oracle/code/game/q_shared.h:186`
-/// Output source: `oracle/oracle/code/client/snd_public.h:18`
-/// Output source: `oracle/oracle/code/client/snd_dma.cpp:1662-1664`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:435`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:610-611`
+/// Enum value source: `oracle/code/cgame/cg_public.h:167`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:237-238`
+/// Args source: `oracle/code/game/q_shared.h:186`
+/// Output source: `oracle/code/client/snd_public.h:18`
+/// Output source: `oracle/code/client/snd_dma.cpp:1662-1664`
+/// Output source: `oracle/code/client/cl_cgame.cpp:435`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:610-611`
 pub struct CgSGetsamplelength;
 
 impl OutboundSysCall for CgSGetsamplelength {

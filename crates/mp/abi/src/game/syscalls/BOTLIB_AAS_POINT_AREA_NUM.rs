@@ -25,7 +25,7 @@ impl BotlibAasPointAreaNumArgs {
 
 /// `BOTLIB_AAS_POINT_AREA_NUM` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:365`
+/// Source: `oracle/codemp/game/g_public.h:365`
 pub struct BotlibAasPointAreaNum;
 
 impl OutboundSysCall for BotlibAasPointAreaNum {

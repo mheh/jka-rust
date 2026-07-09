@@ -27,7 +27,7 @@ impl GNavShowpathArgs {
 
 /// `G_NAV_SHOWPATH` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:307`
+/// Source: `oracle/codemp/game/g_public.h:307`
 pub struct GNavShowpath;
 
 impl OutboundSysCall for GNavShowpath {

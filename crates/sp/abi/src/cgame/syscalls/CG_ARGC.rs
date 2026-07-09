@@ -5,10 +5,10 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 
 /// `CG_ARGC` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:67`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:70-72`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:454-455`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:454-455`
+/// Enum value source: `oracle/code/cgame/cg_public.h:67`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:70-72`
+/// Output source: `oracle/code/client/cl_cgame.cpp:454-455`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:454-455`
 pub struct CgArgc;
 
 impl OutboundSysCall for CgArgc {

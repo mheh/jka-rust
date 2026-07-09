@@ -2,7 +2,7 @@
 
 /// Raven `ct_table_t` color-table indices.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1044-1127`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1044-1127`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ct_table_t {

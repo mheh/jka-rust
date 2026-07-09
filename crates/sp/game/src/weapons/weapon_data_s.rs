@@ -6,7 +6,7 @@ use sp_qshared::shared::vec3_t;
 
 /// Raven `weaponData_t` — per-weapon-type data.
 ///
-/// Type definition source: `oracle/oracle/code/game/weapons.h:81-139`
+/// Type definition source: `oracle/code/game/weapons.h:81-139`
 #[repr(C)]
 pub struct weaponData_t {
 	pub classname: [c_char; 32], // Spawning name

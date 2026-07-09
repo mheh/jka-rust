@@ -2,7 +2,7 @@
 
 /// Raven `bsp_link_t` — linked-list node tying a BSP entity into a leaf.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:59-65`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:59-65`
 #[repr(C)]
 pub struct bsp_link_t {
 	pub entnum: i32,

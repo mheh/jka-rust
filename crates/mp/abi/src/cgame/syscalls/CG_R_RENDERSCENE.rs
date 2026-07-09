@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_R_RENDERSCENE, fd );`
 /// Raven transport: `re.RenderScene( (const refdef_t *)VMA(1) ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:358-361`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2278`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:922-924`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:358-361`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2278`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:922-924`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRRendersceneArgs {
     refdef: *const c_void,
@@ -26,10 +26,10 @@ impl CgRRendersceneArgs {
 
 /// `CG_R_RENDERSCENE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:158`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:358-361`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:922-924`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:922-924`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:158`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:358-361`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:922-924`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:922-924`
 pub struct CgRRenderscene;
 
 impl OutboundSysCall for CgRRenderscene {

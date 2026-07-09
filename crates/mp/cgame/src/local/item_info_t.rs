@@ -9,7 +9,7 @@ use mp_qshared::shared::qhandle_t;
 /// Raven `itemInfo_t` — cgame-side per-item model/icon cache entry.
 ///
 /// Ghoul2 Insert Start/End marks the `g2Models`/`radius` fields.
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:708-720`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:708-720`
 #[repr(C)]
 pub struct itemInfo_t {
 	pub registered: qboolean,

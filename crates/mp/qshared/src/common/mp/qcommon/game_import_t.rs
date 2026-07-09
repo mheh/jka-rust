@@ -2,7 +2,7 @@
 
 /// Raven `gameImport_t` — enumeration of engine syscalls available to the game module.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:102-581`
+/// Type definition source: `oracle/codemp/game/g_public.h:102-581`
 #[repr(i32)]
 pub enum gameImport_t {
 	// ============== general Quake services ==================

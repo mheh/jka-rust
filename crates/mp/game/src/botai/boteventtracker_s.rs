@@ -6,7 +6,7 @@ use mp_qshared::common::mp::qcommon::player_state::MAX_PS_EVENTS;
 
 /// Raven `boteventtracker_t` — tracks the last player-state events seen by a bot.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/ai_main.h:130-135`
+/// Type definition source: `oracle/codemp/game/ai_main.h:130-135`
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct boteventtracker_t {

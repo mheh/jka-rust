@@ -2,7 +2,7 @@
 
 /// Raven `svc_ops_e` — server to client message opcodes.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:233-250`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:233-250`
 #[repr(i32)]
 pub enum svc_ops_e {
     svc_bad = 0,

@@ -1,6 +1,6 @@
 //! MP `bg_public.h` weapon state enumeration.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:372-380`
+//! Type definition source: `oracle/codemp/game/bg_public.h:372-380`
 
 #![allow(non_camel_case_types)]
 
@@ -8,7 +8,7 @@
 ///
 /// Raven: Enumeration defining the various states a weapon can be in,
 /// ranging from ready to firing, charging, and idle.
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:372-380`
+/// Type definition source: `oracle/codemp/game/bg_public.h:372-380`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum weaponstate_t {

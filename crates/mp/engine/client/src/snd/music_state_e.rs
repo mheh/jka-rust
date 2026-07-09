@@ -3,7 +3,7 @@
 /// Raven `MusicState_e` — dynamic music state/track selection.
 ///
 /// Raven: None.
-/// Type definition source: `oracle/oracle/codemp/client/snd_music.h:11-36`
+/// Type definition source: `oracle/codemp/client/snd_music.h:11-36`
 #[repr(i32)]
 pub enum MusicState_e {
     /// For normal walking around

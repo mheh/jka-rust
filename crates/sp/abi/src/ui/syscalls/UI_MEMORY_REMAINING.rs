@@ -5,14 +5,14 @@ use abi_transport::generic::OutboundSysCall;
 
 /// `UI_MEMORY_REMAINING` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:204`
+/// Source: `oracle/code/ui/ui_public.h:204`
 ///
-/// Args source: no SP-side argument payload is present in `oracle/oracle/code/client/cl_ui.cpp`
+/// Args source: no SP-side argument payload is present in `oracle/code/client/cl_ui.cpp`
 /// (`UI_MEMORY_REMAINING` has no `case` there); fallback from MP ABI:
-/// `oracle/oracle/codemp/ui/ui_syscalls.c:342` and `oracle/oracle/codemp/client/cl_ui.cpp:1119-1120`.
+/// `oracle/codemp/ui/ui_syscalls.c:342` and `oracle/codemp/client/cl_ui.cpp:1119-1120`.
 ///
 /// Output source: fallback from MP ABI:
-/// `oracle/oracle/codemp/ui/ui_syscalls.c:342-343` and `oracle/oracle/codemp/client/cl_ui.cpp:1119-1120`.
+/// `oracle/codemp/ui/ui_syscalls.c:342-343` and `oracle/codemp/client/cl_ui.cpp:1119-1120`.
 pub struct UiMemoryRemaining;
 
 impl OutboundSysCall for UiMemoryRemaining {

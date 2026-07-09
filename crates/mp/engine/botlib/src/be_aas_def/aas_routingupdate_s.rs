@@ -7,7 +7,7 @@ use mp_qshared::shared::{qboolean, vec3_t};
 /// Raven `aas_routingupdate_t` — a pending routing-cache update, linked into
 /// the update list while queued.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:150-160`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:150-160`
 #[repr(C)]
 pub struct aas_routingupdate_t {
 	pub cluster: i32,

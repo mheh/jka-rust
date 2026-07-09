@@ -4,7 +4,7 @@
 /// `[`…`]` value list (Raven `CGPGroup::Parse` / `CGPValue::Parse` returning
 /// `false`, "end of data - error!"). The partially built tree is kept, as in
 /// Raven.
-/// Source: `oracle/oracle/codemp/qcommon/GenericParser2.cpp:679-734,362-385`
+/// Source: `oracle/codemp/qcommon/GenericParser2.cpp:679-734,362-385`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Gp2ParseError;
 

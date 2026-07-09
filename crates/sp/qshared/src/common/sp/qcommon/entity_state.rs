@@ -1,6 +1,6 @@
 //! SP `entityState_t` copied from Raven `code/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/code/game/q_shared.h:2441-2516`
+//! Source: `oracle/code/game/q_shared.h:2441-2516`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -10,7 +10,7 @@ use crate::shared::{qboolean, trajectory_t, vec3_t};
 
 /// Raven SP `entityState_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2448-2516`
+/// Type definition source: `oracle/code/game/q_shared.h:2448-2516`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct entityState_t {

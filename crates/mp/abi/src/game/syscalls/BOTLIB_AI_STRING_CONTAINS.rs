@@ -38,7 +38,7 @@ impl BotlibAiStringContainsArgs {
 
 /// `BOTLIB_AI_STRING_CONTAINS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:431`
+/// Source: `oracle/codemp/game/g_public.h:431`
 pub struct BotlibAiStringContains;
 
 impl OutboundSysCall for BotlibAiStringContains {

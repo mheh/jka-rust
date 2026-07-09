@@ -33,8 +33,8 @@ pub(crate) struct GpGroupNode {
 /// `SortObject`) become insertion-ordered `Vec`s in an arena owned by
 /// [`GenericParser2`], with the sorted view computed on demand. This type is a
 /// copyable borrow of one node.
-/// Class definition source: `oracle/oracle/code/game/genericparser2.h:101-142`
-/// Method source: `oracle/oracle/code/game/genericparser2.cpp:465-816`
+/// Class definition source: `oracle/code/game/genericparser2.h:101-142`
+/// Method source: `oracle/code/game/genericparser2.cpp:465-816`
 #[derive(Clone, Copy)]
 pub struct GpGroup<'a> {
     pub(crate) doc: &'a GenericParser2,

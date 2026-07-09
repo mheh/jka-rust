@@ -11,7 +11,7 @@ use super::le_type_t::leType_t;
 
 /// Anonymous struct for `localEntity_s::data::sprite` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:552-557`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:552-557`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct localEntity_t_sprite {
@@ -23,7 +23,7 @@ pub struct localEntity_t_sprite {
 
 /// Anonymous struct for `localEntity_s::data::trail` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:558-565`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:558-565`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct localEntity_t_trail {
@@ -40,7 +40,7 @@ pub struct localEntity_t_trail {
 /// Raven: below are bezier specific; `control1`/`control2` are the initial position of
 /// control points, `*_velocity` their initial velocity, `*_acceleration` their constant
 /// acceleration.
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:566-576`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:566-576`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct localEntity_t_line {
@@ -56,7 +56,7 @@ pub struct localEntity_t_line {
 
 /// Anonymous struct for `localEntity_s::data::line2` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:577-584`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:577-584`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct localEntity_t_line2 {
@@ -70,7 +70,7 @@ pub struct localEntity_t_line2 {
 
 /// Anonymous struct for `localEntity_s::data::cylinder` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:585-592`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:585-592`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct localEntity_t_cylinder {
@@ -84,7 +84,7 @@ pub struct localEntity_t_cylinder {
 
 /// Anonymous struct for `localEntity_s::data::electricity` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:593-596`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:593-596`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct localEntity_t_electricity {
@@ -97,7 +97,7 @@ pub struct localEntity_t_electricity {
 /// Raven: `dir`'s magnitude is 1, but this is oldpos - newpos right before the particle is
 /// sent to the renderer. May want to add something like particle::localEntity_s *le (for the
 /// particle's think fn).
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:597-606`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:597-606`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct localEntity_t_particle {
@@ -109,7 +109,7 @@ pub struct localEntity_t_particle {
 
 /// Anonymous struct for `localEntity_s::data::spawner` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:607-617`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:607-617`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct localEntity_t_spawner {
@@ -125,7 +125,7 @@ pub struct localEntity_t_spawner {
 
 /// Anonymous struct for `localEntity_s::data::fragment` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:618-621`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:618-621`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct localEntity_t_fragment {
@@ -134,7 +134,7 @@ pub struct localEntity_t_fragment {
 
 /// Anonymous union for `localEntity_s::data` (no Raven name — anonymous in the header).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:551-622`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:551-622`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union localEntity_t_data {
@@ -154,7 +154,7 @@ pub union localEntity_t_data {
 /// Raven: `lifeRate` is `1.0 / (endTime - startTime)`; `bounceFactor` is 0.0 = no bounce,
 /// 1.0 = perfect; `bounceSound` is an optional sound index to play upon bounce; `leMarkType`
 /// is the mark to leave on fragment impact.
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:519-625`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:519-625`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct localEntity_t {

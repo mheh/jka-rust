@@ -6,7 +6,7 @@ use super::fog_parms_t::fogParms_t;
 
 /// Raven `fog_t` — a fog volume.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:616-627`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:616-627`
 #[repr(C)]
 pub struct fog_t {
 	pub originalBrushNumber: i32,

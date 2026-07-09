@@ -12,7 +12,7 @@ extern "C-unwind" {
     /// Declared (not defined) in Rust so the loader can hand its address to the
     /// module handshake (`dllEntry(syscall)`, `win_main.cpp:879-887`).
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:363-380`
+    /// Source: `oracle/codemp/qcommon/vm.cpp:363-380`
     pub fn game_syscall_trampoline(arg: isize, ...) -> isize;
 }
 
@@ -22,7 +22,7 @@ extern "C-unwind" {
 /// engine_slot.rs) and dispatches through it. `extern "C-unwind"` so a
 /// `com_error` panic unwinds back through the shim's live C frame (SEAM-D12).
 ///
-/// Source: `oracle/oracle/codemp/qcommon/vm.cpp:363-377`
+/// Source: `oracle/codemp/qcommon/vm.cpp:363-377`
 ///
 /// # Safety
 /// `args` must point at the shim's 16-word frame; called only from

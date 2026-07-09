@@ -24,7 +24,7 @@ impl GG2ListsurfacesArgs {
 
 /// `G_G2_LISTSURFACES` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:508`
+/// Source: `oracle/codemp/game/g_public.h:508`
 pub struct GG2Listsurfaces;
 
 impl OutboundSysCall for GG2Listsurfaces {

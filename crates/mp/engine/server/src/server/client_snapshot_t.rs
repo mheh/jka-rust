@@ -7,7 +7,7 @@ use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 
 /// Raven `clientSnapshot_t` — per-client server-side snapshot bookkeeping.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../server/server.h:94-112`
+/// Type definition source: `oracle/codemp/qcommon/../server/server.h:94-112`
 #[repr(C)]
 pub struct clientSnapshot_t {
     pub areabytes: c_int,

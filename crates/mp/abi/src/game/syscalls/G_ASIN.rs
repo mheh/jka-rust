@@ -23,7 +23,7 @@ impl GAsinArgs {
 ///
 /// Raven: END VM STUFF
 /// Raven: rww - BEGIN NPC NAV TRAPS
-/// Source: `oracle/oracle/codemp/game/g_public.h:293`
+/// Source: `oracle/codemp/game/g_public.h:293`
 pub struct GAsin;
 
 impl OutboundSysCall for GAsin {

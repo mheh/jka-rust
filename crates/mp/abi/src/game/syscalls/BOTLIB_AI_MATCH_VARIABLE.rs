@@ -53,7 +53,7 @@ impl BotlibAiMatchVariableArgs {
 
 /// `BOTLIB_AI_MATCH_VARIABLE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:433`
+/// Source: `oracle/codemp/game/g_public.h:433`
 pub struct BotlibAiMatchVariable;
 
 impl OutboundSysCall for BotlibAiMatchVariable {

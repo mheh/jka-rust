@@ -5,7 +5,7 @@ use super::ammo_t::ammo_t;
 
 /// Raven `ammoData[AMMO_MAX]` — per-ammo-type capacity table.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_weapons.c:358-400`
+/// Source: `oracle/codemp/game/bg_weapons.c:358-400`
 pub static ammoData: [ammoData_t; ammo_t::AMMO_MAX as usize] = [
 	ammoData_t {	// AMMO_NONE
 		//		"",				//	char	icon[32];	// Name of ammo icon file

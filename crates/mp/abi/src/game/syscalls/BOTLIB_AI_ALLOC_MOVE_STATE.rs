@@ -19,7 +19,7 @@ impl BotlibAiAllocMoveStateArgs {
 
 /// `BOTLIB_AI_ALLOC_MOVE_STATE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:471`
+/// Source: `oracle/codemp/game/g_public.h:471`
 pub struct BotlibAiAllocMoveState;
 
 impl OutboundSysCall for BotlibAiAllocMoveState {

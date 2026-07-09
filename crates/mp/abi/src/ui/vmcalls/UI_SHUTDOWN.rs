@@ -7,11 +7,11 @@ use abi_transport::generic::InboundVmCall;
 /// Raven comment for this enum slot is shifted; actual signature in `ui_main.c` is
 /// `void _UI_Shutdown( void )`.
 ///
-/// Source (enum): `oracle/oracle/codemp/ui/ui_public.h:222`
-/// Source (args): `oracle/oracle/codemp/ui/ui_main.c:551`
-/// Source (output): `oracle/oracle/codemp/ui/ui_main.c:589-599` (return 0)
-/// Source (call site/transport): `oracle/oracle/codemp/client/cl_ui.cpp:1450`
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:222`
+/// Source (enum): `oracle/codemp/ui/ui_public.h:222`
+/// Source (args): `oracle/codemp/ui/ui_main.c:551`
+/// Source (output): `oracle/codemp/ui/ui_main.c:589-599` (return 0)
+/// Source (call site/transport): `oracle/codemp/client/cl_ui.cpp:1450`
+/// Source: `oracle/codemp/ui/ui_public.h:222`
 pub struct UiShutdown;
 
 impl InboundVmCall for UiShutdown {

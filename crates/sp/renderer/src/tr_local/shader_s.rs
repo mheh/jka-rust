@@ -16,7 +16,7 @@ const MAX_SHADER_DEFORMS: usize = 3;
 
 /// Raven `shader_t` — compiled shader definition.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:446-504`
+/// Type definition source: `oracle/code/renderer/tr_local.h:446-504`
 #[repr(C)]
 pub struct shader_t {
     /// game path, including extension

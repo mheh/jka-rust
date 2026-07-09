@@ -22,7 +22,7 @@ impl BotlibEaMoveBackArgs {
 
 /// `BOTLIB_EA_MOVE_BACK` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:398`
+/// Source: `oracle/codemp/game/g_public.h:398`
 pub struct BotlibEaMoveBack;
 
 impl OutboundSysCall for BotlibEaMoveBack {

@@ -4,7 +4,7 @@ use crate::shared::vec3_t;
 
 /// Raven `aas_altroutegoal_t` — alternate route goal for AAS routing.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_aas.h:180-187`
+/// Type definition source: `oracle/codemp/game/be_aas.h:180-187`
 #[repr(C)]
 pub struct aas_altroutegoal_t {
 	pub origin: vec3_t,

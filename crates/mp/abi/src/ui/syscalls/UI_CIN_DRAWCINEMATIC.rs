@@ -9,9 +9,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall(UI_CIN_DRAWCINEMATIC, handle)`.
 /// Raven transport: `CIN_DrawCinematic(args[1]); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:422-424`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:1005`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1193-1195`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:422-424`
+/// Args source: `oracle/codemp/ui/ui_local.h:1005`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1193-1195`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCinDrawcinematicArgs {
     handle: c_int,
@@ -29,11 +29,11 @@ impl UiCinDrawcinematicArgs {
 
 /// `UI_CIN_DRAWCINEMATIC` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:108`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:105-109`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:422-424`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1193-1195`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1193-1195`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:108`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:105-109`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:422-424`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1193-1195`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1193-1195`
 pub struct UiCinDrawcinematic;
 
 impl OutboundSysCall for UiCinDrawcinematic {

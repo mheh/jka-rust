@@ -7,9 +7,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( UI_LANGUAGE_USESSPACES );`
 /// Raven transport: `return re.Language_UsesSpaces();`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:141-143`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:998`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1151-1152`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:141-143`
+/// Args source: `oracle/codemp/ui/ui_local.h:998`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1151-1152`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct UiLanguageUsesspacesArgs;
 
@@ -21,11 +21,11 @@ impl UiLanguageUsesspacesArgs {
 
 /// `UI_LANGUAGE_USESSPACES` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:81`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:141-143`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:998`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1151-1152`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1151-1152`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:81`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:141-143`
+/// Output source: `oracle/codemp/ui/ui_local.h:998`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1151-1152`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1151-1152`
 pub struct UiLanguageUsesspaces;
 
 impl OutboundSysCall for UiLanguageUsesspaces {

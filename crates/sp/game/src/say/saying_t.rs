@@ -2,7 +2,7 @@
 
 /// Raven `saying_t` — voice command acknowledgement/refusal/error responses.
 ///
-/// Type definition source: `oracle/oracle/code/game/say.h:4-28`
+/// Type definition source: `oracle/code/game/say.h:4-28`
 #[repr(i32)]
 pub enum saying_t {
     /// Acknowledge command

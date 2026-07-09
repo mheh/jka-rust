@@ -3,7 +3,7 @@ use core::ffi::c_int;
 
 /// Raven `backEndCounters_t` — per-frame backend rendering statistics.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:1075-1087`
+/// Type definition source: `oracle/code/renderer/tr_local.h:1075-1087`
 #[repr(C)]
 pub struct backEndCounters_t {
     pub c_surfaces: c_int,

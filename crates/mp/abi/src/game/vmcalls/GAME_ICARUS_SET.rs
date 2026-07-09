@@ -5,10 +5,10 @@ use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, Vm
 
 /// `GAME_ICARUS_SET` MP game exports vmMain ABI token.
 ///
-/// Source (enum): `oracle/oracle/codemp/game/g_public.h:772`
-/// Source (args): `oracle/oracle/codemp/game/g_main.c:563`
-/// Source (output): `oracle/oracle/codemp/game/g_main.c:566`
-/// Source (call site): `oracle/oracle/codemp/icarus/Q3_Interface.cpp:397`
+/// Source (enum): `oracle/codemp/game/g_public.h:772`
+/// Source (args): `oracle/codemp/game/g_main.c:563`
+/// Source (output): `oracle/codemp/game/g_main.c:566`
+/// Source (call site): `oracle/codemp/icarus/Q3_Interface.cpp:397`
 pub struct GameIcarusSet;
 
 impl InboundVmCall for GameIcarusSet {
@@ -21,13 +21,13 @@ impl InboundVmCall for GameIcarusSet {
 
 impl DecodeVmMain for GameIcarusSet {
     // Payload arrives out-of-band in `gSharedBuffer`, not via vmMain arg words —
-    // Source: `oracle/oracle/codemp/game/g_main.c:563`.
+    // Source: `oracle/codemp/game/g_main.c:563`.
     fn decode_vm_main(_t: VmMainTransport) -> Self::Args {}
 }
 
 impl EncodeVmMainReturn for GameIcarusSet {
     fn encode_return(output: Self::Output) -> isize {
-        // Returns the handler result. Source: `oracle/oracle/codemp/game/g_main.c:566`.
+        // Returns the handler result. Source: `oracle/codemp/game/g_main.c:566`.
         output as isize
     }
 }

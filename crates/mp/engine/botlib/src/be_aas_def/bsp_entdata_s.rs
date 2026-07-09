@@ -4,7 +4,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `bsp_entdata_t` — BSP entity data (origin/angles/bounds/solid/model).
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:67-75`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:67-75`
 #[repr(C)]
 pub struct bsp_entdata_t {
 	pub origin: vec3_t,

@@ -10,19 +10,19 @@ use super::sv_entity_s::svEntity_t;
 
 /// Raven `MAX_MODELS` — models sent over the net as -8 bits.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1461`
+/// Type definition source: `oracle/code/game/q_shared.h:1461`
 pub const MAX_MODELS: usize = 256;
 
 /// Raven `MAX_GENTITIES` — `1 << GENTITYNUM_BITS`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1450-1451`
+/// Type definition source: `oracle/code/game/q_shared.h:1450-1451`
 pub const MAX_GENTITIES: usize = 1024;
 
 /// Raven `server_t`.
 ///
 /// Raven: be careful, Jake's code uses the 'svEntities' field as a marker to
 /// memset-this-far-only inside SV_InitSV()!!!!!
-/// Type definition source: `oracle/oracle/code/server/server.h:48-72`
+/// Type definition source: `oracle/code/server/server.h:48-72`
 #[repr(C)]
 pub struct server_t {
     pub state: serverState_t,

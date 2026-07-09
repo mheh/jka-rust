@@ -5,10 +5,11 @@ UI, renderer, engine) as a drop-in replacement, ported from Raven's C/C++ source
 
 ## Oracle
 
-`oracle/oracle/` holds the original Raven source — the differential-testing
-**oracle**, never edited. SP lives under `code/`, MP under `codemp/`. Every port
-is verified against it. `oracle/` (the faithful Rust port) is the parity baseline
-checked via `--features oracle`.
+`oracle/` holds the original Raven source (submodule
+`github.com/mheh/jediacademy`) — the differential-testing **oracle**, never
+edited. SP lives under `code/`, MP under `codemp/`. Every port is verified
+against it. The earlier faithful-Rust-port harness lives externally at
+`github.com/mheh/jedi-academy-rust` (no longer checked out here).
 
 ## Port style — read this before porting anything
 

@@ -22,7 +22,7 @@ impl GNavGetnoderadiusArgs {
 
 /// `G_NAV_GETNODERADIUS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:332`
+/// Source: `oracle/codemp/game/g_public.h:332`
 pub struct GNavGetnoderadius;
 
 impl OutboundSysCall for GNavGetnoderadius {

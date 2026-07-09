@@ -4,7 +4,7 @@ use sp_qshared::shared::{qboolean, vec3_t};
 
 /// Raven `combatPoint_t` — an AI combat waypoint (cover/tactical) point.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_local.h:94-103`
+/// Type definition source: `oracle/code/game/g_local.h:94-103`
 #[repr(C)]
 pub struct combatPoint_t {
 	pub origin: vec3_t,

@@ -11,21 +11,21 @@ use super::veh_turret_status_t::vehTurretStatus_t;
 use super::veh_weapon_status_t::vehWeaponStatus_t;
 
 /// `MAX_VEHICLE_EXHAUSTS`.
-/// Source: `oracle/oracle/code/game/G_Vehicles.h:83`
+/// Source: `oracle/code/game/G_Vehicles.h:83`
 const MAX_VEHICLE_EXHAUSTS: usize = 4;
 /// `MAX_VEHICLE_MUZZLES`.
-/// Source: `oracle/oracle/code/game/G_Vehicles.h:80`
+/// Source: `oracle/code/game/G_Vehicles.h:80`
 const MAX_VEHICLE_MUZZLES: usize = 10;
 /// `MAX_VEHICLE_WEAPONS`.
-/// Source: `oracle/oracle/code/game/G_Vehicles.h:86`
+/// Source: `oracle/code/game/G_Vehicles.h:86`
 const MAX_VEHICLE_WEAPONS: usize = 2;
 /// `MAX_VEHICLE_TURRETS`.
-/// Source: `oracle/oracle/code/game/G_Vehicles.h:87`
+/// Source: `oracle/code/game/G_Vehicles.h:87`
 const MAX_VEHICLE_TURRETS: usize = 2;
 
 /// Raven `Vehicle_t` — runtime state for a spawned vehicle instance.
 ///
-/// Type definition source: `oracle/oracle/code/game/G_Vehicles.h:510-621`
+/// Type definition source: `oracle/code/game/G_Vehicles.h:510-621`
 #[repr(C)]
 pub struct Vehicle_t {
 	// The entity who pilots/drives this vehicle.

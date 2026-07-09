@@ -9,17 +9,17 @@ use super::window_def_t::windowDef_t;
 
 /// Raven `Window` — alias for `windowDef_t` used by menu/item headers.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_shared.h:146`
+/// Type definition source: `oracle/code/ui/ui_shared.h:146`
 pub type Window = windowDef_t;
 
 /// Raven `MAX_MENUITEMS`.
 ///
-/// Source: `oracle/oracle/code/ui/ui_shared.h:271`
+/// Source: `oracle/code/ui/ui_shared.h:271`
 pub const MAX_MENUITEMS: usize = 150;
 
 /// Raven `menuDef_t` — a UI menu definition (window plus its items).
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_shared.h:427-459`
+/// Type definition source: `oracle/code/ui/ui_shared.h:427-459`
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct menuDef_t {

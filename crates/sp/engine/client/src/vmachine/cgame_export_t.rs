@@ -2,7 +2,7 @@
 
 /// Raven `cgameExport_t` — cgame module export function indices.
 ///
-/// Type definition source: `oracle/oracle/code/client/vmachine.h:13-39`
+/// Type definition source: `oracle/code/client/vmachine.h:13-39`
 #[repr(i32)]
 pub enum cgameExport_t {
 	CG_INIT,

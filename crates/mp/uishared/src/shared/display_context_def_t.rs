@@ -13,7 +13,7 @@ use super::item_def_s::itemDef_t;
 /// Raven `displayContextDef_t` — the UI module's function-pointer table into
 /// the engine plus the display/frame state the engine keeps refreshed for it.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:400-477`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:400-477`
 #[repr(C)]
 pub struct displayContextDef_t {
     pub registerShaderNoMip: Option<unsafe extern "C" fn(p: *const c_char) -> qhandle_t>,

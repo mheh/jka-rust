@@ -1,4 +1,4 @@
-//! NPC AI Default behavior states for `oracle/oracle/codemp/game/NPC_AI_Default.c`.
+//! NPC AI Default behavior states for `oracle/codemp/game/NPC_AI_Default.c`.
 //!
 //! Pass-3 port: 15/15 functions transcribed from oracle source with settled
 //! rulings 12-22. Game-tier functions thread `ctx: GameContext<'_>` as first param;
@@ -11,7 +11,7 @@ use crate::trap;
 
 /// Raven `NPC_LostEnemyDecideChase`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:18-35`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:18-35`
 pub fn NPC_LostEnemyDecideChase(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
@@ -37,14 +37,14 @@ pub fn NPC_LostEnemyDecideChase(ctx: GameContext<'_>) {
 
 /// Raven `NPC_StandIdle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:42-85`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:42-85`
 pub fn NPC_StandIdle() {
     // Function is completely commented out in oracle source. Port as no-op.
 }
 
 /// Raven `NPC_StandTrackAndShoot`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:87-158`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:87-158`
 pub fn NPC_StandTrackAndShoot(
     ctx: GameContext<'_>,
     NPC: *mut gentity_t,
@@ -108,7 +108,7 @@ pub fn NPC_StandTrackAndShoot(
 
 /// Raven `NPC_BSIdle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:161-177`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:161-177`
 pub fn NPC_BSIdle(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
 
@@ -129,7 +129,7 @@ pub fn NPC_BSIdle(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSRun`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:179-189`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:179-189`
 pub fn NPC_BSRun(ctx: GameContext<'_>) {
     if UpdateGoal(ctx) != core::ptr::null_mut() {
         NPC_MoveToGoal(ctx, qtrue);
@@ -140,7 +140,7 @@ pub fn NPC_BSRun(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSStandGuard`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:191-224`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:191-224`
 pub fn NPC_BSStandGuard(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let npc = unsafe { &mut *(*world).globals.NPC };
@@ -180,7 +180,7 @@ pub fn NPC_BSStandGuard(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSHuntAndKill`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:232-304`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:232-304`
 pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let npc = unsafe { &mut *(*world).globals.NPC };
@@ -267,7 +267,7 @@ pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSStandAndShoot`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:306-392`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:306-392`
 pub fn NPC_BSStandAndShoot(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let npc = unsafe { &mut *(*world).globals.NPC };
@@ -304,7 +304,7 @@ pub fn NPC_BSStandAndShoot(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSRunAndShoot`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:394-487`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:394-487`
 pub fn NPC_BSRunAndShoot(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let npc = unsafe { &mut *(*world).globals.NPC };
@@ -369,7 +369,7 @@ pub fn NPC_BSRunAndShoot(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSFace`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:490-503`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:490-503`
 pub fn NPC_BSFace(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
@@ -393,7 +393,7 @@ pub fn NPC_BSFace(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSPointShoot`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:505-610`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:505-610`
 pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
     let world = unsafe { &mut *ctx.world };
     let npc = unsafe { &mut *(*world).globals.NPC };
@@ -486,7 +486,7 @@ pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
 
 /// Raven `NPC_BSMove`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:616-637`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:616-637`
 pub fn NPC_BSMove(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let npc = unsafe { &mut *(*world).globals.NPC };
@@ -505,7 +505,7 @@ pub fn NPC_BSMove(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSShoot`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:644-656`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:644-656`
 pub fn NPC_BSShoot(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let client = unsafe { &mut *(*world).globals.client };
@@ -523,7 +523,7 @@ pub fn NPC_BSShoot(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSPatrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:664-703`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:664-703`
 pub fn NPC_BSPatrol(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let npc = unsafe { &mut *(*world).globals.NPC };
@@ -552,7 +552,7 @@ pub fn NPC_BSPatrol(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSDefault`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:712-957`
+/// Source: `oracle/codemp/game/NPC_AI_Default.c:712-957`
 pub fn NPC_BSDefault(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let npc = unsafe { &mut *(*world).globals.NPC };

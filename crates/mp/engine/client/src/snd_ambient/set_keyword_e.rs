@@ -2,7 +2,7 @@
 
 /// Raven `setKeyword_e` — keyword types for ambient set parsing.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/snd_ambient.h:42-55`
+/// Type definition source: `oracle/codemp/client/snd_ambient.h:42-55`
 #[repr(i32)]
 pub enum setKeyword_e {
 	SET_KEYWORD_TIMEBETWEENWAVES = 0,

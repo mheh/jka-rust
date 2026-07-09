@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_Wampa.c 1/10
-//! Port of `oracle/oracle/codemp/game/NPC_AI_Wampa.c` (jampgame mega-pass).
+//! Port of `oracle/codemp/game/NPC_AI_Wampa.c` (jampgame mega-pass).
 //!
 //! SPINE (fork rulings 1/4): NPC AI think-loop helper functions. Most functions
 //! in this file read the implicit NPC/NPCInfo/ucmd bot-AI actor globals that
@@ -21,18 +21,18 @@ use crate::trap;
 use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
-// Source: `oracle/oracle/codemp/game/q_shared.h`
+// Source: `oracle/codemp/game/q_shared.h`
 
 
 
 // These define the working combat range for these suckers
-// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:5-9`
+// Source: `oracle/codemp/game/NPC_AI_Wampa.c:5-9`
 const MIN_DISTANCE: c_int = 48;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 const MAX_DISTANCE: c_int = 1024;
 const MAX_DISTANCE_SQR: c_int = MAX_DISTANCE * MAX_DISTANCE;
 
-// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:11-12`
+// Source: `oracle/codemp/game/NPC_AI_Wampa.c:11-12`
 const LSTATE_CLEAR: c_int = 0;
 const LSTATE_WAITING: c_int = 1;
 
@@ -41,7 +41,7 @@ const LSTATE_WAITING: c_int = 1;
 
 /// Raven `Wampa_SetBolts`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:16-36`
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:16-36`
 pub fn Wampa_SetBolts(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if !self_.is_null() && !(*self_).client.is_null() {
@@ -109,8 +109,8 @@ pub fn Wampa_SetBolts(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `NPC_Wampa_Precache`.
 ///
 /// Precaches the swipe-hit sound. All growl/snort variants are commented out
-/// in the oracle source (oracle/oracle/codemp/game/NPC_AI_Wampa.c:45-55).
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:43-58`
+/// in the oracle source (oracle/codemp/game/NPC_AI_Wampa.c:45-55).
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:43-58`
 pub fn NPC_Wampa_Precache(ctx: GameContext<'_>) {
     // Only the swipe sound is live; growl/snort loops are commented out
     G_SoundIndex(b"sound/chars/rancor/swipehit.wav\0".as_ptr() as *const c_char);
@@ -118,7 +118,7 @@ pub fn NPC_Wampa_Precache(ctx: GameContext<'_>) {
 
 /// Raven `Wampa_Idle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:66-76`
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:66-76`
 pub fn Wampa_Idle(ctx: GameContext<'_>) {
     unsafe {
         let npc_info = (*ctx.world).globals.NPCInfo;
@@ -136,7 +136,7 @@ pub fn Wampa_Idle(ctx: GameContext<'_>) {
 
 /// Raven `Wampa_CheckRoar`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:78-88`
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:78-88`
 pub fn Wampa_CheckRoar(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
     unsafe {
         let level_time = (*ctx.world).level.time as f32;
@@ -166,7 +166,7 @@ pub fn Wampa_CheckRoar(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean 
 
 /// Raven `Wampa_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:94-119`
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:94-119`
 pub fn Wampa_Patrol(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -207,7 +207,7 @@ pub fn Wampa_Patrol(ctx: GameContext<'_>) {
 
 /// Raven `Wampa_Move`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:126-169`
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:126-169`
 pub fn Wampa_Move(ctx: GameContext<'_>, visible: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -276,7 +276,7 @@ pub fn Wampa_Move(ctx: GameContext<'_>, visible: qboolean) {
 
 /// Raven `Wampa_Slash`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:177-264`
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:177-264`
 pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
     unsafe {
         let mut radiusEntNums: [c_int; 128] = [0; 128];
@@ -442,7 +442,7 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
 
 /// Raven `Wampa_Attack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:267-341`
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:267-341`
 pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -589,7 +589,7 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
 
 /// Raven `Wampa_Combat`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:344-425`
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:344-425`
 pub fn Wampa_Combat(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -686,7 +686,7 @@ pub fn Wampa_Combat(ctx: GameContext<'_>) {
 
 /// Raven `NPC_Wampa_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:433-499`
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:433-499`
 pub fn NPC_Wampa_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -812,7 +812,7 @@ pub fn NPC_Wampa_Pain(
 
 /// Raven `NPC_BSWampa_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:506-654`
+/// Source: `oracle/codemp/game/NPC_AI_Wampa.c:506-654`
 pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;

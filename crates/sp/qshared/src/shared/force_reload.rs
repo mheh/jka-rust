@@ -2,7 +2,7 @@
 
 /// Raven `ForceReload_e` — dev-time forced reload/uncache of certain filetypes.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2692-2699`
+/// Type definition source: `oracle/code/game/q_shared.h:2692-2699`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ForceReload_e {

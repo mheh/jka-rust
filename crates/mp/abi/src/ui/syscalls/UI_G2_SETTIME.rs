@@ -7,8 +7,8 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 ///
 /// Raven wrapper: `void trap_G2API_SetTime(int time, int clock)`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:629-631`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1381-1383`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:629-631`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1381-1383`
 #[derive(Debug)]
 pub struct UiG2SettimeArgs {
     /// Time read directly from `args[1]`.
@@ -32,11 +32,11 @@ impl UiG2SettimeArgs {
 
 /// `UI_G2_SETTIME` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:170`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:170`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:629-631`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1381-1383`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1381-1383`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:170`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:170`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:629-631`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1381-1383`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1381-1383`
 pub struct UiG2Settime;
 
 impl OutboundSysCall for UiG2Settime {

@@ -3,7 +3,7 @@
 /// Raven `EMatImpactEffect` — material impact effect enumeration.
 ///
 /// Raven: (no comment).
-/// Type definition source: `oracle/oracle/codemp/client/FxPrimitives.h:101-105`
+/// Type definition source: `oracle/codemp/client/FxPrimitives.h:101-105`
 #[repr(i32)]
 pub enum EMatImpactEffect {
 	MATIMPACTFX_NONE = 0,

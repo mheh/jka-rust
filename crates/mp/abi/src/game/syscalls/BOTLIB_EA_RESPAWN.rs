@@ -24,7 +24,7 @@ impl BotlibEaRespawnArgs {
 
 /// `BOTLIB_EA_RESPAWN` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:393`
+/// Source: `oracle/codemp/game/g_public.h:393`
 pub struct BotlibEaRespawn;
 
 impl OutboundSysCall for BotlibEaRespawn {

@@ -6,7 +6,7 @@ use super::menucommon_s::menucommon_s;
 
 /// Raven `menulist_s`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:204-219`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:204-219`
 #[repr(C)]
 pub struct menulist_s {
 	pub generic: menucommon_s,

@@ -4,7 +4,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `ragCallbackDebugBox_t` — ragdoll debug-box callback payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:542-547`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:542-547`
 #[repr(C)]
 pub struct ragCallbackDebugBox_t {
 	pub mins: vec3_t,

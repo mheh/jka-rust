@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall(CG_Z_FREE,ptr);`
 /// Raven transport: `Z_Free((void *) VMA(1)); return 0;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:553-555`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:837-839`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:837-839`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:553-555`
+/// Output source: `oracle/code/client/cl_cgame.cpp:837-839`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:837-839`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgZFreeArgs {
     ptr: *mut c_void,
@@ -30,10 +30,10 @@ impl CgZFreeArgs {
 
 /// `CG_Z_FREE` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:191`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:553-555`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:837-839`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:837-839`
+/// Enum value source: `oracle/code/cgame/cg_public.h:191`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:553-555`
+/// Output source: `oracle/code/client/cl_cgame.cpp:837-839`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:837-839`
 pub struct CgZFree;
 
 impl OutboundSysCall for CgZFree {

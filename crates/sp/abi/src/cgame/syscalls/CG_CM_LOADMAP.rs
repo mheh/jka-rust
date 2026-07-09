@@ -11,8 +11,8 @@ use sp_qshared::shared::qboolean;
 /// Raven wrapper: `syscall( CG_CM_LOADMAP, mapname, subBSP );`
 /// Raven transport: `CL_CM_LoadMap( (const char *) VMA(1), args[2] );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:131-133`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:522-528`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:131-133`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:522-528`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmLoadmapArgs {
     mapname: *const c_char,
@@ -27,10 +27,10 @@ impl CgCmLoadmapArgs {
 
 /// `CG_CM_LOADMAP` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:81`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:131-133`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:522-528`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:522-528`
+/// Enum value source: `oracle/code/cgame/cg_public.h:81`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:131-133`
+/// Output source: `oracle/code/client/cl_cgame.cpp:522-528`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:522-528`
 pub struct CgCmLoadmap;
 
 impl OutboundSysCall for CgCmLoadmap {

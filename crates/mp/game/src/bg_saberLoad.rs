@@ -1,5 +1,5 @@
 // PORT-COMPLETE: bg_saberLoad.c 31/7 (pass-3 zero-park fill)
-//! Port of `oracle/oracle/codemp/game/bg_saberLoad.c`.
+//! Port of `oracle/codemp/game/bg_saberLoad.c`.
 //!
 //! This crate is `mp/game` (jampgame == Raven's `QAGAME`); the file's
 //! `#elif defined CGAME` branches are dead code here and are dropped per
@@ -27,7 +27,7 @@ use crate::bg_saga::FPTable;
 use mp_bg::public::saber_move_name::*;
 
 /// Raven `SaberTable` — saber-type name/id lookup table.
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:46-61`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:46-61`
 pub static SaberTable: [stringID_table_t; 13] = [
     stringID_table_t {
         name: c"SABER_NONE".as_ptr() as *mut c_char,
@@ -84,7 +84,7 @@ pub static SaberTable: [stringID_table_t; 13] = [
 ];
 
 /// Raven `SaberMoveTable` — saber-move name/id lookup table.
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:63-127`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:63-127`
 pub static SaberMoveTable: [stringID_table_t; 60] = [
     stringID_table_t {
         name: c"LS_NONE".as_ptr() as *mut c_char,
@@ -388,7 +388,7 @@ pub fn saber_snd_tape_drain() -> Vec<String> {
 ///
 /// Raven: builds under both `QAGAME` and `CGAME`; only the `QAGAME` branch
 /// (`G_SoundIndex`) is live in this crate (jampgame).
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:32-39`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:32-39`
 pub fn BG_SoundIndex(sound: *mut c_char) -> c_int {
     SABER_SND_TAPE.with(|t| {
         if let Some(v) = t.borrow_mut().as_mut() {
@@ -405,7 +405,7 @@ pub fn BG_SoundIndex(sound: *mut c_char) -> c_int {
 /// Raven `BG_ParseLiteral`.
 ///
 /// Raven: "Also used in npc code".
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:129-147`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:129-147`
 pub fn BG_ParseLiteral(data: *mut *const c_char, string: *const c_char) -> qboolean {
     unsafe {
         let token = crate::q_shared::COM_ParseExt(data, qtrue);
@@ -428,7 +428,7 @@ pub fn BG_ParseLiteral(data: *mut *const c_char, string: *const c_char) -> qbool
 
 /// Raven `TranslateSaberColor`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:149-180`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:149-180`
 pub fn TranslateSaberColor(name: *const c_char, bg: &mut BgState) -> saber_colors_t {
     unsafe {
         if qstricmp_eq(name, c"red") {
@@ -458,7 +458,7 @@ pub fn TranslateSaberColor(name: *const c_char, bg: &mut BgState) -> saber_color
 
 /// Raven `TranslateSaberStyle`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:182-213`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:182-213`
 pub fn TranslateSaberStyle(name: *const c_char) -> saber_styles_t {
     unsafe {
         if qstricmp_eq(name, c"fast") {
@@ -488,7 +488,7 @@ pub fn TranslateSaberStyle(name: *const c_char) -> saber_styles_t {
 
 /// Raven `WP_SaberBladeUseSecondBladeStyle`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:215-228`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:215-228`
 pub fn WP_SaberBladeUseSecondBladeStyle(saber: *mut saberInfo_t, bladeNum: c_int) -> qboolean {
     if !saber.is_null() {
         let saber = unsafe { &*saber };
@@ -501,7 +501,7 @@ pub fn WP_SaberBladeUseSecondBladeStyle(saber: *mut saberInfo_t, bladeNum: c_int
 
 /// Raven `WP_SaberBladeDoTransitionDamage`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:230-243`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:230-243`
 pub fn WP_SaberBladeDoTransitionDamage(saber: *mut saberInfo_t, bladeNum: c_int) -> qboolean {
     unsafe {
         if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == qfalse
@@ -521,7 +521,7 @@ pub fn WP_SaberBladeDoTransitionDamage(saber: *mut saberInfo_t, bladeNum: c_int)
 
 /// Raven `WP_UseFirstValidSaberStyle`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:245-351`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:245-351`
 pub fn WP_UseFirstValidSaberStyle(
     saber1: *mut saberInfo_t,
     saber2: *mut saberInfo_t,
@@ -626,7 +626,7 @@ pub fn WP_UseFirstValidSaberStyle(
 
 /// Raven `WP_SaberStyleValidForSaber`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:353-464`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:353-464`
 pub fn WP_SaberStyleValidForSaber(
     saber1: *mut saberInfo_t,
     saber2: *mut saberInfo_t,
@@ -741,7 +741,7 @@ pub fn WP_SaberStyleValidForSaber(
 // referenced by name per zero-park policy, reported as missing symbols.
 /// Raven `WP_SaberCanTurnOffSomeBlades`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:466-486`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:466-486`
 pub fn WP_SaberCanTurnOffSomeBlades(saber: *mut saberInfo_t) -> qboolean {
     unsafe {
         if (*saber).bladeStyle2Start > 0 && (*saber).numBlades > (*saber).bladeStyle2Start {
@@ -762,7 +762,7 @@ pub fn WP_SaberCanTurnOffSomeBlades(saber: *mut saberInfo_t) -> qboolean {
 
 /// Raven `WP_SaberSetDefaults`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:488-613`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:488-613`
 pub fn WP_SaberSetDefaults(saber: *mut saberInfo_t) {
     unsafe {
         let s = &mut *saber;
@@ -898,7 +898,7 @@ const DEFAULT_SABER: &std::ffi::CStr = c"Kyle";
 
 /// Raven `WP_SaberParseParms`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:617-2572`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:617-2572`
 // PORT-NOTE(missing-symbols): `SFL_*`/`SFL2_*` bitflag consts beyond
 // `SFL_TWO_HANDED` and the `SaberTable`/`SaberMoveTable`/`FPTable`/
 // `animTable` lookup statics are not yet ported; referenced by name per
@@ -2196,7 +2196,7 @@ pub fn WP_SaberParseParms(
 
 /// Raven `WP_SaberParseParm`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2574-2645`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2574-2645`
 // SHAPE-MISMATCH: this fn gained `bg: &mut BgState` (rulings 12/15) but its
 // existing caller `WP_SaberValidForPlayerInMP` (out of this packet's scope,
 // already ported above) still calls it with the old 3-arg shape — reported
@@ -2278,7 +2278,7 @@ pub fn WP_SaberParseParm(
 
 /// Raven `WP_SaberValidForPlayerInMP`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2647-2662`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2647-2662`
 pub fn WP_SaberValidForPlayerInMP(saberName: *const c_char, bg: &mut BgState) -> qboolean {
     unsafe {
         let mut allowed: [c_char; 8] = [0; 8];
@@ -2301,7 +2301,7 @@ pub fn WP_SaberValidForPlayerInMP(saberName: *const c_char, bg: &mut BgState) ->
 
 /// Raven `WP_RemoveSaber`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2664-2688`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2664-2688`
 pub fn WP_RemoveSaber(sabers: *mut saberInfo_t, saberNum: c_int) {
     if sabers.is_null() {
         return;
@@ -2321,7 +2321,7 @@ pub fn WP_RemoveSaber(sabers: *mut saberInfo_t, saberNum: c_int) {
 
 /// Raven `WP_SetSaber`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2690-2725`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2690-2725`
 pub fn WP_SetSaber(
     entNum: c_int,
     sabers: *mut saberInfo_t,
@@ -2368,7 +2368,7 @@ pub fn WP_SetSaber(
 
 /// Raven `WP_SaberSetColor`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2727-2734`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2727-2734`
 // PORT-NOTE(rng-cascade): gained `bg: &mut BgState` so its `TranslateSaberColor`
 // call reaches the shared `Rng` (the `"random"` color branch). This fn has no
 // callers in-tree, so no call site propagates the added param.
@@ -2391,7 +2391,7 @@ pub fn WP_SaberSetColor(
 
 /// Raven `WP_SaberLoadParms`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2738-2790`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2738-2790`
 // PORT-NOTE(vec-as-fixed-buffer): Raven's `SaberParms`/`bgSaberParseTBuffer`
 // are fixed `char[MAX_SABER_DATA_SIZE]` statics; `BgState` owns them as
 // growable `Vec<u8>`. Pre-sized here to `MAX_SABER_DATA_SIZE`
@@ -2492,7 +2492,7 @@ pub fn WP_SaberLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
 /// Raven `BG_BLADE_ActivateTrail`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2803-2807`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2803-2807`
 pub fn BG_BLADE_ActivateTrail(blade: *mut bladeInfo_t, duration: f32) {
     unsafe {
         (*blade).trail.inAction = qtrue;
@@ -2505,7 +2505,7 @@ pub fn BG_BLADE_ActivateTrail(blade: *mut bladeInfo_t, duration: f32) {
 
 /// Raven `BG_BLADE_DeactivateTrail`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2809-2813`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2809-2813`
 pub fn BG_BLADE_DeactivateTrail(blade: *mut bladeInfo_t, duration: f32) {
     unsafe {
         (*blade).trail.inAction = qfalse;
@@ -2515,7 +2515,7 @@ pub fn BG_BLADE_DeactivateTrail(blade: *mut bladeInfo_t, duration: f32) {
 
 /// Raven `BG_SI_Activate`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2815-2823`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2815-2823`
 pub fn BG_SI_Activate(saber: *mut saberInfo_t) {
     unsafe {
         for i in 0..(*saber).numBlades {
@@ -2526,7 +2526,7 @@ pub fn BG_SI_Activate(saber: *mut saberInfo_t) {
 
 /// Raven `BG_SI_Deactivate`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2825-2833`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2825-2833`
 pub fn BG_SI_Deactivate(saber: *mut saberInfo_t) {
     unsafe {
         for i in 0..(*saber).numBlades {
@@ -2539,7 +2539,7 @@ pub fn BG_SI_Deactivate(saber: *mut saberInfo_t) {
 ///
 /// Raven: Activate a specific Blade of this Saber.
 /// Created: 10/03/02 by Aurelio Reis, Modified: 10/03/02 by Aurelio Reis.
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2840-2847`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2840-2847`
 pub fn BG_SI_BladeActivate(saber: *mut saberInfo_t, iBlade: c_int, bActive: qboolean) {
     unsafe {
         // Validate blade ID/Index.
@@ -2552,7 +2552,7 @@ pub fn BG_SI_BladeActivate(saber: *mut saberInfo_t, iBlade: c_int, bActive: qboo
 
 /// Raven `BG_SI_Active`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2849-2861`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2849-2861`
 pub fn BG_SI_Active(saber: *mut saberInfo_t) -> qboolean {
     unsafe {
         for i in 0..(*saber).numBlades {
@@ -2566,7 +2566,7 @@ pub fn BG_SI_Active(saber: *mut saberInfo_t) -> qboolean {
 
 /// Raven `BG_SI_SetLength`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2863-2871`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2863-2871`
 pub fn BG_SI_SetLength(saber: *mut saberInfo_t, length: f32) {
     unsafe {
         for i in 0..(*saber).numBlades {
@@ -2578,7 +2578,7 @@ pub fn BG_SI_SetLength(saber: *mut saberInfo_t, length: f32) {
 /// Raven `BG_SI_SetDesiredLength`.
 ///
 /// Raven: "not in sp, added it for my own convenience".
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2874-2887`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2874-2887`
 pub fn BG_SI_SetDesiredLength(saber: *mut saberInfo_t, len: f32, bladeNum: c_int) {
     unsafe {
         let mut startBlade = 0;
@@ -2598,7 +2598,7 @@ pub fn BG_SI_SetDesiredLength(saber: *mut saberInfo_t, len: f32, bladeNum: c_int
 /// Raven `BG_SI_SetLengthGradual`.
 ///
 /// Raven: "also not in sp, added it for my own convenience".
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2890-2957`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2890-2957`
 pub fn BG_SI_SetLengthGradual(saber: *mut saberInfo_t, time: c_int) {
     unsafe {
         for i in 0..(*saber).numBlades {
@@ -2657,7 +2657,7 @@ pub fn BG_SI_SetLengthGradual(saber: *mut saberInfo_t, time: c_int) {
 /// Raven `BG_SI_Length`.
 ///
 /// Raven: return largest length.
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2959-2972`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2959-2972`
 pub fn BG_SI_Length(saber: *mut saberInfo_t) -> f32 {
     unsafe {
         // Raven's `len1` is `int`; the float blade length truncates on
@@ -2675,7 +2675,7 @@ pub fn BG_SI_Length(saber: *mut saberInfo_t) -> f32 {
 
 /// Raven `BG_SI_LengthMax`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2974-2987`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2974-2987`
 pub fn BG_SI_LengthMax(saber: *mut saberInfo_t) -> f32 {
     unsafe {
         let mut len1: c_int = 0;
@@ -2691,7 +2691,7 @@ pub fn BG_SI_LengthMax(saber: *mut saberInfo_t) -> f32 {
 
 /// Raven `BG_SI_ActivateTrail`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2989-2998`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2989-2998`
 pub fn BG_SI_ActivateTrail(saber: *mut saberInfo_t, duration: f32) {
     unsafe {
         for i in 0..(*saber).numBlades {
@@ -2705,7 +2705,7 @@ pub fn BG_SI_ActivateTrail(saber: *mut saberInfo_t, duration: f32) {
 
 /// Raven `BG_SI_DeactivateTrail`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:3000-3009`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:3000-3009`
 pub fn BG_SI_DeactivateTrail(saber: *mut saberInfo_t, duration: f32) {
     unsafe {
         for i in 0..(*saber).numBlades {

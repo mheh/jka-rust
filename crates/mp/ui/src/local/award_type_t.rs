@@ -2,7 +2,7 @@
 
 /// Raven `awardType_t` — award type enumeration.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:1064-1071`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:1064-1071`
 #[repr(i32)]
 pub enum awardType_t {
     AWARD_ACCURACY,

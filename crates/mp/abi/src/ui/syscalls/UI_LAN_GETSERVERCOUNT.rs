@@ -8,7 +8,7 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `return syscall( UI_LAN_GETSERVERCOUNT, source );`
 /// Raven transport: `return LAN_GetServerCount(args[1]);`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:270-271`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:270-271`
 #[derive(Debug)]
 pub struct UiLanGetservercountArgs {
     source: c_int,
@@ -29,10 +29,10 @@ impl UiLanGetservercountArgs {
 /// Raven wrapper: `return syscall( UI_LAN_GETSERVERCOUNT, source );`
 /// Raven transport: `return LAN_GetServerCount(args[1]);`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:95`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:270-271`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:964`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1085-1086`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:95`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:270-271`
+/// Output source: `oracle/codemp/ui/ui_local.h:964`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1085-1086`
 pub struct UiLanGetservercount;
 
 impl OutboundSysCall for UiLanGetservercount {

@@ -11,9 +11,9 @@ use abi_transport::generic::{
 /// Raven transport forwards the raw `refEntity_t` block through `VMA(1)`.
 /// Nothing is drawn until `R_RenderScene` is called.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:331-332`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2267`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:894-896`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:331-332`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2267`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:894-896`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRAddrefentitytosceneArgs {
     ref_entity: *const c_void,
@@ -31,10 +31,10 @@ impl CgRAddrefentitytosceneArgs {
 
 /// `CG_R_ADDREFENTITYTOSCENE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:151`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:331-332`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:894-896`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:894-896`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:151`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:331-332`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:894-896`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:894-896`
 pub struct CgRAddrefentitytoscene;
 
 impl OutboundSysCall for CgRAddrefentitytoscene {

@@ -23,7 +23,7 @@ impl GIcarusMaintaintaskmanagerArgs {
 
 /// `G_ICARUS_MAINTAINTASKMANAGER` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:258`
+/// Source: `oracle/codemp/game/g_public.h:258`
 pub struct GIcarusMaintaintaskmanager;
 
 impl OutboundSysCall for GIcarusMaintaintaskmanager {

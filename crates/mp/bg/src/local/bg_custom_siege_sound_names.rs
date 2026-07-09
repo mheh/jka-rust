@@ -8,8 +8,8 @@ use core::ffi::CStr;
 /// voice-order sound names; scanned by consumers until the `NULL` sentinel
 /// (`None`) is hit.
 ///
-/// Definition source: `oracle/oracle/codemp/game/bg_misc.c:113-145`
-/// Extern decl source: `oracle/oracle/codemp/game/bg_public.h:143`
+/// Definition source: `oracle/codemp/game/bg_misc.c:113-145`
+/// Extern decl source: `oracle/codemp/game/bg_public.h:143`
 pub static bg_customSiegeSoundNames: [Option<&CStr>; 30] = [
     Some(c"*att_attack"),
     Some(c"*att_primary"),

@@ -3,13 +3,13 @@ use abi_transport::generic::OutboundSysCall;
 
 /// `UI_UPDATESCREEN` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:180`
+/// Source: `oracle/code/ui/ui_public.h:180`
 pub struct UiUpdatescreen;
 
 impl OutboundSysCall for UiUpdatescreen {
     type Import = SpUiImport;
-    /// Args source: `oracle/oracle/code/client/cl_ui.cpp:992-994`
-    /// Output source: `oracle/oracle/code/client/cl_ui.cpp:992-994`
+    /// Args source: `oracle/code/client/cl_ui.cpp:992-994`
+    /// Output source: `oracle/code/client/cl_ui.cpp:992-994`
     /// (token-only RPC; wrapper calls `SCR_UpdateScreen()` and returns 0)
     type Args = ();
     type Output = ();

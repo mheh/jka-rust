@@ -6,7 +6,7 @@ use native_types::qhandle_t;
 
 /// Raven `addpolyArgStruct_t` (`addpolyArgStruct_s`) — `CG_ADDPOLY` VM syscall args.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2538-2556`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2538-2556`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct addpolyArgStruct_t {

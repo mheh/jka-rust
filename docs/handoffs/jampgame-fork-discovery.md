@@ -1,7 +1,7 @@
 # jampgame pre-port fork discovery (2026-07-03) — ALL RULINGS SETTLED
 
 Read-only investigation of the three broadest call trees in
-`oracle/oracle/codemp/game/` (G_RunFrame 887 in-module fns; ClientThink_real
+`oracle/codemp/game/` (G_RunFrame 887 in-module fns; ClientThink_real
 722; ClientSpawn chain 721; combined distinct reach 986 of ~2,000-2,500 —
 ~40-50% of the module and effectively all gameplay-visible code). Seam stops
 clean at ≤77 distinct trap_* — no surprise seam surface. Heavy bg_ crossing:

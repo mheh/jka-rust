@@ -6,7 +6,7 @@ use core::ffi::c_char;
 /// Raven `CCMShader` — a collision-model shader entry (name + surface/content flags),
 /// linked into a hash-bucket chain via `mNext`.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:73-85`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:73-85`
 #[repr(C)]
 pub struct CCMShader {
     pub shader: [c_char; MAX_QPATH as usize],

@@ -42,7 +42,7 @@ impl BotlibTestArgs {
 
 /// `BOTLIB_TEST` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:350`
+/// Source: `oracle/codemp/game/g_public.h:350`
 pub struct BotlibTest;
 
 impl OutboundSysCall for BotlibTest {

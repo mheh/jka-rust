@@ -42,7 +42,7 @@ impl UiG2SetmodelsArgs {
 
 /// `UI_G2_SETMODELS` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:510`
+/// Source: `oracle/codemp/ui/ui_public.h:510`
 pub struct UiG2Setmodels;
 
 impl OutboundSysCall for UiG2Setmodels {

@@ -29,7 +29,7 @@ impl BotlibAiMutateGoalFuzzyLogicArgs {
 
 /// `BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:484`
+/// Source: `oracle/codemp/game/g_public.h:484`
 pub struct BotlibAiMutateGoalFuzzyLogic;
 
 impl OutboundSysCall for BotlibAiMutateGoalFuzzyLogic {

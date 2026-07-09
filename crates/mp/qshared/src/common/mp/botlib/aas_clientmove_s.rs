@@ -6,7 +6,7 @@ use super::aas_trace_s::aas_trace_s;
 
 /// Raven `aas_clientmove_t` — result of client movement prediction.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_aas.h:162-173`
+/// Type definition source: `oracle/codemp/game/be_aas.h:162-173`
 #[repr(C)]
 pub struct aas_clientmove_t {
 	/// position at the end of movement prediction

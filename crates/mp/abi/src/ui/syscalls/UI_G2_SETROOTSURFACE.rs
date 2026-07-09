@@ -36,7 +36,7 @@ impl UiG2SetrootsurfaceArgs {
 
 /// `UI_G2_SETROOTSURFACE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:533`
+/// Source: `oracle/codemp/ui/ui_public.h:533`
 pub struct UiG2Setrootsurface;
 
 impl OutboundSysCall for UiG2Setrootsurface {

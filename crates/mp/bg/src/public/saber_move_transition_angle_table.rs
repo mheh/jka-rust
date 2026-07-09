@@ -1,6 +1,6 @@
 //! MP `bg_saber.c` quadrant-to-quadrant transition-angle lookup.
 //!
-//! Source: `oracle/oracle/codemp/game/bg_saber.c:715-781`
+//! Source: `oracle/codemp/game/bg_saber.c:715-781`
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
@@ -12,7 +12,7 @@ use super::saber_quadrant::saberQuadrant_t::Q_NUM_QUADS;
 /// `[from-quad][to-quad]` pair, the angle (degrees) swept by the transition.
 /// Row-major, matching the C flat initializer.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:715-781`
+/// Source: `oracle/codemp/game/bg_saber.c:715-781`
 #[rustfmt::skip]
 pub static saberMoveTransitionAngle: [[c_int; Q_NUM_QUADS as usize]; Q_NUM_QUADS as usize] = [
     [

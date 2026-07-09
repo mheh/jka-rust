@@ -2,7 +2,7 @@
 
 /// Raven `texMod_t` — texture modifier type.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:298-307`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:298-307`
 #[repr(i32)]
 pub enum texMod_t {
 	TMOD_NONE = 0,

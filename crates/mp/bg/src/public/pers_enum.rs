@@ -1,6 +1,6 @@
 //! MP `bg_public.h` persistent player statistics enumeration.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:539-556`
+//! Type definition source: `oracle/codemp/game/bg_public.h:539-556`
 
 #![allow(non_camel_case_types)]
 
@@ -8,7 +8,7 @@
 ///
 /// Raven: Enumeration for various persistent player statistics tracked across
 /// respawns and the game session, including score, rank, team, and awards.
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:539-556`
+/// Type definition source: `oracle/codemp/game/bg_public.h:539-556`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum persEnum_t {

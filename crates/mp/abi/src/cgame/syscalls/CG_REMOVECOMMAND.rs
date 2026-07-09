@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_REMOVECOMMAND, cmdName );`
 /// Raven transport: `Cmd_RemoveCommand( (const char *)VMA(1) ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:111-112`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:757-759`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:111-112`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:757-759`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRemovecommandArgs {
     cmd_name: *const c_char,
@@ -25,10 +25,10 @@ impl CgRemovecommandArgs {
 
 /// `CG_REMOVECOMMAND` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:80`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:111-112`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:757-759`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:757-759`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:80`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:111-112`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:757-759`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:757-759`
 pub struct CgRemovecommand;
 
 impl OutboundSysCall for CgRemovecommand {

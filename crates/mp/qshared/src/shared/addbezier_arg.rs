@@ -6,7 +6,7 @@ use native_types::qhandle_t;
 
 /// Raven `addbezierArgStruct_t` (`addbezierArgStruct_s`) — `CG_ADDBEZIER` VM args.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2558-2577`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2558-2577`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct addbezierArgStruct_t {

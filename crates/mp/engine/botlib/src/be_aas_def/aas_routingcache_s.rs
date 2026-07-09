@@ -5,7 +5,7 @@ use mp_qshared::shared::vec3_t;
 /// Raven `aas_routingcache_t` — a cached routing table for a portal or area.
 ///
 /// Raven: portal or area cache.
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:133-147`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:133-147`
 #[repr(C)]
 pub struct aas_routingcache_t {
     /// portal or area cache

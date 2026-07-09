@@ -7,7 +7,7 @@ use sp_qshared::shared::vec3_t;
 /// Raven `CTerVert` — a single landscape terxel's render data (position, lighting,
 /// texture coords, and tess-array bookkeeping).
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_landscape.h:24-37`
+/// Type definition source: `oracle/code/renderer/tr_landscape.h:24-37`
 #[repr(C)]
 pub struct CTerVert {
     /// real world coords of terxel

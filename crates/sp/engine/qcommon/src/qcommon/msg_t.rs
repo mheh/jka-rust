@@ -5,7 +5,7 @@ use sp_qshared::shared::qboolean;
 /// Raven `msg_t` — a growable read/write bit-stream buffer used for network
 /// messages and demo/save serialization.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/qcommon.h:26-34`
+/// Type definition source: `oracle/code/qcommon/qcommon.h:26-34`
 #[repr(C)]
 pub struct msg_t {
 	pub allowoverflow: qboolean, // if false, do a Com_Error

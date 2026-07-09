@@ -27,7 +27,7 @@ impl BotlibAasEnableRoutingAreaArgs {
 
 /// `BOTLIB_AAS_ENABLE_ROUTING_AREA` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:356`
+/// Source: `oracle/codemp/game/g_public.h:356`
 pub struct BotlibAasEnableRoutingArea;
 
 impl OutboundSysCall for BotlibAasEnableRoutingArea {

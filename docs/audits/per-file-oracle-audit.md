@@ -1,7 +1,7 @@
 # Per-file oracle audit ledger
 
 Line-level transcription audit of every `crates/mp/game/src/*.rs` file against
-its oracle TU (`oracle/oracle/codemp/game/`), per the GOAL.md audit gate.
+its oracle TU (`oracle/codemp/game/`), per the GOAL.md audit gate.
 Divergence classes hunted: inverted/mistranscribed conditions, f32-vs-f64
 promotion through double libm, empty-`Vec`-vs-fixed-array state init, silent
 C UB needing §19 decisions. Status: `pending` / `in-review` / `audited`
@@ -132,7 +132,8 @@ Refuted candidates are recorded so later waves don't re-litigate them.
 - **Parked (shared with faithful port — fixing here alone would diverge from
   the differential baseline):** `PM_CheckJump` flip-anim `fabs*1.5` compare
   (rs:~2793 / c:1988); `PM_SetVehicleAngles` water-pitch outer add (rs:~398 /
-  c:526). Fix only together with `oracle/` faithful port, if ever.
+  c:526). Fix only together with the faithful-port harness
+  (`github.com/mheh/jedi-academy-rust`), if ever.
 - Verified-clean quirks preserved: `mins[0]`-twice duck bug, always-false NPC
   `VectorCompare`, uninitialized-clamp vehicle view path.
 - Lead: `vectoyaw`/`vectoangles` atan2 width (checked in the wave-1 fix round).

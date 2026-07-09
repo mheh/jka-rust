@@ -1,12 +1,12 @@
 //! SP `saberType_t`.
 //!
-//! Type definition source: `oracle/oracle/code/game/q_shared.h:1561-1577`
+//! Type definition source: `oracle/code/game/q_shared.h:1561-1577`
 
 #![allow(non_camel_case_types)]
 
 /// Raven SP `saberType_t` — identical to MP.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1561-1577`
+/// Type definition source: `oracle/code/game/q_shared.h:1561-1577`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum saberType_t {

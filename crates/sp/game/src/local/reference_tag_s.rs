@@ -4,12 +4,12 @@ use core::ffi::c_char;
 
 use sp_qshared::shared::vec3_t;
 
-/// Raven `MAX_REFNAME`. Source: `oracle/oracle/code/game/g_local.h:568`
+/// Raven `MAX_REFNAME`. Source: `oracle/code/game/g_local.h:568`
 pub const MAX_REFNAME: usize = 32;
 
 /// Raven `reference_tag_s` — a named navigation/reference point.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_local.h:573-580`
+/// Type definition source: `oracle/code/game/g_local.h:573-580`
 #[repr(C)]
 pub struct reference_tag_t {
 	pub name: [c_char; MAX_REFNAME],

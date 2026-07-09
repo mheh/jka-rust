@@ -1,6 +1,6 @@
 //! SP `bg_public.h` player movement type enumeration.
 //!
-//! Type definition source: `oracle/oracle/code/game/bg_public.h:63-70`
+//! Type definition source: `oracle/code/game/bg_public.h:63-70`
 
 #![allow(non_camel_case_types)]
 
@@ -8,7 +8,7 @@
 ///
 /// Enumeration indicating the current movement mode or physics state
 /// of a player character, ranging from normal movement to spectator to dead.
-/// Type definition source: `oracle/oracle/code/game/bg_public.h:63-70`
+/// Type definition source: `oracle/code/game/bg_public.h:63-70`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum pmtype_t {

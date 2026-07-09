@@ -1,6 +1,6 @@
 //! SP `saberMoveData_t` — table-driven data for a single saber animation move.
 //!
-//! Type definition source: `oracle/oracle/code/game/wp_saber.h:428-440`
+//! Type definition source: `oracle/code/game/wp_saber.h:428-440`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -12,7 +12,7 @@ use super::saber_move_name_t::saberMoveName_t;
 
 /// Raven `saberMoveData_t` — table-driven data for a single saber animation move.
 ///
-/// Type definition source: `oracle/oracle/code/game/wp_saber.h:428-440`
+/// Type definition source: `oracle/code/game/wp_saber.h:428-440`
 #[repr(C)]
 pub struct saberMoveData_t {
     pub name: *mut c_char,

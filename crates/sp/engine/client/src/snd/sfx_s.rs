@@ -9,7 +9,7 @@ use crate::snd::sound_compression_method_t::SoundCompressionMethod_t;
 
 /// Raven `sfx_s` — a loaded/loadable sound effect (typedef'd as `sfx_t`).
 ///
-/// Type definition source: `oracle/oracle/code/client/snd_local.h:48-65`
+/// Type definition source: `oracle/code/client/snd_local.h:48-65`
 #[repr(C)]
 pub struct sfx_t {
     pub pSoundData: *mut i16,

@@ -4,12 +4,12 @@ use core::ffi::c_char;
 
 /// `MAX_STRINGFIELD`.
 ///
-/// Source: `oracle/oracle/codemp/botlib/l_struct.h:16`
+/// Source: `oracle/codemp/botlib/l_struct.h:16`
 const MAX_STRINGFIELD: usize = 80;
 
 /// Raven `projectileinfo_t` — bot AI weapon projectile info.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_ai_weap.h:27-43`
+/// Type definition source: `oracle/codemp/game/be_ai_weap.h:27-43`
 #[repr(C)]
 pub struct projectileinfo_t {
 	pub name: [c_char; MAX_STRINGFIELD],

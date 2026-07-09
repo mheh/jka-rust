@@ -4,7 +4,7 @@ use mp_qshared::shared::{sfxHandle_t, vec3_t};
 
 /// Raven `cgLoopSound_t` — a looping sound attached to an entity or a fixed point.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:324-329`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:324-329`
 #[repr(C)]
 pub struct cgLoopSound_t {
 	pub entityNum: i32,

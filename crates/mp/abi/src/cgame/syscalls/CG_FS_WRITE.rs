@@ -12,8 +12,8 @@ use mp_qshared::shared::fileHandle_t;
 /// forwards the raw buffer pointer, byte count, and file handle.
 ///
 /// Sources:
-/// - args: `oracle/oracle/codemp/cgame/cg_syscalls.c:91-92`
-/// - transport: `oracle/oracle/codemp/client/cl_cgame.cpp:742-743`
+/// - args: `oracle/codemp/cgame/cg_syscalls.c:91-92`
+/// - transport: `oracle/codemp/client/cl_cgame.cpp:742-743`
 #[derive(Debug)]
 pub struct CgFsWriteArgs {
     buffer: *const u8,
@@ -42,7 +42,7 @@ impl CgFsWriteArgs {
 /// `CG_FS_WRITE` MP cgame imports syscall ABI token.
 ///
 /// Raven: `( const void *buffer, int len, fileHandle_t f );`
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:75`
+/// Source: `oracle/codemp/cgame/cg_public.h:75`
 pub struct CgFsWrite;
 
 impl OutboundSysCall for CgFsWrite {
@@ -52,8 +52,8 @@ impl OutboundSysCall for CgFsWrite {
     /// `0` to the VM.
     ///
     /// Sources:
-    /// - wrapper output: `oracle/oracle/codemp/cgame/cg_syscalls.c:91-92`
-    /// - switch output: `oracle/oracle/codemp/client/cl_cgame.cpp:742-744`
+    /// - wrapper output: `oracle/codemp/cgame/cg_syscalls.c:91-92`
+    /// - switch output: `oracle/codemp/client/cl_cgame.cpp:742-744`
     type Output = ();
 
     const IMPORT: MpCgameImport = MpCgameImport::CG_FS_WRITE;

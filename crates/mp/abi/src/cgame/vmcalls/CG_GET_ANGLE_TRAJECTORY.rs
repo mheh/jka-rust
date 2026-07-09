@@ -8,7 +8,7 @@ use mp_qshared::shared::trajectory_t;
 
 /// Arguments for `CG_GET_ANGLE_TRAJECTORY`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:296-297`
+/// Args source: `oracle/codemp/cgame/cg_main.c:296-297`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgGetAngleTrajectoryArgs {
     ent_num: c_int,
@@ -27,12 +27,12 @@ impl CgGetAngleTrajectoryArgs {
 /// `CG_GET_ANGLE_TRAJECTORY` MP cgame exports vmMain ABI token.
 ///
 /// Raven: int entnum
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:422`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:296-297`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:296-297`
-/// Output type source: `oracle/oracle/codemp/game/q_shared.h:2654-2660`
-/// Transport/call-site source: `oracle/oracle/codemp/qcommon/RoffSystem.cpp:838`
-/// Transport/call-site source: `oracle/oracle/codemp/qcommon/RoffSystem.cpp:984`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:422`
+/// Args source: `oracle/codemp/cgame/cg_main.c:296-297`
+/// Output source: `oracle/codemp/cgame/cg_main.c:296-297`
+/// Output type source: `oracle/codemp/game/q_shared.h:2654-2660`
+/// Transport/call-site source: `oracle/codemp/qcommon/RoffSystem.cpp:838`
+/// Transport/call-site source: `oracle/codemp/qcommon/RoffSystem.cpp:984`
 pub struct CgGetAngleTrajectory;
 
 impl InboundVmCall for CgGetAngleTrajectory {

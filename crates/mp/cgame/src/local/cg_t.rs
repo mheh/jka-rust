@@ -15,32 +15,32 @@ use super::skulltrail_t::skulltrail_t;
 
 /// Raven `MAX_REWARDSTACK`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:736`
+/// Source: `oracle/codemp/cgame/cg_local.h:736`
 pub const MAX_REWARDSTACK: usize = 10;
 
 /// Raven `MAX_SOUNDBUFFER`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:737`
+/// Source: `oracle/codemp/cgame/cg_local.h:737`
 pub const MAX_SOUNDBUFFER: usize = 20;
 
 /// Raven `MAX_PREDICTED_EVENTS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:744`
+/// Source: `oracle/codemp/cgame/cg_local.h:744`
 pub const MAX_PREDICTED_EVENTS: usize = 16;
 
 /// Raven `MAX_CHATBOX_ITEMS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:747`
+/// Source: `oracle/codemp/cgame/cg_local.h:747`
 pub const MAX_CHATBOX_ITEMS: usize = 5;
 
 /// Raven `MAX_CG_SHARED_BUFFER_SIZE`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:593`
+/// Source: `oracle/codemp/cgame/cg_public.h:593`
 pub const MAX_CG_SHARED_BUFFER_SIZE: usize = 2048;
 
 /// Raven `cg_t` — cgame per-frame local state, the "everything" struct.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:755-1014`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:755-1014`
 #[repr(C)]
 pub struct cg_t {
 	/// incremented each frame

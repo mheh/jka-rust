@@ -27,7 +27,7 @@ impl BotlibAiCharacteristicIntegerArgs {
 
 /// `BOTLIB_AI_CHARACTERISTIC_INTEGER` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:417`
+/// Source: `oracle/codemp/game/g_public.h:417`
 pub struct BotlibAiCharacteristicInteger;
 
 impl OutboundSysCall for BotlibAiCharacteristicInteger {

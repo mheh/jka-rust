@@ -12,9 +12,9 @@ use abi_transport::generic::{
 /// Raven transport: writes `glConfig.vidWidth` to `(int *)VMA(1)` and
 /// `glConfig.vidHeight` to `(int *)VMA(2)`, then returns 0.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:431-434`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2303`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1066-1073`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:431-434`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2303`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1066-1073`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRGetrealresArgs {
     w: *mut c_int,
@@ -29,10 +29,10 @@ impl CgRGetrealresArgs {
 
 /// `CG_R_GETREALRES` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:173`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:431-434`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1066-1073`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1066-1073`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:173`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:431-434`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1066-1073`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1066-1073`
 pub struct CgRGetrealres;
 
 impl OutboundSysCall for CgRGetrealres {

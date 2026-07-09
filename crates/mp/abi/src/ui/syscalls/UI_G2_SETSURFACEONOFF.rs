@@ -40,7 +40,7 @@ impl UiG2SetsurfaceonoffArgs {
 
 /// `UI_G2_SETSURFACEONOFF` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:534`
+/// Source: `oracle/codemp/ui/ui_public.h:534`
 pub struct UiG2Setsurfaceonoff;
 
 impl OutboundSysCall for UiG2Setsurfaceonoff {

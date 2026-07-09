@@ -2,7 +2,7 @@
 
 /// Raven `hunkAllocType_t` — hunk allocation type categories.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/qfiles.h:573-585`
+/// Type definition source: `oracle/code/qcommon/qfiles.h:573-585`
 #[repr(i32)]
 pub enum hunkAllocType_t {
 	HA_MISC = 0,

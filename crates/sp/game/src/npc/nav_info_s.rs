@@ -6,7 +6,7 @@ use sp_qshared::shared::vec3_t;
 
 /// Raven `navInfo_t` — navigation query result/state for NPC path movement.
 ///
-/// Type definition source: `oracle/oracle/code/game/b_local.h:340-348`
+/// Type definition source: `oracle/code/game/b_local.h:340-348`
 #[repr(C)]
 pub struct navInfo_t {
 	pub blocker: *mut gentity_t,

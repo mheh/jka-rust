@@ -7,7 +7,7 @@ use super::c_leaf_t::cLeaf_t;
 
 /// Raven `cmodel_t` — a collision model (a submodel's bounds + leaf + main-tree node).
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_local.h:45-49`
+/// Type definition source: `oracle/codemp/qcommon/cm_local.h:45-49`
 #[repr(C)]
 pub struct cmodel_s {
     pub mins: vec3_t,

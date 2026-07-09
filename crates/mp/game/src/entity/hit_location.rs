@@ -2,7 +2,7 @@
 //!
 //! Raven anonymous enum ending in `HL_MAX`; sizes `gentity_t::locationDamage`
 //! (qshared also exposes `HL_MAX` as a `usize` for that array).
-//! Source: `oracle/oracle/codemp/game/g_local.h:98-123`
+//! Source: `oracle/codemp/game/g_local.h:98-123`
 
 use core::ffi::c_int;
 

@@ -8,7 +8,7 @@ use mp_qshared::shared::vec3_t;
 /// polygon, file-local to `sv_bot.cpp` (`SV_BotAllocDebugPolygon` et al.). The
 /// `points[128]` bound is a literal in Raven (no named constant).
 ///
-/// Type definition source: `oracle/oracle/codemp/server/sv_bot.cpp:6-14`
+/// Type definition source: `oracle/codemp/server/sv_bot.cpp:6-14`
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct bot_debugpoly_t {

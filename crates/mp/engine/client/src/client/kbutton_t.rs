@@ -7,7 +7,7 @@ use mp_qshared::shared::qboolean;
 /// Raven: (field comments) `down` = key nums holding it down; `downtime` = msec
 /// timestamp; `msec` = msec down this frame if both a down and up happened;
 /// `active` = current state; `wasPressed` = set when down, not cleared when up.
-/// Type definition source: `oracle/oracle/codemp/client/client.h:479-485`
+/// Type definition source: `oracle/codemp/client/client.h:479-485`
 #[repr(C)]
 pub struct kbutton_t {
     pub down: [i32; 2],

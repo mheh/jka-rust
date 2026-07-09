@@ -20,7 +20,7 @@ impl GArgcArgs {
 ///
 /// Raven: ( void );
 /// Raven: ClientCommand and ServerCommand parameter access
-/// Source: `oracle/oracle/codemp/game/g_public.h:128`
+/// Source: `oracle/codemp/game/g_public.h:128`
 pub struct GArgc;
 
 impl OutboundSysCall for GArgc {

@@ -24,7 +24,7 @@ impl BotlibPcLoadSourceArgs {
 
 /// `BOTLIB_PC_LOAD_SOURCE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:498`
+/// Source: `oracle/codemp/game/g_public.h:498`
 pub struct BotlibPcLoadSource;
 
 impl OutboundSysCall for BotlibPcLoadSource {

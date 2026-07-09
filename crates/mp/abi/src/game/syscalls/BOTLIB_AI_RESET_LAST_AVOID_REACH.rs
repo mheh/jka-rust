@@ -21,7 +21,7 @@ impl BotlibAiResetLastAvoidReachArgs {
 
 /// `BOTLIB_AI_RESET_LAST_AVOID_REACH` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:468`
+/// Source: `oracle/codemp/game/g_public.h:468`
 pub struct BotlibAiResetLastAvoidReach;
 
 impl OutboundSysCall for BotlibAiResetLastAvoidReach {

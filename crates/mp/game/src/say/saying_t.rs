@@ -2,7 +2,7 @@
 
 /// Raven `saying_t` — enum of pre-recorded voice command responses.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/say.h:4-28`
+/// Type definition source: `oracle/codemp/game/say.h:4-28`
 #[repr(i32)]
 pub enum saying_t {
     //Acknowledge command

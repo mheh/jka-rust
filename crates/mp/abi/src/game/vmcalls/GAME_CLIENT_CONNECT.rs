@@ -45,10 +45,10 @@ impl GameClientConnectArgs {
 
 /// `GAME_CLIENT_CONNECT` MP game exports vmMain ABI token.
 ///
-/// Source (enum): `oracle/oracle/codemp/game/g_public.h:742`
-/// Source (args): `oracle/oracle/codemp/game/g_main.c:523`
-/// Source (output): `oracle/oracle/codemp/game/g_main.c:523`
-/// Source (call site): `oracle/oracle/codemp/server/sv_client.cpp:520`
+/// Source (enum): `oracle/codemp/game/g_public.h:742`
+/// Source (args): `oracle/codemp/game/g_main.c:523`
+/// Source (output): `oracle/codemp/game/g_main.c:523`
+/// Source (call site): `oracle/codemp/server/sv_client.cpp:520`
 pub struct GameClientConnect;
 
 impl InboundVmCall for GameClientConnect {

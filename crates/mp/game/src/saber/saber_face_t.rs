@@ -7,7 +7,7 @@ use mp_qshared::shared::vec3_t;
 ///
 /// Raven: file-local to `G_BuildSaberFaces`/`G_SaberFaceCollisionCheck`; not
 /// ABI-crossing, so no `#[repr(C)]`/layout asserts are required.
-/// Type definition source: `oracle/oracle/codemp/game/w_saber.c:2446-2451`
+/// Type definition source: `oracle/codemp/game/w_saber.c:2446-2451`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct saberFace_t {
     pub v1: vec3_t,

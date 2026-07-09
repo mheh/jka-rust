@@ -2,7 +2,7 @@
 
 /// Raven `TCGIncomingConsoleCommand` — incoming console command buffer.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:507-510`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:507-510`
 #[repr(C)]
 pub struct TCGIncomingConsoleCommand {
     pub conCommand: [u8; 1024],

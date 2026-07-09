@@ -7,7 +7,7 @@ use super::search_step::SearchStep;
 /// `mp_engine_qcommon`** (LOAD-D9), never by `native/platform` (which stays
 /// cvar-free, porting-rules §B3). All paths are already resolved when built.
 ///
-/// Source: `oracle/oracle/codemp/win32/win_main.cpp:811-887` (`Sys_LoadDll`).
+/// Source: `oracle/codemp/win32/win_main.cpp:811-887` (`Sys_LoadDll`).
 pub struct ModuleSearchPolicy {
     pub naming: ModuleNaming,
     /// Bare `LoadLibrary(filename)` / CWD-default probe tried first (MP Win32

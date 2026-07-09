@@ -12,9 +12,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `return syscall(CG_G2_GETRAGBONEPOS, ghoul2, boneName, pos, entAngles, entPos, entScale);`
 /// Raven transport: `return G2API_GetRagBonePos(*((CGhoul2Info_v *)args[1]), (const char *)VMA(2), (float *)VMA(3), (float *)VMA(4), (float *)VMA(5), (float *)VMA(6));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1025-1027`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2577`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1601-1602`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1025-1027`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2577`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1601-1602`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2GetragboneposArgs {
     ghoul2: *mut c_void,
@@ -48,10 +48,10 @@ impl CgG2GetragboneposArgs {
 /// `CG_G2_GETRAGBONEPOS` MP cgame imports syscall ABI token.
 ///
 /// Raven: current position of said bone is put into pos (world coordinates)
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:310`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1025-1027`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1601-1602`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1601-1602`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:310`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1025-1027`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1601-1602`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1601-1602`
 pub struct CgG2Getragbonepos;
 
 impl OutboundSysCall for CgG2Getragbonepos {

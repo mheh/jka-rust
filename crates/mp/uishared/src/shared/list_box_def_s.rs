@@ -7,12 +7,12 @@ use mp_qshared::shared::qboolean;
 use super::column_info_s::columnInfo_t;
 
 // Raven `#define MAX_LB_COLUMNS 16`.
-// Source: `oracle/oracle/codemp/ui/ui_shared.h:164`
+// Source: `oracle/codemp/ui/ui_shared.h:164`
 const MAX_LB_COLUMNS: usize = 16;
 
 /// Raven `listBoxDef_s` — list box layout/state definition.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:172-186`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:172-186`
 #[repr(C)]
 pub struct listBoxDef_s {
     pub startPos: c_int,
@@ -32,7 +32,7 @@ pub struct listBoxDef_s {
 
 /// Raven `listBoxDef_t` — `typedef struct listBoxDef_s listBoxDef_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:172-186`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:172-186`
 pub type listBoxDef_t = listBoxDef_s;
 
 #[cfg(target_pointer_width = "64")]

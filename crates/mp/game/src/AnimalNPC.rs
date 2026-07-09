@@ -1,5 +1,5 @@
 // PORT-COMPLETE: AnimalNPC.c 2/7
-//! FAITHFUL port of `oracle/oracle/codemp/game/AnimalNPC.c` (MP `_JK2MP` +
+//! FAITHFUL port of `oracle/codemp/game/AnimalNPC.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!
 //! Generated from the `fnskel.py` signature skeleton; bodies transcribed per
@@ -23,7 +23,7 @@ use crate::prelude::*;
 
 /// Raven `DeathUpdate` — update death sequence.
 ///
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:97-148`
+/// Source: `oracle/codemp/game/AnimalNPC.c:97-148`
 pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let level_time = level_time(ctx);
@@ -40,7 +40,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven `Update` — like a think or move command, this updates various
 /// vehicle properties.
 ///
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:151-154`
+/// Source: `oracle/codemp/game/AnimalNPC.c:151-154`
 pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
         // Animal `Update` delegates to the generic base body.
@@ -54,7 +54,7 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_
 /// If you really need to violate this rule for SP, then use ifdefs.
 /// By BG-compatible, I mean no use of game-specific data - ONLY use
 /// stuff available in the MP bgEntity.
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:168-329`
+/// Source: `oracle/codemp/game/AnimalNPC.c:168-329`
 pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut speedInc: f32;
@@ -152,7 +152,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// If you really need to violate this rule for SP, then use ifdefs.
 /// By BG-compatible, I mean no use of game-specific data - ONLY use
 /// stuff available in the MP bgEntity.
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:338-464`
+/// Source: `oracle/codemp/game/AnimalNPC.c:338-464`
 pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity;
@@ -230,14 +230,14 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven `AnimalProcessOri` — temp hack til mp speeder controls are sorted
 /// (`_JK2MP` only).
 ///
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:467-470`
+/// Source: `oracle/codemp/game/AnimalNPC.c:467-470`
 pub fn AnimalProcessOri(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     ProcessOrientCommands(ctx, pVeh);
 }
 
 /// Raven `AnimateVehicle`.
 ///
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:474-615`
+/// Source: `oracle/codemp/game/AnimalNPC.c:474-615`
 pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut anim: animNumber_t = BOTH_VT_IDLE;
@@ -349,7 +349,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 ///
 /// Raven: rwwFIXMEFIXME: This is all going to have to be predicted I think,
 /// or it will feel awful and lagged.
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:620-849`
+/// Source: `oracle/codemp/game/AnimalNPC.c:620-849`
 pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut anim: animNumber_t = BOTH_VT_IDLE;
@@ -546,7 +546,7 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// (initializing it as well).
 ///
 /// Raven: this is a BG function too in MP so don't un-bg-compatibilify it.
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:904-925`
+/// Source: `oracle/codemp/game/AnimalNPC.c:904-925`
 pub fn G_CreateAnimalNPC(
     ctx: GameContext<'_>,
     pVeh: *mut *mut Vehicle_t,

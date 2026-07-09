@@ -2,7 +2,7 @@
 
 /// Raven `endFrameCommand_t` — end-of-frame render command.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:2004-2007`
+/// Type definition source: `oracle/code/renderer/tr_local.h:2004-2007`
 #[repr(C)]
 pub struct endFrameCommand_t {
     pub commandId: i32,

@@ -2,7 +2,7 @@
 
 /// Raven `alphaGen_t` — Alpha generation type.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:214-228`
+/// Type definition source: `oracle/code/renderer/tr_local.h:214-228`
 #[repr(i32)]
 pub enum alphaGen_t {
 	AGEN_IDENTITY = 0,

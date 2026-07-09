@@ -6,7 +6,7 @@ use crate::shared::vec3_t;
 
 /// Raven `bot_input_t` — bot movement/view input for a single AI frame.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/botlib.h:93-101`
+/// Type definition source: `oracle/codemp/game/botlib.h:93-101`
 #[repr(C)]
 pub struct bot_input_t {
 	/// time since last output (in seconds)

@@ -10,12 +10,12 @@ use super::client_s::client_s;
 /// `MAX_CHALLENGES` is made large to prevent a denial of service attack that
 /// could cycle all of them out before legitimate users connected.
 ///
-/// Source: `oracle/oracle/codemp/server/server.h:190`
+/// Source: `oracle/codemp/server/server.h:190`
 pub const MAX_CHALLENGES: usize = 1024;
 
 /// Raven `serverStatic_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../server/server.h:208-228`
+/// Type definition source: `oracle/codemp/qcommon/../server/server.h:208-228`
 #[repr(C)]
 pub struct serverStatic_t {
     /// sv_init has completed

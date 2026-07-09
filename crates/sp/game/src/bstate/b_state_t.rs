@@ -3,7 +3,7 @@
 /// Raven `bState_t` — NPC behavior state enumeration.
 ///
 /// Raven: These take over only if script allows them to be autonomous.
-/// Type definition source: `oracle/oracle/code/game/bstate.h:5-27`
+/// Type definition source: `oracle/code/game/bstate.h:5-27`
 #[repr(i32)]
 pub enum bState_t {
     BS_DEFAULT = 0,           // default behavior for that NPC

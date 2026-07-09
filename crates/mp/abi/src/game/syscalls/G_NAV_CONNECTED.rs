@@ -28,7 +28,7 @@ impl GNavConnectedArgs {
 
 /// `G_NAV_CONNECTED` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:314`
+/// Source: `oracle/codemp/game/g_public.h:314`
 pub struct GNavConnected;
 
 impl OutboundSysCall for GNavConnected {

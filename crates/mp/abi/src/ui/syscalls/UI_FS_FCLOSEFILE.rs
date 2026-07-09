@@ -9,9 +9,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// syscall: `syscall!(UI_FS_FCLOSEFILE, f)`
 ///
 /// Sources:
-/// - Args: `oracle/oracle/codemp/ui/ui_syscalls.c:95-96`
-/// - Output: `oracle/oracle/codemp/client/cl_ui.cpp:747`
-/// - Transport/switch: `oracle/oracle/codemp/client/cl_ui.cpp:745-747`
+/// - Args: `oracle/codemp/ui/ui_syscalls.c:95-96`
+/// - Output: `oracle/codemp/client/cl_ui.cpp:747`
+/// - Transport/switch: `oracle/codemp/client/cl_ui.cpp:745-747`
 #[derive(Debug)]
 pub struct CgFsFclosefileArgs {
     /// File handle to close (`fileHandle_t`, which is `int` in C).
@@ -31,7 +31,7 @@ impl CgFsFclosefileArgs {
 /// `UI_FS_FCLOSEFILE` MP cgame imports syscall ABI token.
 ///
 /// Raven: ( fileHandle_t f );
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:76`
+/// Source: `oracle/codemp/ui/ui_public.h:76`
 pub struct CgFsFclosefile;
 
 impl OutboundSysCall for CgFsFclosefile {

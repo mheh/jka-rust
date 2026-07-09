@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_R_WORLD_EFFECT_COMMAND, command );`
 /// Raven transport: `re.WorldEffectCommand((const char *) VMA(1));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:514-516`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:813-815`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:514-516`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:813-815`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRWorldEffectCommandArgs {
     command: *const c_char,
@@ -25,10 +25,10 @@ impl CgRWorldEffectCommandArgs {
 
 /// `CG_R_WORLD_EFFECT_COMMAND` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:183`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:514-516`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:813-815`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:813-815`
+/// Enum value source: `oracle/code/cgame/cg_public.h:183`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:514-516`
+/// Output source: `oracle/code/client/cl_cgame.cpp:813-815`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:813-815`
 pub struct CgRWorldEffectCommand;
 
 impl OutboundSysCall for CgRWorldEffectCommand {

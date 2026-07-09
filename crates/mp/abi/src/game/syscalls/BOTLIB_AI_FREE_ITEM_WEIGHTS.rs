@@ -20,7 +20,7 @@ impl BotlibAiFreeItemWeightsArgs {
 
 /// `BOTLIB_AI_FREE_ITEM_WEIGHTS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:459`
+/// Source: `oracle/codemp/game/g_public.h:459`
 pub struct BotlibAiFreeItemWeights;
 
 impl OutboundSysCall for BotlibAiFreeItemWeights {

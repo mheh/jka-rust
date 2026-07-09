@@ -4,7 +4,7 @@ use core::ffi::c_char;
 
 /// Raven `modInfo_t` — a single loadable-mod list entry.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:711-714`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:711-714`
 #[repr(C)]
 pub struct modInfo_t {
 	pub modName: *const c_char,

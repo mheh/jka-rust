@@ -32,7 +32,7 @@ impl GInPvsIgnorePortalsArgs {
 /// `G_IN_PVS_IGNORE_PORTALS` MP game imports syscall ABI token.
 ///
 /// Raven: ( const vec3_t p1, const vec3_t p2 );
-/// Source: `oracle/oracle/codemp/game/g_public.h:193`
+/// Source: `oracle/codemp/game/g_public.h:193`
 pub struct GInPvsIgnorePortals;
 
 impl OutboundSysCall for GInPvsIgnorePortals {

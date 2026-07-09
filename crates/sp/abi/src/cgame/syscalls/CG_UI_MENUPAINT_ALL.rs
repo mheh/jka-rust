@@ -6,18 +6,18 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall(CG_UI_MENUPAINT_ALL);`
 /// Raven transport: `Menu_PaintAll(); return 0;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:613-615`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:887-889`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:887-889`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:613-615`
+/// Output source: `oracle/code/client/cl_cgame.cpp:887-889`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:887-889`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiMenupaintAllArgs;
 
 /// `CG_UI_MENUPAINT_ALL` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:202`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:613-615`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:887-889`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:887-889`
+/// Enum value source: `oracle/code/cgame/cg_public.h:202`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:613-615`
+/// Output source: `oracle/code/client/cl_cgame.cpp:887-889`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:887-889`
 pub struct CgUiMenupaintAll;
 
 impl OutboundSysCall for CgUiMenupaintAll {

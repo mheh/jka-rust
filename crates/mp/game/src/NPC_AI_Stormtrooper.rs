@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_Stormtrooper.c 26/26
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Stormtrooper.c`.
 //!
 //! Landed from the `fnskel.py` signature skeleton; the pass-3 mega-pass fills
 //! every remaining body against the settled fork rulings (ctx threading,
@@ -65,7 +65,7 @@ use mp_bg::public::weaponstate::weaponstate_t::WEAPON_READY;
 // (`b_local.h:243-264`).
 
 // File-scope constants (`#define`).
-// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:19-34`
+// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:19-34`
 pub const MAX_VIEW_DIST: f32 = 1024.0;
 pub const MAX_VIEW_SPEED: f32 = 250.0;
 pub const MAX_LIGHT_INTENSITY: f32 = 255.0;
@@ -107,7 +107,7 @@ unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut ge
 // Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }`
 // (file-scope local state, `gNPC_t::localState`) — not a central type, ported
 // as file-local consts matching the C values.
-// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:53-58`
+// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:53-58`
 const LSTATE_NONE: i32 = 0;
 const LSTATE_UNDERFIRE: i32 = 1;
 const LSTATE_INVESTIGATE: i32 = 2;
@@ -115,7 +115,7 @@ const LSTATE_INVESTIGATE: i32 = 2;
 // Raven's anonymous `enum { SPEECH_CHASE, ... SPEECH_PUSHED }` (file-scope
 // speech-type selector for `ST_Speech`) — not a central type, ported as
 // file-local consts matching the C values.
-// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:106-122`
+// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:106-122`
 pub const SPEECH_CHASE: i32 = 0;
 pub const SPEECH_CONFUSED: i32 = 1;
 pub const SPEECH_COVER: i32 = 2;
@@ -136,7 +136,7 @@ pub const SPEECH_PUSHED: i32 = 13;
 /// Raven: good guys (`NPCTEAM_PLAYER`) are less aggressive (clamp 1-7); bad
 /// guys are more aggressive (clamp 3-10). //FIXME: base this on initial NPC
 /// stats (Raven comment).
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:60-86`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:60-86`
 pub fn ST_AggressionAdjust(self_: *mut gentity_t, change: c_int) {
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
@@ -159,7 +159,7 @@ pub fn ST_AggressionAdjust(self_: *mut gentity_t, change: c_int) {
 
 /// Raven `ST_ClearTimers`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:88-104`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:88-104`
 pub fn ST_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
     TIMER_Set(ctx, ent, c"chatter".as_ptr() as *const c_char, 0);
     TIMER_Set(ctx, ent, c"duck".as_ptr() as *const c_char, 0);
@@ -180,12 +180,12 @@ pub fn ST_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `ST_Speech`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:124-225`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:124-225`
 pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int, failChance: f32) {
     unsafe {
         let world = &mut *ctx.world;
         // Raven's `random()` macro: `(rand() & 0x7fff) / (float)0x7fff`.
-        // Source: `oracle/oracle/codemp/game/q_shared.h:1591`
+        // Source: `oracle/codemp/game/q_shared.h:1591`
         let random_val = world.bg_state.rng.random();
         if random_val < failChance {
             return;
@@ -372,7 +372,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
 
 /// Raven `ST_MarkToCover`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:227-240`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:227-240`
 pub fn ST_MarkToCover(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if self_.is_null() || (*self_).NPC.is_null() {
@@ -396,7 +396,7 @@ pub fn ST_MarkToCover(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ST_StartFlee`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:242-253`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:242-253`
 pub fn ST_StartFlee(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -429,7 +429,7 @@ pub fn ST_StartFlee(
 
 /// Raven `NPC_ST_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:260-274`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:260-274`
 pub fn NPC_ST_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -463,7 +463,7 @@ pub fn NPC_ST_Pain(
 
 /// Raven `ST_HoldPosition`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:282-302`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:282-302`
 pub fn ST_HoldPosition(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -503,7 +503,7 @@ pub fn ST_HoldPosition(ctx: GameContext<'_>) {
 
 /// Raven `NPC_ST_SayMovementSpeech`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:304-325`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:304-325`
 pub fn NPC_ST_SayMovementSpeech(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -544,7 +544,7 @@ pub fn NPC_ST_SayMovementSpeech(ctx: GameContext<'_>) {
 
 /// Raven `NPC_ST_StoreMovementSpeech`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:327-331`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:327-331`
 pub fn NPC_ST_StoreMovementSpeech(ctx: GameContext<'_>, speech: c_int, chance: f32) {
     unsafe {
         let world = &mut *ctx.world;
@@ -556,7 +556,7 @@ pub fn NPC_ST_StoreMovementSpeech(ctx: GameContext<'_>, speech: c_int, chance: f
 
 /// Raven `ST_Move`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:338-390`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:338-390`
 pub fn ST_Move(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         let world = &mut *ctx.world;
@@ -626,7 +626,7 @@ pub fn ST_Move(ctx: GameContext<'_>) -> qboolean {
 
 /// Raven `NPC_ST_SleepShuffle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:399-439`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:399-439`
 pub fn NPC_ST_SleepShuffle(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -667,7 +667,7 @@ pub fn NPC_ST_SleepShuffle(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSST_Sleep`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:447-468`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:447-468`
 pub fn NPC_BSST_Sleep(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -700,7 +700,7 @@ pub fn NPC_BSST_Sleep(ctx: GameContext<'_>) {
 
 /// Raven `NPC_CheckEnemyStealth`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:476-725`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:476-725`
 pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qboolean {
     unsafe {
         let world = &mut *ctx.world;
@@ -988,7 +988,7 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
 
 /// Raven `NPC_CheckPlayerTeamStealth`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:727-757`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:727-757`
 pub fn NPC_CheckPlayerTeamStealth(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         let world = &mut *ctx.world;
@@ -1022,7 +1022,7 @@ pub fn NPC_CheckPlayerTeamStealth(ctx: GameContext<'_>) -> qboolean {
 
 /// Raven `NPC_ST_InvestigateEvent`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:766-919`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:766-919`
 pub fn NPC_ST_InvestigateEvent(
     ctx: GameContext<'_>,
     eventID: c_int,
@@ -1243,7 +1243,7 @@ pub fn NPC_ST_InvestigateEvent(
 
 /// Raven `ST_OffsetLook`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:927-938`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:927-938`
 pub fn ST_OffsetLook(ctx: GameContext<'_>, offset: f32, out: &mut vec3_t) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1272,7 +1272,7 @@ pub fn ST_OffsetLook(ctx: GameContext<'_>, offset: f32, out: &mut vec3_t) {
 
 /// Raven `ST_LookAround`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:946-970`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:946-970`
 pub fn ST_LookAround(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1303,7 +1303,7 @@ pub fn ST_LookAround(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSST_Investigate`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:978-1069`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:978-1069`
 pub fn NPC_BSST_Investigate(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1410,7 +1410,7 @@ pub fn NPC_BSST_Investigate(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSST_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1077-1181`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1077-1181`
 pub fn NPC_BSST_Patrol(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1536,7 +1536,7 @@ pub fn NPC_BSST_Patrol(ctx: GameContext<'_>) {
 
 /// Raven `ST_CheckMoveState`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1212-1358`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1212-1358`
 pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1720,7 +1720,7 @@ pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
 
 /// Raven `ST_ResolveBlockedShot`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1360-1403`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1360-1403`
 pub fn ST_ResolveBlockedShot(ctx: GameContext<'_>, hit: c_int) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1775,7 +1775,7 @@ pub fn ST_ResolveBlockedShot(ctx: GameContext<'_>, hit: c_int) {
 
 /// Raven `ST_CheckFireState`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1411-1534`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1411-1534`
 pub fn ST_CheckFireState(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1925,7 +1925,7 @@ pub fn ST_CheckFireState(ctx: GameContext<'_>) {
 
 /// Raven `ST_TrackEnemy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1536-1548`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1536-1548`
 pub fn ST_TrackEnemy(ctx: GameContext<'_>, self_: *mut gentity_t, enemyPos: vec3_t) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1961,7 +1961,7 @@ pub fn ST_TrackEnemy(ctx: GameContext<'_>, self_: *mut gentity_t, enemyPos: vec3
 
 /// Raven `ST_ApproachEnemy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1550-1561`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1550-1561`
 pub fn ST_ApproachEnemy(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
     unsafe {
         let world = &mut *ctx.world;
@@ -1996,7 +1996,7 @@ pub fn ST_ApproachEnemy(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
 
 /// Raven `ST_HuntEnemy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1563-1577`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1563-1577`
 pub fn ST_HuntEnemy(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let world = &mut *ctx.world;
@@ -2032,7 +2032,7 @@ pub fn ST_HuntEnemy(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ST_TransferTimers`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1579-1593`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1579-1593`
 pub fn ST_TransferTimers(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mut gentity_t) {
     unsafe {
         let world = &mut *ctx.world;
@@ -2085,7 +2085,7 @@ pub fn ST_TransferTimers(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mu
 
 /// Raven `ST_TransferMoveGoal`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1595-1626`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1595-1626`
 pub fn ST_TransferMoveGoal(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mut gentity_t) {
     unsafe {
         let world = &mut *ctx.world;
@@ -2148,7 +2148,7 @@ pub fn ST_TransferMoveGoal(ctx: GameContext<'_>, self_: *mut gentity_t, other: *
 
 /// Raven `ST_GetCPFlags`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1628-1710`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1628-1710`
 pub fn ST_GetCPFlags(ctx: GameContext<'_>) -> c_int {
     unsafe {
         let world = &mut *ctx.world;
@@ -2222,7 +2222,7 @@ pub fn ST_GetCPFlags(ctx: GameContext<'_>) -> c_int {
 
 /// Raven `ST_Commander`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1724-2401`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1724-2401`
 pub fn ST_Commander(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -3010,7 +3010,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSST_Attack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:2409-2724`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:2409-2724`
 pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -3324,7 +3324,7 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSST_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:2726-2742`
+/// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:2726-2742`
 pub fn NPC_BSST_Default(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;

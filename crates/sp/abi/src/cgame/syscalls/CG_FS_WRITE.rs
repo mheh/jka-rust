@@ -11,8 +11,8 @@ use sp_qshared::shared::fileHandle_t;
 /// Raven wrapper: `return syscall( CG_FS_WRITE, buffer, len, f );`
 /// Raven transport: `FS_Write( VMA(1), args[2], args[3] );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:90-92`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:467-469`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:90-92`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:467-469`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFsWriteArgs {
     buffer: *const c_void,
@@ -28,10 +28,10 @@ impl CgFsWriteArgs {
 
 /// `CG_FS_WRITE` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:72`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:90-92`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:467-469`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:467-469`
+/// Enum value source: `oracle/code/cgame/cg_public.h:72`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:90-92`
+/// Output source: `oracle/code/client/cl_cgame.cpp:467-469`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:467-469`
 pub struct CgFsWrite;
 
 impl OutboundSysCall for CgFsWrite {

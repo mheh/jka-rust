@@ -8,7 +8,7 @@ use mp_qshared::shared::trajectory_t;
 
 /// Arguments for `CG_GET_ORIGIN_TRAJECTORY`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:293-295`
+/// Args source: `oracle/codemp/cgame/cg_main.c:293-295`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgGetOriginTrajectoryArgs {
     ent_num: c_int,
@@ -27,10 +27,10 @@ impl CgGetOriginTrajectoryArgs {
 /// `CG_GET_ORIGIN_TRAJECTORY` MP cgame exports vmMain ABI token.
 ///
 /// Raven: int entnum
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:421`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:293-295`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:293-295`
-/// Output type source: `oracle/oracle/codemp/game/q_shared.h:2654-2660`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:421`
+/// Args source: `oracle/codemp/cgame/cg_main.c:293-295`
+/// Output source: `oracle/codemp/cgame/cg_main.c:293-295`
+/// Output type source: `oracle/codemp/game/q_shared.h:2654-2660`
 /// Transport/call-site source: no engine call-site found in initial search; module vmMain switch proves arg slots.
 pub struct CgGetOriginTrajectory;
 

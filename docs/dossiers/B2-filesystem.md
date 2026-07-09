@@ -2,7 +2,7 @@
 
 Scope: the virtual filesystem (search paths, pak files, handles) — MP
 `qcommon/files_common.cpp`+`files_pc.cpp`, SP `code/qcommon/files_common.cpp`+
-`files_pc.cpp`. Every claim cites `oracle/oracle/<path>:<line>`. Builds on
+`files_pc.cpp`. Every claim cites `oracle/<path>:<line>`. Builds on
 `docs/dossiers/A2-state-ownership.md` §1d (FS global census).
 
 Status: complete.
@@ -11,9 +11,9 @@ Status: complete.
 
 ## 0. Build-canonical verification
 
-**MP**: confirmed via `oracle/oracle/codemp/jk2mp.vcproj:1466,1497`,
-`oracle/oracle/codemp/WinDed.vcproj:219,222`, and
-`oracle/oracle/codemp/unix/makefile:305-307,396,398` (the `ded` target) — all
+**MP**: confirmed via `oracle/codemp/jk2mp.vcproj:1466,1497`,
+`oracle/codemp/WinDed.vcproj:219,222`, and
+`oracle/codemp/unix/makefile:305-307,396,398` (the `ded` target) — all
 three real MP build targets (client, dedicated Windows, dedicated Linux) link
 `files_common.cpp` + `files_pc.cpp`. `files.cpp` (a single-TU merge of both,
 used only by the `q3static` unix target at `unix/makefile:933,1114`) and
@@ -21,10 +21,10 @@ used only by the `q3static` unix target at `unix/makefile:933,1114`) and
 build — consistent with A2 and the CLAUDE.md caveat. `unix/files_linux.cpp` is
 a thin platform shim, not a third variant of the FS core.
 
-**SP**: `oracle/oracle/code/starwars.vcproj:1000,1027` (the real PC exe
+**SP**: `oracle/code/starwars.vcproj:1000,1027` (the real PC exe
 project) links `files_common.cpp` + `files_pc.cpp` — the **same pairing as
-MP**. `files_console.cpp` (1033 lines, `oracle/oracle/code/qcommon/`) is
-Xbox-only per `oracle/oracle/code/x_exe/x_exe.vcproj:264,267` (which pairs
+MP**. `files_console.cpp` (1033 lines, `oracle/code/qcommon/`) is
+Xbox-only per `oracle/code/x_exe/x_exe.vcproj:264,267` (which pairs
 `files_common.cpp` + `files_console.cpp`, no `files_pc.cpp`). So for SP PC,
 `files_console.cpp` is the dead variant, not `files.cpp` (SP has no top-level
 `files.cpp` at all — only MP does). **Correction to task framing**: "files.cpp
@@ -41,8 +41,8 @@ no pure-server code, see §6).
 
 ### 1a. Global state (builds on A2 §1d)
 
-All declared in `oracle/oracle/codemp/qcommon/files_common.cpp:183-224`,
-extern'd in `oracle/oracle/codemp/qcommon/files.h:103-143`:
+All declared in `oracle/codemp/qcommon/files_common.cpp:183-224`,
+extern'd in `oracle/codemp/qcommon/files.h:103-143`:
 
 - `fs_gamedir[MAX_OSPATH]` — current gamedir name only (no separators), L183.
 - Cvars `fs_debug, fs_homepath, fs_basepath, fs_basegame, fs_cdpath,
@@ -133,9 +133,9 @@ are unconditionally prepended to `fs_searchpaths` (L1531-1536).
 
 ## 2. Pak (zip) reading
 
-- Vendored minizip fork: `oracle/oracle/codemp/qcommon/unzip.{h,cpp}` (1337
+- Vendored minizip fork: `oracle/codemp/qcommon/unzip.{h,cpp}` (1337
   + 289 lines) and sibling `zlib32/`. SP has its own copy at
-  `oracle/oracle/code/qcommon/unzip.{h,cpp}`. Per project policy these become
+  `oracle/code/qcommon/unzip.{h,cpp}`. Per project policy these become
   Rust `zip`/`flate2` crate calls at the seam (see Design forks).
 - Entry points actually called from `files_pc.cpp`: `unzOpen`,
   `unzGetGlobalInfo`, `unzGoToFirstFile`/`unzGoToNextFile`,
@@ -184,10 +184,10 @@ are unconditionally prepended to `fs_searchpaths` (L1531-1536).
 
 **`fsh` size correction to A2**: A2 §1d cites `fsh[MAX_FILE_HANDLES=16]` for
 MP. That constant is conditional:
-`oracle/oracle/codemp/qcommon/qcommon.h:507-511` —
+`oracle/codemp/qcommon/qcommon.h:507-511` —
 `#ifdef _XBOX` → 16, `#else` → **64**. The PC build (the build-canonical one
 per §0) is non-Xbox, so **MP's real `fsh` array is `fileHandleData_t[64]`**,
-not 16. SP has no such conditional: `oracle/oracle/code/qcommon/files.h:58`
+not 16. SP has no such conditional: `oracle/code/qcommon/files.h:58`
 hardcodes `MAX_FILE_HANDLES 16` unconditionally — so SP really is 16. Net:
 **MP=64, SP=16**, not "16" for both as the task's shorthand `fsh[16]`
 suggested.

@@ -2,7 +2,7 @@
 
 /// Raven `surfaceType_t` — surface type enumeration.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:656-678`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:656-678`
 #[repr(i32)]
 pub enum surfaceType_t {
 	SF_BAD = 0,

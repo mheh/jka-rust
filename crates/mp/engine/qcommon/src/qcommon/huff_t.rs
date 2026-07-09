@@ -5,7 +5,7 @@ use super::nodetype::node_t;
 /// Raven `huff_t` — adaptive Huffman coder state (tree, free-list bookkeeping,
 /// and the fixed node/pointer pools it allocates from).
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:1057-1069`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:1057-1069`
 #[repr(C)]
 pub struct huff_t {
 	pub blocNode: i32,

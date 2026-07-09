@@ -22,7 +22,7 @@ impl BotlibAiFreeChatStateArgs {
 
 /// `BOTLIB_AI_FREE_CHAT_STATE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:422`
+/// Source: `oracle/codemp/game/g_public.h:422`
 pub struct BotlibAiFreeChatState;
 
 impl OutboundSysCall for BotlibAiFreeChatState {

@@ -4,12 +4,12 @@ use mp_qshared::shared::vec3_t;
 
 /// Number of lightmaps per `drawVert_t`.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:500`
+/// Source: `oracle/codemp/qcommon/../qcommon/qfiles.h:500`
 pub const MAXLIGHTMAPS: usize = 4;
 
 /// Raven `drawVert_t` — BSP surface vertex.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:514-520`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:514-520`
 #[repr(C)]
 pub struct drawVert_t {
 	pub xyz: vec3_t,

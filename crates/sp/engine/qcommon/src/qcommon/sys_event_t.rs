@@ -5,7 +5,7 @@ use super::sys_event_type_t::sysEventType_t;
 /// Raven `sysEvent_t` — a single input/system event pulled from the platform
 /// event queue (key, mouse, console, packet, etc.).
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/qcommon.h:744-750`
+/// Type definition source: `oracle/code/qcommon/qcommon.h:744-750`
 #[repr(C)]
 pub struct sysEvent_t {
 	pub evTime: i32,

@@ -11,15 +11,15 @@ use super::ctrland_scape::CTRLandScape;
 /// Raven `CTRPatch` — one renderer-side terrain patch: its bounds, blended shaders
 /// for the two triangles, and visibility state for the current frame.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_landscape.h:52-101`
+/// Type definition source: `oracle/codemp/renderer/tr_landscape.h:52-101`
 #[repr(C)]
 pub struct CTRPatch {
     //TODO: Port CCMLandScape
-    // Source: oracle/oracle/codemp/qcommon/cm_landscape.h:135
+    // Source: oracle/codemp/qcommon/cm_landscape.h:135
     pub owner: *mut c_void,
     pub localowner: *mut CTRLandScape,
     //TODO: Port CCMPatch
-    // Source: oracle/oracle/codemp/qcommon/cm_landscape.h:90
+    // Source: oracle/codemp/qcommon/cm_landscape.h:90
     pub common: *mut c_void,
     /// Real world center of the patch
     pub mCenter: vec3_t,

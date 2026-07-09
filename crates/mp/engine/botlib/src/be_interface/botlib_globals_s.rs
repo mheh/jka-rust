@@ -6,7 +6,7 @@
 /// `maxentities` maximum number of entities; `maxclients` maximum number of
 /// clients; `time` the global time. The `#ifdef DEBUG` fields (`debug`,
 /// `goalareanum`, `goalorigin`, `runai`) are compiled out of release builds.
-/// Type definition source: `oracle/oracle/codemp/botlib/be_interface.h:19-31`
+/// Type definition source: `oracle/codemp/botlib/be_interface.h:19-31`
 #[repr(C)]
 pub struct botlib_globals_t {
     pub botlibsetup: i32,

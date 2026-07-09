@@ -4,7 +4,7 @@
 ///
 /// Raven: I'm defining this '<' operator so this struct can be used as an STL
 /// <map> key... (C++-only comparator, not ported).
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:119-131`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:119-131`
 #[repr(C)]
 pub struct mdxaCompQuatBone_t {
     pub Comp: [u8; 14],

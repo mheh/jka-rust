@@ -5,7 +5,7 @@
 /// the tree/list structures used by the Huffman coder.
 ///
 /// Raven: tree structure / doubly-linked list / highest ranked node in block.
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:1047-1053`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:1047-1053`
 #[repr(C)]
 pub struct node_t {
 	pub left: *mut node_t,

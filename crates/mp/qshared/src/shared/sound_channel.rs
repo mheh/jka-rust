@@ -7,7 +7,7 @@ use core::ffi::c_int;
 /// Raven declares this as `typedef int` alongside a separate anonymous enum of
 /// channel ids, so the alias stays an int and the enumerators are `const`s.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1945-1961`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1945-1961`
 pub type soundChannel_t = c_int;
 
 /// Raven: Auto-picks an empty channel to play sound on

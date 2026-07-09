@@ -25,7 +25,7 @@ harness: tools/gp2-oracle/ (run.sh, stubs/, main.cpp, fixtures/, golden/, README
 parity tests: crates/mp/engine/qcommon/tests/gp2_parity.rs and the sp_qshared twin.`
 
 const RULES = `HOUSE RULES (binding — docs/porting-rules.md, esp. §F rules 17-21):
-- NEVER edit anything under oracle/oracle/. Never commit; leave work for review.
+- NEVER edit anything under oracle/. Never commit; leave work for review.
 - This is the C++ TRACK: idiomatic reimplementation, NOT byte-faithful. No
   #[repr(C)], no offset asserts. Behavior parity is what's checked — the
   differential goldens are the spec.
@@ -76,7 +76,7 @@ Oracle sources: MP ${JSON.stringify(A.mpOracle)} SP ${JSON.stringify(A.spOracle)
    (path:lines), .cpp method-block cite, method count.
 2. MP-vs-SP: diff the twins; per class, one line on behavioral divergences
    (not formatting) — e.g. GP2's SP AddGroup never sets mParent.
-3. Consumer API surface: grep the rest of oracle/oracle for call sites of
+3. Consumer API surface: grep the rest of oracle for call sites of
    these classes; list method names actually called by consumers (this drives
    the differential dump format and which API must exist).
 4. File-statics / globals the .cpp files rely on (they must become owned state).

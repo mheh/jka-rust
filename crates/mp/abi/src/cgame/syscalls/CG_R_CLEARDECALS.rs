@@ -3,7 +3,7 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 
 /// `CG_R_CLEARDECALS` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:150`
+/// Source: `oracle/codemp/cgame/cg_public.h:150`
 pub struct CgRCleardecals;
 
 impl OutboundSysCall for CgRCleardecals {

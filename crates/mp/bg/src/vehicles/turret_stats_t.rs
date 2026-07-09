@@ -5,12 +5,12 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `MAX_VEHICLE_TURRET_MUZZLES`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:87`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:87`
 pub const MAX_VEHICLE_TURRET_MUZZLES: usize = 2;
 
 /// Raven `turretStats_t` — static data describing a vehicle-mounted turret.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:89-110`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:89-110`
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct turretStats_t {

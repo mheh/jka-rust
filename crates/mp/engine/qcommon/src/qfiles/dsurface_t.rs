@@ -8,7 +8,7 @@ use super::draw_vert_t::MAXLIGHTMAPS;
 
 /// Raven `dsurface_t` — on-disk BSP surface (drawsurface) record.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qfiles.h:538-559`
+/// Type definition source: `oracle/codemp/qcommon/qfiles.h:538-559`
 #[repr(C)]
 pub struct dsurface_t {
 	pub shaderNum: i32,

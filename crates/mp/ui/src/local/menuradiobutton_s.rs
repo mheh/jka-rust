@@ -4,7 +4,7 @@ use super::menucommon_s::menucommon_s;
 
 /// Raven `menuradiobutton_s` — a radio-button menu item.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:226-230`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:226-230`
 #[repr(C)]
 pub struct menuradiobutton_s {
 	pub generic: menucommon_s,

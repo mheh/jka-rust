@@ -2,5 +2,5 @@
 
 /// Raven `TGenericParser2` — opaque handle to a generic parser instance.
 ///
-/// Type definition source: `oracle/oracle/code/game/genericparser2.h:172-172`
+/// Type definition source: `oracle/code/game/genericparser2.h:172-172`
 pub type TGenericParser2 = *mut ::core::ffi::c_void;

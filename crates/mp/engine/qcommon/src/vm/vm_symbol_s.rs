@@ -4,7 +4,7 @@
 ///
 /// Raven: `symName[1]` is variable sized — the real allocation trails extra bytes
 /// for the name past this one-byte placeholder.
-/// Type definition source: `oracle/oracle/codemp/qcommon/vm_local.h:101-106`
+/// Type definition source: `oracle/codemp/qcommon/vm_local.h:101-106`
 #[repr(C)]
 pub struct vmSymbol_t {
 	pub next: *mut vmSymbol_t,

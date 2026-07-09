@@ -1,6 +1,6 @@
 //! SP `sharedSetBoneIKStateParams_t` copied from Raven `code/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/code/game/q_shared.h:2591-2602`
+//! Source: `oracle/code/game/q_shared.h:2591-2602`
 
 #![allow(non_camel_case_types)]
 

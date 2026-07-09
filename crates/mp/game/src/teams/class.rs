@@ -1,6 +1,6 @@
 //! MP `class_t` — NPC class enumeration.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/teams.h:17-77`
+//! Type definition source: `oracle/codemp/game/teams.h:17-77`
 
 #![allow(non_camel_case_types)]
 
@@ -8,7 +8,7 @@
 ///
 /// Raven: made up from the model directories; MUST be in the same order as the
 /// `ClassNames` array in `NPC_stats.cpp`.
-/// Type definition source: `oracle/oracle/codemp/game/teams.h:17-77`
+/// Type definition source: `oracle/codemp/game/teams.h:17-77`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum class_t {

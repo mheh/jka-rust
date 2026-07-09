@@ -5,7 +5,7 @@ use core::ffi::{c_char, c_float, c_int, c_ulong, c_void};
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::shared::vec3_t;
 
-// Raven's `DWORD` (`oracle/oracle/codemp/qcommon/platform.h:13-20`): an unsigned
+// Raven's `DWORD` (`oracle/codemp/qcommon/platform.h:13-20`): an unsigned
 // 32-bit integer on the platforms this codebase targets.
 type DWORD = c_ulong;
 
@@ -13,7 +13,7 @@ type DWORD = c_ulong;
 /// through.
 ///
 /// Raven: (unnamed).
-/// Type definition source: `oracle/oracle/codemp/game/../icarus/interface.h:17-70`
+/// Type definition source: `oracle/codemp/game/../icarus/interface.h:17-70`
 #[repr(C)]
 pub struct interface_export_s {
     // General
@@ -155,9 +155,9 @@ pub struct interface_export_s {
         ) -> c_int,
     >,
     //TODO: Port CSequencer
-    // Source: oracle/oracle/codemp/game/../icarus/interface.h:68
+    // Source: oracle/codemp/game/../icarus/interface.h:68
     //TODO: Port CTaskManager
-    // Source: oracle/oracle/codemp/game/../icarus/interface.h:68
+    // Source: oracle/codemp/game/../icarus/interface.h:68
     pub I_LinkEntity: Option<
         unsafe extern "C" fn(
             entID: c_int,

@@ -6,7 +6,7 @@ use sp_qshared::shared::vec3_t;
 
 /// Raven `md3Frame_t` — MD3 model animation frame.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:106-111`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:106-111`
 #[repr(C)]
 pub struct md3Frame_t {
 	pub bounds: [vec3_t; 2],

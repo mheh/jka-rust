@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_GETCLIPBOARDDATA, buf, bufsize );`
 /// Raven transport: `GetClipboardData((char *)VMA(1), args[2]); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:254-255`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1040-1042`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:254-255`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1040-1042`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiGetclipboarddataArgs {
     buf: *mut c_char,
@@ -34,11 +34,11 @@ impl UiGetclipboarddataArgs {
 
 /// `UI_GETCLIPBOARDDATA` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:61`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:52-62`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:254-255`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1040-1042`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1040-1042`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:61`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:52-62`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:254-255`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1040-1042`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1040-1042`
 pub struct UiGetclipboarddata;
 
 impl OutboundSysCall for UiGetclipboarddata {

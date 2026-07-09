@@ -17,11 +17,11 @@ const HEIGHT_RESOLUTION: usize = 256;
 /// Raven `CTRLandScape` — the renderer-side landscape instance: patch storage,
 /// sort order, terrain shaders, and per-height detail shaders.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_landscape.h:121-188`
+/// Type definition source: `oracle/code/renderer/tr_landscape.h:121-188`
 #[repr(C)]
 pub struct CTRLandScape {
     //TODO: Port CCMLandScape
-    // Source: oracle/oracle/code/qcommon/cm_landscape.h:135
+    // Source: oracle/code/qcommon/cm_landscape.h:135
     pub common: *const c_void,
     /// Local patch info
     pub mTRPatches: *mut CTRPatch,

@@ -2,7 +2,7 @@
 
 /// Raven `ammoData_t` — per-ammo-type data.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_weapons.h:87-91`
+/// Type definition source: `oracle/codemp/game/bg_weapons.h:87-91`
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct ammoData_t {

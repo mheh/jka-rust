@@ -16,7 +16,7 @@ impl BotlibShutdownArgs {
 /// `BOTLIB_SHUTDOWN` MP game imports syscall ABI token.
 ///
 /// Raven: ( void );
-/// Source: `oracle/oracle/codemp/game/g_public.h:343`
+/// Source: `oracle/codemp/game/g_public.h:343`
 pub struct BotlibShutdown;
 
 impl OutboundSysCall for BotlibShutdown {

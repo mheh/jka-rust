@@ -1,12 +1,12 @@
 //! SP `bg_public.h` means of death enumeration.
 //!
-//! Type definition source: `oracle/oracle/code/game/bg_public.h:560-617`
+//! Type definition source: `oracle/code/game/bg_public.h:560-617`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `meansOfDeath_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/bg_public.h:560-617`
+/// Type definition source: `oracle/code/game/bg_public.h:560-617`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum meansOfDeath_t {

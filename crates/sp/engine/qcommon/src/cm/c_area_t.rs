@@ -2,7 +2,7 @@
 
 /// Raven `cArea_t` — flood-fill area tracking for connectivity queries.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:95-98`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:95-98`
 #[repr(C)]
 pub struct cArea_t {
     pub floodnum: i32,

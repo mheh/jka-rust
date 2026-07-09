@@ -4,7 +4,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `aas_plane_t` — AAS map plane.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:157-162`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:157-162`
 #[repr(C)]
 pub struct aas_plane_t {
 	/// normal vector of the plane

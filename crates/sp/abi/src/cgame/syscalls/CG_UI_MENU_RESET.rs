@@ -6,20 +6,20 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall(CG_UI_MENU_RESET);`
 /// Raven transport: `Menu_Reset(); return 0;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:568-570`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1209`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:849-851`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:568-570`
+/// Args source: `oracle/code/cgame/cg_local.h:1209`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:849-851`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiMenuResetArgs;
 
 /// `CG_UI_MENU_RESET` SP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/cgame/cg_public.h:192`
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:192`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:568-570`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1209`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:849-851`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:849-851`
+/// Source: `oracle/code/cgame/cg_public.h:192`
+/// Enum value source: `oracle/code/cgame/cg_public.h:192`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:568-570`
+/// Args source: `oracle/code/cgame/cg_local.h:1209`
+/// Output source: `oracle/code/client/cl_cgame.cpp:849-851`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:849-851`
 pub struct CgUiMenuReset;
 
 impl OutboundSysCall for CgUiMenuReset {

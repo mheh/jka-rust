@@ -9,7 +9,7 @@ use super::patch_plane_t::patchPlane_t;
 
 /// Raven `patchCollide_s` — collision representation of a curved-surface patch.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_patch.h:93-99`
+/// Type definition source: `oracle/codemp/qcommon/cm_patch.h:93-99`
 #[repr(C)]
 pub struct patchCollide_s {
     pub bounds: [vec3_t; 2],

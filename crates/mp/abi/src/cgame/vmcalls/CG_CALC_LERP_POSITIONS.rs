@@ -24,10 +24,10 @@ impl CgCalcLerpPositionsArgs {
 /// `CG_CALC_LERP_POSITIONS` MP cgame exports vmMain ABI token.
 ///
 /// Raven: void CG_CalcEntityLerpPositions(int num);
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:402-403`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:239-241`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:239-241`
-/// Transport/switch source: no engine call-site found in initial search; module vmMain switch at `oracle/oracle/codemp/cgame/cg_main.c:239-241` proves arg0 entity index.
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:402-403`
+/// Args source: `oracle/codemp/cgame/cg_main.c:239-241`
+/// Output source: `oracle/codemp/cgame/cg_main.c:239-241`
+/// Transport/switch source: no engine call-site found in initial search; module vmMain switch at `oracle/codemp/cgame/cg_main.c:239-241` proves arg0 entity index.
 pub struct CgCalcLerpPositions;
 
 impl InboundVmCall for CgCalcLerpPositions {

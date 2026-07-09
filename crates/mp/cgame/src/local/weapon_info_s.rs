@@ -9,7 +9,7 @@ use mp_qshared::shared::{fxHandle_t, qboolean, qhandle_t, sfxHandle_t, vec3_t};
 
 /// Raven `weaponInfo_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:652-702`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:652-702`
 #[repr(C)]
 pub struct weaponInfo_t {
 	pub registered: qboolean,

@@ -6,7 +6,7 @@ use mp_qshared::shared::MAX_QPATH;
 
 /// Raven `mdxaHeader_t` — GLA animation-file header.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:351-371`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:351-371`
 #[repr(C)]
 pub struct mdxaHeader_t {
     // ( first 3 fields are same format as MD3/MDR so we can apply easy model-format-type checks )

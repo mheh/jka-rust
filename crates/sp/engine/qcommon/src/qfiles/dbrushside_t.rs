@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 /// Raven `dbrushside_t` — on-disk BSP brush side.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:491-495`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:491-495`
 #[repr(C)]
 pub struct dbrushside_t {
     /// positive plane side faces out of the leaf

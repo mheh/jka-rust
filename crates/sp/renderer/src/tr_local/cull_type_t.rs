@@ -2,7 +2,7 @@
 
 /// Raven `cullType_t` — Face culling type.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:422-426`
+/// Type definition source: `oracle/code/renderer/tr_local.h:422-426`
 #[repr(i32)]
 pub enum cullType_t {
 	CT_FRONT_SIDED = 0,

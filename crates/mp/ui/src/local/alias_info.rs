@@ -4,7 +4,7 @@ use core::ffi::c_char;
 
 /// Raven `aliasInfo`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:608-612`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:608-612`
 #[repr(C)]
 pub struct aliasInfo {
 	pub name: *const c_char,

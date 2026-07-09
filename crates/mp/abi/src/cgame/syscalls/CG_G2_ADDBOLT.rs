@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall(CG_G2_ADDBOLT, ghoul2, modelIndex, boneName);`
 /// Raven transport: `return G2API_AddBolt(*((CGhoul2Info_v *)args[1]), args[2], (const char *)VMA(3));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:940-942`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2544`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1475-1476`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:940-942`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2544`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1475-1476`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2AddboltArgs {
     ghoul2: *mut c_void,
@@ -32,10 +32,10 @@ impl CgG2AddboltArgs {
 
 /// `CG_G2_ADDBOLT` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:283`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:940-942`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1475-1476`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1475-1476`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:283`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:940-942`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1475-1476`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1475-1476`
 pub struct CgG2Addbolt;
 
 impl OutboundSysCall for CgG2Addbolt {

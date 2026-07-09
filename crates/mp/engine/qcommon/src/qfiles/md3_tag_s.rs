@@ -6,7 +6,7 @@ use mp_qshared::shared::{vec3_t, MAX_QPATH};
 
 /// Raven `md3Tag_s` — MD3 model attachment tag.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:114-118`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:114-118`
 #[repr(C)]
 pub struct md3Tag_t {
 	/// tag name

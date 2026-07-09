@@ -2,7 +2,7 @@
 
 /// Raven `dieFunc_t` — enumeration of entity death callback function IDs.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_functions.h:562-588`
+/// Type definition source: `oracle/code/game/g_functions.h:562-588`
 #[repr(i32)]
 pub enum dieFunc_t {
     dieF_NULL = 0,

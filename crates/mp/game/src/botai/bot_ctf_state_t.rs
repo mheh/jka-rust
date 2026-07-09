@@ -2,7 +2,7 @@
 
 /// Raven `bot_ctf_state_t` — CTF bot state enumeration.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/ai_main.h:81-90`
+/// Type definition source: `oracle/codemp/game/ai_main.h:81-90`
 #[repr(i32)]
 pub enum bot_ctf_state_t {
     CTFSTATE_NONE = 0,

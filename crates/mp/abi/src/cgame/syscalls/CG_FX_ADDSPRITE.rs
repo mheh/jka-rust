@@ -10,10 +10,10 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_FX_ADDSPRITE, p );`
 /// Raven transport opens `addspriteArgStruct_t` from `VMA(1)`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:710-713`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2415`
-/// Args struct source: `oracle/oracle/codemp/game/q_shared.h:2579-2593`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1210-1229`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:710-713`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2415`
+/// Args struct source: `oracle/codemp/game/q_shared.h:2579-2593`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1210-1229`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxAddspriteArgs {
     p: *mut c_void,
@@ -28,10 +28,10 @@ impl CgFxAddspriteArgs {
 /// `CG_FX_ADDSPRITE` MP cgame imports syscall ABI token.
 ///
 /// Raven: additional funcs for adding custom incode stuff.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:236`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:710-713`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1210-1229`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1210-1229`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:236`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:710-713`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1210-1229`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1210-1229`
 pub struct CgFxAddsprite;
 
 impl OutboundSysCall for CgFxAddsprite {

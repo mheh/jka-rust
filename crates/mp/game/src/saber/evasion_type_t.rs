@@ -2,7 +2,7 @@
 
 /// Raven `evasionType_t` — saber evasion/parry/dodge types.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/w_saber.h:44-57`
+/// Type definition source: `oracle/codemp/game/w_saber.h:44-57`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum evasionType_t {

@@ -4,7 +4,7 @@ use core::ffi::c_char;
 
 /// Raven `pcx_t` — PCX image file header.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:48-62`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:48-62`
 #[repr(C)]
 pub struct pcx_t {
 	pub manufacturer: c_char,

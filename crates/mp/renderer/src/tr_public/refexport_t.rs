@@ -27,7 +27,7 @@ use mp_qshared::shared::{markFragment_t, orientation_t, qboolean, qhandle_t, vec
 /// calls to R_ClearScene and the various R_Add functions. Nothing is drawn
 /// until R_RenderScene is called. If the pointers are not NULL, timing info
 /// will be returned.
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_public.h:14-110`
+/// Type definition source: `oracle/codemp/renderer/tr_public.h:14-110`
 #[repr(C)]
 pub struct refexport_t {
     /// called before the library is unloaded

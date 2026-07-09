@@ -2,7 +2,7 @@
 
 /// Raven `dynamicMusic_t` — dynamic music state enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/game/dmstates.h:5-13`
+/// Type definition source: `oracle/code/game/dmstates.h:5-13`
 #[repr(i32)]
 pub enum dynamicMusic_t {
 	/// Let the game determine the dynamic music as normal.

@@ -7,7 +7,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `srfPoly_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:692-698`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:692-698`
 #[repr(C)]
 pub struct srfPoly_t {
 	pub surfaceType: surfaceType_t,

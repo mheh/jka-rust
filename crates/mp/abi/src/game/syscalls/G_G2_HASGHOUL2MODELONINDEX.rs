@@ -35,7 +35,7 @@ impl GG2Hasghoul2ModelonindexArgs {
 
 /// `G_G2_HASGHOUL2MODELONINDEX` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:526`
+/// Source: `oracle/codemp/game/g_public.h:526`
 pub struct GG2Hasghoul2Modelonindex;
 
 impl OutboundSysCall for GG2Hasghoul2Modelonindex {

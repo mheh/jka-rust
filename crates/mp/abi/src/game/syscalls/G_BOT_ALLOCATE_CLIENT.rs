@@ -17,7 +17,7 @@ impl GBotAllocateClientArgs {
 /// `G_BOT_ALLOCATE_CLIENT` MP game imports syscall ABI token.
 ///
 /// Raven: ( void );
-/// Source: `oracle/oracle/codemp/game/g_public.h:215`
+/// Source: `oracle/codemp/game/g_public.h:215`
 pub struct GBotAllocateClient;
 
 impl OutboundSysCall for GBotAllocateClient {

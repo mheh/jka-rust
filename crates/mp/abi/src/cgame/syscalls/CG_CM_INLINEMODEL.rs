@@ -9,8 +9,8 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven's wrapper forwards `index` as the only payload word, and the client
 /// switch reads it from `args[1]`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:131-132`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:783-784`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:131-132`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:783-784`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmInlinemodelArgs {
     /// Inline collision model index, read by Raven as `args[1]`.
@@ -32,11 +32,11 @@ impl CgCmInlinemodelArgs {
 /// Raven wrapper: `return syscall( CG_CM_INLINEMODEL, index );`
 /// Raven transport: `return CM_InlineModel( args[1] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:85`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:131-132`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:131-132`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:783-784`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:783-784`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:85`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:131-132`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:131-132`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:783-784`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:783-784`
 pub struct CgCmInlinemodel;
 
 impl OutboundSysCall for CgCmInlinemodel {

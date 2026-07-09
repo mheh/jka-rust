@@ -14,7 +14,7 @@ impl GNavShowedgesArgs {
 
 /// `G_NAV_SHOWEDGES` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:306`
+/// Source: `oracle/codemp/game/g_public.h:306`
 pub struct GNavShowedges;
 
 impl OutboundSysCall for GNavShowedges {

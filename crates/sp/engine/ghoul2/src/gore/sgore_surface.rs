@@ -4,7 +4,7 @@ use core::ffi::{c_float, c_int};
 
 /// Raven `SGoreSurface` — per-surface gore-decal state (shader, tag, fade/grow timing).
 ///
-/// Type definition source: `oracle/oracle/code/ghoul2/ghoul2_gore.h:35-48`
+/// Type definition source: `oracle/code/ghoul2/ghoul2_gore.h:35-48`
 #[repr(C)]
 pub struct SGoreSurface {
     pub shader: c_int,

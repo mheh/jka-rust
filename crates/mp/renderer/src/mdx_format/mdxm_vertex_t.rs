@@ -4,7 +4,7 @@ use mp_qshared::shared::vec3_t;
 /// Raven `mdxmVertex_t` — Ghoul2 mesh vertex (normal, position, packed bone weights).
 ///
 /// Raven: `BoneWeightings` is sized by `iMAX_G2_BONEWEIGHTS_PER_VERT` (4).
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:260-281`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:260-281`
 #[repr(C)]
 pub struct mdxmVertex_t {
     pub normal: vec3_t,

@@ -5,7 +5,7 @@ use sp_qshared::shared::qboolean;
 /// Raven `kbutton_t` — tracks a button-bound key's press state across a frame.
 ///
 /// Raven: (unnamed).
-/// Type definition source: `oracle/oracle/code/client/client.h:332-338`
+/// Type definition source: `oracle/code/client/client.h:332-338`
 #[repr(C)]
 pub struct kbutton_t {
     /// key nums holding it down

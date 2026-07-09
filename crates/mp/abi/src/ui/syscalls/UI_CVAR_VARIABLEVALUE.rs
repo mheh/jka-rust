@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `temp = syscall( UI_CVAR_VARIABLEVALUE, var_name );`
 /// Raven transport: `FloatAsInt( Cvar_VariableValue( (const char *)VMA(1) ) )`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:45-48`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:921`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:880-881`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:45-48`
+/// Args source: `oracle/codemp/ui/ui_local.h:921`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:880-881`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCvarVariablevalueArgs {
     var_name: *const c_char,
@@ -32,11 +32,11 @@ impl UiCvarVariablevalueArgs {
 ///
 /// Raven returns the float bits through the integer syscall word.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:22`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:45-48`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:45-48`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:880-881`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:880-881`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:22`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:45-48`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:45-48`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:880-881`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:880-881`
 pub struct UiCvarVariablevalue;
 
 impl OutboundSysCall for UiCvarVariablevalue {

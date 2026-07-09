@@ -9,10 +9,10 @@ use mp_qshared::shared::qboolean;
 /// Raven signature in this enum block is shifted; actual signature is
 /// `_UI_KeyEvent( int key, qboolean down )`.
 ///
-/// Source (enum): `oracle/oracle/codemp/ui/ui_public.h:225`
-/// Source (args): `oracle/oracle/codemp/ui/ui_main.c:552`
-/// Source (output): `oracle/oracle/codemp/ui/ui_main.c:593` (return 0)
-/// Source (call site/transport): `oracle/oracle/codemp/client/cl_keys.cpp:1549`
+/// Source (enum): `oracle/codemp/ui/ui_public.h:225`
+/// Source (args): `oracle/codemp/ui/ui_main.c:552`
+/// Source (output): `oracle/codemp/ui/ui_main.c:593` (return 0)
+/// Source (call site/transport): `oracle/codemp/client/cl_keys.cpp:1549`
 pub struct UiKeyEvent;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

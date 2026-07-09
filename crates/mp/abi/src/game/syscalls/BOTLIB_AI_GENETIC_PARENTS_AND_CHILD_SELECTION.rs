@@ -54,7 +54,7 @@ impl BotlibAiGeneticParentsAndChildSelectionArgs {
 
 /// `BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:482`
+/// Source: `oracle/codemp/game/g_public.h:482`
 pub struct BotlibAiGeneticParentsAndChildSelection;
 
 impl OutboundSysCall for BotlibAiGeneticParentsAndChildSelection {

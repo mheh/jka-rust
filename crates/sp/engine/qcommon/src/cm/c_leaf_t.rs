@@ -2,7 +2,7 @@
 
 /// Raven `cLeaf_t` — a BSP leaf's brush/surface ranges and cluster/area membership.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:31-40`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:31-40`
 #[repr(C)]
 pub struct cLeaf_t {
     pub cluster: i32,

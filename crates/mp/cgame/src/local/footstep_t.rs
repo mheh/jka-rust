@@ -2,7 +2,7 @@
 
 /// Raven `footstep_t` — enumeration of footstep surface types.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:90-118`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:90-118`
 #[repr(i32)]
 pub enum footstep_t {
     FOOTSTEP_STONEWALK = 0,

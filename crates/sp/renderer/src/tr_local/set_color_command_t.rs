@@ -2,7 +2,7 @@
 
 /// Raven `setColorCommand_t` — render-command to change the current draw color.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:1982-1985`
+/// Type definition source: `oracle/code/renderer/tr_local.h:1982-1985`
 #[repr(C)]
 pub struct setColorCommand_t {
     pub commandId: i32,

@@ -26,7 +26,7 @@ impl BotlibEaForcepowerArgs {
 
 /// `BOTLIB_EA_FORCEPOWER` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:391`
+/// Source: `oracle/codemp/game/g_public.h:391`
 pub struct BotlibEaForcepower;
 
 impl OutboundSysCall for BotlibEaForcepower {

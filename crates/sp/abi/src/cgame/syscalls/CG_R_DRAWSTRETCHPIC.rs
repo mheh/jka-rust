@@ -8,8 +8,8 @@ use sp_qshared::shared::qhandle_t;
 /// Raven wrapper: `cgi_R_DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader )`
 /// Raven transport: `re.DrawStretchPic( VMF(1), VMF(2), VMF(3), VMF(4), VMF(5), VMF(6), VMF(7), VMF(8), args[9] );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:398`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:714-716`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:398`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:714-716`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRDrawstretchpicArgs {
     x: f32,
@@ -87,10 +87,10 @@ impl CgRDrawstretchpicArgs {
 
 /// `CG_R_DRAWSTRETCHPIC` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:141`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:398`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:714-716`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:714-716`
+/// Enum value source: `oracle/code/cgame/cg_public.h:141`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:398`
+/// Output source: `oracle/code/client/cl_cgame.cpp:714-716`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:714-716`
 pub struct CgRDrawstretchpic;
 
 impl OutboundSysCall for CgRDrawstretchpic {

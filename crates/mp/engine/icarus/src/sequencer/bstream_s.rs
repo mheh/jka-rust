@@ -6,7 +6,7 @@ use crate::blockstream::cblock_stream::CBlockStream;
 /// Icarus sequencer.
 ///
 /// Raven: none.
-/// Type definition source: `oracle/oracle/codemp/game/../icarus/sequencer.h:42-46`
+/// Type definition source: `oracle/codemp/game/../icarus/sequencer.h:42-46`
 #[repr(C)]
 pub struct bstream_t {
     pub stream: *mut CBlockStream,

@@ -136,7 +136,7 @@ static PANIC_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
 ///
 /// The engine's `Com_Error` longjmps back into the engine and NEVER returns —
 /// that is the exact contract C game code relies on when it calls `G_Error`
-/// (`oracle/oracle/codemp/game/g_main.c:1208`). So on success this call does not
+/// (`oracle/codemp/game/g_main.c:1208`). So on success this call does not
 /// come back; the game dies with a readable message, same as a C-side fatal.
 /// If the error trap is unavailable (engine pointer not yet armed, or the
 /// message held an interior NUL), or the trap itself panics, or we are already
@@ -337,7 +337,7 @@ fn vm_main_dispatch(
         // GameContext` impls (game_context.rs) overlay-cast that buffer and thread
         // into the ported Q3_* handlers. `Args = ()` — the payload arrives
         // out-of-band, not through the vmMain arg words.
-        // Source: oracle/oracle/codemp/game/g_main.c:558-668.
+        // Source: oracle/codemp/game/g_main.c:558-668.
         MpGameExport::GAME_ICARUS_PLAYSOUND => {
             GameIcarusPlaysound::encode_return(Dispatch::<GameIcarusPlaysound>::dispatch(
                 &ctx,

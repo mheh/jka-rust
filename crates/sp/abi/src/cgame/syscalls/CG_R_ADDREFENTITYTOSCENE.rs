@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `cgi_R_AddRefEntityToScene( const refEntity_t *re )`
 /// Raven transport: `re.AddRefEntityToScene( (const refEntity_t *) VMA(1) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:366-367`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:689-691`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:689-691`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:366-367`
+/// Output source: `oracle/code/client/cl_cgame.cpp:689-691`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:689-691`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRAddrefentitytosceneArgs {
     ref_entity: *const c_void,
@@ -30,10 +30,10 @@ impl CgRAddrefentitytosceneArgs {
 
 /// `CG_R_ADDREFENTITYTOSCENE` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:132`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:366-367`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:689-691`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:689-691`
+/// Enum value source: `oracle/code/cgame/cg_public.h:132`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:366-367`
+/// Output source: `oracle/code/client/cl_cgame.cpp:689-691`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:689-691`
 pub struct CgRAddrefentitytoscene;
 
 impl OutboundSysCall for CgRAddrefentitytoscene {

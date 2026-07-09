@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_ERROR, fmt );`
 /// Raven transport: `Com_Error( ERR_DROP, S_COLOR_RED"%s", VMA(1) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:50-52`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:440-442`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:50-52`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:440-442`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgErrorArgs {
     message: *const c_char,
@@ -27,10 +27,10 @@ impl CgErrorArgs {
 
 /// `CG_ERROR` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:62`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:50-52`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:440-442`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:440-442`
+/// Enum value source: `oracle/code/cgame/cg_public.h:62`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:50-52`
+/// Output source: `oracle/code/client/cl_cgame.cpp:440-442`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:440-442`
 pub struct CgError;
 
 impl OutboundSysCall for CgError {

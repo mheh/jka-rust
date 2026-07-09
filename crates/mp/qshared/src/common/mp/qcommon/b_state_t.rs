@@ -3,7 +3,7 @@
 /// Raven `bState_t` — behavior state type for NPC autonomous behavior.
 ///
 /// Raven: These take over only if script allows them to be autonomous.
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:584-606`
+/// Type definition source: `oracle/codemp/game/g_public.h:584-606`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum bState_t {

@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_reactions.c 6/6
-//! Port of `oracle/oracle/codemp/game/NPC_reactions.c` (jampgame mega-pass).
+//! Port of `oracle/codemp/game/NPC_reactions.c` (jampgame mega-pass).
 //!
 //! Generated from `tools/closure-prototype/fnskel.py`; bodies filled per the
 //! jampgame mega-pass (settled fork rulings,
@@ -48,13 +48,13 @@ use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 
 /// Raven `NPC_CheckAttacker`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:42-131`
+/// Source: `oracle/codemp/game/NPC_reactions.c:42-131`
 pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: *mut gentity_t, r#mod: c_int) {
     unsafe {
         // `FL_NOTARGET` (crate::entity::flags) and `WP_SABER` (mp_bg weapon_t,
         // c_int const == 3) come from the prelude. `mod` is a plain c_int, so
         // keep a local c_int alias sourced from the canonical meansOfDeath_t.
-        // Source: `oracle/oracle/codemp/game/bg_public.h:1046-1099`
+        // Source: `oracle/codemp/game/bg_public.h:1046-1099`
         const MOD_SABER: c_int = meansOfDeath_t::MOD_SABER as c_int;
 
         // valid ent
@@ -135,13 +135,13 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: *mut gentity_t, r#mod: c_i
 
 /// Raven `NPC_SetPainEvent`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:133-149`
+/// Source: `oracle/codemp/game/NPC_reactions.c:133-149`
 pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
         // Raven: `!self->NPC || !(self->NPC->aiFlags&NPCAI_DIE_ON_IMPACT)`.
         // NPCAI_DIE_ON_IMPACT resolves through the prelude (crate::npc::ai_flags).
-        // Source: oracle/oracle/codemp/game/b_public.h:23
+        // Source: oracle/codemp/game/b_public.h:23
         if npc.is_null() || ((*npc).aiFlags & NPCAI_DIE_ON_IMPACT) == 0 {
             let client = (*self_).client as *mut gclient_t;
             let pending = trap::ICARUS_TaskIDPending(
@@ -160,7 +160,7 @@ pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `NPC_GetPainChance`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:157-196`
+/// Source: `oracle/codemp/game/NPC_reactions.c:157-196`
 pub fn NPC_GetPainChance(ctx: GameContext<'_>, self_: *mut gentity_t, damage: c_int) -> f32 {
     unsafe {
         if (*self_).enemy.is_none() {
@@ -200,7 +200,7 @@ pub fn NPC_GetPainChance(ctx: GameContext<'_>, self_: *mut gentity_t, damage: c_
 
 /// Raven `NPC_ChoosePainAnimation`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:207-356`
+/// Source: `oracle/codemp/game/NPC_reactions.c:207-356`
 pub fn NPC_ChoosePainAnimation(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -214,13 +214,13 @@ pub fn NPC_ChoosePainAnimation(
     unsafe {
         // Pain-anim numbers are `animNumber_t` variants; keep local c_int
         // aliases because `pain_anim` and `BG_PickAnim` operate in c_int.
-        // Source: `oracle/oracle/codemp/game/anims.h:6-1791`
+        // Source: `oracle/codemp/game/anims.h:6-1791`
         const BOTH_PAIN1: c_int = animNumber_t::BOTH_PAIN1 as c_int;
         const BOTH_PAIN2: c_int = animNumber_t::BOTH_PAIN2 as c_int;
         const BOTH_PAIN3: c_int = animNumber_t::BOTH_PAIN3 as c_int;
         const BOTH_PAIN18: c_int = animNumber_t::BOTH_PAIN18 as c_int;
         // `mod` is a plain c_int; alias the canonical meansOfDeath_t variants.
-        // Source: `oracle/oracle/codemp/game/bg_public.h:1046-1099`
+        // Source: `oracle/codemp/game/bg_public.h:1046-1099`
         const MOD_MELEE: c_int = meansOfDeath_t::MOD_MELEE as c_int;
         const MOD_CRUSH: c_int = meansOfDeath_t::MOD_CRUSH as c_int;
         // `HL_GENERIC1` (top-of-file import), `SETANIM_*` (mp_bg set_anim),
@@ -411,7 +411,7 @@ pub fn NPC_ChoosePainAnimation(
 
 /// Raven `NPC_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:363-529`
+/// Source: `oracle/codemp/game/NPC_reactions.c:363-529`
 pub fn NPC_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -425,9 +425,9 @@ pub fn NPC_Pain(
         // is a pmtype_t variant compared against the c_int `pm_type` field; and
         // EV_FFWARN is the absolute entity_event_t value G_AddVoiceEvent
         // consumes — alias each from its canonical enum so values track the port.
-        // Source: bSet_t `oracle/oracle/codemp/game/g_public.h:641-664`,
-        // pmtype_t `oracle/oracle/codemp/game/bg_public.h:360-370`,
-        // entity_event_t `oracle/oracle/codemp/game/bg_public.h:745-990`.
+        // Source: bSet_t `oracle/codemp/game/g_public.h:641-664`,
+        // pmtype_t `oracle/codemp/game/bg_public.h:360-370`,
+        // entity_event_t `oracle/codemp/game/bg_public.h:745-990`.
         const BSET_FLEE: c_int = bSet_t::BSET_FLEE as c_int;
         const BSET_PAIN: c_int = bSet_t::BSET_PAIN as c_int;
         const BSET_FFIRE: c_int = bSet_t::BSET_FFIRE as c_int;
@@ -604,7 +604,7 @@ pub fn NPC_Pain(
 
 /// Raven `NPC_Touch`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:537-653`
+/// Source: `oracle/codemp/game/NPC_reactions.c:537-653`
 pub fn NPC_Touch(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -704,7 +704,7 @@ pub fn NPC_Touch(
 
 /// Raven `NPC_TempLookTarget`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:661-688`
+/// Source: `oracle/codemp/game/NPC_reactions.c:661-688`
 pub fn NPC_TempLookTarget(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -720,7 +720,7 @@ pub fn NPC_TempLookTarget(
 
         // Raven `EF2_HELD_BY_MONSTER` (`playerState_t::eFlags2` bit) resolves
         // through the prelude (mp_bg::public::entity_effects).
-        // Source: oracle/oracle/codemp/game/bg_public.h:616
+        // Source: oracle/codemp/game/bg_public.h:616
         if ((*client).ps.eFlags2 & EF2_HELD_BY_MONSTER) != 0 {
             //lookTarget is set by and to the monster that's holding you, no other operations can change that
             return;
@@ -749,7 +749,7 @@ pub fn NPC_TempLookTarget(
 
 /// Raven `NPC_Respond`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:690-942`
+/// Source: `oracle/codemp/game/NPC_reactions.c:690-942`
 pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) {
     unsafe {
         // The `CLASS_*` `class_t` variants resolve through the prelude; the
@@ -1009,7 +1009,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
 
 /// Raven `NPC_UseResponse`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:950-999`
+/// Source: `oracle/codemp/game/NPC_reactions.c:950-999`
 pub fn NPC_UseResponse(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -1058,7 +1058,7 @@ pub fn NPC_UseResponse(
 
 /// Raven `NPC_Use`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:1008-1093`
+/// Source: `oracle/codemp/game/NPC_reactions.c:1008-1093`
 pub fn NPC_Use(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -1070,8 +1070,8 @@ pub fn NPC_Use(
         // (c_int/usize), so alias both from their canonical enums.
         // `CLASS_VEHICLE`/`CLASS_GONK` are `class_t` variants from the prelude,
         // compared against `NPC_class` directly below.
-        // Source: pmtype_t `oracle/oracle/codemp/game/bg_public.h:360-370`,
-        // bSet_t `oracle/oracle/codemp/game/g_public.h:641-664`.
+        // Source: pmtype_t `oracle/codemp/game/bg_public.h:360-370`,
+        // bSet_t `oracle/codemp/game/g_public.h:641-664`.
         const PM_DEAD: c_int = pmtype_t::PM_DEAD as c_int;
         const BSET_USE: c_int = bSet_t::BSET_USE as c_int;
 
@@ -1140,7 +1140,7 @@ pub fn NPC_Use(
 ///
 /// Raven: body is entirely commented out (`//FIXME: need appropriate
 /// dialogue`) — a dead no-op in the oracle.
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:1095-1111`
+/// Source: `oracle/codemp/game/NPC_reactions.c:1095-1111`
 pub fn NPC_CheckPlayerAim() {}
 
 /// Raven `NPC_CheckAllClear`.
@@ -1148,5 +1148,5 @@ pub fn NPC_CheckPlayerAim() {}
 /// Raven: body is entirely commented out (`//FIXME: need to make this happen
 /// only once after losing enemies, not over and over again`) — a dead no-op
 /// in the oracle.
-/// Source: `oracle/oracle/codemp/game/NPC_reactions.c:1113-1125`
+/// Source: `oracle/codemp/game/NPC_reactions.c:1113-1125`
 pub fn NPC_CheckAllClear() {}

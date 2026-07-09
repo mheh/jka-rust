@@ -14,7 +14,7 @@ use super::sv_entity_s::svEntity_t;
 /// `usize`-typed dual of the canonical `mp_qshared::shared::limits::MAX_MODELS`
 /// (`c_int`), for array sizing.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2020`
+/// Source: `oracle/codemp/game/q_shared.h:2020`
 pub const MAX_MODELS: usize = MAX_MODELS_I32 as usize;
 
 // `MAX_GENTITIES` (`q_shared.h:1992-1996`) imported from its canonical Tier-0
@@ -24,7 +24,7 @@ pub const MAX_MODELS: usize = MAX_MODELS_I32 as usize;
 /// Raven `server_t`.
 ///
 /// Raven: non-`_XBOX` variant (`_XBOX` undefined) is the one this codebase ports.
-/// Type definition source: `oracle/oracle/codemp/qcommon/../server/server.h:53-88`
+/// Type definition source: `oracle/codemp/qcommon/../server/server.h:53-88`
 #[repr(C)]
 pub struct server_t {
     pub state: serverState_t,

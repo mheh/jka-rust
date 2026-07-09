@@ -12,7 +12,7 @@ use crate::entrypoints::RawSyscall;
 
 /// The C-engine outbound backend: wraps the raw syscall pointer (SEAM-D9).
 ///
-/// Source: `oracle/oracle/codemp/game/g_syscalls.c:8` (the module `syscall` ptr).
+/// Source: `oracle/codemp/game/g_syscalls.c:8` (the module `syscall` ptr).
 pub struct CEngine {
     syscall: RawSyscall,
 }
@@ -35,7 +35,7 @@ impl CEngine {
     /// frame matching Raven's outbound trampoline `VM_DllSyscall`'s `int
     /// args[16]` (`vm.cpp:363-376`), extras zero-filled.
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:363-376`
+    /// Source: `oracle/codemp/qcommon/vm.cpp:363-376`
     unsafe fn raw_syscall_words(&self, import: c_int, words: &[isize]) -> isize {
         // Fixed 16-slot frame: the import word + 15 argument words, extras
         // zero-filled — exactly the frame VM_DllSyscall's unpack loop consumes

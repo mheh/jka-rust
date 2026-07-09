@@ -6,7 +6,7 @@ use mp_qshared::shared::{qboolean, qhandle_t};
 
 /// Raven `characterInfo`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:599-606`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:599-606`
 #[repr(C)]
 pub struct characterInfo {
 	pub name: *const c_char,

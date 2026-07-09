@@ -198,18 +198,18 @@ def gen_game_cvars(outdir):
     o.append("//!")
     o.append("//! Ruling 1 (docs/handoffs/jampgame-fork-discovery.md): all file-scope")
     o.append("//! globals become GameWorld fields; cvar handles grouped in GameCvars.")
-    o.append(f"//! Source: `oracle/oracle/codemp/game/g_main.c:{a}-{b}` (gameCvarTable)")
+    o.append(f"//! Source: `oracle/codemp/game/g_main.c:{a}-{b}` (gameCvarTable)")
     o.append("#![allow(non_snake_case, non_camel_case_types, unused)]")
     o.append("")
     o.append("use mp_qshared::shared::cvar::vmCvar_t;")
     o.append("use native_types::qboolean;")
     o.append("")
     o.append("//TODO: Port CVAR_ARCHIVE (and sibling CVAR_* flag consts)")
-    o.append("// Source: oracle/oracle/codemp/game/q_shared.h:1782-1800")
+    o.append("// Source: oracle/codemp/game/q_shared.h:1782-1800")
     o.append("")
     o.append("/// Raven `gameCvarTable` cvar handles (one field per non-NULL `vmCvar`).")
     o.append("///")
-    o.append(f"/// Source: `oracle/oracle/codemp/game/g_main.c:{a}-{b}`")
+    o.append(f"/// Source: `oracle/codemp/game/g_main.c:{a}-{b}`")
     o.append("#[derive(Default)]")
     o.append("pub struct GameCvars {")
     for e in handles:
@@ -232,7 +232,7 @@ def gen_game_cvars(outdir):
     o.append("")
     o.append(f"/// Raven `gameCvarTable` ({len(entries)} rows, verbatim order).")
     o.append("///")
-    o.append(f"/// Source: `oracle/oracle/codemp/game/g_main.c:{a}-{b}`")
+    o.append(f"/// Source: `oracle/codemp/game/g_main.c:{a}-{b}`")
     o.append(f"pub const GAME_CVAR_TABLE: [CvarTableEntry; {len(entries)}] = [")
     notes = []
     for e in entries:
@@ -268,7 +268,7 @@ def gen_ent_fn_enums(manifest, outdir):
     o.append("//! Ruling 2 (docs/handoffs/jampgame-fork-discovery.md): per-field fn-ID")
     o.append("//! enums; `PartialEq` replaces Raven's fn-address compares; stored as")
     o.append("//! `Option<EntXxx>` where Raven stored a nullable fn pointer.")
-    o.append("//! Field signatures source: `oracle/oracle/codemp/game/g_local.h:285-291`")
+    o.append("//! Field signatures source: `oracle/codemp/game/g_local.h:285-291`")
     o.append("//! Targets: fnsweep manifest fn-ptr write census (assignments in game/*.c).")
     o.append("//! Vehicle-vtable fields are excluded (fork-7 ruling: mp_bg enum dispatch).")
     o.append("#![allow(non_snake_case, non_camel_case_types, unused)]")
@@ -280,14 +280,14 @@ def gen_ent_fn_enums(manifest, outdir):
         o.append(f"/// Raven `{field}` fn-pointer targets ({len(tgts)} distinct assigns")
         o.append(f"/// in game/*.c bodies).")
         o.append("///")
-        o.append("/// Source: `oracle/oracle/codemp/game/g_local.h:285-291`")
+        o.append("/// Source: `oracle/codemp/game/g_local.h:285-291`")
         o.append("#[derive(Clone, Copy, PartialEq, Eq, Debug)]")
         o.append(f"pub enum {ename} {{")
         for t in tgts:
             hits = byname.get(t)
             if hits:
                 h = hits[0]
-                o.append(f"    /// `oracle/oracle/codemp/game/{h['file']}:{h['line']}`")
+                o.append(f"    /// `oracle/codemp/game/{h['file']}:{h['line']}`")
             else:
                 o.append(f"    //TODO: Port {t}")
                 o.append(f"    // Source: not a game/*.c definition (macro or"
@@ -377,7 +377,7 @@ def gen_trap_wrappers(manifest, outdir, abi_dir):
     o.append("//! manifest records a call to. One thin non-generic fn per call, the")
     o.append("//! frozen SEAM-D13 shape — copied verbatim from the live exemplar")
     o.append("//! `crates/mp/game/src/trap.rs` (skeleton branch). C signatures:")
-    o.append("//! `docs/abi-traps.md`; token mapping: `oracle/oracle/codemp/game/g_syscalls.c`.")
+    o.append("//! `docs/abi-traps.md`; token mapping: `oracle/codemp/game/g_syscalls.c`.")
     o.append("#![allow(non_snake_case, unused)]")
     o.append("")
     # A `trap_`-named symbol DEFINED in game/*.c OUTSIDE g_syscalls.c is a
@@ -432,7 +432,7 @@ def gen_trap_wrappers(manifest, outdir, abi_dir):
         o.append("")
         for t in missing_token:
             o.append(f"//TODO: Port {t}")
-            o.append(f"// Source: oracle/oracle/codemp/game/g_syscalls.c — no "
+            o.append(f"// Source: oracle/codemp/game/g_syscalls.c — no "
                      f"syscall() token found by fngen.py; resolve by hand")
     if missing_abi:
         o.append("")

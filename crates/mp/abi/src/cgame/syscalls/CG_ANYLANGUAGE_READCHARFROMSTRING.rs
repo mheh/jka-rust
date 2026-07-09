@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( CG_ANYLANGUAGE_READCHARFROMSTRING, psText, piAdvanceCount, pbIsTrailingPunctuation);`
 /// Raven transport: `return re.AnyLanguage_ReadCharFromString( (const char *) VMA(1), (int *) VMA(2), (qboolean *) VMA(3) );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:317-319`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2260`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:886-887`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:317-319`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2260`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:886-887`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgAnylanguageReadcharfromstringArgs {
     ps_text: *const c_char,
@@ -37,11 +37,11 @@ impl CgAnylanguageReadcharfromstringArgs {
 
 /// `CG_ANYLANGUAGE_READCHARFROMSTRING` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:128`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:317-319`
-/// Output source: `oracle/oracle/codemp/cgame/cg_local.h:2260`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:886-887`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:886-887`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:128`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:317-319`
+/// Output source: `oracle/codemp/cgame/cg_local.h:2260`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:886-887`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:886-887`
 pub struct CgAnylanguageReadcharfromstring;
 
 impl OutboundSysCall for CgAnylanguageReadcharfromstring {

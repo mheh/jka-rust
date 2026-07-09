@@ -7,7 +7,7 @@ use core::ffi::{c_char, c_long};
 /// Raven: `mHeader` should be "ROFF" (Rotation, Origin File Format). `mCount`
 /// there isn't any reason for this to be anything other than an int, sigh...
 /// Move - Rotate data follows....vec3_t delta_origin, vec3_t delta_rotation
-/// Type definition source: `oracle/oracle/code/game/g_roff.h:18-26`
+/// Type definition source: `oracle/code/game/g_roff.h:18-26`
 #[repr(C)]
 pub struct roff_hdr_t {
 	pub mHeader: [c_char; 4],

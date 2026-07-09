@@ -7,7 +7,7 @@ use core::ffi::c_void;
 /// Only the class's data members are ABI-relevant here; its methods
 /// (`WriteMember`, `ReadMember`, `SetData`, `GetData`, `Duplicate`, ...) are
 /// behavior, not layout, and are ported separately.
-/// Type definition source: `oracle/oracle/codemp/game/../icarus/blockstream.h:38-105`
+/// Type definition source: `oracle/codemp/game/../icarus/blockstream.h:38-105`
 #[repr(C)]
 pub struct CBlockMember {
 	/// ID of the value contained in data

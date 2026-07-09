@@ -2,7 +2,7 @@
 
 /// Raven `saberMoveName_t` — saber move name.
 ///
-/// Type definition source: `oracle/oracle/code/game/wp_saber.h:221-412`
+/// Type definition source: `oracle/code/game/wp_saber.h:221-412`
 #[repr(i32)]
 pub enum saberMoveName_t {
 	// Invalid, or saber not armed

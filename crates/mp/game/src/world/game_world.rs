@@ -26,7 +26,7 @@ pub struct GameWorld {
     /// Raven's ~136 file-scope `vmCvar_t` cvar handles, grouped as one
     /// GameWorld sub-struct (file-scope globals become GameWorld
     /// fields). Not part of the `LocateGameData` alias set.
-    /// Source: `oracle/oracle/codemp/game/g_main.c:230-475`
+    /// Source: `oracle/codemp/game/g_main.c:230-475`
     pub cvars: GameCvars,
 
     /// Raven's remaining game-tier mutable file-scope globals/statics as one
@@ -38,7 +38,7 @@ pub struct GameWorld {
     /// `w_force.c` file-scope loop-sound handles (file-scope
     /// mutable globals become GameWorld fields, grouped by owning .c file).
     /// Cached `G_SoundIndex` results, lazily filled in `WP_InitForcePowers`.
-    /// Source: `oracle/oracle/codemp/game/w_force.c:24-34`
+    /// Source: `oracle/codemp/game/w_force.c:24-34`
     pub speedLoopSound: c_int,
     pub rageLoopSound: c_int,
     pub protectLoopSound: c_int,
@@ -48,7 +48,7 @@ pub struct GameWorld {
 
     /// `NPC_utils.c` file-scope globals (file-scope mutable
     /// globals become GameWorld fields, grouped by owning .c file).
-    /// Source: `oracle/oracle/codemp/game/NPC_utils.c:7-9`
+    /// Source: `oracle/codemp/game/NPC_utils.c:7-9`
     pub teamNumbers: [c_int; 4],
     pub teamStrength: [c_int; 4],
     pub teamCounter: [c_int; 4],
@@ -56,7 +56,7 @@ pub struct GameWorld {
     /// `g_mem.c` file-scope globals (file-scope mutable
     /// globals become GameWorld fields, grouped by owning .c file).
     /// Memory pool for G_Alloc (256 KB), and current allocation point.
-    /// Source: `oracle/oracle/codemp/game/g_mem.c:13-14`
+    /// Source: `oracle/codemp/game/g_mem.c:13-14`
     pub memoryPool: Box<[u8; 262144]>, // 256 * 1024
     pub allocPoint: c_int,
 
@@ -70,14 +70,14 @@ pub struct GameWorld {
     /// `g_misc.c` file-scope `refTagOwnerMap[MAX_TAG_OWNERS]` (file-scope
     /// mutable globals become GameWorld fields, grouped by owning
     /// .c file).
-    /// Source: `oracle/oracle/codemp/game/g_misc.c:2886`
+    /// Source: `oracle/codemp/game/g_misc.c:2886`
     pub refTagOwnerMap:
         Box<[crate::level::tag_owner::tagOwner_t; crate::level::tag_owner::MAX_TAG_OWNERS]>,
 
     /// `char gSharedBuffer[MAX_G_SHARED_BUFFER_SIZE]`, the module's
     /// engine-registered shared-memory region (`trap_SV_RegisterSharedMemory`).
     /// Untyped raw bytes, same shape as `memoryPool` above.
-    /// Source: `oracle/oracle/codemp/game/g_main.c:881`
+    /// Source: `oracle/codemp/game/g_main.c:881`
     pub gSharedBuffer: Box<[u8; crate::g_local_consts::MAX_G_SHARED_BUFFER_SIZE]>,
 }
 

@@ -7,10 +7,10 @@ use abi_transport::generic::{
 
 /// `UI_CMD_EXECUTETEXT` SP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:164`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp:401-403`
-/// Output source: `oracle/oracle/code/client/cl_ui.cpp:401-403`
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:401-403`
+/// Enum value source: `oracle/code/ui/ui_public.h:164`
+/// Args source: `oracle/code/client/cl_ui.cpp:401-403`
+/// Output source: `oracle/code/client/cl_ui.cpp:401-403`
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:401-403`
 pub struct UiCmdExecutetext;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

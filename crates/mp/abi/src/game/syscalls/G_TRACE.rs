@@ -82,7 +82,7 @@ impl GTraceArgs {
 ///
 /// Raven: ( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask );
 /// Raven: collision detection against all linked entities
-/// Source: `oracle/oracle/codemp/game/g_public.h:182`
+/// Source: `oracle/codemp/game/g_public.h:182`
 pub struct GTrace;
 
 impl OutboundSysCall for GTrace {

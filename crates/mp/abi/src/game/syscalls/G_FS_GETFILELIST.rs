@@ -47,7 +47,7 @@ impl GFsGetfilelistArgs {
 
 /// `G_FS_GETFILELIST` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:229`
+/// Source: `oracle/codemp/game/g_public.h:229`
 pub struct GFsGetfilelist;
 
 impl OutboundSysCall for GFsGetfilelist {

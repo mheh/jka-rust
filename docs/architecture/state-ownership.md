@@ -117,13 +117,13 @@ and `com_printf`'s `Common`-owned print state (STATE-D11).
 
 The full ~60-row census lives in the dossier; § State ownership's master table is
 this doc's rendering of it. This section covers only the *architecture* the table
-rests on. MP tree = `oracle/oracle/codemp/`, SP tree = `oracle/oracle/code/`.
+rests on. MP tree = `oracle/codemp/`, SP tree = `oracle/code/`.
 
 ### Build-canonical file variants
 
 The real PC build links `cmd_common.cpp`+`cmd_pc.cpp`,
 `files_common.cpp`+`files_pc.cpp`, `z_memman_pc.cpp`
-(`oracle/oracle/codemp/unix/makefile:302-307`). `files.cpp`, `cmd_console.cpp`,
+(`oracle/codemp/unix/makefile:302-307`). `files.cpp`, `cmd_console.cpp`,
 `files_console.cpp`, `z_memman_console.cpp` are dead console-platform duplicates
 (same globals under `static` linkage) and are **not** owners of anything in the
 table.
@@ -1130,7 +1130,7 @@ impl<'e> Dispatch<GameRunFrame> for GameContext<'e> {
         // e.g. g_run_frame(unsafe { &mut *self.world }, self.engine, args) at a leaf that
         // holds no borrow across a trap:: re-entry; nested reborrows re-derive from self.world;
         // outbound traps issue as trap::X(self.engine, …).
-        todo!("Port G_RunFrame — oracle/oracle/codemp/game/g_main.c:3582")
+        todo!("Port G_RunFrame — oracle/codemp/game/g_main.c:3582")
     }
 }
 ```

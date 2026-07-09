@@ -9,10 +9,10 @@ use abi_transport::generic::{
 
 /// `GAME_NAV_CLEARPATHBETWEENPOINTS` MP game exports vmMain ABI token.
 ///
-/// Source (enum): `oracle/oracle/codemp/game/g_public.h:790`
-/// Source (args): `oracle/oracle/codemp/game/g_main.c:676`
-/// Source (output): `oracle/oracle/codemp/game/g_main.c:676`
-/// Source (call site): `oracle/oracle/codemp/server/NPCNav/gameCallbacks.cpp:18`
+/// Source (enum): `oracle/codemp/game/g_public.h:790`
+/// Source (args): `oracle/codemp/game/g_main.c:676`
+/// Source (output): `oracle/codemp/game/g_main.c:676`
+/// Source (call site): `oracle/codemp/server/NPCNav/gameCallbacks.cpp:18`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GameNavClearpathbetweenpointsArgs {
     start: *const c_float,

@@ -9,9 +9,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall(CG_CIN_DRAWCINEMATIC, handle)`.
 /// Raven transport: `CIN_DrawCinematic(args[1]); return 0;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:537-539`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1201`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:826-828`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:537-539`
+/// Args source: `oracle/code/cgame/cg_local.h:1201`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:826-828`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCinDrawcinematicArgs {
     handle: c_int,
@@ -29,10 +29,10 @@ impl CgCinDrawcinematicArgs {
 
 /// `CG_CIN_DRAWCINEMATIC` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:188`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:537-539`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:826-828`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:826-828`
+/// Enum value source: `oracle/code/cgame/cg_public.h:188`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:537-539`
+/// Output source: `oracle/code/client/cl_cgame.cpp:826-828`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:826-828`
 pub struct CgCinDrawcinematic;
 
 impl OutboundSysCall for CgCinDrawcinematic {

@@ -6,7 +6,7 @@ use sp_qshared::shared::MAX_QPATH;
 ///
 /// Raven: ( first 3 fields are same format as MD3/MDR so we can apply easy model-format-type
 /// checks ).
-/// Type definition source: `oracle/oracle/code/game/../game/../renderer/mdx_format.h:153-172`
+/// Type definition source: `oracle/code/game/../game/../renderer/mdx_format.h:153-172`
 #[repr(C)]
 pub struct mdxmHeader_t {
     pub ident: i32,   // "IDP3" = MD3, "RDM5" = MDR, "2LGM"(GL2 Mesh) = MDX   (cruddy char order I know, but I'm following what was there in other versions)

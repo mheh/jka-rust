@@ -5,7 +5,7 @@ use sp_qshared::shared::qboolean;
 
 /// Raven `qkey_t` — per-key autorepeat/binding state.
 ///
-/// Type definition source: `oracle/oracle/code/client/keys.h:3-7`
+/// Type definition source: `oracle/code/client/keys.h:3-7`
 #[repr(C)]
 pub struct qkey_t {
 	pub down: qboolean,

@@ -96,7 +96,7 @@ impl BotlibAiInitialChatArgs {
 
 /// `BOTLIB_AI_INITIAL_CHAT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:427`
+/// Source: `oracle/codemp/game/g_public.h:427`
 pub struct BotlibAiInitialChat;
 
 impl OutboundSysCall for BotlibAiInitialChat {

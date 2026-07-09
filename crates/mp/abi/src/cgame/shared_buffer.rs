@@ -4,8 +4,8 @@
 //! `CG_SET_SHARED_BUFFER`, then several cgame exports read or write typed
 //! structs through that shared memory instead of normal `vmMain` argv slots.
 //!
-//! Transport source: `oracle/oracle/codemp/cgame/cg_main.c:3713`
-//! Transport source: `oracle/oracle/codemp/client/cl_cgame.cpp:1179-1184`
+//! Transport source: `oracle/codemp/cgame/cg_main.c:3713`
+//! Transport source: `oracle/codemp/client/cl_cgame.cpp:1179-1184`
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -48,8 +48,8 @@ impl<T> SharedBufferPayload<T> {
 
 /// `CG_AUTOMAP_INPUT` shared-buffer payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:442-449`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:317-319`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:442-449`
+/// Args source: `oracle/codemp/cgame/cg_main.c:317-319`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct autoMapInput_t {
@@ -62,9 +62,9 @@ pub struct autoMapInput_t {
 
 /// `CG_POINT_CONTENTS` shared-buffer payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:451-456`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:362-366`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:366`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:451-456`
+/// Args source: `oracle/codemp/cgame/cg_main.c:362-366`
+/// Output source: `oracle/codemp/cgame/cg_main.c:366`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TCGPointContents {
@@ -74,9 +74,9 @@ pub struct TCGPointContents {
 
 /// `CG_GET_LERP_DATA` shared-buffer payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:458-466`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:377-378`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:380-406`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:458-466`
+/// Args source: `oracle/codemp/cgame/cg_main.c:377-378`
+/// Output source: `oracle/codemp/cgame/cg_main.c:380-406`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TCGGetBoltData {
@@ -91,9 +91,9 @@ pub struct TCGGetBoltData {
 /// Raven's switch passes `qtrue` for `alphaFade` and `qfalse` for `temporary`;
 /// those flags are not present in the shared-buffer struct.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:467-479`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:570-579`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:578-579`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:467-479`
+/// Args source: `oracle/codemp/cgame/cg_main.c:570-579`
+/// Output source: `oracle/codemp/cgame/cg_main.c:578-579`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TCGImpactMark {
@@ -110,9 +110,9 @@ pub struct TCGImpactMark {
 
 /// `CG_GET_LERP_ORIGIN` shared-buffer payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:484-489`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:371`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:373-374`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:484-489`
+/// Args source: `oracle/codemp/cgame/cg_main.c:371`
+/// Output source: `oracle/codemp/cgame/cg_main.c:373-374`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TCGVectorData {
@@ -122,9 +122,9 @@ pub struct TCGVectorData {
 
 /// `CG_TRACE` and `CG_G2TRACE` shared-buffer payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:490-496`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:408-417`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:412-417`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:490-496`
+/// Args source: `oracle/codemp/cgame/cg_main.c:408-417`
+/// Output source: `oracle/codemp/cgame/cg_main.c:412-417`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TCGTrace {
@@ -139,8 +139,8 @@ pub struct TCGTrace {
 
 /// `CG_G2MARK` shared-buffer payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:498-504`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:419-424`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:498-504`
+/// Args source: `oracle/codemp/cgame/cg_main.c:419-424`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TCGG2Mark {
@@ -152,9 +152,9 @@ pub struct TCGG2Mark {
 
 /// `CG_FX_CAMERASHAKE` shared-buffer payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:512-519`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:346-350`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:351`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:512-519`
+/// Args source: `oracle/codemp/cgame/cg_main.c:346-350`
+/// Output source: `oracle/codemp/cgame/cg_main.c:351`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TCGCameraShake {
@@ -166,15 +166,15 @@ pub struct TCGCameraShake {
 
 /// `CG_MISC_ENT` shared-buffer payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:521-526`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:582-586`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:599-621`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:521-526`
+/// Args source: `oracle/codemp/cgame/cg_main.c:582-586`
+/// Output source: `oracle/codemp/cgame/cg_main.c:599-621`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TCGMiscEnt {
     /// Raven `char mModel[MAX_QPATH]`.
     ///
-    /// `MAX_QPATH` definition source: `oracle/oracle/codemp/game/q_shared.h:393`
+    /// `MAX_QPATH` definition source: `oracle/codemp/game/q_shared.h:393`
     pub mModel: [c_char; 64],
     pub mOrigin: vec3_t,
     pub mAngles: vec3_t,

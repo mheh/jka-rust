@@ -8,7 +8,7 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `return syscall( UI_LAN_GETSERVERPING, source, n );`
 /// Raven transport: `return LAN_GetServerPing( args[1], args[2] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:282-283`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:282-283`
 #[derive(Debug)]
 pub struct UiLanGetserverpingArgs {
     source: c_int,
@@ -34,10 +34,10 @@ impl UiLanGetserverpingArgs {
 /// Raven wrapper: `return syscall( UI_LAN_GETSERVERPING, source, n );`
 /// Raven transport: `return LAN_GetServerPing( args[1], args[2] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:112`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:282-283`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:967`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1096-1097`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:112`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:282-283`
+/// Output source: `oracle/codemp/ui/ui_local.h:967`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1096-1097`
 pub struct UiLanGetserverping;
 
 impl OutboundSysCall for UiLanGetserverping {

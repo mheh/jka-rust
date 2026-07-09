@@ -26,7 +26,7 @@ impl GG2OverrideserverArgs {
 
 /// `G_G2_OVERRIDESERVER` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:567`
+/// Source: `oracle/codemp/game/g_public.h:567`
 pub struct GG2Overrideserver;
 
 impl OutboundSysCall for GG2Overrideserver {

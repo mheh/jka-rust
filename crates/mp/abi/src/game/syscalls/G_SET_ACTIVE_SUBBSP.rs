@@ -23,7 +23,7 @@ impl GSetActiveSubbspArgs {
 
 /// `G_SET_ACTIVE_SUBBSP` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:571`
+/// Source: `oracle/codemp/game/g_public.h:571`
 pub struct GSetActiveSubbsp;
 
 impl OutboundSysCall for GSetActiveSubbsp {

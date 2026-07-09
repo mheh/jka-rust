@@ -2,7 +2,7 @@
 
 /// Raven `refEntityType_t` — Entity rendering type discriminant.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:82-98`
+/// Type definition source: `oracle/code/renderer/tr_types.h:82-98`
 #[repr(i32)]
 pub enum refEntityType_t {
 	RT_MODEL,

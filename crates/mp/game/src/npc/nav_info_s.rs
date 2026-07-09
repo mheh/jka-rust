@@ -6,7 +6,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `navInfo_t` — navigation query result/state for NPC path movement.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/b_local.h:314-322`
+/// Type definition source: `oracle/codemp/game/b_local.h:314-322`
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct navInfo_t {
@@ -27,7 +27,7 @@ const _: () = assert!(core::mem::offset_of!(navInfo_t, trace) == 36);
 const _: () = assert!(core::mem::offset_of!(navInfo_t, flags) == 84);
 
 // `navInfo_t.flags` bits.
-// Source: `oracle/oracle/codemp/game/b_local.h:302-306`
+// Source: `oracle/codemp/game/b_local.h:302-306`
 /// Raven `NIF_NONE`.
 pub const NIF_NONE: i32 = 0x00000000;
 /// Raven `NIF_FAILED` — failed to find a way to the goal.

@@ -2,7 +2,7 @@
 
 /// Raven `clThinkFunc_t` — enumeration of client-side think callback function IDs.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_functions.h:232-240`
+/// Type definition source: `oracle/code/game/g_functions.h:232-240`
 #[repr(i32)]
 pub enum clThinkFunc_t {
     clThinkF_NULL = 0,

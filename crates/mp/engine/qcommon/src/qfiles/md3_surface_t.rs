@@ -6,7 +6,7 @@ use mp_qshared::shared::MAX_QPATH;
 
 /// Raven `md3Surface_t` — MD3 model surface header.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:130-149`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:130-149`
 #[repr(C)]
 pub struct md3Surface_t {
 	pub ident: i32,

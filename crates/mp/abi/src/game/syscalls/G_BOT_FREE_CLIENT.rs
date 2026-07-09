@@ -23,7 +23,7 @@ impl GBotFreeClientArgs {
 /// `G_BOT_FREE_CLIENT` MP game imports syscall ABI token.
 ///
 /// Raven: ( int clientNum );
-/// Source: `oracle/oracle/codemp/game/g_public.h:217`
+/// Source: `oracle/codemp/game/g_public.h:217`
 pub struct GBotFreeClient;
 
 impl OutboundSysCall for GBotFreeClient {

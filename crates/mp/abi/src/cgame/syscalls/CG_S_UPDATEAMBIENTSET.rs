@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall(CG_S_UPDATEAMBIENTSET, name, origin);`
 /// Raven transport: `S_UpdateAmbientSet((const char *)VMA(1), (float *)VMA(2)); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:237-239`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2239`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:846-848`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:237-239`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2239`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:846-848`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSUpdateambientsetArgs {
     name: *const c_char,
@@ -29,10 +29,10 @@ impl CgSUpdateambientsetArgs {
 /// `CG_S_UPDATEAMBIENTSET` MP cgame imports syscall ABI token.
 ///
 /// Raven: rww - AS trap implem
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:110`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:237-239`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:846-848`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:846-848`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:110`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:237-239`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:846-848`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:846-848`
 pub struct CgSUpdateambientset;
 
 impl OutboundSysCall for CgSUpdateambientset {

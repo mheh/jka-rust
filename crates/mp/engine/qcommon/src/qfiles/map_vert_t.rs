@@ -8,7 +8,7 @@ use super::draw_vert_t::MAXLIGHTMAPS;
 
 /// Raven `mapVert_t` — BSP-file map vertex record.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qfiles.h:506-512`
+/// Type definition source: `oracle/codemp/qcommon/qfiles.h:506-512`
 #[repr(C)]
 pub struct mapVert_t {
 	pub xyz: vec3_t,

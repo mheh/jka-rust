@@ -13,11 +13,11 @@ use mp_qshared::shared::CollisionRecord_t;
 /// Raven transport: `G2API_CollisionDetectCache((CollisionRecord_t*)VMA(1), *((CGhoul2Info_v *)args[2]), ...,
 ///     G2VertSpaceClient, args[10], args[11], VMF(12)); return 0;`.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:266`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:838-853`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2509`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1354-1367`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1354-1367`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:266`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:838-853`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2509`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1354-1367`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1354-1367`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgG2CollisiondetectcacheArgs {
     /// `CollisionRecord_t *collRecMap`, decoded by Raven from `VMA(1)`.
@@ -81,11 +81,11 @@ impl CgG2CollisiondetectcacheArgs {
 
 /// `CG_G2_COLLISIONDETECTCACHE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:266`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:838-853`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2509`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1354-1367`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1354-1367`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:266`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:838-853`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2509`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1354-1367`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1354-1367`
 pub struct CgG2Collisiondetectcache;
 
 impl OutboundSysCall for CgG2Collisiondetectcache {

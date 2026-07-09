@@ -6,14 +6,14 @@ use mp_qshared::shared::qboolean;
 use super::field_t::field_t;
 use super::qkey_t::qkey_t;
 
-// Raven's `#define COMMAND_HISTORY 32` (oracle/oracle/codemp/client/keys.h:10).
+// Raven's `#define COMMAND_HISTORY 32` (oracle/codemp/client/keys.h:10).
 const COMMAND_HISTORY: usize = 32;
-// Raven's `MAX_KEYS` enumerator (oracle/oracle/codemp/client/keycodes.h:338).
+// Raven's `MAX_KEYS` enumerator (oracle/codemp/client/keycodes.h:338).
 const MAX_KEYS: usize = 320;
 
 /// Raven `keyGlobals_t` — global key/console-field input state.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/keys.h:19-33`
+/// Type definition source: `oracle/codemp/client/keys.h:19-33`
 #[repr(C)]
 pub struct keyGlobals_s {
 	pub historyEditLines: [field_t; COMMAND_HISTORY],

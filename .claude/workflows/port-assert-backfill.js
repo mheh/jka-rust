@@ -38,7 +38,7 @@ const results = await pipeline(
   FILES,
   item => agent(
 `You are hardening one Rust file in the jka-rust port with layout static-asserts.
-Work from the repo root. NEVER edit anything under oracle/oracle/.
+Work from the repo root. NEVER edit anything under oracle/.
 
 FILE: ${item.file}   (crate: ${item.crate}, oracle parse module: ${item.module})
 

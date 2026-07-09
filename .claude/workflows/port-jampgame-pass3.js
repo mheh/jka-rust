@@ -20,7 +20,7 @@ const PKT = (args && args.packetsDir) || `${MAIN}/tools/closure-prototype/out/pa
 const MANIFEST = (args && args.manifestPath) || `${MAIN}/tools/closure-prototype/out/pass3/manifest.json`
 const MAX_FILES = (args && args.maxFiles) || 999
 
-const STYLE = `HOUSE RULES: doc-comment + Source cite on every item (oracle/oracle/codemp/game/<file>:<lines>); preserve Raven comments that clarify behavior; state conclusions not derivations; behavioral parity — port faithfully even if ugly; UB sites get the one defined behavior + <=2-line note per S19. NEVER touch oracle/. NEVER run cargo (parallel writers share the tree). NEVER git commit. NEVER add a co-author trailer.`
+const STYLE = `HOUSE RULES: doc-comment + Source cite on every item (oracle/codemp/game/<file>:<lines>); preserve Raven comments that clarify behavior; state conclusions not derivations; behavioral parity — port faithfully even if ugly; UB sites get the one defined behavior + <=2-line note per S19. NEVER touch oracle/. NEVER run cargo (parallel writers share the tree). NEVER git commit. NEVER add a co-author trailer.`
 
 // Zero-park: nothing stops a porter. Rulings 1-20 are all settled (docs/handoffs/jampgame-fork-discovery.md).
 const ZERO_PARK = `ZERO-PARK POLICY (supersedes the pass-1/2 park protocol): every fn in your packet gets a real body. NOTHING blocks you:

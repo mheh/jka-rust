@@ -1,14 +1,14 @@
 // PORT-COMPLETE: bg_g2_utils.c 2/2
 //! Raven `bg_g2_utils.c` functions ported to Rust.
 //!
-//! Source: `oracle/oracle/codemp/game/bg_g2_utils.c:25-122`
+//! Source: `oracle/codemp/game/bg_g2_utils.c:25-122`
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
 
 /// Raven `BG_AttachToRancor`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_g2_utils.c:25-98`
+/// Source: `oracle/codemp/game/bg_g2_utils.c:25-98`
 pub fn BG_AttachToRancor(
     ghoul2: *mut c_void,
     rancYaw: f32,
@@ -142,7 +142,7 @@ pub fn BG_AttachToRancor(
 
 /// Raven `BG_GetRootSurfNameWithVariant`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_g2_utils.c:101-122`
+/// Source: `oracle/codemp/game/bg_g2_utils.c:101-122`
 pub fn BG_GetRootSurfNameWithVariant(
     ghoul2: *mut c_void,
     rootSurfName: *const c_char,
@@ -152,7 +152,7 @@ pub fn BG_GetRootSurfNameWithVariant(
     traps: &dyn BgTraps,
 ) -> qboolean {
     // Raven file-local `#define MAX_VARIANTS 8`.
-    // Source: `oracle/oracle/codemp/game/bg_g2_utils.c:100`
+    // Source: `oracle/codemp/game/bg_g2_utils.c:100`
     const MAX_VARIANTS: c_int = 8;
 
     if ghoul2.is_null() || traps.g2api_get_surface_render_status(ghoul2, 0, rootSurfName) == qfalse

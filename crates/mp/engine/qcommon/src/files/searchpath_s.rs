@@ -5,7 +5,7 @@ use super::pack_t::pack_t;
 /// Raven `searchpath_t` — one entry in the search-path linked list: either a
 /// loaded pak (`pack`) or a loose directory (`dir`).
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/files.h:63-68`
+/// Type definition source: `oracle/codemp/qcommon/files.h:63-68`
 #[repr(C)]
 pub struct searchpath_t {
     pub next: *mut searchpath_t,

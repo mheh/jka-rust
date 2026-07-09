@@ -6,7 +6,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `srfFlare_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:715-720`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:715-720`
 #[repr(C)]
 pub struct srfFlare_t {
 	pub surfaceType: surfaceType_t,

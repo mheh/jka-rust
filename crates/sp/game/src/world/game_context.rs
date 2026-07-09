@@ -21,7 +21,7 @@ use super::game_world::GameWorld;
 /// SEAM-D2 (SP has no `mp_engine_select`-style alias crate; no alias name is
 /// minted here, see skeleton checkpoint-3 findings).
 ///
-/// Source: `oracle/oracle/code/game/g_public.h:168-471` (the import table);
+/// Source: `oracle/code/game/g_public.h:168-471` (the import table);
 /// `docs/handoffs/2026-07-03-skeleton-findings.md` § Settled fork from the
 /// round-4 gate.
 #[derive(Clone, Copy)]
@@ -35,4 +35,4 @@ pub struct GameContext<'e> {
 // unpacks `self.world` via STATE-D6 leaf reborrows and threads `self.engine`
 // into `gi::X(engine, …)` call sites.
 //TODO: Port SP export logic fns taking GameContext (per-export, logic-port)
-// Source: oracle/oracle/code/game/g_main.cpp:875-916 (the export table fills)
+// Source: oracle/code/game/g_main.cpp:875-916 (the export table fills)

@@ -12,9 +12,9 @@ use mp_qshared::shared::qboolean;
 /// Raven transport: `SE_GetString( (const char *) VMA(1) )`, then writes either
 /// the translated string or a `??` fallback into `(char *)VMA(2)`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:725-727`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2419`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1654-1678`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:725-727`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2419`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1654-1678`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSpGetstringtextstringArgs {
     text: *const c_char,
@@ -37,10 +37,10 @@ impl CgSpGetstringtextstringArgs {
 /// Raven comment: `// CG_SP_PRINT,`
 /// Raven switch comment: `// case CG_SP_GETSTRINGTEXT:`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:240`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:725-727`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1654-1678`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1654-1678`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:240`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:725-727`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1654-1678`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1654-1678`
 pub struct CgSpGetstringtextstring;
 
 impl OutboundSysCall for CgSpGetstringtextstring {

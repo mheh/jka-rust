@@ -12,8 +12,8 @@ use mp_qshared::shared::qboolean;
 /// Raven transport: raw `ghoul2` in `args[1]`, `boneName` via `VMA(2)`,
 /// `currentFrame` via `VMA(4)`, and `modelList` via `VMA(5)`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:880-882`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1395-1404`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:880-882`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1395-1404`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2GetboneframeArgs {
     ghoul2: *mut c_void,
@@ -49,11 +49,11 @@ impl CgG2GetboneframeArgs {
 /// Raven: trimmed down version of GBA, so I don't have to pass all those unused args across the VM-exe border
 /// Raven: `//rwwFIXMEFIXME: Just make a G2API_GetBoneFrame func too. This is dirty.`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:271`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:880-882`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:880-882`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1395-1404`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1395-1404`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:271`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:880-882`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:880-882`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1395-1404`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1395-1404`
 pub struct CgG2Getboneframe;
 
 impl OutboundSysCall for CgG2Getboneframe {

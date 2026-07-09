@@ -3,13 +3,13 @@
 use std::os::raw::c_char;
 
 // Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching this struct's field sizes).
-// Source: oracle/oracle/codemp/game/q_shared.h:395
+// Source: oracle/codemp/game/q_shared.h:395
 const MAX_OSPATH: usize = 1024;
 
 /// Raven `directory_t` — a search path directory (base path + game subdirectory).
 ///
 /// Raven: none.
-/// Type definition source: `oracle/oracle/codemp/qcommon/files.h:58-61`
+/// Type definition source: `oracle/codemp/qcommon/files.h:58-61`
 #[repr(C)]
 pub struct directory_t {
 	pub path: [c_char; MAX_OSPATH],    // c:\jk2

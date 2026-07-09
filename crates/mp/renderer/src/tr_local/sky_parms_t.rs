@@ -4,7 +4,7 @@ use crate::tr_local::image_s::image_t;
 
 /// Raven `skyParms_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:449-452`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:449-452`
 #[repr(C)]
 pub struct skyParms_t {
 	pub cloudHeight: f32,

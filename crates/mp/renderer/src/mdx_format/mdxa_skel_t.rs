@@ -5,7 +5,7 @@ use mp_qshared::shared::{mdxaBone_t, MAX_QPATH};
 /// Raven `mdxaSkel_t` — one bone entry in a `.gla` skeleton.
 ///
 /// Raven: struct size = (int)( &((mdxaSkel_t *)0)->children[ mdxaSkel_t->numChildren ] );
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:388-396`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:388-396`
 #[repr(C)]
 pub struct mdxaSkel_t {
     pub name: [c_char; MAX_QPATH], // name of bone

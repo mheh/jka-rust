@@ -6,10 +6,10 @@ use abi_transport::pass_float;
 ///
 /// Raven's engine switch reads one float word with `VMF(1)`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:675`
-/// Transport source: `oracle/oracle/codemp/ui/ui_syscalls.c:15`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:674`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:292`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:675`
+/// Transport source: `oracle/codemp/ui/ui_syscalls.c:15`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:674`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:292`
 #[derive(Debug)]
 pub struct UiFloorArgs {
     value: f32,
@@ -27,10 +27,10 @@ impl UiFloorArgs {
 
 /// `UI_FLOOR` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:140`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:675`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:674`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:292`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:140`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:675`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:674`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:292`
 pub struct UiFloor;
 
 impl OutboundSysCall for UiFloor {

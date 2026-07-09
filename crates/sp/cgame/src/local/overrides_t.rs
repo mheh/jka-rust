@@ -5,7 +5,7 @@
 /// Raven: NOTE: these probably get cleared in save/load!!!
 /// NOTE: could put Alpha and HorzOffset and the target & camera damps, but
 /// no-one is trying to override those, so...
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:277-289`
+/// Type definition source: `oracle/code/cgame/cg_local.h:277-289`
 #[repr(C)]
 pub struct overrides_t {
 	/// bit-flag field of which overrides are active

@@ -4,8 +4,8 @@ use core::ffi::c_int;
 ///
 /// Raven comment: `mode parm for FS_FOpenFile`
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1185`
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1684`
+/// Type definition source: `oracle/code/game/q_shared.h:1185`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1684`
 pub type fsMode_t = c_int;
 
 pub const FS_READ: fsMode_t = 0;

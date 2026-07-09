@@ -8,7 +8,7 @@ use super::msurface_s::msurface_t;
 
 /// Raven `mnode_s` (typedef `mnode_t`) — a BSP tree node/leaf.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:830-847`
+/// Type definition source: `oracle/code/renderer/tr_local.h:830-847`
 #[repr(C)]
 pub struct mnode_t {
     // common with leaf and node

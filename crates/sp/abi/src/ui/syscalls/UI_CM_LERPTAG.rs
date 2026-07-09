@@ -8,12 +8,12 @@ use abi_transport::pass_float;
 
 /// `UI_CM_LERPTAG` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:181`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:206-207` and `oracle/oracle/codemp/ui/ui_local.h:948`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:996-998`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:996-998`
+/// Enum source: `oracle/code/ui/ui_public.h:181`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:206-207` and `oracle/codemp/ui/ui_local.h:948`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:996-998`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:996-998`
 /// TODO: SP `UI_CM_LERPTAG` has no explicit engine switch case in
-/// `oracle/oracle/code/client/cl_ui.cpp`; payload shape is inherited from MP implementation.
+/// `oracle/code/client/cl_ui.cpp`; payload shape is inherited from MP implementation.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UiCmLerptagArgs {
     tag: *mut c_void,

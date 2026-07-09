@@ -2,7 +2,7 @@
 
 /// Raven `dgrid_t` — light grid sample.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:522-528`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:522-528`
 #[repr(C)]
 pub struct dgrid_t {
 	pub ambientLight: [[u8; 3]; 4],

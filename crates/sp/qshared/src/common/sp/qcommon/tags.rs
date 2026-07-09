@@ -1,7 +1,7 @@
 //! SP qcommon memory tag definitions.
 //!
-//! Source: `oracle/oracle/code/qcommon/tags.h:1-53`
-//! Type definition source: `oracle/oracle/code/game/q_shared.h:2682-2688`
+//! Source: `oracle/code/qcommon/tags.h:1-53`
+//! Type definition source: `oracle/code/game/q_shared.h:2682-2688`
 
 #![allow(non_camel_case_types)]
 
@@ -13,7 +13,7 @@
 
 // Raven's `typedef char memtag_t` is 1 byte, not int-wide; `#[repr(i8)]` matches
 // that width.
-// Source: `oracle/oracle/code/game/q_shared.h:2682-2688`
+// Source: `oracle/code/game/q_shared.h:2682-2688`
 #[repr(i8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum memtag_t {

@@ -9,13 +9,13 @@ use core::ffi::c_int;
 /// Raven wrapper: `trap_CIN_StopCinematic( handle )`.
 /// Raven transport: `return CIN_StopCinematic(args[1]);`
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:228`
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2670-2679`
-/// Args source: `oracle/oracle/code/ui/ui_syscalls.cpp:173-176`
-/// Args source: `oracle/oracle/code/ui/ui_local.h:190`
-/// Output source: `oracle/oracle/code/client/client.h:431`
-/// Output source: `oracle/oracle/code/client/cl_ui.cpp:470`
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:470`
+/// Enum value source: `oracle/code/ui/ui_public.h:228`
+/// Type definition source: `oracle/code/game/q_shared.h:2670-2679`
+/// Args source: `oracle/code/ui/ui_syscalls.cpp:173-176`
+/// Args source: `oracle/code/ui/ui_local.h:190`
+/// Output source: `oracle/code/client/client.h:431`
+/// Output source: `oracle/code/client/cl_ui.cpp:470`
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:470`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCinStopcinematicArgs {
     handle: c_int,

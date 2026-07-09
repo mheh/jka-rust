@@ -6,9 +6,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall( CG_S_STOPBACKGROUNDTRACK );`
 /// Raven transport: `S_StopBackgroundTrack(); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:571-572`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2237`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1015-1017`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:571-572`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2237`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1015-1017`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgSStopbackgroundtrackArgs;
 
@@ -20,10 +20,10 @@ impl CgSStopbackgroundtrackArgs {
 
 /// `CG_S_STOPBACKGROUNDTRACK` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:207`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:571-572`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1015-1017`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1015-1017`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:207`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:571-572`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1015-1017`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1015-1017`
 pub struct CgSStopbackgroundtrack;
 
 impl OutboundSysCall for CgSStopbackgroundtrack {

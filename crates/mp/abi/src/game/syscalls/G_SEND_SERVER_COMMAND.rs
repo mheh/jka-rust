@@ -38,7 +38,7 @@ impl GSendServerCommandArgs {
 /// Raven: ( int clientNum, const char *fmt, ... );
 /// Raven: reliably sends a command string to be interpreted by the given
 /// Raven: client.  If clientNum is -1, it will be sent to all clients
-/// Source: `oracle/oracle/codemp/game/g_public.h:153`
+/// Source: `oracle/codemp/game/g_public.h:153`
 pub struct GSendServerCommand;
 
 impl OutboundSysCall for GSendServerCommand {

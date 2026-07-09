@@ -2,7 +2,7 @@
 
 /// Raven `fakeAscii_t` — enumeration of keyboard character codes.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/keycodes.h:8-341`
+/// Type definition source: `oracle/codemp/ui/keycodes.h:8-341`
 #[repr(i32)]
 pub enum fakeAscii_t {
     A_NULL = 0,

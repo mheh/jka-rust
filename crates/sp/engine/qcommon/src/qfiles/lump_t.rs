@@ -2,7 +2,7 @@
 
 /// Raven `lump_t` — BSP file directory entry (offset + length into the file).
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/qfiles.h:420-422`
+/// Type definition source: `oracle/code/qcommon/qfiles.h:420-422`
 #[repr(C)]
 pub struct lump_t {
 	pub fileofs: i32,

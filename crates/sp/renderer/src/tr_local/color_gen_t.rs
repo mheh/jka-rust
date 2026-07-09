@@ -2,7 +2,7 @@
 
 /// Raven `colorGen_t` — Color generation type.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:230-246`
+/// Type definition source: `oracle/code/renderer/tr_local.h:230-246`
 #[repr(i32)]
 pub enum colorGen_t {
 	CGEN_BAD = 0,

@@ -5,7 +5,7 @@ use sp_qshared::shared::vec2_t;
 /// Raven `surfaceSprite_t` — sprite-generation parameters attached to a shader
 /// stage (billboards, wind sway, fade, and facing behavior).
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:350-357`
+/// Type definition source: `oracle/code/renderer/tr_local.h:350-357`
 #[repr(C)]
 pub struct surfaceSprite_t {
     pub surfaceSpriteType: i32,

@@ -8,7 +8,7 @@ use super::bsp_trace_s::bsp_trace_t;
 
 /// Raven `botlib_import_t` — engine services imported by the bot library.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/botlib.h:157-193`
+/// Type definition source: `oracle/codemp/game/botlib.h:157-193`
 #[repr(C)]
 pub struct botlib_import_t {
 	/// print messages from the bot library

@@ -4,7 +4,7 @@ use mp_qshared::common::mp::cgame::mini_ref_entity_s::miniRefEntity_t;
 
 /// Raven `trMiniRefEntity_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:87-90`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:87-90`
 #[repr(C)]
 pub struct trMiniRefEntity_t {
 	pub e: miniRefEntity_t,

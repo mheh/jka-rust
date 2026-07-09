@@ -37,7 +37,7 @@ impl CgRRemapShaderArgs {
 
 /// `CG_R_REMAP_SHADER` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:167`
+/// Source: `oracle/codemp/cgame/cg_public.h:167`
 pub struct CgRRemapShader;
 
 impl OutboundSysCall for CgRRemapShader {

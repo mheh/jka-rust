@@ -15,8 +15,8 @@ use super::tokenizer::Tokenizer;
 /// `mWriteable` flag is read by nothing in either tree and is dropped, and
 /// `CGPGroup::Duplicate`/`CGPValue::Duplicate` collapse to `Clone` of the
 /// document. A failed parse keeps the partially built tree, as in Raven.
-/// Class definition source: `oracle/oracle/codemp/qcommon/GenericParser2.h:136-158`
-/// Method source: `oracle/oracle/codemp/qcommon/GenericParser2.cpp:860-914`
+/// Class definition source: `oracle/codemp/qcommon/GenericParser2.h:136-158`
+/// Method source: `oracle/codemp/qcommon/GenericParser2.cpp:860-914`
 #[derive(Debug, Clone)]
 pub struct GenericParser2 {
     pub(crate) groups: Vec<GpGroupNode>,

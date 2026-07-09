@@ -15,7 +15,7 @@ use crate::server::world_sector_s::{worldSector_t, AREA_NODES};
 /// (`gWPArray[MAX_WPARRAY_SIZE]`). `usize`-typed dual of the canonical
 /// `mp_qshared::shared::limits::MAX_WPARRAY_SIZE` (`c_int`), for array sizing.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:993`
+/// Type definition source: `oracle/codemp/game/q_shared.h:993`
 pub const MAX_WPARRAY_SIZE: usize = MAX_WPARRAY_SIZE_I32 as usize;
 
 /// Raven `sv_bot.cpp` file-scope globals: `debugpolygons`/`bot_maxdebugpolys`
@@ -23,26 +23,26 @@ pub const MAX_WPARRAY_SIZE: usize = MAX_WPARRAY_SIZE_I32 as usize;
 /// table), grouped under Raven names (WorldSectors precedent: a Rust-side
 /// grouping colocated with its sole owner).
 ///
-/// Source: `oracle/oracle/codemp/server/sv_bot.cpp:16-23`
+/// Source: `oracle/codemp/server/sv_bot.cpp:16-23`
 #[allow(non_snake_case)]
 pub struct Bot {
     /// Raven `debugpolygons` — heap array of `bot_debugpoly_t`, allocated by
     /// `SV_BotInitBotLib` (`Z_Malloc(sizeof(bot_debugpoly_t) *
     /// bot_maxdebugpolys, ...)`); null until then.
     ///
-    /// Source: `oracle/oracle/codemp/server/sv_bot.cpp:16,689`
+    /// Source: `oracle/codemp/server/sv_bot.cpp:16,689`
     pub debugpolygons: *mut bot_debugpoly_t,
     /// Raven `bot_maxdebugpolys`.
     ///
-    /// Source: `oracle/oracle/codemp/server/sv_bot.cpp:17`
+    /// Source: `oracle/codemp/server/sv_bot.cpp:17`
     pub bot_maxdebugpolys: c_int,
     /// Raven `gWPArray[MAX_WPARRAY_SIZE]` — bot waypoint pointer table.
     ///
-    /// Source: `oracle/oracle/codemp/server/sv_bot.cpp:23`
+    /// Source: `oracle/codemp/server/sv_bot.cpp:23`
     pub gWPArray: [*mut wpobject_t; MAX_WPARRAY_SIZE],
     /// Raven `gWPNum`.
     ///
-    /// Source: `oracle/oracle/codemp/server/sv_bot.cpp:22`
+    /// Source: `oracle/codemp/server/sv_bot.cpp:22`
     pub gWPNum: c_int,
 }
 
@@ -50,7 +50,7 @@ pub struct Bot {
 /// table's `Server.world_sectors` row, grouped under Raven names (Savegame
 /// precedent: a Rust-side grouping colocated with its sole owner).
 ///
-/// Source: `oracle/oracle/codemp/server/sv_world.cpp:58-59`
+/// Source: `oracle/codemp/server/sv_world.cpp:58-59`
 #[allow(non_snake_case)]
 pub struct WorldSectors {
     pub sv_worldSectors: [worldSector_t; AREA_NODES],
@@ -59,7 +59,7 @@ pub struct WorldSectors {
 
 /// Raven `MAX_MASTER_SERVERS` — master-server slot count (`#ifndef _XBOX`).
 ///
-/// Type definition source: `oracle/oracle/codemp/server/server.h:236`
+/// Type definition source: `oracle/codemp/server/server.h:236`
 pub const MAX_MASTER_SERVERS: usize = 5;
 
 /// The server-island state owned by `Engine.sv: Server` — always present, NOT
@@ -73,33 +73,33 @@ pub const MAX_MASTER_SERVERS: usize = 5;
 /// `eSavedGameJustLoaded`, `code/server/sv_ccmds.cpp:22`) has no MP counterpart
 /// and is deliberately not a field of this (MP) `Server`.
 ///
-/// Source: `oracle/oracle/codemp/server/sv_main.cpp:10-11`;
-/// `oracle/oracle/codemp/server/server.h:46-54` (state/`SS_DEAD`).
+/// Source: `oracle/codemp/server/sv_main.cpp:10-11`;
+/// `oracle/codemp/server/server.h:46-54` (state/`SS_DEAD`).
 pub struct Server {
     /// Raven `sv` (`server_t`) — embeds `svEntities`/`configstrings`/`models`
     /// and holds the `SharedGameData` registration.
     ///
-    /// Source: `oracle/oracle/codemp/server/sv_main.cpp:11`
+    /// Source: `oracle/codemp/server/sv_main.cpp:11`
     pub sv: server_t,
     /// Raven `svs` (`serverStatic_t`, persists across maps) — challenges, heap
     /// `clients[]`, snapshot ring.
     ///
-    /// Source: `oracle/oracle/codemp/server/sv_main.cpp:10`
+    /// Source: `oracle/codemp/server/sv_main.cpp:10`
     pub svs: serverStatic_t,
     /// Raven `sv_worldSectors[AREA_NODES]` + `sv_numworldSectors` — the
     /// Chain-A disjoint field.
     ///
-    /// Source: `oracle/oracle/codemp/server/sv_world.cpp:58-59`
+    /// Source: `oracle/codemp/server/sv_world.cpp:58-59`
     pub world_sectors: WorldSectors,
     /// Raven `debugpolygons`/`bot_maxdebugpolys`/`gWPArray`/`gWPNum` —
     /// `sv_bot.cpp`'s file-scope bot state.
     ///
-    /// Source: `oracle/oracle/codemp/server/sv_bot.cpp:16-23`
+    /// Source: `oracle/codemp/server/sv_bot.cpp:16-23`
     pub bot: Bot,
     /// Raven `g_lastResolveTime[MAX_MASTER_SERVERS]` — master-server
     /// DNS-resolve throttle timestamps (`#ifndef _XBOX`, MP only).
     ///
-    /// Source: `oracle/oracle/codemp/server/sv_main.cpp:192`
+    /// Source: `oracle/codemp/server/sv_main.cpp:192`
     pub master_heartbeat: [c_int; MAX_MASTER_SERVERS],
 }
 
@@ -123,7 +123,7 @@ pub type ServerGame = Server;
 /// An unknown trap number reproduces Raven's `Com_Error(ERR_DROP, "Bad game
 /// system trap: %i")` faithfully (`sv_game.cpp:1654`).
 ///
-/// Source: `oracle/oracle/codemp/server/sv_game.cpp:458`
+/// Source: `oracle/codemp/server/sv_game.cpp:458`
 pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize {
     use mp_abi::game::imports::MpGameImport;
     let _ = engine;
@@ -132,7 +132,7 @@ pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize {
     // module emits. The full exhaustive TryFrom<i32>-decoded match (SEAM-D3)
     // and the ERR_DROP bad-number fallback (sv_game.cpp:1654) land with it:
     //TODO: Port SV_GameSystemCalls exhaustive dispatch
-    // Source: oracle/oracle/codemp/server/sv_game.cpp:458-1654
+    // Source: oracle/codemp/server/sv_game.cpp:458-1654
     let trap = args[0] as i32;
     if trap == MpGameImport::G_PRINT as i32 {
         // `case G_PRINT: Com_Printf( "%s", VMA(1) );` (sv_game.cpp:503-505;
@@ -145,7 +145,7 @@ pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize {
         let _ = std::io::stdout().flush();
         return 0;
     }
-    todo!("Port SV_GameSystemCalls trap {trap} — oracle/oracle/codemp/server/sv_game.cpp:458")
+    todo!("Port SV_GameSystemCalls trap {trap} — oracle/codemp/server/sv_game.cpp:458")
 }
 
 /// The injected `SlotSyscall` target (LOAD-D8 injection): unpacks the
@@ -162,7 +162,7 @@ pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize {
 /// Slice-0 G_PRINT case — which needs no host state — is handled inline, and
 /// every other trap panics loudly.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/vm.cpp:377` (`currentVM->systemCall( args )`).
+/// Source: `oracle/codemp/qcommon/vm.cpp:377` (`currentVM->systemCall( args )`).
 pub extern "C-unwind" fn game_system_calls_shim(
     ctx: *mut core::ffi::c_void,
     args: *const isize,
@@ -185,7 +185,7 @@ pub extern "C-unwind" fn game_system_calls_shim(
     // else fails loudly rather than reading fake state.
     //TODO: Port SV_InitGameProgs ctx injection (&mut Engine.sv)
     // Source: docs/architecture/engine-seam.md § Engine-side dispatchers;
-    // oracle/oracle/codemp/server/sv_game.cpp:1734-1753
+    // oracle/codemp/server/sv_game.cpp:1734-1753
     use mp_abi::game::imports::MpGameImport;
     let trap = frame[0] as i32;
     if trap == MpGameImport::G_PRINT as i32 {
@@ -200,6 +200,6 @@ pub extern "C-unwind" fn game_system_calls_shim(
         return 0;
     }
     todo!(
-        "Port SV_InitGameProgs ctx injection (&mut Engine.sv) — null ctx, trap {trap} needs host state — oracle/oracle/codemp/server/sv_game.cpp:1734-1753"
+        "Port SV_InitGameProgs ctx injection (&mut Engine.sv) — null ctx, trap {trap} needs host state — oracle/codemp/server/sv_game.cpp:1734-1753"
     )
 }

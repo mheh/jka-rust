@@ -4,7 +4,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `aas_settings_t` — AAS physics and reachability (rs_*) settings.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:88-127`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:88-127`
 #[repr(C)]
 pub struct aas_settings_t {
 	pub phys_gravitydirection: vec3_t,

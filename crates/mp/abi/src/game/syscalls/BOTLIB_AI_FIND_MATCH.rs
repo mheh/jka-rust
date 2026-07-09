@@ -41,7 +41,7 @@ impl BotlibAiFindMatchArgs {
 
 /// `BOTLIB_AI_FIND_MATCH` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:432`
+/// Source: `oracle/codemp/game/g_public.h:432`
 pub struct BotlibAiFindMatch;
 
 impl OutboundSysCall for BotlibAiFindMatch {

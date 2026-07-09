@@ -28,7 +28,7 @@ impl GNavAddfailednodeArgs {
 
 /// `G_NAV_ADDFAILEDNODE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:319`
+/// Source: `oracle/codemp/game/g_public.h:319`
 pub struct GNavAddfailednode;
 
 impl OutboundSysCall for GNavAddfailednode {

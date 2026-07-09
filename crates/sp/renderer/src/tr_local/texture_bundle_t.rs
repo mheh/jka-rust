@@ -9,7 +9,7 @@ use super::tex_mod_info_t::texModInfo_t;
 /// Raven `textureBundle_t` — a single texture layer of a shader stage: image,
 /// tex-coord generation, tex-mod stack, and animation state.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:359-376`
+/// Type definition source: `oracle/code/renderer/tr_local.h:359-376`
 #[repr(C)]
 pub struct textureBundle_t {
     pub image: *mut image_t,

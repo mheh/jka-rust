@@ -5,7 +5,7 @@ use mp_qshared::shared::{qboolean, vec3_t};
 
 /// Raven `trRefEntity_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:94-106`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:94-106`
 #[repr(C)]
 pub struct trRefEntity_t {
 	pub e: refEntity_t,

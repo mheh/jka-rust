@@ -11,8 +11,8 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `qboolean trap_G2API_GetBoneFrame(void *ghoul2, const char *boneName,
 /// const int currentTime, float *currentFrame, int *modelList, const int modelIndex)`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:564-566`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1302-1310`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:564-566`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1302-1310`
 #[derive(Debug)]
 pub struct UiG2GetboneframeArgs {
     /// Ghoul2 instance pointer transported as raw `args[1]`.
@@ -73,11 +73,11 @@ impl UiG2GetboneframeArgs {
 /// Raven: trimmed down version of GBA, so I don't have to pass all those unused args across the VM-exe border
 /// Raven switch: `//rwwFIXMEFIXME: Just make a G2API_GetBoneFrame func too. This is dirty.`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:156`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:156`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:564-566`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1302-1310`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1302-1310`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:156`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:156`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:564-566`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1302-1310`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1302-1310`
 pub struct UiG2Getboneframe;
 
 impl OutboundSysCall for UiG2Getboneframe {

@@ -4,7 +4,7 @@
 /// so a held force/weapon/item-select button can bind and later execute a
 /// selection without needing a separate keybind per slot.
 ///
-/// Type definition source: `oracle/oracle/code/client/cl_input_hotswap.h:13-56`
+/// Type definition source: `oracle/code/client/cl_input_hotswap.h:13-56`
 #[repr(C)]
 pub struct HotSwapManager {
 	/// Is the button down?

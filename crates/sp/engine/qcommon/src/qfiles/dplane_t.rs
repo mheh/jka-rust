@@ -2,7 +2,7 @@
 
 /// Raven `dplane_t` — BSP plane.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:465-468`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:465-468`
 #[repr(C)]
 pub struct dplane_t {
 	pub normal: [f32; 3],

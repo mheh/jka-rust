@@ -2,7 +2,7 @@
 
 /// Raven `texCoordGen_t` — texture coordinate generation mode.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:248-259`
+/// Type definition source: `oracle/code/renderer/tr_local.h:248-259`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum texCoordGen_t {

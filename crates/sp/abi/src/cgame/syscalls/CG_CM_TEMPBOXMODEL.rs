@@ -10,8 +10,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `return syscall( CG_CM_TEMPBOXMODEL, mins, maxs );`
 /// Raven transport: `return CM_TempBoxModel( (const float *) VMA(1), (const float *) VMA(2) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:143-145`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:533-534`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:143-145`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:533-534`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmTempboxmodelArgs {
     mins: *const vec3_t,
@@ -26,11 +26,11 @@ impl CgCmTempboxmodelArgs {
 
 /// `CG_CM_TEMPBOXMODEL` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:84`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:143-145`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:533-534`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:533-534`
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:188`
+/// Enum value source: `oracle/code/cgame/cg_public.h:84`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:143-145`
+/// Output source: `oracle/code/client/cl_cgame.cpp:533-534`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:533-534`
+/// Type definition source: `oracle/code/game/q_shared.h:188`
 pub struct CgCmTempboxmodel;
 
 impl OutboundSysCall for CgCmTempboxmodel {

@@ -14,7 +14,7 @@ impl GNavCheckblockededgesArgs {
 
 /// `G_NAV_CHECKBLOCKEDEDGES` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:333`
+/// Source: `oracle/codemp/game/g_public.h:333`
 pub struct GNavCheckblockededges;
 
 impl OutboundSysCall for GNavCheckblockededges {

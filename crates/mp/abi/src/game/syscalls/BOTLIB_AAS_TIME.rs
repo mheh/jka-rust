@@ -14,7 +14,7 @@ impl BotlibAasTimeArgs {
 
 /// `BOTLIB_AAS_TIME` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:363`
+/// Source: `oracle/codemp/game/g_public.h:363`
 pub struct BotlibAasTime;
 
 impl OutboundSysCall for BotlibAasTime {

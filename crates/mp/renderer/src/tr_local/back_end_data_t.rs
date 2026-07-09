@@ -16,7 +16,7 @@ use super::tr_ref_entity_t::trRefEntity_t;
 /// offset asserts, not re-explored in the oracle headers).
 ///
 /// Raven: none.
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:2263-2273`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:2263-2273`
 #[repr(C, align(8))]
 pub struct backEndData_t {
     pub drawSurfs: [drawSurf_t; 65536],

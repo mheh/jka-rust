@@ -8,7 +8,7 @@ use super::bsp_surface_s::bsp_surface_t;
 
 /// Raven `bsp_trace_t` — result of a bot BSP collision trace.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/botlib.h:117-129`
+/// Type definition source: `oracle/codemp/game/botlib.h:117-129`
 #[repr(C)]
 pub struct bsp_trace_t {
 	/// if true, plane is not valid

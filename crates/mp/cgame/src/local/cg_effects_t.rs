@@ -4,7 +4,7 @@ use mp_qshared::shared::fxHandle_t;
 
 /// Raven `cgEffects_t` — cached effect handles for cgame-side weapon/force/misc effects.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:1385-1509`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:1385-1509`
 #[repr(C)]
 pub struct cgEffects_t {
 	//concussion

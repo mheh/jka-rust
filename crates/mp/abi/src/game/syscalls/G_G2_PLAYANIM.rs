@@ -90,7 +90,7 @@ impl GG2PlayanimArgs {
 
 /// `G_G2_PLAYANIM` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:520`
+/// Source: `oracle/codemp/game/g_public.h:520`
 pub struct GG2Playanim;
 
 impl OutboundSysCall for GG2Playanim {

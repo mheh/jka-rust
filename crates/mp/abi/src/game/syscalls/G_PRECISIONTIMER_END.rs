@@ -29,7 +29,7 @@ impl GPrecisiontimerEndArgs {
 /// `G_PRECISIONTIMER_END` MP game imports syscall ABI token.
 ///
 /// Raven: console variable interaction
-/// Source: `oracle/oracle/codemp/game/g_public.h:118`
+/// Source: `oracle/codemp/game/g_public.h:118`
 pub struct GPrecisiontimerEnd;
 
 impl OutboundSysCall for GPrecisiontimerEnd {

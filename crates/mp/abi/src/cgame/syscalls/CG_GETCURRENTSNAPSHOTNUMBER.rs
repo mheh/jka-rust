@@ -13,9 +13,9 @@ use abi_transport::generic::{
 /// server time through the caller-provided out pointers. The switch returns `0`,
 /// so those pointer writes are the result channel.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:469-470`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:147-150`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:960-962`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:469-470`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:147-150`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:960-962`
 #[derive(Debug)]
 pub struct CgGetcurrentsnapshotnumberArgs {
     /// Out pointer for `cl.snap.messageNum`, decoded by Raven as `VMA(1)`.
@@ -51,10 +51,10 @@ impl CgGetcurrentsnapshotnumberArgs {
 /// Raven wrapper: `syscall( CG_GETCURRENTSNAPSHOTNUMBER, snapshotNumber, serverTime );`
 /// Raven transport: `CL_GetCurrentSnapshotNumber((int *)VMA(1), (int *)VMA(2)); return 0;`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:181`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:469-470`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:147-150`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:960-962`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:181`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:469-470`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:147-150`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:960-962`
 pub struct CgGetcurrentsnapshotnumber;
 
 impl OutboundSysCall for CgGetcurrentsnapshotnumber {

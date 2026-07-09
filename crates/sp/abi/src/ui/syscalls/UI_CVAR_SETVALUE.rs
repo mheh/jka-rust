@@ -8,12 +8,12 @@ use abi_transport::pass_float;
 
 /// `UI_CVAR_SETVALUE` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:158`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp` is missing for this SP call;
-/// `oracle/oracle/codemp/ui/ui_syscalls.c:55-56` provides Raven's canonical wrapper form.
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:55-56` and
-/// `oracle/oracle/codemp/client/cl_ui.cpp:887-889`.
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:887-889`.
+/// Enum source: `oracle/code/ui/ui_public.h:158`
+/// Args source: `oracle/code/client/cl_ui.cpp` is missing for this SP call;
+/// `oracle/codemp/ui/ui_syscalls.c:55-56` provides Raven's canonical wrapper form.
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:55-56` and
+/// `oracle/codemp/client/cl_ui.cpp:887-889`.
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:887-889`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UiCvarSetvalueArgs {
     var_name: *const c_char,

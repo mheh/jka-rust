@@ -2,7 +2,7 @@
 
 /// Raven `printParm_t` renderer print levels.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:438-443`
+/// Type definition source: `oracle/codemp/game/q_shared.h:438-443`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum printParm_t {

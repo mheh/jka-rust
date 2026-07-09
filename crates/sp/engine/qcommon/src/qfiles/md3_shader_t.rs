@@ -6,7 +6,7 @@ use sp_qshared::shared::MAX_QPATH;
 
 /// Raven `md3Shader_t` — MD3 shader reference.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:150-153`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:150-153`
 #[repr(C)]
 pub struct md3Shader_t {
 	pub name: [c_char; MAX_QPATH],

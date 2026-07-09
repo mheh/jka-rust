@@ -19,77 +19,77 @@ use super::tier_info::tierInfo;
 
 /// `MAX_ALIASES`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:563`
+/// Source: `oracle/codemp/ui/ui_local.h:563`
 const MAX_ALIASES: usize = 64;
 
 /// `MAX_TEAMS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:565`
+/// Source: `oracle/codemp/ui/ui_local.h:565`
 const MAX_TEAMS: usize = 64;
 
 /// `MAX_GAMETYPES`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:566`
+/// Source: `oracle/codemp/ui/ui_local.h:566`
 const MAX_GAMETYPES: usize = 16;
 
 /// `MAX_MAPS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:567`
+/// Source: `oracle/codemp/ui/ui_local.h:567`
 const MAX_MAPS: usize = 128;
 
 /// `MAX_TIERS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:589`
+/// Source: `oracle/codemp/ui/ui_local.h:589`
 const MAX_TIERS: usize = 16;
 
 /// `MAX_MODS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:590`
+/// Source: `oracle/codemp/ui/ui_local.h:590`
 const MAX_MODS: usize = 64;
 
 /// `MAX_DEMOS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:591`
+/// Source: `oracle/codemp/ui/ui_local.h:591`
 const MAX_DEMOS: usize = 256;
 
 /// `MAX_MOVIES`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:592`
+/// Source: `oracle/codemp/ui/ui_local.h:592`
 const MAX_MOVIES: usize = 256;
 
 /// `MAX_SCROLLTEXT_SIZE`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:596`
+/// Source: `oracle/codemp/ui/ui_local.h:596`
 const MAX_SCROLLTEXT_SIZE: usize = 4096;
 
 /// `MAX_SCROLLTEXT_LINES`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:597`
+/// Source: `oracle/codemp/ui/ui_local.h:597`
 const MAX_SCROLLTEXT_LINES: usize = 64;
 
 /// `MAX_ADDRESSLENGTH`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:571`
+/// Source: `oracle/codemp/ui/ui_local.h:571`
 const MAX_ADDRESSLENGTH: usize = 64;
 
 /// `MAX_FOUNDPLAYER_SERVERS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:580`
+/// Source: `oracle/codemp/ui/ui_local.h:580`
 const MAX_FOUNDPLAYER_SERVERS: usize = 16;
 
 /// `MAX_Q3PLAYERMODELS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:593` (`MAX_Q3PLAYERMODELS`)
+/// Source: `oracle/codemp/ui/ui_local.h:593` (`MAX_Q3PLAYERMODELS`)
 const MAX_Q3PLAYERMODELS: usize = 256;
 
 /// `MAX_FORCE_CONFIGS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:103`
+/// Source: `oracle/codemp/ui/ui_local.h:103`
 const MAX_FORCE_CONFIGS: usize = 128;
 
 /// `MAX_PLAYERMODELS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:594`
+/// Source: `oracle/codemp/ui/ui_local.h:594`
 const MAX_PLAYERMODELS: usize = 32;
 
 /// Raven `uiInfo_t` — the UI module's top-level runtime state (menu display
@@ -97,7 +97,7 @@ const MAX_PLAYERMODELS: usize = 32;
 /// maps, tiers, mods, demos, movies, server browser/status, force configs,
 /// player species, etc).
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:729-841`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:729-841`
 #[repr(C)]
 pub struct uiInfo_t {
 	pub uiDC: displayContextDef_t,

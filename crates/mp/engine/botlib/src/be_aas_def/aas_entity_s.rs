@@ -5,7 +5,7 @@ use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_s;
 /// Raven `aas_entity_t` — an AAS view of a game entity: its info plus links
 /// into the AAS areas and BSP leaves it occupies.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:78-86`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:78-86`
 #[repr(C)]
 pub struct aas_entity_t {
 	//entity info

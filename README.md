@@ -9,7 +9,7 @@ built toward drop-in replacements for Raven's shipped binaries.
 `jedi-academy-rust` is a faithful, 1:1 C-mirror Rust port of Raven's source.
 **This project treats it as an oracle**, not a dependency. It is vendored under
 [`oracle/`](oracle) (git submodule), which also carries Raven's original C/C++
-under `oracle/oracle/` (SP `code/`, MP `codemp/`) — never edited. Every port is
+under `oracle/` (SP `code/`, MP `codemp/`) — never edited. Every port is
 verified against it: clang-verified layout static-asserts for types,
 differential parity tests (`--features oracle`) for behavior. No FFI, no
 extracted C.

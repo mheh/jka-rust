@@ -2,7 +2,7 @@
 
 /// Raven `sexType_t` — character sex type enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/game/b_public.h:106-112`
+/// Type definition source: `oracle/code/game/b_public.h:106-112`
 #[repr(i32)]
 pub enum sexType_t {
     SEX_NEUTRAL = 0,

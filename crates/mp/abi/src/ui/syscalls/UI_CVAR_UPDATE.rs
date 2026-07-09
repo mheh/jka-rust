@@ -27,11 +27,11 @@ impl CgCvarUpdateArgs {
 /// `UI_CVAR_UPDATE` MP UI imports syscall ABI token.
 ///
 /// Raven: ( vmCvar_t *vmCvar );
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:70`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:37-38`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:919`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:872-874`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:872-874`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:70`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:37-38`
+/// Args source: `oracle/codemp/ui/ui_local.h:919`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:872-874`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:872-874`
 pub struct CgCvarUpdate;
 
 impl OutboundSysCall for CgCvarUpdate {

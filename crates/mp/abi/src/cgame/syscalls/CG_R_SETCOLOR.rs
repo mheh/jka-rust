@@ -27,7 +27,7 @@ impl CgRSetcolorArgs {
 
 /// `CG_R_SETCOLOR` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:159`
+/// Source: `oracle/codemp/cgame/cg_public.h:159`
 pub struct CgRSetcolor;
 
 impl OutboundSysCall for CgRSetcolor {

@@ -1,12 +1,12 @@
 //! MP `bg_public.h` footstep type definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:258-265`
+//! Type definition source: `oracle/codemp/game/bg_public.h:258-265`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `footstepType_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:258-265`
+/// Type definition source: `oracle/codemp/game/bg_public.h:258-265`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum footstepType_t {

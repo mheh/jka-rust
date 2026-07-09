@@ -2,7 +2,7 @@
 
 /// Raven `impactSound_t` — impact sound type enumeration.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:120-124`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:120-124`
 #[repr(i32)]
 pub enum impactSound_t {
     IMPACTSOUND_DEFAULT = 0,

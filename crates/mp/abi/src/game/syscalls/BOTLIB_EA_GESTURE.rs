@@ -22,7 +22,7 @@ impl BotlibEaGestureArgs {
 
 /// `BOTLIB_EA_GESTURE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:387`
+/// Source: `oracle/codemp/game/g_public.h:387`
 pub struct BotlibEaGesture;
 
 impl OutboundSysCall for BotlibEaGesture {

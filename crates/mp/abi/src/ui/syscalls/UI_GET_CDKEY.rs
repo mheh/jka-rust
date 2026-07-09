@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_GET_CDKEY, buf, buflen );`
 /// Raven transport: `CLUI_GetCDKey( (char *)VMA(1), args[2] ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:348-349`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:986`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1123-1125`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:348-349`
+/// Args source: `oracle/codemp/ui/ui_local.h:986`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1123-1125`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiGetCdkeyArgs {
     buf: *mut c_char,
@@ -35,10 +35,10 @@ impl UiGetCdkeyArgs {
 
 /// `UI_GET_CDKEY` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:72`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:348-349`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1123-1125`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1123-1125`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:72`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:348-349`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1123-1125`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1123-1125`
 pub struct UiGetCdkey;
 
 impl OutboundSysCall for UiGetCdkey {

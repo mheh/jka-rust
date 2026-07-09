@@ -12,9 +12,9 @@ use abi_transport::pass_float;
 /// Raven's client switch forwards `text` through `VMA(1)`, reads the font
 /// index from `args[2]`, and packs the scale as a float word.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:116-118`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:116-118`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1135-1136`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:116-118`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:116-118`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1135-1136`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRFontStrlenpixelsArgs {
     pub text: *const c_char,
@@ -34,7 +34,7 @@ impl UiRFontStrlenpixelsArgs {
 
 /// `UI_R_FONT_STRLENPIXELS` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:76`
+/// Source: `oracle/codemp/ui/ui_public.h:76`
 pub struct UiRFontStrlenpixels;
 
 impl OutboundSysCall for UiRFontStrlenpixels {

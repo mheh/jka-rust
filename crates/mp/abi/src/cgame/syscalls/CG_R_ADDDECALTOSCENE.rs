@@ -91,7 +91,7 @@ impl CgRAdddecaltosceneArgs {
 
 /// `CG_R_ADDDECALTOSCENE` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:154`
+/// Source: `oracle/codemp/cgame/cg_public.h:154`
 pub struct CgRAdddecaltoscene;
 
 impl OutboundSysCall for CgRAdddecaltoscene {

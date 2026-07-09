@@ -2,7 +2,7 @@
 
 /// Raven `missionFailed_t` — mission failure reason codes.
 ///
-/// Type definition source: `oracle/oracle/code/game/objectives.h:118-138`
+/// Type definition source: `oracle/code/game/objectives.h:118-138`
 #[repr(i32)]
 pub enum missionFailed_t {
 	MISSIONFAILED_JAN = 0,

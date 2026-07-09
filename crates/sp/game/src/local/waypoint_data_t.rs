@@ -2,7 +2,7 @@
 
 //! SP `g_local.h` waypoint node data.
 //!
-//! Type definition source: `oracle/oracle/code/game/g_local.h:146-154`
+//! Type definition source: `oracle/code/game/g_local.h:146-154`
 
 use core::ffi::c_char;
 
@@ -10,7 +10,7 @@ use sp_qshared::shared::MAX_QPATH;
 
 /// Raven `waypointData_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_local.h:146-154`
+/// Type definition source: `oracle/code/game/g_local.h:146-154`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct waypointData_t {

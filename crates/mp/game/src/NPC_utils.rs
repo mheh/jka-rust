@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_utils.c 23/24 (pass-2, packets/NPC_utils.md)
-//! Port of `oracle/oracle/codemp/game/NPC_utils.c` (jampgame mega-pass).
+//! Port of `oracle/codemp/game/NPC_utils.c` (jampgame mega-pass).
 //!
 //! Generated from `tools/closure-prototype/fnskel.py`; bodies filled per the
 //! jampgame mega-pass (settled fork rulings,
@@ -68,35 +68,35 @@ use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 
 // Raven `#define VALID_ATTACK_CONE 2.0f` (this file's own macro).
-// Source: `oracle/oracle/codemp/game/NPC_utils.c:11`
+// Source: `oracle/codemp/game/NPC_utils.c:11`
 pub const VALID_ATTACK_CONE: f32 = 2.0;
 
 // Raven `#define MIN_ANGLE_ERROR 0.01f` (`b_local.h`).
-// Source: `oracle/oracle/codemp/game/b_local.h:29`
+// Source: `oracle/codemp/game/b_local.h:29`
 const MIN_ANGLE_ERROR: f32 = 0.01;
 
 // Raven `#define Q3_INFINITE 16777216` (`g_public.h`).
-// Source: `oracle/oracle/codemp/game/g_public.h:9`
+// Source: `oracle/codemp/game/g_public.h:9`
 const Q3_INFINITE: f32 = 16777216.0;
 
 // Raven `#define WORLD_SIZE ( MAX_WORLD_COORD - MIN_WORLD_COORD )` (65536 -
 // (-65536) = 131072). Per-file local const, same idiom as `NPC_combat.rs`.
-// Source: `oracle/oracle/codemp/game/q_shared.h`
+// Source: `oracle/codemp/game/q_shared.h`
 const WORLD_SIZE: f32 = 131072.0;
 
 // Raven `#define MAX_RADIUS_ENTS 256` (per-file local const, scopes
 // `NPC_FindNearestEnemy`; distinct from the 128 value in `NPC_AI_Utils.rs`).
-// Source: `oracle/oracle/codemp/game/NPC_utils.c:1243`
+// Source: `oracle/codemp/game/NPC_utils.c:1243`
 const MAX_RADIUS_ENTS: usize = 256;
 
 /// Raven `ANGLE2SHORT(x)` — `((int)((x)*65536/360) & 65535)`.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1972`
+/// Source: `oracle/codemp/game/q_shared.h:1972`
 pub(crate) fn ANGLE2SHORT(x: f32) -> c_int {
     (((x * 65536.0 / 360.0) as c_int) & 65535) as c_int
 }
 
 /// Raven `SHORT2ANGLE(x)` — `((x)*(360.0/65536))`.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1973`
+/// Source: `oracle/codemp/game/q_shared.h:1973`
 pub(crate) fn SHORT2ANGLE(x: c_int) -> f32 {
     (x as f32) * (360.0 / 65536.0)
 }
@@ -109,21 +109,21 @@ pub(crate) fn SHORT2ANGLE(x: c_int) -> f32 {
 // glob).
 
 /// Raven `TURN_ON` flag for surface toggling.
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1022`
+/// Source: `oracle/codemp/game/NPC_utils.c:1022`
 const TURN_ON: c_int = 0x00000000;
 
 /// Raven `ORIGIN` — extract the origin vector from a bolt matrix.
-/// Source: `oracle/oracle/codemp/game/ghoul2_shared.h` (Eorientations enum)
+/// Source: `oracle/codemp/game/ghoul2_shared.h` (Eorientations enum)
 const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
 
 /// Raven `q_shared.h:30` `VALIDSTRING(a)` macro.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:30`
+/// Source: `oracle/codemp/game/q_shared.h:30`
 unsafe fn VALIDSTRING(a: *const c_char) -> bool {
     !a.is_null() && *a as c_int != 0
 }
 
 /// Raven `BG_NUM_TOGGLEABLE_SURFACES`.
-/// Source: `oracle/oracle/codemp/game/bg_public.h:138`
+/// Source: `oracle/codemp/game/bg_public.h:138`
 pub const BG_NUM_TOGGLEABLE_SURFACES: c_int = 31;
 
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
@@ -140,7 +140,7 @@ use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 /// Out-param reshape: `point` is written unconditionally on every branch (no
 /// oracle caller passes NULL), so it becomes the non-nullable `&mut vec3_t`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:20-168`
+/// Source: `oracle/codemp/game/NPC_utils.c:20-168`
 pub fn CalcEntitySpot(
     ctx: GameContext<'_>,
     ent: *const gentity_t,
@@ -298,7 +298,7 @@ pub fn CalcEntitySpot(
 /// is dead source, per house ruling on `#if 0`/`#if 1` branches) — only that
 /// branch is transcribed.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:182-517`
+/// Source: `oracle/codemp/game/NPC_utils.c:182-517`
 pub fn NPC_UpdateAngles(ctx: GameContext<'_>, doPitch: qboolean, doYaw: qboolean) -> qboolean {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -435,7 +435,7 @@ pub fn NPC_UpdateAngles(ctx: GameContext<'_>, doPitch: qboolean, doYaw: qboolean
 /// Out-param reshape: `enemy_org` is mutated in place (`VectorAdd(enemy_org,
 /// NPCInfo->aimOfs, enemy_org)`), so it becomes `&mut vec3_t`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:519-533`
+/// Source: `oracle/codemp/game/NPC_utils.c:519-533`
 pub fn NPC_AimWiggle(ctx: GameContext<'_>, enemy_org: &mut vec3_t) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -479,7 +479,7 @@ pub fn NPC_AimWiggle(ctx: GameContext<'_>, enemy_org: &mut vec3_t) {
 /// source, per house ruling on `#if 0` branches) — only that branch is
 /// transcribed.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:540-731`
+/// Source: `oracle/codemp/game/NPC_utils.c:540-731`
 pub fn NPC_UpdateFiringAngles(
     ctx: GameContext<'_>,
     doPitch: qboolean,
@@ -602,7 +602,7 @@ pub fn NPC_UpdateFiringAngles(
 /// read-only here (never written), so the out-param reshape does not
 /// apply — kept by-value.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:740-808`
+/// Source: `oracle/codemp/game/NPC_utils.c:740-808`
 pub fn NPC_UpdateShootAngles(
     ctx: GameContext<'_>,
     angles: vec3_t,
@@ -678,7 +678,7 @@ pub fn NPC_UpdateShootAngles(
 /// `f32` division yields `NaN`/`inf`, and `as c_int` on those saturates to 0
 /// — the one defined behavior, picked per §19.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:818-847`
+/// Source: `oracle/codemp/game/NPC_utils.c:818-847`
 pub fn SetTeamNumbers(ctx: GameContext<'_>) {
     unsafe {
         for i in 0..4usize {
@@ -709,7 +709,7 @@ pub fn SetTeamNumbers(ctx: GameContext<'_>) {
 
 /// Raven `G_ActivateBehavior`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:851-894`
+/// Source: `oracle/codemp/game/NPC_utils.c:851-894`
 pub fn G_ActivateBehavior(ctx: GameContext<'_>, self_: *mut gentity_t, bset: c_int) -> qboolean {
     unsafe {
         if self_.is_null() {
@@ -755,7 +755,7 @@ pub fn G_ActivateBehavior(ctx: GameContext<'_>, self_: *mut gentity_t, bset: c_i
 /// plain `int *` branch below is the compiled one (per house ruling on
 /// `_XBOX` branches).
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:906-995`
+/// Source: `oracle/codemp/game/NPC_utils.c:906-995`
 pub fn NPC_SetBoneAngles(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
@@ -864,7 +864,7 @@ pub fn NPC_SetBoneAngles(
 /// Raven: rww - and another method of automatically managing surface status
 /// for the client and server at once.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1001-1039`
+/// Source: `oracle/codemp/game/NPC_utils.c:1001-1039`
 pub fn NPC_SetSurfaceOnOff(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
@@ -920,7 +920,7 @@ pub fn NPC_SetSurfaceOnOff(
 /// Raven: rww - cheap check to see if an armed client is looking in our
 /// general direction.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1042-1067`
+/// Source: `oracle/codemp/game/NPC_utils.c:1042-1067`
 pub fn NPC_SomeoneLookingAtMe(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let mut i: usize = 0;
@@ -958,42 +958,42 @@ pub fn NPC_SomeoneLookingAtMe(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
 
 /// Raven `NPC_ClearLOS`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1069-1072`
+/// Source: `oracle/codemp/game/NPC_utils.c:1069-1072`
 pub fn NPC_ClearLOS(ctx: GameContext<'_>, start: vec3_t, end: vec3_t) -> qboolean {
     unsafe { G_ClearLOS(ctx, (*ctx.world).globals.NPC, start, end) }
 }
 
 /// Raven `NPC_ClearLOS5`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1073-1076`
+/// Source: `oracle/codemp/game/NPC_utils.c:1073-1076`
 pub fn NPC_ClearLOS5(ctx: GameContext<'_>, end: vec3_t) -> qboolean {
     unsafe { G_ClearLOS5(ctx, (*ctx.world).globals.NPC, end) }
 }
 
 /// Raven `NPC_ClearLOS4`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1077-1080`
+/// Source: `oracle/codemp/game/NPC_utils.c:1077-1080`
 pub fn NPC_ClearLOS4(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe { G_ClearLOS4(ctx, (*ctx.world).globals.NPC, ent) }
 }
 
 /// Raven `NPC_ClearLOS3`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1081-1084`
+/// Source: `oracle/codemp/game/NPC_utils.c:1081-1084`
 pub fn NPC_ClearLOS3(ctx: GameContext<'_>, start: vec3_t, ent: *mut gentity_t) -> qboolean {
     unsafe { G_ClearLOS3(ctx, (*ctx.world).globals.NPC, start, ent) }
 }
 
 /// Raven `NPC_ClearLOS2`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1085-1088`
+/// Source: `oracle/codemp/game/NPC_utils.c:1085-1088`
 pub fn NPC_ClearLOS2(ctx: GameContext<'_>, ent: *mut gentity_t, end: vec3_t) -> qboolean {
     unsafe { G_ClearLOS2(ctx, (*ctx.world).globals.NPC, ent, end) }
 }
 
 /// Raven `NPC_ValidEnemy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1096-1187`
+/// Source: `oracle/codemp/game/NPC_utils.c:1096-1187`
 pub fn NPC_ValidEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1098,7 +1098,7 @@ pub fn NPC_ValidEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 
 /// Raven `NPC_TargetVisible`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1195-1210`
+/// Source: `oracle/codemp/game/NPC_utils.c:1195-1210`
 pub fn NPC_TargetVisible(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1134,7 +1134,7 @@ pub fn NPC_TargetVisible(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean 
 
 /// Raven `NPC_FindNearestEnemy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1246-1294`
+/// Source: `oracle/codemp/game/NPC_utils.c:1246-1294`
 pub fn NPC_FindNearestEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int {
     unsafe {
         let npc_info = (*ctx.world).globals.NPCInfo;
@@ -1205,7 +1205,7 @@ pub fn NPC_FindNearestEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int 
 /// Raven: the "Hazard Team status" `NPC_FindPlayer` shortcut above is `/*
 /// */`-commented out in the oracle — dead source, not transcribed.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1302-1348`
+/// Source: `oracle/codemp/game/NPC_utils.c:1302-1348`
 pub fn NPC_PickEnemyExt(ctx: GameContext<'_>, checkAlerts: qboolean) -> *mut gentity_t {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1262,7 +1262,7 @@ pub fn NPC_PickEnemyExt(ctx: GameContext<'_>, checkAlerts: qboolean) -> *mut gen
 
 /// Raven `NPC_FindPlayer`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1356-1359`
+/// Source: `oracle/codemp/game/NPC_utils.c:1356-1359`
 pub fn NPC_FindPlayer(ctx: GameContext<'_>) -> qboolean {
     unsafe { NPC_TargetVisible(ctx, &mut (*ctx.world).g_entities[0] as *mut gentity_t) }
 }
@@ -1273,7 +1273,7 @@ pub fn NPC_FindPlayer(ctx: GameContext<'_>) -> qboolean {
 /// entire real implementation is `#if 0`-style commented out (dead in this
 /// build); faithfully preserved as an always-false stub.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1367-1399`
+/// Source: `oracle/codemp/game/NPC_utils.c:1367-1399`
 fn NPC_CheckPlayerDistance() -> qboolean {
     qfalse
 }
@@ -1284,7 +1284,7 @@ fn NPC_CheckPlayerDistance() -> qboolean {
 /// in the oracle (`//rwwFIXMEFIXME: support for flag`) — kept as the
 /// always-false condition it faithfully is.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1407-1461`
+/// Source: `oracle/codemp/game/NPC_utils.c:1407-1461`
 pub fn NPC_FindEnemy(ctx: GameContext<'_>, checkAlerts: qboolean) -> qboolean {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1345,14 +1345,14 @@ pub fn NPC_FindEnemy(ctx: GameContext<'_>, checkAlerts: qboolean) -> qboolean {
 
 /// Raven `NPC_CheckEnemyExt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1469-1483`
+/// Source: `oracle/codemp/game/NPC_utils.c:1469-1483`
 pub fn NPC_CheckEnemyExt(ctx: GameContext<'_>, checkAlerts: qboolean) -> qboolean {
     NPC_FindEnemy(ctx, checkAlerts)
 }
 
 /// Raven `NPC_FacePosition`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1491-1547`
+/// Source: `oracle/codemp/game/NPC_utils.c:1491-1547`
 pub fn NPC_FacePosition(ctx: GameContext<'_>, position: vec3_t, doPitch: qboolean) -> qboolean {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1449,7 +1449,7 @@ pub fn NPC_FacePosition(ctx: GameContext<'_>, position: vec3_t, doPitch: qboolea
 
 /// Raven `NPC_FaceEntity`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1555-1563`
+/// Source: `oracle/codemp/game/NPC_utils.c:1555-1563`
 pub fn NPC_FaceEntity(ctx: GameContext<'_>, ent: *mut gentity_t, doPitch: qboolean) -> qboolean {
     let mut entPos: vec3_t = [0.0; 3];
     CalcEntitySpot(
@@ -1463,7 +1463,7 @@ pub fn NPC_FaceEntity(ctx: GameContext<'_>, ent: *mut gentity_t, doPitch: qboole
 
 /// Raven `NPC_FaceEnemy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1571-1580`
+/// Source: `oracle/codemp/game/NPC_utils.c:1571-1580`
 pub fn NPC_FaceEnemy(ctx: GameContext<'_>, doPitch: qboolean) -> qboolean {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1484,7 +1484,7 @@ pub fn NPC_FaceEnemy(ctx: GameContext<'_>, doPitch: qboolean) -> qboolean {
 
 /// Raven `NPC_CheckCanAttackExt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1588-1603`
+/// Source: `oracle/codemp/game/NPC_utils.c:1588-1603`
 pub fn NPC_CheckCanAttackExt(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1515,7 +1515,7 @@ pub fn NPC_CheckCanAttackExt(ctx: GameContext<'_>) -> qboolean {
 
 /// Raven `NPC_ClearLookTarget`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1611-1625`
+/// Source: `oracle/codemp/game/NPC_utils.c:1611-1625`
 pub fn NPC_ClearLookTarget(self_: *mut gentity_t) {
     unsafe {
         if (*self_).client.is_null() {
@@ -1536,7 +1536,7 @@ pub fn NPC_ClearLookTarget(self_: *mut gentity_t) {
 
 /// Raven `NPC_SetLookTarget`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1632-1646`
+/// Source: `oracle/codemp/game/NPC_utils.c:1632-1646`
 pub fn NPC_SetLookTarget(self_: *mut gentity_t, entNum: c_int, clearTime: c_int) {
     unsafe {
         if (*self_).client.is_null() {
@@ -1557,7 +1557,7 @@ pub fn NPC_SetLookTarget(self_: *mut gentity_t, entNum: c_int, clearTime: c_int)
 
 /// Raven `NPC_CheckLookTarget`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1653-1679`
+/// Source: `oracle/codemp/game/NPC_utils.c:1653-1679`
 pub fn NPC_CheckLookTarget(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
     unsafe {
         if !(*self_).client.is_null() {
@@ -1595,7 +1595,7 @@ pub fn NPC_CheckLookTarget(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
 
 /// Raven `NPC_CheckCharmed`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1687-1705`
+/// Source: `oracle/codemp/game/NPC_utils.c:1687-1705`
 pub fn NPC_CheckCharmed(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1636,7 +1636,7 @@ pub fn NPC_CheckCharmed(ctx: GameContext<'_>) {
 /// Out-param reshape: `pos` is guarded by `if (pos)` in the oracle (the
 /// AngleVectors NULL-able idiom), so it becomes `Option<&mut vec3_t>`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1707-1740`
+/// Source: `oracle/codemp/game/NPC_utils.c:1707-1740`
 pub fn G_GetBoltPosition(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -1690,7 +1690,7 @@ pub fn G_GetBoltPosition(
 
 /// Raven `NPC_EntRangeFromBolt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1742-1754`
+/// Source: `oracle/codemp/game/NPC_utils.c:1742-1754`
 pub fn NPC_EntRangeFromBolt(
     ctx: GameContext<'_>,
     targEnt: *mut gentity_t,
@@ -1712,7 +1712,7 @@ pub fn NPC_EntRangeFromBolt(
 
 /// Raven `NPC_EnemyRangeFromBolt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1756-1759`
+/// Source: `oracle/codemp/game/NPC_utils.c:1756-1759`
 pub fn NPC_EnemyRangeFromBolt(ctx: GameContext<'_>, boltIndex: c_int) -> f32 {
     unsafe {
         let enemy = match (*(*ctx.world).globals.NPC).enemy {
@@ -1729,7 +1729,7 @@ pub fn NPC_EnemyRangeFromBolt(ctx: GameContext<'_>, boltIndex: c_int) -> f32 {
 /// (`VectorCopy(org, boltOrg)`), so it becomes the non-nullable
 /// `&mut vec3_t`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1761-1782`
+/// Source: `oracle/codemp/game/NPC_utils.c:1761-1782`
 pub fn NPC_GetEntsNearBolt(
     ctx: GameContext<'_>,
     radiusEnts: *mut c_int,

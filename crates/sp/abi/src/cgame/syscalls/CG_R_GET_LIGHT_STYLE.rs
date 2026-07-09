@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `void trap_R_GetLightStyle(int style, color4ub_t color)`.
 /// Raven transport: `re.GetLightStyle(args[1], (byte *) VMA(2));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:499-501`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:802-804`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:499-501`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:802-804`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRGetLightStyleArgs {
     style: c_int,
@@ -35,10 +35,10 @@ impl CgRGetLightStyleArgs {
 
 /// `CG_R_GET_LIGHT_STYLE` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:180`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:499-501`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:802-804`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:802-804`
+/// Enum value source: `oracle/code/cgame/cg_public.h:180`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:499-501`
+/// Output source: `oracle/code/client/cl_cgame.cpp:802-804`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:802-804`
 pub struct CgRGetLightStyle;
 
 impl OutboundSysCall for CgRGetLightStyle {

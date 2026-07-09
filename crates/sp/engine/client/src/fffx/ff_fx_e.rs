@@ -2,7 +2,7 @@
 
 /// Raven `ffFX_e` — sound effect IDs for foley/ambience effects.
 ///
-/// Type definition source: `oracle/oracle/code/client/fffx.h:13-57`
+/// Type definition source: `oracle/code/client/fffx.h:13-57`
 #[repr(i32)]
 pub enum ffFX_e {
 	fffx_RandomNoise = 0,

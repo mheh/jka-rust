@@ -12,9 +12,9 @@ use abi_transport::generic::{
 /// and reads the buffer size as the raw `args[4]` word. The returned `int` is
 /// the file count; `listbuf` is an out buffer filled by the engine.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:99-100`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:748-749`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:748-749`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:99-100`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:748-749`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:748-749`
 #[derive(Debug)]
 pub struct CgFsGetfilelistArgs {
     /// Null-terminated virtual-filesystem path, decoded by Raven as `VMA(1)`.
@@ -70,10 +70,10 @@ impl CgFsGetfilelistArgs {
 /// Raven wrapper: `return syscall( CG_FS_GETFILELIST, path, extension, listbuf, bufsize );`
 /// Raven transport: `return FS_GetFileList( (const char *)VMA(1), (const char *)VMA(2), (char *)VMA(3), args[4] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:77`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:99-100`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:748-749`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:748-749`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:77`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:99-100`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:748-749`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:748-749`
 pub struct CgFsGetfilelist;
 
 impl OutboundSysCall for CgFsGetfilelist {

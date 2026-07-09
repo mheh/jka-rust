@@ -5,7 +5,7 @@ use core::ffi::c_void;
 ///
 /// Raven: `FILE*` (`o`) is a raw libc stream; `unzFile` (`z`) is a minizip
 /// archive handle. Both are opaque pointer-sized handles at this seam.
-/// Type definition source: `oracle/oracle/code/qcommon/files.h:60-65`
+/// Type definition source: `oracle/code/qcommon/files.h:60-65`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union qfile_gut {

@@ -7,9 +7,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( CG_FX_FREE_SYSTEM );`
 /// Raven transport: `return FX_FreeSystem();`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:679-681`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2407`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1156-1157`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:679-681`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2407`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1156-1157`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxFreeSystemArgs;
 
@@ -21,10 +21,10 @@ impl CgFxFreeSystemArgs {
 
 /// `CG_FX_FREE_SYSTEM` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:229`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:679-681`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1156-1157`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1156-1157`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:229`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:679-681`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1156-1157`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1156-1157`
 pub struct CgFxFreeSystem;
 
 impl OutboundSysCall for CgFxFreeSystem {

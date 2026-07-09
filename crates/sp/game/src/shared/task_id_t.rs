@@ -3,7 +3,7 @@
 /// Raven `taskID_t` — Task identifiers for timed events.
 ///
 /// Raven: (comments preserved inline per variant below).
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:20-34`
+/// Type definition source: `oracle/code/game/g_shared.h:20-34`
 #[repr(i32)]
 pub enum taskID_t {
     /// Waiting for a voice sound to complete.

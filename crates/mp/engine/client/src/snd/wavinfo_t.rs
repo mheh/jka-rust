@@ -2,7 +2,7 @@
 
 /// Raven `wavinfo_t` — parsed WAV file header info.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/snd_local.h:137-144`
+/// Type definition source: `oracle/codemp/client/snd_local.h:137-144`
 #[repr(C)]
 pub struct wavinfo_t {
 	pub format: i32,

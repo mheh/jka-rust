@@ -4,9 +4,9 @@ use abi_transport::pass_float;
 
 /// `UI_ATAN2` SP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:244`
+/// Enum value source: `oracle/code/ui/ui_public.h:244`
 /// Args/output source (SP ambiguous): SP `cl_ui.cpp` has no implementation case.
-/// Transport/source fallback (MP): `oracle/oracle/codemp/client/cl_ui.cpp:830-831`
+/// Transport/source fallback (MP): `oracle/codemp/client/cl_ui.cpp:830-831`
 /// TODO: SP transport evidence for float ABI is still missing; this follows MP float syscall pattern.
 pub struct UiAtan2;
 

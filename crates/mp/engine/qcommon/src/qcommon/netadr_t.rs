@@ -4,7 +4,7 @@ use super::netadrtype_t::netadrtype_t;
 
 /// Raven `netadr_t` — a network address (IP or IPX) with its associated port.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:123-130`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:123-130`
 #[repr(C)]
 pub struct netadr_t {
 	pub r#type: netadrtype_t,

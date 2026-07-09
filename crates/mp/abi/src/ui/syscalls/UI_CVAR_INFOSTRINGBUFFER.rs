@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_CVAR_INFOSTRINGBUFFER, bit, buffer, bufsize );`
 /// Raven transport: `Cvar_InfoStringBuffer( args[1], (char *)VMA(2), args[3] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:67-68`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:926`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:899-901`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:67-68`
+/// Args source: `oracle/codemp/ui/ui_local.h:926`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:899-901`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCvarInfostringbufferArgs {
     bit: c_int,
@@ -44,11 +44,11 @@ impl UiCvarInfostringbufferArgs {
 
 /// `UI_CVAR_INFOSTRINGBUFFER` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:27`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:67-68`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:67-68`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:899-901`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:899-901`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:27`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:67-68`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:67-68`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:899-901`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:899-901`
 pub struct UiCvarInfostringbuffer;
 
 impl OutboundSysCall for UiCvarInfostringbuffer {

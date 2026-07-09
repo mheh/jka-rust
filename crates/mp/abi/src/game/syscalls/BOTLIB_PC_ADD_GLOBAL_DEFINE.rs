@@ -25,7 +25,7 @@ impl BotlibPcAddGlobalDefineArgs {
 
 /// `BOTLIB_PC_ADD_GLOBAL_DEFINE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:346`
+/// Source: `oracle/codemp/game/g_public.h:346`
 pub struct BotlibPcAddGlobalDefine;
 
 impl OutboundSysCall for BotlibPcAddGlobalDefine {

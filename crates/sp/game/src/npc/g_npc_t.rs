@@ -16,22 +16,22 @@ use super::visibility_t::visibility_t;
 
 /// Raven `MAX_ENEMY_POS_LAG`.
 ///
-/// Definition source: `oracle/oracle/code/game/b_public.h:141`
+/// Definition source: `oracle/code/game/b_public.h:141`
 pub const MAX_ENEMY_POS_LAG: i32 = 2400;
 
 /// Raven `ENEMY_POS_LAG_INTERVAL`.
 ///
-/// Definition source: `oracle/oracle/code/game/b_public.h:142`
+/// Definition source: `oracle/code/game/b_public.h:142`
 pub const ENEMY_POS_LAG_INTERVAL: i32 = 100;
 
 /// Raven `ENEMY_POS_LAG_STEPS`.
 ///
-/// Definition source: `oracle/oracle/code/game/b_public.h:143`
+/// Definition source: `oracle/code/game/b_public.h:143`
 pub const ENEMY_POS_LAG_STEPS: usize = (MAX_ENEMY_POS_LAG / ENEMY_POS_LAG_INTERVAL) as usize;
 
 /// Raven `gNPC_t` — per-entity NPC/behavior state.
 ///
-/// Type definition source: `oracle/oracle/code/game/b_public.h:146-313`
+/// Type definition source: `oracle/code/game/b_public.h:146-313`
 #[repr(C)]
 pub struct gNPC_t {
 	//FIXME: Put in playerInfo or something

@@ -21,7 +21,7 @@ pub use core::ffi::{
 // Raven `byte` (`q_shared.h:349`, `typedef unsigned char byte`). `native_types`
 // defines it but is not re-exported for this name through `mp_qshared`; the
 // local alias matches the same `c_uchar` width.
-// Source: `oracle/oracle/codemp/game/q_shared.h:349`
+// Source: `oracle/codemp/game/q_shared.h:349`
 pub type byte = c_uchar;
 
 // Integration round-1 addendum: the fnskel packets transcribe Raven constant
@@ -164,10 +164,10 @@ pub use mp_bg::local::pml_t::pml_t;
 // `use crate::prelude::*` glob resolves those call sites.
 pub use crate::trap;
 // Raven `trap_R_RegisterSkin` re-export with Raven name for pass-3 bodies
-// that transcribe the bare Raven spelling (oracle/oracle/codemp/game/g_syscalls.c:1179-1182)
+// that transcribe the bare Raven spelling (oracle/codemp/game/g_syscalls.c:1179-1182)
 pub use crate::trap::R_RegisterSkin as trap_R_RegisterSkin;
 // Raven `trap_G2API_*` re-exports with Raven names for pass-3 bodies that
-// transcribe the bare Raven spellings (oracle/oracle/codemp/game/g_syscalls.c)
+// transcribe the bare Raven spellings (oracle/codemp/game/g_syscalls.c)
 pub use crate::trap::G2API_AnimateG2Models as trap_G2API_AnimateG2Models;
 pub use crate::trap::G2API_CleanGhoul2Models as trap_G2API_CleanGhoul2Models;
 pub use crate::trap::G2API_GetBoltMatrix as trap_G2API_GetBoltMatrix;
@@ -247,7 +247,7 @@ pub use mp_qshared::common::mp::gentity::{
 // need to access server-side fields like spawnflags. For game-code bodies that have gentity_t
 // parameters cast through bgEntity_t, we re-export gentity_t under the bgEntity_t name to allow
 // those accesses (e.g. `(*bgEntity).spawnflags`).
-// Source: oracle/oracle/codemp/game/g_vehicles.c, FighterNPC.c, etc. (local macro)
+// Source: oracle/codemp/game/g_vehicles.c, FighterNPC.c, etc. (local macro)
 pub use mp_qshared::common::mp::gentity::gentity_t as bgEntity_t;
 pub use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 pub use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
@@ -447,5 +447,5 @@ pub use mp_qshared::common::mp::qcommon::task_id_t::taskID_t::NUM_TIDS;
 // Raven `G_ICARUS_TASKIDPENDING` args re-export under the misspelled
 // `GICARUSTaskIDPendingArgs` spelling that `NPC_sounds.rs` transcribes bare;
 // the canonical camelCase port is `GIcarusTaskidpendingArgs`.
-// Source: oracle/oracle/codemp/game/g_syscalls.c:329-332
+// Source: oracle/codemp/game/g_syscalls.c:329-332
 pub use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs as GICARUSTaskIDPendingArgs;

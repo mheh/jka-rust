@@ -2,7 +2,7 @@
 
 /// Raven `STREAMINGBUFFER` — OpenAL streaming audio buffer handle.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/snd_local.h:80-85`
+/// Type definition source: `oracle/codemp/client/snd_local.h:80-85`
 #[repr(C)]
 pub struct STREAMINGBUFFER {
 	pub BufferID: u32, // ALuint

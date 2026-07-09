@@ -35,7 +35,7 @@ impl GTestprintfloatArgs {
 
 /// `UI_TESTPRINTFLOAT` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:290`
+/// Source: `oracle/codemp/ui/ui_public.h:290`
 pub struct GTestprintfloat;
 
 impl OutboundSysCall for GTestprintfloat {

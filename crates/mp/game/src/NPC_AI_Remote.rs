@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_Remote.c 1/10
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_Remote.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Remote.c`.
 //!
 //! One function ported; ten parked due to ambient-state infrastructure.
 //! All functions except `NPC_Remote_Precache` rely on file-scope globals set
@@ -13,7 +13,7 @@
 use crate::prelude::*;
 
 // Raven's file-scope combat/movement tuning defines.
-// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:6,130-132,170-171,282-283`
+// Source: `oracle/codemp/game/NPC_AI_Remote.c:6,130-132,170-171,282-283`
 const VELOCITY_DECAY: f32 = 0.85;
 const REMOTE_STRAFE_VEL: f32 = 256.0;
 const REMOTE_STRAFE_DIS: f32 = 200.0;
@@ -27,7 +27,7 @@ const MIN_DISTANCE_SQR: f32 = MIN_DISTANCE * MIN_DISTANCE;
 ///
 /// Caches sound and effect resources for Remote NPCs at map load time.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:17-22`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:17-22`
 pub fn NPC_Remote_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/chars/remote/misc/fire.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/remote/misc/hiss.wav".as_ptr());
@@ -36,7 +36,7 @@ pub fn NPC_Remote_Precache(ctx: GameContext<'_>) {
 
 /// Raven `NPC_Remote_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:29-37`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:29-37`
 pub fn NPC_Remote_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -52,7 +52,7 @@ pub fn NPC_Remote_Pain(
 
 /// Raven `Remote_MaintainHeight`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:44-128`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:44-128`
 pub fn Remote_MaintainHeight(ctx: GameContext<'_>) {
     let mut dif: f32;
     let npc = unsafe { (*ctx.world).globals.NPC };
@@ -157,7 +157,7 @@ pub fn Remote_MaintainHeight(ctx: GameContext<'_>) {
 
 /// Raven `Remote_Strafe`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:139-168`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:139-168`
 pub fn Remote_Strafe(ctx: GameContext<'_>) {
     use crate::trap;
 
@@ -233,7 +233,7 @@ pub fn Remote_Strafe(ctx: GameContext<'_>) {
 
 /// Raven `Remote_Hunt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:178-221`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:178-221`
 pub fn Remote_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean, retreat: qboolean) {
     let npc = unsafe { (*ctx.world).globals.NPC };
     let npc_info = unsafe { (*ctx.world).globals.NPCInfo };
@@ -301,7 +301,7 @@ pub fn Remote_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean, r
 
 /// Raven `Remote_Fire`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:229-257`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:229-257`
 pub fn Remote_Fire(ctx: GameContext<'_>) {
     let npc = unsafe { (*ctx.world).globals.NPC };
 
@@ -369,7 +369,7 @@ pub fn Remote_Fire(ctx: GameContext<'_>) {
 
 /// Raven `Remote_Ranged`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:264-277`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:264-277`
 pub fn Remote_Ranged(
     ctx: GameContext<'_>,
     visible: qboolean,
@@ -393,7 +393,7 @@ pub fn Remote_Ranged(
 
 /// Raven `Remote_Attack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:290-332`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:290-332`
 pub fn Remote_Attack(ctx: GameContext<'_>) {
     let npc = unsafe { (*ctx.world).globals.NPC };
     let npc_info = unsafe { (*ctx.world).globals.NPCInfo };
@@ -467,7 +467,7 @@ pub fn Remote_Attack(ctx: GameContext<'_>) {
 
 /// Raven `Remote_Idle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:339-344`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:339-344`
 pub fn Remote_Idle(ctx: GameContext<'_>) {
     Remote_MaintainHeight(ctx);
     crate::NPC_AI_Default::NPC_BSIdle(ctx);
@@ -475,7 +475,7 @@ pub fn Remote_Idle(ctx: GameContext<'_>) {
 
 /// Raven `Remote_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:351-367`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:351-367`
 pub fn Remote_Patrol(ctx: GameContext<'_>) {
     let npc = unsafe { (*ctx.world).globals.NPC };
 
@@ -498,7 +498,7 @@ pub fn Remote_Patrol(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSRemote_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:375-389`
+/// Source: `oracle/codemp/game/NPC_AI_Remote.c:375-389`
 pub fn NPC_BSRemote_Default(ctx: GameContext<'_>) {
     let npc = unsafe { (*ctx.world).globals.NPC };
     let npc_info = unsafe { (*ctx.world).globals.NPCInfo };

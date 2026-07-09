@@ -2,7 +2,7 @@
 
 /// Raven `dmodel_t` — BSP submodel.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:441-445`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:441-445`
 #[repr(C)]
 pub struct dmodel_t {
 	pub mins: [f32; 3],

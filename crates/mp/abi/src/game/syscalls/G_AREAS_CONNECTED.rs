@@ -32,7 +32,7 @@ impl GAreasConnectedArgs {
 /// `G_AREAS_CONNECTED` MP game imports syscall ABI token.
 ///
 /// Raven: ( int area1, int area2 );
-/// Source: `oracle/oracle/codemp/game/g_public.h:197`
+/// Source: `oracle/codemp/game/g_public.h:197`
 pub struct GAreasConnected;
 
 impl OutboundSysCall for GAreasConnected {

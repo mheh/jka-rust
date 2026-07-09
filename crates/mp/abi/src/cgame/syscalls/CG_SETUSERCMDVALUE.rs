@@ -14,8 +14,8 @@ use mp_qshared::shared::qboolean;
 /// `fighterControls` is consumed by the switch as `cl_bUseFighterPitch`; it is
 /// not part of the seven-argument `CL_SetUserCmdValue` call.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:494-495`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:973-975`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:494-495`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:973-975`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgSetusercmdvalueArgs {
     state_value: c_int,
@@ -90,10 +90,10 @@ impl CgSetusercmdvalueArgs {
 /// `PASSFLOAT`. Raven switch returns `0` after updating `cl_bUseFighterPitch`
 /// and calling `CL_SetUserCmdValue`.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:187`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:494-495`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:973-975`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:973-975`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:187`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:494-495`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:973-975`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:973-975`
 pub struct CgSetusercmdvalue;
 
 impl OutboundSysCall for CgSetusercmdvalue {

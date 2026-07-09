@@ -6,7 +6,7 @@
 //! the `extern "C-unwind"` flip is the SEAM-D12 sweep, untouched here.
 //!
 //! //TODO: Port cgame live entrypoint exports (vmMain match, SEAM-D10)
-//! // Source: oracle/oracle/codemp/cgame/cg_main.c:190
+//! // Source: oracle/codemp/cgame/cg_main.c:190
 
 use abi_transport::entrypoints::{AbiCommand, AbiWord, RawSyscall};
 

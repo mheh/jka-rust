@@ -4,14 +4,14 @@ use super::aas_lump_t::aas_lump_t;
 
 /// Raven `AAS_LUMPS` — number of data lumps in an AAS file.
 ///
-/// Source: `oracle/oracle/codemp/botlib/aasfile.h:78`
+/// Source: `oracle/codemp/botlib/aasfile.h:78`
 pub const AAS_LUMPS: usize = 14;
 
 /// Raven `aas_header_s` — AAS file header: identity/version stamp, BSP checksum,
 /// and the data-lump table.
 ///
 /// Raven: none.
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:217-224`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:217-224`
 #[repr(C)]
 pub struct aas_header_t {
     pub ident: i32,

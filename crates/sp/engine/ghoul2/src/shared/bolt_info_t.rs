@@ -3,7 +3,7 @@
 /// Raven `boltInfo_t` — per-bolt attachment info for a Ghoul2 model instance.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/code/game/../game/ghoul2_shared.h:185-196`
+/// Type definition source: `oracle/code/game/../game/ghoul2_shared.h:185-196`
 #[repr(C)]
 pub struct boltInfo_t {
     /// bone number bolt attaches to

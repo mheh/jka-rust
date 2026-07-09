@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_GalakMech.c 15/15
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_GalakMech.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_GalakMech.c`.
 //!
 //! All functions are ported: `GM_Move` reads the canonical `NIF_COLLISION`
 //! bit, `GM_CheckFireState`/`NPC_BSGM_Attack`/`NPC_BSGM_Default` place their
@@ -24,12 +24,12 @@ pub const GALAK_SHIELD_HEALTH: c_int = 500;
 
 // Raven `bState_t::BS_CINEMATIC` bare spelling (not glob-imported by the
 // prelude, unlike the other Raven enums it re-exports).
-// Source: `oracle/oracle/codemp/game/b_public.h`
+// Source: `oracle/codemp/game/b_public.h`
 const BS_CINEMATIC: bState_t = bState_t::BS_CINEMATIC;
 
 // Raven `HL_GENERIC1` (`NPC_AI_GalakMech.c` uses the bare hit-location
 // spelling; not glob-imported by the prelude).
-// Source: `oracle/oracle/codemp/game/g_local.h`
+// Source: `oracle/codemp/game/g_local.h`
 use crate::entity::hit_location::HL_GENERIC1;
 
 // Raven `gNPC_t::scriptFlags` bits (`SCF_*`, b_public.h:26-52) resolve to the
@@ -47,27 +47,27 @@ const FRAMETIME: c_int = 100;
 
 // Raven file-static `vec3_t impactPos4` — shared across GM_CheckFireState,
 // NPC_BSGM_Attack, and others for caching impact positions.
-// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c`
+// Source: `oracle/codemp/game/NPC_AI_GalakMech.c`
 static mut IMPACT_POS_4: vec3_t = [0.0; 3];
 
 // Vector helpers are the canonical `crate::q_math` forms reached via the
 // prelude glob: `_VectorCopy`/`_VectorSubtract`/`_VectorMA` (out-param) and
-// `VectorClear`. Source: `oracle/oracle/codemp/game/q_shared.h`
+// `VectorClear`. Source: `oracle/codemp/game/q_shared.h`
 
 // Distance constants for combat logic (derived from oracle source comments).
-// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c` (various lines with distance checks)
+// Source: `oracle/codemp/game/NPC_AI_GalakMech.c` (various lines with distance checks)
 const MELEE_DIST_SQUARED: f32 = 6400.0; // 80*80
 const MIN_LOB_DIST_SQUARED: f32 = 65536.0; // 256*256
 const MAX_LOB_DIST_SQUARED: f32 = 200704.0; // 448*448
 const REPEATER_ALT_SIZE: f32 = 3.0; // half of bbox size
 // Raven `#define GENERATOR_HEALTH 25`.
-// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:23`
+// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:23`
 const GENERATOR_HEALTH: c_int = 25; // Shield generator health threshold
 // Raven `#define ARMOR_EFFECT_TIME 500` (was a guessed 3000 — corrected).
-// Source: `oracle/oracle/codemp/game/w_saber.h:1`
+// Source: `oracle/codemp/game/w_saber.h:1`
 const ARMOR_EFFECT_TIME: c_int = 500;
 
-/// Inline helper from `oracle/oracle/codemp/game/bg_public.h:1524-1564`
+/// Inline helper from `oracle/codemp/game/bg_public.h:1524-1564`
 /// (same local-copy precedent as `NPC_AI_Mark2.rs`'s private helper of the
 /// same name — the call-surface table's "ported: NPC_AI_Mark2.rs" copy is
 /// `fn`-private to that file).
@@ -98,7 +98,7 @@ pub(crate) fn BG_GiveMeVectorFromMatrix(
 
 /// Raven `NPC_GalakMech_Precache`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:42-57`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:42-57`
 pub fn NPC_GalakMech_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/weapons/galak/skewerhit.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/weapons/galak/lasercharge.wav".as_ptr());
@@ -117,7 +117,7 @@ pub fn NPC_GalakMech_Precache(ctx: GameContext<'_>) {
 
 /// Raven `NPC_GalakMech_Init`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:59-98`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:59-98`
 pub fn NPC_GalakMech_Init(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let npc = (*ent).NPC as *mut gNPC_t;
@@ -162,7 +162,7 @@ pub fn NPC_GalakMech_Init(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `GM_CreateExplosion`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:101-125`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:101-125`
 pub fn GM_CreateExplosion(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -216,7 +216,7 @@ pub fn GM_CreateExplosion(
 
 /// Raven `GM_Dying`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:133-229`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:133-229`
 pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let level_time = (*ctx.world).level.time;
@@ -463,7 +463,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `NPC_GM_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:238-354`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:238-354`
 // The disabled `if (0)`/PW_GALAK_SHIELD-shield-down branch and the dead
 // `gPainPoint`/`point` store (both fully commented out in the oracle, and the
 // `if ( point )` array-as-pointer check is always true) have zero observable
@@ -574,7 +574,7 @@ pub fn NPC_GM_Pain(
 
 /// Raven `GM_HoldPosition`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:362-369`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:362-369`
 pub fn GM_HoldPosition(ctx: GameContext<'_>) {
     unsafe {
         let npc_ent = (*ctx.world).globals.NPC;
@@ -596,7 +596,7 @@ pub fn GM_HoldPosition(ctx: GameContext<'_>) {
 
 /// Raven `GM_Move`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:376-408`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:376-408`
 pub fn GM_Move(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         let npc_ent = (*ctx.world).globals.NPC;
@@ -640,7 +640,7 @@ pub fn GM_Move(ctx: GameContext<'_>) -> qboolean {
 
 /// Raven `NPC_BSGM_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:416-432`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:416-432`
 pub fn NPC_BSGM_Patrol(ctx: GameContext<'_>) {
     unsafe {
         if crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth(ctx) != 0 {
@@ -661,7 +661,7 @@ pub fn NPC_BSGM_Patrol(ctx: GameContext<'_>) {
 
 /// Raven `GM_CheckMoveState`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:440-460`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:440-460`
 pub fn GM_CheckMoveState(ctx: GameContext<'_>) {
     unsafe {
         let npc_ent = (*ctx.world).globals.NPC;
@@ -731,7 +731,7 @@ pub fn GM_CheckMoveState(ctx: GameContext<'_>) {
 // wrong parity across every caller. Deferred rather than guessed per §A2.
 /// Raven `GM_CheckFireState`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:468-556`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:468-556`
 pub fn GM_CheckFireState(ctx: GameContext<'_>) {
     unsafe {
         let npc_ent = (*ctx.world).globals.NPC;
@@ -844,7 +844,7 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
 
 /// Raven `NPC_GM_StartLaser`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:558-573`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:558-573`
 pub fn NPC_GM_StartLaser(ctx: GameContext<'_>) {
     unsafe {
         let npc_ent = (*ctx.world).globals.NPC;
@@ -880,7 +880,7 @@ pub fn NPC_GM_StartLaser(ctx: GameContext<'_>) {
 
 /// Raven `GM_StartGloat`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:575-587`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:575-587`
 pub fn GM_StartGloat(ctx: GameContext<'_>) {
     unsafe {
         let npc_ent = (*ctx.world).globals.NPC;
@@ -906,7 +906,7 @@ pub fn GM_StartGloat(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSGM_Attack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:594-1229`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:594-1229`
 pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
     unsafe {
         let npc_ent = (*ctx.world).globals.NPC;
@@ -1095,7 +1095,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             // (Raven's WP_REPEATER "he's deflecting my shots" branch is inside a
             // `/* ... */` block comment in the oracle — dead code, not transcribed;
             // its `Q_irand(0,50)`/`Q_irand(2000,6000)`/`Q_irand(0,1)` draws never run.)
-            // Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:813-828`
+            // Source: `oracle/codemp/game/NPC_AI_GalakMech.c:813-828`
             if (*ctx.world).globals.enemyDist4 < MELEE_DIST_SQUARED
                 && InFront(
                     (*enemy_ent).r.currentOrigin,
@@ -1602,7 +1602,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSGM_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:1231-1297`
+/// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:1231-1297`
 pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
     unsafe {
         let npc_ent = (*ctx.world).globals.NPC;

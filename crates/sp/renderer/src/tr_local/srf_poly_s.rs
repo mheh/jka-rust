@@ -7,7 +7,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `srfPoly_t` — a dynamically-added polygon surface.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:620-626`
+/// Type definition source: `oracle/code/renderer/tr_local.h:620-626`
 #[repr(C)]
 pub struct srfPoly_s {
     pub surfaceType: surfaceType_t,

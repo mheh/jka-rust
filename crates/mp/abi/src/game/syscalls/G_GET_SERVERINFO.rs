@@ -36,7 +36,7 @@ impl GGetServerinfoArgs {
 ///
 /// Raven: ( char *buffer, int bufferSize );
 /// Raven: the serverinfo info string has all the cvars visible to server browsers
-/// Source: `oracle/oracle/codemp/game/g_public.h:173`
+/// Source: `oracle/codemp/game/g_public.h:173`
 pub struct GGetServerinfo;
 
 impl OutboundSysCall for GGetServerinfo {

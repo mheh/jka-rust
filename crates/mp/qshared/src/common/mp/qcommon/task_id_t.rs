@@ -2,7 +2,7 @@
 
 /// Raven `taskID_t` — enumeration of task IDs for tracking NPC task completion.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:625-639`
+/// Type definition source: `oracle/codemp/game/g_public.h:625-639`
 #[repr(i32)]
 pub enum taskID_t {
 	TID_CHAN_VOICE = 0, // Waiting for a voice sound to complete

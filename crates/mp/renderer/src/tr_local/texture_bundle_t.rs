@@ -10,7 +10,7 @@ use super::tex_mod_info_t::texModInfo_t;
 
 /// Raven `textureBundle_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:372-389`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:372-389`
 #[repr(C)]
 pub struct textureBundle_t {
 	pub image: *mut image_t,

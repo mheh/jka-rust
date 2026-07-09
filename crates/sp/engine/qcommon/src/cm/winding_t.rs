@@ -5,7 +5,7 @@ use sp_qshared::shared::vec3_t;
 /// Raven `winding_t` — a variable-sized polygon (up to 4 points).
 ///
 /// Raven: `p` is `// variable sized`.
-/// Type definition source: `oracle/oracle/code/qcommon/cm_polylib.h:7-11`
+/// Type definition source: `oracle/code/qcommon/cm_polylib.h:7-11`
 #[repr(C)]
 pub struct winding_t {
     pub numpoints: i32,

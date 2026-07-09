@@ -6,7 +6,7 @@ use native_math::vector::vec3_t;
 
 /// Raven `sharedRagDollUpdateParams_t` — per-frame ragdoll update parameters.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2571-2578`
+/// Type definition source: `oracle/code/game/q_shared.h:2571-2578`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct sharedRagDollUpdateParams_t {

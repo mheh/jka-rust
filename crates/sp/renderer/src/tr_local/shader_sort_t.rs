@@ -2,7 +2,7 @@
 
 /// Raven `shaderSort_t` — shader sort order enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:144-175`
+/// Type definition source: `oracle/code/renderer/tr_local.h:144-175`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum shaderSort_t {

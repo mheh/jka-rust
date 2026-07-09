@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_behavior.c 21/21
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_behavior.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_behavior.c`.
 //!
 //! Landed from the `fnskel.py` signature skeleton; the pass-3 mega-pass fills
 //! every remaining body against the settled fork rulings (ctx threading,
@@ -58,15 +58,15 @@ use mp_qshared::shared::MASK_SHOT;
 // (`b_local.h:244-260`).
 
 // Raven `MIN_ANGLE_ERROR` (`b_local.h`, the facing gate in `NPC_BSJump`).
-// Source: `oracle/oracle/codemp/game/b_local.h:29`
+// Source: `oracle/codemp/game/b_local.h:29`
 pub const MIN_ANGLE_ERROR: f32 = 0.01;
 // Raven `APEX_HEIGHT` (`NPC_behavior.c` #define, the jump-parabola apex).
-// Source: `oracle/oracle/codemp/game/NPC_behavior.c:730`
+// Source: `oracle/codemp/game/NPC_behavior.c:730`
 pub const APEX_HEIGHT: f32 = 200.0;
 
 /// Raven `NPC_BSAdvanceFight`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:29-183`
+/// Source: `oracle/codemp/game/NPC_behavior.c:29-183`
 pub fn NPC_BSAdvanceFight(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -214,7 +214,7 @@ pub fn NPC_BSAdvanceFight(ctx: GameContext<'_>) {
                                 _VectorSubtract(hitspot, enemy_org, &mut diff);
                                 let mut aim_off = VectorLength(diff);
                                 // Oracle uses the `random()` macro (randSeed stream), not flrand.
-                                // Source: `oracle/oracle/codemp/game/NPC_behavior.c:140,146`
+                                // Source: `oracle/codemp/game/NPC_behavior.c:140,146`
                                 if aim_off > world.bg_state.rng.random() * max_aim_off {
                                     attack_scale *= 0.75;
                                     _VectorSubtract(hitspot, enemy_head, &mut diff);
@@ -261,7 +261,7 @@ pub fn NPC_BSAdvanceFight(ctx: GameContext<'_>) {
 
 /// Raven `Disappear`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:185-191`
+/// Source: `oracle/codemp/game/NPC_behavior.c:185-191`
 pub fn Disappear(self_: *mut gentity_t) {
     unsafe {
         // ClientDisconnect(self); (Raven: commented out)
@@ -273,7 +273,7 @@ pub fn Disappear(self_: *mut gentity_t) {
 
 /// Raven `BeamOut`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:194-211`
+/// Source: `oracle/codemp/game/NPC_behavior.c:194-211`
 pub fn BeamOut(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let world = &mut *ctx.world;
@@ -294,7 +294,7 @@ pub fn BeamOut(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `NPC_BSCinematic`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:213-244`
+/// Source: `oracle/codemp/game/NPC_behavior.c:213-244`
 pub fn NPC_BSCinematic(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -337,7 +337,7 @@ pub fn NPC_BSCinematic(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSWait`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:246-249`
+/// Source: `oracle/codemp/game/NPC_behavior.c:246-249`
 pub fn NPC_BSWait(ctx: GameContext<'_>) {
     NPC_UpdateAngles(ctx, qtrue, qtrue);
 }
@@ -346,14 +346,14 @@ pub fn NPC_BSWait(ctx: GameContext<'_>) {
 ///
 /// Raven: entire body is `/* ... */`-commented dead code (kept for reference)
 /// — the live function is a no-op. Ported faithfully as a no-op.
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:252-407`
+/// Source: `oracle/codemp/game/NPC_behavior.c:252-407`
 pub fn NPC_BSInvestigate() {
     // Raven's body is entirely commented out; this is a genuine no-op.
 }
 
 /// Raven `NPC_CheckInvestigate`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:409-494`
+/// Source: `oracle/codemp/game/NPC_behavior.c:409-494`
 pub fn NPC_CheckInvestigate(ctx: GameContext<'_>, alertEventNum: c_int) -> qboolean {
     unsafe {
         let world = &mut *ctx.world;
@@ -446,7 +446,7 @@ pub fn NPC_CheckInvestigate(ctx: GameContext<'_>, alertEventNum: c_int) -> qbool
 
 /// Raven `NPC_BSSleep`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:500-521`
+/// Source: `oracle/codemp/game/NPC_behavior.c:500-521`
 pub fn NPC_BSSleep(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -464,7 +464,7 @@ pub fn NPC_BSSleep(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSFollowLeader`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:524-729`
+/// Source: `oracle/codemp/game/NPC_behavior.c:524-729`
 pub fn NPC_BSFollowLeader(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -719,7 +719,7 @@ pub fn NPC_BSFollowLeader(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSJump`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:733-919`
+/// Source: `oracle/codemp/game/NPC_behavior.c:733-919`
 pub fn NPC_BSJump(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -887,7 +887,7 @@ pub fn NPC_BSJump(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSRemove`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:921-937`
+/// Source: `oracle/codemp/game/NPC_behavior.c:921-937`
 pub fn NPC_BSRemove(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -920,7 +920,7 @@ pub fn NPC_BSRemove(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSSearch`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:939-1124`
+/// Source: `oracle/codemp/game/NPC_behavior.c:939-1124`
 pub fn NPC_BSSearch(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1088,7 +1088,7 @@ pub fn NPC_BSSearch(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSSearchStart`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1132-1150`
+/// Source: `oracle/codemp/game/NPC_behavior.c:1132-1150`
 pub fn NPC_BSSearchStart(ctx: GameContext<'_>, homeWp: c_int, bState: bState_t) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1122,7 +1122,7 @@ pub fn NPC_BSSearchStart(ctx: GameContext<'_>, homeWp: c_int, bState: bState_t) 
 
 /// Raven `NPC_BSNoClip`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1160-1191`
+/// Source: `oracle/codemp/game/NPC_behavior.c:1160-1191`
 pub fn NPC_BSNoClip(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1173,7 +1173,7 @@ pub fn NPC_BSNoClip(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSWander`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1193-1286`
+/// Source: `oracle/codemp/game/NPC_behavior.c:1193-1286`
 pub fn NPC_BSWander(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1303,7 +1303,7 @@ pub fn NPC_BSWander(ctx: GameContext<'_>) {
 
 /// Raven `NPC_Surrender`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1317-1339`
+/// Source: `oracle/codemp/game/NPC_behavior.c:1317-1339`
 pub fn NPC_Surrender(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1338,7 +1338,7 @@ pub fn NPC_Surrender(ctx: GameContext<'_>) {
 
 /// Raven `NPC_CheckSurrender`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1341-1442`
+/// Source: `oracle/codemp/game/NPC_behavior.c:1341-1442`
 pub fn NPC_CheckSurrender(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         let world = &mut *ctx.world;
@@ -1409,7 +1409,7 @@ pub fn NPC_CheckSurrender(ctx: GameContext<'_>) -> qboolean {
 
 /// Raven `NPC_BSFlee`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1444-1558`
+/// Source: `oracle/codemp/game/NPC_behavior.c:1444-1558`
 pub fn NPC_BSFlee(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1513,7 +1513,7 @@ pub fn NPC_BSFlee(ctx: GameContext<'_>) {
 
 /// Raven `NPC_StartFlee`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1560-1634`
+/// Source: `oracle/codemp/game/NPC_behavior.c:1560-1634`
 pub fn NPC_StartFlee(
     ctx: GameContext<'_>,
     enemy: *mut gentity_t,
@@ -1642,7 +1642,7 @@ pub fn NPC_StartFlee(
 
 /// Raven `G_StartFlee`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1636-1648`
+/// Source: `oracle/codemp/game/NPC_behavior.c:1636-1648`
 pub fn G_StartFlee(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -1675,7 +1675,7 @@ pub fn G_StartFlee(
 
 /// Raven `NPC_BSEmplaced`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1650-1748`
+/// Source: `oracle/codemp/game/NPC_behavior.c:1650-1748`
 pub fn NPC_BSEmplaced(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;

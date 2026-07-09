@@ -28,7 +28,7 @@ impl GNavNodesareneighborsArgs {
 
 /// `G_NAV_NODESARENEIGHBORS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:321`
+/// Source: `oracle/codemp/game/g_public.h:321`
 pub struct GNavNodesareneighbors;
 
 impl OutboundSysCall for GNavNodesareneighbors {

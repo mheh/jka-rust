@@ -4,13 +4,13 @@
 //! Plain `#define` bit flags (not an enum), so §C8 makes them `const`s
 //! directly.
 //!
-//! Source: `oracle/oracle/codemp/game/g_public.h:9-47`
+//! Source: `oracle/codemp/game/g_public.h:9-47`
 
 use core::ffi::c_int;
 
 /// Raven `Q3_INFINITE`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:9`
+/// Source: `oracle/codemp/game/g_public.h:9`
 pub const Q3_INFINITE: c_int = 16777216;
 
 // entity->svFlags — the server does not know how to interpret most of the

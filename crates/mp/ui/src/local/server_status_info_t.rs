@@ -5,22 +5,22 @@ use mp_qshared::shared::MAX_CLIENTS;
 
 /// `MAX_ADDRESSLENGTH`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:571`
+/// Source: `oracle/codemp/ui/ui_local.h:571`
 const MAX_ADDRESSLENGTH: usize = 64;
 
 /// `MAX_SERVERSTATUS_LINES`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:578`
+/// Source: `oracle/codemp/ui/ui_local.h:578`
 const MAX_SERVERSTATUS_LINES: usize = 128;
 
 /// `MAX_SERVERSTATUS_TEXT`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:579`
+/// Source: `oracle/codemp/ui/ui_local.h:579`
 const MAX_SERVERSTATUS_TEXT: usize = 1024;
 
 /// Raven `serverStatusInfo_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:703-709`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:703-709`
 #[repr(C)]
 pub struct serverStatusInfo_t {
 	pub address: [c_char; MAX_ADDRESSLENGTH],

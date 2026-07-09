@@ -11,8 +11,8 @@ use abi_transport::pass_float;
 /// Raven wrapper: `return syscall( CG_R_FONTHEIGHTPIXELS, iFontIndex, PASSFLOAT(scale) );`
 /// Raven transport: `return re.Font_HeightPixels( args[1], VMF(2) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:333-334`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:669-670`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:333-334`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:669-670`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRFontheightpixelsArgs {
     font_index: c_int,
@@ -27,10 +27,10 @@ impl CgRFontheightpixelsArgs {
 
 /// `CG_R_FONTHEIGHTPIXELS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:125`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:333-334`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:669-670`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:669-670`
+/// Enum value source: `oracle/code/cgame/cg_public.h:125`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:333-334`
+/// Output source: `oracle/code/client/cl_cgame.cpp:669-670`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:669-670`
 pub struct CgRFontheightpixels;
 
 impl OutboundSysCall for CgRFontheightpixels {

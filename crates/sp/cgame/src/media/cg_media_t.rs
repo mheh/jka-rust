@@ -10,7 +10,7 @@ use super::footstep_t::footstep_t;
 /// Raven `cgMedia_t` — all of the model, shader, and sound references that are
 /// loaded at gamestate time.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_media.h:96-306`
+/// Type definition source: `oracle/code/cgame/cg_media.h:96-306`
 #[repr(C)]
 pub struct cgMedia_t {
     pub charsetShader: qhandle_t,
@@ -38,7 +38,7 @@ pub struct cgMedia_t {
 
     // Chunks
     // `[NUM_CHUNK_TYPES][4]` — NUM_CHUNK_TYPES is the 8-entry anonymous enum
-    // terminator at oracle/oracle/code/cgame/cg_media.h:36-89 (not separately
+    // terminator at oracle/code/cgame/cg_media.h:36-89 (not separately
     // ported; used here only as this array bound).
     pub chunkModels: [[qhandle_t; 4]; 8],
     pub chunkSound: sfxHandle_t,

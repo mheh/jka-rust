@@ -2,7 +2,7 @@
 
 /// Raven `ammo_t` — ammunition type enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/game/weapons.h:65-78`
+/// Type definition source: `oracle/code/game/weapons.h:65-78`
 #[repr(i32)]
 pub enum ammo_t {
     AMMO_NONE,

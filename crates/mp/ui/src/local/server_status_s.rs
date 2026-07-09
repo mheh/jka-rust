@@ -8,17 +8,17 @@ use super::pinglist_t::pinglist_t;
 
 /// `MAX_PINGREQUESTS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:570`
+/// Source: `oracle/codemp/ui/ui_local.h:570`
 const MAX_PINGREQUESTS: usize = 32;
 
 /// `MAX_DISPLAY_SERVERS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:577`
+/// Source: `oracle/codemp/ui/ui_local.h:577`
 const MAX_DISPLAY_SERVERS: usize = 2048;
 
 /// Raven `serverStatus_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:660-687`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:660-687`
 #[repr(C)]
 pub struct serverStatus_t {
 	pub pingList: [pinglist_t; MAX_PINGREQUESTS],

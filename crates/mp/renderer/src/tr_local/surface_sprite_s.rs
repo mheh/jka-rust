@@ -5,7 +5,7 @@ use mp_qshared::shared::vec2_t;
 /// Raven `surfaceSprite_t` — per-shader-stage surface-sprite (billboard
 /// vegetation, etc.) parameters.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:363-370`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:363-370`
 #[repr(C)]
 pub struct surfaceSprite_t {
     pub surfaceSpriteType: i32,

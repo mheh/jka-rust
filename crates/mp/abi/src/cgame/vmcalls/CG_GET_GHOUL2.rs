@@ -7,7 +7,7 @@ use abi_transport::generic::{
 
 /// Arguments for `CG_GET_GHOUL2`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:231-234`
+/// Args source: `oracle/codemp/cgame/cg_main.c:231-234`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgGetGhoul2Args {
     ent_num: c_int,
@@ -27,9 +27,9 @@ impl CgGetGhoul2Args {
 ///
 /// Raven: used by effect bolting, which is actually not used at all.
 /// Raven: use at your own risk.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:399`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:231-234`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:231-234`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:399`
+/// Args source: `oracle/codemp/cgame/cg_main.c:231-234`
+/// Output source: `oracle/codemp/cgame/cg_main.c:231-234`
 /// Transport/call-site source: no engine call-site found in initial search; module vmMain switch proves arg slots.
 pub struct CgGetGhoul2;
 

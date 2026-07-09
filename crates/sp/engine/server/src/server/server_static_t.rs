@@ -7,7 +7,7 @@ use super::client_s::client_s;
 
 /// Raven `serverStatic_t` — persistent server state, survives `SV_Init` re-runs.
 ///
-/// Type definition source: `oracle/oracle/code/server/server.h:142-149`
+/// Type definition source: `oracle/code/server/server.h:142-149`
 #[repr(C)]
 pub struct serverStatic_t {
     /// `sv_init` has completed

@@ -32,7 +32,7 @@ impl BotlibUserCommandArgs {
 /// `BOTLIB_USER_COMMAND` MP game imports syscall ABI token.
 ///
 /// Raven: ( int client, usercmd_t *ucmd );
-/// Source: `oracle/oracle/codemp/game/g_public.h:354`
+/// Source: `oracle/codemp/game/g_public.h:354`
 pub struct BotlibUserCommand;
 
 impl OutboundSysCall for BotlibUserCommand {

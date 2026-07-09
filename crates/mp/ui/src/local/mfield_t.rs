@@ -2,13 +2,13 @@
 
 /// Raven `mfield_t` — an editable text field on a menu.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:179-185`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:179-185`
 #[repr(C)]
 pub struct mfield_t {
 	pub cursor: i32,
 	pub scroll: i32,
 	pub widthInChars: i32,
-	// Raven's `#define MAX_EDIT_LINE 256` (oracle/oracle/codemp/ui/ui_local.h:98).
+	// Raven's `#define MAX_EDIT_LINE 256` (oracle/codemp/ui/ui_local.h:98).
 	pub buffer: [core::ffi::c_char; 256],
 	pub maxchars: i32,
 }

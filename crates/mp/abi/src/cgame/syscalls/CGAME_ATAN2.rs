@@ -6,10 +6,10 @@ use abi_transport::pass_float;
 ///
 /// Raven transport: two packed float words read as `VMF(1)` and `VMF(2)`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_cgame.cpp:662`
-/// Transport source: `oracle/oracle/codemp/cgame/cg_syscalls.c:15`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:661`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:287`
+/// Args source: `oracle/codemp/client/cl_cgame.cpp:662`
+/// Transport source: `oracle/codemp/cgame/cg_syscalls.c:15`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:661`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:287`
 #[derive(Debug)]
 pub struct CgameAtan2Args {
     y: f32,
@@ -32,10 +32,10 @@ impl CgameAtan2Args {
 
 /// `CGAME_ATAN2` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:135`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:662`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:661`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:287`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:135`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:662`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:661`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:287`
 pub struct CgameAtan2;
 
 impl OutboundSysCall for CgameAtan2 {
@@ -43,8 +43,8 @@ impl OutboundSysCall for CgameAtan2 {
     type Args = CgameAtan2Args;
     /// Float return transported as an integer word by Raven `FloatAsInt`.
     ///
-    /// Output sources: `oracle/oracle/codemp/client/cl_cgame.cpp:609`,
-    /// `oracle/oracle/codemp/client/cl_cgame.cpp:662`
+    /// Output sources: `oracle/codemp/client/cl_cgame.cpp:609`,
+    /// `oracle/codemp/client/cl_cgame.cpp:662`
     type Output = f32;
 
     const IMPORT: MpCgameImport = MpCgameImport::CGAME_ATAN2;

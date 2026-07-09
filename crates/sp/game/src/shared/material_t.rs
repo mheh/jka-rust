@@ -2,7 +2,7 @@
 
 /// Raven `material_t` — material type for chunk generation.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:37-58`
+/// Type definition source: `oracle/code/game/g_shared.h:37-58`
 #[repr(i32)]
 pub enum material_t {
     MAT_METAL = 0,           // scorched blue-grey metal

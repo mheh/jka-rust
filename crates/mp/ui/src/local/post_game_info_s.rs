@@ -2,7 +2,7 @@
 
 /// Raven `postGameInfo_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:1125-1142`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:1125-1142`
 #[repr(C)]
 pub struct postGameInfo_t {
 	pub score: i32,

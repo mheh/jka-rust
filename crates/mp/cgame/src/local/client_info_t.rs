@@ -10,43 +10,43 @@ use mp_qshared::shared::{qboolean, qhandle_t, sfxHandle_t, vec3_t, MAX_QPATH};
 
 /// Raven `MAX_TEAMNAME`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:12`
+/// Source: `oracle/codemp/game/q_shared.h:12`
 pub const MAX_TEAMNAME: usize = 32;
 
 /// Raven `MAX_CUSTOM_SOUNDS`.
 ///
 /// Raven: rww - Note that for now these must all be the same, because of the way I am
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:193`
+/// Source: `oracle/codemp/cgame/cg_local.h:193`
 pub const MAX_CUSTOM_SOUNDS: usize = 40;
 
 /// Raven `MAX_CUSTOM_COMBAT_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:187`
+/// Source: `oracle/codemp/cgame/cg_local.h:187`
 pub const MAX_CUSTOM_COMBAT_SOUNDS: usize = 40;
 
 /// Raven `MAX_CUSTOM_EXTRA_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:188`
+/// Source: `oracle/codemp/cgame/cg_local.h:188`
 pub const MAX_CUSTOM_EXTRA_SOUNDS: usize = 40;
 
 /// Raven `MAX_CUSTOM_JEDI_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:189`
+/// Source: `oracle/codemp/cgame/cg_local.h:189`
 pub const MAX_CUSTOM_JEDI_SOUNDS: usize = 40;
 
 /// Raven `MAX_CUSTOM_SIEGE_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:140`
+/// Source: `oracle/codemp/game/bg_public.h:140`
 pub const MAX_CUSTOM_SIEGE_SOUNDS: usize = 30;
 
 /// Raven `MAX_CUSTOM_DUEL_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:191`
+/// Source: `oracle/codemp/cgame/cg_local.h:191`
 pub const MAX_CUSTOM_DUEL_SOUNDS: usize = 40;
 
 /// Raven `clientInfo_t` — per-client rendering/gameplay info cached by cgame.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:196-315`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:196-315`
 #[repr(C)]
 pub struct clientInfo_t {
 	pub infoValid: qboolean,
@@ -55,7 +55,7 @@ pub struct clientInfo_t {
 
 	pub saber: [saberInfo_t; MAX_SABERS],
 	//TODO: Port ghoul2Weapons element type (CGhoul2Info_v*)
-	// Source: oracle/oracle/codemp/cgame/cg_local.h:202
+	// Source: oracle/codemp/cgame/cg_local.h:202
 	pub ghoul2Weapons: [*mut c_void; MAX_SABERS],
 
 	pub saberName: [c_char; 64],
@@ -140,7 +140,7 @@ pub struct clientInfo_t {
 	pub torsoSkin: qhandle_t,
 
 	//TODO: Port ghoul2Model (CGhoul2Info_v*)
-	// Source: oracle/oracle/codemp/cgame/cg_local.h:279
+	// Source: oracle/codemp/cgame/cg_local.h:279
 	pub ghoul2Model: *mut c_void,
 
 	pub modelIcon: qhandle_t,

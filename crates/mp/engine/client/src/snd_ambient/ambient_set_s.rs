@@ -2,17 +2,17 @@
 
 /// `MAX_WAVES_PER_GROUP`.
 ///
-/// Source: `oracle/oracle/codemp/client/snd_ambient.h:28`
+/// Source: `oracle/codemp/client/snd_ambient.h:28`
 pub const MAX_WAVES_PER_GROUP: i32 = 8;
 
 /// `MAX_SET_NAME_LENGTH`.
 ///
-/// Source: `oracle/oracle/codemp/client/snd_ambient.h:29`
+/// Source: `oracle/codemp/client/snd_ambient.h:29`
 pub const MAX_SET_NAME_LENGTH: usize = 64;
 
 /// Raven `ambientSet_t` — a named set of ambient sound waves with volume/time ranges.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/snd_ambient.h:60-73`
+/// Type definition source: `oracle/codemp/client/snd_ambient.h:60-73`
 #[repr(C)]
 pub struct ambientSet_t {
 	pub name: [u8; MAX_SET_NAME_LENGTH],

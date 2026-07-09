@@ -6,7 +6,7 @@ use sp_qshared::shared::{mdxaBone_t, vec3_t};
 /// model instance.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:80-183`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:80-183`
 #[repr(C)]
 pub struct boneInfo_t {
     /// what bone are we overriding?

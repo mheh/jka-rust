@@ -1,12 +1,12 @@
 //! SP `bg_public.h` entity event enumeration.
 //!
-//! Type definition source: `oracle/oracle/code/game/bg_public.h:283-465`
+//! Type definition source: `oracle/code/game/bg_public.h:283-465`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `entity_event_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/bg_public.h:283-465`
+/// Type definition source: `oracle/code/game/bg_public.h:283-465`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum entity_event_t {

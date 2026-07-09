@@ -6,7 +6,7 @@ use mp_qshared::shared::{qboolean, vec3_t};
 
 /// Raven `leafList_s` — accumulator used while walking the BSP tree collecting leafs.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_local.h:266-274`
+/// Type definition source: `oracle/codemp/qcommon/cm_local.h:266-274`
 #[repr(C)]
 pub struct leafList_s {
     pub count: c_int,

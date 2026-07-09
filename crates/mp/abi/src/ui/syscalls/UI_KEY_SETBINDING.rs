@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_KEY_SETBINDING, keynum, binding );`
 /// Raven transport: `Key_SetBinding(args[1], (const char *)VMA(2)); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:226-227`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1015-1017`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:226-227`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1015-1017`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiKeySetbindingArgs {
     keynum: c_int,
@@ -34,11 +34,11 @@ impl UiKeySetbindingArgs {
 
 /// `UI_KEY_SETBINDING` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:54`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:52-62`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:226-227`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1015-1017`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1015-1017`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:54`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:52-62`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:226-227`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1015-1017`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1015-1017`
 pub struct UiKeySetbinding;
 
 impl OutboundSysCall for UiKeySetbinding {

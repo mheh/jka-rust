@@ -7,7 +7,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `msurface_s` (typedef `msurface_t`) — a renderable BSP surface.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:784-790`
+/// Type definition source: `oracle/code/renderer/tr_local.h:784-790`
 #[repr(C)]
 pub struct msurface_t {
     /// if == tr.viewCount, already added

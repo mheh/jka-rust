@@ -43,7 +43,7 @@ impl BotlibAiCharacteristicStringArgs {
 
 /// `BOTLIB_AI_CHARACTERISTIC_STRING` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:419`
+/// Source: `oracle/codemp/game/g_public.h:419`
 pub struct BotlibAiCharacteristicString;
 
 impl OutboundSysCall for BotlibAiCharacteristicString {

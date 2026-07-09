@@ -5,7 +5,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `lerpFrame_t` — animation interpolation state for a single body part.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:137-165`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:137-165`
 #[repr(C)]
 pub struct lerpFrame_t {
     pub oldFrame: i32,

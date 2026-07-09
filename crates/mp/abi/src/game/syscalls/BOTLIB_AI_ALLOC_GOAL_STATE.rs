@@ -23,7 +23,7 @@ impl BotlibAiAllocGoalStateArgs {
 
 /// `BOTLIB_AI_ALLOC_GOAL_STATE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:461`
+/// Source: `oracle/codemp/game/g_public.h:461`
 pub struct BotlibAiAllocGoalState;
 
 impl OutboundSysCall for BotlibAiAllocGoalState {

@@ -6,7 +6,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `nodeobject_t` — a single bot navigation-node.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/ai_main.h:115-128`
+/// Type definition source: `oracle/codemp/game/ai_main.h:115-128`
 #[repr(C)]
 pub struct nodeobject_t {
     pub origin: vec3_t,

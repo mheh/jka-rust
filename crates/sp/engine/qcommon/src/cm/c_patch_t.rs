@@ -6,7 +6,7 @@ use super::patch_collide_s::patchCollide_s;
 
 /// Raven `cPatch_t` — a collision-model patch surface (bezier collision facets).
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:87-92`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:87-92`
 #[repr(C)]
 pub struct cPatch_t {
     pub checkcount: c_int, // to avoid repeated testings

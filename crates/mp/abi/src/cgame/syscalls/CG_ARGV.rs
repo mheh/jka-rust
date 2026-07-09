@@ -11,8 +11,8 @@ use abi_transport::generic::{
 /// client switch forwards those as `Cmd_ArgvBuffer(args[1], (char *)VMA(2),
 /// args[3])`, writing the selected argv string into the caller-provided buffer.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:75`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:730`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:75`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:730`
 #[derive(Debug)]
 pub struct CgArgvArgs {
     n: c_int,
@@ -48,10 +48,10 @@ impl CgArgvArgs {
 
 /// `CG_ARGV` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:71`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:75`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:732`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:730`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:71`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:75`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:732`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:730`
 pub struct CgArgv;
 
 impl OutboundSysCall for CgArgv {

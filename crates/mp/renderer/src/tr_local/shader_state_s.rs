@@ -6,13 +6,13 @@ use mp_qshared::shared::MAX_QPATH;
 
 use super::shader_s::shader_s;
 
-// Source: oracle/oracle/codemp/renderer/tr_local.h:51
+// Source: oracle/codemp/renderer/tr_local.h:51
 const MAX_STATE_NAME: usize = 32;
 
 /// Raven `shaderState_s` (typedef `shaderState_t`) — a named shader-remap
 /// state used for shader animation via `RE_SetActiveShaderName`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:532-538`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:532-538`
 #[repr(C)]
 pub struct shaderState_t {
     /// name of shader this state belongs to

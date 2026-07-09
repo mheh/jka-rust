@@ -2,7 +2,7 @@
 
 /// Raven `setType_t` — ICARUS entity properties and script parameters.
 ///
-/// Type definition source: `oracle/oracle/codemp/icarus/Q3_Interface.h:6-255`
+/// Type definition source: `oracle/codemp/icarus/Q3_Interface.h:6-255`
 #[repr(i32)]
 pub enum setType_t {
 	// Parm strings

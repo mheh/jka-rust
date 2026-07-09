@@ -1,6 +1,6 @@
 //! SP `anims.h` player animation enumeration (`animNumber_e`).
 //!
-//! Type definition source: `oracle/oracle/code/game/anims.h:6-1791`
+//! Type definition source: `oracle/code/game/anims.h:6-1791`
 
 #![allow(non_camel_case_types)]
 
@@ -9,7 +9,7 @@
 /// Raven: the master list of every upper/lower/full-body/head animation the
 /// player and NPC skeletons can play; comments below are Raven's `//#` doc
 /// tags, preserved verbatim. Differs from MP in its entry list.
-/// Type definition source: `oracle/oracle/code/game/anims.h:6-1791`
+/// Type definition source: `oracle/code/game/anims.h:6-1791`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum animNumber_t {
@@ -1799,6 +1799,6 @@ pub enum animNumber_t {
 }
 
 // Raven: `#define SABER_ANIM_GROUP_SIZE (BOTH_A2_T__B_ - BOTH_A1_T__B_)`
-// Source: `oracle/oracle/code/game/anims.h:1793`
+// Source: `oracle/code/game/anims.h:1793`
 pub const SABER_ANIM_GROUP_SIZE: i32 =
     animNumber_t::BOTH_A2_T__B_ as i32 - animNumber_t::BOTH_A1_T__B_ as i32;

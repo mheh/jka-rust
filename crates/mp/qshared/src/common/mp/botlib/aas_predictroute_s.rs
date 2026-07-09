@@ -4,7 +4,7 @@ use crate::shared::vec3_t;
 
 /// Raven `aas_predictroute_t` — result of AAS route prediction.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_aas.h:196-205`
+/// Type definition source: `oracle/codemp/game/be_aas.h:196-205`
 #[repr(C)]
 pub struct aas_predictroute_t {
 	/// position at the end of movement prediction

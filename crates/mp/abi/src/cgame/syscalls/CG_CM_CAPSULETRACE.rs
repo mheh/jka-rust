@@ -19,9 +19,9 @@ use mp_qshared::shared::vec3_t;
 /// `trap_CM_CapsuleTrace` in this Raven snapshot; the implemented wrapper and
 /// switch arm are therefore the binding ABI evidence.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:157-160`
-/// Args source: `oracle/oracle/codemp/client/cl_cgame.cpp:796-797`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:796-798`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:157-160`
+/// Args source: `oracle/codemp/client/cl_cgame.cpp:796-797`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:796-798`
 #[derive(Debug)]
 pub struct CgCmCapsuletraceArgs {
     /// Out pointer for the collision trace, decoded by Raven as `(trace_t *)VMA(1)`.
@@ -98,12 +98,12 @@ impl CgCmCapsuletraceArgs {
 /// (const float *)VMA(3), (const float *)VMA(4), (const float *)VMA(5),
 /// args[6], args[7], qtrue); return 0;`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:91`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:157-160`
-/// Args source: `oracle/oracle/codemp/client/cl_cgame.cpp:796-797`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:157-160`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:796-798`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:796-798`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:91`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:157-160`
+/// Args source: `oracle/codemp/client/cl_cgame.cpp:796-797`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:157-160`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:796-798`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:796-798`
 pub struct CgCmCapsuletrace;
 
 impl OutboundSysCall for CgCmCapsuletrace {

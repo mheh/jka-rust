@@ -14,7 +14,7 @@ use super::ea_export_s::ea_export_t;
 /// the game module.
 ///
 /// Raven: (unnamed).
-/// Type definition source: `oracle/oracle/codemp/game/botlib.h:388-422`
+/// Type definition source: `oracle/codemp/game/botlib.h:388-422`
 #[repr(C)]
 pub struct botlib_export_s {
     //Area Awareness System functions

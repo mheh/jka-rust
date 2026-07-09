@@ -12,13 +12,13 @@ use super::vehicle_t::Vehicle_t;
 use super::vehicle_type_t::vehicleType_t;
 
 /// `MAX_VEHICLE_WEAPONS`.
-/// Source: `oracle/oracle/code/game/G_Vehicles.h:86`
+/// Source: `oracle/code/game/G_Vehicles.h:86`
 const MAX_VEHICLE_WEAPONS: usize = 2;
 /// `MAX_VEHICLE_MUZZLES`.
-/// Source: `oracle/oracle/code/game/G_Vehicles.h:80`
+/// Source: `oracle/code/game/G_Vehicles.h:80`
 const MAX_VEHICLE_MUZZLES: usize = 10;
 /// `MAX_VEHICLE_TURRETS`.
-/// Source: `oracle/oracle/code/game/G_Vehicles.h:87`
+/// Source: `oracle/code/game/G_Vehicles.h:87`
 const MAX_VEHICLE_TURRETS: usize = 2;
 
 /// Raven `vehicleInfo_t` — static per-vehicle-type data (parsed from `.veh`
@@ -28,7 +28,7 @@ const MAX_VEHICLE_TURRETS: usize = 2;
 /// Raven: `//*** IMPORTANT!!! *** vehFields table correponds to this
 /// structure!` — see the `vehFields` parsing table this layout must stay in
 /// sync with.
-/// Type definition source: `oracle/oracle/code/game/G_Vehicles.h:135-353`
+/// Type definition source: `oracle/code/game/G_Vehicles.h:135-353`
 #[repr(C)]
 pub struct vehicleInfo_t {
 	/// unique name of the vehicle

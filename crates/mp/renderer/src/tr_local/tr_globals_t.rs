@@ -18,36 +18,36 @@ use super::view_parms_t::viewParms_t;
 use super::world_t::world_t;
 
 /// `NUM_SCRATCH_IMAGES` (non-`_XBOX` branch).
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:1300-1307`
+/// Source: `oracle/codemp/renderer/tr_local.h:1300-1307`
 const NUM_SCRATCH_IMAGES: usize = 16;
 
 /// `MAX_LIGHTMAPS`.
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:1203`
+/// Source: `oracle/codemp/renderer/tr_local.h:1203`
 const MAX_LIGHTMAPS: usize = 256;
 
 /// `MAX_MOD_KNOWN`.
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:1138`
+/// Source: `oracle/codemp/renderer/tr_local.h:1138`
 const MAX_MOD_KNOWN: usize = 1024;
 
 /// `MAX_SUB_BSP` — rwwRMG - added. `usize`-typed dual of the canonical
 /// `mp_qshared::shared::limits::MAX_SUB_BSP` (`c_int`), for array sizing.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2025`
+/// Source: `oracle/codemp/game/q_shared.h:2025`
 const MAX_SUB_BSP: usize = MAX_SUB_BSP_I32 as usize;
 
 /// `MAX_SHADERS` (non-`_XBOX` branch; 14 bits, see `QSORT_SHADERNUM_SHIFT`).
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:40-46`
+/// Source: `oracle/codemp/renderer/tr_local.h:40-46`
 const MAX_SHADERS: usize = 16384;
 
 /// `MAX_SKINS`.
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:1204`
+/// Source: `oracle/codemp/renderer/tr_local.h:1204`
 const MAX_SKINS: usize = 1024;
 
 /// `FUNCTABLE_SIZE`.
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:1247`
+/// Source: `oracle/codemp/renderer/tr_local.h:1247`
 const FUNCTABLE_SIZE: usize = 1024;
 
 /// `FOG_TABLE_SIZE`.
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:1246`
+/// Source: `oracle/codemp/renderer/tr_local.h:1246`
 const FOG_TABLE_SIZE: usize = 256;
 
 /// Raven `trGlobals_t` — the renderer's single big global state struct: current
@@ -58,7 +58,7 @@ const FOG_TABLE_SIZE: usize = 256;
 /// these fields, but may read fields that aren't dynamically modified by the
 /// frontend". Large tables are placed at the end so most elements stay within
 /// the +/-32K indexed range on RISC processors.
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:1309-1423`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:1309-1423`
 #[repr(C)]
 pub struct trGlobals_t {
     /// cleared at shutdown, set at beginRegistration

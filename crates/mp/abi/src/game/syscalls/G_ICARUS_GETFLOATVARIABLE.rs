@@ -32,7 +32,7 @@ impl GIcarusGetfloatvariableArgs {
 
 /// `G_ICARUS_GETFLOATVARIABLE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:269`
+/// Source: `oracle/codemp/game/g_public.h:269`
 pub struct GIcarusGetfloatvariable;
 
 impl OutboundSysCall for GIcarusGetfloatvariable {

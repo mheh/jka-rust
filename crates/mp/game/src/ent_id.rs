@@ -7,7 +7,7 @@
 //! sites re-derive the live pointer via `base.add(id.index())` before
 //! dereferencing — Raven's exact `g_entities + entityNum` idiom.
 //!
-//! Source: `oracle/oracle/codemp/game/g_utils.c` (the `g_entities + i` idiom,
+//! Source: `oracle/codemp/game/g_utils.c` (the `g_entities + i` idiom,
 //! e.g. `G_Find`/`ENT_STATE`).
 
 use crate::world::EntityId;

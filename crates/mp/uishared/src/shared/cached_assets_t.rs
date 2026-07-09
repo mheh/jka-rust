@@ -4,13 +4,13 @@ use mp_qshared::shared::{qhandle_t, qboolean, sfxHandle_t, vec4_t};
 
 /// Number of crosshair shaders cached in `cachedAssets_t::crosshairShader`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:104`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:104`
 pub const NUM_CROSSHAIRS: usize = 9;
 
 /// Raven `cachedAssets_t` — UI-wide cached shader/sound/font handles and fade
 /// settings shared across menu rendering.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:338-392`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:338-392`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct cachedAssets_t {

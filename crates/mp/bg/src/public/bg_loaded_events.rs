@@ -1,6 +1,6 @@
 //! MP `bg_public.h` loaded animation-event cache.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:335-341`
+//! Type definition source: `oracle/codemp/game/bg_public.h:335-341`
 
 #![allow(non_camel_case_types)]
 
@@ -12,12 +12,12 @@ use super::animevent::animevent_t;
 
 /// Raven `MAX_ANIM_EVENTS`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:256`
+/// Source: `oracle/codemp/game/bg_public.h:256`
 pub const MAX_ANIM_EVENTS: usize = 300;
 
 /// Raven `bgLoadedEvents_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:335-341`
+/// Type definition source: `oracle/codemp/game/bg_public.h:335-341`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct bgLoadedEvents_t {

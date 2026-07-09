@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall(CG_G2_REMOVEBONE, ghoul2, boneName, modelIndex);`
 /// Raven transport: `return G2API_RemoveBone(&g2[args[3]], (const char *)VMA(2));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1050-1052`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2585`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1613-1618`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1050-1052`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2585`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1613-1618`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2RemoveboneArgs {
     ghoul2: *mut c_void,
@@ -33,10 +33,10 @@ impl CgG2RemoveboneArgs {
 
 /// `CG_G2_REMOVEBONE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:319`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1050-1052`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1613-1618`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1613-1618`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:319`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1050-1052`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1613-1618`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1613-1618`
 pub struct CgG2Removebone;
 
 impl OutboundSysCall for CgG2Removebone {

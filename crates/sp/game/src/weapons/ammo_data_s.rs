@@ -4,7 +4,7 @@ use core::ffi::c_char;
 
 /// Raven `ammoData_t` — per-ammo-type data.
 ///
-/// Type definition source: `oracle/oracle/code/game/weapons.h:142-146`
+/// Type definition source: `oracle/code/game/weapons.h:142-146`
 #[repr(C)]
 pub struct ammoData_t {
 	pub icon: [c_char; 32], // Name of ammo icon file

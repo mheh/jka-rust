@@ -14,7 +14,7 @@ impl GNavInitArgs {
 
 /// `G_NAV_INIT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:298`
+/// Source: `oracle/codemp/game/g_public.h:298`
 pub struct GNavInit;
 
 impl OutboundSysCall for GNavInit {

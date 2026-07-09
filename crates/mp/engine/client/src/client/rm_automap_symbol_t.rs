@@ -4,7 +4,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `rmAutomapSymbol_t` — an automap symbol marker.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/client.h:143-149`
+/// Type definition source: `oracle/codemp/client/client.h:143-149`
 #[repr(C)]
 pub struct rmAutomapSymbol_t {
     pub mType: i32,

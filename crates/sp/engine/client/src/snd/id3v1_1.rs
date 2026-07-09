@@ -5,7 +5,7 @@ use core::ffi::c_char;
 /// Raven `id3v1_1` — ID3v1.1 MP3 tag trailer, 128 bytes in size.
 ///
 /// Raven: none.
-/// Type definition source: `oracle/oracle/code/client/cl_mp3.h:15-25`
+/// Type definition source: `oracle/code/client/cl_mp3.h:15-25`
 #[repr(C)]
 pub struct id3v1_1 {
 	pub id: [c_char; 3],

@@ -2,7 +2,7 @@
 
 /// Raven `saberQuadrant_t` — saber quadrant.
 ///
-/// Type definition source: `oracle/oracle/code/game/wp_saber.h:416-426`
+/// Type definition source: `oracle/code/game/wp_saber.h:416-426`
 #[repr(i32)]
 pub enum saberQuadrant_t {
 	Q_BR,

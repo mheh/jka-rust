@@ -1,6 +1,6 @@
 //! MP `DAMAGEREDIRECT_*` constants.
 //!
-//! Source: `oracle/oracle/codemp/game/g_local.h:362-364`
+//! Source: `oracle/codemp/game/g_local.h:362-364`
 
 use core::ffi::c_int;
 

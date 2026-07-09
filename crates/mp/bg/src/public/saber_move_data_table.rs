@@ -1,6 +1,6 @@
 //! MP `bg_saber.c` saber-move finite-state table.
 //!
-//! Source: `oracle/oracle/codemp/game/bg_saber.c:113-321`
+//! Source: `oracle/codemp/game/bg_saber.c:113-321`
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
@@ -18,7 +18,7 @@ use super::set_anim::{
 
 // Per-move animation-flag presets — combinations of the `SETANIM_FLAG_*` bits, used by
 // the `animSetFlags` column below.
-// Source: `oracle/oracle/codemp/game/bg_saber.c:113-117`
+// Source: `oracle/codemp/game/bg_saber.c:113-117`
 pub const AFLAG_IDLE: c_uint = SETANIM_FLAG_NORMAL as c_uint;
 pub const AFLAG_ACTIVE: c_uint =
     (SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS) as c_uint;
@@ -37,7 +37,7 @@ pub const AFLAG_FINISH: c_uint = SETANIM_FLAG_HOLD as c_uint;
 /// A raw pointer field is not `Sync`, so this is a `const` (inlined per use), not a
 /// `static` (which would require `Sync`).
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:120-321`
+/// Source: `oracle/codemp/game/bg_saber.c:120-321`
 pub const saberMoveData: [saberMoveData_t; LS_MOVE_MAX as usize] = [
     // name			anim(do all styles?)startQ	endQ	setanimflag		blend,	blocking	chain_idle		chain_attack	trailLen
     saberMoveData_t { name: c"None".as_ptr() as *mut c_char, animToUse: BOTH_STAND1 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_IDLE, blendTime: 350, blocking: BLK_NO as c_int, chain_idle: LS_NONE, chain_attack: LS_NONE, trailLength: 0 }, // LS_NONE		= 0,

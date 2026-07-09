@@ -24,7 +24,7 @@ impl BotlibEaCrouchArgs {
 
 /// `BOTLIB_EA_CROUCH` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:394`
+/// Source: `oracle/codemp/game/g_public.h:394`
 pub struct BotlibEaCrouch;
 
 impl OutboundSysCall for BotlibEaCrouch {

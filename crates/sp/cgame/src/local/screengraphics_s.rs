@@ -6,7 +6,7 @@ use sp_qshared::shared::qhandle_t;
 
 /// Raven `screengraphics_s` — a scripted screen HUD element (string or graphic).
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:521-539`
+/// Type definition source: `oracle/code/cgame/cg_local.h:521-539`
 #[repr(C)]
 pub struct screengraphics_s {
 	/// STRING or GRAPHIC

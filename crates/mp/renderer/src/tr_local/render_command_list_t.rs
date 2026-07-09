@@ -4,7 +4,7 @@
 /// commands, plus a cursor tracking how many bytes are used.
 ///
 /// Raven: none.
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:2180-2183`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:2180-2183`
 #[repr(C)]
 pub struct renderCommandList_t {
     pub cmds: [u8; 0x40000],

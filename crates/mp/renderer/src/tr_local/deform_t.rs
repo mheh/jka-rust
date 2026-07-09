@@ -2,7 +2,7 @@
 
 /// Raven `deform_t` — mesh deformation modes.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:207-224`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:207-224`
 #[repr(i32)]
 pub enum deform_t {
 	DEFORM_NONE,

@@ -2,7 +2,7 @@
 
 /// Raven `aas_link_t` — a link of an entity into an AAS area / BSP leaf list.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:50-56`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:50-56`
 #[repr(C)]
 pub struct aas_link_t {
 	pub entnum: i32,

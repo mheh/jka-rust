@@ -2,7 +2,7 @@
 
 /// Raven `swingType_t` — swing type.
 ///
-/// Type definition source: `oracle/oracle/code/game/wp_saber.h:206-211`
+/// Type definition source: `oracle/code/game/wp_saber.h:206-211`
 #[repr(i32)]
 pub enum swingType_t {
 	SWING_FAST,

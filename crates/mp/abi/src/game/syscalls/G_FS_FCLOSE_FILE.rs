@@ -27,7 +27,7 @@ impl GFsFcloseFileArgs {
 /// `G_FS_FCLOSE_FILE` MP game imports syscall ABI token.
 ///
 /// Raven: ( fileHandle_t f );
-/// Source: `oracle/oracle/codemp/game/g_public.h:136`
+/// Source: `oracle/codemp/game/g_public.h:136`
 pub struct GFsFcloseFile;
 
 impl OutboundSysCall for GFsFcloseFile {

@@ -36,7 +36,7 @@ impl GG2SetrootsurfaceArgs {
 
 /// `G_G2_SETROOTSURFACE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:533`
+/// Source: `oracle/codemp/game/g_public.h:533`
 pub struct GG2Setrootsurface;
 
 impl OutboundSysCall for GG2Setrootsurface {

@@ -27,7 +27,7 @@ impl CgRFontStrheightpixelsArgs {
 
 /// `CG_R_FONT_STRHEIGHTPIXELS` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:124`
+/// Source: `oracle/codemp/cgame/cg_public.h:124`
 pub struct CgRFontStrheightpixels;
 
 impl OutboundSysCall for CgRFontStrheightpixels {

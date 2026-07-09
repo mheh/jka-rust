@@ -4,7 +4,7 @@
 //! Raven's faithful implementations of standard C library functions,
 //! primarily qsort, memmove, and string-to-number conversion.
 //!
-//! Raven source: `oracle/oracle/codemp/game/bg_lib.c`
+//! Raven source: `oracle/codemp/game/bg_lib.c`
 
 use crate::prelude::*;
 
@@ -22,7 +22,7 @@ type CmpFn = extern "C" fn(*const c_void, *const c_void) -> c_int;
 /// - swaptype 1: size-of(long) element swaps
 /// - swaptype 2: byte-by-byte swaps
 ///
-/// Source: `oracle/oracle/codemp/game/bg_lib.c:80-86`
+/// Source: `oracle/codemp/game/bg_lib.c:80-86`
 pub fn swapfunc(a: *mut c_char, b: *mut c_char, n: c_int, swaptype: c_int) {
     let n_usize = n as usize;
 
@@ -65,7 +65,7 @@ pub fn swapfunc(a: *mut c_char, b: *mut c_char, n: c_int, swaptype: c_int) {
 /// Selects the median of three values using the provided comparison function.
 /// Used by qsort to choose a pivot element.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_lib.c:98-103`
+/// Source: `oracle/codemp/game/bg_lib.c:98-103`
 pub fn med3(a: *mut c_char, b: *mut c_char, c: *mut c_char, cmp: *mut c_void) -> *mut c_char {
     unsafe {
         let cmp_fn = std::mem::transmute::<*mut c_void, CmpFn>(cmp);
@@ -103,7 +103,7 @@ pub fn med3(a: *mut c_char, b: *mut c_char, c: *mut c_char, cmp: *mut c_void) ->
 /// partitioning. Uses insertion sort for small arrays and tail-recursion
 /// optimization via a loop instead of recursive calls.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_lib.c:105-181`
+/// Source: `oracle/codemp/game/bg_lib.c:105-181`
 pub fn qsort(a: *mut c_void, n: usize, es: usize, cmp: *mut c_void) {
     let cmp_fn = unsafe { std::mem::transmute::<*mut c_void, CmpFn>(cmp) };
 
@@ -262,7 +262,7 @@ pub fn qsort(a: *mut c_void, n: usize, es: usize, cmp: *mut c_void) {
 /// backwards when destination > source. The __builtin_object_size
 /// parameter is ignored (used by compiler for bounds checking).
 ///
-/// Source: `oracle/oracle/codemp/game/bg_lib.c:287-300`
+/// Source: `oracle/codemp/game/bg_lib.c:287-300`
 pub fn __builtin___memmove_chk(
     dest: *mut c_void,
     src: *const c_void,
@@ -293,7 +293,7 @@ pub fn __builtin___memmove_chk(
 // `srand`/`rand` are ported as the `randSeed` generator on
 // `bg_channel::rng::Rng` (BgState) — reach them via
 // `world.bg_state.rng.srand`/`.rand`.
-// Source: oracle/oracle/codemp/game/bg_lib.c:763-772
+// Source: oracle/codemp/game/bg_lib.c:763-772
 
 /// Raven `atoi`.
 ///
@@ -302,7 +302,7 @@ pub fn __builtin___memmove_chk(
 /// for the local `extern "C" { fn atoi }` / `atoi_cstr` shims that stood in
 /// for the unported `bg_lib.c` function.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_lib.c:915-958`
+/// Source: `oracle/codemp/game/bg_lib.c:915-958`
 ///
 /// This is the faithful Q3_VM-bytecode port; that `#if defined(Q3_VM)` span
 /// is never compiled into the native game DLL, which links libc `atoi`
@@ -349,7 +349,7 @@ pub fn atoi(string: *const c_char) -> c_int {
             // C's `int value = value*10 + c` wraps on overflow (2's complement);
             // Rust's `*`/`+` panic in debug. Use wrapping to reproduce Raven's
             // behavior for out-of-range inputs (e.g. "99999999999").
-            // Source: `oracle/oracle/codemp/game/bg_lib.c:948-953`
+            // Source: `oracle/codemp/game/bg_lib.c:948-953`
             value = value.wrapping_mul(10).wrapping_add((c - b'0') as c_int);
         }
 
@@ -364,7 +364,7 @@ pub fn atoi(string: *const c_char) -> c_int {
 /// decimal point, and fractional part. Does not handle scientific
 /// notation (e.g., 1.5e10).
 ///
-/// Source: `oracle/oracle/codemp/game/bg_lib.c:774-839`
+/// Source: `oracle/codemp/game/bg_lib.c:774-839`
 pub fn atof(string: *const c_char) -> f64 {
     unsafe {
         let mut string = string;
@@ -437,7 +437,7 @@ pub fn atof(string: *const c_char) -> f64 {
 /// Converts a string to double, updating the string pointer to point
 /// past the parsed value. Similar to `atof` but takes a pointer-to-pointer.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_lib.c:841-907`
+/// Source: `oracle/codemp/game/bg_lib.c:841-907`
 pub fn _atof(stringPtr: *mut *const c_char) -> f64 {
     unsafe {
         let mut string = *stringPtr;
@@ -450,7 +450,7 @@ pub fn _atof(stringPtr: *mut *const c_char) -> f64 {
         // block is SKIPPED — `_atof(".5")` returns 0 and advances 0. (This
         // differs from `atof`, which advances past a leading '.'.) The prior
         // port seeded `c` from the sign char and wrongly entered the fraction.
-        // Source: `oracle/oracle/codemp/game/bg_lib.c:845,858-885`
+        // Source: `oracle/codemp/game/bg_lib.c:845,858-885`
         let mut c: u8 = b'0';
 
         // Skip whitespace (signed-char semantics — see `atoi`).

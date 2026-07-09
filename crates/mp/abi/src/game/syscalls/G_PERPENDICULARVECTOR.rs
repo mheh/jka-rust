@@ -31,7 +31,7 @@ impl GPerpendicularvectorArgs {
 
 /// `G_PERPENDICULARVECTOR` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:285`
+/// Source: `oracle/codemp/game/g_public.h:285`
 pub struct GPerpendicularvector;
 
 impl OutboundSysCall for GPerpendicularvector {

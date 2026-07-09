@@ -34,7 +34,7 @@ impl GPointContentsArgs {
 ///
 /// Raven: ( const vec3_t point, int passEntityNum );
 /// Raven: point contents against all linked entities
-/// Source: `oracle/oracle/codemp/game/g_public.h:188`
+/// Source: `oracle/codemp/game/g_public.h:188`
 pub struct GPointContents;
 
 impl OutboundSysCall for GPointContents {

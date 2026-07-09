@@ -97,7 +97,7 @@ impl BotlibAasPredictRouteArgs {
 
 /// `BOTLIB_AAS_PREDICT_ROUTE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:495`
+/// Source: `oracle/codemp/game/g_public.h:495`
 pub struct BotlibAasPredictRoute;
 
 impl OutboundSysCall for BotlibAasPredictRoute {

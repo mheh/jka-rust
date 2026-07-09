@@ -25,7 +25,7 @@ impl GG2CleanmodelsArgs {
 
 /// `G_G2_CLEANMODELS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:529`
+/// Source: `oracle/codemp/game/g_public.h:529`
 pub struct GG2Cleanmodels;
 
 impl OutboundSysCall for GG2Cleanmodels {

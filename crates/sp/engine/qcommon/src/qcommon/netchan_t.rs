@@ -5,12 +5,12 @@ use super::netsrc_t::netsrc_t;
 
 // Raven `MAX_MSGLEN` — max length of a message, which may be fragmented into
 // multiple packets.
-// Source: oracle/oracle/code/qcommon/qcommon.h:155
+// Source: oracle/code/qcommon/qcommon.h:155
 const MAX_MSGLEN: usize = 1 * 17408;
 
 /// Raven `netchan_t`.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/qcommon.h:164-182`
+/// Type definition source: `oracle/code/qcommon/qcommon.h:164-182`
 #[repr(C)]
 pub struct netchan_t {
 	pub sock: netsrc_t,

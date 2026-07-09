@@ -6,12 +6,12 @@ use mp_qshared::shared::qboolean;
 use super::qfile_us::qfile_ut;
 
 /// Raven's `MAX_ZPATH` — max length of a file path inside a pak/zip.
-/// Source: `oracle/oracle/codemp/qcommon/files.h:32`
+/// Source: `oracle/codemp/qcommon/files.h:32`
 const MAX_ZPATH: usize = 256;
 
 /// Raven `fileHandleData_t` — per-handle state for an open engine file.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/files.h:84-100`
+/// Type definition source: `oracle/codemp/qcommon/files.h:84-100`
 #[repr(C)]
 pub struct fileHandleData_t {
     pub handleFiles: qfile_ut,

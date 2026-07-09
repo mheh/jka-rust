@@ -3,7 +3,7 @@
 /// Raven `clc_ops_e` — client-to-server operation codes.
 ///
 /// Raven: .
-/// Type definition source: `oracle/oracle/code/qcommon/qcommon.h:222-227`
+/// Type definition source: `oracle/code/qcommon/qcommon.h:222-227`
 #[repr(i32)]
 pub enum clc_ops_e {
 	clc_bad,

@@ -10,10 +10,10 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_FX_ADDPRIMITIVE, p );`
 /// Raven transport opens `effectTrailArgStruct_t` from `VMA(1)`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:705-708`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2414`
-/// Args struct source: `oracle/oracle/codemp/game/q_shared.h:2615-2620`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1197-1208`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:705-708`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2414`
+/// Args struct source: `oracle/codemp/game/q_shared.h:2615-2620`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1197-1208`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxAddprimitiveArgs {
     p: *mut c_void,
@@ -28,10 +28,10 @@ impl CgFxAddprimitiveArgs {
 /// `CG_FX_ADDPRIMITIVE` MP cgame imports syscall ABI token.
 ///
 /// Raven: additional funcs for adding custom incode stuff.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:235`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:705-708`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1197-1208`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1197-1208`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:235`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:705-708`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1197-1208`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1197-1208`
 pub struct CgFxAddprimitive;
 
 impl OutboundSysCall for CgFxAddprimitive {

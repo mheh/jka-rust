@@ -8,8 +8,8 @@ use abi_transport::pass_float;
 /// Raven wrapper: `syscall(CG_R_SETRANGEFOG, PASSFLOAT(range));`
 /// Raven transport: `tr.rangedFog = VMF(1);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:426-429`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:732-742`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:426-429`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:732-742`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRSetrangefogArgs {
     range: f32,
@@ -27,10 +27,10 @@ impl CgRSetrangefogArgs {
 
 /// `CG_R_SETRANGEFOG` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:147`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:426-429`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:732-742`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:732-742`
+/// Enum value source: `oracle/code/cgame/cg_public.h:147`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:426-429`
+/// Output source: `oracle/code/client/cl_cgame.cpp:732-742`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:732-742`
 pub struct CgRSetrangefog;
 
 impl OutboundSysCall for CgRSetrangefog {

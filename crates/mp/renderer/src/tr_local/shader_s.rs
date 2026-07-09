@@ -16,12 +16,12 @@ use super::sky_parms_t::skyParms_t;
 
 /// Raven `MAX_SHADER_DEFORMS`.
 ///
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:309`
+/// Source: `oracle/codemp/renderer/tr_local.h:309`
 const MAX_SHADER_DEFORMS: usize = 3;
 
 /// Raven `shader_t` — compiled shader definition.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:459-530`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:459-530`
 #[repr(C)]
 pub struct shader_t {
     /// game path, including extension

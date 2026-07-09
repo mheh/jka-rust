@@ -11,8 +11,8 @@ use sp_qshared::shared::qhandle_t;
 /// Raven wrapper: `return syscall( CG_R_REGISTERFONT, fontName );`
 /// Raven transport: `return re.RegisterFont( (const char *) VMA(1) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:321-322`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:663-664`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:321-322`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:663-664`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRRegisterfontArgs {
     font_name: *const c_char,
@@ -26,10 +26,10 @@ impl CgRRegisterfontArgs {
 
 /// `CG_R_REGISTERFONT` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:122`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:321-322`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:663-664`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:663-664`
+/// Enum value source: `oracle/code/cgame/cg_public.h:122`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:321-322`
+/// Output source: `oracle/code/client/cl_cgame.cpp:663-664`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:663-664`
 pub struct CgRRegisterfont;
 
 impl OutboundSysCall for CgRRegisterfont {

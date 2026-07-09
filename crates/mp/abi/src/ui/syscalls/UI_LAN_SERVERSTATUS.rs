@@ -10,7 +10,7 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall( UI_LAN_SERVERSTATUS, serverAddress, serverStatus, maxLen );`
 /// Raven transport: `return LAN_GetServerStatus( (char *)VMA(1), (char *)VMA(2), args[3] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:290-291`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:290-291`
 #[derive(Debug)]
 pub struct UiLanServerstatusArgs {
     server_address: *const c_char,
@@ -45,10 +45,10 @@ impl UiLanServerstatusArgs {
 /// Raven wrapper: `return syscall( UI_LAN_SERVERSTATUS, serverAddress, serverStatus, maxLen );`
 /// Raven transport: `return LAN_GetServerStatus( (char *)VMA(1), (char *)VMA(2), args[3] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:111`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:290-291`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:980`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1113-1114`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:111`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:290-291`
+/// Output source: `oracle/codemp/ui/ui_local.h:980`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1113-1114`
 pub struct UiLanServerstatus;
 
 impl OutboundSysCall for UiLanServerstatus {

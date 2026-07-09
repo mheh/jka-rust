@@ -32,102 +32,102 @@ use mp_qshared::shared::limits::MAX_VEH_WEAPONS;
 /// pools/tables → `Vec`/`Box`). Each field cites its owning Raven static.
 pub struct BgState {
     /// The faithful LCG RNG. The single parity-critical member.
-    /// Source: `oracle/oracle/codemp/game/q_math.c:1432`
+    /// Source: `oracle/codemp/game/q_math.c:1432`
     pub rng: Rng,
 
     // --- `bg_panimate.c` animation tables ---
     /// Raven `bgLoadedAnim_t bgAllAnims[MAX_ANIM_FILES]` — per-model animation
     /// sets, each pointing at a heap `animation_t` array.
-    /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1702`
+    /// Source: `oracle/codemp/game/bg_panimate.c:1702`
     pub bgAllAnims: Vec<bgLoadedAnim_t>,
     /// Raven `int bgNumAllAnims` — count of loaded entries in `bgAllAnims`.
-    /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1703`
+    /// Source: `oracle/codemp/game/bg_panimate.c:1703`
     pub bgNumAllAnims: c_int,
     /// Raven `bgLoadedEvents_t bgAllEvents[MAX_ANIM_FILES]`.
-    /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2166`
+    /// Source: `oracle/codemp/game/bg_panimate.c:2166`
     pub bgAllEvents: Vec<bgLoadedEvents_t>,
     /// Raven `int bgNumAnimEvents = 1` (first one is null/default).
-    /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2167`
+    /// Source: `oracle/codemp/game/bg_panimate.c:2167`
     pub bgNumAnimEvents: c_int,
     /// Raven `animation_t bgHumanoidAnimations[MAX_TOTALANIMATIONS]` — the only
     /// statically-allocated animation set.
-    /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1672`
+    /// Source: `oracle/codemp/game/bg_panimate.c:1672`
     pub bgHumanoidAnimations: Vec<animation_t>,
     /// Raven `char BGPAFtext[60000]` — animation-config parse scratch.
-    /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1669`
+    /// Source: `oracle/codemp/game/bg_panimate.c:1669`
     pub BGPAFtext: Vec<u8>,
     /// Raven `qboolean BGPAFtextLoaded`.
-    /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1671`
+    /// Source: `oracle/codemp/game/bg_panimate.c:1671`
     pub BGPAFtextLoaded: qboolean,
 
     // --- `bg_saberLoad.c` saber-parm tables ---
     /// Raven `char SaberParms[MAX_SABER_DATA_SIZE]` — accumulated saber `.sab`
     /// text kept for lazy re-parse.
-    /// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:44`
+    /// Source: `oracle/codemp/game/bg_saberLoad.c:44`
     pub SaberParms: Vec<u8>,
     /// Raven `char bgSaberParseTBuffer[MAX_SABER_DATA_SIZE]` — per-file read
     /// scratch during saber-parm loading.
-    /// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2736`
+    /// Source: `oracle/codemp/game/bg_saberLoad.c:2736`
     pub bgSaberParseTBuffer: Vec<u8>,
 
     // --- `bg_saber.c` saber-move tables ---
     /// Raven `saberMoveData_t saberMoveData[LS_MOVE_MAX]` — per-move animation
     /// and chaining data (a static const array in C, stored here as a static ref).
-    /// Source: `oracle/oracle/codemp/game/bg_saber.c:120-321`
+    /// Source: `oracle/codemp/game/bg_saber.c:120-321`
     pub saberMoveData: &'static [saberMoveData_t],
 
     // --- `bg_vehicleLoad.c` vehicle tables ---
     /// Raven `vehWeaponInfo_t g_vehWeaponInfo[MAX_VEH_WEAPONS]`.
-    /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:103`
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:103`
     pub g_vehWeaponInfo: Vec<vehWeaponInfo_t>,
     /// Raven `int numVehicleWeapons = 1` (first one is null/default).
-    /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:104`
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:104`
     pub numVehicleWeapons: c_int,
     /// Raven `vehicleInfo_t g_vehicleInfo[MAX_VEHICLES]`.
-    /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:106`
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:106`
     pub g_vehicleInfo: Vec<vehicleInfo_t>,
     /// Raven `int numVehicles = 0` (first one is null/default).
-    /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:107`
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:107`
     pub numVehicles: c_int,
     /// Raven `char VehWeaponParms[MAX_VEH_WEAPON_DATA_SIZE]` — accumulated
     /// `.vwp` text scratch buffer (§B3: file-scope static -> owned field).
-    /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:69`
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:69`
     pub VehWeaponParms: Vec<c_char>,
     /// Raven `char VehicleParms[MAX_VEHICLE_DATA_SIZE]` — accumulated `.veh`
     /// text scratch buffer.
-    /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:70`
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:70`
     pub VehicleParms: Vec<c_char>,
 
     // --- `bg_saga.c` siege class tables ---
     /// Raven `siegeClass_t bgSiegeClasses[MAX_SIEGE_CLASSES]` — siege gametype
     /// player class definitions, loaded from siege config files.
-    /// Source: `oracle/oracle/codemp/game/bg_saga.c:38`
+    /// Source: `oracle/codemp/game/bg_saga.c:38`
     pub bgSiegeClasses: Vec<siegeClass_t>,
     /// Raven `int bgNumSiegeClasses = 0` — count of loaded siege classes.
-    /// Source: `oracle/oracle/codemp/game/bg_saga.c:39`
+    /// Source: `oracle/codemp/game/bg_saga.c:39`
     pub bgNumSiegeClasses: c_int,
 
     // --- `bg_saga.c` siege team tables (module-scope mutable state, now owned by BgState) ---
     /// Raven `siegeTeam_t bgSiegeTeams[MAX_SIEGE_TEAMS]` — siege team definitions.
-    /// Source: `oracle/oracle/codemp/game/bg_saga.c:41`
+    /// Source: `oracle/codemp/game/bg_saga.c:41`
     pub bgSiegeTeams: Vec<siegeTeam_t>,
     /// Raven `int bgNumSiegeTeams = 0` — count of loaded siege teams.
-    /// Source: `oracle/oracle/codemp/game/bg_saga.c:42`
+    /// Source: `oracle/codemp/game/bg_saga.c:42`
     pub bgNumSiegeTeams: c_int,
     /// Raven `siegeTeam_t *team1Theme` — theme team for side 1 (points into
     /// `bgSiegeTeams`; NULL until set).
-    /// Source: `oracle/oracle/codemp/game/bg_saga.c:35`
+    /// Source: `oracle/codemp/game/bg_saga.c:35`
     pub team1Theme: *mut siegeTeam_t,
     /// Raven `siegeTeam_t *team2Theme` — theme team for side 2.
-    /// Source: `oracle/oracle/codemp/game/bg_saga.c:36`
+    /// Source: `oracle/codemp/game/bg_saga.c:36`
     pub team2Theme: *mut siegeTeam_t,
     /// Raven `extern char siege_info[MAX_SIEGE_INFO_SIZE]` — accumulated siege
     /// config text kept for lazy re-parse (`.siege` file contents).
-    /// Source: `oracle/oracle/codemp/game/bg_saga.h:112`
+    /// Source: `oracle/codemp/game/bg_saga.h:112`
     pub siege_info: Vec<u8>,
     /// Raven `extern int siege_valid` — whether `siege_info` currently holds a
     /// loaded siege config.
-    /// Source: `oracle/oracle/codemp/game/bg_saga.h:113`
+    /// Source: `oracle/codemp/game/bg_saga.h:113`
     pub siege_valid: c_int,
 
     // --- `g_cmds.c` `ConcatArgs` returned-string scratch ---
@@ -135,24 +135,24 @@ pub struct BgState {
     /// `static char line[MAX_STRING_CHARS]` and returns a pointer to it;
     /// `concat_args_line` is the owned home for that static, holding the
     /// NUL-terminated bytes across the return.
-    /// Source: `oracle/oracle/codemp/game/g_cmds.c:127-140`
+    /// Source: `oracle/codemp/game/g_cmds.c:127-140`
     pub concat_args_line: Vec<u8>,
 
     // --- `bg_misc.c` string pool ---
     /// Raven `static char bg_pool[MAX_POOL_SIZE]` — the `BG_Alloc` bump pool.
-    /// Source: `oracle/oracle/codemp/game/bg_misc.c:3324`
+    /// Source: `oracle/codemp/game/bg_misc.c:3324`
     pub bg_pool: Vec<u8>,
     /// Raven `static int bg_poolSize = 0` — bump allocation point.
-    /// Source: `oracle/oracle/codemp/game/bg_misc.c:3325`
+    /// Source: `oracle/codemp/game/bg_misc.c:3325`
     pub bg_poolSize: c_int,
     /// Raven `static int bg_poolTail = MAX_POOL_SIZE`.
-    /// Source: `oracle/oracle/codemp/game/bg_misc.c:3326`
+    /// Source: `oracle/codemp/game/bg_misc.c:3326`
     pub bg_poolTail: c_int,
 
     // --- `bg_pmove.c` cross-frame debug counter ---
     /// Raven `int c_pmove = 0` — the PmoveSingle journal counter; genuine
     /// cross-frame state, so it's an owned field.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:57`
+    /// Source: `oracle/codemp/game/bg_pmove.c:57`
     pub c_pmove: c_int,
 
     // --- game-cvar mirrors (bg code cannot reach GameCvars) ---
@@ -160,7 +160,7 @@ pub struct BgState {
     /// game-tier cvar register/update path for `BG_UnrestrainedPitchRoll`.
     /// Raven read the `vmCvar_t` global directly (`extern vmCvar_t
     /// bg_fighterAltControl`).
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:7783`
+    /// Source: `oracle/codemp/game/bg_pmove.c:7783`
     pub bg_fighterAltControl: c_int,
 }
 

@@ -2,7 +2,7 @@
 
 /// Raven `MusicState_e` — background music state enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/client/snd_music.h:11-36`
+/// Type definition source: `oracle/code/client/snd_music.h:11-36`
 #[repr(i32)]
 pub enum MusicState_e {
 	/// For normal walking around

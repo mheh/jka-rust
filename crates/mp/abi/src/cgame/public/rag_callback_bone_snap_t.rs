@@ -2,7 +2,7 @@
 
 /// Raven `ragCallbackBoneSnap_t` — ragdoll bone-snap callback payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:560-564`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:560-564`
 #[repr(C)]
 pub struct ragCallbackBoneSnap_t {
 	pub boneName: [i8; 128], //name of the bone in question

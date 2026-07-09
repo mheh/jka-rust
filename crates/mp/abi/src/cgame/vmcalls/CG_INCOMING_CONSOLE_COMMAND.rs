@@ -7,12 +7,12 @@ use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, Vm
 ///
 /// Raven: TCGIncomingConsoleCommand shares `conCommand` through `cg.sharedBuffer`
 /// Raven: so the client can filter or rewrite local console commands before execution.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:414`
-/// Shared-buffer source: `oracle/oracle/codemp/cgame/cg_public.h:506-509`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:259-280`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:259-280`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_keys.cpp:844`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_keys.cpp:1629`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:414`
+/// Shared-buffer source: `oracle/codemp/cgame/cg_public.h:506-509`
+/// Args source: `oracle/codemp/cgame/cg_main.c:259-280`
+/// Output source: `oracle/codemp/cgame/cg_main.c:259-280`
+/// Transport/call-site source: `oracle/codemp/client/cl_keys.cpp:844`
+/// Transport/call-site source: `oracle/codemp/client/cl_keys.cpp:1629`
 pub struct CgIncomingConsoleCommand;
 
 impl InboundVmCall for CgIncomingConsoleCommand {

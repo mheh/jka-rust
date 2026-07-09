@@ -5,12 +5,12 @@ use core::ffi::c_char;
 use mp_qshared::shared::qhandle_t;
 
 // Raven's `#define MAPS_PER_TIER 3`.
-// Source: oracle/oracle/codemp/ui/ui_local.h:588
+// Source: oracle/codemp/ui/ui_local.h:588
 pub const MAPS_PER_TIER: usize = 3;
 
 /// Raven `tierInfo` — a tier's map rotation entry (name, maps, gametypes, level shots).
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:642-647`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:642-647`
 #[repr(C)]
 pub struct tierInfo {
 	pub tierName: *const c_char,

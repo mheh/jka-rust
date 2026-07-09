@@ -1,6 +1,6 @@
 //! MP `DAMAGE_*` flags (`means-of-damage` modifiers).
 //!
-//! Source: `oracle/oracle/codemp/game/g_local.h:1170-1190`
+//! Source: `oracle/codemp/game/g_local.h:1170-1190`
 
 use core::ffi::c_int;
 

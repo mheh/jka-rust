@@ -4,8 +4,8 @@ Decision prefix: LIFE     Ledger deps: DEC-01, DEC-02, DEC-04, DEC-07, DEC-08, D
 
 ## Standing context
 
-Links only — never restated here. MP tree = `oracle/oracle/codemp/`, SP tree =
-`oracle/oracle/code/`; file:line short forms below resolve against those roots.
+Links only — never restated here. MP tree = `oracle/codemp/`, SP tree =
+`oracle/code/`; file:line short forms below resolve against those roots.
 
 - `docs/workspace-architecture.md` — crate graph and tiers (`native/*`,
   `abi-transport`, `crates/{mp,sp}/{qshared,engine/*,app}`).

@@ -5,7 +5,7 @@ use native_types::byte;
 /// Raven `qint64` — 64-bit integer for the global rankings interface,
 /// implemented as a byte struct for qvm compatibility.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1726-1736`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1726-1736`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct qint64 {

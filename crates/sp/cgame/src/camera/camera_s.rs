@@ -6,7 +6,7 @@ use sp_qshared::shared::{qboolean, vec3_t, vec4_t, MAX_QPATH};
 /// Raven `camera_s` — cinematic camera state (position, movement, FOV, fades,
 /// tracking, shakes, and ROFF playback).
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_camera.h:30-118`
+/// Type definition source: `oracle/code/cgame/cg_camera.h:30-118`
 #[repr(C)]
 pub struct camera_t {
 	//Position / Facing information

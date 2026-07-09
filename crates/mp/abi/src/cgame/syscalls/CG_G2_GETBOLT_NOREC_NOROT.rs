@@ -16,11 +16,11 @@ use mp_qshared::shared::vec3_t;
 /// Raven transport: `//Yeah, this was probably BAD.`
 /// Raven transport: `gG2_GBMUseSPMethod = qtrue; return G2API_GetBoltMatrix(*((CGhoul2Info_v *)args[1]), args[2], args[3], (mdxaBone_t *)VMA(4), (const float *)VMA(5), (const float *)VMA(6), args[7], (qhandle_t *)VMA(8), (float *)VMA(9));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:803-806`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2523-2524`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:803,806`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1318-1322`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1318-1322`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:803-806`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2523-2524`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:803,806`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1318-1322`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1318-1322`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2GetboltNorecNorotArgs {
     ghoul2: *mut c_void,
@@ -62,7 +62,7 @@ impl CgG2GetboltNorecNorotArgs {
 
 /// `CG_G2_GETBOLT_NOREC_NOROT` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:262`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:262`
 pub struct CgG2GetboltNorecNorot;
 
 impl OutboundSysCall for CgG2GetboltNorecNorot {

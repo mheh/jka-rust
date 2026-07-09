@@ -4,11 +4,11 @@ use sp_qshared::shared::fileHandle_t;
 
 /// `UI_FS_FCLOSEFILE` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:168`
-/// Args source: `oracle/oracle/code/ui/ui_public.h:39`
-/// Output source: `oracle/oracle/code/ui/ui_public.h:39`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:925-927`
-/// SP caveat: `oracle/oracle/code/client/cl_ui.cpp` does not emit a `UI_FS_FCLOSEFILE` case in this branch.
+/// Enum source: `oracle/code/ui/ui_public.h:168`
+/// Args source: `oracle/code/ui/ui_public.h:39`
+/// Output source: `oracle/code/ui/ui_public.h:39`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:925-927`
+/// SP caveat: `oracle/code/client/cl_ui.cpp` does not emit a `UI_FS_FCLOSEFILE` case in this branch.
 /// TODO: using MP transport parity until SP table entry is confirmed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiFsFclosefileArgs {

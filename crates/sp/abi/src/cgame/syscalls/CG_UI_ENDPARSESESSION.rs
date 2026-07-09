@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `cgi_UI_EndParseSession(buf);`
 /// Raven transport: `PC_EndParseSession((char *) VMA(1)); return 0;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:598-600`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:872-874`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:598-600`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:872-874`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiEndparsesessionArgs {
     buf: *mut c_char,
@@ -31,10 +31,10 @@ impl CgUiEndparsesessionArgs {
 
 /// `CG_UI_ENDPARSESESSION` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:200`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:598-600`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:872-874`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:872-874`
+/// Enum value source: `oracle/code/cgame/cg_public.h:200`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:598-600`
+/// Output source: `oracle/code/client/cl_cgame.cpp:872-874`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:872-874`
 pub struct CgUiEndparsesession;
 
 impl OutboundSysCall for CgUiEndparsesession {

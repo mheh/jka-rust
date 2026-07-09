@@ -37,7 +37,7 @@ taystjk client connected to the Rust `jampgame` server mispredicts constantly; t
 
 ## Remaining suspects (in rough priority order)
 
-1. **The engine seam (out of repo).** Everything above proves the Rust module is self-consistent with the *vendored* oracle headers. If the **actual engine binary the server runs** has a different `playerState_t` netfield table / offsets than `oracle/oracle/codemp/game/q_shared.h`, the wire serializer reads the wrong bytes — invisible to every in-repo audit. Identify exactly which engine binary hosts the server and diff its netfields/headers against the vendored oracle.
+1. **The engine seam (out of repo).** Everything above proves the Rust module is self-consistent with the *vendored* oracle headers. If the **actual engine binary the server runs** has a different `playerState_t` netfield table / offsets than `oracle/codemp/game/q_shared.h`, the wire serializer reads the wrong bytes — invisible to every in-repo audit. Identify exactly which engine binary hosts the server and diff its netfields/headers against the vendored oracle.
 2. **Runtime-only state divergence.** A `ps` field feeding Pmove (speed, gravity, pm_flags, groundEntityNum) that differs between the server's sim and what the client's prediction starts from — not findable statically; needs the probe below.
 3. **The client side (taystjk cgame prediction setup)** — never examined. A constant miss can equally mean the client predictor diverges while the server is right.
 
@@ -114,10 +114,10 @@ Task list (in Claude session): #4 rig (in progress, nearly done) → #5 probe cl
 
 ## First A/B verdict (Rust vs OpenJK-game): divergence at frame 1 — but CONFOUNDED
 OpenJK's game ≠ Raven oracle. Mixed findings: OpenJK drift (ClientConnect does 1283 vs 569 boundary records, spawn eFlags/pitch/groundEntityNum init, 256 vs 1024 bufsize) vs likely-real port findings: **ents 117-128 loopSound/eventParm = 0 on Rust vs 7-10 (ambient speaker sound/configstring indices missing)**; **-0.0 vs +0.0 in r.mins[2] on 44 item ents**; 1-ULP velocity drift on client 0 at frame 1.
-Decision (user): **ignore OpenJK as reference; oracle only.** Oracle source = oracle/oracle/ = mheh/jediacademy @4bebb8e (nested inside the oracle wrapper crate submodule, mheh/jedi-academy-rust).
+Decision (user): **ignore OpenJK as reference; oracle only.** Oracle source = oracle/ = mheh/jediacademy @4bebb8e (nested inside the oracle wrapper crate submodule, mheh/jedi-academy-rust).
 
 ## In flight at compaction
-Background agent building the **oracle game dylib** (oracle/oracle/codemp/game/*.c → arm64 jampgamearm64.dylib, exports vmMain/dllEntry, -ffp-contract=off, harness in scratchpad/oracle-game-build/, reuse oracle/build.rs config if possible, do NOT modify the vendored oracle) and re-running the 2400-frame A/B as Rust-vs-oracle. Its report = the port's true baseline diff. Referee polish backlog: mask trace arg slots beyond each trap's real arg count (C stack garbage vs Rust zero-fill = noise).
+Background agent building the **oracle game dylib** (oracle/codemp/game/*.c → arm64 jampgamearm64.dylib, exports vmMain/dllEntry, -ffp-contract=off, harness in scratchpad/oracle-game-build/, reuse oracle/build.rs config if possible, do NOT modify the vendored oracle) and re-running the 2400-frame A/B as Rust-vs-oracle. Its report = the port's true baseline diff. Referee polish backlog: mask trace arg slots beyond each trap's real arg count (C stack garbage vs Rust zero-fill = noise).
 
 ## Session logistics
 - Session runs from jedi-academy-rust cwd (can't re-root); all jka-rust work via absolute paths. Next session: open in ~/Developer/Milo/jka-rust directly.
@@ -127,7 +127,7 @@ Background agent building the **oracle game dylib** (oracle/oracle/codemp/game/*
 
 ## SESSION 3 (cont.) — Rust-vs-ORACLE baseline landed (task #4 COMPLETE)
 
-Reference side is now the vendored Raven oracle game (`oracle/oracle/codemp/game/*.c`), per user
+Reference side is now the vendored Raven oracle game (`oracle/codemp/game/*.c`), per user
 directive "Ignore OpenJK in this regard for now. Do only oracle."
 
 ### Oracle dylib build (reusable harness)

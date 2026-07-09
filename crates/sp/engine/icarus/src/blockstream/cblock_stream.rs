@@ -9,7 +9,7 @@ use super::file::FILE;
 /// Only the class's data members are ABI-relevant here; its methods (`Init`,
 /// `Create`, `Free`, `BlockAvailable`, `WriteBlock`, `ReadBlock`, `Open`,
 /// overloaded `new`/`delete`) are behavior, not layout, and are ported separately.
-/// Type definition source: `oracle/oracle/code/icarus/blockstream.h:163-211`
+/// Type definition source: `oracle/code/icarus/blockstream.h:163-211`
 #[repr(C)]
 pub struct CBlockStream {
 	/// Size of the file

@@ -3,7 +3,7 @@
 /// Raven `sysEventType_t` — system event types.
 ///
 /// Raven: bk001129 - make sure SE_NONE is zero.
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:923-932`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:923-932`
 #[repr(i32)]
 pub enum sysEventType_t {
     SE_NONE = 0,             // evTime is still valid

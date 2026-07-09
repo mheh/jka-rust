@@ -12,9 +12,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `qboolean trap_G2API_RagEffectorKick(void *ghoul2, const char *boneName, vec3_t velocity)`
 /// Raven transport: `return G2API_RagEffectorKick(*((CGhoul2Info_v *)args[1]), (const char *)VMA(2), (float *)VMA(3));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1030-1032`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2578`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1603-1604`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1030-1032`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2578`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1603-1604`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2RageffectorkickArgs {
     ghoul2: *mut c_void,
@@ -36,10 +36,10 @@ impl CgG2RageffectorkickArgs {
 ///
 /// Raven: additional ragdoll options -rww
 /// Raven: add velocity to a rag bone
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:311`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1030-1032`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1603-1604`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1603-1604`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:311`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1030-1032`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1603-1604`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1603-1604`
 pub struct CgG2Rageffectorkick;
 
 impl OutboundSysCall for CgG2Rageffectorkick {

@@ -14,7 +14,7 @@ impl BotlibAiUpdateEntityItemsArgs {
 
 /// `BOTLIB_AI_UPDATE_ENTITY_ITEMS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:457`
+/// Source: `oracle/codemp/game/g_public.h:457`
 pub struct BotlibAiUpdateEntityItems;
 
 impl OutboundSysCall for BotlibAiUpdateEntityItems {

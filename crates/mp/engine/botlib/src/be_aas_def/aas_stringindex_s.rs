@@ -4,7 +4,7 @@ use core::ffi::c_char;
 
 /// Raven `aas_stringindex_t` — an indexed table of strings.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:43-47`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:43-47`
 #[repr(C)]
 pub struct aas_stringindex_t {
 	pub numindexes: i32,

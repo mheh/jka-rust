@@ -5,10 +5,10 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 
 /// `UI_ARGC` SP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:162`
-/// Args source: `oracle/oracle/code/qcommon/qcommon.h:289`
-/// Output source: `oracle/oracle/code/qcommon/qcommon.h:289`
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:218`
+/// Enum value source: `oracle/code/ui/ui_public.h:162`
+/// Args source: `oracle/code/qcommon/qcommon.h:289`
+/// Output source: `oracle/code/qcommon/qcommon.h:289`
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:218`
 pub struct UiArgc;
 
 #[derive(Debug, Default)]

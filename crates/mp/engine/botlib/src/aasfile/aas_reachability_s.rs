@@ -4,7 +4,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `aas_reachability_t` — inter-area reachability link.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:107-116`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:107-116`
 #[repr(C)]
 pub struct aas_reachability_t {
 	/// number of the reachable area

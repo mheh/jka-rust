@@ -2,7 +2,7 @@
 
 /// Raven `waterHeightLevel_t` — how deep an entity is submerged. SP-only.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1603-1613`
+/// Type definition source: `oracle/code/game/q_shared.h:1603-1613`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum waterHeightLevel_t {

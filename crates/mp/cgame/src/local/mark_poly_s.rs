@@ -7,12 +7,12 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `MAX_VERTS_ON_POLY`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:56`
+/// Source: `oracle/codemp/cgame/cg_local.h:56`
 pub const MAX_VERTS_ON_POLY: usize = 10;
 
 /// Raven `markPoly_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:470-478`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:470-478`
 #[repr(C)]
 pub struct markPoly_t {
 	pub prevMark: *mut markPoly_t,

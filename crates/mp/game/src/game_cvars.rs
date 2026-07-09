@@ -7,7 +7,7 @@
 //!
 //! All file-scope globals become GameWorld fields; cvar handles grouped in
 //! GameCvars.
-//! Source: `oracle/oracle/codemp/game/g_main.c:230-475` (gameCvarTable)
+//! Source: `oracle/codemp/game/g_main.c:230-475` (gameCvarTable)
 #![allow(non_snake_case, non_camel_case_types, unused)]
 
 use mp_qshared::shared::cvar::vmCvar_t;
@@ -17,7 +17,7 @@ use mp_qshared::shared::cvar::vmCvar_t;
 
 /// Raven `gameCvarTable` cvar handles (one field per non-NULL `vmCvar`).
 ///
-/// Source: `oracle/oracle/codemp/game/g_main.c:230-475`
+/// Source: `oracle/codemp/game/g_main.c:230-475`
 #[derive(Default)]
 pub struct GameCvars {
     /// `"sv_cheats"` — default `""`.
@@ -248,7 +248,7 @@ pub struct GameCvars {
     pub g_autoBanTKSpammers: vmCvar_t,
     /// `"g_saberDebugBox"` — default `"0"`, flags `CVAR_CHEAT`. `DEBUG_SABER_BOX`
     /// is unconditionally `#define`d in `g_local.h:82`, so this row is live.
-    /// Source: `oracle/oracle/codemp/game/g_main.c:427-429`
+    /// Source: `oracle/codemp/game/g_main.c:427-429`
     pub g_saberDebugBox: vmCvar_t,
     /// `"d_altRoutes"` — default `"0"`.
     pub d_altRoutes: vmCvar_t,
@@ -298,60 +298,60 @@ pub struct GameCvars {
     pub g_powerDuelEndHealth: vmCvar_t,
     /// Raven `bot_wp_info` — file-scope `vmCvar_t` (not in `gameCvarTable`;
     /// registered ad hoc by `G_InitGame`). `"bot_wp_info"` — default `"1"`, flags `0`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.h:377`, registration `ai_main.c:7593`.
+    /// Source: `oracle/codemp/game/ai_main.h:377`, registration `ai_main.c:7593`.
     pub bot_wp_info: vmCvar_t,
     /// Raven `bot_wp_edit` — file-scope `vmCvar_t` (not in `gameCvarTable`).
     /// `"bot_wp_edit"` — default `"0"`, flags `CVAR_CHEAT`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.h:378`, registration `ai_main.c:7594`.
+    /// Source: `oracle/codemp/game/ai_main.h:378`, registration `ai_main.c:7594`.
     pub bot_wp_edit: vmCvar_t,
     /// Raven `bot_wp_clearweight` — file-scope `vmCvar_t` (not in `gameCvarTable`).
     /// `"bot_wp_clearweight"` — default `"1"`, flags `0`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.h:379`, registration `ai_main.c:7595`.
+    /// Source: `oracle/codemp/game/ai_main.h:379`, registration `ai_main.c:7595`.
     pub bot_wp_clearweight: vmCvar_t,
     /// Raven `bot_wp_distconnect` — file-scope `vmCvar_t` (not in `gameCvarTable`).
     /// `"bot_wp_distconnect"` — default `"1"`, flags `0`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.h:380`, registration `ai_main.c:7596`.
+    /// Source: `oracle/codemp/game/ai_main.h:380`, registration `ai_main.c:7596`.
     pub bot_wp_distconnect: vmCvar_t,
     /// Raven `bot_wp_visconnect` — file-scope `vmCvar_t` (not in `gameCvarTable`).
     /// `"bot_wp_visconnect"` — default `"1"`, flags `0`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.h:381`, registration `ai_main.c:7597`.
+    /// Source: `oracle/codemp/game/ai_main.h:381`, registration `ai_main.c:7597`.
     pub bot_wp_visconnect: vmCvar_t,
     /// Raven `bot_normgpath` — file-scope `vmCvar_t` declared in `ai_main.c`,
     /// `extern`'d locally in `ai_wpnav.c` (not in `gameCvarTable`; registered
     /// ad hoc on first use in `ai_wpnav.c`).
     /// `"bot_normgpath"` — default `"1"`, flags `CVAR_CHEAT`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.c:66`, registration `ai_wpnav.c:3360`.
+    /// Source: `oracle/codemp/game/ai_main.c:66`, registration `ai_wpnav.c:3360`.
     pub bot_normgpath: vmCvar_t,
     /// Raven `bot_pvstype` — file-scope `vmCvar_t` (not in `gameCvarTable`;
     /// registered ad hoc by `BotAISetup`). `"bot_pvstype"` — default `"1"`,
     /// flags `CVAR_CHEAT`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.c:7575-7616` (registration `:7593`-area).
+    /// Source: `oracle/codemp/game/ai_main.c:7575-7616` (registration `:7593`-area).
     pub bot_pvstype: vmCvar_t,
     /// Raven `bot_camp` — file-scope `vmCvar_t` (not in `gameCvarTable`;
     /// registered ad hoc by `BotAISetup`). `"bot_camp"` — default `"1"`, flags `0`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.c:7575-7616`.
+    /// Source: `oracle/codemp/game/ai_main.c:7575-7616`.
     pub bot_camp: vmCvar_t,
     /// Raven `bot_attachments` — file-scope `vmCvar_t` (not in `gameCvarTable`;
     /// registered ad hoc by `BotAISetup`). `"bot_attachments"` — default `"1"`, flags `0`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.c:7575-7616`.
+    /// Source: `oracle/codemp/game/ai_main.c:7575-7616`.
     pub bot_attachments: vmCvar_t,
     /// Raven `bot_forcepowers` — file-scope `vmCvar_t` (not in `gameCvarTable`;
     /// registered ad hoc by `BotAISetup`). `"bot_forcepowers"` — default `"1"`, flags `CVAR_CHEAT`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.c:62`, registration `ai_main.c:7577`.
+    /// Source: `oracle/codemp/game/ai_main.c:62`, registration `ai_main.c:7577`.
     pub bot_forcepowers: vmCvar_t,
     /// Raven `bot_forgimmick` — file-scope `vmCvar_t` (not in `gameCvarTable`;
     /// registered ad hoc by `BotAISetup`). `"bot_forgimmick"` — default `"0"`, flags `CVAR_CHEAT`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.c:63`, registration `ai_main.c:7578`.
+    /// Source: `oracle/codemp/game/ai_main.c:63`, registration `ai_main.c:7578`.
     pub bot_forgimmick: vmCvar_t,
     /// Raven `bot_honorableduelacceptance` — file-scope `vmCvar_t` (not in
     /// `gameCvarTable`; registered ad hoc by `BotAISetup`).
     /// `"bot_honorableduelacceptance"` — default `"0"`, flags `CVAR_CHEAT`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.c:64`, registration `ai_main.c:7579`.
+    /// Source: `oracle/codemp/game/ai_main.c:64`, registration `ai_main.c:7579`.
     pub bot_honorableduelacceptance: vmCvar_t,
     /// Raven `bot_getinthecarrr` — file-scope `vmCvar_t` (not in `gameCvarTable`;
     /// registered ad hoc by `BotAISetup`, `#ifndef FINAL_BUILD` only).
     /// `"bot_getinthecarrr"` — default `"0"`, flags `0`.
-    /// Source: `oracle/oracle/codemp/game/ai_main.c:68`, registration `ai_main.c:7583`-area.
+    /// Source: `oracle/codemp/game/ai_main.c:68`, registration `ai_main.c:7583`-area.
     pub bot_getinthecarrr: vmCvar_t,
 }
 
@@ -371,7 +371,7 @@ pub struct CvarTableEntry {
 /// Raven `gameCvarTable` (140 rows, verbatim order — incl. the live
 /// `DEBUG_SABER_BOX` row).
 ///
-/// Source: `oracle/oracle/codemp/game/g_main.c:230-475`
+/// Source: `oracle/codemp/game/g_main.c:230-475`
 pub const GAME_CVAR_TABLE: [CvarTableEntry; 140] = [
     CvarTableEntry {
         field: Some("g_cheats"),
@@ -1305,7 +1305,7 @@ pub const GAME_CVAR_TABLE: [CvarTableEntry; 140] = [
     },
     // `#ifdef DEBUG_SABER_BOX` — `g_local.h:82` `#define`s it unconditionally, so
     // this row is compiled into the oracle's `gameCvarTable`.
-    // Source: `oracle/oracle/codemp/game/g_main.c:427-429`
+    // Source: `oracle/codemp/game/g_main.c:427-429`
     CvarTableEntry {
         field: Some("g_saberDebugBox"),
         name: "g_saberDebugBox",

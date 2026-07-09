@@ -2,7 +2,7 @@
 
 /// Raven `moverState_t` — mover entity state.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:107-113`
+/// Type definition source: `oracle/code/game/g_shared.h:107-113`
 #[repr(i32)]
 pub enum moverState_t {
     MOVER_POS1 = 0,

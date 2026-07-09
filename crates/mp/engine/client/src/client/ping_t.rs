@@ -7,7 +7,7 @@ use mp_qshared::shared::MAX_INFO_STRING;
 
 /// Raven `ping_t` — a pending server ping request/response record.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/client.h:247-255`
+/// Type definition source: `oracle/codemp/client/client.h:247-255`
 #[repr(C)]
 pub struct ping_t {
 	pub adr: netadr_t,

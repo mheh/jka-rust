@@ -2,7 +2,7 @@
 
 /// Raven `serverAddress_t` — a saved server address (favorites list entry).
 ///
-/// Type definition source: `oracle/oracle/codemp/client/client.h:290-293`
+/// Type definition source: `oracle/codemp/client/client.h:290-293`
 #[repr(C)]
 pub struct serverAddress_t {
     pub ip: [u8; 4],

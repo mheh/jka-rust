@@ -4,12 +4,12 @@ use sp_qshared::shared::vec3_t;
 
 /// Light Style Constants.
 ///
-/// Source: `oracle/oracle/code/qcommon/qfiles.h:310`
+/// Source: `oracle/code/qcommon/qfiles.h:310`
 const MAXLIGHTMAPS: usize = 4;
 
 /// Raven `drawVert_t` — BSP surface vertex.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:524-530`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:524-530`
 #[repr(C)]
 pub struct drawVert_t {
 	pub xyz: vec3_t,

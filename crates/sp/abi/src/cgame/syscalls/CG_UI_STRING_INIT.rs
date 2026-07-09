@@ -6,18 +6,18 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall(CG_UI_STRING_INIT);`
 /// Raven transport: `String_Init(); return 0;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:618-620`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:891-893`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:891-893`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:618-620`
+/// Output source: `oracle/code/client/cl_cgame.cpp:891-893`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:891-893`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiStringInitArgs;
 
 /// `CG_UI_STRING_INIT` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:204`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:618-620`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:891-893`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:891-893`
+/// Enum value source: `oracle/code/cgame/cg_public.h:204`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:618-620`
+/// Output source: `oracle/code/client/cl_cgame.cpp:891-893`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:891-893`
 pub struct CgUiStringInit;
 
 impl OutboundSysCall for CgUiStringInit {

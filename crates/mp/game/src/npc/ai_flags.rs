@@ -3,7 +3,7 @@
 //! Plain `#define` bit flags (not an enum), so §C8 makes them `const`s
 //! directly.
 //!
-//! Source: `oracle/oracle/codemp/game/b_public.h:6-24`
+//! Source: `oracle/codemp/game/b_public.h:6-24`
 
 use core::ffi::c_int;
 

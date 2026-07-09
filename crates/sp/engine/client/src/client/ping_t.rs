@@ -5,7 +5,7 @@ use sp_engine_qcommon::qcommon::netadr_t::netadr_t;
 /// Raven `ping_t` — a pending server ping request/response record.
 ///
 /// Raven: (unnamed).
-/// Type definition source: `oracle/oracle/code/client/client.h:177-181`
+/// Type definition source: `oracle/code/client/client.h:177-181`
 #[repr(C)]
 pub struct ping_t {
     pub adr: netadr_t,

@@ -9,9 +9,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `syscall(CG_R_SETREFRACTIONPROP, PASSFLOAT(alpha), PASSFLOAT(stretch), prepost, negate);`
 /// Raven transport: `tr_distortionAlpha = VMF(1); tr_distortionStretch = VMF(2); tr_distortionPrePost = (qboolean)args[3]; tr_distortionNegate = (qboolean)args[4]; return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:401-404`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2292`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:947-952`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:401-404`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2292`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:947-952`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRSetrefractionpropArgs {
     alpha: f32,
@@ -42,10 +42,10 @@ impl CgRSetrefractionpropArgs {
 /// `CG_R_SETREFRACTIONPROP` MP cgame imports syscall ABI token.
 ///
 /// Raven: set some properties for the draw layer for my refractive effect (here primarily for mod authors) -rww
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:166`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:401-404`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:947-952`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:947-952`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:166`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:401-404`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:947-952`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:947-952`
 pub struct CgRSetrefractionprop;
 
 impl OutboundSysCall for CgRSetrefractionprop {

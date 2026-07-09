@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// C ABI: `void trap_R_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset)`.
 /// Raven's client switch forwards all three strings through `VMA(1..3)`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:434-435`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:434-435`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1201-1202`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:434-435`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:434-435`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1201-1202`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRRemapShaderArgs {
     pub old_shader: *const c_char,
@@ -36,7 +36,7 @@ impl UiRRemapShaderArgs {
 
 /// `UI_R_REMAP_SHADER` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:110`
+/// Source: `oracle/codemp/ui/ui_public.h:110`
 pub struct UiRRemapShader;
 
 impl OutboundSysCall for UiRRemapShader {

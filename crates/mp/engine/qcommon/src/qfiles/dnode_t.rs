@@ -2,7 +2,7 @@
 
 /// Raven `dnode_t` — BSP tree node.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:460-465`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:460-465`
 #[repr(C)]
 pub struct dnode_t {
 	pub planeNum: i32,

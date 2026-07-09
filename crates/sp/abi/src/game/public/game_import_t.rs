@@ -23,14 +23,14 @@ use crate::cgame::types::CGhoul2Info_v;
 /// the SP server-game code needs from the engine. Like SP's UI (see `uiimport_t`), `jagame` is
 /// linked directly into the engine binary rather than routed through a VM syscall table, so this
 /// is a plain function-pointer struct.
-/// Type definition source: `oracle/oracle/code/game/g_public.h:168-471`
+/// Type definition source: `oracle/code/game/g_public.h:168-471`
 #[repr(C)]
 pub struct game_import_t {
     //============== general Quake services ==================
 
     /// print message on the local console
     //TODO: Port Printf variadic args
-    // Source: oracle/oracle/code/game/g_public.h:172
+    // Source: oracle/code/game/g_public.h:172
     pub Printf: Option<unsafe extern "C" fn(fmt: *const c_char, ...)>,
 
     /// Write a camera ref_tag to cameras.map
@@ -39,7 +39,7 @@ pub struct game_import_t {
 
     /// abort the game
     //TODO: Port Error variadic args
-    // Source: oracle/oracle/code/game/g_public.h:179
+    // Source: oracle/code/game/g_public.h:179
     pub Error: Option<unsafe extern "C" fn(level: c_int, fmt: *const c_char, ...)>,
 
     /// get current time for profiling reasons
@@ -118,7 +118,7 @@ pub struct game_import_t {
     /// reliably sends a command string to be interpreted by the given
     /// client.  If clientNum is -1, it will be sent to all clients
     //TODO: Port SendServerCommand variadic args
-    // Source: oracle/oracle/code/game/g_public.h:233
+    // Source: oracle/code/game/g_public.h:233
     pub SendServerCommand: Option<unsafe extern "C" fn(clientNum: c_int, fmt: *const c_char, ...)>,
 
     // config strings hold all the index strings, and various other information
@@ -223,7 +223,7 @@ pub struct game_import_t {
         ) -> c_int,
     >,
     //TODO: Port CGhoul2Info
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:240
+    // Source: oracle/code/game/ghoul2_shared.h:240
     // `CGhoul2Info` is a distinct (non-vector) Ghoul2 C++ class from `CGhoul2Info_v`;
     // pointer-only dep kept opaque per house rules.
     pub G2API_SetSkin: Option<
@@ -429,7 +429,7 @@ pub struct game_import_t {
     pub G2API_GetAnimFileName:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, filename: *mut *mut c_char) -> qboolean>,
     //TODO: Port CMiniHeap
-    // Source: oracle/oracle/code/game/g_public.h:164
+    // Source: oracle/code/game/g_public.h:164
     pub G2API_CollisionDetect: Option<
         unsafe extern "C" fn(
             collRecMap: *mut CCollisionRecord,
@@ -452,7 +452,7 @@ pub struct game_import_t {
     >,
     pub G2API_CleanGhoul2Models: Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v)>,
     //TODO: Port IGhoul2InfoArray
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:313
+    // Source: oracle/code/game/ghoul2_shared.h:313
     // Returns a C++ reference (`&`), which crosses the ABI as a bare pointer; kept
     // opaque since `IGhoul2InfoArray` itself is unported.
     pub TheGhoul2InfoArray: Option<unsafe extern "C" fn() -> *mut c_void>,
@@ -495,7 +495,7 @@ pub struct game_import_t {
     pub G2API_SetRagDoll:
         Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, parms: *mut CRagDollParams)>,
     //TODO: Port CRagDollUpdateParams
-    // Source: oracle/oracle/code/game/g_public.h:47
+    // Source: oracle/code/game/g_public.h:47
     pub G2API_AnimateG2Models: Option<
         unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, AcurrentTime: c_int, params: *mut c_void),
     >,

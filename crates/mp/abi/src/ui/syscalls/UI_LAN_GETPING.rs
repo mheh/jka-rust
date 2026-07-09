@@ -10,7 +10,7 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_LAN_GETPING, n, buf, buflen, pingtime );`
 /// Raven transport: `LAN_GetPing( args[1], (char *)VMA(2), args[3], (int *)VMA(4) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:310-311`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:310-311`
 #[derive(Debug)]
 pub struct UiLanGetpingArgs {
     n: c_int,
@@ -51,10 +51,10 @@ impl UiLanGetpingArgs {
 /// Raven wrapper: `syscall( UI_LAN_GETPING, n, buf, buflen, pingtime );`
 /// Raven transport: `LAN_GetPing( args[1], (char *)VMA(2), args[3], (int *)VMA(4) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:67`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:310-311`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:970`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1077-1079`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:67`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:310-311`
+/// Output source: `oracle/codemp/ui/ui_local.h:970`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1077-1079`
 pub struct UiLanGetping;
 
 impl OutboundSysCall for UiLanGetping {

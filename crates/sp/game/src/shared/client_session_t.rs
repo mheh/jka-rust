@@ -7,12 +7,12 @@ use super::objectives_s::objectives_t;
 
 /// Raven `MAX_MISSION_OBJ` — DO NOT CHANGE. IT AFFECTS THE SAVEGAME STRUCTURE.
 ///
-/// Source: `oracle/oracle/code/game/g_shared.h:299`
+/// Source: `oracle/code/game/g_shared.h:299`
 pub const MAX_MISSION_OBJ: usize = 100;
 
 /// Raven `clientSession_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:331-336`
+/// Type definition source: `oracle/code/game/g_shared.h:331-336`
 #[repr(C)]
 pub struct clientSession_t {
     /// Number of times mission objectives have been updated.

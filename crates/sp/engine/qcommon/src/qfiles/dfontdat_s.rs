@@ -7,7 +7,7 @@ pub const GLYPH_COUNT: usize = 256;
 
 /// Raven `dfontdat_t` — on-disk font data (glyph table + metrics).
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/qfiles.h:617-627`
+/// Type definition source: `oracle/code/qcommon/qfiles.h:617-627`
 #[repr(C)]
 pub struct dfontdat_t {
 	pub mGlyphs: [glyphInfo_t; GLYPH_COUNT],

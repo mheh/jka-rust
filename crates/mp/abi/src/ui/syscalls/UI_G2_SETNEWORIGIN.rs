@@ -35,7 +35,7 @@ impl UiG2SetneworiginArgs {
 
 /// `UI_G2_SETNEWORIGIN` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:535`
+/// Source: `oracle/codemp/ui/ui_public.h:535`
 pub struct UiG2Setneworigin;
 
 impl OutboundSysCall for UiG2Setneworigin {

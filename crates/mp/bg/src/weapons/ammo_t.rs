@@ -2,7 +2,7 @@
 
 /// Raven `ammo_t` — ammunition type enumeration.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_weapons.h:45-58`
+/// Type definition source: `oracle/codemp/game/bg_weapons.h:45-58`
 #[allow(non_camel_case_types)]
 #[repr(i32)]
 pub enum ammo_t {

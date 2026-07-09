@@ -8,9 +8,9 @@ use abi_transport::pass_float;
 /// Raven's client switch forwards the origin through `VMA(1)` and packs the
 /// four scalar values as float words.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:182-183`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:182-183`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:968-972`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:182-183`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:182-183`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:968-972`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRAddlighttosceneArgs {
     pub origin: *const f32,
@@ -34,7 +34,7 @@ impl UiRAddlighttosceneArgs {
 
 /// `UI_R_ADDLIGHTTOSCENE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:43`
+/// Source: `oracle/codemp/ui/ui_public.h:43`
 pub struct UiRAddlighttoscene;
 
 impl OutboundSysCall for UiRAddlighttoscene {

@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_R_LOADWORLDMAP, mapname );`
 /// Raven transport: `re.LoadWorld( (const char *) VMA(1) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:299-300`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:652-654`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:299-300`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:652-654`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRLoadworldmapArgs {
     mapname: *const c_char,
@@ -25,10 +25,10 @@ impl CgRLoadworldmapArgs {
 
 /// `CG_R_LOADWORLDMAP` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:117`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:299-300`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:652-654`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:652-654`
+/// Enum value source: `oracle/code/cgame/cg_public.h:117`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:299-300`
+/// Output source: `oracle/code/client/cl_cgame.cpp:652-654`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:652-654`
 pub struct CgRLoadworldmap;
 
 impl OutboundSysCall for CgRLoadworldmap {

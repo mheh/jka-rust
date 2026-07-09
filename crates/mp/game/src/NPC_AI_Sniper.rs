@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_Sniper.c 2/13
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_Sniper.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Sniper.c`.
 //!
 //! Landed from the `fnskel.py` signature skeleton. 2 functions are
 //! transcribed faithfully from packet + prelude alone; the remaining 13 are
@@ -45,13 +45,13 @@ use mp_qshared::common::mp::qcommon::usercmd_button::{
 // Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }`
 // (file-scope local state, `gNPC_t::localState`) — not a central type, ported
 // as file-local consts matching the C values.
-// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:37-42`
+// Source: `oracle/codemp/game/NPC_AI_Sniper.c:37-42`
 const LSTATE_NONE: i32 = 0;
 const LSTATE_UNDERFIRE: i32 = 1;
 const LSTATE_INVESTIGATE: i32 = 2;
 
-// Squad behavior states (from oracle/oracle/codemp/game/NPC_behavior.c)
-// Source: `oracle/oracle/codemp/game/NPC_behavior.c`
+// Squad behavior states (from oracle/codemp/game/NPC_behavior.c)
+// Source: `oracle/codemp/game/NPC_behavior.c`
 const SQUAD_IDLE: i32 = 0;
 const SQUAD_STAND_AND_SHOOT: i32 = 1;
 const SQUAD_RETREAT: i32 = 2;
@@ -67,7 +67,7 @@ const SQUAD_SCOUT: i32 = 6;
 // ENEMY_POS_LAG_INTERVAL imported from `crate::npc::g_npc_t`. STEPS is kept
 // local as `i32` (g_npc_t's is `usize`, for array sizing) since it is used in
 // signed arithmetic here.
-// Source: `oracle/oracle/codemp/game/b_public.h:113-115`
+// Source: `oracle/codemp/game/b_public.h:113-115`
 const ENEMY_POS_LAG_STEPS: i32 = MAX_ENEMY_POS_LAG / ENEMY_POS_LAG_INTERVAL; // 24
 
 // `MASK_SHOT` (`bg_public.h:1177`) now resolves via the crate prelude
@@ -75,7 +75,7 @@ const ENEMY_POS_LAG_STEPS: i32 = MAX_ENEMY_POS_LAG / ENEMY_POS_LAG_INTERVAL; // 
 
 /// Raven `Sniper_ClearTimers`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:44-58`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:44-58`
 pub fn Sniper_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
     TIMER_Set(ctx, ent, c"chatter".as_ptr(), 0);
     TIMER_Set(ctx, ent, c"duck".as_ptr(), 0);
@@ -94,7 +94,7 @@ pub fn Sniper_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `NPC_Sniper_PlayConfusionSound`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:60-76`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:60-76`
 pub fn NPC_Sniper_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).health > 0 {
@@ -126,7 +126,7 @@ pub fn NPC_Sniper_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t
 
 /// Raven `NPC_Sniper_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:85-98`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:85-98`
 pub fn NPC_Sniper_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -159,7 +159,7 @@ pub fn NPC_Sniper_Pain(
 
 /// Raven `Sniper_HoldPosition`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:106-116`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:106-116`
 pub fn Sniper_HoldPosition(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -172,7 +172,7 @@ pub fn Sniper_HoldPosition(ctx: GameContext<'_>) {
 
 /// Raven `Sniper_Move`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:124-177`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:124-177`
 pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         let world = &mut *ctx.world;
@@ -272,7 +272,7 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
 
 /// Raven `NPC_BSSniper_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:185-275`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:185-275`
 pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -381,7 +381,7 @@ pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
 
 /// Raven `Sniper_CheckMoveState`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:308-381`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:308-381`
 pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -500,7 +500,7 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
 
 /// Raven `Sniper_ResolveBlockedShot`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:383-434`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:383-434`
 pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -598,7 +598,7 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
 
 /// Raven `Sniper_CheckFireState`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:442-486`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:442-486`
 pub fn Sniper_CheckFireState(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -662,7 +662,7 @@ pub fn Sniper_CheckFireState(ctx: GameContext<'_>) {
 
 /// Raven `Sniper_EvaluateShot`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:488-506`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:488-506`
 pub fn Sniper_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
     unsafe {
         let world = &mut *ctx.world;
@@ -692,7 +692,7 @@ pub fn Sniper_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
 
 /// Raven `Sniper_FaceEnemy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:508-603`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:508-603`
 pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -828,7 +828,7 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
 
 /// Raven `Sniper_UpdateEnemyPos`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:605-623`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:605-623`
 pub fn Sniper_UpdateEnemyPos(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -865,7 +865,7 @@ pub fn Sniper_UpdateEnemyPos(ctx: GameContext<'_>) {
 
 /// Raven `Sniper_StartHide`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:631-638`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:631-638`
 pub fn Sniper_StartHide(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -885,7 +885,7 @@ pub fn Sniper_StartHide(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSSniper_Attack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:640-852`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:640-852`
 pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -1116,7 +1116,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSSniper_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:854-864`
+/// Source: `oracle/codemp/game/NPC_AI_Sniper.c:854-864`
 pub fn NPC_BSSniper_Default(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;

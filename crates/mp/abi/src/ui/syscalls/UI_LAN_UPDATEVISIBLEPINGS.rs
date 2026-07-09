@@ -9,7 +9,7 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( UI_LAN_UPDATEVISIBLEPINGS, source );`
 /// Raven transport: `return LAN_UpdateVisiblePings( args[1] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:326-327`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:326-327`
 #[derive(Debug)]
 pub struct UiLanUpdatevisiblepingsArgs {
     source: c_int,
@@ -30,10 +30,10 @@ impl UiLanUpdatevisiblepingsArgs {
 /// Raven wrapper: `return syscall( UI_LAN_UPDATEVISIBLEPINGS, source );`
 /// Raven transport: `return LAN_UpdateVisiblePings( args[1] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:99`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:326-327`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:976`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1106-1107`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:99`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:326-327`
+/// Output source: `oracle/codemp/ui/ui_local.h:976`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1106-1107`
 pub struct UiLanUpdatevisiblepings;
 
 impl OutboundSysCall for UiLanUpdatevisiblepings {

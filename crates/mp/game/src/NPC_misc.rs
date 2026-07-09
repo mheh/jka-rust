@@ -1,6 +1,6 @@
 // PORT-COMPLETE: NPC_misc.c 2/2
 
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_misc.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_misc.c`.
 //!
 //! Debug logging functions for NPC AI. Both functions thread GameContext
 //! as the first parameter and access level.time from the game world.
@@ -13,7 +13,7 @@ use crate::prelude::*;
 // (DETAIL 1 / WARNING 5 / ERROR 7) were guessed and inverted the severity
 // ordering the `cv->value < debugLevel` gate depends on — a live bug — so they
 // are corrected to the oracle values.
-// Source: oracle/oracle/codemp/game/b_local.h:22-25
+// Source: oracle/codemp/game/b_local.h:22-25
 const DEBUG_LEVEL_DETAIL: c_int = 4;
 const DEBUG_LEVEL_INFO: c_int = 3;
 const DEBUG_LEVEL_WARNING: c_int = 2;
@@ -24,7 +24,7 @@ const DEBUG_LEVEL_ERROR: c_int = 1;
 /// Debug logging function that formats a message if the debug level is enabled,
 /// then prints it with timestamp prefix. The cvar is checked first to gate output.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_misc.c:10-35`
+/// Source: `oracle/codemp/game/NPC_misc.c:10-35`
 pub fn Debug_Printf(
     ctx: GameContext<'_>,
     cv: *mut vmCvar_t,
@@ -66,7 +66,7 @@ pub fn Debug_Printf(
 /// (name and Q_COLOR_ESCAPE prefix) to the output. Format: `^c^t^i (npc) msg`
 /// where c is the color escape, t is time, i is the NPC targetname.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_misc.c:41-73`
+/// Source: `oracle/codemp/game/NPC_misc.c:41-73`
 pub fn Debug_NPCPrintf(
     ctx: GameContext<'_>,
     printNPC: *mut gentity_t,

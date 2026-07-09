@@ -2,7 +2,7 @@
 
 /// Raven `siegeClassFlags_t` — class feature flags.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_saga.h:31-41`
+/// Type definition source: `oracle/codemp/game/bg_saga.h:31-41`
 #[repr(i32)]
 pub enum siegeClassFlags_t {
 	CFL_MORESABERDMG = 0,

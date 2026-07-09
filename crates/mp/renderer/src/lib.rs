@@ -1,6 +1,6 @@
 //! `mp_renderer` crate.
 //TODO: Port renderer subsystem (rd-vanilla logic; types already ported)
-// Source: oracle/oracle/codemp/renderer/ (DEC-01: renderer port deferred)
+// Source: oracle/codemp/renderer/ (DEC-01: renderer port deferred)
 
 pub mod mdx_format;
 pub mod tr_landscape;

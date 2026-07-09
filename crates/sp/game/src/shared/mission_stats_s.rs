@@ -6,7 +6,7 @@ use crate::weapons::weapon_t::weapon_t;
 
 /// Raven `missionStats_t` — per-mission player statistics.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:302-318`
+/// Type definition source: `oracle/code/game/g_shared.h:302-318`
 #[repr(C)]
 pub struct missionStats_t {
     pub secretsFound: i32,   // # of secret areas found

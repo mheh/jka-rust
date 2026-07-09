@@ -5,7 +5,7 @@ use crate::shared::vec3_t;
 /// Raven `T_G_ICARUS_LERP2ORIGIN` — ICARUS `lerp2origin` task data passed
 /// across the game ABI seam.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:828-834`
+/// Type definition source: `oracle/codemp/game/g_public.h:828-834`
 #[repr(C)]
 pub struct T_G_ICARUS_LERP2ORIGIN {
 	pub taskID: i32,

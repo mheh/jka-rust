@@ -2,7 +2,7 @@
 
 /// Raven `sharedERagEffector` ragdoll effector bone bit flags.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:867-894`
+/// Type definition source: `oracle/codemp/game/q_shared.h:867-894`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum sharedERagEffector {

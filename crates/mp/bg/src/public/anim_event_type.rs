@@ -1,13 +1,13 @@
 //! MP `bg_public.h` animation event type definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:304-316`
+//! Type definition source: `oracle/codemp/game/bg_public.h:304-316`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `animEventType_t`.
 ///
 /// Raven: Be sure to update animEventTypeTable and ParseAnimationEvtBlock(...) if you change this enum list!
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:304-316`
+/// Type definition source: `oracle/codemp/game/bg_public.h:304-316`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum animEventType_t {

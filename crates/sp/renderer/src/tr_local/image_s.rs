@@ -9,7 +9,7 @@ use sp_qshared::shared::MAX_QPATH;
 ///
 /// Raven: game path, including extension / for texture usage in frame
 /// statistics / source image / gl texture binding / GL_CLAMP or GL_REPEAT.
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:115-139`
+/// Type definition source: `oracle/code/renderer/tr_local.h:115-139`
 #[repr(C)]
 pub struct image_t {
     pub imgName: [c_char; MAX_QPATH as usize],

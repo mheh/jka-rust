@@ -8,10 +8,10 @@ use abi_transport::generic::InboundVmCall;
 /// Raven comment in this enum block is shifted; actual signature is
 /// `_UI_SetActiveMenu( uiMenuCommand_t menu )`.
 ///
-/// Source (enum): `oracle/oracle/codemp/ui/ui_public.h:237`
-/// Source (args): `oracle/oracle/codemp/ui/ui_main.c:608`
-/// Source (output): `oracle/oracle/codemp/ui/ui_main.c:608` (return 0)
-/// Source (call site/transport): `oracle/oracle/codemp/client/cl_scrn.cpp:429`
+/// Source (enum): `oracle/codemp/ui/ui_public.h:237`
+/// Source (args): `oracle/codemp/ui/ui_main.c:608`
+/// Source (output): `oracle/codemp/ui/ui_main.c:608` (return 0)
+/// Source (call site/transport): `oracle/codemp/client/cl_scrn.cpp:429`
 pub struct UiSetActiveMenu;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

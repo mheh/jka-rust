@@ -8,7 +8,7 @@ use mp_qshared::shared::qboolean;
 
 /// Arguments for `CG_DRAW_ACTIVE_FRAME`.
 ///
-/// `stereoFrame_t` is a Raven `typedef int` in `oracle/oracle/codemp/cgame/tr_types.h:283`.
+/// `stereoFrame_t` is a Raven `typedef int` in `oracle/codemp/cgame/tr_types.h:283`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgDrawActiveFrameArgs {
     server_time: c_int,
@@ -43,10 +43,10 @@ impl CgDrawActiveFrameArgs {
 /// Raven: void (*CG_DrawActiveFrame)( int serverTime, stereoFrame_t stereoView, qboolean demoPlayback );
 /// Raven: Generates and draws a game scene and status information at the given time.
 /// Raven: If demoPlayback is set, local movement prediction will not be enabled
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:373-376`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:201-203`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:201-203`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_cgame.cpp:1830-1843`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:373-376`
+/// Args source: `oracle/codemp/cgame/cg_main.c:201-203`
+/// Output source: `oracle/codemp/cgame/cg_main.c:201-203`
+/// Transport/call-site source: `oracle/codemp/client/cl_cgame.cpp:1830-1843`
 pub struct CgDrawActiveFrame;
 
 impl InboundVmCall for CgDrawActiveFrame {

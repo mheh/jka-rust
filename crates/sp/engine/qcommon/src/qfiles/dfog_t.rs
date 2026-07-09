@@ -6,7 +6,7 @@ use sp_qshared::shared::MAX_QPATH;
 
 /// Raven `dfog_t` — on-disk BSP fog volume.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:503-507`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:503-507`
 #[repr(C)]
 pub struct dfog_t {
     pub shader: [c_char; MAX_QPATH],

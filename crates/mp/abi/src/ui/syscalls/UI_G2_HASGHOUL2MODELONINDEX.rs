@@ -35,7 +35,7 @@ impl UiG2Hasghoul2ModelonindexArgs {
 
 /// `UI_G2_HASGHOUL2MODELONINDEX` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:526`
+/// Source: `oracle/codemp/ui/ui_public.h:526`
 pub struct UiG2Hasghoul2Modelonindex;
 
 impl OutboundSysCall for UiG2Hasghoul2Modelonindex {

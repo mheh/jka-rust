@@ -2,7 +2,7 @@
 
 /// Raven `serverState_t` — server operation state enumeration.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../server/server.h:47-51`
+/// Type definition source: `oracle/codemp/qcommon/../server/server.h:47-51`
 #[repr(i32)]
 pub enum serverState_t {
 	/// no map loaded

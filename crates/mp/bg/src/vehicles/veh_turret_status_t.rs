@@ -2,7 +2,7 @@
 
 /// Raven `vehTurretStatus_t` — per-turret runtime firing/targeting state.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:462-474`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:462-474`
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct vehTurretStatus_t {

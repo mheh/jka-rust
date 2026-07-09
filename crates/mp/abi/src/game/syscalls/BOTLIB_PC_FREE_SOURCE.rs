@@ -22,7 +22,7 @@ impl BotlibPcFreeSourceArgs {
 
 /// `BOTLIB_PC_FREE_SOURCE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:499`
+/// Source: `oracle/codemp/game/g_public.h:499`
 pub struct BotlibPcFreeSource;
 
 impl OutboundSysCall for BotlibPcFreeSource {

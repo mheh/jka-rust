@@ -9,7 +9,7 @@ use super::skin_surface_t::skinSurface_t;
 /// Raven `skin_t` — a named skin binding surface names to shaders.
 ///
 /// Raven: game path, including extension.
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:609-613`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:609-613`
 #[repr(C)]
 pub struct skin_t {
     pub name: [u8; MAX_QPATH as usize],

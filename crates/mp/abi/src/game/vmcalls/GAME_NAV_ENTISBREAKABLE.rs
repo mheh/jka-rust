@@ -34,7 +34,7 @@ impl GameNavEntIsBreakableArgs {
 
 /// `GAME_NAV_ENTISBREAKABLE` MP game exports vmMain ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:794`
+/// Source: `oracle/codemp/game/g_public.h:794`
 pub struct GameNavEntIsBreakable;
 
 impl InboundVmCall for GameNavEntIsBreakable {

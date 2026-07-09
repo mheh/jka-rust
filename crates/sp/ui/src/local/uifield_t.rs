@@ -2,13 +2,13 @@
 
 /// Raven `uifield_t` — an editable text field on a menu, with label/color styling.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_local.h:21-31`
+/// Type definition source: `oracle/code/ui/ui_local.h:21-31`
 #[repr(C)]
 pub struct uifield_t {
 	pub cursor: i32,
 	pub scroll: i32,
 	pub widthInChars: i32,
-	// Raven's `#define MAX_EDIT_LINE 256` (oracle/oracle/code/ui/ui_local.h:19).
+	// Raven's `#define MAX_EDIT_LINE 256` (oracle/code/ui/ui_local.h:19).
 	pub buffer: [core::ffi::c_char; 256],
 	pub maxchars: i32,
 	pub style: i32,

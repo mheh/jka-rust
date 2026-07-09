@@ -8,9 +8,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `return syscall( UI_MEMORY_REMAINING );`
 /// Raven transport: `return Hunk_MemoryRemaining();`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:342-343`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:982`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1119-1120`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:342-343`
+/// Args source: `oracle/codemp/ui/ui_local.h:982`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1119-1120`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct UiMemoryRemainingArgs;
 
@@ -22,11 +22,11 @@ impl UiMemoryRemainingArgs {
 
 /// `UI_MEMORY_REMAINING` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:71`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:342-343`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:342-343`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1119-1120`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1119-1120`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:71`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:342-343`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:342-343`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1119-1120`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1119-1120`
 pub struct UiMemoryRemaining;
 
 impl OutboundSysCall for UiMemoryRemaining {

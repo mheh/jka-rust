@@ -24,7 +24,7 @@ impl GSqrtArgs {
 
 /// `G_SQRT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:282`
+/// Source: `oracle/codemp/game/g_public.h:282`
 pub struct GSqrt;
 
 impl OutboundSysCall for GSqrt {

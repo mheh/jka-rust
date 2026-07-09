@@ -101,7 +101,7 @@ impl UiG2AngleoverrideArgs {
 
 /// `UI_G2_ANGLEOVERRIDE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:519`
+/// Source: `oracle/codemp/ui/ui_public.h:519`
 pub struct UiG2Angleoverride;
 
 impl OutboundSysCall for UiG2Angleoverride {

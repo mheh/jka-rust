@@ -8,12 +8,12 @@ use mp_qshared::shared::qhandle_t;
 
 /// Number of vertices a decal polygon may hold.
 ///
-/// Source: `oracle/oracle/codemp/renderer/tr_local.h:2316`
+/// Source: `oracle/codemp/renderer/tr_local.h:2316`
 pub const MAX_VERTS_ON_DECAL_POLY: usize = 10;
 
 /// Raven `decalPoly_s` — a persistent decal polygon queued for rendering.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:2319-2328`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:2319-2328`
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct decalPoly_t {

@@ -79,7 +79,7 @@ impl GG2GetboltNorecArgs {
 
 /// `G_G2_GETBOLT_NOREC` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:512`
+/// Source: `oracle/codemp/game/g_public.h:512`
 pub struct GG2GetboltNorec;
 
 impl OutboundSysCall for GG2GetboltNorec {

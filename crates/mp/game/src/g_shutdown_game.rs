@@ -28,7 +28,7 @@ use crate::trap;
 /// Raven: the `==== ShutdownGame ====` banner is commented out in the oracle
 /// (`g_main.c:1132`), so it is not reproduced here.
 ///
-/// Source: `oracle/oracle/codemp/game/g_main.c:1128-1199`
+/// Source: `oracle/codemp/game/g_main.c:1128-1199`
 pub fn g_shutdown_game(ctx: GameContext<'_>, args: GameShutdownArgs) {
     unsafe {
         let restart = args.restart();

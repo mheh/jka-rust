@@ -6,7 +6,7 @@ use super::menuframework_s::menuframework_s;
 
 /// Raven `menucommon_s` — base fields shared by every menu item widget.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:160-177`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:160-177`
 #[repr(C)]
 pub struct menucommon_s {
 	pub r#type: c_int,

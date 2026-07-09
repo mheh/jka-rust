@@ -1,6 +1,6 @@
 //! MP `saberInfo_t` and `MAX_SABERS`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/q_shared.h:735-841`
+//! Type definition source: `oracle/codemp/game/q_shared.h:735-841`
 
 #![allow(non_camel_case_types)]
 
@@ -14,7 +14,7 @@ use super::saber_type::saberType_t;
 
 /// Raven `saberInfo_t` — a full saber definition (as loaded from `sabers.cfg`).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:735-840`
+/// Type definition source: `oracle/codemp/game/q_shared.h:735-840`
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct saberInfo_t {
@@ -115,5 +115,5 @@ const _: () = assert!(core::mem::size_of::<saberInfo_t>() == 2156);
 
 /// Raven `MAX_SABERS`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:841`
+/// Source: `oracle/codemp/game/q_shared.h:841`
 pub const MAX_SABERS: usize = 2;

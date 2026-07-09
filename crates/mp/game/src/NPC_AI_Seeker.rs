@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_Seeker.c 10/10
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_Seeker.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Seeker.c`.
 //!
 //! All 10 functions ported. Nearly every function in this file relies on
 //! file-scope globals set up by `SetNPCGlobals()` (NPC, NPCInfo, ucmd, etc.)
@@ -11,16 +11,16 @@ use crate::npc::script_flags::SCF_CHASE_ENEMIES;
 use crate::prelude::*;
 use mp_qshared::shared::{CONTENTS_LIGHTSABER, MASK_SHOT};
 
-// Raven `#define VELOCITY_DECAY 0.7f32` (oracle/oracle/codemp/game/NPC_AI_Seeker.c:8).
+// Raven `#define VELOCITY_DECAY 0.7f32` (oracle/codemp/game/NPC_AI_Seeker.c:8).
 const VELOCITY_DECAY: f32 = 0.7f32;
 
 // Raven `#define MIN_MELEE_RANGE 320` / `MIN_MELEE_RANGE_SQR`.
-// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:10-11`
+// Source: `oracle/codemp/game/NPC_AI_Seeker.c:10-11`
 const MIN_MELEE_RANGE: c_int = 320;
 const MIN_MELEE_RANGE_SQR: c_int = MIN_MELEE_RANGE * MIN_MELEE_RANGE;
 
 // Raven `#define MIN_DISTANCE 80` / `MIN_DISTANCE_SQR`.
-// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:13-14`
+// Source: `oracle/codemp/game/NPC_AI_Seeker.c:13-14`
 const MIN_DISTANCE: c_int = 80;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 
@@ -41,7 +41,7 @@ pub const SEEKER_SEEK_RADIUS: f32 = 1024.0f32;
 
 
 // Local constants for Seeker AI.
-// Source: oracle/oracle/codemp/game/NPC_AI_Seeker.c / g_local.h
+// Source: oracle/codemp/game/NPC_AI_Seeker.c / g_local.h
 const MOD_FALLING: c_int = 38;
 const MOD_BLASTER: c_int = 6;
 const MOD_UNKNOWN: c_int = 0;
@@ -51,7 +51,7 @@ const MOD_TELEFRAG: c_int = 37;
 ///
 /// Caches sound and effect resources for Seeker NPCs at map load time.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:26-31`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:26-31`
 pub fn NPC_Seeker_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/fire.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/hiss.wav".as_ptr());
@@ -60,7 +60,7 @@ pub fn NPC_Seeker_Precache(ctx: GameContext<'_>) {
 
 /// Raven `NPC_Seeker_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:34-46`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:34-46`
 pub fn NPC_Seeker_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -98,7 +98,7 @@ pub fn NPC_Seeker_Pain(
 
 /// Raven `Seeker_MaintainHeight`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:49-148`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:49-148`
 pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -204,7 +204,7 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
 
 /// Raven `Seeker_Strafe`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:151-239`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:151-239`
 pub fn Seeker_Strafe(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -371,7 +371,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
 
 /// Raven `Seeker_Hunt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:242-287`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:242-287`
 pub fn Seeker_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         let world = &mut *ctx.world;
@@ -431,7 +431,7 @@ pub fn Seeker_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
 
 /// Raven `Seeker_Fire`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:290-317`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:290-317`
 pub fn Seeker_Fire(ctx: GameContext<'_>) {
     unsafe {
         let NPC = (*ctx.world).globals.NPC;
@@ -482,7 +482,7 @@ pub fn Seeker_Fire(ctx: GameContext<'_>) {
 
 /// Raven `Seeker_Ranged`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:320-347`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:320-347`
 pub fn Seeker_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         let NPC = (*ctx.world).globals.NPC;
@@ -524,7 +524,7 @@ pub fn Seeker_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qboolean)
 
 /// Raven `Seeker_Attack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:350-380`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:350-380`
 pub fn Seeker_Attack(ctx: GameContext<'_>) {
     unsafe {
         let NPC = (*ctx.world).globals.NPC;
@@ -571,7 +571,7 @@ pub fn Seeker_Attack(ctx: GameContext<'_>) {
 
 /// Raven `Seeker_FindEnemy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:383-436`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:383-436`
 pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -643,7 +643,7 @@ pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
 
 /// Raven `Seeker_FollowOwner`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:439-520`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:439-520`
 pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -753,7 +753,7 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSSeeker_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:523-574`
+/// Source: `oracle/codemp/game/NPC_AI_Seeker.c:523-574`
 pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;

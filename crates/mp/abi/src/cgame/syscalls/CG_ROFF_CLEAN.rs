@@ -7,9 +7,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( CG_ROFF_CLEAN );`
 /// Raven transport: `return theROFFSystem.Clean(qtrue);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:730-732`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2430`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1268-1269`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:730-732`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2430`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1268-1269`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgRoffCleanArgs;
 
@@ -21,11 +21,11 @@ impl CgRoffCleanArgs {
 
 /// `CG_ROFF_CLEAN` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:242`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:730-732`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:730-732`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1268-1269`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1268-1269`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:242`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:730-732`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:730-732`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1268-1269`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1268-1269`
 pub struct CgRoffClean;
 
 impl OutboundSysCall for CgRoffClean {

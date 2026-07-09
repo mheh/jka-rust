@@ -4,7 +4,7 @@ use crate::shared::vec3_t;
 
 /// Raven `aas_entityinfo_t` — AAS-visible entity state snapshot.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_aas.h:107-132`
+/// Type definition source: `oracle/codemp/game/be_aas.h:107-132`
 #[repr(C)]
 pub struct aas_entityinfo_t {
 	/// true if updated this frame

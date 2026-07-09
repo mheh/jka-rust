@@ -2,7 +2,7 @@
 
 /// Raven `sharedERagPhase` ragdoll update callback phases.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:856-865`
+/// Type definition source: `oracle/codemp/game/q_shared.h:856-865`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum sharedERagPhase {

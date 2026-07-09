@@ -11,17 +11,17 @@ use super::player_species_info_t::playerSpeciesInfo_t;
 
 /// `MAX_MODS`.
 ///
-/// Source: `oracle/oracle/code/ui/ui_local.h:96`
+/// Source: `oracle/code/ui/ui_local.h:96`
 const MAX_MODS: usize = 64;
 
 /// `MAX_PLAYERMODELS`.
 ///
-/// Source: `oracle/oracle/code/ui/ui_local.h:13`
+/// Source: `oracle/code/ui/ui_local.h:13`
 const MAX_PLAYERMODELS: usize = 32;
 
 /// `MAX_DEFERRED_SCRIPT`.
 ///
-/// Source: `oracle/oracle/code/ui/ui_local.h:14`
+/// Source: `oracle/code/ui/ui_local.h:14`
 const MAX_DEFERRED_SCRIPT: usize = 1024;
 
 /// Raven `uiInfo_t` — the SP UI module's top-level runtime state (display
@@ -32,7 +32,7 @@ const MAX_DEFERRED_SCRIPT: usize = 1024;
 /// (no team/gametype/map/server-browser caches) built around the SP-only
 /// Force-power allocation and weapon-selection screens; it lacks all of
 /// MP's multiplayer browser/lobby state.
-/// Type definition source: `oracle/oracle/code/ui/ui_local.h:119-170`
+/// Type definition source: `oracle/code/ui/ui_local.h:119-170`
 #[repr(C)]
 pub struct uiInfo_t {
 	pub uiDC: displayContextDef_t,

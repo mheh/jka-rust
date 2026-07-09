@@ -12,9 +12,9 @@ use mp_qshared::shared::sharedIKMoveParams_t;
 /// Raven wrapper: `return syscall(CG_G2_IKMOVE, ghoul2, time, params);`
 /// Raven transport: `return G2API_IKMove(*((CGhoul2Info_v *)args[1]), args[2], (sharedIKMoveParams_t *)VMA(3));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1045-1047`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2582`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1610-1611`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1045-1047`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2582`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1610-1611`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2IkmoveArgs {
     ghoul2: *mut c_void,
@@ -36,10 +36,10 @@ impl CgG2IkmoveArgs {
 ///
 /// Raven: rww - ik move method, allows you to specify a bone and move it to a world point (within joint constraints)
 /// Raven: by using the majority of gil's existing bone angling stuff from the ragdoll code.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:317`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1045-1047`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1610-1611`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1610-1611`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:317`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1045-1047`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1610-1611`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1610-1611`
 pub struct CgG2Ikmove;
 
 impl OutboundSysCall for CgG2Ikmove {

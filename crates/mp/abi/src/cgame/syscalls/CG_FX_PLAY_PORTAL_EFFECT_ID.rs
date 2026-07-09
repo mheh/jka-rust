@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_FX_PLAY_PORTAL_EFFECT_ID, id, org, fwd);`
 /// Raven transport: `FX_PlayEffectID(args[1], (float *)VMA(2), (float *)VMA(3), args[4], args[5], qtrue ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:642-644`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2402`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1121-1123`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:642-644`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2402`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1121-1123`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxPlayPortalEffectIdArgs {
     id: c_int,
@@ -30,10 +30,10 @@ impl CgFxPlayPortalEffectIdArgs {
 /// `CG_FX_PLAY_PORTAL_EFFECT_ID` MP cgame imports syscall ABI token.
 ///
 /// Raven: wrapper omits the header's `vol` and `rad`; this type matches the actual syscall transport.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:223`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:642-644`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1121-1123`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1121-1123`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:223`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:642-644`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1121-1123`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1121-1123`
 pub struct CgFxPlayPortalEffectId;
 
 impl OutboundSysCall for CgFxPlayPortalEffectId {

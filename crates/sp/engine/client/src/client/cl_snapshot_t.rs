@@ -6,7 +6,7 @@ use sp_qshared::shared::qboolean;
 
 /// Raven `clSnapshot_t` — a locally saved snapshot of the game state.
 ///
-/// Type definition source: `oracle/oracle/code/client/client.h:14-33`
+/// Type definition source: `oracle/code/client/client.h:14-33`
 #[repr(C)]
 pub struct clSnapshot_t {
     /// cleared if delta parsing was invalid

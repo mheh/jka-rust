@@ -1,5 +1,5 @@
 // PORT-COMPLETE: WalkerNPC.c 6/6
-//! FAITHFUL port of `oracle/oracle/codemp/game/WalkerNPC.c`.
+//! FAITHFUL port of `oracle/codemp/game/WalkerNPC.c`.
 //!
 //! Walker NPC vehicle implementation — movement, orientation, animation, and
 //! initialization for the Walker vehicle type.
@@ -13,7 +13,7 @@ use crate::trap;
 /// Raven `RegisterAssets`.
 ///
 /// Registers the turret weapon used by the Walker vehicle.
-/// Source: `oracle/oracle/codemp/game/WalkerNPC.c:84-95`
+/// Source: `oracle/codemp/game/WalkerNPC.c:84-95`
 pub fn RegisterAssets(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         // atst uses turret weapon (#ifdef _JK2MP path — both MP/SP port to same)
@@ -28,7 +28,7 @@ pub fn RegisterAssets(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven `ProcessMoveCommands`.
 ///
 /// Updates vehicle speed based on movement input and vehicle properties.
-/// Source: `oracle/oracle/codemp/game/WalkerNPC.c:129-251`
+/// Source: `oracle/codemp/game/WalkerNPC.c:129-251`
 pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let pVeh = &mut *pVeh;
@@ -151,7 +151,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 ///
 /// Adjusts walker yaw based on rider view angles and vehicle speed.
 /// MP-only function.
-/// Source: `oracle/oracle/codemp/game/WalkerNPC.c:254-278`
+/// Source: `oracle/codemp/game/WalkerNPC.c:254-278`
 pub fn WalkerYawAdjust(
     pVeh: *mut Vehicle_t,
     riderPS: *mut playerState_t,
@@ -200,7 +200,7 @@ pub fn WalkerYawAdjust(
 /// Raven `ProcessOrientCommands`.
 ///
 /// Processes vehicle orientation based on rider input and vehicle properties.
-/// Source: `oracle/oracle/codemp/game/WalkerNPC.c:316-411`
+/// Source: `oracle/codemp/game/WalkerNPC.c:316-411`
 pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let pVeh = &mut *pVeh;
@@ -301,7 +301,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven `AnimateVehicle`.
 ///
 /// Animates the Walker vehicle based on speed and state.
-/// Source: `oracle/oracle/codemp/game/WalkerNPC.c:415-536`
+/// Source: `oracle/codemp/game/WalkerNPC.c:415-536`
 pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let pVeh = &mut *pVeh;
@@ -390,7 +390,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven `Board`.
 ///
 /// Board the Walker vehicle (reached via `crate::veh_dispatch::board`).
-/// Source: `oracle/oracle/codemp/game/WalkerNPC.c:106-115`
+/// Source: `oracle/codemp/game/WalkerNPC.c:106-115`
 pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
     unsafe {
         // `g_vehicleInfo[VEHICLE_BASE].Board` is the generic base body.
@@ -408,7 +408,7 @@ pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
 /// Raven `G_CreateWalkerNPC`.
 ///
 /// Allocate and initialize a new Walker vehicle.
-/// Source: `oracle/oracle/codemp/game/WalkerNPC.c:594-615`
+/// Source: `oracle/codemp/game/WalkerNPC.c:594-615`
 pub fn G_CreateWalkerNPC(
     ctx: GameContext<'_>,
     pVeh: *mut *mut Vehicle_t,

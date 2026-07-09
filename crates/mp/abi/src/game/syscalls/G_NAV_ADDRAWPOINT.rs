@@ -35,7 +35,7 @@ impl GNavAddrawpointArgs {
 
 /// `G_NAV_ADDRAWPOINT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:302`
+/// Source: `oracle/codemp/game/g_public.h:302`
 pub struct GNavAddrawpoint;
 
 impl OutboundSysCall for GNavAddrawpoint {

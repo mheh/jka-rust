@@ -15,8 +15,8 @@ use sp_qshared::shared::vec3_t;
 /// that it also gets here legally during level start where normally the internal
 /// `s_soundStarted` check would return.
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:217-218`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:591-598`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:217-218`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:591-598`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSAddloopingsoundArgs {
     entity_num: c_int,
@@ -66,10 +66,10 @@ impl CgSAddloopingsoundArgs {
 
 /// `CG_S_ADDLOOPINGSOUND` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:94`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:217-218`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:591-598`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:591-598`
+/// Enum value source: `oracle/code/cgame/cg_public.h:94`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:217-218`
+/// Output source: `oracle/code/client/cl_cgame.cpp:591-598`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:591-598`
 pub struct CgSAddloopingsound;
 
 impl OutboundSysCall for CgSAddloopingsound {

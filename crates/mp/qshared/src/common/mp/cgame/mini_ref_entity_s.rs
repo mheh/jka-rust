@@ -13,7 +13,7 @@ use crate::shared::{qboolean, vec2_t, vec3_t};
 ///
 /// Raven: this stucture must remain identical as the miniRefEntity_t (comment
 /// mirrored from `refEntity_t`, whose head this struct's layout matches).
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:100-130`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:100-130`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct miniRefEntity_t {

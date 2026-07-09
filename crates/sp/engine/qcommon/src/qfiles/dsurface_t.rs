@@ -4,12 +4,12 @@ use sp_qshared::shared::vec3_t;
 
 /// Light Style Constants.
 ///
-/// Source: `oracle/oracle/code/qcommon/qfiles.h:310`
+/// Source: `oracle/code/qcommon/qfiles.h:310`
 const MAXLIGHTMAPS: usize = 4;
 
 /// Raven `dsurface_t` — on-disk BSP surface (drawsurface) record.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/qfiles.h:548-569`
+/// Type definition source: `oracle/code/qcommon/qfiles.h:548-569`
 #[repr(C)]
 pub struct dsurface_t {
 	pub shaderNum: i32,

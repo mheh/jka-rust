@@ -8,7 +8,7 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `return syscall( UI_LAN_SERVERISVISIBLE, source, n );`
 /// Raven transport: `return LAN_ServerIsVisible( args[1], args[2] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:322-323`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:322-323`
 #[derive(Debug)]
 pub struct UiLanServerisvisibleArgs {
     source: c_int,
@@ -34,10 +34,10 @@ impl UiLanServerisvisibleArgs {
 /// Raven wrapper: `return syscall( UI_LAN_SERVERISVISIBLE, source, n );`
 /// Raven transport: `return LAN_ServerIsVisible( args[1], args[2] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:113`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:322-323`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:975`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1103-1104`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:113`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:322-323`
+/// Output source: `oracle/codemp/ui/ui_local.h:975`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1103-1104`
 pub struct UiLanServerisvisible;
 
 impl OutboundSysCall for UiLanServerisvisible {

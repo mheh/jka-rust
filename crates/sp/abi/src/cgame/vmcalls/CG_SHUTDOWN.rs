@@ -4,10 +4,10 @@ use abi_transport::generic::InboundVmCall;
 /// `CG_SHUTDOWN` SP cgame exports vmMain ABI token.
 ///
 /// Raven: `void CG_Shutdown( void );`
-/// Enum value source: `oracle/oracle/code/client/vmachine.h:15`
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:101-103`
-/// Output source: `oracle/oracle/code/cgame/cg_main.cpp:101-103`
-/// VM_Main switch source: `oracle/oracle/code/cgame/cg_main.cpp:94-132`
+/// Enum value source: `oracle/code/client/vmachine.h:15`
+/// Args source: `oracle/code/cgame/cg_main.cpp:101-103`
+/// Output source: `oracle/code/cgame/cg_main.cpp:101-103`
+/// VM_Main switch source: `oracle/code/cgame/cg_main.cpp:94-132`
 pub struct CgShutdown;
 
 impl InboundVmCall for CgShutdown {

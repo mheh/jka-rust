@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 /// Raven `pscript_s` — compiled Icarus script buffer handed to the game.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/codemp/icarus/GameInterface.h:4-8`
+/// Type definition source: `oracle/codemp/icarus/GameInterface.h:4-8`
 #[repr(C)]
 pub struct pscript_t {
     pub buffer: *mut c_char,

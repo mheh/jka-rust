@@ -22,7 +22,7 @@ impl BotlibAiDumpAvoidGoalsArgs {
 
 /// `BOTLIB_AI_DUMP_AVOID_GOALS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:445`
+/// Source: `oracle/codemp/game/g_public.h:445`
 pub struct BotlibAiDumpAvoidGoals;
 
 impl OutboundSysCall for BotlibAiDumpAvoidGoals {

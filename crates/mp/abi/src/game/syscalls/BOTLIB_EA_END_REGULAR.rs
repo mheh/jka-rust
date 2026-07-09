@@ -28,7 +28,7 @@ impl BotlibEaEndRegularArgs {
 
 /// `BOTLIB_EA_END_REGULAR` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:408`
+/// Source: `oracle/codemp/game/g_public.h:408`
 pub struct BotlibEaEndRegular;
 
 impl OutboundSysCall for BotlibEaEndRegular {

@@ -39,7 +39,7 @@ impl GSetConfigstringArgs {
 /// Raven: All of the current configstrings are sent to clients when
 /// Raven: they connect, and changes are sent to all connected clients.
 /// Raven: All confgstrings are cleared at each level start.
-/// Source: `oracle/oracle/codemp/game/g_public.h:157`
+/// Source: `oracle/codemp/game/g_public.h:157`
 pub struct GSetConfigstring;
 
 impl OutboundSysCall for GSetConfigstring {

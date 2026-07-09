@@ -31,7 +31,7 @@ impl BotlibGetSnapshotEntityArgs {
 /// `BOTLIB_GET_SNAPSHOT_ENTITY` MP game imports syscall ABI token.
 ///
 /// Raven: ( int client, int ent );
-/// Source: `oracle/oracle/codemp/game/g_public.h:352`
+/// Source: `oracle/codemp/game/g_public.h:352`
 pub struct BotlibGetSnapshotEntity;
 
 impl OutboundSysCall for BotlibGetSnapshotEntity {

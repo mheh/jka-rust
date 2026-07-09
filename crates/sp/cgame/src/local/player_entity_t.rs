@@ -6,7 +6,7 @@ use super::lerp_frame_t::lerpFrame_t;
 
 /// Raven `playerEntity_t` — extra data for a player entity's cgame model.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:112-124`
+/// Type definition source: `oracle/code/cgame/cg_local.h:112-124`
 #[repr(C)]
 pub struct playerEntity_t {
 	pub legs: lerpFrame_t,

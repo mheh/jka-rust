@@ -40,7 +40,7 @@ impl BotlibAiCharacteristicBfloatArgs {
 
 /// `BOTLIB_AI_CHARACTERISTIC_BFLOAT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:416`
+/// Source: `oracle/codemp/game/g_public.h:416`
 pub struct BotlibAiCharacteristicBfloat;
 
 impl OutboundSysCall for BotlibAiCharacteristicBfloat {

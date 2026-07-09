@@ -24,7 +24,7 @@ impl BotlibAiChatLengthArgs {
 
 /// `BOTLIB_AI_CHAT_LENGTH` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:429`
+/// Source: `oracle/codemp/game/g_public.h:429`
 pub struct BotlibAiChatLength;
 
 impl OutboundSysCall for BotlibAiChatLength {

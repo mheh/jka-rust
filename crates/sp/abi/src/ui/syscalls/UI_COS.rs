@@ -4,12 +4,12 @@ use abi_transport::pass_float;
 
 /// `UI_COS` SP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:243`
+/// Enum value source: `oracle/code/ui/ui_public.h:243`
 /// Args/output source: SP-side transport implementation absent from
-/// `oracle/oracle/code/ui/ui_syscalls.cpp` / `oracle/oracle/code/client/cl_ui.cpp`;
-/// fallback source (same Raven profile): `oracle/oracle/codemp/ui/ui_syscalls.c` and
-/// `oracle/oracle/codemp/client/cl_ui.cpp:659-660`.
-/// Transport/switch source: fallback reference `oracle/oracle/codemp/client/cl_ui.cpp:659-660`.
+/// `oracle/code/ui/ui_syscalls.cpp` / `oracle/code/client/cl_ui.cpp`;
+/// fallback source (same Raven profile): `oracle/codemp/ui/ui_syscalls.c` and
+/// `oracle/codemp/client/cl_ui.cpp:659-660`.
+/// Transport/switch source: fallback reference `oracle/codemp/client/cl_ui.cpp:659-660`.
 /// TODO: SP transport evidence for float ABI is still missing; this mirrors MP float syscall pattern.
 #[derive(Debug)]
 pub struct UiCosArgs {

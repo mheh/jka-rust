@@ -4,7 +4,7 @@ use crate::shared::vec3_t;
 
 /// Raven `bot_initmove_t` — initial movement state for the bot movement code.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_ai_move.h:60-71`
+/// Type definition source: `oracle/codemp/game/be_ai_move.h:60-71`
 #[repr(C)]
 pub struct bot_initmove_t {
 	pub origin: vec3_t,       //origin of the bot

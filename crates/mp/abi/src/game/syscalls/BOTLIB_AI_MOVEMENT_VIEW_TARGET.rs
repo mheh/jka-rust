@@ -66,7 +66,7 @@ impl BotlibAiMovementViewTargetArgs {
 
 /// `BOTLIB_AI_MOVEMENT_VIEW_TARGET` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:470`
+/// Source: `oracle/codemp/game/g_public.h:470`
 pub struct BotlibAiMovementViewTarget;
 
 impl OutboundSysCall for BotlibAiMovementViewTarget {

@@ -27,13 +27,13 @@ use crate::aasfile::aas_vertex_t::aas_vertex_t;
 
 /// `MAX_TRAVELTYPES`.
 ///
-/// Source: `oracle/oracle/codemp/botlib/aasfile.h:16`
+/// Source: `oracle/codemp/botlib/aasfile.h:16`
 pub const MAX_TRAVELTYPES: usize = 32;
 
 /// Raven `aas_t` — the whole in-memory AAS (area awareness system) file plus
 /// derived routing state for one loaded map.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:183-276`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:183-276`
 #[repr(C)]
 pub struct aas_t {
 	/// true when an AAS file is loaded

@@ -10,7 +10,7 @@ use mp_qshared::shared::MAX_QPATH;
 /// Raven: game path, including extension / after power of two and picmip
 /// but not including clamp to MAX_TEXTURE_SIZE / gl texture binding / for
 /// texture usage in frame statistics / GL_CLAMP or GL_REPEAT.
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:136-151`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:136-151`
 #[repr(C)]
 pub struct image_t {
     pub imgName: [c_char; MAX_QPATH as usize],

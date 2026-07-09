@@ -10,10 +10,10 @@ use super::lerp_frame_t::lerpFrame_t;
 ///
 /// Raven: model info, currently in use drawing parms, animation vars.
 ///
-/// `animations` is sized `MAX_TOTALANIMATIONS` (`oracle/oracle/codemp/game/anims.h:1789-1790`);
+/// `animations` is sized `MAX_TOTALANIMATIONS` (`oracle/codemp/game/anims.h:1789-1790`);
 /// that enum is unported, so the array length (1544) is taken from the assert-verified
 /// layout below.
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:480-527`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:480-527`
 #[repr(C)]
 pub struct playerInfo_t {
 	// model info

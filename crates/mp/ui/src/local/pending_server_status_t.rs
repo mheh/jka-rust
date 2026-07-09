@@ -4,12 +4,12 @@ use super::pending_server_t::pendingServer_t;
 
 /// `MAX_SERVERSTATUSREQUESTS`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:3062`
+/// Source: `oracle/codemp/game/q_shared.h:3062`
 const MAX_SERVERSTATUSREQUESTS: usize = 16;
 
 /// Raven `pendingServerStatus_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:698-701`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:698-701`
 #[repr(C)]
 pub struct pendingServerStatus_t {
 	pub num: i32,

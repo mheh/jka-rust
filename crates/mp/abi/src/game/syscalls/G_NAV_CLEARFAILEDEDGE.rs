@@ -23,7 +23,7 @@ impl GNavClearfailededgeArgs {
 
 /// `G_NAV_CLEARFAILEDEDGE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:322`
+/// Source: `oracle/codemp/game/g_public.h:322`
 pub struct GNavClearfailededge;
 
 impl OutboundSysCall for GNavClearfailededge {

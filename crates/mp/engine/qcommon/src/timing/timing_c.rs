@@ -8,9 +8,9 @@
 /// Windows-only — `End()`'s read is skipped under `#ifndef __linux__`), then
 /// `End()` returns `(int)(end - start)`, clamped to zero if negative.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/timing.h:2-60`
+/// Type definition source: `oracle/codemp/qcommon/timing.h:2-60`
 //TODO: Port timing_c::start, timing_c::end, timing_c::reset
-// Source: oracle/oracle/codemp/qcommon/timing.h:5-8
+// Source: oracle/codemp/qcommon/timing.h:5-8
 // Raven's `start`/`end` (__int64) and `reset` (int) are stamped by inline
 // x86 `rdtsc` assembly, which has no portable Rust equivalent; the class is a
 // host-side profiling helper never crossing the ABI seam, so only its

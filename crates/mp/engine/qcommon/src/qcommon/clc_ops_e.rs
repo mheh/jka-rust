@@ -2,7 +2,7 @@
 
 /// Raven `clc_ops_e` — client to server message opcodes.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:256-263`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:256-263`
 #[repr(i32)]
 pub enum clc_ops_e {
     clc_bad = 0,

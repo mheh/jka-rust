@@ -34,7 +34,7 @@ impl BotlibAiTouchingGoalArgs {
 
 /// `BOTLIB_AI_TOUCHING_GOAL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:452`
+/// Source: `oracle/codemp/game/g_public.h:452`
 pub struct BotlibAiTouchingGoal;
 
 impl OutboundSysCall for BotlibAiTouchingGoal {

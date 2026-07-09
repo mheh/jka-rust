@@ -4,7 +4,7 @@
 // carry no ctx/bg channel in their fixed vtable/fn-ptr slot signatures yet reach
 // world/engine/rng — those references are transcribed against the game channel
 // (`ctx`) and flagged with PORT-NOTEs pending the vtable-dispatch retrofit.
-//! FAITHFUL port of `oracle/oracle/codemp/game/g_vehicles.c` (MP `_JK2MP` +
+//! FAITHFUL port of `oracle/codemp/game/g_vehicles.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!
 //! Generated from the `fnskel.py` signature skeleton; bodies transcribed per the
@@ -50,11 +50,11 @@ use mp_bg::vehicles::vehicleType_t;
 // Raven vehicle constants spelled locally per this file's staging convention
 // (the integrator wires the const home later; the name preserves intent).
 // Boarding sentinels stored in `m_iBoarding`.
-// Source: `oracle/oracle/codemp/game/bg_vehicles.h:402-403`
+// Source: `oracle/codemp/game/bg_vehicles.h:402-403`
 pub const VEH_MOUNT_THROW_LEFT: c_int = -5;
 pub const VEH_MOUNT_THROW_RIGHT: c_int = -6;
 // Eject-direction anon enum.
-// Source: `oracle/oracle/codemp/game/bg_vehicles.h:407-414`
+// Source: `oracle/codemp/game/bg_vehicles.h:407-414`
 pub const VEH_EJECT_LEFT: c_int = 0;
 pub const VEH_EJECT_RIGHT: c_int = 1;
 pub const VEH_EJECT_FRONT: c_int = 2;
@@ -64,7 +64,7 @@ pub const VEH_EJECT_BOTTOM: c_int = 5;
 // Default player bbox z-extents (used for the MP eject-clearance trace).
 // Canonical in `mp_bg::public::viewheight` (`c_int`, cast here to match the
 // `vec3_t` components they seed).
-// Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
+// Source: `oracle/codemp/game/bg_public.h:41-42`
 const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
 const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
@@ -97,11 +97,11 @@ pub const SHIPSURF_BROKEN_F: c_int = 1 << 5; // wing 4
 pub const SHIPSURF_BROKEN_G: c_int = 1 << 6; // front
 
 /// Raven `TURN_OFF` — `NPC_SetSurfaceOnOff` flag; this TU's local `#define`.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:2928`
+/// Source: `oracle/codemp/game/g_vehicles.c:2928`
 const TURN_OFF: c_int = 0x0000_0100;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
-// Source: `oracle/oracle/codemp/game/q_shared.h`
+// Source: `oracle/codemp/game/q_shared.h`
 
 
 
@@ -110,7 +110,7 @@ const TURN_OFF: c_int = 0x0000_0100;
 
 /// Raven `Vehicle_SetAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:91-100`
+/// Source: `oracle/codemp/game/g_vehicles.c:91-100`
 pub fn Vehicle_SetAnim(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
@@ -148,7 +148,7 @@ pub fn Vehicle_SetAnim(
 
 /// Raven `G_VehicleTrace`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:102-109`
+/// Source: `oracle/codemp/game/g_vehicles.c:102-109`
 pub fn G_VehicleTrace(
     ctx: GameContext<'_>,
     results: *mut trace_t,
@@ -175,7 +175,7 @@ pub fn G_VehicleTrace(
 
 /// Raven `G_IsRidingVehicle`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:111-120`
+/// Source: `oracle/codemp/game/g_vehicles.c:111-120`
 pub fn G_IsRidingVehicle(ctx: GameContext<'_>, pEnt: *mut gentity_t) -> *mut Vehicle_t {
     unsafe {
         let ent = pEnt;
@@ -194,14 +194,14 @@ pub fn G_IsRidingVehicle(ctx: GameContext<'_>, pEnt: *mut gentity_t) -> *mut Veh
 ///
 /// Raven: the entire body is `#ifndef _JK2MP`; in the MP (`_JK2MP`) compile it
 /// reduces to `return 0.0f;`.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:124-183`
+/// Source: `oracle/codemp/game/g_vehicles.c:124-183`
 pub fn G_CanJumpToEnemyVeh(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> f32 {
     0.0
 }
 
 /// Raven `G_VehicleSpawn`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:186-244`
+/// Source: `oracle/codemp/game/g_vehicles.c:186-244`
 pub fn G_VehicleSpawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).s.origin = (*self_).r.currentOrigin;
@@ -245,7 +245,7 @@ pub fn G_VehicleSpawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `G_AttachToVehicle`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:247-289`
+/// Source: `oracle/codemp/game/g_vehicles.c:247-289`
 pub fn G_AttachToVehicle(ctx: GameContext<'_>, pEnt: *mut gentity_t, ucmd: *mut *mut usercmd_t) {
     unsafe {
         if pEnt.is_null() || ucmd.is_null() {
@@ -303,7 +303,7 @@ pub fn G_AttachToVehicle(ctx: GameContext<'_>, pEnt: *mut gentity_t, ucmd: *mut 
 
 /// Raven `Animate` — animate the vehicle and its riders.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:481-493`
+/// Source: `oracle/codemp/game/g_vehicles.c:481-493`
 pub fn Animate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         // Validate a pilot rider. (The per-type dispatch no-ops for
@@ -317,7 +317,7 @@ pub fn Animate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 
 /// Raven `ValidateBoard`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:496-594`
+/// Source: `oracle/codemp/game/g_vehicles.c:496-594`
 pub fn ValidateBoard(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
@@ -406,7 +406,7 @@ pub fn ValidateBoard(
 
 /// Raven `Board`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:630-872`
+/// Source: `oracle/codemp/game/g_vehicles.c:630-872`
 pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean {
     unsafe {
         let ent = pEnt as *mut gentity_t;
@@ -575,7 +575,7 @@ pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
 ///
 /// `vExitPos` is Raven's out-param exit position (written through, never
 /// NULL at any oracle caller) → `&mut vec3_t`.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:874-987`
+/// Source: `oracle/codemp/game/g_vehicles.c:874-987`
 pub fn VEH_TryEject(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
@@ -677,7 +677,7 @@ pub fn VEH_TryEject(
 
 /// Raven `G_EjectDroidUnit`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:989-1016`
+/// Source: `oracle/codemp/game/g_vehicles.c:989-1016`
 pub fn G_EjectDroidUnit(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, kill: qboolean) {
     unsafe {
         let droid = (*pVeh).m_pDroidUnit as *mut gentity_t;
@@ -717,7 +717,7 @@ pub fn G_EjectDroidUnit(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, kill: qboole
 
 /// Raven `EjectAll`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1377-1448`
+/// Source: `oracle/codemp/game/g_vehicles.c:1377-1448`
 pub fn EjectAll(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
     unsafe {
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
@@ -807,7 +807,7 @@ pub fn EjectAll(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
 
 /// Raven `StartDeathDelay`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1451-1482`
+/// Source: `oracle/codemp/game/g_vehicles.c:1451-1482`
 pub fn StartDeathDelay(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, iDelayTimeOverride: c_int) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
@@ -831,7 +831,7 @@ pub fn StartDeathDelay(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, iDelayTimeOve
 
 /// Raven `Initialize`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1626-1757`
+/// Source: `oracle/codemp/game/g_vehicles.c:1626-1757`
 pub fn Initialize(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
     unsafe {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
@@ -957,7 +957,7 @@ pub fn Initialize(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
 /// against the game channel `ctx`, which must be threaded in by the
 /// vtable-dispatch retrofit (see shape_mismatch). All other logic is faithful MP+QAGAME.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1763-2334`
+/// Source: `oracle/codemp/game/g_vehicles.c:1763-2334`
 pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_t) -> qboolean {
     unsafe {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
@@ -1401,7 +1401,7 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
 
 /// Raven `UpdateRider`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:2338-2588`
+/// Source: `oracle/codemp/game/g_vehicles.c:2338-2588`
 pub fn UpdateRider(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
@@ -1585,7 +1585,7 @@ pub fn UpdateRider(
 
 /// Raven `AttachRiders`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:2598-2731`
+/// Source: `oracle/codemp/game/g_vehicles.c:2598-2731`
 pub fn AttachRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut i: c_int = 0;
@@ -1729,7 +1729,7 @@ pub fn AttachRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 
 /// Raven `Ghost` — make someone invisible and un-collidable.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:2734-2756`
+/// Source: `oracle/codemp/game/g_vehicles.c:2734-2756`
 pub fn Ghost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
     unsafe {
         if pEnt.is_null() {
@@ -1751,7 +1751,7 @@ pub fn Ghost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
 
 /// Raven `UnGhost` — make someone visible and collidable.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:2759-2781`
+/// Source: `oracle/codemp/game/g_vehicles.c:2759-2781`
 pub fn UnGhost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
     unsafe {
         if pEnt.is_null() {
@@ -1773,7 +1773,7 @@ pub fn UnGhost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t
 
 /// Raven `G_VehicleDamageBoxSizing`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:2785-2840`
+/// Source: `oracle/codemp/game/g_vehicles.c:2785-2840`
 pub fn G_VehicleDamageBoxSizing(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let fDist = 256.0f32; // estimated distance to nose from origin
@@ -1871,7 +1871,7 @@ pub fn G_VehicleDamageBoxSizing(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// `trap_Trace` (engine). The trap calls are transcribed against the game channel
 /// `ctx`, which must be threaded in by the dispatch retrofit (see shape_mismatch).
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:2843-2924`
+/// Source: `oracle/codemp/game/g_vehicles.c:2843-2924`
 pub fn G_FlyVehicleImpactDir(
     ctx: GameContext<'_>,
     veh: *mut gentity_t,
@@ -1988,7 +1988,7 @@ pub fn G_FlyVehicleImpactDir(
 
 /// Raven `G_ShipSurfaceForSurfName` — map a surface name to its ship surface id.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:2930-2959`
+/// Source: `oracle/codemp/game/g_vehicles.c:2930-2959`
 pub fn G_ShipSurfaceForSurfName(surfaceName: *const c_char) -> c_int {
     unsafe {
         if surfaceName.is_null() {
@@ -2027,7 +2027,7 @@ pub fn G_ShipSurfaceForSurfName(surfaceName: *const c_char) -> c_int {
 /// that resolution is transcribed against the game channel `ctx`, threaded in by
 /// the dispatch retrofit (see shape_mismatch). The bit flag bulk is faithful.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:2961-3039`
+/// Source: `oracle/codemp/game/g_vehicles.c:2961-3039`
 pub fn G_SetVehDamageFlags(
     ctx: GameContext<'_>,
     veh: *mut gentity_t,
@@ -2124,7 +2124,7 @@ pub fn G_SetVehDamageFlags(
 
 /// Raven `G_VehicleSetDamageLocFlags`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3041-3100`
+/// Source: `oracle/codemp/game/g_vehicles.c:3041-3100`
 pub fn G_VehicleSetDamageLocFlags(
     ctx: GameContext<'_>,
     veh: *mut gentity_t,
@@ -2191,7 +2191,7 @@ pub fn G_VehicleSetDamageLocFlags(
 /// `G_EntitySound`). Those are transcribed against the game channel `ctx`, threaded
 /// in by the dispatch retrofit (see shape_mismatch).
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3102-3188`
+/// Source: `oracle/codemp/game/g_vehicles.c:3102-3188`
 pub fn G_FlyVehicleDestroySurface(
     ctx: GameContext<'_>,
     veh: *mut gentity_t,
@@ -2294,7 +2294,7 @@ pub fn G_FlyVehicleDestroySurface(
 
 /// Raven `G_FlyVehicleSurfaceDestruction`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3190-3259`
+/// Source: `oracle/codemp/game/g_vehicles.c:3190-3259`
 pub fn G_FlyVehicleSurfaceDestruction(
     ctx: GameContext<'_>,
     veh: *mut gentity_t,
@@ -2371,7 +2371,7 @@ pub fn G_FlyVehicleSurfaceDestruction(
 
 /// Raven `G_VehUpdateShields`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3261-3273`
+/// Source: `oracle/codemp/game/g_vehicles.c:3261-3273`
 pub fn G_VehUpdateShields(targ: *mut gentity_t) {
     unsafe {
         if targ.is_null() || (*targ).client.is_null() || (*targ).m_pVehicle.is_null() {
@@ -2394,7 +2394,7 @@ pub fn G_VehUpdateShields(targ: *mut gentity_t) {
 
 /// Raven `SetParent` — set the parent entity of this Vehicle NPC.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3277-3277`
+/// Source: `oracle/codemp/game/g_vehicles.c:3277-3277`
 pub fn SetParent(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pParentEntity: *mut bgEntity_t) {
     unsafe {
         (*pVeh).m_pParentEntity = pParentEntity as *mut mp_bg::public::bg_entity::bgEntity_t;
@@ -2403,7 +2403,7 @@ pub fn SetParent(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pParentEntity: *mut
 
 /// Raven `SetPilot` — add a pilot to the vehicle.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3280-3280`
+/// Source: `oracle/codemp/game/g_vehicles.c:3280-3280`
 pub fn SetPilot(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pPilot: *mut bgEntity_t) {
     unsafe {
         (*pVeh).m_pPilot = pPilot as *mut mp_bg::public::bg_entity::bgEntity_t;
@@ -2413,14 +2413,14 @@ pub fn SetPilot(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pPilot: *mut bgEntit
 /// Raven `AddPassenger` — add a passenger to the vehicle (false if we're full).
 ///
 /// Raven: the generic implementation always returns false.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3283-3283`
+/// Source: `oracle/codemp/game/g_vehicles.c:3283-3283`
 pub fn AddPassenger(pVeh: *mut Vehicle_t) -> qboolean {
     qfalse
 }
 
 /// Raven `Inhabited` — whether this vehicle is currently inhabited (by anyone).
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3286-3286`
+/// Source: `oracle/codemp/game/g_vehicles.c:3286-3286`
 pub fn Inhabited(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
     unsafe {
         if !(*pVeh).m_pPilot.is_null() || (*pVeh).m_iNumPassengers != 0 {
@@ -2433,7 +2433,7 @@ pub fn Inhabited(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
 
 /// Raven `Eject`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1019-1376`
+/// Source: `oracle/codemp/game/g_vehicles.c:1019-1376`
 pub fn Eject(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
@@ -2669,7 +2669,7 @@ pub fn Eject(
 
 /// Raven `DeathUpdate`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1485-1617`
+/// Source: `oracle/codemp/game/g_vehicles.c:1485-1617`
 pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
@@ -2803,7 +2803,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     }
 }
 
-// Source: oracle/oracle/codemp/game/g_vehicles.c:1618-1620
+// Source: oracle/codemp/game/g_vehicles.c:1618-1620
 /// Raven `RegisterAssets` — register all the assets used by this vehicle. The
 /// base implementation is an empty function body in Raven (see cite); this
 /// stub matches that faithfully rather than panicking.

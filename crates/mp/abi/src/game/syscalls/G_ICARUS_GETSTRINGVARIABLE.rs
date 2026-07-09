@@ -34,7 +34,7 @@ impl GIcarusGetstringvariableArgs {
 
 /// `G_ICARUS_GETSTRINGVARIABLE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:270`
+/// Source: `oracle/codemp/game/g_public.h:270`
 pub struct GIcarusGetstringvariable;
 
 impl OutboundSysCall for GIcarusGetstringvariable {

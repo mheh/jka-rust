@@ -6,7 +6,7 @@
 /// `CGPGroup::Parse` checks `mParent`, which SP's `AddGroup` never sets, so
 /// end of data always terminates group parsing successfully. The partially
 /// built tree is kept, as in Raven.
-/// Source: `oracle/oracle/code/game/genericparser2.cpp:686-741,371-394`
+/// Source: `oracle/code/game/genericparser2.cpp:686-741,371-394`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Gp2ParseError;
 

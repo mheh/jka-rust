@@ -13,7 +13,7 @@ use super::player_entity_t::playerEntity_t;
 
 /// Raven `MAX_CG_LOOPSOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:321`
+/// Source: `oracle/codemp/cgame/cg_local.h:321`
 pub const MAX_CG_LOOPSOUNDS: usize = 8;
 
 /// Raven `centity_t` — client-side representation of an entity, tracking
@@ -23,7 +23,7 @@ pub const MAX_CG_LOOPSOUNDS: usize = 8;
 /// thing in bg shared entity, so it goes first. - AReis
 /// rww - entstate must be first, to correspond with the bg shared entity
 /// structure.
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:333-462`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:333-462`
 #[repr(C)]
 pub struct centity_t {
 	/// Raven: from cg.frame

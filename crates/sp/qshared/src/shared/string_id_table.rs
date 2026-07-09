@@ -8,7 +8,7 @@ use core::ffi::{c_char, c_int};
 /// `name` is Raven's `char *`; the struct crosses the ABI seam so it keeps the raw
 /// pointer and `#[repr(C)]` layout.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2617-2621`
+/// Type definition source: `oracle/code/game/q_shared.h:2617-2621`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct stringID_table_t {

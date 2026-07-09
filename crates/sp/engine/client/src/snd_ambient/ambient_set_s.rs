@@ -4,18 +4,18 @@ use std::os::raw::c_char;
 
 /// `MAX_WAVES_PER_GROUP`.
 ///
-/// Source: `oracle/oracle/code/client/snd_ambient.h:28`
+/// Source: `oracle/code/client/snd_ambient.h:28`
 pub const MAX_WAVES_PER_GROUP: usize = 8;
 
 /// `MAX_SET_NAME_LENGTH`.
 ///
-/// Source: `oracle/oracle/code/client/snd_ambient.h:29`
+/// Source: `oracle/code/client/snd_ambient.h:29`
 pub const MAX_SET_NAME_LENGTH: usize = 64;
 
 /// Raven `ambientSet_s` — a named set of ambient background waves that can be
 /// looped and cross-faded.
 ///
-/// Type definition source: `oracle/oracle/code/client/snd_ambient.h:60-73`
+/// Type definition source: `oracle/code/client/snd_ambient.h:60-73`
 #[repr(C)]
 pub struct ambientSet_s {
     pub name: [c_char; MAX_SET_NAME_LENGTH],

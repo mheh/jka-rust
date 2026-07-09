@@ -2,7 +2,7 @@
 
 /// Raven `statusText_t` — status message codes.
 ///
-/// Type definition source: `oracle/oracle/code/game/objectives.h:141-157`
+/// Type definition source: `oracle/code/game/objectives.h:141-157`
 #[repr(i32)]
 pub enum statusText_t {
 	STAT_INSUBORDINATION = 0, // Starfleet will not tolerate such insubordination

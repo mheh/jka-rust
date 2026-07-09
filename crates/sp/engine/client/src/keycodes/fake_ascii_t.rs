@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 /// Raven `fakeAscii_t` — key code enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/client/keycodes.h:6-339`
+/// Type definition source: `oracle/code/client/keycodes.h:6-339`
 #[repr(i32)]
 pub enum fakeAscii_t {
 	A_NULL = 0,

@@ -3,7 +3,7 @@
 /// Raven `vehFieldType_t` — parse-table value-kind tag for `vehField_t`
 /// entries (`vehWeaponFields`/`vehicleFields`).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:114-129`
+/// Type definition source: `oracle/codemp/game/bg_vehicleLoad.c:114-129`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum vehFieldType_t {

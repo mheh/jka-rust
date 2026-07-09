@@ -4,7 +4,7 @@
 ///
 /// Raven: Vehicle type for different vehicle behaviors.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:9-18`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:9-18`
 #[allow(non_camel_case_types)]
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -10,7 +10,7 @@ use super::file::FILE;
 /// `Create`, `Free`, `BlockAvailable`, `WriteBlock`, `ReadBlock`, `Open`,
 /// `GetUnsignedInteger`, `GetInteger`, `GetChar`, `GetLong`, `GetFloat`,
 /// `StripExtension`) are behavior, not layout, and are ported separately.
-/// Type definition source: `oracle/oracle/codemp/game/../icarus/blockstream.h:158-196`
+/// Type definition source: `oracle/codemp/game/../icarus/blockstream.h:158-196`
 #[repr(C)]
 pub struct CBlockStream {
 	/// Size of the file

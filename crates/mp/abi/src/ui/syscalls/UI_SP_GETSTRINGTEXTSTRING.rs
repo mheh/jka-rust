@@ -11,8 +11,8 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( UI_SP_GETSTRINGTEXTSTRING, text, buffer, bufferLength );`
 /// Raven transport: `Q_strncpyz( (char *) VMA(2), text, args[3] ); return qtrue;`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:448-450`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1221-1228`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:448-450`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1221-1228`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiSpGetstringtextstringArgs {
     text: *const c_char,
@@ -44,10 +44,10 @@ impl UiSpGetstringtextstringArgs {
 
 /// `UI_SP_GETSTRINGTEXTSTRING` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:137`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:448-450`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1221-1228`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1221-1228`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:137`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:448-450`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1221-1228`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1221-1228`
 pub struct UiSpGetstringtextstring;
 
 impl OutboundSysCall for UiSpGetstringtextstring {

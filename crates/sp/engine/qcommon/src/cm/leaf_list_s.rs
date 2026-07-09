@@ -5,7 +5,7 @@ use sp_qshared::shared::{qboolean, vec3_t};
 /// Raven `leafList_t` — accumulates BSP leaf indices touched by a box/sphere
 /// traversal, overflowing into a callback when too many to store individually.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:265-273`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:265-273`
 #[repr(C)]
 pub struct leafList_s {
     pub count: i32,

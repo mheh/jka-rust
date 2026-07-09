@@ -8,8 +8,8 @@
 //! (game-tier ICARUS callbacks) needs this enum and its `setTable` string
 //! lookup at the game layer. Kept byte-identical to the icarus-crate port.
 //!
-//! Type definition source: `oracle/oracle/codemp/icarus/Q3_Interface.h:6-255`
-//! `setTable` source: `oracle/oracle/codemp/game/g_ICARUScb.c:52-241`
+//! Type definition source: `oracle/codemp/icarus/Q3_Interface.h:6-255`
+//! `setTable` source: `oracle/codemp/game/g_ICARUScb.c:52-241`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -18,7 +18,7 @@ use mp_qshared::shared::string_id_table::stringID_table_t;
 
 /// Raven `setType_t` — ICARUS entity properties and script parameters.
 ///
-/// Type definition source: `oracle/oracle/codemp/icarus/Q3_Interface.h:6-255`
+/// Type definition source: `oracle/codemp/icarus/Q3_Interface.h:6-255`
 #[repr(i32)]
 pub enum setType_t {
     // Parm strings

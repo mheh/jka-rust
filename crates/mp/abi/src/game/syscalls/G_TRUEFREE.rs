@@ -28,7 +28,7 @@ impl GTruefreeArgs {
 /// `G_TRUEFREE` MP game imports syscall ABI token.
 ///
 /// Raven: rww - icarus traps
-/// Source: `oracle/oracle/codemp/game/g_public.h:249`
+/// Source: `oracle/codemp/game/g_public.h:249`
 pub struct GTruefree;
 
 impl OutboundSysCall for GTruefree {

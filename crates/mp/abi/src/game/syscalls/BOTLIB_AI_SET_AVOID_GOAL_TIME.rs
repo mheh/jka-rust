@@ -35,7 +35,7 @@ impl BotlibAiSetAvoidGoalTimeArgs {
 
 /// `BOTLIB_AI_SET_AVOID_GOAL_TIME` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:492`
+/// Source: `oracle/codemp/game/g_public.h:492`
 pub struct BotlibAiSetAvoidGoalTime;
 
 impl OutboundSysCall for BotlibAiSetAvoidGoalTime {

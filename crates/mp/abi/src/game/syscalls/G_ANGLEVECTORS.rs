@@ -48,7 +48,7 @@ impl GAnglevectorsArgs {
 
 /// `G_ANGLEVECTORS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:284`
+/// Source: `oracle/codemp/game/g_public.h:284`
 pub struct GAnglevectors;
 
 impl OutboundSysCall for GAnglevectors {

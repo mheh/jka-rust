@@ -1,12 +1,12 @@
 //! SP `bg_public.h` entity type enumeration.
 //!
-//! Type definition source: `oracle/oracle/code/game/bg_public.h:713-732`
+//! Type definition source: `oracle/code/game/bg_public.h:713-732`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `entityType_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/bg_public.h:713-732`
+/// Type definition source: `oracle/code/game/bg_public.h:713-732`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum entityType_t {

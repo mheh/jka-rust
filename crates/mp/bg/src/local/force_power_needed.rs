@@ -11,8 +11,8 @@ use core::ffi::c_int;
 /// FP_PROTECT, FP_ABSORB, FP_TEAM_HEAL, FP_TEAM_FORCE, FP_DRAIN, FP_SEE,
 /// FP_SABER_OFFENSE, FP_SABER_DEFENSE, FP_SABERTHROW.
 ///
-/// Definition source: `oracle/oracle/codemp/game/bg_pmove.c:67-153`
-/// Extern decl source: `oracle/oracle/codemp/game/bg_local.h:54`
+/// Definition source: `oracle/codemp/game/bg_pmove.c:67-153`
+/// Extern decl source: `oracle/codemp/game/bg_local.h:54`
 pub static forcePowerNeeded: [[c_int; 18]; 4] = [
     [
         999, //FP_HEAL,//instant

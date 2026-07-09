@@ -9,8 +9,8 @@ use crate::shared::qboolean;
 
 /// Raven `cvarHandle_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1325`
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1820`
+/// Type definition source: `oracle/code/game/q_shared.h:1325`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1820`
 pub type cvarHandle_t = c_int;
 
 pub const MAX_CVAR_VALUE_STRING: usize = 256;
@@ -20,7 +20,7 @@ pub const MAX_CVAR_VALUE_STRING: usize = 256;
 /// Raven comment: "nothing outside the Cvar_*() functions should modify these
 /// fields!". Unlike MP, the SP node has only a `next` link (no `hashNext`).
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1310-1321`
+/// Type definition source: `oracle/code/game/q_shared.h:1310-1321`
 #[repr(C)]
 pub struct cvar_t {
     pub name: *mut c_char,
@@ -71,8 +71,8 @@ const _: () = assert!(core::mem::size_of::<cvar_t>() == 64);
 /// Raven comment: "the modules that run in the virtual machine can't access
 /// the cvar_t directly, so they must ask for structured updates".
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1323-1335`
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1818-1830`
+/// Type definition source: `oracle/code/game/q_shared.h:1323-1335`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1818-1830`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct vmCvar_t {

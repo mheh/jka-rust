@@ -2,7 +2,7 @@
 
 /// Raven `dma_t` — digital-audio (DMA) sound device description.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/snd_local.h:67-74`
+/// Type definition source: `oracle/codemp/client/snd_local.h:67-74`
 #[repr(C)]
 pub struct dma_t {
 	pub channels: i32,

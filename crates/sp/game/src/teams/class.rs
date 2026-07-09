@@ -1,6 +1,6 @@
 //! SP `class_t` — NPC class enumeration.
 //!
-//! Type definition source: `oracle/oracle/code/game/teams.h:18-88`
+//! Type definition source: `oracle/code/game/teams.h:18-88`
 
 #![allow(non_camel_case_types)]
 
@@ -9,7 +9,7 @@
 /// Raven: made up from the model directories; MUST be in the same order as the
 /// `ClassNames` array in `NPC_stats.cpp`. SP's roster differs substantially from
 /// MP's (64 variants vs 56; SP is story-NPC oriented).
-/// Type definition source: `oracle/oracle/code/game/teams.h:18-88`
+/// Type definition source: `oracle/code/game/teams.h:18-88`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum class_t {

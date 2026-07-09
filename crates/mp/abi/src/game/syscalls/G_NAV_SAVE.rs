@@ -30,7 +30,7 @@ impl GNavSaveArgs {
 
 /// `G_NAV_SAVE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:301`
+/// Source: `oracle/codemp/game/g_public.h:301`
 pub struct GNavSave;
 
 impl OutboundSysCall for GNavSave {

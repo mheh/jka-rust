@@ -8,7 +8,7 @@ use super::item_def_s::itemDef_t;
 
 /// Raven `commandDef_t` — a named script command with its handler.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_shared.h:477-482`
+/// Type definition source: `oracle/code/ui/ui_shared.h:477-482`
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct commandDef_t {

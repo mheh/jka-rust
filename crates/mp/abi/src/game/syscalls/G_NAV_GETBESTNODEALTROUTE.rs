@@ -12,7 +12,7 @@ use abi_transport::generic::{
 #[derive(Debug)]
 /// `G_NAV_GETBESTNODEALTROUTE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:329`
+/// Source: `oracle/codemp/game/g_public.h:329`
 pub struct GNavGetbestnodealtroute;
 
 #[derive(Debug)]

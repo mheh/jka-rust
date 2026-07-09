@@ -2,7 +2,7 @@
 
 /// Raven `SAMPLE` — a single MP3 PCM sample, reinterpretable as int or float.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/../mp3code/small_header.h:11-15`
+/// Type definition source: `oracle/codemp/client/../mp3code/small_header.h:11-15`
 #[repr(C)]
 pub union SAMPLE {
     pub s: i32,

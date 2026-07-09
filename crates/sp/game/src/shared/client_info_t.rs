@@ -8,34 +8,34 @@ use crate::teams::team::team_t;
 
 /// Raven `MAX_CUSTOM_BASIC_SOUNDS`.
 ///
-/// Source: `oracle/oracle/code/game/g_shared.h:70`
+/// Source: `oracle/code/game/g_shared.h:70`
 pub const MAX_CUSTOM_BASIC_SOUNDS: usize = 14;
 
 /// Raven `MAX_CUSTOM_COMBAT_SOUNDS`.
 ///
-/// Source: `oracle/oracle/code/game/g_shared.h:71`
+/// Source: `oracle/code/game/g_shared.h:71`
 pub const MAX_CUSTOM_COMBAT_SOUNDS: usize = 17;
 
 /// Raven `MAX_CUSTOM_EXTRA_SOUNDS`.
 ///
-/// Source: `oracle/oracle/code/game/g_shared.h:72`
+/// Source: `oracle/code/game/g_shared.h:72`
 pub const MAX_CUSTOM_EXTRA_SOUNDS: usize = 36;
 
 /// Raven `MAX_CUSTOM_JEDI_SOUNDS`.
 ///
-/// Source: `oracle/oracle/code/game/g_shared.h:73`
+/// Source: `oracle/code/game/g_shared.h:73`
 pub const MAX_CUSTOM_JEDI_SOUNDS: usize = 22;
 
 /// Raven `MAX_CUSTOM_SOUNDS`.
 ///
 /// Raven: `#define MAX_CUSTOM_SOUNDS (MAX_CUSTOM_JEDI_SOUNDS + MAX_CUSTOM_EXTRA_SOUNDS + MAX_CUSTOM_COMBAT_SOUNDS + MAX_CUSTOM_BASIC_SOUNDS)`.
-/// Source: `oracle/oracle/code/game/g_shared.h:74`
+/// Source: `oracle/code/game/g_shared.h:74`
 pub const MAX_CUSTOM_SOUNDS: usize =
     MAX_CUSTOM_JEDI_SOUNDS + MAX_CUSTOM_EXTRA_SOUNDS + MAX_CUSTOM_COMBAT_SOUNDS + MAX_CUSTOM_BASIC_SOUNDS;
 
 /// Raven `clientInfo_t` — per-client rendering info shared between game and cgame.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:76-103`
+/// Type definition source: `oracle/code/game/g_shared.h:76-103`
 #[repr(C)]
 pub struct clientInfo_t {
     pub infoValid: qboolean,

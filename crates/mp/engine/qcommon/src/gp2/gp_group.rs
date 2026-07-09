@@ -31,8 +31,8 @@ pub(crate) struct GpGroupNode {
 /// [`GenericParser2`], with the sorted view computed on demand. This type is a
 /// copyable borrow of one node, so Raven pointer walks like
 /// `group->GetParent()->FindPairValue(...)` translate directly.
-/// Class definition source: `oracle/oracle/codemp/qcommon/GenericParser2.h:93-134`
-/// Method source: `oracle/oracle/codemp/qcommon/GenericParser2.cpp:458-844`
+/// Class definition source: `oracle/codemp/qcommon/GenericParser2.h:93-134`
+/// Method source: `oracle/codemp/qcommon/GenericParser2.cpp:458-844`
 #[derive(Clone, Copy)]
 pub struct GpGroup<'a> {
     pub(crate) doc: &'a GenericParser2,

@@ -2,7 +2,7 @@
 
 /// Raven `dleaf_t` — BSP leaf.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:477-489`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:477-489`
 #[repr(C)]
 pub struct dleaf_t {
 	pub cluster: i32, // -1 = opaque cluster (do I still store these?)

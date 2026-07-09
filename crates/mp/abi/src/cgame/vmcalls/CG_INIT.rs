@@ -11,10 +11,10 @@ use abi_transport::generic::{
 /// Raven: called when the level loads or when the renderer is restarted
 /// Raven: reliableCommandSequence will be 0 on fresh loads, but higher for
 /// Raven: demos, tourney restarts, or vid_restarts
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:353-360`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:193-195`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:193-195`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_cgame.cpp:1777-1780`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:353-360`
+/// Args source: `oracle/codemp/cgame/cg_main.c:193-195`
+/// Output source: `oracle/codemp/cgame/cg_main.c:193-195`
+/// Transport/call-site source: `oracle/codemp/client/cl_cgame.cpp:1777-1780`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgInitArgs {
     server_message_num: c_int,

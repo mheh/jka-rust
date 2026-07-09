@@ -9,12 +9,12 @@ use super::rect_def_t::rectDef_t;
 use super::window_def_t::windowDef_t;
 
 // Raven `#define MAX_COLOR_RANGES 10`.
-// Source: `oracle/oracle/codemp/ui/ui_shared.h:18`
+// Source: `oracle/codemp/ui/ui_shared.h:18`
 const MAX_COLOR_RANGES: usize = 10;
 
 /// Raven `itemDef_s` — a single UI item (text, button, listbox, combo, etc.) within a menu.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:258-305`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:258-305`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct itemDef_s {
@@ -104,7 +104,7 @@ pub struct itemDef_s {
 
 /// Raven `itemDef_t` — `typedef struct itemDef_s itemDef_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:258-305`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:258-305`
 pub type itemDef_t = itemDef_s;
 
 #[cfg(target_pointer_width = "64")]

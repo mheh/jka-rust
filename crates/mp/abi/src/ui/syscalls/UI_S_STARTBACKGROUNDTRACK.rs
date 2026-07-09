@@ -14,9 +14,9 @@ use mp_qshared::shared::qboolean;
 /// The MP UI wrapper sends `bReturnWithoutStarting`, but the MP client switch
 /// ignores `args[3]` and passes `qfalse`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:396-397`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:1001`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1176-1178`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:396-397`
+/// Args source: `oracle/codemp/ui/ui_local.h:1001`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1176-1178`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiSStartbackgroundtrackArgs {
     intro: *const c_char,
@@ -52,10 +52,10 @@ impl UiSStartbackgroundtrackArgs {
 
 /// `UI_S_STARTBACKGROUNDTRACK` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:93`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:396-397`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1176-1178`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1176-1178`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:93`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:396-397`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1176-1178`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1176-1178`
 pub struct UiSStartbackgroundtrack;
 
 impl OutboundSysCall for UiSStartbackgroundtrack {

@@ -29,7 +29,7 @@ impl BotlibAiRemoveConsoleMessageArgs {
 
 /// `BOTLIB_AI_REMOVE_CONSOLE_MESSAGE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:424`
+/// Source: `oracle/codemp/game/g_public.h:424`
 pub struct BotlibAiRemoveConsoleMessage;
 
 impl OutboundSysCall for BotlibAiRemoveConsoleMessage {

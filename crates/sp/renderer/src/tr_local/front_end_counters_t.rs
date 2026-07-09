@@ -2,7 +2,7 @@
 
 /// Raven `frontEndCounters_t` — per-frame culling/surface statistics.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:1047-1056`
+/// Type definition source: `oracle/code/renderer/tr_local.h:1047-1056`
 #[repr(C)]
 pub struct frontEndCounters_t {
     pub c_sphere_cull_patch_in: i32,

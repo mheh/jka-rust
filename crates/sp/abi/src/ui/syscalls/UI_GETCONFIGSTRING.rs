@@ -6,7 +6,7 @@ use core::ffi::{c_char, c_int};
 
 /// `UI_GETCONFIGSTRING` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:197`
+/// Source: `oracle/code/ui/ui_public.h:197`
 pub struct UiGetconfigstring;
 
 #[derive(Debug)]
@@ -42,10 +42,10 @@ impl OutboundSysCall for UiGetconfigstring {
     type Import = SpUiImport;
     /// Raven wrapper: `syscall( UI_GETCONFIGSTRING, index, buff, buffsize );`
     ///
-    /// Args source: `oracle/oracle/code/client/cl_ui.cpp:141`
-    /// Output source: `oracle/oracle/code/client/cl_ui.cpp:141`
+    /// Args source: `oracle/code/client/cl_ui.cpp:141`
+    /// Output source: `oracle/code/client/cl_ui.cpp:141`
     ///
-    /// Transport/import source: `oracle/oracle/code/client/cl_ui.cpp:293`
+    /// Transport/import source: `oracle/code/client/cl_ui.cpp:293`
     type Args = UiGetconfigstringArgs;
     /// `GetConfigString` fills the provided buffer and returns `qboolean` in C helper.
     type Output = c_int;

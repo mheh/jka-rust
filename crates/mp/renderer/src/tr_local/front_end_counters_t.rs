@@ -2,7 +2,7 @@
 
 /// Raven `frontEndCounters_t` — front-end (CPU) rendering stat counters.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:1235-1244`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:1235-1244`
 #[repr(C)]
 pub struct frontEndCounters_t {
 	pub c_sphere_cull_patch_in: i32,

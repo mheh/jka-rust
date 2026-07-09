@@ -6,7 +6,7 @@ use sp_qshared::shared::MAX_QPATH;
 
 /// Raven `mdxaHeader_t` — GLA animation-file header.
 ///
-/// Type definition source: `oracle/oracle/code/game/../game/../renderer/mdx_format.h:351-371`
+/// Type definition source: `oracle/code/game/../game/../renderer/mdx_format.h:351-371`
 #[repr(C)]
 pub struct mdxaHeader_t {
     //

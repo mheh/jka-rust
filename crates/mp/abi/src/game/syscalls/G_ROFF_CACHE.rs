@@ -26,7 +26,7 @@ impl GRoffCacheArgs {
 /// `G_ROFF_CACHE` MP game imports syscall ABI token.
 ///
 /// Raven: int		ROFF_Cache(char *file);
-/// Source: `oracle/oracle/codemp/game/g_public.h:243`
+/// Source: `oracle/codemp/game/g_public.h:243`
 pub struct GRoffCache;
 
 impl OutboundSysCall for GRoffCache {

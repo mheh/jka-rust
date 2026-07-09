@@ -1,6 +1,6 @@
 //! MP Ghoul2 collision record types copied from Raven `codemp/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/q_shared.h:1871-1888`
+//! Source: `oracle/codemp/game/q_shared.h:1871-1888`
 
 #![allow(non_camel_case_types)]
 

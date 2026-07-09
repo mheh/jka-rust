@@ -1,6 +1,6 @@
 //! MP `bg_public.h` saber move animation data.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:1496-1508`
+//! Type definition source: `oracle/codemp/game/bg_public.h:1496-1508`
 
 #![allow(non_camel_case_types)]
 
@@ -12,7 +12,7 @@ use super::saber_move_name::saberMoveName_t;
 
 /// Raven `saberMoveData_t` — per-move animation and chaining data for a saber move.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:1496-1508`
+/// Type definition source: `oracle/codemp/game/bg_public.h:1496-1508`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct saberMoveData_t {

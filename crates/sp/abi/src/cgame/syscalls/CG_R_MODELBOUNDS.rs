@@ -10,9 +10,9 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `cgi_R_ModelBounds( qhandle_t model, vec3_t mins, vec3_t maxs )`
 /// Raven transport: `re.ModelBounds( args[1], (float *) VMA(2), (float *) VMA(3) );`
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:143`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:406`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:720-722`
+/// Enum value source: `oracle/code/cgame/cg_public.h:143`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:406`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:720-722`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRModelboundsArgs {
     model: qhandle_t,
@@ -40,10 +40,10 @@ impl CgRModelboundsArgs {
 
 /// `CG_R_MODELBOUNDS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:143`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:406`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:720-722`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:720-722`
+/// Enum value source: `oracle/code/cgame/cg_public.h:143`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:406`
+/// Output source: `oracle/code/client/cl_cgame.cpp:720-722`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:720-722`
 pub struct CgRModelbounds;
 
 impl OutboundSysCall for CgRModelbounds {

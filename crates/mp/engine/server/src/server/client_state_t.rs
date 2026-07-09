@@ -2,7 +2,7 @@
 
 /// Raven `clientState_t` — client connection state enumeration.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../server/server.h:114-121`
+/// Type definition source: `oracle/codemp/qcommon/../server/server.h:114-121`
 #[repr(i32)]
 pub enum clientState_t {
 	/// can be reused for a new connection

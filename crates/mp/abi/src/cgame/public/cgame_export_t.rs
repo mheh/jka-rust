@@ -2,7 +2,7 @@
 
 /// Raven `cgameExport_t` — cgame syscall export indices.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:352-440`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:352-440`
 #[repr(i32)]
 pub enum cgameExport_t {
 	CG_INIT,

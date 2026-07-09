@@ -11,9 +11,9 @@ use mp_qshared::common::mp::qcommon::sharedRagDollUpdateParams_t;
 /// Raven wrapper: `syscall(CG_G2_ANIMATEG2MODELS, ghoul2, time, params);`
 /// Raven transport: `sharedRagDollUpdateParams_t *rduParamst = (sharedRagDollUpdateParams_t *)VMA(3);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1003-1005`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2571`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1571-1591`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1003-1005`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2571`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1571-1591`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2Animateg2modelsArgs {
     ghoul2: *mut c_void,
@@ -38,10 +38,10 @@ impl CgG2Animateg2modelsArgs {
 /// `CG_G2_ANIMATEG2MODELS` MP cgame imports syscall ABI token.
 ///
 /// Raven: rww - RAGDOLL_BEGIN
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:297-301`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1003-1005`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1571-1591`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1571-1591`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:297-301`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1003-1005`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1571-1591`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1571-1591`
 pub struct CgG2Animateg2models;
 
 impl OutboundSysCall for CgG2Animateg2models {

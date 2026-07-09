@@ -9,8 +9,8 @@ use abi_transport::generic::{
 ///
 /// Raven wrapper: `void trap_G2API_SetBoltInfo(void *ghoul2, int modelIndex, int boltInfo)`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:604-606`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1357-1359`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:604-606`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1357-1359`
 #[derive(Debug)]
 pub struct UiG2SetboltonArgs {
     /// Ghoul2 instance pointer transported as raw `args[1]`.
@@ -43,11 +43,11 @@ impl UiG2SetboltonArgs {
 
 /// `UI_G2_SETBOLTON` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:164`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:164`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:604-606`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1357-1359`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1357-1359`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:164`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:164`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:604-606`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1357-1359`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1357-1359`
 pub struct UiG2Setbolton;
 
 impl OutboundSysCall for UiG2Setbolton {

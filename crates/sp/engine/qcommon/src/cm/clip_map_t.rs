@@ -16,7 +16,7 @@ use super::cmodel_s::cmodel_t;
 /// Raven `clipMap_t` — the collision model: parsed BSP geometry (planes, nodes,
 /// leafs, brushes, patch surfaces) plus area/visibility data used for tracing.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:156-206`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:156-206`
 #[repr(C)]
 pub struct clipMap_t {
     pub name: [c_char; MAX_QPATH],
@@ -71,7 +71,7 @@ pub struct clipMap_t {
     pub checkcount: c_int,
 
     //TODO: Port CCMLandScape
-    // Source: oracle/oracle/code/qcommon/cm_local.h:205
+    // Source: oracle/code/qcommon/cm_local.h:205
     pub landScape: *mut c_void,
 }
 

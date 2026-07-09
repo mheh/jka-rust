@@ -7,14 +7,14 @@ use sp_qshared::shared::qhandle_t;
 /// `UI_R_REGISTERSHADERNOMIP` SP UI imports syscall ABI token.
 ///
 /// Raven: 20
-/// Source: `oracle/oracle/code/ui/ui_public.h:172`
+/// Source: `oracle/code/ui/ui_public.h:172`
 pub struct UiRRegistershadernomip;
 
 impl OutboundSysCall for UiRRegistershadernomip {
     type Import = SpUiImport;
-    /// Args source: `oracle/oracle/code/ui/ui_public.h:49` and `oracle/oracle/code/client/cl_ui.cpp:394`.
+    /// Args source: `oracle/code/ui/ui_public.h:49` and `oracle/code/client/cl_ui.cpp:394`.
     type Args = *const c_char;
-    /// Output source: `oracle/oracle/code/ui/ui_public.h:49` and `oracle/oracle/code/client/cl_ui.cpp:394`.
+    /// Output source: `oracle/code/ui/ui_public.h:49` and `oracle/code/client/cl_ui.cpp:394`.
     type Output = qhandle_t;
 
     const IMPORT: SpUiImport = SpUiImport::UI_R_REGISTERSHADERNOMIP;

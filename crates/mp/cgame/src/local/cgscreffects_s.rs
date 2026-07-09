@@ -4,7 +4,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `cgscreffects_t` — cgame-side screen effect state (FOV kicks, shake, music ducking).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:1030-1042`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:1030-1042`
 #[repr(C)]
 pub struct cgscreffects_t {
 	pub FOV: f32,

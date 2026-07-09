@@ -14,7 +14,7 @@ impl GNavFreeArgs {
 
 /// `G_NAV_FREE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:299`
+/// Source: `oracle/codemp/game/g_public.h:299`
 pub struct GNavFree;
 
 impl OutboundSysCall for GNavFree {

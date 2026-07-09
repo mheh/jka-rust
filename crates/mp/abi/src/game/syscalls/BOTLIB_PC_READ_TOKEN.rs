@@ -29,7 +29,7 @@ impl BotlibPcReadTokenArgs {
 
 /// `BOTLIB_PC_READ_TOKEN` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:500`
+/// Source: `oracle/codemp/game/g_public.h:500`
 pub struct BotlibPcReadToken;
 
 impl OutboundSysCall for BotlibPcReadToken {

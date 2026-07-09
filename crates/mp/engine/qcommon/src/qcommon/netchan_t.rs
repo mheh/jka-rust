@@ -6,12 +6,12 @@ use mp_qshared::shared::qboolean;
 
 // Raven `MAX_MSGLEN` — max length of a message, which may be fragmented into
 // multiple packets.
-// Source: oracle/oracle/codemp/qcommon/qcommon.h:150
+// Source: oracle/codemp/qcommon/qcommon.h:150
 const MAX_MSGLEN: usize = 49152;
 
 /// Raven `netchan_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:163-186`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:163-186`
 #[repr(C)]
 pub struct netchan_t {
 	pub sock: netsrc_t,

@@ -25,7 +25,7 @@ impl GRmgInitArgs {
 
 /// `G_RMG_INIT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:573`
+/// Source: `oracle/codemp/game/g_public.h:573`
 pub struct GRmgInit;
 
 impl OutboundSysCall for GRmgInit {

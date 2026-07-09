@@ -33,7 +33,7 @@ impl BotlibAiLoadWeaponWeightsArgs {
 
 /// `BOTLIB_AI_LOAD_WEAPON_WEIGHTS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:477`
+/// Source: `oracle/codemp/game/g_public.h:477`
 pub struct BotlibAiLoadWeaponWeights;
 
 impl OutboundSysCall for BotlibAiLoadWeaponWeights {

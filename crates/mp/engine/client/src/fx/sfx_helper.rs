@@ -6,7 +6,7 @@ use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 /// (time, sound, tracing, scene/decal registration).
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/codemp/client/FxSystem.h:49-219`
+/// Type definition source: `oracle/codemp/client/FxSystem.h:49-219`
 #[repr(C)]
 pub struct SFxHelper {
     pub mTime: i32,

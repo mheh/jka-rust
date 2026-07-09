@@ -6,7 +6,7 @@ use super::fuzzyseperator_s::fuzzyseperator_t;
 
 /// Raven `weight_t` — named fuzzy weight (root of a separator tree).
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_ai_weight.h:32-36`
+/// Type definition source: `oracle/codemp/botlib/be_ai_weight.h:32-36`
 #[repr(C)]
 pub struct weight_t {
 	pub name: *mut c_char,

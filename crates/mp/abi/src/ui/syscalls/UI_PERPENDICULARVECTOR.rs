@@ -12,10 +12,10 @@ use mp_qshared::shared::vec3_t;
 /// vector is written through `dst`, so that out-buffer remains part of `Args`
 /// rather than becoming `Output`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:672`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:673`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:671`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:291`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:672`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:673`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:671`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:291`
 #[derive(Debug)]
 pub struct UiPerpendicularvectorArgs {
     dst: *mut vec3_t,
@@ -38,11 +38,11 @@ impl UiPerpendicularvectorArgs {
 
 /// `UI_PERPENDICULARVECTOR` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:139`
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:672`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:673`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:671`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:291`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:139`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:672`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:673`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:671`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:291`
 pub struct UiPerpendicularvector;
 
 impl OutboundSysCall for UiPerpendicularvector {

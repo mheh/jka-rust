@@ -6,9 +6,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall( UI_KEY_CLEARSTATES );`
 /// Raven transport: `Key_ClearStates(); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:242-243`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:957`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1029-1031`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:242-243`
+/// Args source: `oracle/codemp/ui/ui_local.h:957`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1029-1031`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct UiKeyClearstatesArgs;
 
@@ -20,11 +20,11 @@ impl UiKeyClearstatesArgs {
 
 /// `UI_KEY_CLEARSTATES` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:58`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:242-243`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:242-243`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1029-1031`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1029-1031`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:58`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:242-243`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:242-243`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1029-1031`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1029-1031`
 pub struct UiKeyClearstates;
 
 impl OutboundSysCall for UiKeyClearstates {

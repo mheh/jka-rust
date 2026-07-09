@@ -2,7 +2,7 @@
 
 /// Raven `evasionType_t` — evasion type enum.
 ///
-/// Type definition source: `oracle/oracle/code/game/wp_saber.h:191-204`
+/// Type definition source: `oracle/code/game/wp_saber.h:191-204`
 #[repr(i32)]
 pub enum evasionType_t {
 	EVASION_NONE = 0,

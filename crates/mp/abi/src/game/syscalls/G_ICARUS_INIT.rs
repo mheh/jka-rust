@@ -17,7 +17,7 @@ impl GIcarusInitArgs {
 
 /// `G_ICARUS_INIT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:255`
+/// Source: `oracle/codemp/game/g_public.h:255`
 pub struct GIcarusInit;
 
 impl OutboundSysCall for GIcarusInit {

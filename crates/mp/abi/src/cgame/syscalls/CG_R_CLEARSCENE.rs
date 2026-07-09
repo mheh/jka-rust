@@ -7,9 +7,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven transport: `re.ClearScene(); return 0;`
 ///
 /// Raven comment: `Nothing is drawn until R_RenderScene is called.`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:322-323`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2264-2265`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:888-890`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:322-323`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2264-2265`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:888-890`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgRClearsceneArgs;
 
@@ -21,10 +21,10 @@ impl CgRClearsceneArgs {
 
 /// `CG_R_CLEARSCENE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:149`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:322-323`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:888-890`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:888-890`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:149`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:322-323`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:888-890`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:888-890`
 pub struct CgRClearscene;
 
 impl OutboundSysCall for CgRClearscene {

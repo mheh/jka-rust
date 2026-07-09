@@ -52,7 +52,7 @@ impl GEntitiesInBoxArgs {
 /// Raven: ( const vec3_t mins, const vec3_t maxs, gentity_t **list, int maxcount );
 /// Raven: EntitiesInBox will return brush models based on their bounding box,
 /// Raven: so exact determination must still be done with EntityContact
-/// Source: `oracle/oracle/codemp/game/g_public.h:207`
+/// Source: `oracle/codemp/game/g_public.h:207`
 pub struct GEntitiesInBox;
 
 impl OutboundSysCall for GEntitiesInBox {

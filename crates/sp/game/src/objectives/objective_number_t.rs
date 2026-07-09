@@ -2,7 +2,7 @@
 
 /// Raven `objectiveNumber_t` — mission objective identifiers.
 ///
-/// Type definition source: `oracle/oracle/code/game/objectives.h:9-115`
+/// Type definition source: `oracle/code/game/objectives.h:9-115`
 #[repr(i32)]
 pub enum objectiveNumber_t {
 	LIGHTSIDE_OBJ = 0,

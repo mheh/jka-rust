@@ -1,6 +1,6 @@
 //! MP `bot_settings_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/g_local.h:1490-1496`
+//! Type definition source: `oracle/codemp/game/g_local.h:1490-1496`
 
 #![allow(non_camel_case_types)]
 

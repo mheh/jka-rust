@@ -2,7 +2,7 @@
 
 /// Raven `glyphInfo_t` — font glyph metrics and texture coordinates.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/qfiles.h:600-611`
+/// Type definition source: `oracle/code/qcommon/qfiles.h:600-611`
 #[repr(C)]
 pub struct glyphInfo_t {
 	/// number of pixels wide

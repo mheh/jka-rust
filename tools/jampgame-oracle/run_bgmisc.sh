@@ -19,7 +19,7 @@ cd "$(dirname "$0")"
 # the crate is self-contained; this harness only generates/checks it.
 DATA=../../crates/mp/game/tests/oracle
 
-ORACLE=../../oracle/oracle
+ORACLE=../../oracle
 G=$ORACLE/codemp/game
 Q=$ORACLE/codemp/qcommon
 B=build-bgmisc

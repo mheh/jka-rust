@@ -13,7 +13,7 @@ use crate::l_script::token_s::token_t;
 /// use / stack with scripts of the source / tokens to read first / list with
 /// macro definitions / hash chain with defines / stack with indents / > 0 if
 /// skipping conditional code / last read token.
-/// Type definition source: `oracle/oracle/codemp/botlib/l_precomp.h:80-92`
+/// Type definition source: `oracle/codemp/botlib/l_precomp.h:80-92`
 #[repr(C)]
 pub struct source_t {
     /// file name of the script

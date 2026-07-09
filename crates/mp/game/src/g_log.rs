@@ -1,4 +1,4 @@
-//! Weapon-statistics logging (`oracle/oracle/codemp/game/g_log.c`).
+//! Weapon-statistics logging (`oracle/codemp/game/g_log.c`).
 //!
 //! `g_log.c` opens with an unconditional `#define LOGGING_WEAPONS` (line 3), so
 //! every `#ifdef LOGGING_WEAPONS` block in the file compiles into the shipped
@@ -8,7 +8,7 @@
 //! via `ctx.world.globals`). `G_LogWeaponOutput` and `CalculateAwards` stay
 //! gated at *runtime* by the `g_statLog` cvar (default `"0"`), not at compile
 //! time.
-//! Source: `oracle/oracle/codemp/game/g_log.c:1-1752`
+//! Source: `oracle/codemp/game/g_log.c:1-1752`
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_combat::modNames;
@@ -28,7 +28,7 @@ use std::ffi::{CStr, CString};
 /// trailing 3 slots are C zero-init NULL (glibc `printf("%s", NULL)` renders
 /// those as `(null)`). The names are also index-shifted relative to the modern
 /// `weapon_t` enum (they predate `WP_MELEE`) — a faithful Raven quirk, preserved.
-/// Source: `oracle/oracle/codemp/game/g_log.c:79-97`
+/// Source: `oracle/codemp/game/g_log.c:79-97`
 const weaponNameFromIndex: [*const c_char; WP_NUM_WEAPONS as usize] = [
     c"No Weapon".as_ptr(),
     c"Stun Baton".as_ptr(),
@@ -54,7 +54,7 @@ const weaponNameFromIndex: [*const c_char; WP_NUM_WEAPONS as usize] = [
 /// Raven `G_LogWeaponInit` — zeroes every per-player weapon-log accumulator at
 /// level start. Faithfully omits `G_WeaponLogClientTouch` (the oracle's
 /// `memset` list skips it).
-/// Source: `oracle/oracle/codemp/game/g_log.c:108-121`
+/// Source: `oracle/codemp/game/g_log.c:108-121`
 pub fn G_LogWeaponInit(ctx: GameContext<'_>) {
     unsafe {
         let g = &mut (*ctx.world).globals;
@@ -72,7 +72,7 @@ pub fn G_LogWeaponInit(ctx: GameContext<'_>) {
 }
 
 /// Raven `G_LogWeaponPickup`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:123-129`
+/// Source: `oracle/codemp/game/g_log.c:123-129`
 pub fn G_LogWeaponPickup(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
     unsafe {
         let g = &mut (*ctx.world).globals;
@@ -83,7 +83,7 @@ pub fn G_LogWeaponPickup(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
 
 /// Raven `G_LogWeaponFire` — records a shot and the (capped at 5s) time since
 /// this client's last logged weapon action.
-/// Source: `oracle/oracle/codemp/game/g_log.c:131-145`
+/// Source: `oracle/codemp/game/g_log.c:131-145`
 pub fn G_LogWeaponFire(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
     unsafe {
         let time = (*ctx.world).level.time;
@@ -102,7 +102,7 @@ pub fn G_LogWeaponFire(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
 }
 
 /// Raven `G_LogWeaponDamage`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:147-155`
+/// Source: `oracle/codemp/game/g_log.c:147-155`
 pub fn G_LogWeaponDamage(ctx: GameContext<'_>, client: c_int, r#mod: c_int, amount: c_int) {
     if client >= MAX_CLIENTS as c_int {
         return;
@@ -115,7 +115,7 @@ pub fn G_LogWeaponDamage(ctx: GameContext<'_>, client: c_int, r#mod: c_int, amou
 }
 
 /// Raven `G_LogWeaponKill`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:157-165`
+/// Source: `oracle/codemp/game/g_log.c:157-165`
 pub fn G_LogWeaponKill(ctx: GameContext<'_>, client: c_int, r#mod: c_int) {
     if client >= MAX_CLIENTS as c_int {
         return;
@@ -128,7 +128,7 @@ pub fn G_LogWeaponKill(ctx: GameContext<'_>, client: c_int, r#mod: c_int) {
 }
 
 /// Raven `G_LogWeaponFrag`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:167-175`
+/// Source: `oracle/codemp/game/g_log.c:167-175`
 pub fn G_LogWeaponFrag(ctx: GameContext<'_>, attacker: c_int, deadguy: c_int) {
     if attacker >= MAX_CLIENTS as c_int || deadguy >= MAX_CLIENTS as c_int {
         return;
@@ -141,7 +141,7 @@ pub fn G_LogWeaponFrag(ctx: GameContext<'_>, attacker: c_int, deadguy: c_int) {
 }
 
 /// Raven `G_LogWeaponDeath`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:177-185`
+/// Source: `oracle/codemp/game/g_log.c:177-185`
 pub fn G_LogWeaponDeath(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
     if client >= MAX_CLIENTS as c_int {
         return;
@@ -154,7 +154,7 @@ pub fn G_LogWeaponDeath(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
 }
 
 /// Raven `G_LogWeaponPowerup`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:187-195`
+/// Source: `oracle/codemp/game/g_log.c:187-195`
 pub fn G_LogWeaponPowerup(ctx: GameContext<'_>, client: c_int, powerupid: c_int) {
     if client >= MAX_CLIENTS as c_int {
         return;
@@ -167,7 +167,7 @@ pub fn G_LogWeaponPowerup(ctx: GameContext<'_>, client: c_int, powerupid: c_int)
 }
 
 /// Raven `G_LogWeaponItem`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:197-205`
+/// Source: `oracle/codemp/game/g_log.c:197-205`
 pub fn G_LogWeaponItem(ctx: GameContext<'_>, client: c_int, itemid: c_int) {
     if client >= MAX_CLIENTS as c_int {
         return;
@@ -182,7 +182,7 @@ pub fn G_LogWeaponItem(ctx: GameContext<'_>, client: c_int, itemid: c_int) {
 /// Raven `G_LogWeaponOutput` — prints the aggregate weapon statistics to the
 /// console log and appends the per-player tables to `g_statLogFile`. Runtime-
 /// gated by the `g_statLog` cvar: returns immediately when it is `0`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:227-821`
+/// Source: `oracle/codemp/game/g_log.c:227-821`
 pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
     const WPN: usize = WP_NUM_WEAPONS as usize;
     const MODN: usize = meansOfDeath_t::MOD_MAX as usize;
@@ -537,7 +537,7 @@ fn weaponName(j: usize) -> String {
 
 /// Raven `CalculateEfficiency` — awards the accuracy leader if their hit ratio
 /// tops 50%. Writes the winner's efficiency percentage through `efficiency`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:824-863`
+/// Source: `oracle/codemp/game/g_log.c:824-863`
 pub fn CalculateEfficiency(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
@@ -578,7 +578,7 @@ pub fn CalculateEfficiency(
 
 /// Raven `CalculateSharpshooter` — awards the sniper-kills leader if they and
 /// the passed player both averaged at least one sniper kill per minute.
-/// Source: `oracle/oracle/codemp/game/g_log.c:866-903`
+/// Source: `oracle/codemp/game/g_log.c:866-903`
 pub fn CalculateSharpshooter(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
@@ -624,7 +624,7 @@ pub fn CalculateSharpshooter(
 
 /// Raven `CalculateUntouchable` — the "perfect game" award: at least two points
 /// per minute and never killed.
-/// Source: `oracle/oracle/codemp/game/g_log.c:906-928`
+/// Source: `oracle/codemp/game/g_log.c:906-928`
 pub fn CalculateUntouchable(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let ec = (*ent).client as *mut gclient_t;
@@ -651,7 +651,7 @@ pub fn CalculateUntouchable(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
 
 /// Raven `CalculateLogistics` — awards the player who used the most items and
 /// powerups, provided they used at least four distinct kinds.
-/// Source: `oracle/oracle/codemp/game/g_log.c:931-982`
+/// Source: `oracle/codemp/game/g_log.c:931-982`
 pub fn CalculateLogistics(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
@@ -702,7 +702,7 @@ pub fn CalculateLogistics(
 /// Raven `CalculateTactician` — awards the player who got a kill with every
 /// weapon available on the map (and the most such kills), given a two-per-minute
 /// score rate and no saber-only / Jedi-Master restriction.
-/// Source: `oracle/oracle/codemp/game/g_log.c:988-1081`
+/// Source: `oracle/codemp/game/g_log.c:988-1081`
 pub fn CalculateTactician(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
@@ -785,7 +785,7 @@ pub fn CalculateTactician(
 /// Raven `CalculateDemolitionist` — awards the explosive-kills leader, provided
 /// they averaged at least two explosive kills per minute (`playTime` measured
 /// from the passed player, a faithful Raven quirk).
-/// Source: `oracle/oracle/codemp/game/g_log.c:1087-1134`
+/// Source: `oracle/codemp/game/g_log.c:1087-1134`
 pub fn CalculateDemolitionist(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
@@ -838,14 +838,14 @@ pub fn CalculateDemolitionist(
 /// Raven: the live body is `#if 0`'d out (dead streak-award code — the
 /// comment above it says "No streak calculation, at least for now"); the
 /// only compiled statement is the trailing `return 0`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1136-1158`
+/// Source: `oracle/codemp/game/g_log.c:1136-1158`
 pub fn CalculateStreak(ent: *mut gentity_t) -> c_int {
     0
 }
 
 /// Raven `CalculateTeamMVP`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_log.c:1160-1188`
+/// Source: `oracle/codemp/game/g_log.c:1160-1188`
 pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -881,7 +881,7 @@ pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 /// Raven: the `team == PERS_TEAM && PERS_CLASS == PC_BORG` Borg-queen
 /// special case is commented out in the oracle (`#if 0`-equivalent
 /// `/* */`) — dead source, not ported.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1190-1240`
+/// Source: `oracle/codemp/game/g_log.c:1190-1240`
 pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -919,7 +919,7 @@ pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
 ///
 /// Raven: the `CalculateTeamMVP(ent)` short-circuit is commented out in the
 /// oracle — dead source, not ported.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1242-1276`
+/// Source: `oracle/codemp/game/g_log.c:1242-1276`
 pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -954,7 +954,7 @@ pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
 ///
 /// Raven: the `CalculateTeamMVP(ent) || CalculateTeamDefender(ent)`
 /// short-circuit is commented out in the oracle — dead source, not ported.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1278-1312`
+/// Source: `oracle/codemp/game/g_log.c:1278-1312`
 pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -989,7 +989,7 @@ pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
 ///
 /// Raven: the `CalculateTeamMVP/Defender/Warrior(ent)` short-circuit is
 /// commented out in the oracle — dead source, not ported.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1314-1348`
+/// Source: `oracle/codemp/game/g_log.c:1314-1348`
 pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -1024,7 +1024,7 @@ pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
 ///
 /// Raven: the `CalculateTeamMVP/Defender/Warrior/Carrier(ent)`
 /// short-circuit is commented out in the oracle — dead source, not ported.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1350-1386`
+/// Source: `oracle/codemp/game/g_log.c:1350-1386`
 pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -1060,7 +1060,7 @@ pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: *mut gentity_t) -> qb
 ///
 /// Raven: the `CalculateTeamMVP/Defender/Warrior/Carrier/Interceptor(ent)`
 /// short-circuit is commented out in the oracle — dead source, not ported.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1388-1424`
+/// Source: `oracle/codemp/game/g_log.c:1388-1424`
 pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -1100,7 +1100,7 @@ pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
 /// TEAM_WARRIOR "most frags"; TEAM_CARRIER "infected the most people with
 /// plague"; TEAM_INTERCEPTOR "returned your own flag the most";
 /// TEAM_BRAVERY "Red Shirt Award (tm). you died more than anybody."
-/// Source: `oracle/oracle/codemp/game/g_log.c:1438-1447`
+/// Source: `oracle/codemp/game/g_log.c:1438-1447`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TeamAward_e {
@@ -1116,7 +1116,7 @@ pub enum TeamAward_e {
 
 /// Raven `CalculateTeamAward`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_log.c:1451-1484`
+/// Source: `oracle/codemp/game/g_log.c:1451-1484`
 pub fn CalculateTeamAward(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int {
     unsafe {
         let mut team_awards: c_int = 0;
@@ -1150,7 +1150,7 @@ pub fn CalculateTeamAward(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int {
 
 /// Raven `CalculateSection31Award` — the all-around "god" award: sharpshooter,
 /// untouchable, and ≥75 efficiency all at once.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1486-1514`
+/// Source: `oracle/codemp/game/g_log.c:1486-1514`
 pub fn CalculateSection31Award(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
@@ -1175,7 +1175,7 @@ pub fn CalculateSection31Award(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbo
 }
 
 /// Raven `awardType_t` — award bit indices for `CalculateAwards`' flag word.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1426-1437`
+/// Source: `oracle/codemp/game/g_log.c:1426-1437`
 #[allow(non_camel_case_types)]
 #[repr(i32)]
 #[derive(Clone, Copy)]
@@ -1193,13 +1193,13 @@ enum awardType_t {
 }
 
 /// Raven `#define AWARDS_MSG_LENGTH 256`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1516`
+/// Source: `oracle/codemp/game/g_log.c:1516`
 const AWARDS_MSG_LENGTH: usize = 256;
 
 /// Raven `CalculateAwards` — appends this player's award flag word and per-award
 /// values onto `msg` (a fixed `AWARDS_MSG_LENGTH` buffer, truncated like
 /// `Com_sprintf`).
-/// Source: `oracle/oracle/codemp/game/g_log.c:1518-1587`
+/// Source: `oracle/codemp/game/g_log.c:1518-1587`
 pub fn CalculateAwards(ctx: GameContext<'_>, ent: *mut gentity_t, msg: *mut c_char) {
     unsafe {
         let old = cstr_to_str(msg).to_string();
@@ -1261,7 +1261,7 @@ pub fn CalculateAwards(ctx: GameContext<'_>, ent: *mut gentity_t, msg: *mut c_ch
 
 /// Raven `GetMaxDeathsForClient`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_log.c:1589-1605`
+/// Source: `oracle/codemp/game/g_log.c:1589-1605`
 pub fn GetMaxDeathsForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
     if nClient < 0 || nClient >= MAX_CLIENTS as c_int {
         return 0;
@@ -1280,7 +1280,7 @@ pub fn GetMaxDeathsForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
 
 /// Raven `GetMaxKillsForClient`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_log.c:1607-1623`
+/// Source: `oracle/codemp/game/g_log.c:1607-1623`
 pub fn GetMaxKillsForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
     if nClient < 0 || nClient >= MAX_CLIENTS as c_int {
         return 0;
@@ -1299,7 +1299,7 @@ pub fn GetMaxKillsForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
 
 /// Raven `GetFavoriteTargetForClient`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_log.c:1625-1642`
+/// Source: `oracle/codemp/game/g_log.c:1625-1642`
 pub fn GetFavoriteTargetForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
     if nClient < 0 || nClient >= MAX_CLIENTS as c_int {
         return 0;
@@ -1323,7 +1323,7 @@ pub fn GetFavoriteTargetForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int
 /// Raven: "If there is a tie for most deaths, we want to choose anybody
 /// else over the client... I.E. Most deaths should not tie with yourself
 /// and have yourself show up..."
-/// Source: `oracle/oracle/codemp/game/g_log.c:1644-1666`
+/// Source: `oracle/codemp/game/g_log.c:1644-1666`
 pub fn GetWorstEnemyForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
     if nClient < 0 || nClient >= MAX_CLIENTS as c_int {
         return 0;
@@ -1350,7 +1350,7 @@ pub fn GetWorstEnemyForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
 /// entries — the trailing entries (`MOD_FORCE_DARK`..`MOD_TRIGGER_HURT`) are
 /// C zero-init, which is `WP_NONE` (0) anyway, so this array is faithfully
 /// padded with `WP_NONE`.
-/// Source: `oracle/oracle/codemp/game/g_log.c:35-77`
+/// Source: `oracle/codemp/game/g_log.c:35-77`
 pub const weaponFromMOD: [c_int; meansOfDeath_t::MOD_MAX as usize] = {
     let mut table = [WP_NONE; meansOfDeath_t::MOD_MAX as usize];
     table[meansOfDeath_t::MOD_UNKNOWN as usize] = WP_NONE;
@@ -1398,7 +1398,7 @@ pub const weaponFromMOD: [c_int; meansOfDeath_t::MOD_MAX as usize] = {
 
 /// Raven `GetFavoriteWeaponForClient`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_log.c:1668-1702`
+/// Source: `oracle/codemp/game/g_log.c:1668-1702`
 pub fn GetFavoriteWeaponForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
     let mut n_most_kills: c_int = 0;
     let mut fav: c_int = 0;
@@ -1444,7 +1444,7 @@ pub fn GetFavoriteWeaponForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int
 ///
 /// Raven: kef -- if a client leaves the game, clear out all counters he may
 /// have set.
-/// Source: `oracle/oracle/codemp/game/g_log.c:1705-1751`
+/// Source: `oracle/codemp/game/g_log.c:1705-1751`
 pub fn G_ClearClientLog(ctx: GameContext<'_>, client: c_int) {
     unsafe {
         let g = &mut (*ctx.world).globals;

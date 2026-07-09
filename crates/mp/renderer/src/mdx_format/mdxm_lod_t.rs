@@ -4,7 +4,7 @@
 ///
 /// Raven: (used to contain numSurface/ofsSurfaces fields, but these are same
 /// per LOD level now).
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:203-207`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:203-207`
 #[repr(C)]
 pub struct mdxmLOD_t {
     /// offset to next LOD

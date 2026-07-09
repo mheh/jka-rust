@@ -2,7 +2,7 @@
 
 /// Raven `aas_node_t` — BSP node used to represent the world for tracing.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:200-205`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:200-205`
 #[repr(C)]
 pub struct aas_node_t {
 	pub planenum: i32,

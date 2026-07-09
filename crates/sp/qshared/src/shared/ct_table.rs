@@ -4,7 +4,7 @@
 ///
 /// SP-vs-MP: SP adds `CT_TITLE` immediately before `CT_MAX`; MP has no `CT_TITLE`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:355-440`
+/// Type definition source: `oracle/code/game/q_shared.h:355-440`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ct_table_t {

@@ -41,7 +41,7 @@ impl UiG2IkmoveArgs {
 
 /// `UI_G2_IKMOVE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:560`
+/// Source: `oracle/codemp/ui/ui_public.h:560`
 pub struct UiG2Ikmove;
 
 impl OutboundSysCall for UiG2Ikmove {

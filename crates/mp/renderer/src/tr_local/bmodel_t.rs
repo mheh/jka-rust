@@ -7,7 +7,7 @@ use super::msurface_s::msurface_t;
 
 /// Raven `bmodel_t` — an inline (brush) model's bounds and surface range.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:938-942`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:938-942`
 #[repr(C)]
 pub struct bmodel_t {
     // for culling

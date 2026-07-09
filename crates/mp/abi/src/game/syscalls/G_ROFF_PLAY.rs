@@ -41,7 +41,7 @@ impl GRoffPlayArgs {
 /// `G_ROFF_PLAY` MP game imports syscall ABI token.
 ///
 /// Raven: qboolean	ROFF_Play(int entID, int roffID, qboolean doTranslation);
-/// Source: `oracle/oracle/codemp/game/g_public.h:244`
+/// Source: `oracle/codemp/game/g_public.h:244`
 pub struct GRoffPlay;
 
 impl OutboundSysCall for GRoffPlay {

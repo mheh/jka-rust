@@ -27,7 +27,7 @@ impl GNavEdgefailedArgs {
 
 /// `G_NAV_EDGEFAILED` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:324`
+/// Source: `oracle/codemp/game/g_public.h:324`
 pub struct GNavEdgefailed;
 
 impl OutboundSysCall for GNavEdgefailed {

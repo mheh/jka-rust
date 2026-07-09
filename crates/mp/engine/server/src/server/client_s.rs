@@ -16,23 +16,23 @@ use super::client_state_t::clientState_t;
 
 /// Raven `MAX_RELIABLE_COMMANDS` — max string commands buffered for retransmit.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/qcommon.h:106`
+/// Source: `oracle/codemp/qcommon/qcommon.h:106`
 const MAX_RELIABLE_COMMANDS: usize = 128;
 
 /// Raven `MAX_DOWNLOAD_WINDOW` — max of eight download frames.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/qcommon.h:155`
+/// Source: `oracle/codemp/qcommon/qcommon.h:155`
 const MAX_DOWNLOAD_WINDOW: usize = 8;
 
 /// Raven `PACKET_BACKUP` — number of old messages that must be kept on
 /// client and server for delta comparison and ping estimation.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/qcommon.h:98`
+/// Source: `oracle/codemp/qcommon/qcommon.h:98`
 const PACKET_BACKUP: usize = 32;
 
 /// Raven `client_t` — server-side per-client connection state.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../server/server.h:124-182`
+/// Type definition source: `oracle/codemp/qcommon/../server/server.h:124-182`
 #[repr(C)]
 pub struct client_t {
 	pub state: clientState_t,

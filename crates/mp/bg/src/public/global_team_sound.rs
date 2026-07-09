@@ -1,12 +1,12 @@
 //! MP `bg_public.h` global team sound definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:993-1005`
+//! Type definition source: `oracle/codemp/game/bg_public.h:993-1005`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `global_team_sound_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:993-1005`
+/// Type definition source: `oracle/codemp/game/bg_public.h:993-1005`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum global_team_sound_t {

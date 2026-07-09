@@ -5,7 +5,7 @@
 //! (`item - bg_itemlist`); moved here (bg crate) so both mp_bg and jampgame
 //! consumers see one definition per the "family resolves together" rule.
 //!
-//! Source: `oracle/oracle/codemp/game/bg_misc.c:795-1771`
+//! Source: `oracle/codemp/game/bg_misc.c:795-1771`
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
@@ -22,7 +22,7 @@ use mp_qshared::common::mp::qcommon::game_item::gitem_t;
 /// "leave index 0 alone" sentinel per the Raven comment; last entry is the
 /// Raven `{NULL}` end-of-list marker).
 ///
-/// Source: `oracle/oracle/codemp/game/bg_misc.c:795-1770`
+/// Source: `oracle/codemp/game/bg_misc.c:795-1770`
 pub static bg_itemlist: [gitem_t; 52] = [
     gitem_t {
         classname: core::ptr::null_mut(),
@@ -706,5 +706,5 @@ pub static bg_itemlist: [gitem_t; 52] = [
 /// Raven `bg_numItems` = `sizeof(bg_itemlist) / sizeof(bg_itemlist[0]) - 1`
 /// (excludes the trailing `{NULL}` end-of-list marker).
 ///
-/// Source: `oracle/oracle/codemp/game/bg_misc.c:1771`
+/// Source: `oracle/codemp/game/bg_misc.c:1771`
 pub const bg_numItems: c_int = (bg_itemlist.len() - 1) as c_int;

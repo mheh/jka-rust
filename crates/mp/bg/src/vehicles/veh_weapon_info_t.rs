@@ -9,7 +9,7 @@ use mp_qshared::shared::qboolean;
 /// struct (including all elements of arrays) must be reflected by
 /// NUM_VWEAP_PARMS!!! *** IMPORTANT!!! *** vWeapFields table correponds to
 /// this structure!
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:35-64`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:35-64`
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct vehWeaponInfo_t {

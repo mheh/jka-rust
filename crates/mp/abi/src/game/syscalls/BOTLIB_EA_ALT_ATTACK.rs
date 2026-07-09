@@ -20,7 +20,7 @@ impl BotlibEaAltAttackArgs {
 
 /// `BOTLIB_EA_ALT_ATTACK` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:390`
+/// Source: `oracle/codemp/game/g_public.h:390`
 pub struct BotlibEaAltAttack;
 
 impl OutboundSysCall for BotlibEaAltAttack {

@@ -2,7 +2,7 @@
 
 /// Raven `deform_t` — Geometry deformation type.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:195-212`
+/// Type definition source: `oracle/code/renderer/tr_local.h:195-212`
 #[repr(i32)]
 pub enum deform_t {
 	DEFORM_NONE = 0,

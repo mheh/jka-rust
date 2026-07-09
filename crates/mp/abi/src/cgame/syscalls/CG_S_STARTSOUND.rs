@@ -15,10 +15,10 @@ use mp_qshared::shared::vec3_t;
 /// `entchannel`, and `sfx` as raw syscall words. `sfxHandle_t` is
 /// `typedef int` in Raven `q_shared.h`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:192-193`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2221`
-/// Args source: `oracle/oracle/codemp/game/q_shared.h:361`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:812-814`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:192-193`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2221`
+/// Args source: `oracle/codemp/game/q_shared.h:361`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:812-814`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSStartsoundArgs {
     /// Sound origin, decoded by Raven as `(float *)VMA(1)`.
@@ -70,12 +70,12 @@ impl CgSStartsoundArgs {
 /// Raven transport: `S_StartSound( (float *)VMA(1), args[2], args[3],
 /// args[4] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:97`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:192-193`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2221`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:192-194`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:812-814`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:812-814`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:97`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:192-193`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2221`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:192-194`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:812-814`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:812-814`
 pub struct CgSStartsound;
 
 impl OutboundSysCall for CgSStartsound {

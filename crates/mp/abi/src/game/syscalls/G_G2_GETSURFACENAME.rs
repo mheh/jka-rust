@@ -49,7 +49,7 @@ impl GG2GetsurfacenameArgs {
 
 /// `G_G2_GETSURFACENAME` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:569`
+/// Source: `oracle/codemp/game/g_public.h:569`
 pub struct GG2Getsurfacename;
 
 impl OutboundSysCall for GG2Getsurfacename {

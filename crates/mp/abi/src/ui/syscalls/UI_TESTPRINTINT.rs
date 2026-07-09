@@ -32,7 +32,7 @@ impl GTestprintintArgs {
 
 /// `UI_TESTPRINTINT` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:289`
+/// Source: `oracle/codemp/ui/ui_public.h:289`
 pub struct GTestprintint;
 
 impl OutboundSysCall for GTestprintint {

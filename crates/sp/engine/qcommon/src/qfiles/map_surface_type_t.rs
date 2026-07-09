@@ -2,7 +2,7 @@
 
 /// Raven `mapSurfaceType_t` — BSP map surface types.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/qfiles.h:540-546`
+/// Type definition source: `oracle/code/qcommon/qfiles.h:540-546`
 #[repr(i32)]
 pub enum mapSurfaceType_t {
 	MST_BAD = 0,

@@ -4,7 +4,7 @@ use core::ffi::{c_char, c_void};
 
 /// Raven `roff_list_t` — loaded ROFF (relative orientation-and-facing) file entry.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_roff.h:62-73`
+/// Type definition source: `oracle/code/game/g_roff.h:62-73`
 #[repr(C)]
 pub struct roff_list_t {
 	pub r#type: i32,                    // roff type number, 1-old, 2-new

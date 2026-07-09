@@ -13,7 +13,7 @@ section; this ledger holds only cross-cutting choices.
 
 The renderer is **not ported until much later** in the project. Until then the
 engine boots headless: MP dedicated uses Raven's own null path
-(`oracle/oracle/codemp/null/`), and MP client / SP get a **null-renderer
+(`oracle/codemp/null/`), and MP client / SP get a **null-renderer
 `refexport_t` stub** behind the same seam (renderer types are already ported,
 Wave 7). When the renderer is ported, **wgpu is the likely backend** (an
 idiomatic C++-track-style rewrite, not a fixed-function GL transcription) —
@@ -25,7 +25,7 @@ executables.
 
 > **Amendment 2026-07-02:** the earlier note that SP boots the renderer early
 > inside `Com_Init` was wrong — that block
-> (`oracle/oracle/code/qcommon/common.cpp:965-981`) is `#ifdef _XBOX` dead
+> (`oracle/code/qcommon/common.cpp:965-981`) is `#ifdef _XBOX` dead
 > code. On PC, SP initializes the renderer inside `CL_Init` like MP (A3
 > survey). Headless design needs no special SP early-boot handling.
 
@@ -38,8 +38,8 @@ Raven's poll-style `Sys_*`/input pump.
 > **Amendment 2026-07-02:** accepted divergence — under winit's `Poll` mode,
 > OS input arriving during the FPS-cap busy-spin is deferred one frame
 > (≤`1000/com_maxfps` ms; Raven pumps `PeekMessage` per spin iteration,
-> `oracle/oracle/codemp/qcommon/common.cpp:1647-1653` →
-> `oracle/oracle/codemp/win32/win_main.cpp:1211`). This sits below the
+> `oracle/codemp/qcommon/common.cpp:1647-1653` →
+> `oracle/codemp/win32/win_main.cpp:1211`). This sits below the
 > differential seam (journaling feeds the event ring directly). Recorded in
 > `lifecycle.md` LIFE-D1.
 
@@ -92,7 +92,7 @@ what "drop-in `jampded`" means.
 ## DEC-07 — SP cgame/ui: statically linked via the vmachine shim
 
 `sp/app` statically links `sp/cgame` + `sp/ui`; Raven's fake-VM shim
-(`oracle/oracle/code/client/vmachine.cpp`) survives as a thin dispatch layer
+(`oracle/code/client/vmachine.cpp`) survives as a thin dispatch layer
 preserving the `VM_Call` ABI shape — matching shipped `jasp`. The retail
 load-from-DLL variant is not ported. Resolves workspace-architecture's "SP
 transport" open item.
@@ -100,7 +100,7 @@ transport" open item.
 > **Amendment 2026-07-02:** the vmachine shim is preserved as the **inbound**
 > `VM_Call`-shaped dispatch surface into cgame's `vmMain` only; outbound
 > cgame→engine calls are direct typed calls through the `Static` transport (no
-> word packing — `oracle/oracle/code/client/vmachine.cpp:36-39`'s
+> word packing — `oracle/code/client/vmachine.cpp:36-39`'s
 > `VM_DllSyscall`→`CL_CgameSystemCalls` round-trip is internal plumbing with no
 > observable behavior). Recorded in `engine-seam.md` SEAM-D1.
 
@@ -115,8 +115,8 @@ control flow.
 
 > **Amendment 2026-07-02:** Raven's mechanism is C++ `throw`/`catch` (string
 > exceptions like `"DROPPED\n"` caught in `Com_Frame` —
-> `oracle/oracle/codemp/qcommon/common.cpp:1762`,
-> `oracle/oracle/code/qcommon/common.cpp:1450`), not setjmp/longjmp as first
+> `oracle/codemp/qcommon/common.cpp:1762`,
+> `oracle/code/qcommon/common.cpp:1450`), not setjmp/longjmp as first
 > recorded. Recovery runs *before* the throw; the catch prints and returns.
 > This maps onto panic+catch_unwind even more directly — the decision stands
 > unchanged. (A3 survey.)

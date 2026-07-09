@@ -34,7 +34,7 @@ impl GNavSetcheckednodeArgs {
 
 /// `G_NAV_SETCHECKEDNODE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:336`
+/// Source: `oracle/codemp/game/g_public.h:336`
 pub struct GNavSetcheckednode;
 
 impl OutboundSysCall for GNavSetcheckednode {

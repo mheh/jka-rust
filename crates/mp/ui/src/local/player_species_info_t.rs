@@ -4,12 +4,12 @@ use core::ffi::c_char;
 
 /// `MAX_PLAYERMODELS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:594`
+/// Source: `oracle/codemp/ui/ui_local.h:594`
 const MAX_PLAYERMODELS: usize = 32;
 
 /// Raven `playerSpeciesInfo_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:716-727`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:716-727`
 #[repr(C)]
 pub struct playerSpeciesInfo_t {
 	pub Name: [c_char; 64],

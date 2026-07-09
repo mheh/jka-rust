@@ -22,7 +22,7 @@ impl BotlibEaUseArgs {
 
 /// `BOTLIB_EA_USE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:392`
+/// Source: `oracle/codemp/game/g_public.h:392`
 pub struct BotlibEaUse;
 
 impl OutboundSysCall for BotlibEaUse {

@@ -13,8 +13,8 @@ use mp_qshared::shared::qboolean;
 /// `args[2]`. When `SubBSP` is true the client loads a sub BSP with
 /// `CM_LoadSubBSP`; otherwise it calls `CL_CM_LoadMap`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:123-124`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:771-780`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:123-124`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:771-780`
 #[derive(Debug)]
 pub struct CgCmLoadmapArgs {
     /// Map name C string decoded by Raven as `(const char *)VMA(1)`.
@@ -48,10 +48,10 @@ impl CgCmLoadmapArgs {
 /// Raven transport: if `args[2]`, call `CM_LoadSubBSP` with `VMA(1)`;
 /// otherwise call `CL_CM_LoadMap((const char *)VMA(1))`; the switch returns 0.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:83`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:123-124`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:779-780`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:771-780`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:83`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:123-124`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:779-780`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:771-780`
 pub struct CgCmLoadmap;
 
 impl OutboundSysCall for CgCmLoadmap {

@@ -34,7 +34,7 @@ impl GameNavEntIsRemovableUsableArgs {
 
 /// `GAME_NAV_ENTISREMOVABLEUSABLE` MP game exports vmMain ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:795`
+/// Source: `oracle/codemp/game/g_public.h:795`
 pub struct GameNavEntIsRemovableUsable;
 
 impl InboundVmCall for GameNavEntIsRemovableUsable {

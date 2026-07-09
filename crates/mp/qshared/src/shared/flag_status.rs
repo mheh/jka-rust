@@ -8,7 +8,7 @@ use core::ffi::c_int;
 /// `_flag_status` enum, so the alias stays an int and the enumerators are
 /// `const`s.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:3043-3050`
+/// Type definition source: `oracle/codemp/game/q_shared.h:3043-3050`
 pub type flagStatus_t = c_int;
 
 pub const FLAG_ATBASE: flagStatus_t = 0;

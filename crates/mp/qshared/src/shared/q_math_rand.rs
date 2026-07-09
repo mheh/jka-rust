@@ -5,7 +5,7 @@
 //! `crates/mp/game/src/bg_channel/rng.rs` (the generator is stateful, so it is
 //! an owned threaded object in `BgState`, not a qshared free function). Only
 //! this stateless `RAND_MAX` constant stays here.
-//! Source: `oracle/oracle/codemp/game/q_math.c:1432-1469`
+//! Source: `oracle/codemp/game/q_math.c:1432-1469`
 
 use core::ffi::c_int;
 
@@ -13,5 +13,5 @@ use core::ffi::c_int;
 /// by `32768.0F` (`0x8000`), i.e. treat the output range as `0..0x7fff`
 /// inclusive — the VC libc `RAND_MAX` convention. No `#define RAND_MAX`
 /// appears in `q_math.c` itself; this names that implicit constant.
-/// Source: `oracle/oracle/codemp/game/q_math.c:1445-1446,1465-1466`
+/// Source: `oracle/codemp/game/q_math.c:1445-1446,1465-1466`
 pub const RAND_MAX: c_int = 0x7fff;

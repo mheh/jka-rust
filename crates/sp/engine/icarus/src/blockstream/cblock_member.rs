@@ -5,7 +5,7 @@ use core::ffi::c_void;
 /// Raven `CBlockMember` — a single named/typed member of a block (id + size +
 /// data blob) written/read to Icarus block-format save files.
 ///
-/// Type definition source: `oracle/oracle/code/icarus/blockstream.h:15-89`
+/// Type definition source: `oracle/code/icarus/blockstream.h:15-89`
 #[repr(C)]
 pub struct CBlockMember {
 	/// ID of the value contained in data

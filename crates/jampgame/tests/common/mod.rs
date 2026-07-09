@@ -191,7 +191,7 @@ impl MockEngine {
         // point")` drops the game (g_client.c SelectSpawnPoint). After the stream
         // `G_GET_ENTITY_TOKEN` returns qfalse (end of entity string).
         // Contract: `qboolean trap_GetEntityToken( char *buffer, int bufferSize )`
-        // — Source: oracle/oracle/codemp/game/g_public.h:221.
+        // — Source: oracle/codemp/game/g_public.h:221.
         let tokens = [
             "{", "classname", "worldspawn", "}", //
             "{", "classname", "info_player_deathmatch", "origin", "0 0 100", "angle", "0", "}",
@@ -373,7 +373,7 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
             // ---- command args ----------------------------------------------
             // `int trap_Argc( void )` / `void trap_Argv( int n, char *buffer,
             // int bufferSize )` — the module's tokenized view of the current
-            // command. Source: oracle/oracle/codemp/game/g_public.h (trap_Argc/Argv).
+            // command. Source: oracle/codemp/game/g_public.h (trap_Argc/Argv).
             G_ARGC => m.cmd_args.len() as isize,
             G_ARGV => {
                 let idx = unsafe { word(args, 1) } as usize;
@@ -414,7 +414,7 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
                 // A realistic client userinfo drives ClientUserinfoChanged's key
                 // reads (name/model/color/sex/handicap/cg_predictItems/team_model
                 // /snaps/rate) faithfully; unknown clients get an empty string.
-                // Source: oracle/oracle/codemp/game/g_client.c:1912,2269 (trap_GetUserinfo).
+                // Source: oracle/codemp/game/g_client.c:1912,2269 (trap_GetUserinfo).
                 let num = unsafe { word(args, 1) } as c_int;
                 let s = m.userinfos.get(&num).cloned().unwrap_or_default();
                 unsafe { write_c_buffer(word(args, 2), word(args, 3), &s) };
@@ -422,7 +422,7 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
             }
             G_SET_USERINFO => {
                 // `void trap_SetUserinfo( int num, const char *buffer )`.
-                // Source: oracle/oracle/codemp/game/g_public.h (trap_SetUserinfo).
+                // Source: oracle/codemp/game/g_public.h (trap_SetUserinfo).
                 let num = unsafe { word(args, 1) } as c_int;
                 let s = unsafe { c_str(word(args, 2)) };
                 m.userinfos.insert(num, s);
@@ -439,7 +439,7 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
             // `void trap_GetUsercmd( int clientNum, usercmd_t *cmd )` — fill the
             // out-param from the per-client cmd the referee injected for this
             // frame (all-zero for unset clients — a valid idle cmd).
-            // Source: oracle/oracle/codemp/game/g_public.h:219.
+            // Source: oracle/codemp/game/g_public.h:219.
             G_GET_USERCMD => {
                 let num = unsafe { word(args, 1) } as c_int;
                 let out = unsafe { word(args, 2) } as *mut usercmd_t;

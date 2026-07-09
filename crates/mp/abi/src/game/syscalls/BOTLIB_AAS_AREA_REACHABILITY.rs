@@ -20,7 +20,7 @@ impl BotlibAasAreaReachabilityArgs {
 
 /// `BOTLIB_AAS_AREA_REACHABILITY` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:375`
+/// Source: `oracle/codemp/game/g_public.h:375`
 pub struct BotlibAasAreaReachability;
 
 impl OutboundSysCall for BotlibAasAreaReachability {

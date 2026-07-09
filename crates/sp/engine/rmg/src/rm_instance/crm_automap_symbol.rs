@@ -2,7 +2,7 @@
 
 /// Raven `CRMAutomapSymbol` — automap symbol drawn for an RMG instance.
 ///
-/// Type definition source: `oracle/oracle/code/Rmg/RM_Instance.h:13-23`
+/// Type definition source: `oracle/code/Rmg/RM_Instance.h:13-23`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CRMAutomapSymbol {

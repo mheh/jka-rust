@@ -2,7 +2,7 @@
 
 /// Raven `aas_reversedreachability_t` — reversed reachability links for one area.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:171-175`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:171-175`
 #[repr(C)]
 pub struct aas_reversedreachability_t {
 	pub numlinks: i32,

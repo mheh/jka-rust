@@ -1,6 +1,6 @@
 //! MP `bg_public.h` animation event descriptor.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:318-324`
+//! Type definition source: `oracle/codemp/game/bg_public.h:318-324`
 
 #![allow(non_camel_case_types)]
 
@@ -10,17 +10,17 @@ use super::anim_event_type::animEventType_t;
 
 /// Raven `MAX_RANDOM_ANIM_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:271`
+/// Source: `oracle/codemp/game/bg_public.h:271`
 pub const MAX_RANDOM_ANIM_SOUNDS: usize = 4;
 
 /// Raven `AED_ARRAY_SIZE`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:272`
+/// Source: `oracle/codemp/game/bg_public.h:272`
 pub const AED_ARRAY_SIZE: usize = MAX_RANDOM_ANIM_SOUNDS + 3;
 
 /// Raven `animevent_s` (`animevent_t`).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:318-324`
+/// Type definition source: `oracle/codemp/game/bg_public.h:318-324`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct animevent_t {

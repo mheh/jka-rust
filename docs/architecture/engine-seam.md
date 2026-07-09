@@ -49,9 +49,9 @@ Non-goals (punted, each with its owning doc):
 Every MP module exports `int vmMain( int command, int arg0..arg11 )` — a command
 word plus twelve `int`-sized argument words, regardless of host word width, and
 switches on its `GAME_*`/`CG_*`/`UI_*` command
-(`oracle/oracle/codemp/game/g_main.c:515`,
-`oracle/oracle/codemp/cgame/cg_main.c:190`,
-`oracle/oracle/codemp/ui/ui_main.c:579`). UI additionally answers a version-
+(`oracle/codemp/game/g_main.c:515`,
+`oracle/codemp/cgame/cg_main.c:190`,
+`oracle/codemp/ui/ui_main.c:579`). UI additionally answers a version-
 negotiation command `UI_GETAPIVERSION` (`ui/ui_main.c:581`). An **unrecognized
 command word** is handled per module: game and UI fall through the `switch` to
 `return -1` (`g_main.c:695`, `ui_main.c:624`), while cgame's `default` arm calls
@@ -63,7 +63,7 @@ for high-arity calls by reading a shared-memory struct (`gSharedBuffer`; `C_Trac
 
 Outbound, the module holds one poisoned variadic function pointer
 `static int (QDECL *syscall)( int arg, ... ) = ...-1;`
-(`oracle/oracle/codemp/game/g_syscalls.c:8`), set exactly once by the engine at
+(`oracle/codemp/game/g_syscalls.c:8`), set exactly once by the engine at
 load through `void dllEntry( int (QDECL *syscallptr)(...) ) { syscall = syscallptr; }`
 (`g_syscalls.c:14-16`). Each `trap_*` wrapper packs its args and calls
 `syscall(IMPORT, ...)`; the callee reinterprets the varargs region as a flat
@@ -77,7 +77,7 @@ because a native DLL shares the engine's address space (`trap_Trace`,
 
 Engine-side, each module's syscalls land in one dispatcher over `int *args`
 (`args[0]` = syscall number): `SV_GameSystemCalls`
-(`oracle/oracle/codemp/server/sv_game.cpp:458`), `CL_CgameSystemCalls`
+(`oracle/codemp/server/sv_game.cpp:458`), `CL_CgameSystemCalls`
 (`client/cl_cgame.cpp:644`), `CL_UISystemCalls` (`client/cl_ui.cpp:813`). Each
 reads pointer args through `VMA(x)` and float args through `VMF(x) =
 ((float*)args)[x]` (`sv_game.cpp:400-406`), inverting `PASSFLOAT` with
@@ -111,7 +111,7 @@ treats `&arg` as the base of a contiguous `int[]` (the comment block calls it
 
 SP game uses a **struct-of-function-pointers** ABI, not numbered syscalls:
 `game_import_t` / `game_export_t` are plain structs of typed C fn-pointer members
-(`oracle/oracle/code/game/g_public.h:168-527`), `GAME_API_VERSION = 8`
+(`oracle/code/game/g_public.h:168-527`), `GAME_API_VERSION = 8`
 (`g_public.h:5`), factory `game_export_t *GetGameApi( game_import_t *import );`
 (`g_public.h:529`). The definition copies the import struct by value
 (`gi = *import;`), fills each export field, sets `globals.gentitySize =
@@ -698,7 +698,7 @@ logic crates — **no** `dllEntry`/`vmMain`/`GetGameAPI`/`OnceLock` — so the
 Slice 0 (SEAM-D7) exercises exactly those two, and both trace to cited Raven
 ground truth (`dllEntry` `g_syscalls.c:14-16`; `vmMain` `g_main.c:515`). The
 third slot, `GetModuleAPI`, has **zero occurrences in the Raven oracle** (grep-
-verified across `oracle/oracle/**`): Raven 1.01 loads a native module through
+verified across `oracle/**`): Raven 1.01 loads a native module through
 `dllEntry`+`vmMain` alone (§ Raven ground truth), so its version-negotiation
 check, returned-table content, and call timing cannot be derived from oracle
 ground truth. It belongs to the OpenJK-native module-load handshake — the
@@ -1164,7 +1164,7 @@ function/struct/file per commit, slice-driven.
 - **SEAM-Q7 — `GetModuleAPI` export contract (OpenJK-native load handshake).**
   The QVM-module export list carries `GetModuleAPI(api_version, import) ->
   export_table`, but it has **zero occurrences in the Raven oracle** (grep-
-  verified across `oracle/oracle/**`): Raven 1.01 loads native modules through
+  verified across `oracle/**`): Raven 1.01 loads native modules through
   `dllEntry`+`vmMain` alone (§ Raven ground truth), and no cited doc
   (`tools/closure-prototype/NOTES.md`, the DEC-05 divergence record, included)
   captures OpenJK's version check, returned-table content, or call timing. Its

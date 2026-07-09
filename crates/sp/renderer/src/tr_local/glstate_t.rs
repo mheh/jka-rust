@@ -4,7 +4,7 @@ use sp_qshared::shared::qboolean;
 
 /// Raven `glstate_t` — persistent GL renderer state.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:1065-1072`
+/// Type definition source: `oracle/code/renderer/tr_local.h:1065-1072`
 #[repr(C)]
 pub struct glstate_t {
     pub currenttextures: [i32; 2],

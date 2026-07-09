@@ -1,6 +1,6 @@
 //! MP `bg_public.h` field descriptor.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:1263-1269`
+//! Type definition source: `oracle/codemp/game/bg_public.h:1263-1269`
 
 #![allow(non_camel_case_types)]
 
@@ -10,7 +10,7 @@ use super::fieldtype::fieldtype_t;
 
 /// Raven `BG_field_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:1263-1269`
+/// Type definition source: `oracle/codemp/game/bg_public.h:1263-1269`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BG_field_t {

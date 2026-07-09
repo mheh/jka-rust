@@ -1,6 +1,6 @@
 //! SP `bg_public.h` weapon state enumeration.
 //!
-//! Type definition source: `oracle/oracle/code/game/bg_public.h:72-80`
+//! Type definition source: `oracle/code/game/bg_public.h:72-80`
 
 #![allow(non_camel_case_types)]
 
@@ -8,7 +8,7 @@
 ///
 /// Enumeration indicating the current state of a weapon,
 /// such as ready, firing, charging, or idle.
-/// Type definition source: `oracle/oracle/code/game/bg_public.h:72-80`
+/// Type definition source: `oracle/code/game/bg_public.h:72-80`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum weaponstate_t {

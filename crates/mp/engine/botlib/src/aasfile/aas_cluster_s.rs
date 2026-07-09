@@ -2,7 +2,7 @@
 
 /// Raven `aas_cluster_t` — an AAS cluster.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:144-150`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:144-150`
 #[repr(C)]
 pub struct aas_cluster_t {
 	/// number of areas in the cluster

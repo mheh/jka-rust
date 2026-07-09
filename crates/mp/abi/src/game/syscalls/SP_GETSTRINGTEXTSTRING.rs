@@ -40,7 +40,7 @@ impl SpGetstringtextstringArgs {
 
 /// `SP_GETSTRINGTEXTSTRING` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:239`
+/// Source: `oracle/codemp/game/g_public.h:239`
 pub struct SpGetstringtextstring;
 
 impl OutboundSysCall for SpGetstringtextstring {

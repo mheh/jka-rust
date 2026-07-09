@@ -85,7 +85,7 @@ impl UiG2GetboltArgs {
 
 /// `UI_G2_GETBOLT` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:511`
+/// Source: `oracle/codemp/ui/ui_public.h:511`
 pub struct UiG2Getbolt;
 
 impl OutboundSysCall for UiG2Getbolt {

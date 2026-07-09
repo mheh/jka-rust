@@ -36,7 +36,7 @@ impl GG2DoesboneexistArgs {
 
 /// `G_G2_DOESBONEEXIST` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:536`
+/// Source: `oracle/codemp/game/g_public.h:536`
 pub struct GG2Doesboneexist;
 
 impl OutboundSysCall for GG2Doesboneexist {

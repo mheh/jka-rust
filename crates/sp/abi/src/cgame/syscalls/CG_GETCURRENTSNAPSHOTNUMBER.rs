@@ -11,9 +11,9 @@ use abi_transport::generic::{
 /// The SP client switch decodes both pointers as `VMA(1)` and `VMA(2)` and writes
 /// snapshot data through `CL_GetCurrentSnapshotNumber`, then returns `0`.
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:450-451`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:755-757`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:755-757`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:450-451`
+/// Output source: `oracle/code/client/cl_cgame.cpp:755-757`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:755-757`
 #[derive(Debug)]
 pub struct CgGetcurrentsnapshotnumberArgs {
     snapshot_number: *mut c_int,
@@ -44,10 +44,10 @@ impl CgGetcurrentsnapshotnumberArgs {
 
 /// `CG_GETCURRENTSNAPSHOTNUMBER` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:152`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:450-451`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:755-757`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:755-757`
+/// Enum value source: `oracle/code/cgame/cg_public.h:152`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:450-451`
+/// Output source: `oracle/code/client/cl_cgame.cpp:755-757`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:755-757`
 pub struct CgGetcurrentsnapshotnumber;
 
 impl OutboundSysCall for CgGetcurrentsnapshotnumber {

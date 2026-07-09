@@ -10,9 +10,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_WE_ADDWEATHERZONE, mins, maxs );`
 /// Raven transport: `R_AddWeatherZone( (vec_t *)VMA(1), (vec_t *)VMA(2) ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1115-1118`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2429`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1724-1726`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1115-1118`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2429`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1724-1726`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgWeAddweatherzoneArgs {
     mins: *const vec3_t,
@@ -28,10 +28,10 @@ impl CgWeAddweatherzoneArgs {
 /// `CG_WE_ADDWEATHERZONE` MP cgame imports syscall ABI token.
 ///
 /// Raven: Adding trap to get weather working
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:336`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1115-1118`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1724-1726`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1724-1726`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:336`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1115-1118`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1724-1726`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1724-1726`
 pub struct CgWeAddweatherzone;
 
 impl OutboundSysCall for CgWeAddweatherzone {

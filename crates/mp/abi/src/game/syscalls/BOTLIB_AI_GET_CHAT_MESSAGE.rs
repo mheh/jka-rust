@@ -40,7 +40,7 @@ impl BotlibAiGetChatMessageArgs {
 
 /// `BOTLIB_AI_GET_CHAT_MESSAGE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:488`
+/// Source: `oracle/codemp/game/g_public.h:488`
 pub struct BotlibAiGetChatMessage;
 
 impl OutboundSysCall for BotlibAiGetChatMessage {

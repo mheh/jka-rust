@@ -2,7 +2,7 @@
 
 /// Raven `T_G_ICARUS_SOUNDINDEX` — ICARUS sound-index registration args.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:916-919`
+/// Type definition source: `oracle/codemp/game/g_public.h:916-919`
 #[repr(C)]
 pub struct T_G_ICARUS_SOUNDINDEX {
     pub filename: [core::ffi::c_char; 2048],

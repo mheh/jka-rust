@@ -36,7 +36,7 @@ impl BotlibAiEnterChatArgs {
 
 /// `BOTLIB_AI_ENTER_CHAT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:430`
+/// Source: `oracle/codemp/game/g_public.h:430`
 pub struct BotlibAiEnterChat;
 
 impl OutboundSysCall for BotlibAiEnterChat {

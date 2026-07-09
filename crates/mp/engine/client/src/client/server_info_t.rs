@@ -8,7 +8,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `serverInfo_t` — a server's info as shown in the server browser.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/client.h:257-288`
+/// Type definition source: `oracle/codemp/client/client.h:257-288`
 #[repr(C)]
 pub struct serverInfo_t {
 	pub adr: netadr_t,

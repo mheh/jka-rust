@@ -1,9 +1,9 @@
-//! Faithful port of `oracle/oracle/codemp/game/NPC_AI_Sentry.c` (MP only).
+//! Faithful port of `oracle/codemp/game/NPC_AI_Sentry.c` (MP only).
 //!
 //! Sentry gun AI behavior: hovering turret NPC that maintains height, fires
 //! at enemies, and has separate idle/patrol/attack states.
 //!
-//! Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c`
+//! Source: `oracle/codemp/game/NPC_AI_Sentry.c`
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -23,12 +23,12 @@ const SENTRY_FORWARD_BASE_SPEED: f32 = 10.0f32;
 const SENTRY_FORWARD_MULTIPLIER: f32 = 5.0f32;
 /// `MIN_DISTANCE` 256; `MIN_DISTANCE_SQR` = 256*256 (no separate `MIN_DISTANCE`
 /// const ported — only the squared form is used at call sites).
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:9-10`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:9-10`
 const MIN_DISTANCE_SQR: f32 = 65536.0f32;
 
 /// Sentry `localState` enum (anonymous enum local to this TU).
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:23-30`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:23-30`
 const LSTATE_NONE: i32 = 0;
 const LSTATE_ASLEEP: i32 = 1;
 const LSTATE_WAKEUP: i32 = 2;
@@ -38,7 +38,7 @@ const LSTATE_ATTACKING: i32 = 5;
 
 /// `NPC_Sentry_Precache` — Precache sounds and effects for the sentry gun.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:37-57`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:37-57`
 pub fn NPC_Sentry_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_explo").as_ptr());
     crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_pain").as_ptr());
@@ -63,7 +63,7 @@ pub fn NPC_Sentry_Precache(ctx: GameContext<'_>) {
 
 /// `sentry_use` — Entrypoint when sentry gun is activated via trigger.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:64-72`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:64-72`
 pub fn sentry_use(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -87,7 +87,7 @@ pub fn sentry_use(
 
 /// `NPC_Sentry_Pain` — Sentry pain behavior (hit by damage).
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:79-105`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:79-105`
 pub fn NPC_Sentry_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -130,7 +130,7 @@ pub fn NPC_Sentry_Pain(
 
 /// `Sentry_Fire` — Fire a bryar projectile from one of the muzzle bolts.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:112-203`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:112-203`
 pub fn Sentry_Fire(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -273,7 +273,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
 
 /// `Sentry_MaintainHeight` — Maintain hover height relative to enemies/goals.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:210-304`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:210-304`
 pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -361,7 +361,7 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
 
 /// `Sentry_Idle` — Idle behavior; sleeping/waking up states.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:311-331`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:311-331`
 pub fn Sentry_Idle(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -393,7 +393,7 @@ pub fn Sentry_Idle(ctx: GameContext<'_>) {
 
 /// `Sentry_Strafe` — Perform a strafe maneuver.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:338-365`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:338-365`
 pub fn Sentry_Strafe(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -459,7 +459,7 @@ pub fn Sentry_Strafe(ctx: GameContext<'_>) {
 
 /// `Sentry_Hunt` — Hunt the enemy, either strafing or chasing.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:372-411`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:372-411`
 pub fn Sentry_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         let world = &mut *ctx.world;
@@ -520,7 +520,7 @@ pub fn Sentry_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
 
 /// `Sentry_RangedAttack` — Ranged attack behavior.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:418-448`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:418-448`
 pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         let world = &mut *ctx.world;
@@ -574,7 +574,7 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
 
 /// `Sentry_AttackDecision` — Decide how to attack the enemy.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:455-510`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:455-510`
 pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -659,7 +659,7 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
 
 /// `NPC_Sentry_Patrol` — Patrol behavior when no enemy.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:519-550`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:519-550`
 pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -702,7 +702,7 @@ pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
 
 /// `NPC_BSSentry_Default` — Main behavior state for sentry gun.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:557-577`
+/// Source: `oracle/codemp/game/NPC_AI_Sentry.c:557-577`
 pub fn NPC_BSSentry_Default(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;

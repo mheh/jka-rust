@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall(CG_G2_CLEANMODELS, ghoul2Ptr);`
 /// Raven transport: `G2API_CleanGhoul2Models((CGhoul2Info_v **)VMA(1)); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:856-858`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2548`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1374-1380`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:856-858`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2548`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1374-1380`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2CleanmodelsArgs {
     ghoul2_ptr: *mut *mut c_void,
@@ -26,10 +26,10 @@ impl CgG2CleanmodelsArgs {
 
 /// `CG_G2_CLEANMODELS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:267`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:856-858`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1374-1380`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1374-1380`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:267`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:856-858`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1374-1380`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1374-1380`
 pub struct CgG2Cleanmodels;
 
 impl OutboundSysCall for CgG2Cleanmodels {

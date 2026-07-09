@@ -6,7 +6,7 @@ use sp_qshared::shared::{fileHandle_t, fsMode_t};
 
 /// Raven `gameinfo_import_t` — engine import table for the SP gameinfo module.
 ///
-/// Type definition source: `oracle/oracle/code/ui/gameinfo.h:9-19`
+/// Type definition source: `oracle/code/ui/gameinfo.h:9-19`
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct gameinfo_import_t {
@@ -24,7 +24,7 @@ pub struct gameinfo_import_t {
     pub FS_ReadFile: Option<unsafe extern "C" fn(name: *const c_char, buf: *mut *mut c_void) -> c_int>,
     pub FS_FreeFile: Option<unsafe extern "C" fn(buf: *mut c_void)>,
     //TODO: Port Printf variadic args
-    // Source: oracle/oracle/code/ui/gameinfo.h:18
+    // Source: oracle/code/ui/gameinfo.h:18
     pub Printf: Option<unsafe extern "C" fn(fmt: *const c_char, ...)>,
 }
 

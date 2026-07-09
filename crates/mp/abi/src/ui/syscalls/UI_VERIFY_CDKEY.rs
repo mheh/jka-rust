@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( UI_VERIFY_CDKEY, key, chksum);`
 /// Raven transport: `return CL_CDKeyValidate((const char *)VMA(1), (const char *)VMA(2));`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:356-357`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:988`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1206-1207`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:356-357`
+/// Args source: `oracle/codemp/ui/ui_local.h:988`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1206-1207`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiVerifyCdkeyArgs {
     key: *const c_char,
@@ -36,11 +36,11 @@ impl UiVerifyCdkeyArgs {
 
 /// `UI_VERIFY_CDKEY` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:74`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:356-357`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:988`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1206-1207`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1206-1207`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:74`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:356-357`
+/// Output source: `oracle/codemp/ui/ui_local.h:988`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1206-1207`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1206-1207`
 pub struct UiVerifyCdkey;
 
 impl OutboundSysCall for UiVerifyCdkey {

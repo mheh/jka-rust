@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 /// Raven `keyname_t` — a key name/binding table entry.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/keys.h:36-43`
+/// Type definition source: `oracle/codemp/client/keys.h:36-43`
 #[repr(C)]
 pub struct keyname_t {
     pub upper: u16,

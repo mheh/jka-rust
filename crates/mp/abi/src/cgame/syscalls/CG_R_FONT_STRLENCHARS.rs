@@ -24,7 +24,7 @@ impl CgRFontStrlencharsArgs {
 
 /// `CG_R_FONT_STRLENCHARS` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:123`
+/// Source: `oracle/codemp/cgame/cg_public.h:123`
 pub struct CgRFontStrlenchars;
 
 impl OutboundSysCall for CgRFontStrlenchars {

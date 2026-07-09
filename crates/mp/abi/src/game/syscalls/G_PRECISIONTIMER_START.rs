@@ -28,7 +28,7 @@ impl GPrecisiontimerStartArgs {
 
 /// `G_PRECISIONTIMER_START` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:117`
+/// Source: `oracle/codemp/game/g_public.h:117`
 pub struct GPrecisiontimerStart;
 
 impl OutboundSysCall for GPrecisiontimerStart {

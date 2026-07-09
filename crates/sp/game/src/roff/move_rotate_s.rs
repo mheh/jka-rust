@@ -4,7 +4,7 @@ use sp_qshared::shared::vec3_t;
 
 /// Raven `move_rotate_t` — per-frame ROFF delta origin/rotation entry.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_roff.h:31-36`
+/// Type definition source: `oracle/code/game/g_roff.h:31-36`
 #[repr(C)]
 pub struct move_rotate_t {
 	pub origin_delta: vec3_t,

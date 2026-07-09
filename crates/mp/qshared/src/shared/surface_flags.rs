@@ -4,7 +4,7 @@
 //! Plain `#define` bit flags (not an enum), so §C8 makes them `const`s
 //! directly.
 //!
-//! Source: `oracle/oracle/codemp/game/surfaceflags.h:10-45`
+//! Source: `oracle/codemp/game/surfaceflags.h:10-45`
 
 use core::ffi::c_int;
 
@@ -50,7 +50,7 @@ pub const SURF_NOMISCENTS: c_int = 0x0100_0000; // no client models allowed on t
 // into `groundTrace.surfaceFlags` and masked out via `MATERIAL_MASK`). Only the
 // subset referenced by `bg_pmove.c`'s footstep/material handling is ported here;
 // add more `MATERIAL_*` values as they gain call sites.
-// Source: `oracle/oracle/codemp/game/surfaceflags.h:51-86`
+// Source: `oracle/codemp/game/surfaceflags.h:51-86`
 pub const MATERIAL_MASK: c_int = 0x1f;
 pub const MATERIAL_DIRT: c_int = 7;
 pub const MATERIAL_SAND: c_int = 8;
@@ -60,47 +60,47 @@ pub const MATERIAL_MUD: c_int = 17;
 
 /// Raven `MASK_ALL`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:1170`
+/// Source: `oracle/codemp/game/bg_public.h:1170`
 pub const MASK_ALL: c_int = -1;
 
 /// Raven `MASK_SOLID`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:1171`
+/// Source: `oracle/codemp/game/bg_public.h:1171`
 pub const MASK_SOLID: c_int = CONTENTS_SOLID | CONTENTS_TERRAIN;
 
 /// Raven `MASK_PLAYERSOLID`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:1172`
+/// Source: `oracle/codemp/game/bg_public.h:1172`
 pub const MASK_PLAYERSOLID: c_int = CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_BODY | CONTENTS_TERRAIN;
 
 /// Raven `MASK_NPCSOLID`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:1173`
+/// Source: `oracle/codemp/game/bg_public.h:1173`
 pub const MASK_NPCSOLID: c_int =
     CONTENTS_SOLID | CONTENTS_MONSTERCLIP | CONTENTS_BODY | CONTENTS_TERRAIN;
 
 /// Raven `MASK_DEADSOLID`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:1174`
+/// Source: `oracle/codemp/game/bg_public.h:1174`
 pub const MASK_DEADSOLID: c_int = CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_TERRAIN;
 
 /// Raven `MASK_WATER`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:1175`
+/// Source: `oracle/codemp/game/bg_public.h:1175`
 pub const MASK_WATER: c_int = CONTENTS_WATER | CONTENTS_LAVA | CONTENTS_SLIME;
 
 /// Raven `MASK_OPAQUE`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:1176`
+/// Source: `oracle/codemp/game/bg_public.h:1176`
 pub const MASK_OPAQUE: c_int = CONTENTS_SOLID | CONTENTS_SLIME | CONTENTS_LAVA | CONTENTS_TERRAIN;
 
 /// Raven `MASK_SHOT`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:1177`
+/// Source: `oracle/codemp/game/bg_public.h:1177`
 pub const MASK_SHOT: c_int = CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_CORPSE | CONTENTS_TERRAIN;
 
 /// Raven `SOLID_BMODEL` — an entity's `solid` field is set to this sentinel
 /// when the entity uses its brush model as its collision shape.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2642`
+/// Source: `oracle/codemp/game/q_shared.h:2642`
 pub const SOLID_BMODEL: c_int = 0xffffff;

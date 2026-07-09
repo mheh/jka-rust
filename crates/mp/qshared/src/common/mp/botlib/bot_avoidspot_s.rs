@@ -4,7 +4,7 @@ use crate::shared::vec3_t;
 
 /// Raven `bot_avoidspot_t` — a spot the bot movement code should avoid.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_ai_move.h:89-94`
+/// Type definition source: `oracle/codemp/game/be_ai_move.h:89-94`
 #[repr(C)]
 pub struct bot_avoidspot_t {
 	pub origin: vec3_t,

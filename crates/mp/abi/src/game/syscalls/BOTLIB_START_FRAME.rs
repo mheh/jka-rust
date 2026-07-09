@@ -27,7 +27,7 @@ impl BotlibStartFrameArgs {
 
 /// `BOTLIB_START_FRAME` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:347`
+/// Source: `oracle/codemp/game/g_public.h:347`
 pub struct BotlibStartFrame;
 
 impl OutboundSysCall for BotlibStartFrame {

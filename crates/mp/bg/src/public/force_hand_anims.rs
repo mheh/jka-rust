@@ -1,12 +1,12 @@
 //! MP `bg_public.h` force hand animation definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:149-170`
+//! Type definition source: `oracle/codemp/game/bg_public.h:149-170`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `forceHandAnims_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:149-170`
+/// Type definition source: `oracle/codemp/game/bg_public.h:149-170`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum forceHandAnims_t {

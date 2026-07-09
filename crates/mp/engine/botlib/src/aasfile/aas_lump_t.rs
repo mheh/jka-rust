@@ -3,7 +3,7 @@
 /// Raven `aas_lump_t` — offset and length of a lump within an AAS file.
 ///
 /// Raven: none.
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:210-214`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:210-214`
 #[repr(C)]
 pub struct aas_lump_t {
     pub fileofs: i32,

@@ -1,7 +1,7 @@
 //! MP `entityState_t` copied from Raven `codemp/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/q_shared.h:2662-2832`
-//! Xbox packed variant source: `oracle/oracle/codemp/game/q_shared.h:2841-2985`
+//! Source: `oracle/codemp/game/q_shared.h:2662-2832`
+//! Xbox packed variant source: `oracle/codemp/game/q_shared.h:2841-2985`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -11,7 +11,7 @@ use crate::shared::{qboolean, trajectory_t, vec3_t};
 
 /// Raven MP `entityState_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2670-2832`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2670-2832`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct entityState_t {

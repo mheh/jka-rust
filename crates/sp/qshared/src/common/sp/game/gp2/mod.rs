@@ -2,7 +2,7 @@
 //! FX system, ambient music sets, and terrain/RMG instance files. SP's copy
 //! lives in `code/game/` and is included by SP `q_shared.h`, hence this crate.
 //!
-//! C++-track idiomatic reimplementation of `oracle/oracle/code/game/genericparser2.{h,cpp}`:
+//! C++-track idiomatic reimplementation of `oracle/code/game/genericparser2.{h,cpp}`:
 //!
 //! - `CGenericParser2` → [`generic_parser2::GenericParser2`] (owns all nodes in
 //!   an arena), `CGPGroup` → [`gp_group::GpGroup`] (id + borrow wrapper),

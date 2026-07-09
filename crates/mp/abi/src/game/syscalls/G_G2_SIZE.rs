@@ -26,7 +26,7 @@ impl GG2SizeArgs {
 
 /// `G_G2_SIZE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:516`
+/// Source: `oracle/codemp/game/g_public.h:516`
 pub struct GG2Size;
 
 impl OutboundSysCall for GG2Size {

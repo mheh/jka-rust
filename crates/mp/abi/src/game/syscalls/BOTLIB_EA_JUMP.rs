@@ -23,7 +23,7 @@ impl BotlibEaJumpArgs {
 
 /// `BOTLIB_EA_JUMP` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:403`
+/// Source: `oracle/codemp/game/g_public.h:403`
 pub struct BotlibEaJump;
 
 impl OutboundSysCall for BotlibEaJump {

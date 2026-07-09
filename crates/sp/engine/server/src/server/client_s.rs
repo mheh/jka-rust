@@ -12,28 +12,28 @@ use super::client_state_t::clientState_t;
 
 /// Raven `MAX_INFO_STRING`.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:210`
+/// Source: `oracle/code/game/q_shared.h:210`
 const MAX_INFO_STRING: usize = 1024;
 
 /// Raven `MAX_RELIABLE_COMMANDS` — max string commands buffered for retransmit.
 ///
-/// Source: `oracle/oracle/code/qcommon/qcommon.h:125`
+/// Source: `oracle/code/qcommon/qcommon.h:125`
 const MAX_RELIABLE_COMMANDS: usize = 64;
 
 /// Raven `MAX_NAME_LENGTH` — max length of a client name.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:218`
+/// Source: `oracle/code/game/q_shared.h:218`
 const MAX_NAME_LENGTH: usize = 32;
 
 /// Raven `PACKET_BACKUP` — number of old messages that must be kept on client
 /// and server for delta compression and ping estimation.
 ///
-/// Source: `oracle/oracle/code/qcommon/qcommon.h:117`
+/// Source: `oracle/code/qcommon/qcommon.h:117`
 const PACKET_BACKUP: usize = 16;
 
 /// Raven `client_t` — server-side per-client connection state.
 ///
-/// Type definition source: `oracle/oracle/code/server/server.h:99-130`
+/// Type definition source: `oracle/code/server/server.h:99-130`
 #[repr(C)]
 pub struct client_t {
 	pub state: clientState_t,

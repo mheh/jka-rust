@@ -6,7 +6,7 @@ use native_types::qhandle_t;
 
 /// Raven `addspriteArgStruct_t` (`addspriteArgStruct_s`) — `CG_ADDSPRITE` VM args.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2579-2593`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2579-2593`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct addspriteArgStruct_t {

@@ -2,7 +2,7 @@
 
 /// Raven `gameExport_t` — enumeration of game export functions called by the engine.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:734-799`
+/// Type definition source: `oracle/codemp/game/g_public.h:734-799`
 #[repr(i32)]
 pub enum gameExport_t {
 	GAME_INIT,                          // ( int levelTime, int randomSeed, int restart );

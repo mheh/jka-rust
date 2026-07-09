@@ -11,7 +11,7 @@ use crate::shared::qboolean;
 /// (`CG_GETGLCONFIG` / `UI_GETGLCONFIG` copy one across the ABI seam).
 ///
 /// SP diverges from MP: extra `textureFilterAnisotropicAvailable` field.
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:199-226`
+/// Type definition source: `oracle/code/renderer/tr_types.h:199-226`
 #[repr(C)]
 pub struct glconfig_t {
     pub renderer_string: *const c_char,

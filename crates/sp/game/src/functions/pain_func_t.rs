@@ -2,7 +2,7 @@
 
 /// Raven `painFunc_t` — enumeration of entity pain/damage callback function IDs.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_functions.h:499-530`
+/// Type definition source: `oracle/code/game/g_functions.h:499-530`
 #[repr(i32)]
 pub enum painFunc_t {
     painF_NULL = 0,

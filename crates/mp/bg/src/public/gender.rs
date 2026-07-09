@@ -1,12 +1,12 @@
 //! MP `bg_public.h` gender definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:201-201`
+//! Type definition source: `oracle/codemp/game/bg_public.h:201-201`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `gender_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:201-201`
+/// Type definition source: `oracle/codemp/game/bg_public.h:201-201`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum gender_t {

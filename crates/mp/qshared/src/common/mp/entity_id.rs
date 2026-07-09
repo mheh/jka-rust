@@ -40,7 +40,7 @@ impl EntityId {
 /// `ent - g_entities` arithmetic; both are `#[repr(C)]` and the array is one
 /// allocation). Confined here so safe module logic never does pointer math.
 ///
-/// Source: `oracle/oracle/codemp/game/g_utils.c` (the `ent - g_entities` idiom,
+/// Source: `oracle/codemp/game/g_utils.c` (the `ent - g_entities` idiom,
 /// e.g. `G_FreeEntity`/`ENTITYNUM`).
 #[inline]
 pub unsafe fn ent_id(base: *const gentity_t, ent: *const gentity_t) -> EntityId {

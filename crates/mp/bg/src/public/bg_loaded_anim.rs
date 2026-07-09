@@ -1,6 +1,6 @@
 //! MP `bg_public.h` loaded animation config.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:326-333`
+//! Type definition source: `oracle/codemp/game/bg_public.h:326-333`
 
 #![allow(non_camel_case_types)]
 
@@ -12,7 +12,7 @@ use super::animation::animation_t;
 
 /// Raven `bgLoadedAnim_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:326-333`
+/// Type definition source: `oracle/codemp/game/bg_public.h:326-333`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct bgLoadedAnim_t {

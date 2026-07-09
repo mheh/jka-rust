@@ -9,10 +9,10 @@ use abi_transport::generic::{
 
 /// `GAME_NAV_CHECKNODEFAILEDFORENT` MP game exports vmMain ABI token.
 ///
-/// Source (enum): `oracle/oracle/codemp/game/g_public.h:791`
-/// Source (args): `oracle/oracle/codemp/game/g_main.c:678`
-/// Source (output): `oracle/oracle/codemp/game/g_main.c:678`
-/// Source (call site): `oracle/oracle/codemp/server/NPCNav/gameCallbacks.cpp:23`
+/// Source (enum): `oracle/codemp/game/g_public.h:791`
+/// Source (args): `oracle/codemp/game/g_main.c:678`
+/// Source (output): `oracle/codemp/game/g_main.c:678`
+/// Source (call site): `oracle/codemp/server/NPCNav/gameCallbacks.cpp:23`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GameNavChecknodefailedforentArgs {
     entity_num: c_int,

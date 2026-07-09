@@ -17,7 +17,7 @@ impl GRoffUpdateEntitiesArgs {
 /// `G_ROFF_UPDATE_ENTITIES` MP game imports syscall ABI token.
 ///
 /// Raven: void		ROFF_UpdateEntities(void);
-/// Source: `oracle/oracle/codemp/game/g_public.h:242`
+/// Source: `oracle/codemp/game/g_public.h:242`
 pub struct GRoffUpdateEntities;
 
 impl OutboundSysCall for GRoffUpdateEntities {

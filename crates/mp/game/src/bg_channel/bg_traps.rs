@@ -22,7 +22,7 @@ pub trait BgTraps {
     // --- pmove_t world-test callbacks (bg_public.h:484-485 semantics) ---
 
     /// Mirror of `pmove_t::trace` — `trap_Trace` against all linked entities.
-    /// Source: `oracle/oracle/codemp/game/bg_public.h:484`
+    /// Source: `oracle/codemp/game/bg_public.h:484`
     fn trace(
         &self,
         results: *mut trace_t,
@@ -35,20 +35,20 @@ pub trait BgTraps {
     );
 
     /// Mirror of `pmove_t::pointcontents` — `trap_PointContents`.
-    /// Source: `oracle/oracle/codemp/game/bg_public.h:485`
+    /// Source: `oracle/codemp/game/bg_public.h:485`
     fn pointcontents(&self, point: *const vec3_t, passEntityNum: c_int) -> c_int;
 
     // --- filesystem (trap_FS_*; bg saber/anim/vehicle loaders) ---
 
-    /// Raven `trap_FS_FOpenFile`. Source: `oracle/oracle/codemp/game/g_syscalls.c`
+    /// Raven `trap_FS_FOpenFile`. Source: `oracle/codemp/game/g_syscalls.c`
     fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int;
-    /// Raven `trap_FS_Read`. Source: `oracle/oracle/codemp/game/g_syscalls.c`
+    /// Raven `trap_FS_Read`. Source: `oracle/codemp/game/g_syscalls.c`
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t);
-    /// Raven `trap_FS_Write`. Source: `oracle/oracle/codemp/game/g_syscalls.c`
+    /// Raven `trap_FS_Write`. Source: `oracle/codemp/game/g_syscalls.c`
     fn fs_write(&self, buffer: *const c_void, len: c_int, f: fileHandle_t);
-    /// Raven `trap_FS_FCloseFile`. Source: `oracle/oracle/codemp/game/g_syscalls.c`
+    /// Raven `trap_FS_FCloseFile`. Source: `oracle/codemp/game/g_syscalls.c`
     fn fs_fclose(&self, f: fileHandle_t);
-    /// Raven `trap_FS_GetFileList`. Source: `oracle/oracle/codemp/game/g_syscalls.c`
+    /// Raven `trap_FS_GetFileList`. Source: `oracle/codemp/game/g_syscalls.c`
     fn fs_getfilelist(
         &self,
         path: *const c_char,
@@ -60,13 +60,13 @@ pub trait BgTraps {
     /// Mirror of `trap_R_RegisterSkin` — the bg-visible surface bg saber-load
     /// code (`WP_SaberParseParms`'s `customSkin` field) needs to register a
     /// skin without holding `&Engine`.
-    /// Source: `oracle/oracle/codemp/game/g_syscalls.c:1179-1182`
+    /// Source: `oracle/codemp/game/g_syscalls.c:1179-1182`
     fn r_register_skin(&self, name: *const c_char) -> qhandle_t;
 
     /// Mirror of `trap_G2API_InitGhoul2Model` — the bg-visible surface
     /// `BG_ModelCache`'s QAGAME branch needs to precache a ghoul2 model
     /// without holding `&Engine`.
-    /// Source: `oracle/oracle/codemp/game/g_syscalls.c:1223-1227`
+    /// Source: `oracle/codemp/game/g_syscalls.c:1223-1227`
     #[allow(clippy::too_many_arguments)]
     fn g2api_init_ghoul2_model(
         &self,
@@ -81,7 +81,7 @@ pub trait BgTraps {
 
     /// Mirror of `trap_G2API_CleanGhoul2Models` — bg-visible counterpart to
     /// `g2api_init_ghoul2_model` (`BG_ModelCache`'s QAGAME branch).
-    /// Source: `oracle/oracle/codemp/game/g_syscalls.c:1303-1306`
+    /// Source: `oracle/codemp/game/g_syscalls.c:1303-1306`
     fn g2api_clean_ghoul2_models(&self, ghoul2Ptr: *mut *mut c_void);
 
     // --- ghoul2 straps (the 10 strap_G2API_* wrappers, g_strap.c) ---
@@ -89,7 +89,7 @@ pub trait BgTraps {
     /// Raven `trap_G2API_AddBolt` — the bg-visible mirror of `crate::trap::G2API_AddBolt`
     /// (`G_G2_ADDBOLT` syscall), needed by bg vehicle-loader code (`AttachRidersGeneric`)
     /// that only has `&dyn BgTraps`, not `&Engine`.
-    /// Source: `oracle/oracle/codemp/game/g_syscalls.c:1239-1242`
+    /// Source: `oracle/codemp/game/g_syscalls.c:1239-1242`
     fn g2api_add_bolt(
         &self,
         ghoul2: *mut c_void,
@@ -97,7 +97,7 @@ pub trait BgTraps {
         boneName: *const c_char,
     ) -> c_int;
 
-    /// Raven `strap_G2API_GetBoltMatrix`. Source: `oracle/oracle/codemp/game/g_strap.c:6-10`
+    /// Raven `strap_G2API_GetBoltMatrix`. Source: `oracle/codemp/game/g_strap.c:6-10`
     fn g2api_get_bolt_matrix(
         &self,
         ghoul2: *mut c_void,
@@ -214,7 +214,7 @@ pub trait BgTraps {
 
     // --- effects / misc ---
 
-    /// Raven `trap_FX_PlayEffectID`. Source: `oracle/oracle/codemp/game/g_syscalls.c`
+    /// Raven `trap_FX_PlayEffectID`. Source: `oracle/codemp/game/g_syscalls.c`
     fn fx_play_effect_id(
         &self,
         fxID: c_int,
@@ -224,9 +224,9 @@ pub trait BgTraps {
         rad: c_int,
     );
     /// Raven `trap_SnapVector` — snap a vector to integer coords on the engine.
-    /// Source: `oracle/oracle/codemp/game/g_syscalls.c`
+    /// Source: `oracle/codemp/game/g_syscalls.c`
     fn snap_vector(&self, v: *mut f32);
-    /// Raven `trap_Cvar_Register`. Source: `oracle/oracle/codemp/game/g_syscalls.c`
+    /// Raven `trap_Cvar_Register`. Source: `oracle/codemp/game/g_syscalls.c`
     fn cvar_register(
         &self,
         cvar: *mut vmCvar_t,

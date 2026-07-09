@@ -2,7 +2,7 @@
 
 /// Raven `opcode_t` — VM instruction opcodes.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/vm_local.h:10-95`
+/// Type definition source: `oracle/codemp/qcommon/vm_local.h:10-95`
 #[repr(i32)]
 pub enum opcode_t {
     OP_UNDEF = 0,

@@ -21,7 +21,7 @@ impl GNavCalculatepathsArgs {
 
 /// `G_NAV_CALCULATEPATHS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:303`
+/// Source: `oracle/codemp/game/g_public.h:303`
 pub struct GNavCalculatepaths;
 
 impl OutboundSysCall for GNavCalculatepaths {

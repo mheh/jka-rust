@@ -12,7 +12,7 @@ use super::player_entity_t::playerEntity_t;
 /// Raven `centity_t` — client-side representation of an entity, tracked
 /// across snapshots for interpolation.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:130-176`
+/// Type definition source: `oracle/code/cgame/cg_local.h:130-176`
 #[repr(C)]
 pub struct centity_t {
 	/// from cg.frame

@@ -25,7 +25,7 @@ impl BotlibEaResetInputArgs {
 
 /// `BOTLIB_EA_RESET_INPUT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:410`
+/// Source: `oracle/codemp/game/g_public.h:410`
 pub struct BotlibEaResetInput;
 
 impl OutboundSysCall for BotlibEaResetInput {

@@ -6,7 +6,7 @@ use core::ffi::c_int;
 
 /// Raven `e_status` cinematic state wire value.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2670-2679`
+/// Type definition source: `oracle/code/game/q_shared.h:2670-2679`
 ///
 /// Kept as a transparent integer rather than a Rust enum so decoding syscall
 /// words remains ABI-safe even if an engine sends an out-of-range value.
@@ -41,10 +41,10 @@ impl e_status {
 
 /// Opaque Raven `uiClientState_t` payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_public.h:7-15`
+/// Type definition source: `oracle/codemp/ui/ui_public.h:7-15`
 ///
 /// SP Raven comments out the `trap_GetClientState` syscall wrapper in
-/// `oracle/oracle/code/ui/ui_syscalls.cpp:148-153`; keeping the payload opaque
+/// `oracle/code/ui/ui_syscalls.cpp:148-153`; keeping the payload opaque
 /// avoids claiming an SP layout that is not active in the SP UI transport.
 #[repr(C)]
 pub struct uiClientState_t {
@@ -55,5 +55,5 @@ pub struct uiClientState_t {
 /// `sp_qshared` (`common/sp/renderer/refdef_t.rs`); re-exported here for the
 /// syscall wrappers that transport it by pointer.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:159-176`
+/// Type definition source: `oracle/code/renderer/tr_types.h:159-176`
 pub use sp_qshared::common::sp::renderer::refdef_t::refdef_t;

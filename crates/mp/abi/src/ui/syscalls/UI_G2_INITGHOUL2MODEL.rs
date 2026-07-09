@@ -71,7 +71,7 @@ impl UiG2Initghoul2ModelArgs {
 
 /// `UI_G2_INITGHOUL2MODEL` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:514`
+/// Source: `oracle/codemp/ui/ui_public.h:514`
 pub struct UiG2Initghoul2Model;
 
 impl OutboundSysCall for UiG2Initghoul2Model {

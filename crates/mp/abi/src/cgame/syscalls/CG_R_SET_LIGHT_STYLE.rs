@@ -26,7 +26,7 @@ impl CgRSetLightStyleArgs {
 
 /// `CG_R_SET_LIGHT_STYLE` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:169`
+/// Source: `oracle/codemp/cgame/cg_public.h:169`
 pub struct CgRSetLightStyle;
 
 impl OutboundSysCall for CgRSetLightStyle {

@@ -5,12 +5,12 @@ use core::ffi::c_char;
 use mp_qshared::shared::qhandle_t;
 
 // Raven's `#define TEAM_MEMBERS 8//5`.
-// Source: oracle/oracle/codemp/ui/ui_local.h:581
+// Source: oracle/codemp/ui/ui_local.h:581
 pub const TEAM_MEMBERS: usize = 8;
 
 /// Raven `teamInfo` — per-team UI data (name, image, member list, icons).
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:614-622`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:614-622`
 #[repr(C)]
 pub struct teamInfo {
 	pub teamName: *const c_char,

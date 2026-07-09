@@ -8,7 +8,7 @@ use super::engine_slot::EngineSlot;
 /// with engine-seam SEAM-D11. Faithful `vm_s` mirror: the reuse-by-name key sits
 /// beside the handle/entry it identifies (`vm_local.h:119,122-123`).
 ///
-/// Source: `oracle/oracle/codemp/qcommon/vm_local.h:111-146`
+/// Source: `oracle/codemp/qcommon/vm_local.h:111-146`
 pub struct ModuleSlot {
     /// `vm->name` (`vm_local.h:119`): the bare module name, the reuse-by-name key
     /// `load_module`'s scan compares case-insensitively. `pub(crate)` (LOAD-D12f).

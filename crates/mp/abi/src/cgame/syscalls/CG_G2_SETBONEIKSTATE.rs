@@ -12,9 +12,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall(CG_G2_SETBONEIKSTATE, ghoul2, time, boneName, ikState, params);`
 /// Raven transport: `return G2API_SetBoneIKState(*((CGhoul2Info_v *)args[1]), args[2], (const char *)VMA(3), args[4], (sharedSetBoneIKStateParams_t *)VMA(5));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1040-1042`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2581`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1608-1609`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1040-1042`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2581`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1608-1609`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SetboneikstateArgs {
     ghoul2: *mut c_void,
@@ -46,10 +46,10 @@ impl CgG2SetboneikstateArgs {
 ///
 /// Raven: rww - ik move method, allows you to specify a bone and move it to a world point (within joint constraints)
 /// Raven: by using the majority of gil's existing bone angling stuff from the ragdoll code.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:316`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1040-1042`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1608-1609`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1608-1609`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:316`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1040-1042`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1608-1609`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1608-1609`
 pub struct CgG2Setboneikstate;
 
 impl OutboundSysCall for CgG2Setboneikstate {

@@ -8,9 +8,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall( CG_FX_ADJUST_TIME, time );`
 /// Raven transport: `FX_AdjustTime(args[1]); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:689-691`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2408`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1159-1161`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:689-691`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2408`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1159-1161`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxAdjustTimeArgs {
     time: c_int,
@@ -24,10 +24,10 @@ impl CgFxAdjustTimeArgs {
 
 /// `CG_FX_ADJUST_TIME` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:230`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:689-691`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1159-1161`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1159-1161`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:230`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:689-691`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1159-1161`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1159-1161`
 pub struct CgFxAdjustTime;
 
 impl OutboundSysCall for CgFxAdjustTime {

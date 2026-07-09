@@ -3,13 +3,13 @@
 use core::ffi::{c_char, c_float, c_int};
 
 // Raven `#define MAX_TEXTSCROLL_LINES 256`.
-// Source: `oracle/oracle/code/ui/ui_shared.h:6`
+// Source: `oracle/code/ui/ui_shared.h:6`
 const MAX_TEXTSCROLL_LINES: usize = 256;
 
 /// Raven `textScrollDef_s` (typedef `textScrollDef_t`) — a scrolling text box's
 /// line buffer and layout state.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_shared.h:461-475`
+/// Type definition source: `oracle/code/ui/ui_shared.h:461-475`
 #[repr(C)]
 pub struct textScrollDef_s {
     pub startPos: c_int,
@@ -27,7 +27,7 @@ pub struct textScrollDef_s {
 
 /// Raven `textScrollDef_t` — `typedef struct textScrollDef_s textScrollDef_t`.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_shared.h:461-475`
+/// Type definition source: `oracle/code/ui/ui_shared.h:461-475`
 pub type textScrollDef_t = textScrollDef_s;
 
 #[cfg(target_pointer_width = "64")]

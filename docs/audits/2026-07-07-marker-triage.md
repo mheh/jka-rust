@@ -453,5 +453,5 @@ Two patterns account for essentially all of it:
 2. **Raven's own comments, preserved verbatim** — `FIXME`/`rwwFIXMEFIXME`/
    `OVERRIDEFIXME` comments and dead `if(0)` branches confirmed
    byte-for-byte identical to the oracle C source (checked via direct
-   `grep` against `oracle/oracle/codemp/game/*.c`). These document
+   `grep` against `oracle/codemp/game/*.c`). These document
    upstream Raven dev notes and known engine-era gaps, not porting gaps.

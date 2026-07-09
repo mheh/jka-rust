@@ -2,7 +2,7 @@
 
 /// Raven `weapon_t` — weapon type enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/game/weapons.h:9-59`
+/// Type definition source: `oracle/code/game/weapons.h:9-59`
 #[repr(i32)]
 pub enum weapon_t {
     WP_NONE,

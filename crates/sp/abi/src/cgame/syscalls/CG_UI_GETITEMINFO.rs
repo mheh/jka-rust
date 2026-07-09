@@ -13,9 +13,9 @@ use sp_qshared::shared::vec4_t;
 /// Raven wrapper: `return(int) syscall(CG_UI_GETITEMINFO,menuFile,itemName,x,y,w,h,color,background);`
 /// Raven transport: `Menus_FindByName((char *) VMA(1)); ... (*color)[0]...; *background = item->window.background;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:628-630`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1221`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:895-917`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:628-630`
+/// Args source: `oracle/code/cgame/cg_local.h:1221`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:895-917`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiGetiteminfoArgs {
     menu_file: *const c_char,
@@ -87,11 +87,11 @@ impl CgUiGetiteminfoArgs {
 
 /// `CG_UI_GETITEMINFO` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:208`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:628-630`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1221`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:895-917`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:895-917`
+/// Enum value source: `oracle/code/cgame/cg_public.h:208`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:628-630`
+/// Args source: `oracle/code/cgame/cg_local.h:1221`
+/// Output source: `oracle/code/client/cl_cgame.cpp:895-917`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:895-917`
 pub struct CgUiGetiteminfo;
 
 impl OutboundSysCall for CgUiGetiteminfo {

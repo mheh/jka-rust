@@ -4,7 +4,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `score_t` — scoreboard entry sent from server-side score commands.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:630-646`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:630-646`
 #[repr(C)]
 pub struct score_t {
 	pub client: i32,

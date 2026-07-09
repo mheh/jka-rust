@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// C ABI: `void trap_R_AddRefEntityToScene(const refEntity_t *re)`.
 /// Raven's client switch forwards the raw `refEntity_t` block through `VMA(1)`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:174-175`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:174-175`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:960-961`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:174-175`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:174-175`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:960-961`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRAddrefentitytosceneArgs {
     pub ref_entity: *const c_void,
@@ -26,7 +26,7 @@ impl UiRAddrefentitytosceneArgs {
 
 /// `UI_R_ADDREFENTITYTOSCENE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:41`
+/// Source: `oracle/codemp/ui/ui_public.h:41`
 pub struct UiRAddrefentitytoscene;
 
 impl OutboundSysCall for UiRAddrefentitytoscene {

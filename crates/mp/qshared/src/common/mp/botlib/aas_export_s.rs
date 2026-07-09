@@ -13,7 +13,7 @@ use super::aas_predictroute_s::aas_predictroute_t;
 /// Raven `aas_export_t` — AAS (Area Awareness System) function table exported by
 /// the botlib to the game/cgame.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/botlib.h:195-253`
+/// Type definition source: `oracle/codemp/game/botlib.h:195-253`
 #[repr(C)]
 pub struct aas_export_s {
     //-----------------------------------

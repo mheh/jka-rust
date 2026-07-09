@@ -8,7 +8,7 @@ use core::ffi::c_int;
 // enum (unlike SP's named enum), so this stays an int alias + consts.
 /// Raven `stereoFrame_t` — which eye a frame is rendered for.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:278-284`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:278-284`
 pub type stereoFrame_t = c_int;
 
 /// Raven `STEREO_CENTER`.

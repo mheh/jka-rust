@@ -5,7 +5,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `ragCallbackTraceLine_t` — ragdoll trace-line callback payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:582-591`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:582-591`
 #[repr(C)]
 pub struct ragCallbackTraceLine_t {
 	pub tr: trace_t,

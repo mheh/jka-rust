@@ -10,7 +10,7 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_GETCONFIGSTRING, index, buff, buffsize );`
 /// Raven transport: `return GetConfigString( args[1], (char *)VMA(2), args[3] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:266-267`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:266-267`
 #[derive(Debug)]
 pub struct UiGetconfigstringArgs {
     index: c_int,
@@ -45,10 +45,10 @@ impl UiGetconfigstringArgs {
 /// Raven wrapper: `syscall( UI_GETCONFIGSTRING, index, buff, buffsize );`
 /// Raven transport: `return GetConfigString( args[1], (char *)VMA(2), args[3] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:64`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:266-267`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:963`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1052-1053`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:64`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:266-267`
+/// Output source: `oracle/codemp/ui/ui_local.h:963`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1052-1053`
 pub struct UiGetconfigstring;
 
 impl OutboundSysCall for UiGetconfigstring {

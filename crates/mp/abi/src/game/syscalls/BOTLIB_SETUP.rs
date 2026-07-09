@@ -15,7 +15,7 @@ impl BotlibSetupArgs {
 /// `BOTLIB_SETUP` MP game imports syscall ABI token.
 ///
 /// Raven: ( void );
-/// Source: `oracle/oracle/codemp/game/g_public.h:342`
+/// Source: `oracle/codemp/game/g_public.h:342`
 pub struct BotlibSetup;
 
 impl OutboundSysCall for BotlibSetup {

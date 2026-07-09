@@ -6,7 +6,7 @@ use super::fieldtype_save_t::fieldtypeSAVE_t;
 
 /// Raven `save_field_t` — one entry in a save/restore field table.
 ///
-/// Type definition source: `oracle/oracle/code/game/fields.h:55-60`
+/// Type definition source: `oracle/code/game/fields.h:55-60`
 #[repr(C)]
 pub struct save_field_t {
 	pub psName: *mut c_char,

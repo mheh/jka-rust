@@ -4,7 +4,7 @@ use sp_qshared::shared::qboolean;
 
 /// Raven `vehWeaponStats_t` — per-weapon-slot static vehicle weapon data.
 ///
-/// Type definition source: `oracle/oracle/code/game/G_Vehicles.h:113-130`
+/// Type definition source: `oracle/code/game/G_Vehicles.h:113-130`
 #[repr(C)]
 pub struct vehWeaponStats_t {
 	//*** IMPORTANT!!! *** See note at top of next structure!!! ***

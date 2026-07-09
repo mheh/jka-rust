@@ -5,10 +5,10 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 ///
 /// Raven wrapper: `cgi_R_ClearScene` calls `syscall( CG_R_CLEARSCENE );`
 /// Raven comment: `Nothing is drawn until R_RenderScene is called.`
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:131`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:362-363`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:686-688`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:686-688`
+/// Enum value source: `oracle/code/cgame/cg_public.h:131`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:362-363`
+/// Output source: `oracle/code/client/cl_cgame.cpp:686-688`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:686-688`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgRClearsceneArgs;
 

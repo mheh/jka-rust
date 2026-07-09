@@ -22,7 +22,7 @@ impl GNavFlagallnodesArgs {
 
 /// `G_NAV_FLAGALLNODES` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:337`
+/// Source: `oracle/codemp/game/g_public.h:337`
 pub struct GNavFlagallnodes;
 
 impl OutboundSysCall for GNavFlagallnodes {

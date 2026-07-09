@@ -1,5 +1,5 @@
 // PORT-COMPLETE: g_object.c 0/4
-//! FAITHFUL signature skeleton for `oracle/oracle/codemp/game/g_object.c`.
+//! FAITHFUL signature skeleton for `oracle/codemp/game/g_object.c`.
 //!
 //! All 4 functions in this file read ambient game state (`level`, `g_gravity`,
 //! `g_entities`) that is not reachable through the raw-pointer-only signatures
@@ -13,7 +13,7 @@ use crate::prelude::*;
 
 /// Raven `G_BounceObject`. Reflects velocity on trace plane.
 ///
-/// Source: `oracle/oracle/codemp/game/g_object.c:14-59`
+/// Source: `oracle/codemp/game/g_object.c:14-59`
 pub fn G_BounceObject(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut trace_t) {
     let mut velocity: [f32; 3] = [0.0; 3];
     let world = unsafe { &mut *ctx.world };
@@ -80,7 +80,7 @@ pub fn G_BounceObject(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut tra
 
 /// Raven `G_RunObject`. Main object physics simulation.
 ///
-/// Source: `oracle/oracle/codemp/game/g_object.c:72-241`
+/// Source: `oracle/codemp/game/g_object.c:72-241`
 pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
     let mut origin: [f32; 3] = [0.0; 3];
     let mut old_org: [f32; 3] = [0.0; 3];
@@ -259,7 +259,7 @@ pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `G_StopObjectMoving`. Stops an object from moving.
 ///
-/// Source: `oracle/oracle/codemp/game/g_object.c:244-258`
+/// Source: `oracle/codemp/game/g_object.c:244-258`
 pub fn G_StopObjectMoving(object: *mut gentity_t) {
     unsafe { (*object).s.pos.trType = TR_STATIONARY };
     crate::q_math::_VectorCopy(unsafe { (*object).r.currentOrigin }, unsafe { &mut (*object).s.origin });
@@ -275,7 +275,7 @@ pub fn G_StopObjectMoving(object: *mut gentity_t) {
 
 /// Raven `G_StartObjectMoving`. Starts an object moving with direction and speed.
 ///
-/// Source: `oracle/oracle/codemp/game/g_object.c:260-287`
+/// Source: `oracle/codemp/game/g_object.c:260-287`
 pub fn G_StartObjectMoving(
     ctx: GameContext<'_>,
     object: *mut gentity_t,

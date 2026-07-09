@@ -6,7 +6,7 @@ use mp_qshared::shared::MAX_QPATH;
 
 /// Raven `md3Header_t` — MD3 model file header.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:169-188`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:169-188`
 #[repr(C)]
 pub struct md3Header_t {
 	pub ident: i32,

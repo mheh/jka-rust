@@ -5,7 +5,7 @@
 //! constructor defaults live in `crate::common::sp::qcommon::collision_record`.
 //! Re-exported here so ghoul2-tier users find it at the owning header's home.
 //!
-//! Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:461-481`
+//! Type definition source: `oracle/code/game/ghoul2_shared.h:461-481`
 
 pub use crate::common::sp::qcommon::collision_record::{
     new_ccollision_record, CCollisionRecord, MAX_G2_COLLISIONS,

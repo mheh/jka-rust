@@ -15,8 +15,8 @@ use super::tokenizer::Tokenizer;
 /// either tree and is dropped, and `CGPGroup::Duplicate`/`CGPValue::Duplicate`
 /// collapse to `Clone` of the document. A failed parse keeps the partially
 /// built tree, as in Raven.
-/// Class definition source: `oracle/oracle/code/game/genericparser2.h:144-166`
-/// Method source: `oracle/oracle/code/game/genericparser2.cpp:832-893`
+/// Class definition source: `oracle/code/game/genericparser2.h:144-166`
+/// Method source: `oracle/code/game/genericparser2.cpp:832-893`
 #[derive(Debug, Clone)]
 pub struct GenericParser2 {
     pub(crate) groups: Vec<GpGroupNode>,

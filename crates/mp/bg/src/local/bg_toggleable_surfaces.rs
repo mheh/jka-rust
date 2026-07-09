@@ -8,8 +8,8 @@ use core::ffi::{c_int, CStr};
 /// names that can be toggled on/off (vehicle parts, cyborg canisters, etc.);
 /// scanned by consumers until the `NULL` sentinel (`None`) is hit.
 ///
-/// Definition source: `oracle/oracle/codemp/game/bg_misc.c:34-76`
-/// Extern decl source: `oracle/oracle/codemp/game/bg_public.h:145`
+/// Definition source: `oracle/codemp/game/bg_misc.c:34-76`
+/// Extern decl source: `oracle/codemp/game/bg_public.h:145`
 pub static bgToggleableSurfaces: [Option<&CStr>; 31] = [
     Some(c"l_arm_key"), //0
     Some(c"torso_canister1"),
@@ -57,8 +57,8 @@ pub static bgToggleableSurfaces: [Option<&CStr>; 31] = [
 /// effect index paired 1:1 with `bgToggleableSurfaces`; `-1` marks the
 /// sentinel slot past the real entries.
 ///
-/// Definition source: `oracle/oracle/codemp/game/bg_misc.c:78-111`
-/// Extern decl source: `oracle/oracle/codemp/game/bg_public.h:146`
+/// Definition source: `oracle/codemp/game/bg_misc.c:78-111`
+/// Extern decl source: `oracle/codemp/game/bg_public.h:146`
 pub static bgToggleableSurfaceDebris: [c_int; 31] = [
     0, //0
     0,

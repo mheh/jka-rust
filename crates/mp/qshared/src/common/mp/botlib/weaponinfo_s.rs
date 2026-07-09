@@ -8,12 +8,12 @@ use super::projectileinfo_s::projectileinfo_t;
 
 /// `MAX_STRINGFIELD`.
 ///
-/// Source: `oracle/oracle/codemp/botlib/l_struct.h:16`
+/// Source: `oracle/codemp/botlib/l_struct.h:16`
 const MAX_STRINGFIELD: usize = 80;
 
 /// Raven `weaponinfo_t` — bot AI weapon info.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_ai_weap.h:45-71`
+/// Type definition source: `oracle/codemp/game/be_ai_weap.h:45-71`
 #[repr(C)]
 pub struct weaponinfo_t {
 	/// true if the weapon info is valid

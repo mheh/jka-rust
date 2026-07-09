@@ -12,10 +12,10 @@ use mp_qshared::shared::vec3_t;
 /// computed vectors are written through those out-pointers, so they remain part
 /// of `Args` rather than becoming `Output`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:669`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:670`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:668`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:290`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:669`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:670`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:668`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:290`
 #[derive(Debug)]
 pub struct UiAnglevectorsArgs {
     angles: *const vec3_t,
@@ -58,11 +58,11 @@ impl UiAnglevectorsArgs {
 
 /// `UI_ANGLEVECTORS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:138`
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:669`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:670`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:668`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:290`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:138`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:669`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:670`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:668`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:290`
 pub struct UiAnglevectors;
 
 impl OutboundSysCall for UiAnglevectors {

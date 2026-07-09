@@ -11,9 +11,9 @@ use mp_qshared::shared::qhandle_t;
 /// Raven wrapper: `syscall( CG_G2_SETMODELS, ghoul2, modelList, skinList);`
 /// Raven transport: `G2API_SetGhoul2ModelIndexes( *((CGhoul2Info_v *)args[1]),(qhandle_t *)VMA(2),(qhandle_t *)VMA(3));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:781-783`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2517`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1307-1309`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:781-783`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2517`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1307-1309`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SetmodelsArgs {
     ghoul2: *mut c_void,
@@ -37,10 +37,10 @@ impl CgG2SetmodelsArgs {
 
 /// `CG_G2_SETMODELS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:258`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:781-783`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1307-1309`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1307-1309`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:258`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:781-783`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1307-1309`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1307-1309`
 pub struct CgG2Setmodels;
 
 impl OutboundSysCall for CgG2Setmodels {

@@ -2,7 +2,7 @@
 
 /// Raven `saberBlockedType_t` — saber block reaction types.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:358-372`
+/// Type definition source: `oracle/code/game/g_shared.h:358-372`
 #[repr(i32)]
 pub enum saberBlockedType_t {
     BLOCKED_NONE = 0,

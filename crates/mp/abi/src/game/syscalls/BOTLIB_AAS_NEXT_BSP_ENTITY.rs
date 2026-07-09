@@ -22,7 +22,7 @@ impl BotlibAasNextBspEntityArgs {
 
 /// `BOTLIB_AAS_NEXT_BSP_ENTITY` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:369`
+/// Source: `oracle/codemp/game/g_public.h:369`
 pub struct BotlibAasNextBspEntity;
 
 impl OutboundSysCall for BotlibAasNextBspEntity {

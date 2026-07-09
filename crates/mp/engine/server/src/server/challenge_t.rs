@@ -5,7 +5,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `challenge_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../server/server.h:194-201`
+/// Type definition source: `oracle/codemp/qcommon/../server/server.h:194-201`
 #[repr(C)]
 pub struct challenge_t {
 	pub adr: netadr_t,

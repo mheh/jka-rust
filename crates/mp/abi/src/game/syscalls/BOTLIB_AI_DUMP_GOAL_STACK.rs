@@ -22,7 +22,7 @@ impl BotlibAiDumpGoalStackArgs {
 
 /// `BOTLIB_AI_DUMP_GOAL_STACK` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:446`
+/// Source: `oracle/codemp/game/g_public.h:446`
 pub struct BotlibAiDumpGoalStack;
 
 impl OutboundSysCall for BotlibAiDumpGoalStack {

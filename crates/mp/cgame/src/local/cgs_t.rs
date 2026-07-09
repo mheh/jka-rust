@@ -22,7 +22,7 @@ use super::client_info_t::clientInfo_t;
 /// Raven `cgs_t` — the entire cgame state that persists across an active
 /// connection, similar to `svs.clients[]`.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:1516-1609`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:1516-1609`
 #[repr(C)]
 pub struct cgs_t {
     /// gamestate from server

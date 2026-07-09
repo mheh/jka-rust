@@ -5,7 +5,7 @@ use std::os::raw::c_int;
 /// Raven `wavinfo_t` — parsed WAV file header info.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/code/client/snd_local.h:137-144`
+/// Type definition source: `oracle/code/client/snd_local.h:137-144`
 #[repr(C)]
 pub struct wavinfo_t {
 	pub format: c_int,

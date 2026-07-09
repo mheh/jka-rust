@@ -8,9 +8,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall( UI_KEY_SETCATCHER, catcher );`
 /// Raven transport: `Key_SetCatcher( args[1] ); return 0;`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:193`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp:411-412`
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:411-413`
+/// Enum source: `oracle/code/ui/ui_public.h:193`
+/// Args source: `oracle/code/client/cl_ui.cpp:411-412`
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:411-413`
 pub struct UiKeySetcatcherArgs {
     /// Key catcher mask, read by Raven as `args[1]`.
     catcher: c_int,
@@ -28,7 +28,7 @@ impl UiKeySetcatcherArgs {
 
 /// `UI_KEY_SETCATCHER` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:193`
+/// Source: `oracle/code/ui/ui_public.h:193`
 pub struct UiKeySetcatcher;
 
 impl OutboundSysCall for UiKeySetcatcher {

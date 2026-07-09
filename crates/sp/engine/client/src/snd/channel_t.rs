@@ -9,7 +9,7 @@ use crate::snd::streamingbuffer::STREAMINGBUFFER;
 
 /// `NUM_STREAMING_BUFFERS` — OpenAL streaming buffers per channel.
 ///
-/// Source: `oracle/oracle/code/client/snd_local.h:87`
+/// Source: `oracle/code/client/snd_local.h:87`
 pub const NUM_STREAMING_BUFFERS: usize = 4;
 
 /// Raven `channel_t` — a live sound-playback channel (mixer slot / OpenAL source).
@@ -17,7 +17,7 @@ pub const NUM_STREAMING_BUFFERS: usize = 4;
 /// Raven: back-indented fields new in TA codebase, will re-format when MP3 code finished -ste;
 /// note: field missing in TA: `qboolean loopSound;` // from an `S_AddLoopSound` call, cleared
 /// each frame.
-/// Type definition source: `oracle/oracle/code/client/snd_local.h:94-129`
+/// Type definition source: `oracle/code/client/snd_local.h:94-129`
 #[repr(C)]
 pub struct channel_t {
     /// START_SAMPLE_IMMEDIATE = set immediately on next mix

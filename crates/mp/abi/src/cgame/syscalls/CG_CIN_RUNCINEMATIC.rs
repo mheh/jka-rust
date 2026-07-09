@@ -10,9 +10,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall(CG_CIN_RUNCINEMATIC, handle)`.
 /// Raven transport: `return CIN_RunCinematic(args[1]);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:596-597`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2383`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1031-1032`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:596-597`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2383`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1031-1032`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCinRuncinematicArgs {
     handle: c_int,
@@ -32,11 +32,11 @@ impl CgCinRuncinematicArgs {
 ///
 /// Raven `e_status` is an integer transport value.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:212`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:596-597`
-/// Output source: `oracle/oracle/codemp/cgame/cg_local.h:2383`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1031-1032`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1031-1032`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:212`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:596-597`
+/// Output source: `oracle/codemp/cgame/cg_local.h:2383`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1031-1032`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1031-1032`
 pub struct CgCinRuncinematic;
 
 impl OutboundSysCall for CgCinRuncinematic {

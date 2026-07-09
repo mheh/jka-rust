@@ -22,7 +22,7 @@ impl GFloorArgs {
 
 /// `G_FLOOR` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:286`
+/// Source: `oracle/codemp/game/g_public.h:286`
 pub struct GFloor;
 
 impl OutboundSysCall for GFloor {

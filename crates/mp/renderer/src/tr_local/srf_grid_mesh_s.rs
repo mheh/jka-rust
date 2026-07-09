@@ -7,7 +7,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `srfGridMesh_t` — bezier patch surface (curved surface tessellation).
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:750-774`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:750-774`
 #[repr(C)]
 pub struct srfGridMesh_t {
 	pub surfaceType: surfaceType_t,

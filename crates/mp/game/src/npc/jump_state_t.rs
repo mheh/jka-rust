@@ -2,7 +2,7 @@
 
 /// Raven `jumpState_t` — jump animation state for AI.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/b_public.h:77-84`
+/// Type definition source: `oracle/codemp/game/b_public.h:77-84`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum jumpState_t {

@@ -6,12 +6,12 @@ use sp_engine_qcommon::qcommon::netadr_t::netadr_t;
 
 /// Raven `MAX_INFO_STRING`.
 ///
-/// Source: `oracle/oracle/code/client/client.h:52`
+/// Source: `oracle/code/client/client.h:52`
 const MAX_INFO_STRING: usize = 1024;
 
 /// Raven `getserversResponse_t`.
 ///
-/// Type definition source: `oracle/oracle/code/client/client.h:188-191`
+/// Type definition source: `oracle/code/client/client.h:188-191`
 #[repr(C)]
 pub struct getserversResponse_t {
 	pub netadr: netadr_t,

@@ -15,7 +15,7 @@ use super::tr_ref_entity_t::trRefEntity_t;
 
 /// Raven `trRefdef_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:563-598`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:563-598`
 #[repr(C)]
 pub struct trRefdef_t {
 	pub x: i32,

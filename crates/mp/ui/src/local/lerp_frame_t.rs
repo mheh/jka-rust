@@ -5,7 +5,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `lerpFrame_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:461-478`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:461-478`
 #[repr(C)]
 pub struct lerpFrame_t {
 	pub oldFrame: i32,

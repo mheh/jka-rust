@@ -24,7 +24,7 @@ impl GMillisecondsArgs {
 /// Raven: this should NOT be used for any game related tasks,
 /// Raven: because it is not journaled
 /// Raven: Also for profiling.. do not use for game related tasks.
-/// Source: `oracle/oracle/codemp/game/g_public.h:111`
+/// Source: `oracle/codemp/game/g_public.h:111`
 pub struct GMilliseconds;
 
 impl OutboundSysCall for GMilliseconds {

@@ -8,9 +8,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// `trap_Milliseconds` takes no arguments; the transport carries no payload
 /// words after the import token.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:29`
-/// Transport source: `oracle/oracle/codemp/ui/ui_syscalls.c:30`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:694`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:29`
+/// Transport source: `oracle/codemp/ui/ui_syscalls.c:30`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:694`
 #[derive(Debug, Default)]
 pub struct CgMillisecondsArgs;
 
@@ -22,11 +22,11 @@ impl CgMillisecondsArgs {
 
 /// `UI_MILLISECONDS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:59`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:29`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:30`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:695`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:694`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:59`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:29`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:30`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:695`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:694`
 pub struct CgMilliseconds;
 
 impl OutboundSysCall for CgMilliseconds {

@@ -1,13 +1,15 @@
 # Porting Rules
 
-Rules for converting Raven C/C++ (`oracle/oracle/**`) into idiomatic Rust under
-the crate graph in `docs/workspace-architecture.md`. Verified against the faithful
-port (`oracle/`) by differential testing (`--features oracle`).
+Rules for converting Raven C/C++ (`oracle/**`) into idiomatic Rust under
+the crate graph in `docs/workspace-architecture.md`. Verified against the oracle
+differentially: committed golden fixtures (`tools/jampgame-oracle`) and the A/B
+referee running the Rust and oracle game dylibs in lockstep.
 
 ## A. What "correct" means
 
 1. **Behavioral parity at the ABI seam, verified against oracle.** A port is done
-   when its observable behavior matches the oracle under `--features oracle`.
+   when its observable behavior matches the oracle under differential test
+   (golden fixtures / A/B referee).
    Internals are free; the seam is not.
 2. **No speculative behavior.** If Raven's behavior is unclear, port it faithfully
    first — even if ugly — get it green, *then* refactor behind the passing diff.
@@ -97,7 +99,7 @@ Every ported item keeps the current codebase style:
   /// `trajectory_t`.
   ///
   /// Raven: <original Raven comment, if any>.
-  /// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2648-2657`
+  /// Type definition source: `oracle/codemp/game/q_shared.h:2648-2657`
   pub struct Trajectory { /* ... */ }
   ```
 
@@ -113,7 +115,7 @@ Every ported item keeps the current codebase style:
   ```rust
   // Raven's `typedef char memtag_t` is 1 byte, not int-wide; `#[repr(i8)]` matches
   // that width.
-  // Source: `oracle/oracle/codemp/game/q_shared.h:3101-3107`
+  // Source: `oracle/codemp/game/q_shared.h:3101-3107`
   #[repr(i8)]
   ```
 
@@ -138,7 +140,7 @@ greppable.
 
   ```rust
   //TODO: Port gentity_t
-  // Source: oracle/oracle/codemp/game/g_local.h:137
+  // Source: oracle/codemp/game/g_local.h:137
   pub m_pVehicle: (),
   ```
 
@@ -147,7 +149,7 @@ greppable.
 
   ```rust
   fn G_Spawn() -> EntityId {
-      todo!("Port G_Spawn — oracle/oracle/codemp/game/g_utils.c:...")
+      todo!("Port G_Spawn — oracle/codemp/game/g_utils.c:...")
   }
   ```
 

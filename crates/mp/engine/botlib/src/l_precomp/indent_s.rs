@@ -7,7 +7,7 @@ use crate::l_script::script_s::script_t;
 /// Raven `indent_t` — a preprocessor `#if`/`#ifdef` indent stack entry.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/codemp/botlib/l_precomp.h:71-77`
+/// Type definition source: `oracle/codemp/botlib/l_precomp.h:71-77`
 #[repr(C)]
 pub struct indent_t {
     /// indent type

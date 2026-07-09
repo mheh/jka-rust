@@ -1,5 +1,5 @@
 // PORT-COMPLETE: g_navnew.c 5/8
-//! Port of `oracle/oracle/codemp/game/g_navnew.c` (jampgame mega-pass).
+//! Port of `oracle/codemp/game/g_navnew.c` (jampgame mega-pass).
 //!
 //! Generated from `tools/closure-prototype/fnskel.py`; bodies filled per the
 //! jampgame mega-pass (settled fork rulings,
@@ -58,7 +58,7 @@ use crate::q_math::VectorNormalize;
 
 // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
 // (`c_int`, cast here to match the `vec3_t` components they seed).
-// Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
+// Source: `oracle/codemp/game/bg_public.h:41-42`
 const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
 const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
@@ -67,7 +67,7 @@ const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 /// Raven: "FIXME: must be a better way to do this". `+1` because 0 is a valid
 /// nodeNum but also the default (unset) slot value.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:15-28`
+/// Source: `oracle/codemp/game/g_navnew.c:15-28`
 pub fn NAV_CheckNodeFailedForEnt(ent: *mut gentity_t, nodeNum: c_int) -> qboolean {
     unsafe {
         for j in 0..MAX_FAILED_NODES {
@@ -82,7 +82,7 @@ pub fn NAV_CheckNodeFailedForEnt(ent: *mut gentity_t, nodeNum: c_int) -> qboolea
 
 /// Raven `NPC_ClearBlocked`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:34-41`
+/// Source: `oracle/codemp/game/g_navnew.c:34-41`
 pub fn NPC_ClearBlocked(self_: *mut gentity_t) {
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
@@ -96,7 +96,7 @@ pub fn NPC_ClearBlocked(self_: *mut gentity_t) {
 
 /// Raven `NPC_SetBlocked`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:43-51`
+/// Source: `oracle/codemp/game/g_navnew.c:43-51`
 pub fn NPC_SetBlocked(ctx: GameContext<'_>, self_: *mut gentity_t, blocker: *mut gentity_t) {
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
@@ -114,7 +114,7 @@ pub fn NPC_SetBlocked(ctx: GameContext<'_>, self_: *mut gentity_t, blocker: *mut
 
 /// Raven `NAVNEW_ClearPathBetweenPoints`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:58-77`
+/// Source: `oracle/codemp/game/g_navnew.c:58-77`
 pub fn NAVNEW_ClearPathBetweenPoints(
     ctx: GameContext<'_>,
     start: vec3_t,
@@ -162,7 +162,7 @@ pub fn NAVNEW_ClearPathBetweenPoints(
 ///
 /// Raven: try pushing blocker to one side.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:84-171`
+/// Source: `oracle/codemp/game/g_navnew.c:84-171`
 pub fn NAVNEW_PushBlocker(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -282,7 +282,7 @@ pub fn NAVNEW_PushBlocker(
 /// callee, so unlike the `vec3-outparam-seam` park precedent (`g_combat.rs`)
 /// it is fixed here rather than parked.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:178-215`
+/// Source: `oracle/codemp/game/g_navnew.c:178-215`
 pub fn NAVNEW_DanceWithBlocker(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -335,7 +335,7 @@ pub fn NAVNEW_DanceWithBlocker(
 ///
 /// Raven: trace to sides of blocker and see if either is clear.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:222-340`
+/// Source: `oracle/codemp/game/g_navnew.c:222-340`
 pub fn NAVNEW_SidestepBlocker(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -518,7 +518,7 @@ pub fn NAVNEW_SidestepBlocker(
 
 /// Raven `NAVNEW_Bypass`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:347-377`
+/// Source: `oracle/codemp/game/g_navnew.c:347-377`
 pub fn NAVNEW_Bypass(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -576,7 +576,7 @@ pub fn NAVNEW_Bypass(
 ///
 /// Raven: stop double waiting.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:384-391`
+/// Source: `oracle/codemp/game/g_navnew.c:384-391`
 pub fn NAVNEW_CheckDoubleBlock(
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
@@ -593,7 +593,7 @@ pub fn NAVNEW_CheckDoubleBlock(
 
 /// Raven `NAVNEW_ResolveEntityCollision`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:399-435`
+/// Source: `oracle/codemp/game/g_navnew.c:399-435`
 pub fn NAVNEW_ResolveEntityCollision(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -656,7 +656,7 @@ pub fn NAVNEW_ResolveEntityCollision(
 
 /// Raven `NAVNEW_AvoidCollision`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:442-518`
+/// Source: `oracle/codemp/game/g_navnew.c:442-518`
 pub fn NAVNEW_AvoidCollision(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -771,7 +771,7 @@ pub fn NAVNEW_AvoidCollision(
 /// Raven: see if the direct path between 2 nodes is blocked by architecture
 /// or an ent.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:520-572`
+/// Source: `oracle/codemp/game/g_navnew.c:520-572`
 pub fn NAVNEW_TestNodeConnectionBlocked(
     ctx: GameContext<'_>,
     wp1: c_int,
@@ -865,7 +865,7 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
 
 /// Raven `NAVNEW_MoveToGoal`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_navnew.c:578-865`
+/// Source: `oracle/codemp/game/g_navnew.c:578-865`
 pub fn NAVNEW_MoveToGoal(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,

@@ -120,7 +120,7 @@ drops before the syscall reads it (dangling). Bind, then pass.
 Raven stores a `va()` rotating-buffer pointer into a **persistent** field:
 
 ```c
-// oracle/oracle/codemp/game/g_target.c:800
+// oracle/codemp/game/g_target.c:800
 self->activator->script_targetname = va( "newICARUSEnt%d", numNewICARUSEnts++ );
 ```
 

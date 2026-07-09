@@ -11,10 +11,10 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `qboolean trap_G2API_SkinlessModel(void *ghlInfo, int modelIndex)`.
 /// Raven transport: `CGhoul2Info_v &g2 = *((CGhoul2Info_v *)args[1]); return G2API_SkinlessModel(&g2[args[2]]);`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:278`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:915-917`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1444-1448`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1444-1448`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:278`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:915-917`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1444-1448`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1444-1448`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SkinlessmodelArgs {
     /// Raw Ghoul2 handle word, decoded by Raven as `args[1]`.
@@ -38,10 +38,10 @@ impl CgG2SkinlessmodelArgs {
 /// `modelIndex` as raw `args[2]`; the engine returns the int-compatible
 /// `qboolean` result from `G2API_SkinlessModel`.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:278`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:915-917`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1444-1448`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1444-1448`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:278`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:915-917`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1444-1448`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1444-1448`
 pub struct CgG2Skinlessmodel;
 
 impl OutboundSysCall for CgG2Skinlessmodel {

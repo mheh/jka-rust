@@ -6,7 +6,7 @@ use super::menucommon_s::menucommon_s;
 
 /// Raven `menutext_s` — a static text menu item.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:244-250`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:244-250`
 #[repr(C)]
 pub struct menutext_s {
 	pub generic: menucommon_s,

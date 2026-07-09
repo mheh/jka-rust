@@ -62,7 +62,7 @@ Raven's `jampgamex86.dll`:
   is the per-file audit and referee replay below).
 - [x] Audit every ported game-tier file against its oracle TU (the per-file
   oracle review): all 107 files compared line-level against
-  `oracle/oracle/codemp/game/*.c` (waves 1-2, 2026-07-06; ~160 findings,
+  `oracle/codemp/game/*.c` (waves 1-2, 2026-07-06; ~160 findings,
   ~102 confirmed fixed, follow-up ports resolved). Ledger + findings log:
   `docs/audits/per-file-oracle-audit.md`. Honestly-skimmed functions listed
   there remain an optional second-pass tail, not a gate.

@@ -2,7 +2,7 @@
 
 //! SP `level_locals_t` — the world container.
 //!
-//! Type definition source: `oracle/oracle/code/game/g_local.h:161-220`
+//! Type definition source: `oracle/code/game/g_local.h:161-220`
 
 use core::ffi::{c_char, c_int};
 
@@ -20,22 +20,22 @@ use super::interest_point_t::interestPoint_t;
 
 /// Raven `MAX_ALERT_EVENTS`.
 ///
-/// Source: `oracle/oracle/code/game/g_local.h:107`
+/// Source: `oracle/code/game/g_local.h:107`
 pub const MAX_ALERT_EVENTS: usize = 32;
 
 /// Raven `MAX_ANIM_FILES` (non-`_XBOX` build; jka-rust targets desktop only).
 ///
-/// Source: `oracle/oracle/code/game/bg_public.h:480-482`
+/// Source: `oracle/code/game/bg_public.h:480-482`
 pub const MAX_ANIM_FILES: usize = 16;
 
 /// Raven `MAX_INTEREST_POINTS`.
 ///
-/// Source: `oracle/oracle/code/game/g_local.h:82`
+/// Source: `oracle/code/game/g_local.h:82`
 pub const MAX_INTEREST_POINTS: usize = 64;
 
 /// Raven `MAX_COMBAT_POINTS`.
 ///
-/// Source: `oracle/oracle/code/game/g_local.h:92`
+/// Source: `oracle/code/game/g_local.h:92`
 pub const MAX_COMBAT_POINTS: usize = 512;
 
 /// Raven `level_locals_t` — game-internal world state; cleared as each map is
@@ -50,7 +50,7 @@ pub const MAX_COMBAT_POINTS: usize = 512;
 ///
 /// Pointer-bearing => arch-dependent; asserts pin the host-64-bit layout.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_local.h:161-220`
+/// Type definition source: `oracle/code/game/g_local.h:161-220`
 #[repr(C)]
 pub struct level_locals_t {
 	/// `[maxclients]`
@@ -179,5 +179,5 @@ const _: () = assert!(core::mem::offset_of!(level_locals_t, hasBspInstances) == 
 // The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
 // all-zero bytes are a valid level_locals_t — the same property the layout asserts above
 // pin and Raven's memset/static zero-init relies on.
-// Source: oracle/oracle/code/game/g_local.h (all-zero-valid #[repr(C)]; SP zero-inits `level`, g_main.cpp:46)
+// Source: oracle/code/game/g_local.h (all-zero-valid #[repr(C)]; SP zero-inits `level`, g_main.cpp:46)
 unsafe impl native_platform::ZeroValid for level_locals_t {}

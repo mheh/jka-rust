@@ -5,7 +5,7 @@ use sp_qshared::shared::{qboolean, qhandle_t};
 
 /// Raven `uiStatic_t` — per-frame UI module state.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_local.h:66-81`
+/// Type definition source: `oracle/code/ui/ui_local.h:66-81`
 #[repr(C)]
 pub struct uiStatic_t {
 	pub frametime: i32,

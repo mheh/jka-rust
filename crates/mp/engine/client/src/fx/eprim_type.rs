@@ -3,7 +3,7 @@
 /// Raven `EPrimType` — effect primitive type enumeration.
 ///
 /// Raven: (no comment).
-/// Type definition source: `oracle/oracle/codemp/client/FxScheduler.h:120-136`
+/// Type definition source: `oracle/codemp/client/FxScheduler.h:120-136`
 #[repr(i32)]
 pub enum EPrimType {
 	None = 0,

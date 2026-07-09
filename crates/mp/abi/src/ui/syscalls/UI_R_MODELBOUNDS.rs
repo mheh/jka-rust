@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( UI_R_MODELBOUNDS, model, mins, maxs );`
 /// Raven transport: `re.ModelBounds( args[1], (float *)VMA(2), (float *)VMA(3) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:198-199`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:946`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:988-990`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:198-199`
+/// Args source: `oracle/codemp/ui/ui_local.h:946`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:988-990`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiRModelboundsArgs {
     model: c_int,
@@ -29,10 +29,10 @@ impl UiRModelboundsArgs {
 
 /// `UI_R_MODELBOUNDS` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:83`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:198-199`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:988-990`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:988-990`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:83`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:198-199`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:988-990`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:988-990`
 pub struct UiRModelbounds;
 
 impl OutboundSysCall for UiRModelbounds {

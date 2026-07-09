@@ -19,7 +19,7 @@ impl BotlibAiAllocWeaponStateArgs {
 
 /// `BOTLIB_AI_ALLOC_WEAPON_STATE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:478`
+/// Source: `oracle/codemp/game/g_public.h:478`
 pub struct BotlibAiAllocWeaponState;
 
 impl OutboundSysCall for BotlibAiAllocWeaponState {

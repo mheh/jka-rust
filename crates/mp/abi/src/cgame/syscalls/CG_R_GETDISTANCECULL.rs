@@ -9,9 +9,9 @@ use abi_transport::generic::{
 /// Raven transport: writes `tr.distanceCull` to `(float *)VMA(1)`, then returns
 /// 0.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:426-428`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2301`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1058-1064`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:426-428`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2301`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1058-1064`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRGetdistancecullArgs {
     f: *mut f32,
@@ -25,10 +25,10 @@ impl CgRGetdistancecullArgs {
 
 /// `CG_R_GETDISTANCECULL` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:171`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:426-428`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1058-1064`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1058-1064`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:171`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:426-428`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1058-1064`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1058-1064`
 pub struct CgRGetdistancecull;
 
 impl OutboundSysCall for CgRGetdistancecull {

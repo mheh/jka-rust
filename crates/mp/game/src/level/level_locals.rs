@@ -1,6 +1,6 @@
 //! MP `level_locals_t` — the world container.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/g_local.h:819-930`
+//! Type definition source: `oracle/codemp/game/g_local.h:819-930`
 
 #![allow(non_camel_case_types)]
 
@@ -19,13 +19,13 @@ use super::alert_event::{alertEvent_t, MAX_ALERT_EVENTS};
 use super::combat_point::{combatPoint_t, MAX_COMBAT_POINTS};
 use super::interest_point::{interestPoint_t, MAX_INTEREST_POINTS};
 
-/// Raven `BODY_QUEUE_SIZE`. Source: `oracle/oracle/codemp/game/g_local.h:31`
+/// Raven `BODY_QUEUE_SIZE`. Source: `oracle/codemp/game/g_local.h:31`
 pub const BODY_QUEUE_SIZE: usize = 8;
 
 /// Raven `level_locals_t` — game-internal world state; cleared as each map is
 /// entered. Pointer-bearing => arch-dependent; asserts pin the host-64-bit layout.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:819-930`
+/// Type definition source: `oracle/codemp/game/g_local.h:819-930`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct level_locals_t {
@@ -147,5 +147,5 @@ const _: () = assert!(core::mem::offset_of!(level_locals_t, mTeamFilter) == 4711
 // The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
 // all-zero bytes are a valid level_locals_t — the same property the layout asserts above
 // pin and Raven's memset/static zero-init relies on.
-// Source: oracle/oracle/codemp/game/g_local.h (all-zero-valid #[repr(C)]; Raven zero-inits `level`, g_main.c:9)
+// Source: oracle/codemp/game/g_local.h (all-zero-valid #[repr(C)]; Raven zero-inits `level`, g_main.c:9)
 unsafe impl native_platform::ZeroValid for level_locals_t {}

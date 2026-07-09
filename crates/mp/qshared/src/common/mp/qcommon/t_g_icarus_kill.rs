@@ -3,7 +3,7 @@
 /// Raven `T_G_ICARUS_KILL` — ICARUS `KILL` command payload (entity to kill, by
 /// id or by name).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:872-876`
+/// Type definition source: `oracle/codemp/game/g_public.h:872-876`
 #[repr(C)]
 pub struct T_G_ICARUS_KILL {
 	pub entID: i32,

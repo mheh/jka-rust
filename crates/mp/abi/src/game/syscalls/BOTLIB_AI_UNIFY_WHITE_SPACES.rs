@@ -24,7 +24,7 @@ impl BotlibAiUnifyWhiteSpacesArgs {
 
 /// `BOTLIB_AI_UNIFY_WHITE_SPACES` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:434`
+/// Source: `oracle/codemp/game/g_public.h:434`
 pub struct BotlibAiUnifyWhiteSpaces;
 
 impl OutboundSysCall for BotlibAiUnifyWhiteSpaces {

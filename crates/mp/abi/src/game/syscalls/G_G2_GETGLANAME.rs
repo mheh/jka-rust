@@ -45,7 +45,7 @@ impl GG2GetglanameArgs {
 
 /// `G_G2_GETGLANAME` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:522`
+/// Source: `oracle/codemp/game/g_public.h:522`
 pub struct GG2Getglaname;
 
 impl OutboundSysCall for GG2Getglaname {

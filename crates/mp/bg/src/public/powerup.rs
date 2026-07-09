@@ -1,6 +1,6 @@
 //! MP `bg_public.h` powerup definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:652-684`
+//! Type definition source: `oracle/codemp/game/bg_public.h:652-684`
 
 #![allow(non_camel_case_types)]
 
@@ -11,7 +11,7 @@ use core::ffi::c_int;
 /// Raven: NOTE: may not have more than 16. Names the powerups via an anonymous
 /// `enum { PW_NONE..PW_NUM_POWERUPS }` (several members removed by Raven and left
 /// as dead comments), then `typedef int powerup_t` for storage.
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:684`
+/// Type definition source: `oracle/codemp/game/bg_public.h:684`
 pub type powerup_t = c_int;
 
 pub const PW_NONE: powerup_t = 0;

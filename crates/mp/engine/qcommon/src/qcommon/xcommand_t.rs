@@ -2,5 +2,5 @@
 
 /// Raven `xcommand_t` — function pointer for console commands.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:363-363`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:363-363`
 pub type xcommand_t = extern "C" fn();

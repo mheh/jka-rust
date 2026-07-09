@@ -20,7 +20,7 @@ impl BotlibAiResetWeaponStateArgs {
 
 /// `BOTLIB_AI_RESET_WEAPON_STATE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:480`
+/// Source: `oracle/codemp/game/g_public.h:480`
 pub struct BotlibAiResetWeaponState;
 
 impl OutboundSysCall for BotlibAiResetWeaponState {

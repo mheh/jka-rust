@@ -4,7 +4,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `ragCallbackDebugLine_t` — ragdoll debug-line callback payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:550-557`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:550-557`
 #[repr(C)]
 pub struct ragCallbackDebugLine_t {
 	pub start: vec3_t,

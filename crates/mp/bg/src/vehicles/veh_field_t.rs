@@ -7,7 +7,7 @@ use crate::vehicles::veh_field_type_t::vehFieldType_t;
 /// Raven `vehField_t` — one `.veh`/`.vwp` key/value parse-table entry
 /// (`name` -> byte offset into `vehicleInfo_t`/`vehWeaponInfo_t` + value kind).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:131-135`
+/// Type definition source: `oracle/codemp/game/bg_vehicleLoad.c:131-135`
 #[derive(Clone, Copy)]
 pub struct vehField_t {
     pub name: *const c_char,

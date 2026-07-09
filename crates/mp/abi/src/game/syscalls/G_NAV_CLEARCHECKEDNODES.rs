@@ -14,7 +14,7 @@ impl GNavClearcheckednodesArgs {
 
 /// `G_NAV_CLEARCHECKEDNODES` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:334`
+/// Source: `oracle/codemp/game/g_public.h:334`
 pub struct GNavClearcheckednodes;
 
 impl OutboundSysCall for GNavClearcheckednodes {

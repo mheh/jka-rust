@@ -2,8 +2,8 @@
 //!
 //! Identical values in SP and MP (MP writes `typedef enum Eorientations`, SP
 //! `enum Eorientations` — same layout). Note the enumerator order is X, **Z, Y**.
-//! Type definition source: `oracle/oracle/code/game/q_shared.h:2641-2650`
-//! Type definition source: `oracle/oracle/codemp/game/q_shared.h:3086-3095`
+//! Type definition source: `oracle/code/game/q_shared.h:2641-2650`
+//! Type definition source: `oracle/codemp/game/q_shared.h:3086-3095`
 
 #![allow(non_camel_case_types)]
 

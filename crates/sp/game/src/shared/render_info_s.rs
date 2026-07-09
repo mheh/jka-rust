@@ -1,6 +1,6 @@
 //! SP `renderInfo_t`.
 //!
-//! Type definition source: `oracle/oracle/code/game/g_shared.h:135-224`
+//! Type definition source: `oracle/code/game/g_shared.h:135-224`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -14,7 +14,7 @@ use crate::npc::lookMode_t;
 /// header, so `legsModelName`/`modelName` are promoted directly onto `renderInfo_t` via
 /// GCC's anonymous-union extension; here it needs a field name to exist in Rust).
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:139-143`
+/// Type definition source: `oracle/code/game/g_shared.h:139-143`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union renderInfo_t_uModelName {
@@ -26,7 +26,7 @@ pub union renderInfo_t_uModelName {
 /// Raven `renderInfo_t` — per-entity model-rendering state: part yaw/pitch ranges,
 /// bone/tag points, muzzle points, look target, head/torso/eye/hand/foot points.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:135-224`
+/// Type definition source: `oracle/code/game/g_shared.h:135-224`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct renderInfo_t {

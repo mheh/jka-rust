@@ -4,7 +4,7 @@ use crate::shared::vec3_t;
 
 /// Raven `bot_moveresult_t` — result of a bot movement prediction/execution.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_ai_move.h:74-85`
+/// Type definition source: `oracle/codemp/game/be_ai_move.h:74-85`
 #[repr(C)]
 pub struct bot_moveresult_t {
 	pub failure: i32,             // true if movement failed all together

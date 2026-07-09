@@ -4,7 +4,7 @@ use super::menucommon_s::menucommon_s;
 
 /// Raven `menuslider_s` — a slider menu item.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:193-202`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:193-202`
 #[repr(C)]
 pub struct menuslider_s {
 	pub generic: menucommon_s,
