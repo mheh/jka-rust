@@ -42,6 +42,16 @@ referenced before it is ported).
 
 ## Prerequisite (Stage 0)
 
+- [ ] All forks in `docs/handoffs/engine-fork-discovery.md` ruled by the user
+  (error-recovery/longjmp, global placement, statics, allocators, dispatch
+  tables, VM stance, §F doc list, platform trait, FS semantics, print
+  routing).
+- [ ] Type rosetta regenerated and packet-referenced
+  (`tools/closure-prototype/typemap.py` →
+  `out/engine/type-rosetta.tsv`; 2,702 items, 2,002 Raven names): porters
+  import types from the listed paths, never declare them; a missing name is
+  an escalation, not a stub.
+
 - [ ] Game-host interface crate: Rust traits transcribing the C seam (syscall
   surface, vmcall driver, shared-memory contract), extracted from the mock
   engine's behavioral spec; `sv_game_system_calls` dispatches it with a real
