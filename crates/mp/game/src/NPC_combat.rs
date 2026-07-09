@@ -2780,7 +2780,9 @@ pub fn NPC_FindSquadPoint(ctx: GameContext<'_>, position: vec3_t) -> c_int {
 pub fn NPC_ReserveCombatPoint(ctx: GameContext<'_>, combatPointID: c_int) -> qboolean {
     unsafe {
         //Make sure it's valid
-        if combatPointID > (*ctx.world).level.numCombatPoints {
+        // §19: Raven only guards the upper bound; a -1 id reads combatPoints[-1] (UB,
+        // reads as not-occupied → returns qfalse). We reject negatives to that same effect.
+        if combatPointID > (*ctx.world).level.numCombatPoints || combatPointID < 0 {
             return 0;
         }
 
@@ -2813,7 +2815,9 @@ pub fn NPC_FreeCombatPoint(
             (*npc_info).lastFailedCombatPoint = combatPointID;
         }
         //Make sure it's valid
-        if combatPointID > world.level.numCombatPoints {
+        // §19: Raven only guards the upper bound; a -1 id reads combatPoints[-1] (UB,
+        // reads as not-occupied → returns qfalse). We reject negatives to that same effect.
+        if combatPointID > world.level.numCombatPoints || combatPointID < 0 {
             return qfalse;
         }
 
