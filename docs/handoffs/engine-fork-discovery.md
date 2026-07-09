@@ -169,3 +169,45 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
   wave-20 `SV_GameSystemCalls` transcription, not the nav subsystem.
 - **RMG-Q2:** the RM_Terrain client-model chain is dead under DEDICATED
   (see ruling 17).
+
+## §F doc-session rulings, round 2 (user, 2026-07-09 — third session)
+
+19. **Ruling-11 amendment — EngineHost gains gentity access:**
+    `gentity(ent_num) -> *mut sharedEntity_t` (the `SV_GentityNum` dual over
+    the G_LOCATE_GAME_DATA base; raw pointer, transcription-first). Needed by
+    the icarus Q3_TaskID*/InitEnt/FreeEnt/AssociateEnt/RunScript seam, which
+    reads/writes game-entity fields.
+    **RULING: add the service (user, 2026-07-09)**
+20. **Ruling-13 amendment — the ICARUS arena is dropped entirely** (its
+    remaining tag-5 users went owned `Vec<u8>` in the roster, leaving it
+    empty); `ICARUS_Malloc`/`ICARUS_Free` are not ported. Plus two explicit
+    doc statements: `Icarus` gets a hand-written `impl Default`
+    (`ent_filter: -1` — its only writer was §20-dropped and the value gates
+    referee-digested prints; boxed MAX_GENTITIES arrays via `from_fn`), and
+    `InterfaceExport` is constructed with the real `Q3_*`/`I_*` fn items at
+    Default time with Raven's own `initialized` flag preserving
+    Interface_Init timing.
+    **RULING: bless all three (user, 2026-07-09)**
+21. **RMG shapes:** `rmAutomapSymbol_t` relocates to `mp_qshared`; NO
+    RandomTerrainHandle newtype (methods use `CmLandScape`'s
+    `Option<RandomTerrain>` directly, the seam converts Raven's handle int);
+    the ENGINE's own q_math LCG instance is a qshared `QRand`-type field on
+    `Engine.common` exposed via EngineHost `flrand`/`irand`; `CRMArea*` →
+    `AreaId` + arena on `CRMAreaManager` per §B5; the
+    `CCMPatch::owner`/`CRandomTerrain::mLandScape`/`CRMMission::mLandScape`
+    back-pointers are dropped and `&CmLandScape` threaded through the
+    affected methods.
+    **RULING: bless all five (user, 2026-07-09)**
+22. **G2/NAV/ROFF:** gore APPLY path (`G2API_AddSkinGore`,
+    `DestroyGoreTexCoordinates`, `ResetGoreTag`, `G2_GetGoreRecord`) is
+    graph-dead server-side → §20 notes; gore RECORD infra (`AllocGoreRecord`,
+    `Find/New/DeleteGoreSet`, `ClearSkinGore`, `G2_GorePolys`) is live and
+    ports. `CRagDollUpdateParams` closed hierarchy → enum per §17. "SlotMap"
+    = the hand-rolled generational arena matching Ghoul2InfoArray's bit-exact
+    handle scheme; `CGhoul2Info_v` forwarding methods colocate in
+    `cghoul2_info_v.rs`. `Q3_INFINITE`/`WORLD_SIZE`/`STEPSIZE`/
+    `WAYPOINT_NONE` + the vec3 primitives get their engine-reachable home in
+    `mp_qshared` (moved or re-exported from mp_game's copies). ROFF's
+    InitROFF-failure fallthrough (`map::find(0)` end-deref, oracle UB) →
+    guard-and-return per §19 with a 2-line note.
+    **RULING: bless all five (user, 2026-07-09)**
