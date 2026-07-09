@@ -4,12 +4,15 @@ Decision prefix: G2SV     Ledger deps: DEC-04 (per-mode), DEC-09 (verification);
 engine-fork-discovery rulings 2 (state placement), 3 (fn-statics), 7 (this doc),
 11 (EngineHost), 12 (direct Engine fields), 18 (GetBoltMatrix defect), 22
 (2026-07-09: gore apply/record split, `CRagDollUpdateParams` §F17 enum, bone-cache
-arena, `CGhoul2Info_v` method colocation)
+arena, `CGhoul2Info_v` method colocation), 24 (2026-07-09: Stage-0 host-interface
+crate PINNED — `crates/mp/host-interface`, package `mp_host_interface`), 26
+(2026-07-09: gore correction — `DestroyGoreTexCoordinates`/`DeleteGoreRecord` are
+LIVE, closing `G2SV-Q8`)
 
 This is a C++-track (`porting-rules.md` §F) design doc. It carries the machine-
 readable `files:` roster and `divergences:` list (doc-standards rule 6) that
 `.claude/workflows/port-cpp-subsystem.js` consumes via `designPath`; both live
-under `## Files roster` and `## Divergences` below.
+in the `## Files roster` YAML block below (the `files:` and `divergences:` keys).
 
 ## Standing context
 
@@ -34,8 +37,15 @@ Links only — never restated here:
   (the `g2api_get_bolt_matrix` write-through defect), **ruling 22** (2026-07-09:
   the ghoul2 gore apply/record split, the `CRagDollUpdateParams` §F17 enum shape,
   the bone-cache generational arena, and `CGhoul2Info_v` method colocation —
-  rendered here as `G2SV-D7`–`G2SV-D10`; rulings 11–18 stand unchanged), and the
-  G2SV-Q1/G2SV-Q2 evidence resolutions.
+  rendered here as `G2SV-D7`–`G2SV-D10`; rulings 11–18 stand unchanged), **ruling
+  24** (2026-07-09: the Stage-0 host-interface crate is PINNED —
+  `crates/mp/host-interface`, package `mp_host_interface`; rendered here as
+  `G2SV-D12`), **ruling 26** (2026-07-09: the gore correction —
+  `DestroyGoreTexCoordinates` and `DeleteGoreRecord` move to the LIVE gore bucket,
+  reached via `~CGoreSet` ← `DeleteGoreSet`; the ruling-22 dead-bucket listing was
+  an engineorder graph blind spot — implicit destructor calls are not graph edges;
+  rendered here as `G2SV-D11`, closing `G2SV-Q8`), and the G2SV-Q1/G2SV-Q2 evidence
+  resolutions.
 - `docs/GOAL-engine.md` — M3 gate: "G2 bone/bolt/collision goldens".
 - GP2 exemplar: `crates/mp/engine/qcommon/src/gp2/`, `tools/gp2-oracle/`.
 - Already type-ported (layout frozen, this doc reuses, never re-declares):
@@ -77,13 +87,17 @@ Links only — never restated here:
 - Client/`cgame`-side rendering (`RB_SurfaceGhoul`, `R_AddGhoulSurfaces`) —
   compiled out under `DEDICATED`.
 - **The exact method roster of the `EngineHost` trait** — the concrete Rust method
-  signatures for the four services ghoul2 consumes: (a) the loader model-memory
+  signatures for the services ghoul2 consumes: (a) the loader model-memory
   read of `mdxaHeader_t`/`mdxaSkel_t` (for `CBoneCache::new` parent-seeding and
-  `render/skeleton.rs`), (b) collision trace (`G2_TraceModels`, `G2_GorePolys`),
-  (c) print/error, and (d) cvar register/read (`cg_g2MarksAllModels`,
-  `G2_misc.cpp:40`) — is owned by the **Stage-0 interface-crate design**
-  (`docs/plans/2026-07-08-mp-engine-build-out.md:250`, ruling 11), not here —
-  mirroring the sibling §F docs (`docs/subsystems/roff.md` non-goals,
+  `render/skeleton.rs`), (b) collision trace (`G2_TraceModels`, `G2_GorePolys`,
+  `Rag_Trace`'s `CM_BoxTrace`, `G2_bones.cpp:2708`), (c) print/error, (d) cvar
+  register/read (`cg_g2MarksAllModels`, `G2_misc.cpp:40`), and (e) loader
+  model-registration/file-read (`RE_RegisterModel`/`R_GetModelByHandle`,
+  `G2_API.cpp:593`, `G2_surfaces.cpp:426`; save/load buffers, `G2_API.cpp:2472,
+  2477`) — is owned by the **Stage-0 interface-crate design** (the crate
+  is PINNED by ruling 24 to `crates/mp/host-interface`, package `mp_host_interface`
+  — `G2SV-D12`; `docs/plans/2026-07-08-mp-engine-build-out.md:250`, ruling 11), not
+  here — mirroring the sibling §F docs (`docs/subsystems/roff.md` non-goals,
   `docs/subsystems/npcnav.md` NAV-D2, `docs/subsystems/icarus.md` ICARUS-D1). This
   doc names the services ghoul2 consumes and takes `&mut impl EngineHost` in every
   §F signature; it does not define the trait. No cvar-registration API exists in
@@ -240,35 +254,43 @@ real work only when `TS.gore` is set — which happens via `G2API_AddSkinGore`
 buffers never do real work (`G2SV-Q4`, resolved). `GoreTouch++` still runs via the
 collision path independently.
 
-**Ruling 22's apply/record split (`G2SV-D7`, resolving `G2SV-Q4`).** The gore
-surface splits into a graph-dead *apply* entry set and a server-live *record-store*
-infra set:
+**Ruling 22's apply/record split, corrected by ruling 26 (`G2SV-D7`/`G2SV-D11`,
+resolving `G2SV-Q4`/`G2SV-Q8`).** The gore surface splits into a graph-dead *apply*
+entry set and a server-live *record-store* infra set:
 - **Graph-dead server-side (zero reachability from engine roots → §20 zero-caller
   notes):** `G2API_AddSkinGore` (`G2_API.cpp:2569`; only the client
   `CG_G2_ADDSKINGORE` trap, `cg_public.h:280`, no `G_G2_*` arm), `ResetGoreTag`
   (`G2_misc.cpp:96`; sole caller is `G2API_AddSkinGore` at `:2590`), and
   `G2_GetGoreRecord` (`G2_misc.cpp:113`; **no** caller anywhere in `codemp/`).
-  These are dropped with §20 zero-caller notes.
+  These three — and only these three — are dropped with §20 zero-caller notes
+  (ruling 26 narrowed the apply set to exactly this trio, `G2SV-D11`).
 - **Server-live (ports fully):** the record store `AllocGoreRecord`
   (`G2_misc.cpp:58`), `FindGoreRecord` (`:103`), `DeleteGoreRecord` (`:118`),
-  `FindGoreSet` (`:127`), `NewGoreSet` (`:142`), `DeleteGoreSet` (`:153`),
-  `CGoreSet::~CGoreSet` (`:174`), `G2API_ClearSkinGore` (`G2_API.cpp:2549`), and
-  `G2_GorePolys` (`G2_misc.cpp:804`). `G2API_ClearSkinGore` is reached from the
-  live `G2API_CleanGhoul2Models` (`G2_API.cpp:496`, its call at `:545`) behind the
-  `G_G2_CLEANMODELS` trap (`g_public.h:529`) and from `G2API_LoadSaveCodeDestructGhoul2Info`
-  (`:2493`); the record store's `DeleteGoreSet` is additionally reached **directly** from the
-  `G_G2_REMOVEGHOUL2MODEL`/`G_G2_REMOVEGHOUL2MODELS` removal paths (`G2_API.cpp:814,901`, which
-  call `DeleteGoreSet`, not `ClearSkinGore`). `ClearSkinGore` drives `DeleteGoreSet` (`:2557`) →
-  `~CGoreSet` (`:174` → `delete` at `G2_misc.cpp:163`) → `DeleteGoreRecord`
-  (`:179`); `G2_GorePolys` is reached from the collision `G2_TraceModels` loop
+  `DestroyGoreTexCoordinates` (`:43`, the private helper `DeleteGoreRecord` calls
+  at `:120`), `FindGoreSet` (`:127`), `NewGoreSet` (`:142`), `DeleteGoreSet`
+  (`:153`), `CGoreSet::~CGoreSet` (`:174`), `G2API_ClearSkinGore`
+  (`G2_API.cpp:2549`), and `G2_GorePolys` (`G2_misc.cpp:804`). `G2API_ClearSkinGore`
+  is reached from the live `G2API_CleanGhoul2Models` (`G2_API.cpp:496`, its call at
+  `:545`) behind the `G_G2_CLEANMODELS` trap (`g_public.h:529`) and from
+  `G2API_LoadSaveCodeDestructGhoul2Info` (`:2493`); the record store's
+  `DeleteGoreSet` is additionally reached **directly** from the
+  `G_G2_REMOVEGHOUL2MODEL`/`G_G2_REMOVEGHOUL2MODELS` removal paths
+  (`G2_API.cpp:814,901`, which call `DeleteGoreSet`, not `ClearSkinGore`).
+  `ClearSkinGore` drives `DeleteGoreSet` (`:2557`) → `~CGoreSet` (`:174` → `delete`
+  at `G2_misc.cpp:163`) → `DeleteGoreRecord` (`:179`) → `DestroyGoreTexCoordinates`
+  (`:120`); `G2_GorePolys` is reached from the collision `G2_TraceModels` loop
   (`G2_misc.cpp:1494`, `#ifdef _G2_GORE`, no DEDICATED guard).
-- **Ground-truth conflict (`G2SV-Q8`, escalated):** ruling 22 as transcribed lists
-  `DestroyGoreTexCoordinates` (`G2_misc.cpp:43`) in the graph-dead apply set, but
-  the oracle shows it **reached** server-side via `DeleteGoreRecord` (`:120`) ←
-  `~CGoreSet` (`:179`) ← `DeleteGoreSet` ← `G2API_ClearSkinGore` (all live above).
-  It compiles (`#ifdef _G2_GORE`, ON, `:26`) and is a private helper of
-  `DeleteGoreRecord`. Pending the user's confirmation it is ported with the live
-  record store in `gore.rs`, not §20-noted (see Open questions).
+- **Ruling 26 (`G2SV-Q8` SETTLED, `G2SV-D11`).** Ruling 22 as first transcribed
+  mislisted `DestroyGoreTexCoordinates` (`G2_misc.cpp:43`) — and, implicitly, its
+  caller `DeleteGoreRecord` — in the graph-dead apply set. Oracle ground truth shows
+  both are **reached** server-side via `~CGoreSet` (`:174`, its `DeleteGoreRecord`
+  call at `:179`) ← `DeleteGoreSet` ← the live `G2API_ClearSkinGore` (and the direct
+  `REMOVEGHOUL2MODEL`/`MODELS` paths). Both compile (`#ifdef _G2_GORE`, ON, `:26`).
+  The prior mislisting was an **engineorder graph blind spot**: the reachability
+  tool does not treat an implicit C++ destructor invocation (`~CGoreSet` running on
+  `delete`, `G2_misc.cpp:163`) as a call edge, so the whole `~CGoreSet →
+  DeleteGoreRecord → DestroyGoreTexCoordinates` chain read as unreachable. Ruling 26
+  moves both to the LIVE bucket; they port with the record store in `gore.rs`.
 
 Separately `tr_ghoul2.cpp:866-867`
 holds a render-surface pool `RSStorage[MAX_RENDER_SURFACES=2048]` with a rolling
@@ -355,8 +377,10 @@ separate `RenderG2State`** — the render-side bone state (`mBoneCache`,
 `goreShader`) folds into `Ghoul2System` because ruling 12 fixes the §F subsystem
 count at five (`icarus`, `nav`, `g2`, `roff`, `rmg`) with a single `g2`. Services
 (model-memory read, trace, print/error, cvar register/read) cross the **one
-`EngineHost` trait** (ruling 11); §F methods take `(&mut Ghoul2System, &mut impl
-EngineHost)`, and `Engine` implements `EngineHost` via a split-borrow view struct.
+`EngineHost` trait** (ruling 11), which lives in the ruling-24-pinned Stage-0 crate
+`crates/mp/host-interface` (package `mp_host_interface`, `G2SV-D12`); §F methods
+take `(&mut Ghoul2System, &mut impl EngineHost)`, and `Engine` implements
+`EngineHost` via a split-borrow view struct.
 The concrete host method signatures are Stage-0's (non-goals); this doc names the
 consumed services and freezes the §F call shape.
 
@@ -368,15 +392,15 @@ consumed services and freezes the §F call shape.
 | `gG2_GBMNoReconstruct`, `gG2_GBMUseSPMethod` | `G2_API.cpp:1724-1725` | `Ghoul2System.gbm_no_reconstruct/gbm_use_sp_method: bool` | `Ghoul2System::default` | `&mut Ghoul2System` |
 | `g_Ghoul2Allocations`, `g_G2ServerAlloc`, `g_G2ClientAlloc`, `g_G2AllocServer`, `g_G2AllocTrack*`, `g_G2AllocTrackInit` (all `_FULL_G2_LEAK_CHECKING`); `g_goreAllocs`, `g_goreTexAllocs` (`_DEBUG`) | `G2_API.cpp:34-37,43-44`, `G2_misc.cpp:138-139` | dropped (debug alloc tracking, no parity surface, §F20) | — | — (divergences list) |
 | `G2Time_*`, `G2PerformanceCounter_*`, `G2PerformanceTimer_*` (`G2_PERFORMANCE_ANALYSIS`, ON) | `tr_ghoul2.cpp:42-62` | dropped (timing instrumentation, no parity surface, §F20 — same treatment as the leak-checking globals) | — | — (divergences list) |
-| `GoreRecords`, `GoreTagsTemp`, `CurrentTag`, `CurrentTagUpper` | `G2_misc.cpp:35,36,32,33` | `Ghoul2System.gore: GoreState { records: BTreeMap<i32, GoreTextureCoordinates>, tags_temp, current_tag, current_tag_upper }` | `Ghoul2System::default` | `&mut Ghoul2System.gore` |
+| `GoreRecords`, `GoreTagsTemp`, `CurrentTag`, `CurrentTagUpper` | `G2_misc.cpp:35,36,32,33` | `Ghoul2System.gore: GoreState { records: BTreeMap<i32, GoreTextureCoordinates>, tags_temp, current_tag, current_tag_upper }` (the frozen `GoreTextureCoordinates.tex` per-LOD buffer ownership is `G2SV-Q10`, OPEN — see Open questions) | `Ghoul2System::default` | `&mut Ghoul2System.gore` |
 | `GoreSets`, `CurrentGoreSet` | `G2_misc.cpp:125,124` | `GoreState.sets: BTreeMap<i32, CGoreSet>`, `GoreState.current_set` | `Ghoul2System::default` | `&mut Ghoul2System.gore` |
 | `GoreTouch` (persistent gen counter) | `G2_misc.cpp:795` | `GoreState.gore_touch: i32` (ruling 2, same file/subsystem; three-kind persistent). Runs server-side via the collision path (`:890`); gore-*apply* has no server caller (`G2SV-D7`) | `Ghoul2System::default` | `&mut Ghoul2System.gore` |
 | `GoreVerts`, `GoreIndexCopy`, `GoreIndecies` | `G2_misc.cpp:793,794,798` | scratch buffers (three-kind scratch; per-`G2_GorePolys` rebuild, invalidated by `gore_touch`) — impl-local, not a global; never server-driven (`G2SV-D7`: no `AddSkinGore` server trap), transcribed faithfully, goldens optional | — | — |
 | `goreModelIndex` | `G2_misc.cpp:38` | scratch (three-kind scratch; set in the `G2_TraceModels` model loop `:1539`, read as the `GoreTagsTemp` key `:959,1000`) — impl-local, threaded through the trace, not a global | — | — |
 | `cg_g2MarksAllModels` | `G2_misc.cpp:40` | `Ghoul2System.cvars: Ghoul2Cvars` (the ruling-2 per-subsystem EngineCvars sub-struct; own file `cvars.rs` per one-type-per-file, roster) | registered via the `EngineHost` cvar register/read service (ruling 11, method sig Stage-0's — non-goals; `cvar_init` is a no-op stub today, plan §0.5) | `&Ghoul2System.cvars` |
-| RagDoll fn-statics block (`ragBasepose`…`rag`) | `G2_bones.cpp:1214-1241` | `Ghoul2System.rag: RagDollSolver { basepose, basepose_inv, bones, effectors, bone_data, temp_dependents, blist_index, num_rags, bone_mins/maxs/cm, desired_pelvis_offset, have_desired_pelvis_offset, origin_change, origin_change_dir, hand_pos, hand_pos2, rag_state, rag: Vec<..> }` | `Ghoul2System::default` | `&mut Ghoul2System.rag` (ruling 3 cross-frame kind, `G2SV-D3`) |
+| RagDoll fn-statics block (`ragBasepose`…`rag`) | `G2_bones.cpp:1214-1241` | `Ghoul2System.rag: RagDollSolver { basepose, basepose_inv, bones, effectors, bone_data, temp_dependents, blist_index, num_rags, bone_mins/maxs/cm, desired_pelvis_offset, have_desired_pelvis_offset, origin_change, origin_change_dir, hand_pos, hand_pos2, rag_state, rag: Vec<..> }` (the raw-pointer array fields `basepose`/`basepose_inv`/`bone_data`/`rag` are `G2SV-Q9`, OPEN — see Open questions) | `Ghoul2System::default` | `&mut Ghoul2System.rag` (ruling 3 cross-frame kind, `G2SV-D3`) |
 | solver `static const` matrices / settle-pass `static` locals | `G2_bones.cpp:1423,3452-3475` | `const` items / function locals (three-kind rule: const-table / scratch) | — | — |
-| `CBoneCache *mBoneCache` per instance | `ghoul2_shared.h:265` | `Ghoul2System.bone_caches` — a hand-rolled owned in-crate generational arena of `CBoneCache` keyed by `BoneCacheId` (§B5 arena, same kind as `Ghoul2InfoArray`; **not** an external `slotmap` crate — `G2SV-D9`, zero workspace precedent, container shape free per §A1), folded from the former RenderG2State per ruling 12; `CGhoul2Info.mBoneCache` → `Option<BoneCacheId>` | `G2_ConstructGhoulSkeleton` on demand; freed by `Ghoul2InfoArray::delete_low` | `&mut Ghoul2System` |
+| `CBoneCache *mBoneCache` per instance | `ghoul2_shared.h:265` | `Ghoul2System.bone_caches` — a hand-rolled owned in-crate generational arena of `CBoneCache` keyed by `BoneCacheId` (§B5 arena, same kind as `Ghoul2InfoArray`; **not** an external `slotmap` crate — `G2SV-D9`, zero workspace precedent, container shape free per §A1), folded from the former RenderG2State per ruling 12; `CGhoul2Info.mBoneCache` → `Option<BoneCacheId>` | `G2_ConstructGhoulSkeleton` on demand; freed by the Ghoul2System-level `DeleteLow` teardown (`G2_API.cpp:319-326`, Seam definition `delete` note — the sibling `bone_caches` arena is unreachable from `Ghoul2InfoArray` alone) | `&mut Ghoul2System` |
 | `worldMatrix`, `worldMatrixInv` | `tr_ghoul2.cpp:136-137` | per-construct scratch threaded through the skeleton build (three-kind: scratch), NOT a global | set by `G2_GenerateWorldMatrix` | passed into the transform chain |
 | `identityMatrix` | `tr_ghoul2.cpp:128` | `const` item | — | — |
 | `rootParents`, `otherParents`, `bottomBones`, `BoneHierarchyList`, `OldToNewRemapTable` | `tr_ghoul2.cpp:5061-5097,5173,4469` | `const` items (three-kind const-table, as `identityMatrix`; `OldToNewRemapTable` is decl'd non-`const` but read-only, `:5034`) | — | — |
@@ -389,7 +413,9 @@ consumed services and freezes the §F call shape.
 Per doc-standards rule 5 the pub signatures freeze here; porters transcribe into
 them without changing them. Per ruling 11 every §F entry takes the subsystem
 state plus the services trait — `(g2: &mut Ghoul2System, host: &mut impl
-EngineHost, ...)`. `host` provides the loader-owned model-memory read
+EngineHost, ...)`; `EngineHost` is defined in the ruling-24-pinned crate
+`crates/mp/host-interface` (package `mp_host_interface`, `G2SV-D12`). `host`
+provides the loader-owned model-memory read
 (`mdxaHeader_t`/`mdxaSkel_t`), trace, print/error, and cvar register/read
 (`cg_g2MarksAllModels`); the exact host method signatures are Stage-0's
 (non-goals). There is **no `RenderG2State` parameter** (folded into
@@ -409,14 +435,30 @@ never re-declares, and **no new crate edge** is added beyond the existing
   (`SSkinGoreData`, `CRagDollParams`, `SRagDollEffectorCollision`,
   `GoreTextureCoordinates`, `SGoreSurface`).
 - **Via the existing `mp_qshared` dependency — no direct `native_types` edge
-  needed.** `qhandle_t` and `mdxaBone_t` are `native_types`-owned
-  (`crates/native/types/src/lib.rs`, type-rosetta) but `mp_qshared` **re-exports**
-  them (`crates/mp/qshared/src/shared/mod.rs:136-137`), so a porter writes `use
-  mp_qshared::shared::{qhandle_t, mdxaBone_t}` and adds nothing to `Cargo.toml`.
-  `CollisionRecord_t` is `mp_qshared`-owned directly
-  (`crates/mp/qshared/src/shared/collision.rs`, with `G2Trace_t =
-  [CollisionRecord_t; MAX_G2_COLLISIONS]`, `MAX_G2_COLLISIONS = 16`; `mEntityNum ==
-  -1` = unused record).
+  needed.** `qhandle_t`, `mdxaBone_t`, and `vec3_t` are `native_types`-owned
+  (`crates/native/types/src/lib.rs`; `vec3_t = [vec_t; 3]` in
+  `crates/native/math/src/vector.rs:12`, type-rosetta) but `mp_qshared`
+  **re-exports** them (`crates/mp/qshared/src/shared/mod.rs:133` for `vec3_t`,
+  `:137` for `qhandle_t`/`mdxaBone_t`), so a porter writes `use
+  mp_qshared::shared::{qhandle_t, mdxaBone_t, vec3_t}` and adds nothing to
+  `Cargo.toml`. **`vec3_t` is the type spelled in every §F angles/position/scale/
+  velocity parameter and in `RagDollUpdateParams`' vector fields** — the frozen
+  signatures use the already-ported `vec3_t` array alias (`[f32; 3]`) verbatim (it
+  is the Raven `vec3_t` those params carry); they do **not** introduce a new
+  `Vec3` wrapper struct (none exists in the tree and none is on the roster). Any
+  ergonomic wrapper would be a new type + roster row + decision, which no settled
+  ruling authorizes — so `vec3_t` it is.
+  `CollisionRecord_t` (and `cplane_t`) are `mp_qshared`-owned directly in
+  `crates/mp/qshared/src/shared/collision.rs` and re-exported from `shared`
+  (`mod.rs:68`; `mEntityNum == -1` = unused record). The aggregate
+  `G2Trace_t = [CollisionRecord_t; MAX_G2_COLLISIONS]` and `MAX_G2_COLLISIONS =
+  16` live in a **different** module,
+  `crates/mp/qshared/src/common/mp/qcommon/collision_record.rs:19,21` (which
+  re-imports `CollisionRecord_t` from `shared`), and are **not** re-exported from
+  `shared::collision` — a porter needing those two names imports them from that
+  path. The §F `g2api_collision_detect` returns `Vec<CollisionRecord_t>` (the
+  populated `collRecMap` entries), so it needs only `CollisionRecord_t`, not
+  `G2Trace_t`.
 - **NOT importable into this crate** (`mp_renderer`-owned,
   `crates/mp/renderer/src/mdx_format/`; `G2SV-D5` forbids the crate edge):
   `mdxaHeader_t`/`mdxaSkel_t`. They are **never named as Rust types** in
@@ -455,7 +497,7 @@ pub fn g2api_set_bone_anim(g2: &mut Ghoul2System, ghoul2: &mut CGhoul2Info_v, mo
     bone_name: &str, start_frame: i32, end_frame: i32, flags: i32, anim_speed: f32,
     current_time: i32, set_frame: f32, blend_time: i32) -> bool;
 pub fn g2api_set_bone_angles(g2: &mut Ghoul2System, host: &mut impl EngineHost,
-    ghoul2: &mut CGhoul2Info_v, model_index: i32, bone_name: &str, angles: Vec3,
+    ghoul2: &mut CGhoul2Info_v, model_index: i32, bone_name: &str, angles: vec3_t,
     flags: i32, up: Eorientations, left: Eorientations, forward: Eorientations,
     model_list: &[qhandle_t], blend_time: i32, current_time: i32) -> bool;
 pub fn g2api_add_bolt(g2: &mut Ghoul2System, ghoul2: &mut CGhoul2Info_v, model_index: i32, bone_name: &str) -> i32;
@@ -463,12 +505,12 @@ pub fn g2api_add_bolt(g2: &mut Ghoul2System, ghoul2: &mut CGhoul2Info_v, model_i
 // `qboolean G2API_GetBoltMatrix(..., mdxaBone_t *matrix)` — the out-matrix is
 // ALWAYS written (failure paths write the identity/fallback too), NOT Option.
 pub fn g2api_get_bolt_matrix(g2: &mut Ghoul2System, host: &mut impl EngineHost,
-    ghoul2: &mut CGhoul2Info_v, model_index: i32, bolt_index: i32, angles: Vec3,
-    position: Vec3, frame_num: i32, model_list: &[qhandle_t], scale: Vec3,
+    ghoul2: &mut CGhoul2Info_v, model_index: i32, bolt_index: i32, angles: vec3_t,
+    position: vec3_t, frame_num: i32, model_list: &[qhandle_t], scale: vec3_t,
     bolt_matrix: &mut mdxaBone_t) -> bool;   // out-matrix write-through, qboolean return
 pub fn g2api_collision_detect(g2: &mut Ghoul2System, host: &mut impl EngineHost,
-    ghoul2: &mut CGhoul2Info_v, angles: Vec3, position: Vec3, frame_number: i32,
-    ent_num: i32, ray_start: Vec3, ray_end: Vec3, scale: Vec3, trace_flags: i32,
+    ghoul2: &mut CGhoul2Info_v, angles: vec3_t, position: vec3_t, frame_number: i32,
+    ent_num: i32, ray_start: vec3_t, ray_end: vec3_t, scale: vec3_t, trace_flags: i32,
     use_lod: i32, f_radius: f32) -> Vec<CollisionRecord_t>; // populated collRecMap entries (mEntityNum != -1)
 pub fn g2api_set_ragdoll(g2: &mut Ghoul2System, ghoul2: &mut CGhoul2Info_v, parms: &mut CRagDollParams);
 pub fn g2api_animate_g2_models_rag(g2: &mut Ghoul2System, host: &mut impl EngineHost,
@@ -478,7 +520,7 @@ pub fn g2api_animate_g2_models_rag(g2: &mut Ghoul2System, host: &mut impl Engine
 // the four virtuals (:106-123) are no-op base bodies, so Server's hooks do nothing.
 // SP's two subclasses (code/, out of scope) would add variants as a DEC-04 diff.
 pub struct RagDollUpdateParams {
-    pub angles: Vec3, pub position: Vec3, pub scale: Vec3, pub velocity: Vec3,
+    pub angles: vec3_t, pub position: vec3_t, pub scale: vec3_t, pub velocity: vec3_t,
     pub me: i32, pub settle_frame: i32,     // G2_gore.h:97-103
     pub kind: RagDollUpdateKind,
 }
@@ -504,7 +546,20 @@ pub struct Ghoul2Handle(pub i32);
 pub struct Ghoul2InfoArray { /* mInfos, mIds, free_indices */ }
 impl Ghoul2InfoArray {
     pub fn new_handle(&mut self) -> i32;          // Raven New()
-    pub fn delete(&mut self, handle: i32);        // Raven Delete()
+    // Raven Delete()/DeleteLow (G2_API.cpp:413,315). Raven's DeleteLow does TWO things:
+    // (1) frees every model instance's bone cache — RemoveBoneCache(mInfos[idx][model]
+    // .mBoneCache) for model in 0..mInfos[idx].size() (:319-326) — then (2) clears
+    // mInfos[idx] and bumps the slot generation / pushes the free index (:328-339).
+    // Only (2) touches Ghoul2InfoArray's OWN fields; the CBoneCaches freed in (1) live in
+    // the SIBLING Ghoul2System.bone_caches arena (G2SV-D9), NOT inside Ghoul2InfoArray, so
+    // the arena's own `delete` cannot reach them. The bone-cache teardown is therefore a
+    // Ghoul2System-level step (it owns both fields) run before/around the arena bookkeeping;
+    // every §F caller already holds &mut Ghoul2System, so both are in hand. Whether `delete`
+    // is spelled on Ghoul2System, or as a Ghoul2System wrapper threading &mut bone_caches
+    // into the arena's slot-only delete, is §A1 internal latitude (as the handle-arity note
+    // above) — the observable behavior (bone caches freed on Delete; generation/free-list
+    // bit-exact, G2SV-D6) is fixed by the oracle either way, so this is not an open decision.
+    pub fn delete(&mut self, handle: i32);        // slot/generation bookkeeping only (see note)
     pub fn is_valid(&self, handle: i32) -> bool;
     pub fn get(&self, handle: i32) -> &[CGhoul2Info];
     pub fn get_mut(&mut self, handle: i32) -> &mut Vec<CGhoul2Info>;
@@ -526,14 +581,45 @@ impl CBoneCache {
 }
 pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32);            // tr_ghoul2.cpp:1541
 pub fn g2_construct_ghoul_skeleton(g2: &mut Ghoul2System, host: &mut impl EngineHost,
-    ghoul2: &mut CGhoul2Info_v, frame_num: i32, check_for_new_origin: bool, scale: Vec3);
+    ghoul2: &mut CGhoul2Info_v, frame_num: i32, check_for_new_origin: bool, scale: vec3_t);
 pub fn eval_bone_cache(g2: &mut Ghoul2System, cache: BoneCacheId, index: i32) -> mdxaBone_t;
 pub fn multiply_3x4_matrix(out: &mut mdxaBone_t, in2: &mdxaBone_t, inm: &mdxaBone_t); // -ffp-contract=off (G2SV-D6)
 ```
 
 *(Exact struct fields and the full `G2API_*` list are the roster's per-file
 transcription target; the method-mapping table below enumerates the non-obvious
-ones.)* `BoneCacheId` is the key for the hand-rolled `Ghoul2System.bone_caches`
+ones.)*
+
+**Out-param contract for the un-illustrated `G2API_*` functions (G2SV-D1
+generalized — the frozen discriminator, not a per-function judgment).** The ~80
+functions not spelled above are 1:1 per §C7, but §C7's mechanical out-param→return
+default does **not** by itself settle the false-path write contract that `G2SV-D1`
+flags as a real bug class. The discriminator is frozen here and classifies every
+out-param function by reading **only its failure path** in the oracle (a
+mechanical transcription check, not a design call):
+- **Write-on-all-paths → `&mut T` out-param + `bool` return (write-through,
+  `G2SV-D1`).** A function whose failure path still writes the out-param before
+  returning `qfalse` (callers read it on false) keeps the `&mut` out-param.
+  `G2API_GetBoltMatrix` (`G2_API.cpp:1795`) is the archetype and is frozen above.
+- **Write-on-success-only → §C7 value/`Option` return (the default).** A function
+  that `return qfalse`s **before touching** its out-params when
+  `G2_SetupModelPointers` fails maps by the §C7 default to a returned value, i.e.
+  `Option<…>` (`None` = the false path, `Some(values)` = the written success
+  path). `G2API_GetBoneAnim` (`G2_API.cpp:1140`: `if (G2_SetupModelPointers(…)) {
+  … return ret; } return qfalse;` — out-params `currentFrame`/`startFrame`/
+  `endFrame`/`flags`/`animSpeed` untouched on the false path) and
+  `G2API_GetAnimRange` (`:1191`, same shape) are the archetypes of this class;
+  the remaining out-param functions (`GetRagBonePos`, `GetAnimFileName`,
+  `SaveGhoul2Models`, …) each classify the same way from their own failure path.
+
+This freezes the *contract* (which paths write); the exact returned tuple/struct
+shape for the success-only class is the per-file transcription target's §A1
+internal latitude, as for the rest of the un-illustrated set. A porter therefore
+never re-derives the write-through-vs-drop question as an open judgment — the rule
+above decides it, and `G2SV-D1`'s defect cannot recur because the two classes are
+named with their oracle discriminator.
+
+`BoneCacheId` is the key for the hand-rolled `Ghoul2System.bone_caches`
 owned arena introduced by this doc (`G2SV-D9`; §B5, hand-rolled in-crate, no external `slotmap` crate); it lives beside `Ghoul2System` in
 `mp_engine_ghoul2` (roster). The `mdxaHeader_t`/`mdxaSkel_t` model memory the bone
 ctor reads is loader-owned in `mp_renderer` and reached over `EngineHost` (a
@@ -549,7 +635,16 @@ before returning `qfalse`), so the seam takes `bolt_matrix: &mut mdxaBone_t` and
 returns `bool`. Because ruling 18 settled the earlier `-> Option<mdxaBone_t>`
 draft as a **defect**: callers read the matrix on the false path and an `Option`
 would drop that write. Rejected the `Option` return: it silently changes the
-observable contract the server depends on.
+observable contract the server depends on. **Generalized to every out-param
+`G2API_*` function** (the ~80 un-illustrated ones) via the §F frozen
+discriminator "Out-param contract for the un-illustrated `G2API_*` functions":
+write-on-all-paths (incl. failure) → `&mut` + `bool` (this decision);
+write-on-success-only, i.e. `return qfalse` before touching the out-param → §C7
+value/`Option` return. The complementary (non-write-through) class is
+`G2API_GetBoneAnim` (`G2_API.cpp:1140`) / `G2API_GetAnimRange` (`:1191`), which do
+**not** write on the `G2_SetupModelPointers`-fail path. Classifying a function is
+a mechanical failure-path read, not a per-function design choice, so this defect
+class is closed for the whole surface, not just `GetBoltMatrix`.
 
 **G2SV-D2.** The welded renderer subset is exactly the **8 WinDed vcproj renderer
 TUs**; the bone pipeline is `tr_ghoul2.cpp`'s subset (fn-extent 3,505 LOC). The
@@ -608,27 +703,30 @@ Because these were settled before the fork session and the rulings did not distu
 them. Rejected float tolerance and overload merging: parity is byte-for-byte
 (§A1) and the switch is name/arity-sensitive.
 
-`G2SV-D7`–`G2SV-D10` fold ruling 22 (2026-07-09); `G2SV-D1`–`G2SV-D6` (rendering
-rulings 11–18) stand unchanged per that ruling.
+`G2SV-D7`–`G2SV-D10` fold ruling 22 (2026-07-09); `G2SV-D11`–`G2SV-D12` fold
+rulings 26 and 24 (2026-07-09, fourth session); `G2SV-D1`–`G2SV-D6` (rendering
+rulings 11–18) and the rulings-11–22 rig stand unchanged per rulings 22/26.
 
 **G2SV-D7.** The gore surface splits into a graph-dead *apply* set and a
-server-live *record store* (resolving `G2SV-Q4`). The apply entries with zero
-reachability from engine roots — `G2API_AddSkinGore` (`G2_API.cpp:2569`, only the
-client `CG_G2_ADDSKINGORE` trap), `ResetGoreTag` (`G2_misc.cpp:96`, sole caller
+server-live *record store* (resolving `G2SV-Q4`; the record-store membership is
+finalized by `G2SV-D11`/ruling 26). The apply entries with zero reachability from
+engine roots — `G2API_AddSkinGore` (`G2_API.cpp:2569`, only the client
+`CG_G2_ADDSKINGORE` trap), `ResetGoreTag` (`G2_misc.cpp:96`, sole caller
 `AddSkinGore:2590`), `G2_GetGoreRecord` (`G2_misc.cpp:113`, no caller) — get §20
 zero-caller notes and no roster row. The record store — `AllocGoreRecord`/
-`FindGoreRecord`/`DeleteGoreRecord`/`FindGoreSet`/`NewGoreSet`/`DeleteGoreSet`/
-`CGoreSet::~CGoreSet`, `G2API_ClearSkinGore` (`G2_API.cpp:2549`, live via the
-`G_G2_CLEANMODELS` trap `:545` and the save/load destruct path `:2493`; the record
-store's `DeleteGoreSet` is additionally reached directly from the
-`G_G2_REMOVEGHOUL2MODEL`/`MODELS` removal paths `:814,901`), and `G2_GorePolys`
-(`G2_misc.cpp:804`, live via the collision `G2_TraceModels` loop `:1494`) — ports
-fully into `gore.rs`. Because ruling 22 settled that gore-apply produces no
-server-observable state (no populator behind a `G_G2_*` trap), so its vert-buffer/
-`GoreTouch` goldens are not referee-gating (`G2SV-Q4`), while the record store is
-reached by the live model-cleanup path. Rejected transcribing `AddSkinGore` as a
-live seam function (the prior draft): it is graph-dead server-side (§20).
-`DestroyGoreTexCoordinates`'s bucketing is escalated (`G2SV-Q8`).
+`FindGoreRecord`/`DeleteGoreRecord`/`DestroyGoreTexCoordinates` (`G2SV-D11`)/
+`FindGoreSet`/`NewGoreSet`/`DeleteGoreSet`/`CGoreSet::~CGoreSet`,
+`G2API_ClearSkinGore` (`G2_API.cpp:2549`, live via the `G_G2_CLEANMODELS` trap
+`:545` and the save/load destruct path `:2493`; the record store's `DeleteGoreSet`
+is additionally reached directly from the `G_G2_REMOVEGHOUL2MODEL`/`MODELS` removal
+paths `:814,901`), and `G2_GorePolys` (`G2_misc.cpp:804`, live via the collision
+`G2_TraceModels` loop `:1494`) — ports fully into `gore.rs`. Because ruling 22
+settled that gore-apply produces no server-observable state (no populator behind a
+`G_G2_*` trap), so its vert-buffer/`GoreTouch` goldens are not referee-gating
+(`G2SV-Q4`), while the record store is reached by the live model-cleanup path.
+Rejected transcribing `AddSkinGore` as a live seam function (the prior draft): it
+is graph-dead server-side (§20). Ruling 26 (`G2SV-D11`) narrows the apply drop to
+exactly this trio; `DeleteGoreRecord`/`DestroyGoreTexCoordinates` are live.
 
 **G2SV-D8.** `CRagDollUpdateParams` (`G2_gore.h:94`) is reimplemented as a §F17
 enum, not a vtable class (resolving `G2SV-Q5`). Its four non-`_DEBUG` virtuals
@@ -668,6 +766,35 @@ methods belong in its own file per §F21 (one class per file, methods colocate).
 Rejected the prior draft's placement of these methods in `info_array.rs`: that
 split one Raven class across two files against §F21.
 
+**G2SV-D11 (ruling 26, 2026-07-09).** `DestroyGoreTexCoordinates`
+(`G2_misc.cpp:43`) **and** `DeleteGoreRecord` (`:118`) are in the **live** record
+store, not the graph-dead apply set — settling `G2SV-Q8`. Because both are reached
+server-side through `~CGoreSet` (`:174`, its `DeleteGoreRecord` call at `:179`,
+whose `DestroyGoreTexCoordinates` call is at `:120`) ← `DeleteGoreSet` ← the live
+`G2API_ClearSkinGore`/`REMOVEGHOUL2MODEL` paths (`G2SV-D7`), and both compile
+(`#ifdef _G2_GORE`, ON). The ruling-22 dead-bucket mislisting was an **engineorder
+graph blind spot**: the reachability tool does not model an implicit C++ destructor
+invocation (`~CGoreSet` firing on `delete`, `G2_misc.cpp:163`) as a call edge, so
+the destructor's callees read as unreachable. So the §20 gore-apply drop covers
+**only** `G2API_AddSkinGore`, `ResetGoreTag`, and `G2_GetGoreRecord`; the two
+correction targets port with the record store in `gore.rs`. Rejected §20-noting
+`DestroyGoreTexCoordinates`/`DeleteGoreRecord` (the prior draft's escalated
+reading): the `~CGoreSet` teardown path genuinely calls them at runtime — the
+apparent dead-ness was a tool artifact, not oracle ground truth. (The container
+they iterate is empty server-side because its only populator is the apply path, so
+they do no observable work — but that is a runtime fact, not static dead-ness, and
+does not justify dropping the code the live destructor path invokes.)
+
+**G2SV-D12 (ruling 24, 2026-07-09).** The `EngineHost` trait this doc's §F
+signatures consume lives in the **pinned** Stage-0 crate `crates/mp/host-interface`
+(package `mp_host_interface`), and this doc cites that real path rather than a
+placeholder. Because ruling 24 pinned the interface crate and directed docs to cite
+real paths from then on. This does **not** define the trait's method roster (still
+Stage-0's, non-goals); it only fixes the crate/package a porter `use`s
+(`use mp_host_interface::EngineHost;`). Rejected leaving the path unspecified: a
+porter reaching a host-consuming body needs the concrete import, and the crate is
+now settled.
+
 ## Verification strategy
 
 Governing clause: porting-rules §F18 (differential goldens), DEC-09
@@ -694,7 +821,8 @@ Fixtures / goldens (the M3 gate is "G2 bone/bolt/collision goldens",
   generation rollover (`G2SV-D6`).
 - **RagDoll determinism** — `G2API_SetRagDoll`→settle over a fixed frame count,
   dumping the settled bone matrices. **Load-bearing** for the referee: the solver
-  is server-live (`G2SV-D3`, 36 arms from `SV_GameSystemCalls`).
+  is server-live (`G2SV-D3`, 36 reachable rag/IK fns from `SV_GameSystemCalls`'s
+  12 ragdoll/IK arms).
 - **Gore goldens** — `AllocGoreRecord`/`FindGoreSet` tag sequencing incl. the
   `MAX_GORE_RECORDS` eviction (`_G2_GORE` on). The gore-apply/`GoreTouch`
   vert-buffer goldens (`G2API_AddSkinGore` → `GoreVerts`/`GoreIndecies`) are
@@ -815,7 +943,7 @@ files:
     crate: mp_engine_ghoul2
     mode: mp
     class: CGoreSet
-    summary: CGoreSet + ~CGoreSet + the server-live gore-record store (G2SV-D7): AllocGoreRecord/FindGoreRecord/DeleteGoreRecord (+ its private helper DestroyGoreTexCoordinates, reached via ~CGoreSet -> pending G2SV-Q8), FindGoreSet/NewGoreSet/DeleteGoreSet, GoreState (G2SV-D5), G2_GorePolys (live via collision trace, G2_misc.cpp:1494). ResetGoreTag/G2_GetGoreRecord are graph-dead (G2SV-D7) -> §20 notes, not ported. _G2_GORE on.
+    summary: CGoreSet + ~CGoreSet + the server-live gore-record store (G2SV-D7): AllocGoreRecord/FindGoreRecord/DeleteGoreRecord (+ its private helper DestroyGoreTexCoordinates, G2_misc.cpp:43) — both LIVE per G2SV-D11/ruling 26 (reached via ~CGoreSet -> DeleteGoreSet, G2SV-Q8 SETTLED), FindGoreSet/NewGoreSet/DeleteGoreSet, GoreState (G2SV-D5), G2_GorePolys (live via collision trace, G2_misc.cpp:1494). Only G2API_AddSkinGore/ResetGoreTag/G2_GetGoreRecord are graph-dead (G2SV-D7/D11) -> §20 notes, not ported. _G2_GORE on.
   - path: crates/mp/engine/ghoul2/src/render/bone_cache.rs
     crate: mp_engine_ghoul2
     mode: mp
@@ -846,7 +974,7 @@ divergences:
   - "cgvm ragdoll-callback dead branches in G2_bones.cpp (client.h #include :32) all fold to their DEDICATED arm: Rag_Trace (:2684, #ifndef DEDICATED cgvm TRACELINE) -> real CM_BoxTrace else-arm (:2708); G2_BoneSnap (:3951, #ifdef DEDICATED return;) -> compiled no-op (caller G2_RagDollSolve :4244); the four RAG_CALLBACK_BONEINSOLID sites in G2_RagDollSettlePositionNumeroTrois (:3056,3085,3180,3217, #ifndef DEDICATED) compile out (surrounding if(params) logic stays); the :3826 site is doubly dead (#if 0 + #ifndef DEDICATED); G2_RagDebugBox/G2_RagDebugLine (:2884,2905, compiled via _DEBUG_BONE_NAMES #define :2577 but #ifdef DEDICATED return;) are compiled no-ops. No cgvm global resolves in this build (C10/§20)."
   - "RSStorage/NextRS/AllocRS render-surface pool dropped: dead server-side (sole caller tr_ghoul2.cpp:2660 is #ifndef DEDICATED); the #else non-_G2_GORE second GoreVerts (G2_misc.cpp:1088) is also dead (_G2_GORE ON)."
   - "G2_PERFORMANCE_ANALYSIS ON (FINAL_BUILD undefined) but its G2Time_*/G2PerformanceCounter_*/G2PerformanceTimer_* globals are timing instrumentation with no parity surface; dropped (F20), same as the leak-checking globals."
-  - "Gore apply/record split (G2SV-D7, ruling 22): the gore-APPLY entries G2API_AddSkinGore (G2_API.cpp:2569), ResetGoreTag (G2_misc.cpp:96, sole caller AddSkinGore:2590), G2_GetGoreRecord (G2_misc.cpp:113, no caller) are graph-dead server-side (only client CG_G2_ADDSKINGORE trap, no G_G2_* arm) -> §20 zero-caller notes, not ported. The record store (AllocGoreRecord/FindGoreRecord/DeleteGoreRecord, FindGoreSet/NewGoreSet/DeleteGoreSet, ~CGoreSet, G2API_ClearSkinGore, G2_GorePolys) is server-live (ClearSkinGore via G_G2_CLEANMODELS :545 + the save/load destruct path :2493; the record-store DeleteGoreSet also reached directly from the REMOVEGHOUL2MODEL/MODELS removal paths :814,901; GorePolys via collision trace G2_misc.cpp:1494) and ports fully. AddSkinGore vert-buffer/GoreTouch goldens are not M3-gating (G2SV-Q4)."
+  - "Gore apply/record split (G2SV-D7, ruling 22; corrected by G2SV-D11/ruling 26): the gore-APPLY entries — and ONLY these three — G2API_AddSkinGore (G2_API.cpp:2569), ResetGoreTag (G2_misc.cpp:96, sole caller AddSkinGore:2590), G2_GetGoreRecord (G2_misc.cpp:113, no caller) are graph-dead server-side (only client CG_G2_ADDSKINGORE trap, no G_G2_* arm) -> §20 zero-caller notes, not ported. The record store (AllocGoreRecord/FindGoreRecord/DeleteGoreRecord/DestroyGoreTexCoordinates, FindGoreSet/NewGoreSet/DeleteGoreSet, ~CGoreSet, G2API_ClearSkinGore, G2_GorePolys) is server-live (ClearSkinGore via G_G2_CLEANMODELS :545 + the save/load destruct path :2493; the record-store DeleteGoreSet also reached directly from the REMOVEGHOUL2MODEL/MODELS removal paths :814,901; GorePolys via collision trace G2_misc.cpp:1494) and ports fully. Ruling 26 moved DestroyGoreTexCoordinates (G2_misc.cpp:43) and DeleteGoreRecord (:118) into this live bucket (reached via ~CGoreSet :174/:179 -> :120): the ruling-22 dead-listing was an engineorder graph blind spot — an implicit C++ destructor call (~CGoreSet on delete, :163) is not a reachability edge (G2SV-Q8 SETTLED). AddSkinGore vert-buffer/GoreTouch goldens are not M3-gating (G2SV-Q4)."
   - "CRagDollUpdateParams (G2_gore.h:94) reimplemented as the §F17 RagDollUpdateParams enum (G2SV-D8, ruling 22), NOT a vtable class: MP instantiates only the base (sv_game.cpp:1539); the four virtuals (:106-123) are no-op base bodies, so the sole MP variant RagDollUpdateKind::Server has no-op hooks and params->RagDollSettled() (G2_bones.cpp:2505) matches to nothing. Distinct from the already-ported plain-data sharedRagDollUpdateParams_t. SP's two subclasses (code/) are a future DEC-04 diff."
   - "CGhoul2Info_v forwarding/lifecycle methods (ghoul2_shared.h:335-435) colocate in shared/cghoul2_info_v.rs (G2SV-D10, ruling 22, §F21), not info_array.rs; the #[repr(C)] struct layout (mItem: i32) stays frozen, only the impl is added; methods forward into Ghoul2InfoArray."
   - "Ghoul2System.bone_caches is a hand-rolled in-crate generational arena (BoneCacheId), matching Ghoul2InfoArray's bit-exact handle scheme (§B5), NOT an external slotmap crate (G2SV-D9, ruling 22)."
@@ -883,8 +1011,8 @@ row is one transcription target.
 | `G2_RagDollSetup/RagDoll/RagDollSolve` | `G2_bones.cpp:2254,2403,3970` | `ragdoll.rs` | fn-statics → `RagDollSolver` (G2SV-D3) |
 | `G2_RagDollSettlePositionNumeroTrois` | `G2_bones.cpp:3449` | `ragdoll.rs` | settle-pass `static` locals = scratch kind |
 | `G2_IKSolve / G2_DoIK` | `G2_bones.cpp:4297,4453` | `ragdoll.rs` | IK arm shares the solver statics |
-| `AllocGoreRecord/FindGoreRecord/DeleteGoreRecord` | `G2_misc.cpp:58,103,118` | `gore.rs` | server-live record store (G2SV-D7); `MAX_GORE_RECORDS` eviction |
-| `DestroyGoreTexCoordinates` | `G2_misc.cpp:43` | `gore.rs` | private helper of `DeleteGoreRecord` (`:120`), reached via `~CGoreSet`; ruling-22 graph-dead bucketing conflicts (G2SV-Q8) |
+| `AllocGoreRecord/FindGoreRecord` | `G2_misc.cpp:58,103` | `gore.rs` | server-live record store (G2SV-D7); `MAX_GORE_RECORDS` eviction |
+| `DestroyGoreTexCoordinates` / `DeleteGoreRecord` | `G2_misc.cpp:43,118` | `gore.rs` | server-LIVE record store (G2SV-D11/ruling 26, G2SV-Q8 SETTLED); reached via `~CGoreSet` (`:174/:179` → `:120`); ruling-22 dead-listing was a destructor-edge graph blind spot |
 | `FindGoreSet/NewGoreSet/DeleteGoreSet`, `CGoreSet::~CGoreSet` | `G2_misc.cpp:127,142,153,174` | `gore.rs` | server-live (G2SV-D7); `_G2_GORE` on |
 | `G2API_ClearSkinGore` | `G2_API.cpp:2549` | `api_gore.rs` | server-live via `G_G2_CLEANMODELS` (`:545`) + save/load destruct (`:2493`) (G2SV-D7); drives `DeleteGoreSet` (`:2557`), which the `REMOVEGHOUL2MODEL`/`MODELS` paths (`:814,901`) also call directly |
 | `G2API_AddSkinGore/ResetGoreTag/G2_GetGoreRecord` | `G2_API.cpp:2569`, `G2_misc.cpp:96,113` | — (dropped) | graph-dead server-side (G2SV-D7) → §20 zero-caller notes; no roster row |
@@ -895,13 +1023,55 @@ row is one transcription target.
 - **M3 waves 13–19** (`GOAL-engine.md:71`) — "renderer, RMG, botlib, ghoul2
   complete"; gate = the bone/bolt/collision goldens above. Needs frozen first:
   the already-ported `shared/` + `gore/` layout types (done), and the **Stage-0
-  `EngineHost` trait** (ruling 11) carrying all four consumed services —
-  model-memory read (`mdxaHeader_t`/`mdxaSkel_t`), trace, print/error, cvar
-  register/read. The host-consuming bodies (`render/bone_cache.rs` ctor,
-  `render/skeleton.rs`, `misc.rs` trace, `api_gore.rs`/`cvars.rs` cvar
-  registration, print/error paths) are transcribed against that frozen trait; their
-  §F signatures freeze in this doc, their method bodies wait on Stage-0 (non-goals,
+  `EngineHost` trait** (ruling 11) carrying the consumed services — model-memory
+  read (`mdxaHeader_t`/`mdxaSkel_t`), collision trace, print/error, cvar
+  register/read, and (naming completed here from ground truth, still Stage-0's to
+  spec) **loader model-registration/file-read** (`RE_RegisterModel` /
+  `R_GetModelByHandle`, `G2_API.cpp:593`, `G2_surfaces.cpp:426`, and the save/load
+  buffer path `G2API_SaveGhoul2Models`/`LoadGhoul2Models`, `G2_API.cpp:2472,2477`).
+  Every one of these is a loader/engine host service whose method signature is
+  Stage-0's (non-goals); this doc only enumerates *that* ghoul2 consumes them.
+  The host-consuming bodies are transcribed against that frozen trait; their §F
+  signatures freeze in this doc, their method bodies wait on Stage-0 (non-goals,
   sequencing consequence).
+- **Per-file Stage-0 dependency partition** (which roster files a porter may begin
+  transcribing now vs. which bind the not-yet-frozen `EngineHost` trait). Derived
+  from each file's oracle host-service touches; two pervasive host edges cut across
+  the whole surface and are called out once here rather than per row: (i) nearly
+  every `G2API_*` wrapper opens with `G2_SetupModelPointers` (`G2_misc.cpp:1839`),
+  a loader model-memory read, so its *completed* body binds the loader-read
+  service even before its concern-specific one; (ii) print/error (`Com_Printf`/
+  `Com_Error`) is a host service too, so any live error arm is a Stage-0 edge.
+  - **Host-free — transcribe fully now (no live body touches any host service):**
+    `ghoul2_system.rs` (state struct, `Default`-init), `shared/cghoul2_info.rs`
+    (per-instance data class + `DeepCopy` zeroing), `shared/cghoul2_info_v.rs`
+    (wrapper forwarding into the in-crate arena, `G2SV-D10`), `info_array.rs`
+    (arena `New`/`Delete`/`IsValid`/`Get`; the `OutputDebugString` leak report is
+    `_FULL_G2_LEAK_CHECKING` debug-only, dropped §F20), `ragdoll_update_params.rs`
+    (the §F17 enum), `bolts.rs` (internal bolt-list ops — its one apparent host
+    line `G2_bolts.cpp:194` is a **commented-out** `Com_Printf`, so genuinely
+    host-free), and `render/bone_transform.rs` (pure `-ffp-contract=off` matrix/
+    quaternion math, no host).
+  - **Stage-0-blocked — §F signature freezes now, host-consuming body waits on the
+    frozen `EngineHost` trait:** `render/bone_cache.rs` (ctor header read, service
+    a), `render/skeleton.rs` (model-memory read, a), `misc.rs` (`G2_TraceModels`
+    trace b + `G2_SetupModelPointers` model read a + `Com_Printf`/`Com_Error` c),
+    `gore.rs` (`G2_GorePolys` reads `cg_g2MarksAllModels` via `Cvar_Get`,
+    `G2_misc.cpp:1524`, service d), `cvars.rs` (cvar register/read d), `api_gore.rs`
+    (cvar d), `api_collision.rs` (`CollisionDetect` → `G2_TraceModels` trace b),
+    `api_models.rs` (`RE_RegisterModel` loader-register + `Com_Printf` c),
+    `api_bolts.rs` (`GetBoltMatrix` model-memory read a), `api_saveload.rs`
+    (save/load file buffer + print), `surfaces.rs` (`R_GetModelByHandle(RE_Register
+    Model(...))`, `G2_surfaces.cpp:426`, loader-register — blocked despite being an
+    "internal" file), and `ragdoll.rs` (`Rag_Trace` → `CM_BoxTrace` trace b, the
+    DEDICATED `#else` arm `G2_bones.cpp:2708`).
+  - **Mostly host-free — start the host-free bodies now, defer isolated host arms:**
+    `bones.rs` (internal bone-anim list logic is pure, but `G2_bones.cpp` carries a
+    few live `Com_Printf` error arms among its 14 host tokens — the non-error
+    bodies transcribe now, the error arms bind print/error), and the thin 1:1
+    wrappers `api_bones.rs`/`api_surfaces.rs`/`api_ragdoll.rs` (their own §C7
+    marshalling is host-free, but each opens with `G2_SetupModelPointers` (a) and
+    forwards into a blocked internal, so the completed body binds Stage-0).
 - **`SV_GameSystemCalls`** (wave 20, plan §"server is the integrator") — the
   server→ghoul2 edges call the `G2API_*` surface frozen by `G2SV-D6` (incl. the 12
   rag/IK arms, `G2SV-D3`); that seam must be stable before the switch arm ports.
@@ -910,7 +1080,7 @@ row is one transcription target.
 
 Questions the 2026-07-09 fork session and its evidence queries closed (were open
 in the prior draft), plus `G2SV-Q4` and `G2SV-Q5` closed by ruling 22
-(`G2SV-D7`/`G2SV-D8`):
+(`G2SV-D7`/`G2SV-D8`) and `G2SV-Q8` closed by ruling 26 (`G2SV-D11`):
 - **G2SV-Q1** (renderer-subset boundary) — **RESOLVED by `G2SV-D2`**: the 8 WinDed
   vcproj renderer TUs, fn-extent LOC per `engine-fork-discovery.md:162-164`; this
   doc owns the `tr_ghoul2` bone subset, the loader is a `tr_model` sibling doc.
@@ -954,24 +1124,76 @@ in the prior draft), plus `G2SV-Q4` and `G2SV-Q5` closed by ruling 22
   data members + a single `Server` variant with no-op hooks (`ragdoll_update_params.rs`),
   and `params->RagDollSettled()` becomes a no-op `match`. Distinct from the
   already-ported plain-data `sharedRagDollUpdateParams_t`.
+- **G2SV-Q8** (`DestroyGoreTexCoordinates`/`DeleteGoreRecord` bucketing,
+  `G2_misc.cpp:43,118`) — **RESOLVED by `G2SV-D11`** (ruling 26): both port with the
+  **live** gore record store in `gore.rs`, not the graph-dead apply set. Oracle
+  ground truth (`G2_misc.cpp:174/179/120`) shows `~CGoreSet` → `DeleteGoreRecord` →
+  `DestroyGoreTexCoordinates` fires on the live `DeleteGoreSet` teardown (`~CGoreSet`
+  runs on `delete`, `:163`), reached from `G2API_ClearSkinGore`
+  (`G_G2_CLEANMODELS`) and the `REMOVEGHOUL2MODEL`/`MODELS` paths (`G2SV-D7`); both
+  compile (`#ifdef _G2_GORE`, ON). The prior draft's escalation rested on a
+  reachability-tool artifact — an **engineorder graph blind spot** where an implicit
+  C++ destructor invocation is not counted as a call edge — not on oracle ground
+  truth. The §20 gore-apply drop is thereby narrowed to exactly `G2API_AddSkinGore`,
+  `ResetGoreTag`, `G2_GetGoreRecord`. Not M3-gating either way (gore-apply is out of
+  the referee surface, `G2SV-Q4`).
 
 ## Open questions
 
-- **`G2SV-Q8`** — `DestroyGoreTexCoordinates` (`G2_misc.cpp:43`) bucketing. Ruling 22
-  as transcribed into this revision lists it in the **graph-dead** gore-apply set
-  ("zero reachability from engine roots"), but oracle ground truth shows it **is**
-  reached server-side: it is the private helper `DeleteGoreRecord` calls (`:120`),
-  and `DeleteGoreRecord` is invoked by `CGoreSet::~CGoreSet` (`:179`) ←
-  `DeleteGoreSet` (its call at `G2_API.cpp:2557` inside the **live** `G2API_ClearSkinGore`,
-  reached behind `G_G2_CLEANMODELS`; the `G_G2_REMOVEGHOUL2MODEL`/`MODELS` paths reach
-  `DeleteGoreSet` directly at `:814,901`). It compiles
-  (`#ifdef _G2_GORE`, ON, `G2_misc.cpp:26`). Only the runtime container it iterates
-  (`CGoreSet::mGoreRecords`) is always empty server-side, because its sole populator
-  is the graph-dead apply path — so it never does observable work, but it is **not**
-  statically graph-dead. This revision ports it as a live private helper of the
-  record store in `gore.rs` (the `~CGoreSet` path needs it) rather than §20-noting
-  it, but the classification conflicts with the ruling's transcribed wording. A
-  drafting agent must not self-resolve a ruling/ground-truth conflict: **escalate**
-  for the user to confirm whether `DestroyGoreTexCoordinates` ports with the record
-  store (this revision's reading) or is genuinely dropped. Not M3-gating either way
-  (gore-apply is out of the referee surface, `G2SV-Q4`).
+`G2SV-Q8` (the prior last item) is **SETTLED by ruling 26** (`G2SV-D11`,
+2026-07-09). Two items surfaced by the Gate-3 dry-run remain and **escalate to a
+design session** (doc-standards Gate 2/3: contested points escalate, never
+self-resolve). Both are *internal* representation choices for §F reimplemented
+types — they **refine**, and do not reopen, the settled reachability/ownership
+decisions they sit under (`G2SV-D3`; `G2SV-D7`/`G2SV-D11`); each concerns only the
+Rust shape of a raw-pointer field those decisions left as an ellipsis. Neither is
+answerable from cited oracle behavior (Raven uses raw pointers throughout, and no
+cited behavior mechanically forces one safe-Rust mapping) or from an existing
+settled decision, so a drafting agent may not pick one (doc-standards, drafting
+rule).
+
+- **`G2SV-Q9` — RagDollSolver's raw-pointer array fields (refines `G2SV-D3`).**
+  `G2SV-D3` settles that the ragdoll fn-statics block (`G2_bones.cpp:1214-1241`)
+  becomes owned fields on `RagDollSolver`, but leaves the *field type* of the
+  pointer arrays as an ellipsis (`rag: Vec<..>`, State ownership). Four fields hold
+  raw pointers **into other owned data**, which porting-rules §B5 ("no aliasing raw
+  pointers in safe code") / §D11 ("unsafe confined to the seam") forbid as literal
+  raw fields on a non-ABI §F type: `ragBasepose`/`ragBaseposeInv` (`mdxaBone_t
+  *[MAX_BONES_RAG]`, `:1214-1215`) point into loader-owned model memory reached only
+  via `EngineHost` (`G2SV-D5`), while `ragBoneData` (`boneInfo_t *[MAX_BONES_RAG]`,
+  `:1218`) and `rag` (`vector<boneInfo_t*>`, `:1241`) point into a live model's own
+  `mBlist` bone list. The `boneInfo_t` raw-pointer exemption (Seam definition, "kept
+  as raw … because they're inside an already-frozen ABI struct") does **not** apply —
+  `RagDollSolver` is a new §F type, not a frozen ABI struct. §B5 names the general
+  pattern (arena + id/handle) but the concrete mapping is unsettled — e.g. an
+  index/handle into the owning model's `mBlist` for `rag`/`ragBoneData` plus a
+  separate loader-model-handle + bone-index (or a host-fetched owned basepose copy)
+  for the basepose arrays, versus another shape — each with different borrow/
+  threading consequences. This is a genuine design choice for a session, not a
+  mechanical transcription.
+
+- **`G2SV-Q10` — `GoreTextureCoordinates.tex` per-LOD buffer ownership in the ported
+  gore store (refines `G2SV-D7`/`G2SV-D11`).** The live gore record store (`gore.rs`,
+  `G2SV-D7`) composes `GoreState.records: BTreeMap<i32, GoreTextureCoordinates>` over
+  the **already-ported, layout-frozen** `GoreTextureCoordinates { tex: [*mut c_float;
+  MAX_LODS] }` (Standing context "already type-ported"; that type's own doc comment
+  disclaims ownership — "free-on-drop behavior is not modeled at the ABI-layout level
+  here"). Raven allocates each `tex[TS.lod]` with `Z_Malloc` (`G2_misc.cpp:1020,
+  1034`) and frees it with `Z_Free` in `~GoreTextureCoordinates` (`G2_gore.h:33`) and
+  on realloc (`G2_misc.cpp:1028`). porting-rules §9 maps `Z_Malloc`→owned `Vec`/`Box`,
+  but the frozen `[*mut c_float; MAX_LODS]` ABI field cannot itself become a `Vec`,
+  and §D11 forbids raw `Z_Malloc`-mirroring `unsafe` in this internal (non-seam)
+  type — so the buffer-backing scheme (owned side-store + `Drop` mirroring `Z_Free`;
+  vs. keeping the frozen layout with seam-confined unsafe; vs. a §F layout-free
+  reimplementation superseding the type-port layout for this internal type) is a
+  genuine design choice, covered by no settled decision. Note the server-side runtime
+  is **all-null**: the sole allocator is `G2_GorePolys`'s `TS.gore`-set arm
+  (`G2_misc.cpp:1020-1034`), which sits behind the `if (!TS.gore) return;` early
+  return at `:891-893` and is never reached server-side because no server caller sets
+  `TS.gore` (`G2SV-D7`/`G2SV-Q4`); the live store only ever holds default
+  (all-`tex[i]==0`) records (`G2_misc.cpp:91`) whose destructor `Z_Free` loop is a
+  no-op. So this decision carries **no golden/parity surface** on the server slice —
+  but `G2_GorePolys` ports fully (`G2SV-D7`), so the porter still transcribes the
+  allocation code and needs the settled shape to write it. Dropping the alloc arm on
+  the strength of that runtime-dead fact would be a §A2/§C10 speculative fold of a
+  runtime (not `#ifdef`) branch, so the shape is escalated rather than self-resolved.
