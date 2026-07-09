@@ -112,3 +112,60 @@ index. Agent rules it enforces:
 - Vendored zlib/png via Rust crates; platform files excluded (plan §1).
 - FINAL_BUILD undefined; WinDed vcproj Release macro set (plan appendix).
 - One engine in the repo; interface crate first (referee plan).
+
+## §F doc-session rulings (user, 2026-07-09 — second session)
+
+The five NEEDS_SESSION design docs' contested points, ruled after evidence
+queries against `engine-port-order.json` and the oracle:
+
+11. **Host seam (ICARUS-Q1 = NAV-Q1 = ROFF-Q1 = STATE-Q2 service half):**
+    ONE `EngineHost` services trait in the Stage-0 interface crate (trace, FS,
+    print/error, VM_Call, shared memory). §F methods take
+    `(&mut SubsystemState, &mut impl EngineHost)`; `Engine` implements it via
+    a split-borrow view struct. Referee injects a deterministic impl.
+    **RULING: EngineHost trait + view-struct impl (user, 2026-07-09)**
+12. **Attachment (STATE-Q2 placement half):** the five §F states are plain
+    Default-initialized direct fields on `Engine` (`icarus`, `nav`, `g2`,
+    `roff`, `rmg`) — no Option/Box, no nesting. Lazy-init timing modeled with
+    Raven's own initialized flags.
+    **RULING: direct Engine fields (user, 2026-07-09)**
+13. **ICARUS-Q2:** owned objects replace the TAG_ICARUS2/3/4 class allocs;
+    the fork-4 arena covers only ICARUS_Malloc/Free raw blobs (TAG_ICARUS5).
+    **RULING: residual raw blobs only (user, 2026-07-09)**
+14. **ICARUS-Q3:** committed .IBI goldens are hand-authored scripts compiled
+    once by a `tools/ibi-gen` harness built from the oracle's out-of-set
+    Interpreter/Tokenizer; no retail blobs in the public repo (retail corpus
+    may run locally, uncommitted).
+    **RULING: hand-authored, tool-compiled (user, 2026-07-09)**
+15. **ICARUS-Q4:** the unchecked `gSequencers[ent_num]` UB paths (5 of 11
+    inbound fns) guard-and-return per §19, ≤2-line note per site.
+    **RULING: guard-and-return (user, 2026-07-09)**
+16. **RMG-Q1:** the qcommon terrain twins (CCMLandScape, CRandomTerrain,
+    CTerrainMap, CPathInfo, CArea, CCMPatch, CCMHeightDetails) fold into the
+    rmg-terrain doc; the cm C-track packets exclude those classes.
+    **RULING: fold them in (user, 2026-07-09)**
+17. **Dead surface (§20 drops, evidence-backed):** `Svcmd_ICARUS_f`,
+    `RmManager.mCurObjective`, `noiseTable`/`noisePerm`, and the RM_Terrain
+    client-model chain (`RM_CreateRandomModels`, `CTerrainMap::Upload`,
+    `CTerrainMap::SaveImageToDisk` — zero engine callers under DEDICATED,
+    graph-confirmed) are recorded with §20 zero-caller notes, not ported.
+    **RULING: §20-drop all four (user, 2026-07-09)**
+18. **Doc defects:** ghoul2's `g2api_get_bolt_matrix` seam signature becomes
+    write-through + qboolean (Raven ALWAYS writes the out-matrix); npcnav
+    transcribes Raven's own priority-queue implementation faithfully instead
+    of std::BinaryHeap (equal-cost tie order is parity-visible).
+    **RULING: fix both as stated (user, 2026-07-09)**
+
+Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
+- **G2SV-Q2:** ragdoll/IK is server-live — 36 rag/IK functions reachable from
+  `SV_GameSystemCalls`. In scope, statics per fork-3.
+- **G2SV-Q1:** the renderer-subset boundary is exactly the 8 WinDed vcproj
+  renderer files; fn-extent LOC: tr_ghoul2 3,505, tr_shader 3,139, tr_model
+  1,547, tr_image 845, tr_init 538, matcomp 240, tr_main 47, tr_mesh 39.
+- **ROFF-Q3:** the syscall switch has FIVE roff arms (G_ROFF_CLEAN,
+  G_ROFF_UPDATE_ENTITIES, G_ROFF_CACHE, G_ROFF_PLAY, G_ROFF_PURGE_ENT).
+- **NAV-Q3:** the G_NAV_SETCHECKEDNODE→FLAGALLNODES→GETPATHSCALCULATED
+  fall-through (sv_game.cpp:928-933, a real Raven bug) is owned by the
+  wave-20 `SV_GameSystemCalls` transcription, not the nav subsystem.
+- **RMG-Q2:** the RM_Terrain client-model chain is dead under DEDICATED
+  (see ruling 17).
