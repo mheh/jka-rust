@@ -246,3 +246,86 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     g++-16/libstdc++), the same reference every golden uses; retail-MSVC
     tie-order divergence accepted exactly as for FP parity.
     **RULING: bless both (user, 2026-07-09)**
+
+## §F doc-session rulings, round 4 (user, 2026-07-09 — fifth session)
+
+27. **ICARUS ownership graph (ICARUS-Q10/Q11):** faithful Vec arenas + id
+    newtypes. `IcarusInstance` owns `Vec<Sequence>` / `Vec<Sequencer>`;
+    `SequenceId(i32)` / `SequencerId(i32)` carry Raven's monotonic
+    never-reused `m_GUID`; `GetSequence(id)` stays a linear scan (faithful
+    O(n), insertion-ordered iteration). A sequencer's non-owning subset is
+    `Vec<SequenceId>`; its `map<CTaskGroup*,CSequence*>` becomes
+    `BTreeMap<TaskGroupId, SequenceId>`. `TaskManager`: ONE owning
+    `Vec<TaskGroup>` arena + `TaskGroupId`; the string/int maps become
+    `BTreeMap` side-indexes of ids (three parallel owners collapse to
+    owner + side-indexes). Matches rulings 21/22 precedent.
+    **RULING: faithful arenas + ids (user, 2026-07-09)**
+28. **RMG live collision surface + landscape accessor (RMG-Q8/Q9):** the
+    per-frame terrain-collision surface IS live under DEDICATED — amend
+    RMG-D1's live enumeration to four items (+ `CmLandScape::PatchCollide` /
+    `WaterCollide` / `GetBounds` / water accessors). They port as
+    `CmLandScape` methods with faithful signatures threaded through
+    `&`/`&mut CollisionWorld`, frozen in the rmg-terrain doc now; they land
+    with the early clipmap-trace waves their cm_trace/cm_test callers
+    occupy (the doc keeps ownership). `RmManager` stores
+    `land: Option<TerrainHandle>` (Raven inits `mLandScape` null); the
+    accessor returns `Option<TerrainHandle>`, callers resolve through
+    `CollisionWorld`; `GetHeightMap`/`GetFlattenMap` return `&[u8]`.
+    Naming (RMG-Q7): `CRMArea` → `RmArea`, qcommon `CArea` → `CmArea`
+    (both §20-dropped shape-map entries).
+    **RULING: collision live; Option handle; RmArea/CmArea (user, 2026-07-09)**
+29. **Ghoul2 shape holes (delete / ragdoll pointers / gore buffers):**
+    (a) `delete`/`delete_low` move UP to `Ghoul2System` methods — free the
+    slot's bone caches from `bone_caches`, then drop the info slot (Raven's
+    method placement is an artifact of its globals). (b) `RagDollSolver`
+    stores bone INDICES into the model's blist and resolves basepose
+    matrices per call through EngineHost — no stored raw pointers outside
+    the ABI seam (write-through GetBoltMatrix pattern, ruling 21).
+    (c) `GoreState` owns each per-LOD gore buffer as `Vec<f32>`; the
+    ABI-frozen `GoreTextureCoordinates.tex` pointers point into those Vecs;
+    teardown order mirrors `Z_Free`.
+    **RULING: system-level delete; ids not ptrs; owned Vec buffers (user, 2026-07-09)**
+30. **NAV entity seam:** the five ent-taking nav arms (G_NAV_GETNEARESTNODE,
+    CHECKFAILEDNODES, ADDFAILEDNODE, NODEFAILED, GETBESTPATHBETWEENENTS)
+    carry `*mut sharedEntity_t` exactly as the trap marshals
+    `(sharedEntity_t *)VMA(1)` — ruling 23's precedent applies verbatim;
+    methods deref the pointer like Raven. The `gentity()` EngineHost
+    service stays for genuinely index-based access. The npcnav doc's
+    `ent: EntityId` model and its "reached through SV_GentityNum" note are
+    both corrected.
+    **RULING: carry the pointer, per ruling 23 (user, 2026-07-09)**
+31. **Stage-0 sequencing (EngineHost signature gap):** the Stage-0 crate
+    `crates/mp/host-interface` (pkg `mp_host_interface`) is BUILT BEFORE
+    the doc relaunch — PlatformHost + EngineHost traits land as real
+    compiled code first, and the four docs cite the crate's actual
+    signatures instead of a paper spec. The doc loop resumes only after
+    `cargo build` is green on the crate.
+    **RULING: build Stage 0 first (user, 2026-07-09)**
+32. **NAV first-slice goldens (NAV-Q7):** no test-only constructor — the
+    3a golden harness implements EngineHost as a fixture-backed mock (FS
+    reads serve committed `.nav` fixture bytes; print/error captured;
+    flrand deterministic), so `Load` ports in the first slice with its real
+    frozen signature and populates the graph through the front door. The
+    mock is the reusable goldens vehicle for every host-taking subsystem
+    (icarus, RMG, G2).
+    **RULING: fixture-backed mock EngineHost (user, 2026-07-09)**
+
+### Round-4 mechanical resolutions (evidence, not forks)
+
+- **TODO-marker conflict (rmg doc):** the engine-wide no-TODO/no-FIXME rule
+  (GOAL-engine.md, user-directed) WINS unconditionally; the rmg doc's
+  "leave a `//TODO: Port CArea` marker" fallback is struck — §20-dropped
+  items get a zero-caller §20 note, never a marker.
+- **`rmAutomapSymbol_t` destination (RMG-D2d):** already ported at
+  `crates/mp/engine/client/src/client/rm_automap_symbol_t.rs`; relocates to
+  `crates/mp/qshared/src/common/mp/rmg/rm_automap_symbol_t.rs` (new `rmg/`
+  folder mirroring `oracle/codemp/RMG/RM_Manager.h` ownership), client
+  import updated in the same commit.
+- **NAV-D6 migration mechanics:** the four consts and four vec3 fns MOVE
+  (never duplicate) to mp_qshared; vec3 fns → a new
+  `crates/mp/qshared/src/shared/q_math.rs` (sibling of `q_math_rand.rs`,
+  mirroring `oracle/codemp/game/q_math.c`); each const lands in the folder
+  mirroring its owning Raven header per existing convention. The existing
+  `mp_game` copies are deleted and re-imported in the SAME commit — no
+  re-export shims. This migration is in-scope for the npcnav doc's first
+  slice.
