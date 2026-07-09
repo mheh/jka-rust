@@ -1,0 +1,10 @@
+[package]
+name = "mp_host_interface"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_host_interface"
+
+[dependencies]
+mp_qshared = { path = "../qshared" }

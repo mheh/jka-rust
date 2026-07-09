@@ -2,7 +2,7 @@
 
 use std::os::raw::{c_char, c_int};
 
-use mp_engine_qcommon::qcommon::netadr_t::netadr_t;
+use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::shared::limits::MAX_NAME_LENGTH;
 use mp_qshared::shared::qboolean;
 

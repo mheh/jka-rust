@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use super::netadr_t::netadr_t;
-use super::netsrc_t::netsrc_t;
+use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
+use mp_qshared::common::mp::qcommon::netsrc_t::netsrc_t;
 use mp_qshared::shared::qboolean;
 
 // Raven `MAX_MSGLEN` — max length of a message, which may be fragmented into

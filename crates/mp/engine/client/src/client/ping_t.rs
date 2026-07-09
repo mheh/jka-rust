@@ -2,7 +2,7 @@
 
 use std::os::raw::c_char;
 
-use mp_engine_qcommon::qcommon::netadr_t::netadr_t;
+use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::shared::MAX_INFO_STRING;
 
 /// Raven `ping_t` — a pending server ping request/response record.

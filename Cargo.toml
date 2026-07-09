@@ -13,6 +13,7 @@ members = [
     "crates/mp/uishared",
     "crates/mp/abi",
     "crates/mp/engine-select",
+    "crates/mp/host-interface",
     "crates/mp/game",
     "crates/mp/cgame",
     "crates/mp/ui",

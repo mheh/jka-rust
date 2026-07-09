@@ -2,7 +2,7 @@
 
 use std::os::raw::c_char;
 
-use mp_engine_qcommon::qcommon::netadr_t::netadr_t;
+use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 use mp_qshared::shared::{fileHandle_t, qboolean, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS};

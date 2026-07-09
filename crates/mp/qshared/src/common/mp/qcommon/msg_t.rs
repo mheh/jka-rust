@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use mp_qshared::shared::qboolean;
+use crate::shared::qboolean;
 
 /// Raven `msg_t` — a growable read/write bit-stream buffer used for network
 /// messages and demo/save serialization.

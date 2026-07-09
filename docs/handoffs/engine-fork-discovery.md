@@ -329,3 +329,19 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
   `mp_game` copies are deleted and re-imported in the SAME commit — no
   re-export shims. This migration is in-scope for the npcnav doc's first
   slice.
+
+## Stage-0 crate escalations (user, 2026-07-09 — "no deferrals")
+
+33. **No deferrals in the Stage-0 seam.** (a) The UDP surface
+    (`Sys_GetPacket`/`Sys_SendPacket` family) lands in `PlatformHost` NOW
+    with faithful Raven signatures; the wire types it needs
+    (`netadr_t`/`netsrc_t`/`msg_t`) relocate below the crate into
+    `mp_qshared` (`common/mp/qcommon/`, one type per file — same treatment
+    as `rmAutomapSymbol_t`), imports updated in the same change. (b)
+    `vm_call` gains the VM selector mirroring Raven's `VM_Call(vm, …)`
+    first parameter (gvm/cgvm) — ROFF's `VM_Call(cgvm, …)` call sites
+    transcribe 1:1 even though cgvm is NULL under DEDICATED. The agent's
+    other two provisional choices stand as faithful defaults: `trace` keeps
+    the out-param shape; `fs_read_file` returns exact file bytes (Raven's
+    trailing NUL is an FS-impl detail, noted at the site).
+    **RULING: no deferrals (user, 2026-07-09)**

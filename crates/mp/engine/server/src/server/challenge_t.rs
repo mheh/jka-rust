@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use mp_engine_qcommon::qcommon::netadr_t::netadr_t;
+use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::shared::qboolean;
 
 /// Raven `challenge_t`.

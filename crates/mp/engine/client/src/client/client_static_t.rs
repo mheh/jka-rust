@@ -3,7 +3,7 @@
 use core::ffi::c_char;
 use core::ffi::c_int;
 
-use mp_engine_qcommon::qcommon::netadr_t::netadr_t;
+use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
 use mp_qshared::shared::{connstate_t, qboolean, qhandle_t, MAX_INFO_STRING};
 

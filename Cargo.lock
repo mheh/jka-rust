@@ -209,6 +209,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mp_host_interface"
+version = "0.1.0"
+dependencies = [
+ "mp_qshared",
+]
+
+[[package]]
 name = "mp_qshared"
 version = "0.1.0"
 dependencies = [
