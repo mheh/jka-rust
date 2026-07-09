@@ -1,12 +1,11 @@
-# Engine pre-port fork discovery (2026-07-09) — RULINGS PENDING
+# Engine pre-port fork discovery (2026-07-09) — ALL RULINGS SETTLED
 
 The engine equivalent of `jampgame-fork-discovery.md`: the design forks that
 must be user-ruled BEFORE the mega-pass transcription window, so porters are
 blind executors of settled decisions (see plan §"Port-process discipline" and
 `docs/GOAL-engine.md`). Derived from the corrected dependency walk
 (`tools/closure-prototype/out/engine/engine-port-order.{json,tsv,md}`, 2,481
-fns / 87,728 LOC / 5,081 edges). Each fork lists a RECOMMENDED position;
-**none are settled until ruled inline.**
+fns / 87,728 LOC / 5,081 edges). All ten forks were ruled in the 2026-07-09 session; rulings recorded inline.
 
 ## Fork classes (blast-radius order)
 
@@ -17,7 +16,7 @@ fns / 87,728 LOC / 5,081 edges). Each fork lists a RECOMMENDED position;
    sites; payload carries the error level/message; `com_error_recover` (the
    existing stub) becomes the landing pad. No `Result` threading — it would
    rewrite every signature in the engine and break transcription-first.
-   **RULING: PENDING**
+   **RULING: panic + catch_unwind at Raven's setjmp sites; payload = level+message; com_error_recover is the landing pad (user, 2026-07-09)**
 
 2. **Global state placement** (~680 file-scope globals: `sv` 665KB, `svs`,
    `cvar_indexes`/hash, `fs_*` pak state, `cm` clipmap, `msgHuff` 102KB,
@@ -27,14 +26,14 @@ fns / 87,728 LOC / 5,081 edges). Each fork lists a RECOMMENDED position;
    (`Engine { common, sv, cm, fs, net, bot, g2, ... }`), grouped by owning
    .c file; engine cvar *handles* in one `EngineCvars` sub-struct per
    subsystem. No `static mut` anywhere (const tables stay `const`).
-   **RULING: PENDING**
+   **RULING: Engine sub-structs, grouped by owning .c file; EngineCvars per subsystem; no static mut (user, 2026-07-09)**
 
 3. **Function-scope statics (119: qcommon 48, ghoul2 40 — the RagDoll
    solver, `CM_LoadMap_Actual::last_checksum`, botlib `AAS_ContinueInit*`
    frame counters).** RECOMMENDED: bless the jampgame fork-5 three-kind rule
    unchanged — const tables → `const`; rotating scratch/return buffers →
    owned return values; genuine cross-frame state → host-struct fields
-   (fork 2). **RULING: PENDING**
+   (fork 2). **RULING: jampgame fork-5 three-kind rule blessed unchanged (user, 2026-07-09)**
 
 4. **Memory allocators: Zone (`Z_Malloc` tags) + Hunk (two-sided marks,
    temp/perm) + `Hunk_AllocateTempMemory`.** Allocation ORDER and reuse are
@@ -42,7 +41,7 @@ fns / 87,728 LOC / 5,081 edges). Each fork lists a RECOMMENDED position;
    diffs. RECOMMENDED: port allocator logic faithfully as owned arenas
    (`Vec<u8>`-backed, same mark/free-list semantics, deterministic layout);
    no Rust global allocator substitution on parity paths; idiomatization
-   deferred to the safe-state migration. **RULING: PENDING**
+   deferred to the safe-state migration. **RULING: faithful owned arenas (Vec<u8>-backed, same mark/free-list/tag semantics); idiomatization deferred to safe-state migration (user, 2026-07-09)**
 
 5. **Internal dispatch tables** (`botlib_export_t`/`botlib_import_t`,
    `refexport_t` (1 live arm under DEDICATED), ICARUS `interface_export_t`
@@ -51,13 +50,13 @@ fns / 87,728 LOC / 5,081 edges). Each fork lists a RECOMMENDED position;
    jampgame entity handlers). RECOMMENDED: plain Rust structs of `fn` items
    populated at the same init sites (1:1 shape, zero indirection cost, keeps
    the 261 ref-edges meaningful); command tables as `&[(&str, fn(...))]`
-   consts. Fn-ID enums NOT needed absent address compares. **RULING: PENDING**
+   consts. Fn-ID enums NOT needed absent address compares. **RULING: plain Rust structs of fn items at the same init sites; command tables as const (&str, fn) slices; no fn-ID enums (user, 2026-07-09)**
 
 6. **VM subsystem stance** (`vm.cpp`/`vm_interpreted.cpp`/`vm_x86.cpp`; plan
    §5.4). RECOMMENDED: all three port; interpreter is portable logic;
    `vm_x86` ports as data-faithful emitter (executes only on x86 hosts, same
    as C); runtime path for our module stays native-dylib; interface-crate
-   arg slots are `intptr_t`-width. **RULING: PENDING**
+   arg slots are `intptr_t`-width. **RULING: all three port; vm_x86 data-faithful emitter (golden-testable everywhere, executes only on x86 like Raven); native-dylib runtime path; intptr_t arg slots (user, 2026-07-09)**
 
 7. **C++-track design docs (§F) — which subsystems get one, before the
    window.** GP2 is already done (the pilot). RECOMMENDED docs: **icarus**
@@ -66,7 +65,7 @@ fns / 87,728 LOC / 5,081 edges). Each fork lists a RECOMMENDED position;
    class internals** (CGhoul2Info_v arena + CBoneCache), **CNavigator**
    (server/NPCNav, 81 fns — engine-side twin of the game's nav API),
    **CROFFSystem** (RoffSystem.cpp). Everything else is C-track packets.
-   **RULING: PENDING (list + per-doc scope)**
+   **RULING: the 5-doc list blessed — icarus, RMG, ghoul2+CBoneCache, CNavigator, CROFFSystem; GP2 exemplar; REVIEWED before the window (user, 2026-07-09)**
 
 8. **The platform trait** (the 26 `Sys_*`/`NET_*` externals + the main loop
    from `null/win_main.cpp`, excluded from the port set). RECOMMENDED: one
@@ -74,7 +73,7 @@ fns / 87,728 LOC / 5,081 edges). Each fork lists a RECOMMENDED position;
    file listing, dylib loading — the module loader already exists);
    deterministic test impl for the referee (fixed clock, scripted packets),
    std impl for the real binary. Unix path semantics (the referee platform),
-   not Win32. **RULING: PENDING**
+   not Win32. **RULING: one PlatformHost trait in the interface crate; deterministic test impl for the referee, std impl for the binary; unix semantics (user, 2026-07-09)**
 
 9. **Filesystem semantics** (`files_common.cpp`/`files_pc.cpp`): search-path
    order, pure-server pak checksum lists, `fs_homepath`/`fs_basepath`,
@@ -82,13 +81,13 @@ fns / 87,728 LOC / 5,081 edges). Each fork lists a RECOMMENDED position;
    through configstrings (`sv_paks`) and download lists. RECOMMENDED:
    faithful port of ordering/checksum logic over the platform trait's
    directory enumeration, with enumeration order pinned (sorted) and a
-   golden fixture on the retail-assets pak list. **RULING: PENDING**
+   golden fixture on the retail-assets pak list. **RULING: faithful ordering/checksum logic over the platform trait; enumeration order pinned (sorted); retail pak-list golden fixture (user, 2026-07-09)**
 
 10. **Console/print routing** (`Com_Printf` → console/logfile — feeds the
     referee's syscall-stream digest via `G_PRINT` echo and `Sys_Print`).
     RECOMMENDED: route through the platform trait; byte-identical
     formatting (`va`/`Com_sprintf` already ported in qshared); no timestamps
-    unless Raven prints them. **RULING: PENDING**
+    unless Raven prints them. **RULING: all output via PlatformHost; byte-identical formatting; no non-Raven decoration (user, 2026-07-09)**
 
 ## The type rosetta (agent packet reference)
 

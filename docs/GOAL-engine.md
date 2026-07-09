@@ -42,10 +42,10 @@ referenced before it is ported).
 
 ## Prerequisite (Stage 0)
 
-- [ ] All forks in `docs/handoffs/engine-fork-discovery.md` ruled by the user
+- [x] All forks in `docs/handoffs/engine-fork-discovery.md` ruled by the user
   (error-recovery/longjmp, global placement, statics, allocators, dispatch
   tables, VM stance, §F doc list, platform trait, FS semantics, print
-  routing).
+  routing — all ten settled 2026-07-09).
 - [ ] Type rosetta regenerated and packet-referenced
   (`tools/closure-prototype/typemap.py` →
   `out/engine/type-rosetta.tsv`; 2,702 items, 2,002 Raven names): porters
