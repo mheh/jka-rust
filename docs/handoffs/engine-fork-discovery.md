@@ -345,3 +345,18 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     the out-param shape; `fs_read_file` returns exact file bytes (Raven's
     trailing NUL is an FS-impl detail, noted at the site).
     **RULING: no deferrals (user, 2026-07-09)**
+
+34. **No "port later" (user, 2026-07-09).** The pre-campaign scaffolding
+    markers in the engine-side crates (48 as of this census: `TODO: Port` +
+    `todo!()` + the LIFE-Q8 boot-success no-ops + DEV-GLUE provisionals in
+    `crates/mp/engine`, `crates/mp/app`, `crates/native`) are ENUMERATED
+    IN-SCOPE WORK for this campaign — not items that "burn down eventually."
+    Every marker subject maps to a wave in engine-port-order (function
+    bodies), a §F doc (C++ classes), or a design ruling to be taken during
+    the campaign (`ZeroValid` for Engine, LOAD-Q1 macOS module suffix,
+    SV_InitGameProgs ctx injection). The campaign is NOT COMPLETE while any
+    of them exists; nothing is re-deferred to a later campaign. Sole flagged
+    exception pending a user call: the wasm-host wiring marker (LOAD-D10)
+    belongs to the DEC-settled WASM-transport track, outside the WinDed
+    parity scope.
+    **RULING: no port later — the marker inventory is the work list (user, 2026-07-09)**

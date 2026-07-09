@@ -25,7 +25,13 @@ referenced before it is ported).
   during the port.** The dependency order makes placeholders unnecessary; a
   porter who cannot finish a function escalates instead of stubbing.
   `grep -rn "TODO\|FIXME\|todo!"` over the engine crates stays empty at every
-  commit (existing scaffolding `todo!`s only burn down).
+  commit.
+- [ ] **No "port later" (ruling 34).** The pre-campaign scaffolding markers
+  (48 census 2026-07-09: lifecycle `todo!` bodies, LIFE-Q8 boot no-ops,
+  DEV-GLUE provisionals, host-struct field markers) are enumerated in-scope
+  work for THIS campaign: each maps to a wave, a §F doc, or an in-campaign
+  design ruling (`ZeroValid`, LOAD-Q1, ctx injection). The campaign is not
+  complete while any remains; nothing is re-deferred.
 - [ ] **The order comes only from the tool.** `engineorder.py` under its
   pinned parse configuration (plan appendix) is the single source of the port
   order; fix the tool and regenerate, never hand-edit the artifact.
