@@ -139,6 +139,12 @@ fn c_atoi(s: &str) -> i32 {
 pub struct MockHost {
     /// FS fixtures served by [`EngineHost::fs_read_file`], keyed by qpath.
     pub files: BTreeMap<String, Vec<u8>>,
+    /// Count of *successful* [`EngineHost::fs_read_file`] disk loads — the
+    /// tr-model cache hit/miss golden's fixture knob (the oracle host's
+    /// `host_fs_reads`, `tools/trmodel-oracle/host.cpp:184`: incremented only
+    /// after a successful read, so a cache hit — served without touching the FS
+    /// — reads 0). Reset it between phases like the dumper does.
+    pub fs_reads: usize,
     /// Pak-membership fixtures served by [`EngineHost::fs_file_is_in_pak`]:
     /// qpath → the pak's `pure_checksum`. A file present in [`files`] but
     /// absent here behaves as disk-only — `None`, Raven's `-1` path
@@ -208,6 +214,7 @@ impl MockHost {
         let stride = core::mem::size_of::<sharedEntity_t>();
         Self {
             files: BTreeMap::new(),
+            fs_reads: 0,
             pak_files: BTreeMap::new(),
             dir_entries: BTreeMap::new(),
             incoming_packets: VecDeque::new(),
@@ -264,6 +271,28 @@ impl MockHost {
         // all-zero bit pattern is a valid value.
         unsafe { &mut *(self.gentities.as_mut_ptr().add(n * stride) as *mut sharedEntity_t) }
     }
+
+    /// Re-seed the `holdrand` LCG behind [`EngineHost::flrand`]/[`irand`], the
+    /// mock mirror of Raven's `Rand_Init(int seed)` (`holdrand = seed`). The
+    /// `int` seed sign-extends into the platform-width `c_ulong` state exactly
+    /// as Raven's assignment does on an LP64 host (`(int)0x89abcdef` →
+    /// `0xffffffff89abcdef`) — the fixture knob the RMG substrate golden
+    /// (`tools/rmg-oracle/golden/seed.txt`) drives per seed.
+    ///
+    /// [`irand`]: EngineHost::irand
+    /// Source: `oracle/codemp/game/q_math.c:1436`
+    pub fn rand_init(&mut self, seed: i32) {
+        self.rng.holdrand = seed as c_ulong;
+    }
+
+    /// The raw `holdrand` LCG state (the RMG oracle dumper's `rng_state()`,
+    /// `tools/rmg-oracle/main.cpp`), for pinning the platform-width substrate
+    /// golden's post-draw state words byte-for-byte.
+    ///
+    /// Source: `oracle/codemp/game/q_math.c:1432`
+    pub fn rng_state(&self) -> c_ulong {
+        self.rng.holdrand
+    }
 }
 
 impl Default for MockHost {
@@ -295,7 +324,13 @@ impl EngineHost for MockHost {
     }
 
     fn fs_read_file(&mut self, qpath: &str) -> Option<Vec<u8>> {
-        self.files.get(qpath).cloned()
+        let bytes = self.files.get(qpath).cloned();
+        // Mirror the oracle host: count only successful reads (a miss returns
+        // the -1/`None` path without bumping the counter).
+        if bytes.is_some() {
+            self.fs_reads += 1;
+        }
+        bytes
     }
 
     fn print(&mut self, msg: &str) {

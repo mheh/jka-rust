@@ -12,7 +12,10 @@ mp_qshared = { path = "../../qshared" }
 abi_transport = { path = "../../../abi-transport" }
 native_platform = { path = "../../../native/platform" }
 native_math = { path = "../../../native/math" }
-# EngineHost (cm_trace.rs §F callees) — authorized blanket edge (ruling 56c).
+# The RMG terrain seams (`register_terrain`, `rmg_create_seed`, the ctor's
+# empty-heightMap `Com_Error`) and cm_trace.rs's §F callees thread
+# `&mut impl EngineHost` — the one Stage-0 host-services trait (RMG-D3,
+# rulings 11/24/36; ruling 56c authorizes this edge).
 mp_host_interface = { path = "../../host-interface" }
 
 [build-dependencies]

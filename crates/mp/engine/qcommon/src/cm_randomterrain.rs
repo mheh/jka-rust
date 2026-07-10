@@ -1,496 +1,599 @@
-#![allow(
-    non_snake_case,
-    non_camel_case_types,
-    unused_variables,
-    unused_mut,
-    unused_unsafe,
-    unused_parens,
-    clippy::too_many_arguments
-)]
-
-//! `cm_randomterrain.cpp` — the RMG random-terrain support math (Perlin-style
-//! noise lookups, the Ken Shoemake `lincrv.c` spline family) and the
-//! consonant/vowel piece-table name generator (`RMG_CreateSeed`).
+//! Raven `RMG_CreateSeed` — a procedural-name generator that also folds the
+//! result into a 32-bit hash "seed" (`cm_randomterrain.cpp:1008-1084`).
+//!
+//! **GOLDEN-ONLY** (RMG-D4f, `docs/subsystems/rmg-terrain.md` roster row for
+//! `crates/mp/engine/qcommon/src/cm_randomterrain.rs`): `RMG_CreateSeed` has
+//! **zero live callers** anywhere in `codemp/` — no live RMG path under
+//! `DEDICATED` draws it — but it is kept because it is the harness's golden
+//! #1, pinning `Engine.common.rng` (`mp_qshared::QRand`) through
+//! `EngineHost::flrand`/`irand` (ruling 21 part 3). Its sole private helper,
+//! `FindPiece` (`cm_randomterrain.cpp:960-1005`), and the `ECPType` enum /
+//! `TCharacterPiece` table shape it walks port alongside it per §21 (private
+//! helpers colocate with their caller).
+//!
+//! **§20-dropped** (RMG-D1 generation path, not represented in this file):
+//! the whole `CRandomTerrain`/`CPathInfo` class (`Generate`/`Smooth`/
+//! `ParseGenerate`/`DrawPath`/…, `cm_randomterrain.h`,
+//! `cm_randomterrain.cpp:1-825`) and the dead Perlin-noise path
+//! (`noiseTable`/`noisePerm`/`CM_NoiseInit`, `cm_randomterrain.cpp:14-28`) —
+//! both unreachable under `DEDICATED` (sole constructor `CreateRandomTerrain`
+//! is in the `#else` of `#ifdef DEDICATED`, `cm_terrain.cpp:170-188`).
 //!
 //! Source: `oracle/codemp/qcommon/cm_randomterrain.cpp`
-//!
-//! PORT-NOTE(cm-fields): `CollisionWorld` (`crate::collision_world`) is still
-//! a `//TODO: Port CollisionWorld fields` placeholder (`_private: ()`), same
-//! precedent as `cm_polylib.rs`/`cm_load.rs`. Bodies below reach
-//! `cm.noise_table`/`cm.noise_perm` (the file-scope `noiseTable`/`noisePerm`
-//! arrays) as missing symbols, reported for the finisher to add once the
-//! struct lands.
-//!
-//! PORT-NOTE(qrand-field): the `common: &mut Common` receiver's `QRand` field
-//! (ruling 21) has not landed on `Common` yet — the field name is pinned
-//! when the type lands, per `_PREAMBLE.md`. Referenced here as
-//! `common.qrand.irand(...)`, reported as a missing symbol.
 
-use core::ffi::{c_char, c_int, c_uint};
+use mp_host_interface::EngineHost;
 
-use native_math::vector::{vec2_t, vec4_t, vec_t};
-
-use crate::cm::ecptype::ECPType;
-use crate::cm::cm_randomterrain_cpp_consts::NOISE_SIZE;
-use crate::collision_world::CollisionWorld;
-use crate::common::Common;
-
-/// Raven `VAL`/`INDEX` function-like macros (`cm_randomterrain.cpp:29-31`),
-/// expanded inline rather than re-declared as consts (§ macros are not
-/// consts).
+/// Raven `ECPType` — the character-piece category `FindPiece` draws from.
 ///
-/// `NOISE_MASK` = `NOISE_SIZE - 1`.
-const NOISE_MASK: c_int = NOISE_SIZE as c_int - 1;
-
-/// `TCharacterPiece` (`oracle/codemp/qcommon/cm_randomterrain.cpp:840-845`).
-/// Internal, file-local to the name-generator tables; not a rosetta-imported
-/// type (absent from every packet's TYPE ROSETTA table).
-struct TCharacterPiece {
-    mPiece: &'static str,
-    mCommonality: c_int,
+/// `typedef enum {...} ECPType` -> `#[repr(i32)] enum` per porting-rules
+/// enum-vs-alias fidelity (never flattened to a bare `i32`).
+///
+/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:829-839`
+// `None`/`NumPieces` are faithful Raven enumerators kept for enum-vs-alias
+// fidelity (never flatten a named enum); on the non-test build they are only
+// *matched* (the defensive `default` arm of `find_piece`, `:966-968`), never
+// *constructed*, so `dead_code` fires on them without this allow.
+#[allow(dead_code)]
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EcpType {
+    None = -1,
+    Consonant = 0,
+    ComplexConsonant = 1,
+    Vowel = 2,
+    ComplexVowel = 3,
+    Ending = 4,
+    NumPieces = 5,
 }
 
-/// `Consonants[]` — `oracle/codemp/qcommon/cm_randomterrain.cpp:847-869`.
-const CONSONANTS: &[TCharacterPiece] = &[
-    TCharacterPiece { mPiece: "b", mCommonality: 6 },
-    TCharacterPiece { mPiece: "c", mCommonality: 8 },
-    TCharacterPiece { mPiece: "d", mCommonality: 6 },
-    TCharacterPiece { mPiece: "f", mCommonality: 5 },
-    TCharacterPiece { mPiece: "g", mCommonality: 4 },
-    TCharacterPiece { mPiece: "h", mCommonality: 5 },
-    TCharacterPiece { mPiece: "j", mCommonality: 2 },
-    TCharacterPiece { mPiece: "k", mCommonality: 4 },
-    TCharacterPiece { mPiece: "l", mCommonality: 4 },
-    TCharacterPiece { mPiece: "m", mCommonality: 7 },
-    TCharacterPiece { mPiece: "n", mCommonality: 7 },
-    TCharacterPiece { mPiece: "r", mCommonality: 6 },
-    TCharacterPiece { mPiece: "s", mCommonality: 10 },
-    TCharacterPiece { mPiece: "t", mCommonality: 10 },
-    TCharacterPiece { mPiece: "v", mCommonality: 1 },
-    TCharacterPiece { mPiece: "w", mCommonality: 2 },
-    TCharacterPiece { mPiece: "x", mCommonality: 1 },
-    TCharacterPiece { mPiece: "z", mCommonality: 1 },
+/// Raven `TCharacterPiece` (`struct SCharacterPiece`) — one weighted
+/// name-generation syllable.
+///
+/// Internal-only shape (never crosses the ABI seam): the raw `char *mPiece`
+/// becomes an idiomatic `&'static str` (porting-rules §12); the sentinel
+/// `{ 0, 0 }` terminator Raven's linear scan relies on is dropped in favor of
+/// a plain Rust slice (`FindPiece` sums/walks `.len()`, not a null check).
+///
+/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:841-844`
+struct CharacterPiece {
+    piece: &'static str,
+    commonality: i32,
+}
+
+/// Raven `Consonants[]`.
+///
+/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:847-869`
+const CONSONANTS: &[CharacterPiece] = &[
+    CharacterPiece {
+        piece: "b",
+        commonality: 6,
+    },
+    CharacterPiece {
+        piece: "c",
+        commonality: 8,
+    },
+    CharacterPiece {
+        piece: "d",
+        commonality: 6,
+    },
+    CharacterPiece {
+        piece: "f",
+        commonality: 5,
+    },
+    CharacterPiece {
+        piece: "g",
+        commonality: 4,
+    },
+    CharacterPiece {
+        piece: "h",
+        commonality: 5,
+    },
+    CharacterPiece {
+        piece: "j",
+        commonality: 2,
+    },
+    CharacterPiece {
+        piece: "k",
+        commonality: 4,
+    },
+    CharacterPiece {
+        piece: "l",
+        commonality: 4,
+    },
+    CharacterPiece {
+        piece: "m",
+        commonality: 7,
+    },
+    CharacterPiece {
+        piece: "n",
+        commonality: 7,
+    },
+    CharacterPiece {
+        piece: "r",
+        commonality: 6,
+    },
+    CharacterPiece {
+        piece: "s",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "t",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "v",
+        commonality: 1,
+    },
+    CharacterPiece {
+        piece: "w",
+        commonality: 2,
+    },
+    CharacterPiece {
+        piece: "x",
+        commonality: 1,
+    },
+    CharacterPiece {
+        piece: "z",
+        commonality: 1,
+    },
 ];
 
-/// `ComplexConsonants[]` — `oracle/codemp/qcommon/cm_randomterrain.cpp:871-896`.
-const COMPLEX_CONSONANTS: &[TCharacterPiece] = &[
-    TCharacterPiece { mPiece: "st", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ck", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ss", mCommonality: 10 },
-    TCharacterPiece { mPiece: "tt", mCommonality: 7 },
-    TCharacterPiece { mPiece: "ll", mCommonality: 8 },
-    TCharacterPiece { mPiece: "nd", mCommonality: 10 },
-    TCharacterPiece { mPiece: "rn", mCommonality: 6 },
-    TCharacterPiece { mPiece: "nc", mCommonality: 6 },
-    TCharacterPiece { mPiece: "mp", mCommonality: 4 },
-    TCharacterPiece { mPiece: "sc", mCommonality: 10 },
-    TCharacterPiece { mPiece: "sl", mCommonality: 10 },
-    TCharacterPiece { mPiece: "tch", mCommonality: 6 },
-    TCharacterPiece { mPiece: "th", mCommonality: 4 },
-    TCharacterPiece { mPiece: "rn", mCommonality: 5 },
-    TCharacterPiece { mPiece: "cl", mCommonality: 10 },
-    TCharacterPiece { mPiece: "sp", mCommonality: 10 },
-    TCharacterPiece { mPiece: "st", mCommonality: 10 },
-    TCharacterPiece { mPiece: "fl", mCommonality: 4 },
-    TCharacterPiece { mPiece: "sh", mCommonality: 7 },
-    TCharacterPiece { mPiece: "ng", mCommonality: 4 },
+/// Raven `ComplexConsonants[]`.
+///
+/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:871-896`
+const COMPLEX_CONSONANTS: &[CharacterPiece] = &[
+    CharacterPiece {
+        piece: "st",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ck",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ss",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "tt",
+        commonality: 7,
+    },
+    CharacterPiece {
+        piece: "ll",
+        commonality: 8,
+    },
+    CharacterPiece {
+        piece: "nd",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "rn",
+        commonality: 6,
+    },
+    CharacterPiece {
+        piece: "nc",
+        commonality: 6,
+    },
+    CharacterPiece {
+        piece: "mp",
+        commonality: 4,
+    },
+    CharacterPiece {
+        piece: "sc",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "sl",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "tch",
+        commonality: 6,
+    },
+    CharacterPiece {
+        piece: "th",
+        commonality: 4,
+    },
+    CharacterPiece {
+        piece: "rn",
+        commonality: 5,
+    },
+    CharacterPiece {
+        piece: "cl",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "sp",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "st",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "fl",
+        commonality: 4,
+    },
+    CharacterPiece {
+        piece: "sh",
+        commonality: 7,
+    },
+    CharacterPiece {
+        piece: "ng",
+        commonality: 4,
+    },
 ];
 
-/// `Vowels[]` — `oracle/codemp/qcommon/cm_randomterrain.cpp:898-908`.
-const VOWELS: &[TCharacterPiece] = &[
-    TCharacterPiece { mPiece: "a", mCommonality: 10 },
-    TCharacterPiece { mPiece: "e", mCommonality: 10 },
-    TCharacterPiece { mPiece: "i", mCommonality: 10 },
-    TCharacterPiece { mPiece: "o", mCommonality: 10 },
-    TCharacterPiece { mPiece: "u", mCommonality: 2 },
+/// Raven `Vowels[]`.
+///
+/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:898-908`
+const VOWELS: &[CharacterPiece] = &[
+    CharacterPiece {
+        piece: "a",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "e",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "i",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "o",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "u",
+        commonality: 2,
+    },
 ];
 
-/// `ComplexVowels[]` — `oracle/codemp/qcommon/cm_randomterrain.cpp:910-927`.
-const COMPLEX_VOWELS: &[TCharacterPiece] = &[
-    TCharacterPiece { mPiece: "ea", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ue", mCommonality: 3 },
-    TCharacterPiece { mPiece: "oi", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ai", mCommonality: 8 },
-    TCharacterPiece { mPiece: "oo", mCommonality: 10 },
-    TCharacterPiece { mPiece: "io", mCommonality: 10 },
-    TCharacterPiece { mPiece: "oe", mCommonality: 10 },
-    TCharacterPiece { mPiece: "au", mCommonality: 3 },
-    TCharacterPiece { mPiece: "ee", mCommonality: 7 },
-    TCharacterPiece { mPiece: "ei", mCommonality: 7 },
-    TCharacterPiece { mPiece: "ou", mCommonality: 7 },
-    TCharacterPiece { mPiece: "ia", mCommonality: 4 },
+/// Raven `ComplexVowels[]`.
+///
+/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:910-927`
+const COMPLEX_VOWELS: &[CharacterPiece] = &[
+    CharacterPiece {
+        piece: "ea",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ue",
+        commonality: 3,
+    },
+    CharacterPiece {
+        piece: "oi",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ai",
+        commonality: 8,
+    },
+    CharacterPiece {
+        piece: "oo",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "io",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "oe",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "au",
+        commonality: 3,
+    },
+    CharacterPiece {
+        piece: "ee",
+        commonality: 7,
+    },
+    CharacterPiece {
+        piece: "ei",
+        commonality: 7,
+    },
+    CharacterPiece {
+        piece: "ou",
+        commonality: 7,
+    },
+    CharacterPiece {
+        piece: "ia",
+        commonality: 4,
+    },
 ];
 
-/// `Endings[]` — `oracle/codemp/qcommon/cm_randomterrain.cpp:929-958`.
-const ENDINGS: &[TCharacterPiece] = &[
-    TCharacterPiece { mPiece: "ing", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ed", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ute", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ance", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ey", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ation", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ous", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ent", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ate", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ible", mCommonality: 10 },
-    TCharacterPiece { mPiece: "age", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ity", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ist", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ism", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ime", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ic", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ant", mCommonality: 10 },
-    TCharacterPiece { mPiece: "etry", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ious", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ative", mCommonality: 10 },
-    TCharacterPiece { mPiece: "er", mCommonality: 10 },
-    TCharacterPiece { mPiece: "ize", mCommonality: 10 },
-    TCharacterPiece { mPiece: "able", mCommonality: 10 },
-    TCharacterPiece { mPiece: "itude", mCommonality: 10 },
+/// Raven `Endings[]`.
+///
+/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:929-957`
+const ENDINGS: &[CharacterPiece] = &[
+    CharacterPiece {
+        piece: "ing",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ed",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ute",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ance",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ey",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ation",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ous",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ent",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ate",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ible",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "age",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ity",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ist",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ism",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ime",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ic",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ant",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "etry",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ious",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ative",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "er",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "ize",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "able",
+        commonality: 10,
+    },
+    CharacterPiece {
+        piece: "itude",
+        commonality: 10,
+    },
 ];
 
-/// Raven `GetNoiseValue`.
+/// Raven `FindPiece` — draws one weighted-random piece from `type`'s table.
 ///
-/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:35-40`
-pub fn GetNoiseValue(cm: &mut CollisionWorld, x: c_int, y: c_int, z: c_int, t: c_int) -> f32 {
-    // `VAL(a) = noisePerm[a & NOISE_MASK]`; `INDEX(x,y,z,t) = VAL(x + VAL(y + VAL(z + VAL(t))))`.
-    // PORT-NOTE(missing-field): `noiseTable`/`noisePerm` (`cm_randomterrain.cpp:14-15`)
-    // are file-scope globals with no home field on `CollisionWorld` yet;
-    // referenced as `cm.noise_perm`/`cm.noise_table`, reported as missing symbols.
-    let val_t = cm.noise_perm[(t as usize) & (NOISE_MASK as usize)];
-    let val_z = cm.noise_perm[((z + val_t) as usize) & (NOISE_MASK as usize)];
-    let val_y = cm.noise_perm[((y + val_z) as usize) & (NOISE_MASK as usize)];
-    let index = cm.noise_perm[((x + val_y) as usize) & (NOISE_MASK as usize)];
-
-    cm.noise_table[index as usize]
-}
-
-/// Raven `CM_NoiseGet4f`.
+/// Raven takes `char *&pos` and both writes the piece text at `pos` and
+/// advances it past the copy; per porting-rules §C7 (out-params -> return
+/// values) this returns the picked piece and lets the caller append + advance
+/// its own buffer, rather than mutating a caller-owned cursor in place.
 ///
-/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:51-89`
-pub fn CM_NoiseGet4f(cm: &mut CollisionWorld, x: f32, y: f32, z: f32, t: f32) -> f32 {
-    // `LERP(a, b, w) = a * (1.0f - w) + b * w` (function-like macro, expanded inline).
-    let ix = x.floor() as c_int;
-    let fx = x - ix as f32;
-    let iy = y.floor() as c_int;
-    let fy = y - iy as f32;
-    let iz = z.floor() as c_int;
-    let fz = z - iz as f32;
-    let it = t.floor() as c_int;
-    let ft = t - it as f32;
-
-    let mut value = [0.0f32; 2];
-
-    for i in 0..2 {
-        let front = [
-            GetNoiseValue(cm, ix, iy, iz, it + i),
-            GetNoiseValue(cm, ix + 1, iy, iz, it + i),
-            GetNoiseValue(cm, ix, iy + 1, iz, it + i),
-            GetNoiseValue(cm, ix + 1, iy + 1, iz, it + i),
-        ];
-        let back = [
-            GetNoiseValue(cm, ix, iy, iz + 1, it + i),
-            GetNoiseValue(cm, ix + 1, iy, iz + 1, it + i),
-            GetNoiseValue(cm, ix, iy + 1, iz + 1, it + i),
-            GetNoiseValue(cm, ix + 1, iy + 1, iz + 1, it + i),
-        ];
-
-        let fvalue = lerp_macro(lerp_macro(front[0], front[1], fx), lerp_macro(front[2], front[3], fx), fy);
-        let bvalue = lerp_macro(lerp_macro(back[0], back[1], fx), lerp_macro(back[2], back[3], fx), fy);
-
-        value[i as usize] = lerp_macro(fvalue, bvalue, fz);
-    }
-
-    lerp_macro(value[0], value[1], ft)
-}
-
-/// Raven `LERP(a, b, w)` function-like macro helper (`cm_randomterrain.cpp:33`),
-/// factored out so `CM_NoiseGet4f` reads 1:1 against the oracle's repeated
-/// `LERP(...)` expansions.
-fn lerp_macro(a: f32, b: f32, w: f32) -> f32 {
-    a * (1.0f32 - w) + b * w
-}
-
-/// Raven `lerp` (the Ken Shoemake `lincrv.c` spline lerp — distinct from the
-/// `LERP` macro above).
-///
-/// PORT-NOTE(shape): the resolved signature passes `p0`/`p1`/`p` by value
-/// (`vec4_t` = `[f32; 4]`, `Copy`); Raven's `vec4_t p0/p1/p` parameters are
-/// array-decayed pointers the body writes THROUGH into the caller's array.
-/// Passing by value here means writes to `p` are NOT observed by
-/// `DialASpline`'s call sites — reported in shape_mismatches; the resolved
-/// signature is LAW for this pass.
-///
-/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:105-110`
-pub fn lerp(t: f32, a0: f32, a1: f32, p0: vec4_t, p1: vec4_t, m: c_int, mut p: vec4_t) {
-    let t0 = (a1 - t) / (a1 - a0);
-    let t1 = 1.0 - t0;
-    let mut i = m - 1;
-    while i >= 0 {
-        p[i as usize] = t0 * p0[i as usize] + t1 * p1[i as usize];
-        i -= 1;
-    }
-}
-
-/// Raven `DialASpline`.
-///
-/// PORT-NOTE(shape): see `lerp`'s PORT-NOTE — the `lerp(...)` calls below
-/// transcribe the oracle 1:1 (LAW), but since `lerp`'s `p` param is
-/// by-value, the `work[...]`/`val` writes those calls appear to perform are
-/// NOT actually observed here; reported in shape_mismatches.
-///
-/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:119-157`
-pub fn DialASpline(
-    t: f32,
-    a: *mut f32,
-    p: *mut vec4_t,
-    m: c_int,
-    n: c_int,
-    work: *mut vec4_t,
-    mut Cn: c_uint,
-    interp: bool,
-    val: vec4_t,
-) -> c_int {
-    unsafe {
-        if Cn as c_int > n - 1 {
-            Cn = (n - 1) as c_uint;
-        }
-        let mut k: c_int = 0;
-        while t > *a.offset(k as isize) {
-            k += 1;
-        }
-        let mut h = k;
-        while t == *a.offset(k as isize) {
-            k += 1;
-        }
-        if k > n {
-            k = n;
-            if h > k {
-                h = k;
-            }
-        }
-        h = 1 + Cn as c_int - (k - h);
-        k -= 1;
-        let lo0 = k - Cn as c_int;
-        let hi0 = k + 1 + Cn as c_int;
-        let mut lo = lo0;
-        let mut hi = hi0;
-
-        if interp {
-            let mut drop: c_int = 0;
-            if lo < 0 {
-                lo = 0;
-                drop += Cn as c_int - k;
-                if hi - lo < Cn as c_int {
-                    drop += Cn as c_int - hi;
-                    hi = Cn as c_int;
-                }
-            }
-            if hi > n {
-                hi = n;
-                drop += k + 1 + Cn as c_int - n;
-                if hi - lo < Cn as c_int {
-                    drop += lo - (n - Cn as c_int);
-                    lo = n - Cn as c_int;
-                }
-            }
-            for i in lo..=hi {
-                *work.offset(i as isize) = *p.offset(i as isize);
-            }
-            for j in 1..=(Cn as c_int) {
-                for i in lo..=(hi - j) {
-                    lerp(
-                        t,
-                        *a.offset(i as isize),
-                        *a.offset((i + j) as isize),
-                        *work.offset(i as isize),
-                        *work.offset((i + 1) as isize),
-                        m,
-                        *work.offset(i as isize),
-                    );
-                }
-            }
-            h = 1 + Cn as c_int - drop;
-        } else {
-            if lo < 0 {
-                h += lo;
-                lo = 0;
-            }
-            for i in lo..=(lo + h) {
-                *work.offset(i as isize) = *p.offset(i as isize);
-            }
-            if h < 0 {
-                h = 0;
-            }
-        }
-        for j in 0..h {
-            let tmp = 1 + Cn as c_int - j;
-            let mut i = h - 1;
-            while i >= j {
-                lerp(
-                    t,
-                    *a.offset((lo + i) as isize),
-                    *a.offset((lo + i + tmp) as isize),
-                    *work.offset((lo + i) as isize),
-                    *work.offset((lo + i + 1) as isize),
-                    m,
-                    *work.offset((lo + i + 1) as isize),
-                );
-                i -= 1;
-            }
-        }
-        // PORT-NOTE(shape): `V_Op(val,=,work[lo+h],m)` writes the result into
-        // the caller's `val` array; `val` here is by-value (see this fn's
-        // shape PORT-NOTE), so the copy below is not observed by callers.
-        let _val_result: vec4_t = *work.offset((lo + h) as isize);
-        let _ = val;
-
-        k
-    }
-}
-
-/// Raven `Vector2Normalize`.
-///
-/// PORT-NOTE(shape): the resolved signature takes `v: vec2_t` by value
-/// (`[f32; 2]`, `Copy`) rather than a mutable reference/pointer — Raven's
-/// `vec2_t v` parameter is an array-decayed pointer the body normalizes
-/// in place. Writes to `v[0]`/`v[1]` here are local only; reported in
-/// shape_mismatches.
-///
-/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:161-176`
-pub fn Vector2Normalize(mut v: vec2_t) -> vec_t {
-    let mut length = v[0] * v[0] + v[1] * v[1];
-    length = length.sqrt();
-
-    if length != 0.0 {
-        let ilength = 1.0 / length;
-        v[0] *= ilength;
-        v[1] *= ilength;
-    }
-
-    length
-}
-
-/// Raven `FindPiece`.
-///
-/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:960-1006`
-pub fn FindPiece(common: &mut Common, cm: &mut CollisionWorld, r#type: ECPType, pos: &mut *mut c_char) {
-    let start: &[TCharacterPiece] = match r#type {
-        ECPType::CP_COMPLEX_CONSONANT => COMPLEX_CONSONANTS,
-        ECPType::CP_VOWEL => VOWELS,
-        ECPType::CP_COMPLEX_VOWEL => COMPLEX_VOWELS,
-        ECPType::CP_ENDING => ENDINGS,
-        // `CP_CONSONANT` and default.
-        _ => CONSONANTS,
+/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:960-1005`
+fn find_piece(host: &mut impl EngineHost, kind: EcpType) -> &'static str {
+    // Raven's `switch(type) { case CP_CONSONANT: default: start = Consonants; ... }`
+    // (`:966-968`) — the default arm falls through to Consonants alongside the
+    // named `CP_CONSONANT` case, so `EcpType::None`/`NumPieces` (never actually
+    // passed by `rmg_create_seed`) resolve there too.
+    let table: &[CharacterPiece] = match kind {
+        EcpType::ComplexConsonant => COMPLEX_CONSONANTS,
+        EcpType::Vowel => VOWELS,
+        EcpType::ComplexVowel => COMPLEX_VOWELS,
+        EcpType::Ending => ENDINGS,
+        EcpType::Consonant | EcpType::None | EcpType::NumPieces => CONSONANTS,
     };
 
-    let mut count: c_int = 0;
-    for piece in start {
-        count += piece.mCommonality;
-    }
+    // First while-loop (`:987-991`): sum the table's commonality weights.
+    let total: i32 = table.iter().map(|piece| piece.commonality).sum();
 
-    // PORT-NOTE(qrand-field): `irand` routes through the engine LCG on
-    // `common`'s not-yet-landed `QRand` field (ruling 21) — reported as a
-    // missing symbol; referenced exactly as the preamble resolves it.
-    count = common.qrand.irand(0, count - 1);
+    // `count = irand(0, count-1)` (`:993`).
+    let mut count = host.irand(0, total - 1);
 
-    let mut search_idx = 0usize;
-    while count > start[search_idx].mCommonality {
-        count -= start[search_idx].mCommonality;
-        search_idx += 1;
-    }
-
-    let piece = start[search_idx].mPiece;
-    unsafe {
-        for byte in piece.as_bytes() {
-            **pos = *byte as c_char;
-            (*pos) = (*pos).add(1);
+    // Second while-loop (`:994-999`): walk down, subtracting each piece's
+    // weight, until `count <= search->mCommonality`.
+    let mut chosen = table[table.len() - 1].piece;
+    for piece in table {
+        if count <= piece.commonality {
+            chosen = piece.piece;
+            break;
         }
-        **pos = 0;
-        // Raven's `strcpy` NUL-terminates but does not itself advance `pos`
-        // past the terminator; `pos += strlen(...)` leaves `pos` pointing AT
-        // the (still-written) NUL, ready for the next piece's `strcpy` to
-        // overwrite it — matches the loop above which stops before writing
-        // the trailing NUL into the advanced position.
+        count -= piece.commonality;
     }
+    chosen
 }
 
 /// Raven `RMG_CreateSeed`.
 ///
-/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:1008-1091`
-pub fn RMG_CreateSeed(common: &mut Common, cm: &mut CollisionWorld, TextSeed: *mut c_char) -> c_uint {
-    // PORT-NOTE(qrand-field): see `FindPiece` — `irand` via `common.qrand`,
-    // reported as a missing symbol.
-    let mut Length = common.qrand.irand(4, 9);
+/// Builds a pronounceable "text seed" (a `char TextSeed[]` in the oracle,
+/// caller-allocated `MAX_QPATH`-ish sized) by chaining weighted syllable
+/// pieces via [`find_piece`], then folds that text into a 32-bit hash. Per
+/// porting-rules §C7 the out-param `char *TextSeed` becomes an owned `String`
+/// return; the `unsigned` return becomes the pinned `u32` (Seam §C,
+/// `docs/subsystems/rmg-terrain.md`). Every random draw
+/// (`irand(4,9)`/`irand(0,100)`/piece selection) threads through
+/// `EngineHost::irand`, i.e. `Engine.common.rng` (`mp_qshared::QRand`,
+/// RMG-D4f) — this is the harness's golden #1, so no live caller reaches it
+/// (RMG-D1).
+///
+/// Source: `oracle/codemp/qcommon/cm_randomterrain.cpp:1008-1084`
+pub fn rmg_create_seed(host: &mut impl EngineHost) -> (String, u32) {
+    // `Length = irand(4, 9);` (`:1016`).
+    let mut length = host.irand(4, 9);
 
-    let mut LookingFor = if common.qrand.irand(0, 100) < 20 {
-        ECPType::CP_VOWEL
+    // `if (irand(0, 100) < 20) LookingFor = CP_VOWEL; else LookingFor = CP_CONSONANT;`
+    // (`:1018-1025`).
+    let mut looking_for = if host.irand(0, 100) < 20 {
+        EcpType::Vowel
     } else {
-        ECPType::CP_CONSONANT
+        EcpType::Consonant
     };
 
-    // §19: `Ending` is a local scratch buffer Raven writes (`Ending[0] = 0`)
-    // before any read; zero-init the whole buffer to keep it well-defined.
-    let mut Ending: [c_char; 256] = [0; 256];
-    let mut ending_len: usize = 0;
-
-    if common.qrand.irand(0, 100) < 55 {
-        let mut pos: *mut c_char = Ending.as_mut_ptr();
-        FindPiece(common, cm, ECPType::CP_ENDING, &mut pos);
-        ending_len = unsafe { pos.offset_from(Ending.as_mut_ptr()) as usize };
-        Length -= ending_len as c_int;
+    // `Ending[0] = 0;` then the 55%-chance ending draw (`:1027-1033`). Raven
+    // writes into a caller `Ending[256]` buffer via the `pos` out-cursor and
+    // shrinks `Length` by the copied piece's length; ported as an owned
+    // `String` per porting-rules §C7.
+    let mut ending = String::new();
+    if host.irand(0, 100) < 55 {
+        let piece = find_piece(host, EcpType::Ending);
+        ending.push_str(piece);
+        length -= piece.len() as i32;
     }
 
-    unsafe {
-        *TextSeed = 0;
-    }
-    let mut pos: *mut c_char = TextSeed;
+    // `pos = TextSeed; *pos = 0;` (`:1035-1036`).
+    let mut text_seed = String::new();
 
-    let mut ComplexVowelChance: c_int = -1;
-    let mut ComplexConsonantChance: c_int = -1;
+    // `ComplexVowelChance = -1; ComplexConsonantChance = -1;` (`:1038-1039`).
+    let mut complex_vowel_chance: i32 = -1;
+    let mut complex_consonant_chance: i32 = -1;
 
-    while unsafe { pos.offset_from(TextSeed) } < Length as isize || matches!(LookingFor, ECPType::CP_CONSONANT) {
-        if matches!(LookingFor, ECPType::CP_VOWEL) {
-            if common.qrand.irand(0, 100) < ComplexVowelChance {
-                ComplexVowelChance = -1;
-                LookingFor = ECPType::CP_COMPLEX_VOWEL;
+    // `while((pos - TextSeed) < Length || LookingFor == CP_CONSONANT)` (`:1041`).
+    while (text_seed.len() as i32) < length || looking_for == EcpType::Consonant {
+        if looking_for == EcpType::Vowel {
+            // `:1043-1051`.
+            if host.irand(0, 100) < complex_vowel_chance {
+                complex_vowel_chance = -1;
+                looking_for = EcpType::ComplexVowel;
             } else {
-                ComplexVowelChance += 10;
+                complex_vowel_chance += 10;
             }
-
-            FindPiece(common, cm, LookingFor, &mut pos);
-            LookingFor = ECPType::CP_CONSONANT;
+            text_seed.push_str(find_piece(host, looking_for));
+            looking_for = EcpType::Consonant;
         } else {
-            if common.qrand.irand(0, 100) < ComplexConsonantChance {
-                ComplexConsonantChance = -1;
-                LookingFor = ECPType::CP_COMPLEX_CONSONANT;
+            // `:1053-1063`.
+            if host.irand(0, 100) < complex_consonant_chance {
+                complex_consonant_chance = -1;
+                looking_for = EcpType::ComplexConsonant;
             } else {
-                ComplexConsonantChance += 45;
+                complex_consonant_chance += 45;
             }
-
-            FindPiece(common, cm, LookingFor, &mut pos);
-            LookingFor = ECPType::CP_VOWEL;
+            text_seed.push_str(find_piece(host, looking_for));
+            looking_for = EcpType::Vowel;
         }
     }
 
-    if Ending[0] != 0 {
-        unsafe {
-            for i in 0..=ending_len {
-                *pos.add(i) = Ending[i];
-            }
+    // `if (Ending[0]) strcpy(pos, Ending);` (`:1067-1070`).
+    if !ending.is_empty() {
+        text_seed.push_str(&ending);
+    }
+
+    // The hash fold (`:1072-1080`): `SeedValue ^= (SeedValue << 4) + ((*pos)-'a');
+    // SeedValue ^= high;` per byte, `high` captured before the xor-add. Raven's
+    // `unsigned` arithmetic wraps; `wrapping_add` mirrors that (the shift itself
+    // cannot overflow-panic in Rust).
+    let mut seed_value: u32 = 0;
+    for byte in text_seed.bytes() {
+        let high = seed_value >> 28;
+        seed_value ^= (seed_value << 4).wrapping_add((byte as u32).wrapping_sub(b'a' as u32));
+        seed_value ^= high;
+    }
+
+    (text_seed, seed_value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mp_host_interface::mock::MockHost;
+
+    /// `FindPiece` never returns a piece text longer than any table's longest
+    /// entry, and always returns *some* piece from the requested table — a
+    /// cheap way to pin the "weighted draw picks a real table entry" shape
+    /// without hard-coding the LCG's exact sequence (that belongs to the
+    /// harness golden, RMG-D4f).
+    #[test]
+    fn find_piece_returns_a_table_member() {
+        let mut host = MockHost::new();
+        for _ in 0..64 {
+            let piece = find_piece(&mut host, EcpType::Consonant);
+            assert!(CONSONANTS.iter().any(|p| p.piece == piece));
+            let piece = find_piece(&mut host, EcpType::ComplexConsonant);
+            assert!(COMPLEX_CONSONANTS.iter().any(|p| p.piece == piece));
+            let piece = find_piece(&mut host, EcpType::Vowel);
+            assert!(VOWELS.iter().any(|p| p.piece == piece));
+            let piece = find_piece(&mut host, EcpType::ComplexVowel);
+            assert!(COMPLEX_VOWELS.iter().any(|p| p.piece == piece));
+            let piece = find_piece(&mut host, EcpType::Ending);
+            assert!(ENDINGS.iter().any(|p| p.piece == piece));
         }
     }
 
-    let mut pos: *const c_char = TextSeed;
-    let mut SeedValue: c_uint = 0;
-    unsafe {
-        while *pos != 0 {
-            let high = SeedValue >> 28;
-            SeedValue ^= ((SeedValue << 4) as c_int + ((*pos as c_int) - ('a' as c_int))) as c_uint;
-            SeedValue ^= high;
-            pos = pos.add(1);
-        }
+    /// Raven's default-arm fallthrough (`case CP_CONSONANT: default:`,
+    /// `cm_randomterrain.cpp:966-968`) — an out-of-band `EcpType` still draws
+    /// from `Consonants`, matching the switch's fallthrough rather than
+    /// diverging into a panic/empty result.
+    #[test]
+    fn find_piece_defaults_unmapped_kinds_to_consonants() {
+        let mut host = MockHost::new();
+        let piece = find_piece(&mut host, EcpType::None);
+        assert!(CONSONANTS.iter().any(|p| p.piece == piece));
+        let piece = find_piece(&mut host, EcpType::NumPieces);
+        assert!(CONSONANTS.iter().any(|p| p.piece == piece));
     }
 
-    SeedValue
+    /// Two draws off freshly-seeded (`0x89abcdef`) `MockHost` instances are
+    /// bit-identical — pins that `rmg_create_seed` is a pure function of the
+    /// threaded `EngineHost` RNG, per the golden-#1 role (RMG-D4f).
+    #[test]
+    fn rmg_create_seed_is_deterministic_over_the_same_rng_seed() {
+        let mut host_a = MockHost::new();
+        let mut host_b = MockHost::new();
+        let (text_a, seed_a) = rmg_create_seed(&mut host_a);
+        let (text_b, seed_b) = rmg_create_seed(&mut host_b);
+        assert_eq!(text_a, text_b);
+        assert_eq!(seed_a, seed_b);
+    }
+
+    /// The returned text seed is exactly ASCII lowercase-letter pieces (the
+    /// hash fold assumes `byte - b'a'` never underflows).
+    #[test]
+    fn rmg_create_seed_text_is_ascii_lowercase() {
+        let mut host = MockHost::new();
+        let (text, _) = rmg_create_seed(&mut host);
+        assert!(!text.is_empty());
+        assert!(text.bytes().all(|b| b.is_ascii_lowercase()));
+    }
 }

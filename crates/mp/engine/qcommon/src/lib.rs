@@ -5,6 +5,7 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
 pub mod cm;
+pub mod cm_height_details;
 pub mod cm_load;
 pub mod cm_patch;
 pub mod cm_randomterrain;
@@ -30,6 +31,9 @@ pub mod msg;
 pub mod net_chan;
 pub mod qcommon;
 pub mod qfiles;
+pub mod roff;
+pub mod stringed;
+pub mod terrain_handle;
 pub mod timing;
 pub mod unzip;
 pub mod vm;

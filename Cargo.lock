@@ -61,12 +61,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libc"
-version = "0.2.186"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
-
-[[package]]
 name = "libloading"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -119,8 +113,6 @@ dependencies = [
 name = "mp_engine_botlib"
 version = "0.1.0"
 dependencies = [
- "libc",
- "mp_engine_qcommon",
  "mp_qshared",
 ]
 
@@ -138,10 +130,13 @@ name = "mp_engine_core"
 version = "0.1.0"
 dependencies = [
  "mp_engine_client",
+ "mp_engine_ghoul2",
  "mp_engine_icarus",
  "mp_engine_qcommon",
+ "mp_engine_rmg",
  "mp_engine_server",
  "mp_qshared",
+ "mp_renderer",
  "native_platform",
 ]
 
@@ -149,6 +144,7 @@ dependencies = [
 name = "mp_engine_ghoul2"
 version = "0.1.0"
 dependencies = [
+ "mp_host_interface",
  "mp_qshared",
 ]
 
@@ -166,10 +162,8 @@ version = "0.1.0"
 dependencies = [
  "abi_transport",
  "cc",
- "libc",
  "mp_host_interface",
  "mp_qshared",
- "native_math",
  "native_platform",
 ]
 
@@ -177,6 +171,8 @@ dependencies = [
 name = "mp_engine_rmg"
 version = "0.1.0"
 dependencies = [
+ "mp_engine_qcommon",
+ "mp_host_interface",
  "mp_qshared",
 ]
 
@@ -193,6 +189,7 @@ version = "0.1.0"
 dependencies = [
  "mp_abi",
  "mp_engine_qcommon",
+ "mp_host_interface",
  "mp_qshared",
 ]
 
@@ -229,6 +226,7 @@ name = "mp_renderer"
 version = "0.1.0"
 dependencies = [
  "mp_engine_qcommon",
+ "mp_host_interface",
  "mp_qshared",
  "native_platform",
 ]

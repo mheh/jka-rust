@@ -1,1670 +1,961 @@
-//! `cm_patch.cpp` — patch (bezier curve) collision generation, transcribed
-//! per the C-track engine-port packets (`qcommon__0072`..`qcommon__2275`).
+//! `CCMPatch` — one terrain collision patch (`CmPatch`, ruling 40 rename), its
+//! **own file** per ruling 39d / §21 (one class per file), beside
+//! `cm_terrain.rs`. Built by the LIVE `CmLandScape::UpdatePatches`
+//! (`cm_terrain.cpp:898-927`) and owned as `CmLandScape.patches: Vec<CmPatch>`
+//! (frozen there, not here — Files roster, class `CCMLandScape`). Not in any
+//! pub Seam signature (`docs/subsystems/rmg-terrain.md` Files roster,
+//! `cm_patch.rs` row): every method below is a private helper the owning
+//! `CmLandScape` (and, cross-file, the `cm`-C-track `CM_HandlePatchCollision`,
+//! Open questions below) calls intra-crate.
 //!
-//! State receivers follow the pinned order (preamble "State receivers"):
-//! `common: &mut Common`, `cm: &mut CollisionWorld`, `sv: &mut Server`,
-//! `rm: &mut RenderModels`, `host: &mut dyn EngineHost`. `Server`,
-//! `RenderModels`, and `EngineHost` are not importable from this crate yet
-//! (no rosetta row / no Cargo dependency edge) — reported in missing_symbols;
-//! the signatures below spell them exactly as the packets resolve them.
+//! Per `docs/subsystems/rmg-terrain.md` (roster row, class `CCMPatch`;
+//! RMG-D7/ruling 46) only **five** prototypes are LIVE and get stubs below:
+//! `Init`, `InitPlane`, `CreatePatchPlaneData`, `GetAdjacentBrushX`,
+//! `GetAdjacentBrushY` (`cm_landscape.h:125-130`).
 //!
-//! File-scope statics this TU owns (`debugPatchCollide`, `debugFacet`,
-//! `debugBlock`, `debugBlockPoints`, `numPlanes`, `planes`, `facets`,
-//! `c_totalPatchBlocks`) are threaded per ruling 2 as `cm.<RavenName>` fields
-//! on `CollisionWorld` — `CollisionWorld` is currently a placeholder
-//! (`_private: ()`), so these field accesses are forward references for
-//! integration to backfill (porting-rules state-threading contract).
+//! **§B3/RMG-D4h — `owner: CCMLandScape*` (`cm_landscape.h:93`) is DROPPED.**
+//! It is a live back-pointer into state owned elsewhere (read by
+//! `GetAdjacentBrushY`, `cm_terrain.cpp:246-256`); per §B3 no `CmPatch` field
+//! aliases it — the owning `CmLandScape` is threaded as a `&`/`&mut` parameter
+//! into every method that used `owner->…` (Init, CreatePatchPlaneData,
+//! GetAdjacentBrushX/Y).
+//!
+//! **RMG-D7/ruling 46 — `mPatchBrushData` (`cbrush_s*`, `cm_landscape.h:100`)
+//! is an offset/length RANGE into `CmLandScape`'s single shared `Vec`-backed
+//! brush arena**, not a raw pointer (§B5) — see `brush_offset`/`brush_len`
+//! below.
+//!
+//! **§20-dropped (zero-caller or generation-path-only), module-doc note, no
+//! stub:**
+//! - `CCMPatch(void) {}` (`cm_landscape.h:105`) and `~CCMPatch(void)`
+//!   (def `cm_terrain.cpp:112-114`) — both empty bodies, no member is
+//!   initialized or released. `#[derive(Default)]` below is the faithful
+//!   Rust equivalent of the no-op ctor (§19: Raven leaves these members
+//!   uninitialized garbage until `Init` runs; `Default` zero-inits instead —
+//!   never reads as garbage, a definedness improvement, not a behavior
+//!   change on the live path); the no-op dtor needs no `Drop` impl.
+//! - `GetWorld` (`:109`) — zero callers anywhere in codemp.
+//! - `GetMins`/`GetMaxs` (`:110-111`, the patch's own, distinct from
+//!   `CCMLandScape`'s same-named accessors at `:200-201`) and
+//!   `GetHeightMapX`/`GetHeightMapY`/`GetHeight(corner)` (`:113-115`) — their
+//!   only callers are `RM_Terrain.cpp:343-344,385,467,470`, the ruling-17
+//!   §20-dropped client-model chain (RMG-D4c), dead under DEDICATED (RMG-D1).
+//! - `SetSurfaceFlags`/`GetSurfaceFlags`/`SetContents`/`GetContents`
+//!   (`:119-122`) — zero callers anywhere (a grep of `->SetSurfaceFlags`,
+//!   `->SetContents`, and the patch's own no-arg `GetSurfaceFlags()`/
+//!   `GetContents()` finds none; the same-named calls that do exist resolve
+//!   to `CCMHeightDetails`'s or `CCMLandScape`'s own overloads,
+//!   `cm_landscape.h:225-226`, `cm_terrain.cpp:32`).
+//!
+//! Source: `oracle/codemp/qcommon/cm_landscape.h:90-131`,
+//! `oracle/codemp/qcommon/cm_terrain.cpp`
 
-#![allow(non_snake_case, non_upper_case_globals, clippy::too_many_arguments)]
+use crate::cm::cbrush_s::cbrush_t;
+use crate::cm::cbrushside_s::cbrushside_t;
+use crate::cm_terrain::CmLandScape;
+use mp_qshared::shared::collision::{cplane_t, PLANE_X, PLANE_Y, PLANE_Z};
+use mp_qshared::shared::{vec3_t, vec3pair_t};
 
-use core::ffi::c_int;
-
-use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t, vec4_t};
-
-use crate::cm::c_grid_t::{cGrid_t, MAX_GRID_SIZE};
-use crate::cm::cm_local_consts::SURFACE_CLIP_EPSILON;
-use crate::cm::cm_patch_cpp_consts::{DIST_EPSILON, NORMAL_EPSILON, POINT_EPSILON};
-use crate::cm::cm_patch_h_consts::{MAX_FACETS, MAX_PATCH_PLANES, PLANE_TRI_EPSILON, SUBDIVIDE_DISTANCE, WRAP_POINT_EPSILON};
-use crate::cm::cm_polylib_consts::{MAX_MAP_BOUNDS, SIDE_BACK, SIDE_FRONT, SIDE_ON};
-use crate::cm::facet_t::facet_t;
-use crate::cm::patch_collide_s::{patchCollide_s, patchCollide_t};
-use crate::cm::patch_plane_t::patchPlane_t;
-use crate::cm::trace_work_s::traceWork_t;
-use crate::cm::winding_t::winding_t;
-use crate::collision_world::CollisionWorld;
-use crate::common::Common;
-
-/// Raven `CM_ClearLevelPatches`.
+/// Raven `BRUSH_SIDES_PER_TERXEL` under the unconditionally-defined
+/// `_SMOOTH_TERXEL_BRUSH` (no `#undef`/config gate anywhere in the TU, so the
+/// `#ifndef _SMOOTH_TERXEL_BRUSH` arm of every method below is preprocessor-
+/// excluded dead code and is not transcribed).
 ///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:108-111`
-pub fn CM_ClearLevelPatches(cm: &mut CollisionWorld) {
-    cm.debugPatchCollide = std::ptr::null();
-    cm.debugFacet = std::ptr::null();
+/// Source: `oracle/codemp/qcommon/cm_terrain.cpp:17-22`
+const BRUSH_SIDES_PER_TERXEL: usize = 8;
+
+/// Raven `MAX_WORLD_COORD`.
+/// Source: `oracle/codemp/game/q_shared.h:18`
+const MAX_WORLD_COORD: f32 = 64.0 * 1024.0;
+
+/// Raven `MIN_WORLD_COORD`.
+/// Source: `oracle/codemp/game/q_shared.h:19`
+const MIN_WORLD_COORD: f32 = -64.0 * 1024.0;
+
+/// Raven `PLANE_NON_AXIAL` (`PLANE_X`/`PLANE_Y`/`PLANE_Z` are already ported,
+/// `mp_qshared::shared::collision`; this fourth band has no existing home
+/// there, so it is repeated locally rather than widening that module's
+/// public surface for one private-helper use).
+/// Source: `oracle/codemp/game/q_shared.h:1847`
+const PLANE_NON_AXIAL: i32 = 3;
+
+/// Raven `DotProduct` macro. Pure vec3 math with no existing home reachable
+/// from this crate (`mp_engine_qcommon` depends on `mp_qshared`/
+/// `mp_host_interface` only — `q_math.c`'s free-fn port lives in the
+/// game-tier `mp_game` crate, wrong dependency direction, porting-rules
+/// workspace-architecture tiers), so the handful of primitives
+/// `InitPlane`/`CreatePatchPlaneData` need are transcribed locally.
+/// Source: `oracle/codemp/game/q_shared.h:1358`
+fn dot_product(a: vec3_t, b: vec3_t) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
-/// Raven `CM_SignbitsForNormal`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:118-128`
-pub fn CM_SignbitsForNormal(normal: vec3_t) -> c_int {
-    let mut bits = 0;
+/// Raven `VectorSubtract` macro.
+/// Source: `oracle/codemp/game/q_shared.h:1359`
+fn vector_subtract(a: vec3_t, b: vec3_t) -> vec3_t {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+/// Raven `CrossProduct`.
+/// Source: `oracle/codemp/game/q_shared.h:1553-1557`
+fn cross_product(v1: vec3_t, v2: vec3_t) -> vec3_t {
+    [
+        v1[1] * v2[2] - v1[2] * v2[1],
+        v1[2] * v2[0] - v1[0] * v2[2],
+        v1[0] * v2[1] - v1[1] * v2[0],
+    ]
+}
+
+/// Raven `VectorNormalize` — normalizes `v` in place, returns the
+/// pre-normalize length (`0.0` length leaves `v` untouched, as Raven's
+/// `if(length)` guard does).
+/// Source: `oracle/codemp/game/q_math.c:1172-1186`
+fn vector_normalize(v: &mut vec3_t) -> f32 {
+    let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if length != 0.0 {
+        let ilength = 1.0 / length;
+        v[0] *= ilength;
+        v[1] *= ilength;
+        v[2] *= ilength;
+    }
+    length
+}
+
+/// Raven `PlaneTypeForNormal` macro.
+/// Source: `oracle/codemp/game/q_shared.h:1856`
+fn plane_type_for_normal(n: vec3_t) -> u8 {
+    if n[0] == 1.0 {
+        PLANE_X as u8
+    } else if n[1] == 1.0 {
+        PLANE_Y as u8
+    } else if n[2] == 1.0 {
+        PLANE_Z as u8
+    } else {
+        PLANE_NON_AXIAL as u8
+    }
+}
+
+/// Raven `SetPlaneSignbits`.
+/// Source: `oracle/codemp/game/q_math.c:751-762`
+fn set_plane_signbits(plane: &mut cplane_t) {
+    let mut bits: u8 = 0;
     for j in 0..3 {
-        if normal[j] < 0.0 {
+        if plane.normal[j] < 0.0 {
             bits |= 1 << j;
         }
     }
-    bits
+    plane.signbits = bits;
 }
 
-/// Raven `CM_PlaneFromPoints`.
+/// Byte length of one patch's slice of the shared brush arena (RMG-D7):
+/// `numBrushesPerPatch * sizeof(cbrush_t) + numBrushesPerPatch *
+/// BRUSH_SIDES_PER_TERXEL * 2 * (sizeof(cbrushside_t) + sizeof(cplane_t))` —
+/// the same formula the ctor/`UpdatePatches` use to size/slice the shared
+/// `Z_Malloc(size * GetBlockCount())` buffer, recomputed here from `terxels`
+/// (a landscape-wide constant, identical for every patch) since `Init`'s
+/// frozen signature receives only the starting `brush_offset`, not a length.
 ///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:138-150`
-pub fn CM_PlaneFromPoints(plane: vec4_t, a: vec3_t, b: vec3_t, c: vec3_t) -> qboolean {
-    let mut plane = plane;
-    let d1 = VectorSubtract(b, a);
-    let d2 = VectorSubtract(c, a);
-    let cross = CrossProduct(d2, d1);
-    plane[0] = cross[0];
-    plane[1] = cross[1];
-    plane[2] = cross[2];
-    let mut p3: vec3_t = [plane[0], plane[1], plane[2]];
-    if VectorNormalize(&mut p3) == 0.0 {
-        return qfalse;
-    }
-    plane[0] = p3[0];
-    plane[1] = p3[1];
-    plane[2] = p3[2];
-    plane[3] = DotProduct(a, p3);
-    qtrue
+/// Source: `oracle/codemp/qcommon/cm_terrain.cpp:212-215`
+fn brush_region_len(terxels: i32) -> usize {
+    let num_brushes_per_patch = (terxels * terxels * 2) as usize;
+    num_brushes_per_patch * core::mem::size_of::<cbrush_t>()
+        + num_brushes_per_patch
+            * BRUSH_SIDES_PER_TERXEL
+            * 2
+            * (core::mem::size_of::<cbrushside_t>() + core::mem::size_of::<cplane_t>())
 }
 
-/// Raven `CM_NeedsSubdivision`.
+/// Pure index math for `GetAdjacentBrushY`: `Some((blockX, blockY))` when the
+/// y-adjacent terxel crosses into a different patch (Raven's
+/// `owner->GetPatch(...)` branch), `None` when it stays within `self`
+/// (Raven's `patch = this;`); plus the target brush's index within its
+/// patch's 2-brushes-per-terxel array.
 ///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:169-191`
-pub fn CM_NeedsSubdivision(a: vec3_t, b: vec3_t, c: vec3_t) -> qboolean {
-    let mut lmid: vec3_t = [0.0; 3];
-    let mut cmid: vec3_t = [0.0; 3];
-    for i in 0..3 {
-        lmid[i] = 0.5 * (a[i] + c[i]);
-    }
-    for i in 0..3 {
-        cmid[i] = 0.5 * (0.5 * (a[i] + b[i]) + 0.5 * (b[i] + c[i]));
-    }
-    let delta = VectorSubtract(cmid, lmid);
-    let dist = VectorLengthSquared(delta);
-    (dist >= SUBDIVIDE_DISTANCE * SUBDIVIDE_DISTANCE) as qboolean
+/// Source: `oracle/codemp/qcommon/cm_terrain.cpp:246-256`
+fn adjacent_brush_y_index(terxels: i32, x: i32, y: i32) -> (Option<(i32, i32)>, usize) {
+    let yo1 = y % terxels;
+    let yo2 = (y - 1) % terxels;
+    let xo = x % terxels;
+    let other_patch = (yo2 > yo1).then(|| (x / terxels, (y - 1) / terxels));
+    let index = ((yo2 * terxels + xo) * 2 + 1) as usize;
+    (other_patch, index)
 }
 
-/// Raven `CM_Subdivide`.
+/// Pure index math for `GetAdjacentBrushX` — see
+/// [`adjacent_brush_y_index`] for the shape rationale.
 ///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:201-209`
-pub fn CM_Subdivide(a: vec3_t, b: vec3_t, c: vec3_t, out1: vec3_t, out2: vec3_t, out3: vec3_t) {
-    let mut out1 = out1;
-    let mut out2 = out2;
-    let mut out3 = out3;
-    for i in 0..3 {
-        out1[i] = 0.5 * (a[i] + b[i]);
-        out3[i] = 0.5 * (b[i] + c[i]);
-        out2[i] = 0.5 * (out1[i] + out3[i]);
+/// Source: `oracle/codemp/qcommon/cm_terrain.cpp:272-282`
+fn adjacent_brush_x_index(terxels: i32, x: i32, y: i32) -> (Option<(i32, i32)>, usize) {
+    let xo1 = x % terxels;
+    let xo2 = (x - 1) % terxels;
+    let yo = y % terxels;
+    let other_patch = (xo2 > xo1).then(|| ((x - 1) / terxels, y / terxels));
+    let mut index = ((yo * terxels + xo2) * 2) as usize;
+    if (x + y) & 1 == 0 {
+        index += 1;
     }
-    // PORT-NOTE(out-params): `vec3_t` out-params are `[f32; 3]` values here
-    // (§C mechanical resolved signature), not raw pointers; the writes above
-    // are local until the resolved-signature call surface threads them as
-    // `*mut f32` at integration (matches the packet's printed shape).
-    let _ = (out1, out2, out3);
+    (other_patch, index)
 }
 
-/// Raven `CM_TransposeGrid`.
+/// Which of the 4 corner heightmap-sample offsets around terxel `(x, y)` map
+/// to TL/TR/BL/BR, permuted by the checkerboard `(x+y)&1` split (Raven splits
+/// each terxel into 2 triangles along whichever diagonal keeps the split
+/// consistent across the grid).
 ///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:218-260`
-pub fn CM_TransposeGrid(grid: *mut cGrid_t) {
-    unsafe {
-        let mut temp: vec3_t;
-        let mut temp_wrap: qboolean;
-        if (*grid).width > (*grid).height {
-            for i in 0..(*grid).height {
-                for j in (i + 1)..(*grid).width {
-                    if j < (*grid).height {
-                        temp = (*grid).points[i as usize][j as usize];
-                        (*grid).points[i as usize][j as usize] = (*grid).points[j as usize][i as usize];
-                        (*grid).points[j as usize][i as usize] = temp;
-                    } else {
-                        (*grid).points[i as usize][j as usize] = (*grid).points[j as usize][i as usize];
-                    }
-                }
-            }
-        } else {
-            for i in 0..(*grid).width {
-                for j in (i + 1)..(*grid).height {
-                    if j < (*grid).width {
-                        temp = (*grid).points[j as usize][i as usize];
-                        (*grid).points[j as usize][i as usize] = (*grid).points[i as usize][j as usize];
-                        (*grid).points[i as usize][j as usize] = temp;
-                    } else {
-                        (*grid).points[j as usize][i as usize] = (*grid).points[i as usize][j as usize];
-                    }
-                }
-            }
-        }
-
-        let l = (*grid).width;
-        (*grid).width = (*grid).height;
-        (*grid).height = l;
-
-        temp_wrap = (*grid).wrapWidth;
-        (*grid).wrapWidth = (*grid).wrapHeight;
-        (*grid).wrapHeight = temp_wrap;
+/// Source: `oracle/codemp/qcommon/cm_terrain.cpp:325-341`
+fn terxel_corner_offsets(x: i32, y: i32, real_width: i32) -> [i32; 4] {
+    let tl = y * real_width + x;
+    let tr = y * real_width + x + 1;
+    let bl = (y + 1) * real_width + x;
+    let br = (y + 1) * real_width + x + 1;
+    if (x + y) & 1 != 0 {
+        [tl, tr, bl, br]
+    } else {
+        [tr, br, tl, bl]
     }
 }
 
-/// Raven `CM_SetGridWrapWidth`.
+/// Raw-pointer accessor into the shared brush arena (RMG-D7/§B5): the
+/// `index`th `cbrush_t` within the byte range starting at `base_offset`.
+/// Mirrors Raven's `mPatchBrushData + index` pointer arithmetic over the
+/// `Z_Malloc`'d buffer.
 ///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:269-289`
-pub fn CM_SetGridWrapWidth(grid: *mut cGrid_t) {
-    unsafe {
-        let mut i = 0;
-        let mut j;
-        while i < (*grid).height {
-            j = 0;
-            while j < 3 {
-                let d = (*grid).points[0][i as usize][j as usize]
-                    - (*grid).points[((*grid).width - 1) as usize][i as usize][j as usize];
-                if d < -WRAP_POINT_EPSILON || d > WRAP_POINT_EPSILON {
-                    break;
-                }
-                j += 1;
-            }
-            if j != 3 {
-                break;
-            }
-            i += 1;
-        }
-        if i == (*grid).height {
-            (*grid).wrapWidth = qtrue;
-        } else {
-            (*grid).wrapWidth = qfalse;
-        }
-    }
+/// # Safety
+/// `arena_ptr` must be a valid pointer into a byte buffer of at least
+/// `base_offset + (index + 1) * size_of::<cbrush_t>()` bytes, and no other
+/// live reference may alias the addressed `cbrush_t`.
+unsafe fn brush_ptr(arena_ptr: *mut u8, base_offset: usize, index: usize) -> *mut cbrush_t {
+    arena_ptr.add(base_offset + index * core::mem::size_of::<cbrush_t>()) as *mut cbrush_t
 }
 
-/// Raven `CM_ComparePoints`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:370-386`
-pub fn CM_ComparePoints(a: *mut f32, b: *mut f32) -> qboolean {
-    unsafe {
-        for k in 0..3usize {
-            let d = *a.add(k) - *b.add(k);
-            if d < -POINT_EPSILON || d > POINT_EPSILON {
-                return qfalse;
-            }
-        }
-    }
-    qtrue
+/// Raw-pointer accessor into the shared brush arena — the `index`th
+/// `cbrushside_t` within the byte range starting at `base_offset`. See
+/// [`brush_ptr`] for the safety contract.
+unsafe fn side_ptr(arena_ptr: *mut u8, base_offset: usize, index: usize) -> *mut cbrushside_t {
+    arena_ptr.add(base_offset + index * core::mem::size_of::<cbrushside_t>()) as *mut cbrushside_t
 }
 
-/// Raven `CM_PlaneEqual`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:440-467`
-pub fn CM_PlaneEqual(p: *mut patchPlane_t, plane: *mut f32, flipped: *mut c_int) -> c_int {
-    unsafe {
-        if Q_fabs((*p).plane[0] - *plane.add(0)) < NORMAL_EPSILON
-            && Q_fabs((*p).plane[1] - *plane.add(1)) < NORMAL_EPSILON
-            && Q_fabs((*p).plane[2] - *plane.add(2)) < NORMAL_EPSILON
-            && Q_fabs((*p).plane[3] - *plane.add(3)) < DIST_EPSILON
-        {
-            *flipped = qfalse;
-            return qtrue;
-        }
-
-        let mut invplane = [0.0f32; 4];
-        invplane[0] = -*plane.add(0);
-        invplane[1] = -*plane.add(1);
-        invplane[2] = -*plane.add(2);
-        invplane[3] = -*plane.add(3);
-
-        if Q_fabs((*p).plane[0] - invplane[0]) < NORMAL_EPSILON
-            && Q_fabs((*p).plane[1] - invplane[1]) < NORMAL_EPSILON
-            && Q_fabs((*p).plane[2] - invplane[2]) < NORMAL_EPSILON
-            && Q_fabs((*p).plane[3] - invplane[3]) < DIST_EPSILON
-        {
-            *flipped = qtrue;
-            return qtrue;
-        }
-
-        qfalse
-    }
+/// Raw-pointer accessor into the shared brush arena — the `index`th
+/// `cplane_t` within the byte range starting at `base_offset`. See
+/// [`brush_ptr`] for the safety contract.
+unsafe fn plane_ptr(arena_ptr: *mut u8, base_offset: usize, index: usize) -> *mut cplane_t {
+    arena_ptr.add(base_offset + index * core::mem::size_of::<cplane_t>()) as *mut cplane_t
 }
 
-/// Raven `CM_SnapVector`.
+/// Copies one `cbrushside_t`'s fields (Raven's `memcpy(dst, src,
+/// sizeof(cbrushside_t))`).
 ///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:469-487`
-pub fn CM_SnapVector(normal: vec3_t) {
-    let mut normal = normal;
-    for i in 0..3 {
-        if Q_fabs(normal[i] - 1.0) < NORMAL_EPSILON {
-            normal = [0.0; 3];
-            normal[i] = 1.0;
-            break;
-        }
-        if Q_fabs(normal[i] - -1.0) < NORMAL_EPSILON {
-            normal = [0.0; 3];
-            normal[i] = -1.0;
-            break;
-        }
-    }
-    // PORT-NOTE(out-param): `normal` is a `vec3_t` value per the resolved
-    // signature (matches the packet's printed `pub fn CM_SnapVector(normal: vec3_t)`);
-    // callers needing the write-through pass a raw pointer at integration.
-    let _ = normal;
+/// # Safety
+/// `dst` and `src` must each be valid, non-aliasing pointers to a live
+/// `cbrushside_t`.
+unsafe fn copy_side(dst: *mut cbrushside_t, src: *mut cbrushside_t) {
+    (*dst).plane = (*src).plane;
+    (*dst).shaderNum = (*src).shaderNum;
 }
 
-/// Raven `CM_PointOnPlaneSide`.
+/// `CCMPatch` — one collision patch of the terrain brush grid.
 ///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:570-590`
-pub fn CM_PointOnPlaneSide(cm: &mut CollisionWorld, p: *mut f32, planeNum: c_int) -> c_int {
-    if planeNum == -1 {
-        return SIDE_ON;
-    }
-    let plane = &cm.planes[planeNum as usize].plane;
-    unsafe {
-        let d = DotProductPtr(p, plane.as_ptr()) - plane[3];
-        if d > PLANE_TRI_EPSILON {
-            return SIDE_FRONT;
-        }
-        if d < -PLANE_TRI_EPSILON {
-            return SIDE_BACK;
-        }
-    }
-    SIDE_ON
+/// **Complete field set.** `owner` (`cm_landscape.h:93`) is dropped (§B3,
+/// above) — its owning `CmLandScape` is threaded per-call instead.
+/// `mPatchBrushData` (`:100`) becomes `brush_offset`/`brush_len` (RMG-D7): an
+/// offset/length range into `CmLandScape`'s shared byte arena, mirroring
+/// Raven's per-patch pointer-arithmetic slice
+/// (`cm_terrain.cpp:213-215,319-321,524,588,925`) — no raw pointer, §B5.
+/// `mHeightMap` (`:95`, `byte*` into the landscape's own height map,
+/// `cm_terrain.cpp:538`) is the same "pointer into state owned elsewhere"
+/// shape as `mPatchBrushData`, so it becomes `height_map_offset` for the same
+/// reason, though it is write-only within the live `Init` body (read nowhere
+/// else, `cm_terrain.cpp:578-581` only).
+///
+/// Source: `oracle/codemp/qcommon/cm_landscape.h:90-102`
+#[derive(Default)]
+pub struct CmPatch {
+    /// `mHx` — terxel x coord of this patch's top-left corner.
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:94`
+    pub hx: i32,
+    /// `mHy` — terxel y coord of this patch's top-left corner.
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:94`
+    pub hy: i32,
+    /// `mHeightMap` — offset into the owning `CmLandScape`'s height map
+    /// (§B3-style pointer-into-owner reshape; write-only past `Init`).
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:95`
+    pub height_map_offset: usize,
+    /// `mCornerHeights[4]` — heights at the corners of the patch.
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:96`
+    pub corner_heights: [u8; 4],
+    /// `mWorldCoords` — world coordinate offset of this patch.
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:97`
+    pub world_coords: vec3_t,
+    /// `mBounds` — mins/maxs of the patch for culling.
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:98`
+    pub bounds: vec3pair_t,
+    /// `mNumBrushes` — number of brushes to collide with in the patch.
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:99`
+    pub num_brushes: i32,
+    /// `mPatchBrushData` (RMG-D7/ruling 46) — byte offset of this patch's
+    /// slice within the owning `CmLandScape`'s shared brush arena.
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:100`
+    pub brush_offset: usize,
+    /// `mPatchBrushData` (RMG-D7/ruling 46) — byte length of this patch's
+    /// slice within the owning `CmLandScape`'s shared brush arena.
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:100`
+    pub brush_len: usize,
+    /// `mSurfaceFlags` — surfaceflag of the heightshader.
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:101`
+    pub surface_flags: i32,
+    /// `mContentFlags` — contents of the heightshader.
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:102`
+    pub content_flags: i32,
 }
 
-/// Raven `CM_CheckFacetPlane`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:1346-1385`
-pub fn CM_CheckFacetPlane(
-    plane: *mut f32,
-    start: vec3_t,
-    end: vec3_t,
-    enterFrac: *mut f32,
-    leaveFrac: *mut f32,
-    hit: *mut c_int,
-) -> c_int {
-    unsafe {
-        *hit = qfalse;
+impl CmPatch {
+    /// `CCMPatch::Init` — sets the patch's world/height/bounds/corner/shader
+    /// data from the owning landscape and this patch's slice of the shared
+    /// height map and brush arena, then builds the patch's collision planes
+    /// (`CreatePatchPlaneData`, `:589`). `ls` is `&mut` because `Init` calls
+    /// through to `CreatePatchPlaneData`, which writes into `ls`'s shared
+    /// brush arena (RMG-D7). `height_map` is the landscape's whole height map
+    /// (Raven's `hMap` param, passed un-offset, `cm_terrain.cpp:925`);
+    /// `brush_offset` is this patch's pre-computed slice start within the
+    /// shared arena (Raven's `patchBrushData` param, already offset by the
+    /// caller, `cm_terrain.cpp:925`).
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_terrain.cpp:524-591`
+    pub fn init(
+        &mut self,
+        ls: &mut CmLandScape,
+        height_x: i32,
+        height_y: i32,
+        world: vec3_t,
+        height_map: &[u8],
+        brush_offset: usize,
+    ) {
+        // Store the base of the top left corner.
+        self.world_coords = world;
 
-        let d1 = DotProductPtr(start.as_ptr(), plane) - *plane.add(3);
-        let d2 = DotProductPtr(end.as_ptr(), plane) - *plane.add(3);
+        // Store pointer to first byte of the height data for this patch.
+        self.hx = height_x;
+        self.hy = height_y;
+        let real_width = ls.width + 1; // owner->GetRealWidth()
+        self.height_map_offset = (height_y * real_width + height_x) as usize;
 
-        // if completely in front of face, no intersection with the entire facet
-        if d1 > 0.0 && (d2 >= SURFACE_CLIP_EPSILON || d2 >= d1) {
-            return qfalse;
-        }
-
-        // if it doesn't cross the plane, the plane isn't relevent
-        if d1 <= 0.0 && d2 <= 0.0 {
-            return qtrue;
-        }
-
-        // crosses face
-        if d1 > d2 {
-            // enter
-            let mut f = (d1 - SURFACE_CLIP_EPSILON) / (d1 - d2);
-            if f < 0.0 {
-                f = 0.0;
-            }
-            // always favor previous plane hits and thus also the surface plane hit
-            if f > *enterFrac {
-                *enterFrac = f;
-                *hit = qtrue;
-            }
-        } else {
-            // leave
-            let mut f = (d1 + SURFACE_CLIP_EPSILON) / (d1 - d2);
-            if f > 1.0 {
-                f = 1.0;
-            }
-            if f < *leaveFrac {
-                *leaveFrac = f;
-            }
-        }
-        qtrue
-    }
-}
-
-/// Raven `CM_PositionTestInPatchCollide`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:1545-1628`
-pub fn CM_PositionTestInPatchCollide(tw: *mut traceWork_t, pc: *const patchCollide_s) -> qboolean {
-    unsafe {
-        if (*tw).isPoint != qfalse {
-            return qfalse;
-        }
-
-        let mut facet = (*pc).facets;
-        for _i in 0..(*pc).numFacets {
-            let mut planes = (*pc).planes.add((*facet).surfacePlane as usize);
-            let mut plane = [(*planes).plane[0], (*planes).plane[1], (*planes).plane[2], (*planes).plane[3]];
-            let mut startp: vec3_t;
-
-            if (*tw).sphere.r#use != qfalse {
-                plane[3] += (*tw).sphere.radius;
-                let t = DotProductPtr(plane.as_ptr(), (*tw).sphere.offset.as_ptr());
-                if t > 0.0 {
-                    startp = VectorSubtract((*tw).start, (*tw).sphere.offset);
-                } else {
-                    startp = VectorAdd((*tw).start, (*tw).sphere.offset);
-                }
-            } else {
-                let offset = DotProductPtr((*tw).offsets[(*planes).signbits as usize].as_ptr(), plane.as_ptr());
-                plane[3] -= offset;
-                startp = (*tw).start;
-            }
-
-            if DotProductPtr(plane.as_ptr(), startp.as_ptr()) - plane[3] > 0.0 {
-                facet = facet.add(1);
+        // Calculate the bounds for culling. Use the dimensions 1 terxel
+        // outside the patch to allow for sloping of edge terxels.
+        let mut min: i32 = 256;
+        let mut max: i32 = -1;
+        for y in (height_y - 1)..(height_y + ls.terxels + 1) {
+            if y < 0 {
                 continue;
             }
-
-            let mut j = 0;
-            while j < (*facet).numBorders {
-                planes = (*pc).planes.add((*facet).borderPlanes[j as usize] as usize);
-                if (*facet).borderInward[j as usize] != 0 {
-                    plane = [-(*planes).plane[0], -(*planes).plane[1], -(*planes).plane[2], -(*planes).plane[3]];
-                } else {
-                    plane = [(*planes).plane[0], (*planes).plane[1], (*planes).plane[2], (*planes).plane[3]];
-                }
-                if (*tw).sphere.r#use != qfalse {
-                    plane[3] += (*tw).sphere.radius;
-                    let t = DotProductPtr(plane.as_ptr(), (*tw).sphere.offset.as_ptr());
-                    if t > 0.0 {
-                        startp = VectorSubtract((*tw).start, (*tw).sphere.offset);
-                    } else {
-                        startp = VectorAdd((*tw).start, (*tw).sphere.offset);
-                    }
-                } else {
-                    // NOTE: this works even though the plane might be flipped because the bbox is centered
-                    let offset = DotProductPtr((*tw).offsets[(*planes).signbits as usize].as_ptr(), plane.as_ptr());
-                    plane[3] += offset.abs();
-                    startp = (*tw).start;
-                }
-
-                if DotProductPtr(plane.as_ptr(), startp.as_ptr()) - plane[3] > 0.0 {
-                    break;
-                }
-                j += 1;
-            }
-            if j < (*facet).numBorders {
-                facet = facet.add(1);
-                continue;
-            }
-            // inside this patch facet
-            return qtrue;
-        }
-
-        qfalse
-    }
-}
-
-/// Raven `CM_SubdivideGridColumns`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:301-361`
-pub fn CM_SubdivideGridColumns(grid: *mut cGrid_t) {
-    unsafe {
-        let mut i = 0;
-        while i < (*grid).width - 2 {
-            // grid->points[i][x] is an interpolating control point
-            // grid->points[i+1][x] is an aproximating control point
-            // grid->points[i+2][x] is an interpolating control point
-
-            // first see if we can collapse the aproximating collumn away
-            let mut j = 0;
-            while j < (*grid).height {
-                if CM_NeedsSubdivision(
-                    (*grid).points[i as usize][j as usize],
-                    (*grid).points[(i + 1) as usize][j as usize],
-                    (*grid).points[(i + 2) as usize][j as usize],
-                ) != qfalse
-                {
-                    break;
-                }
-                j += 1;
-            }
-            if j == (*grid).height {
-                // all of the points were close enough to the linear midpoints
-                // that we can collapse the entire column away
-                for j in 0..(*grid).height {
-                    for k in (i + 2)..(*grid).width {
-                        (*grid).points[(k - 1) as usize][j as usize] = (*grid).points[k as usize][j as usize];
-                    }
-                }
-
-                (*grid).width -= 1;
-
-                // go to the next curve segment
-                i += 1;
-                continue;
-            }
-
-            // we need to subdivide the curve
-            for j in 0..(*grid).height {
-                let prev = (*grid).points[i as usize][j as usize];
-                let mid = (*grid).points[(i + 1) as usize][j as usize];
-                let next = (*grid).points[(i + 2) as usize][j as usize];
-
-                // make room for two additional columns in the grid
-                // columns i+1 will be replaced, column i+2 will become i+4
-                // i+1, i+2, and i+3 will be generated
-                let mut k = (*grid).width - 1;
-                while k > i + 1 {
-                    (*grid).points[(k + 2) as usize][j as usize] = (*grid).points[k as usize][j as usize];
-                    k -= 1;
-                }
-
-                // generate the subdivided points
-                let mut out1 = (*grid).points[(i + 1) as usize][j as usize];
-                let mut out2 = (*grid).points[(i + 2) as usize][j as usize];
-                let mut out3 = (*grid).points[(i + 3) as usize][j as usize];
-                CM_Subdivide(prev, mid, next, out1, out2, out3);
-                out1 = [0.5 * (prev[0] + mid[0]), 0.5 * (prev[1] + mid[1]), 0.5 * (prev[2] + mid[2])];
-                out3 = [0.5 * (mid[0] + next[0]), 0.5 * (mid[1] + next[1]), 0.5 * (mid[2] + next[2])];
-                out2 = [0.5 * (out1[0] + out3[0]), 0.5 * (out1[1] + out3[1]), 0.5 * (out1[2] + out3[2])];
-                (*grid).points[(i + 1) as usize][j as usize] = out1;
-                (*grid).points[(i + 2) as usize][j as usize] = out2;
-                (*grid).points[(i + 3) as usize][j as usize] = out3;
-            }
-
-            (*grid).width += 2;
-
-            // the new aproximating point at i+1 may need to be removed
-            // or subdivided farther, so don't advance i
-        }
-    }
-}
-
-/// Raven `CM_RemoveDegenerateColumns`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:395-420`
-pub fn CM_RemoveDegenerateColumns(grid: *mut cGrid_t) {
-    unsafe {
-        let mut i = 0;
-        while i < (*grid).width - 1 {
-            let mut j = 0;
-            while j < (*grid).height {
-                let mut a = (*grid).points[i as usize][j as usize];
-                let mut b = (*grid).points[(i + 1) as usize][j as usize];
-                if CM_ComparePoints(a.as_mut_ptr(), b.as_mut_ptr()) == qfalse {
-                    break;
-                }
-                j += 1;
-            }
-
-            if j != (*grid).height {
-                i += 1;
-                continue; // not degenerate
-            }
-
-            for j in 0..(*grid).height {
-                // remove the column
-                for k in (i + 2)..(*grid).width {
-                    (*grid).points[(k - 1) as usize][j as usize] = (*grid).points[k as usize][j as usize];
-                }
-            }
-            (*grid).width -= 1;
-
-            // check against the next column
-            i -= 1;
-            i += 1;
-        }
-    }
-}
-
-/// Raven `CM_FindPlane2`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:489-510`
-pub fn CM_FindPlane2(cm: &mut CollisionWorld, plane: *mut f32, flipped: *mut c_int) -> c_int {
-    unsafe {
-        // see if the points are close enough to an existing plane
-        for i in 0..cm.numPlanes {
-            if CM_PlaneEqual(&mut cm.planes[i as usize], plane, flipped) != 0 {
-                return i;
-            }
-        }
-    }
-
-    // add a new plane
-    if cm.numPlanes == MAX_PATCH_PLANES as c_int {
-        com_error(errorParm_t::ERR_DROP, "MAX_PATCH_PLANES".to_string());
-    }
-
-    unsafe {
-        cm.planes[cm.numPlanes as usize].plane =
-            [*plane.add(0), *plane.add(1), *plane.add(2), *plane.add(3)];
-        cm.planes[cm.numPlanes as usize].signbits = CM_SignbitsForNormal([*plane.add(0), *plane.add(1), *plane.add(2)]);
-    }
-
-    cm.numPlanes += 1;
-
-    unsafe {
-        *flipped = qfalse;
-    }
-
-    cm.numPlanes - 1
-}
-
-/// Raven `CM_FindPlane`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:517-562`
-pub fn CM_FindPlane(cm: &mut CollisionWorld, p1: *mut f32, p2: *mut f32, p3: *mut f32) -> c_int {
-    let mut plane: vec4_t = [0.0; 4];
-    unsafe {
-        if CM_PlaneFromPoints(plane, [*p1, *p1.add(1), *p1.add(2)], [*p2, *p2.add(1), *p2.add(2)], [*p3, *p3.add(1), *p3.add(2)])
-            == qfalse
-        {
-            return -1;
-        }
-    }
-
-    // see if the points are close enough to an existing plane
-    for i in 0..cm.numPlanes {
-        let p = &cm.planes[i as usize];
-        if DotProduct(plane_xyz(plane), plane_xyz(p.plane)) < 0.0 {
-            continue; // allow backwards planes?
-        }
-
-        let mut d = unsafe { DotProductPtr(p1, p.plane.as_ptr()) } - p.plane[3];
-        if d < -PLANE_TRI_EPSILON || d > PLANE_TRI_EPSILON {
-            continue;
-        }
-
-        d = unsafe { DotProductPtr(p2, p.plane.as_ptr()) } - p.plane[3];
-        if d < -PLANE_TRI_EPSILON || d > PLANE_TRI_EPSILON {
-            continue;
-        }
-
-        d = unsafe { DotProductPtr(p3, p.plane.as_ptr()) } - p.plane[3];
-        if d < -PLANE_TRI_EPSILON || d > PLANE_TRI_EPSILON {
-            continue;
-        }
-
-        // found it
-        return i;
-    }
-
-    // add a new plane
-    if cm.numPlanes == MAX_PATCH_PLANES as c_int {
-        com_error(errorParm_t::ERR_DROP, "MAX_PATCH_PLANES".to_string());
-    }
-
-    cm.planes[cm.numPlanes as usize].plane = plane;
-    cm.planes[cm.numPlanes as usize].signbits = CM_SignbitsForNormal(plane_xyz(plane));
-
-    cm.numPlanes += 1;
-
-    cm.numPlanes - 1
-}
-
-/// Raven `CM_GridPlane`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:592-607`
-pub fn CM_GridPlane(
-    common: &mut Common,
-    gridPlanes: *mut *mut *mut c_int,
-    i: c_int,
-    j: c_int,
-    tri: c_int,
-) -> c_int {
-    unsafe {
-        let cell = gridPlanes.cast::<[[c_int; 2]; MAX_GRID_SIZE]>().add(i as usize).cast::<[c_int; 2]>().add(j as usize);
-        let mut p = (*cell)[tri as usize];
-        if p != -1 {
-            return p;
-        }
-        p = (*cell)[(tri == 0) as usize];
-        if p != -1 {
-            return p;
-        }
-    }
-
-    // should never happen
-    com_printf(common, "WARNING: CM_GridPlane unresolvable\n");
-    -1
-}
-
-/// Raven `CM_SetBorderInward`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:675-746`
-pub fn CM_SetBorderInward(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    facet: *mut facet_t,
-    grid: *mut cGrid_t,
-    gridPlanes: *mut *mut *mut c_int,
-    i: c_int,
-    j: c_int,
-    which: c_int,
-) {
-    unsafe {
-        let mut points: [*mut f32; 4] = [std::ptr::null_mut(); 4];
-        let num_points: c_int;
-
-        match which {
-            -1 => {
-                points[0] = (*grid).points[i as usize][j as usize].as_mut_ptr();
-                points[1] = (*grid).points[(i + 1) as usize][j as usize].as_mut_ptr();
-                points[2] = (*grid).points[(i + 1) as usize][(j + 1) as usize].as_mut_ptr();
-                points[3] = (*grid).points[i as usize][(j + 1) as usize].as_mut_ptr();
-                num_points = 4;
-            }
-            0 => {
-                points[0] = (*grid).points[i as usize][j as usize].as_mut_ptr();
-                points[1] = (*grid).points[(i + 1) as usize][j as usize].as_mut_ptr();
-                points[2] = (*grid).points[(i + 1) as usize][(j + 1) as usize].as_mut_ptr();
-                num_points = 3;
-            }
-            1 => {
-                points[0] = (*grid).points[(i + 1) as usize][(j + 1) as usize].as_mut_ptr();
-                points[1] = (*grid).points[i as usize][(j + 1) as usize].as_mut_ptr();
-                points[2] = (*grid).points[i as usize][j as usize].as_mut_ptr();
-                num_points = 3;
-            }
-            _ => {
-                com_error(errorParm_t::ERR_FATAL, "CM_SetBorderInward: bad parameter".to_string());
-            }
-        }
-
-        for k in 0..(*facet).numBorders {
-            let mut front = 0;
-            let mut back = 0;
-
-            for l in 0..num_points {
-                let side = CM_PointOnPlaneSide(cm, points[l as usize], (*facet).borderPlanes[k as usize]);
-                if side == SIDE_FRONT {
-                    front += 1;
-                }
-                if side == SIDE_BACK {
-                    back += 1;
-                }
-            }
-
-            if front != 0 && back == 0 {
-                (*facet).borderInward[k as usize] = qtrue;
-            } else if back != 0 && front == 0 {
-                (*facet).borderInward[k as usize] = qfalse;
-            } else if front == 0 && back == 0 {
-                // flat side border
-                (*facet).borderPlanes[k as usize] = -1;
-            } else {
-                // bisecting side border
-                // #ifndef BSPC — this build always compiles the debug print
-                com_dprintf(common, "WARNING: CM_SetBorderInward: mixed plane sides\n");
-                (*facet).borderInward[k as usize] = qfalse;
-                if cm.debugBlock == qfalse {
-                    cm.debugBlock = qtrue;
-                    cm.debugBlockPoints[0] = (*grid).points[i as usize][j as usize];
-                    cm.debugBlockPoints[1] = (*grid).points[(i + 1) as usize][j as usize];
-                    cm.debugBlockPoints[2] = (*grid).points[(i + 1) as usize][(j + 1) as usize];
-                    cm.debugBlockPoints[3] = (*grid).points[i as usize][(j + 1) as usize];
-                }
-            }
-        }
-    }
-}
-
-/// Raven `CM_TracePointThroughPatchCollide`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:1246-1339`
-pub fn CM_TracePointThroughPatchCollide(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    tw: *mut traceWork_t,
-    trace: &mut trace_t,
-    pc: *const patchCollide_s,
-) {
-    unsafe {
-        if cm.cm_playerCurveClip_integer == 0 || (*tw).isPoint == qfalse {
-            return;
-        }
-
-        let mut front_facing = [qfalse; MAX_PATCH_PLANES];
-        let mut intersection = [0.0f32; MAX_PATCH_PLANES];
-
-        // determine the trace's relationship to all planes
-        let mut planes = (*pc).planes;
-        for i in 0..(*pc).numPlanes {
-            let offset = DotProductPtr((*tw).offsets[(*planes).signbits as usize].as_ptr(), (*planes).plane.as_ptr());
-            let d1 = DotProductPtr((*tw).start.as_ptr(), (*planes).plane.as_ptr()) - (*planes).plane[3] + offset;
-            let d2 = DotProductPtr((*tw).end.as_ptr(), (*planes).plane.as_ptr()) - (*planes).plane[3] + offset;
-            front_facing[i as usize] = if d1 <= 0.0 { qfalse } else { qtrue };
-            if d1 == d2 {
-                intersection[i as usize] = 99999.0;
-            } else {
-                intersection[i as usize] = d1 / (d1 - d2);
-                if intersection[i as usize] <= 0.0 {
-                    intersection[i as usize] = 99999.0;
-                }
-            }
-            planes = planes.add(1);
-        }
-
-        // see if any of the surface planes are intersected
-        let mut facet = (*pc).facets;
-        for _i in 0..(*pc).numFacets {
-            if front_facing[(*facet).surfacePlane as usize] == qfalse {
-                facet = facet.add(1);
-                continue;
-            }
-            let intersect = intersection[(*facet).surfacePlane as usize];
-            if intersect < 0.0 {
-                facet = facet.add(1);
-                continue; // surface is behind the starting point
-            }
-            if intersect > trace.fraction {
-                facet = facet.add(1);
-                continue; // already hit something closer
-            }
-            let mut j = 0;
-            while j < (*facet).numBorders {
-                let k = (*facet).borderPlanes[j as usize];
-                if (front_facing[k as usize] != qfalse) ^ ((*facet).borderInward[j as usize] != 0) {
-                    if intersection[k as usize] > intersect {
-                        break;
-                    }
-                } else if intersection[k as usize] < intersect {
-                    break;
-                }
-                j += 1;
-            }
-            if j == (*facet).numBorders {
-                // we hit this facet
-                if !host.cvar_integer_ptr_initialized() {
-                    // PORT-NOTE(cv-static): the `static cvar_t *cv` becomes a
-                    // per-call `host.cvar_integer` lookup (ruling 36) rather
-                    // than a cached handle; see missing_symbols for the exact
-                    // EngineHost accessor name pending its landing.
-                }
-                if host.cvar_integer("r_debugSurfaceUpdate") != 0 {
-                    cm.debugPatchCollide = pc;
-                    cm.debugFacet = facet;
-                }
-                planes = (*pc).planes.add((*facet).surfacePlane as usize);
-
-                // calculate intersection with a slight pushoff
-                let offset = DotProductPtr((*tw).offsets[(*planes).signbits as usize].as_ptr(), (*planes).plane.as_ptr());
-                let d1 = DotProductPtr((*tw).start.as_ptr(), (*planes).plane.as_ptr()) - (*planes).plane[3] + offset;
-                let d2 = DotProductPtr((*tw).end.as_ptr(), (*planes).plane.as_ptr()) - (*planes).plane[3] + offset;
-                trace.fraction = (d1 - SURFACE_CLIP_EPSILON) / (d1 - d2);
-
-                if trace.fraction < 0.0 {
-                    trace.fraction = 0.0;
-                }
-
-                trace.plane.normal = [(*planes).plane[0], (*planes).plane[1], (*planes).plane[2]];
-                trace.plane.dist = (*planes).plane[3];
-            }
-            facet = facet.add(1);
-        }
-    }
-    let _ = (common, rm);
-}
-
-/// Raven `CM_EdgePlaneNum`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:615-667`
-pub fn CM_EdgePlaneNum(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    grid: *mut cGrid_t,
-    gridPlanes: *mut *mut *mut c_int,
-    i: c_int,
-    j: c_int,
-    k: c_int,
-) -> c_int {
-    unsafe {
-        let (p1, p2, p): (*mut f32, *mut f32, c_int);
-        let mut up: vec3_t;
-
-        match k {
-            0 => {
-                // top border
-                p1 = (*grid).points[i as usize][j as usize].as_mut_ptr();
-                p2 = (*grid).points[(i + 1) as usize][j as usize].as_mut_ptr();
-                p = CM_GridPlane(common, gridPlanes, i, j, 0);
-                up = VectorMA(*p1.cast::<vec3_t>(), 4.0, cm.planes[p as usize].plane);
-                CM_FindPlane(cm, p1, p2, up.as_mut_ptr())
-            }
-            2 => {
-                // bottom border
-                p1 = (*grid).points[i as usize][(j + 1) as usize].as_mut_ptr();
-                p2 = (*grid).points[(i + 1) as usize][(j + 1) as usize].as_mut_ptr();
-                p = CM_GridPlane(common, gridPlanes, i, j, 1);
-                up = VectorMA(*p1.cast::<vec3_t>(), 4.0, cm.planes[p as usize].plane);
-                CM_FindPlane(cm, p2, p1, up.as_mut_ptr())
-            }
-            3 => {
-                // left border
-                p1 = (*grid).points[i as usize][j as usize].as_mut_ptr();
-                p2 = (*grid).points[i as usize][(j + 1) as usize].as_mut_ptr();
-                p = CM_GridPlane(common, gridPlanes, i, j, 1);
-                up = VectorMA(*p1.cast::<vec3_t>(), 4.0, cm.planes[p as usize].plane);
-                CM_FindPlane(cm, p2, p1, up.as_mut_ptr())
-            }
-            1 => {
-                // right border
-                p1 = (*grid).points[(i + 1) as usize][j as usize].as_mut_ptr();
-                p2 = (*grid).points[(i + 1) as usize][(j + 1) as usize].as_mut_ptr();
-                p = CM_GridPlane(common, gridPlanes, i, j, 0);
-                up = VectorMA(*p1.cast::<vec3_t>(), 4.0, cm.planes[p as usize].plane);
-                CM_FindPlane(cm, p1, p2, up.as_mut_ptr())
-            }
-            4 => {
-                // diagonal out of triangle 0
-                p1 = (*grid).points[(i + 1) as usize][(j + 1) as usize].as_mut_ptr();
-                p2 = (*grid).points[i as usize][j as usize].as_mut_ptr();
-                p = CM_GridPlane(common, gridPlanes, i, j, 0);
-                up = VectorMA(*p1.cast::<vec3_t>(), 4.0, cm.planes[p as usize].plane);
-                CM_FindPlane(cm, p1, p2, up.as_mut_ptr())
-            }
-            5 => {
-                // diagonal out of triangle 1
-                p1 = (*grid).points[i as usize][j as usize].as_mut_ptr();
-                p2 = (*grid).points[(i + 1) as usize][(j + 1) as usize].as_mut_ptr();
-                p = CM_GridPlane(common, gridPlanes, i, j, 1);
-                up = VectorMA(*p1.cast::<vec3_t>(), 4.0, cm.planes[p as usize].plane);
-                CM_FindPlane(cm, p1, p2, up.as_mut_ptr())
-            }
-            _ => {
-                com_error(errorParm_t::ERR_DROP, "CM_EdgePlaneNum: bad k".to_string());
-            }
-        }
-    }
-}
-
-/// Raven `CM_TraceThroughPatchCollide`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:1392-1527`
-pub fn CM_TraceThroughPatchCollide(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    tw: *mut traceWork_t,
-    trace: &mut trace_t,
-    pc: *const patchCollide_s,
-) {
-    unsafe {
-        // I'm not sure if test is strictly correct.  Are all
-        // bboxes axis aligned?  Do I care?  It seems to work
-        // good enough...
-        for i in 0..3usize {
-            if (*tw).bounds[0][i] > (*pc).bounds[1][i] || (*tw).bounds[1][i] < (*pc).bounds[0][i] {
-                return;
-            }
-        }
-
-        if (*tw).isPoint != qfalse {
-            CM_TracePointThroughPatchCollide(common, cm, rm, host, tw, trace, pc);
-            return;
-        }
-
-        let mut facet = (*pc).facets;
-        for _i in 0..(*pc).numFacets {
-            let mut enter_frac = -1.0f32;
-            let mut leave_frac = 1.0f32;
-            let mut hitnum: c_int = -1;
-
-            let mut planes = (*pc).planes.add((*facet).surfacePlane as usize);
-            let mut plane = [(*planes).plane[0], (*planes).plane[1], (*planes).plane[2], (*planes).plane[3]];
-            let (mut startp, mut endp): (vec3_t, vec3_t);
-            if (*tw).sphere.r#use != qfalse {
-                plane[3] += (*tw).sphere.radius;
-                let t = DotProductPtr(plane.as_ptr(), (*tw).sphere.offset.as_ptr());
-                if t > 0.0 {
-                    startp = VectorSubtract((*tw).start, (*tw).sphere.offset);
-                    endp = VectorSubtract((*tw).end, (*tw).sphere.offset);
-                } else {
-                    startp = VectorAdd((*tw).start, (*tw).sphere.offset);
-                    endp = VectorAdd((*tw).end, (*tw).sphere.offset);
-                }
-            } else {
-                let offset = DotProductPtr((*tw).offsets[(*planes).signbits as usize].as_ptr(), plane.as_ptr());
-                plane[3] -= offset;
-                startp = (*tw).start;
-                endp = (*tw).end;
-            }
-
-            let mut hit: c_int = 0;
-            if CM_CheckFacetPlane(plane.as_mut_ptr(), startp, endp, &mut enter_frac, &mut leave_frac, &mut hit) == qfalse {
-                facet = facet.add(1);
-                continue;
-            }
-            let mut bestplane = plane;
-            if hit != 0 {
-                bestplane = plane;
-            }
-
-            let mut j = 0;
-            while j < (*facet).numBorders {
-                planes = (*pc).planes.add((*facet).borderPlanes[j as usize] as usize);
-                if (*facet).borderInward[j as usize] != 0 {
-                    plane = [-(*planes).plane[0], -(*planes).plane[1], -(*planes).plane[2], -(*planes).plane[3]];
-                } else {
-                    plane = [(*planes).plane[0], (*planes).plane[1], (*planes).plane[2], (*planes).plane[3]];
-                }
-                if (*tw).sphere.r#use != qfalse {
-                    plane[3] += (*tw).sphere.radius;
-                    let t = DotProductPtr(plane.as_ptr(), (*tw).sphere.offset.as_ptr());
-                    if t > 0.0 {
-                        startp = VectorSubtract((*tw).start, (*tw).sphere.offset);
-                        endp = VectorSubtract((*tw).end, (*tw).sphere.offset);
-                    } else {
-                        startp = VectorAdd((*tw).start, (*tw).sphere.offset);
-                        endp = VectorAdd((*tw).end, (*tw).sphere.offset);
-                    }
-                } else {
-                    // NOTE: this works even though the plane might be flipped because the bbox is centered
-                    let offset = DotProductPtr((*tw).offsets[(*planes).signbits as usize].as_ptr(), plane.as_ptr());
-                    plane[3] += offset.abs();
-                    startp = (*tw).start;
-                    endp = (*tw).end;
-                }
-
-                if CM_CheckFacetPlane(plane.as_mut_ptr(), startp, endp, &mut enter_frac, &mut leave_frac, &mut hit) == qfalse {
-                    break;
-                }
-                if hit != 0 {
-                    hitnum = j;
-                    bestplane = plane;
-                }
-                j += 1;
-            }
-            if j < (*facet).numBorders {
-                facet = facet.add(1);
-                continue;
-            }
-            // never clip against the back side
-            if hitnum == (*facet).numBorders - 1 {
-                facet = facet.add(1);
-                continue;
-            }
-
-            if enter_frac < leave_frac && enter_frac >= 0.0 && enter_frac < trace.fraction {
-                if enter_frac < 0.0 {
-                    enter_frac = 0.0;
-                }
-                if host.cvar_integer("r_debugSurfaceUpdate") != 0 {
-                    cm.debugPatchCollide = pc;
-                    cm.debugFacet = facet;
-                }
-
-                trace.fraction = enter_frac;
-                trace.plane.normal = [bestplane[0], bestplane[1], bestplane[2]];
-                trace.plane.dist = bestplane[3];
-            }
-            facet = facet.add(1);
-        }
-    }
-}
-
-/// Raven `CM_ValidateFacet`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:755-800`
-pub fn CM_ValidateFacet(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    facet: *mut facet_t,
-) -> qboolean {
-    unsafe {
-        if (*facet).surfacePlane == -1 {
-            return qfalse;
-        }
-
-        let mut plane = cm.planes[(*facet).surfacePlane as usize].plane;
-        let mut w = BaseWindingForPlane(common, cm, rm, host, plane.as_mut_ptr(), plane[3]);
-        let mut j = 0;
-        while j < (*facet).numBorders && !w.is_null() {
-            if (*facet).borderPlanes[j as usize] == -1 {
-                FreeWinding(common, cm, w);
-                return qfalse;
-            }
-            plane = cm.planes[(*facet).borderPlanes[j as usize] as usize].plane;
-            if (*facet).borderInward[j as usize] == 0 {
-                plane = [-plane[0], -plane[1], -plane[2], -plane[3]];
-            }
-            ChopWindingInPlace(common, cm, rm, host, &mut w, plane.as_mut_ptr(), plane[3], 0.1);
-            j += 1;
-        }
-
-        if w.is_null() {
-            return qfalse; // winding was completely chopped away
-        }
-
-        // see if the facet is unreasonably large
-        let mut bounds: [vec3_t; 2] = [[0.0; 3]; 2];
-        WindingBounds(w, &mut bounds[0], &mut bounds[1]);
-        FreeWinding(common, cm, w);
-
-        for j in 0..3usize {
-            if bounds[1][j] - bounds[0][j] > MAX_MAP_BOUNDS as f32 {
-                return qfalse; // we must be missing a plane
-            }
-            if bounds[0][j] >= MAX_MAP_BOUNDS as f32 {
-                return qfalse;
-            }
-            if bounds[1][j] <= -(MAX_MAP_BOUNDS as f32) {
-                return qfalse;
-            }
-        }
-        qtrue // winding is fine
-    }
-}
-
-/// Raven `CM_AddFacetBevels`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:807-968`
-pub fn CM_AddFacetBevels(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    facet: *mut facet_t,
-) {
-    unsafe {
-        let mut plane = cm.planes[(*facet).surfacePlane as usize].plane;
-
-        let mut w = BaseWindingForPlane(common, cm, rm, host, plane.as_mut_ptr(), plane[3]);
-        let mut j = 0;
-        while j < (*facet).numBorders && !w.is_null() {
-            if (*facet).borderPlanes[j as usize] == (*facet).surfacePlane {
-                j += 1;
-                continue;
-            }
-            plane = cm.planes[(*facet).borderPlanes[j as usize] as usize].plane;
-
-            if (*facet).borderInward[j as usize] == 0 {
-                plane = [-plane[0], -plane[1], -plane[2], -plane[3]];
-            }
-
-            ChopWindingInPlace(common, cm, rm, host, &mut w, plane.as_mut_ptr(), plane[3], 0.1);
-            j += 1;
-        }
-        if w.is_null() {
-            return;
-        }
-
-        let (mut mins, mut maxs): (vec3_t, vec3_t) = ([0.0; 3], [0.0; 3]);
-        WindingBounds(w, &mut mins, &mut maxs);
-
-        // add the axial planes
-        let mut flipped: c_int = 0;
-        let mut order = 0;
-        for axis in 0..3usize {
-            let mut dir = -1;
-            while dir <= 1 {
-                let mut plane: vec4_t = [0.0; 4];
-                plane[axis] = dir as f32;
-                if dir == 1 {
-                    plane[3] = maxs[axis];
-                } else {
-                    plane[3] = -mins[axis];
-                }
-                // if it's the surface plane
-                if CM_PlaneEqual(&mut cm.planes[(*facet).surfacePlane as usize], plane.as_mut_ptr(), &mut flipped) != 0 {
-                    dir += 2;
-                    order += 1;
+            for x in (height_x - 1)..(height_x + ls.terxels + 1) {
+                if x < 0 {
                     continue;
                 }
-                // see if the plane is allready present
-                let mut i = 0;
-                while i < (*facet).numBorders {
-                    if CM_PlaneEqual(&mut cm.planes[(*facet).borderPlanes[i as usize] as usize], plane.as_mut_ptr(), &mut flipped) != 0 {
-                        break;
-                    }
-                    i += 1;
+                let height = height_map[(y * real_width + x) as usize] as i32;
+                if height > max {
+                    max = height;
                 }
-
-                if i == (*facet).numBorders {
-                    if (*facet).numBorders > 4 + 6 + 16 {
-                        com_printf(common, "ERROR: too many bevels\n");
-                    }
-                    (*facet).borderPlanes[(*facet).numBorders as usize] = CM_FindPlane2(cm, plane.as_mut_ptr(), &mut flipped);
-                    (*facet).borderNoAdjust[(*facet).numBorders as usize] = qfalse;
-                    (*facet).borderInward[(*facet).numBorders as usize] = flipped;
-                    (*facet).numBorders += 1;
+                if height < min {
+                    min = height;
                 }
-                dir += 2;
-                order += 1;
             }
         }
-        let _ = order;
 
-        // add the edge bevels
-        // test the non-axial plane edges
-        let mut j = 0;
-        while j < (*w).numpoints {
-            let k = (j + 1) % (*w).numpoints;
-            let mut vec = VectorSubtract((*w).p[j as usize], (*w).p[k as usize]);
-            // if it's a degenerate edge
-            let mut vlen = VectorNormalize(&mut vec);
-            if vlen < 0.5 {
-                j += 1;
-                continue;
-            }
-            let _ = vlen;
-            CM_SnapVector(vec);
-            let mut k2 = 0;
-            while k2 < 3 {
-                if vec[k2] == -1.0 || vec[k2] == 1.0 {
-                    break; // axial
+        // Mins.
+        self.bounds[0][0] = world[0];
+        self.bounds[0][1] = world[1];
+        self.bounds[0][2] = world[2] + (min as f32) * ls.terxel_size[2];
+
+        // Maxs.
+        self.bounds[1][0] = world[0] + ls.patch_size[0];
+        self.bounds[1][1] = world[1] + ls.patch_size[1];
+        self.bounds[1][2] = world[2] + (max as f32) * ls.terxel_size[2];
+
+        // Corner heights.
+        let terxels = ls.terxels as usize;
+        let hm = self.height_map_offset;
+        self.corner_heights[0] = height_map[hm];
+        self.corner_heights[1] = height_map[hm + terxels];
+        self.corner_heights[2] = height_map[hm + terxels * real_width as usize];
+        self.corner_heights[3] = height_map[hm + terxels * real_width as usize + terxels];
+
+        // Set the surfaceFlags using average height (may want a more
+        // complex algo here).
+        let avg = ((min + max) >> 1) as usize;
+        self.surface_flags = ls.height_details[avg].get_surface_flags();
+        self.content_flags = ls.height_details[avg].get_contents();
+
+        // Set base of brush data from big array.
+        self.brush_offset = brush_offset;
+        self.brush_len = brush_region_len(ls.terxels);
+        self.create_patch_plane_data(ls);
+    }
+
+    /// `CCMPatch::InitPlane` — initializes a `cbrushside_t`/`cplane_t` pair
+    /// from 3 world-space corner coords. Does not touch `self` (Raven's
+    /// method is a non-static member of `CCMPatch` that never reads `this`);
+    /// kept as an instance method for fidelity to the class it is declared on
+    /// (`docs/subsystems/rmg-terrain.md` roster: "`CmPatch::Init`/`InitPlane`/
+    /// `CreatePatchPlaneData`").
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_terrain.cpp:223-241`
+    pub fn init_plane(
+        &self,
+        side: &mut cbrushside_t,
+        plane: &mut cplane_t,
+        p0: vec3_t,
+        p1: vec3_t,
+        p2: vec3_t,
+    ) {
+        let dx = vector_subtract(p1, p0);
+        let dy = vector_subtract(p2, p0);
+        plane.normal = cross_product(dx, dy);
+        vector_normalize(&mut plane.normal);
+
+        plane.dist = dot_product(p0, plane.normal);
+        plane.r#type = plane_type_for_normal(plane.normal);
+        set_plane_signbits(plane);
+
+        // Raven's non-`_XBOX` arm: `side->plane = plane;`
+        side.plane = plane as *mut cplane_t;
+    }
+
+    /// `CCMPatch::CreatePatchPlaneData` — builds the 2 collision brushes (5
+    /// sides/planes each) for this patch's terxel, then smooths the shared
+    /// edge with the x/y-adjacent patch's brush (`GetAdjacentBrushX/Y`,
+    /// `:461,483`, live under the unconditional `_SMOOTH_TERXEL_BRUSH`
+    /// `#define`, `cm_terrain.cpp:18`). `ls` is `&mut`: it both reads the
+    /// landscape's terxel/coords/mins (`owner->Get…`) and writes into the
+    /// shared brush arena (this patch's own slice, plus the adjacent patch's
+    /// slice via `GetAdjacentBrushX/Y`, RMG-D7).
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_terrain.cpp:302-522`
+    pub fn create_patch_plane_data(&mut self, ls: &mut CmLandScape) {
+        let terxels = ls.terxels;
+        let num_brushes = (terxels * terxels * 2) as usize;
+        self.num_brushes = num_brushes as i32;
+        let real_width = ls.width + 1;
+
+        let side_base = self.brush_offset + num_brushes * core::mem::size_of::<cbrush_t>();
+        let plane_base = side_base
+            + num_brushes * BRUSH_SIDES_PER_TERXEL * 2 * core::mem::size_of::<cbrushside_t>();
+
+        // SAFETY: `arena_ptr` is a raw pointer into `ls`'s shared brush
+        // arena (RMG-D7), captured once and reused for every disjoint-index
+        // access to THIS patch's own terxel entries below — deliberately
+        // untied from `ls`'s borrow so the y/x-adjacent-brush lookups
+        // (`get_adjacent_brush_x/y`, which reborrow `ls`) can run alongside
+        // it. This mirrors Raven's aliasing raw `cbrush_t*` pointer walk
+        // over the same `Z_Malloc`'d buffer: every index touched here is
+        // either this not-yet-built terxel (`brush_idx`/`side_idx`/
+        // `plane_idx`) or an already-fully-built one reached only through
+        // `get_adjacent_brush_x/y` — never both at once.
+        let arena_ptr = ls.patch_brush_data.as_mut_ptr();
+
+        let mut brush_idx = 0usize;
+        let mut side_idx = 0usize;
+        let mut plane_idx = 0usize;
+
+        for y in self.hy..(self.hy + terxels) {
+            for x in self.hx..(self.hx + terxels) {
+                let offsets = terxel_corner_offsets(x, y, real_width);
+
+                let mut local_coords = [[0.0f32; 3]; 8];
+                for i in 0..4 {
+                    let c = ls.coords[offsets[i] as usize];
+                    local_coords[i] = c;
+                    local_coords[i + 4] = c;
+                    // Set z of base of brush to bottom of landscape brush.
+                    local_coords[i + 4][2] = ls.bounds[0][2];
                 }
-                k2 += 1;
-            }
-            if k2 < 3 {
-                j += 1;
-                continue; // only test non-axial edges
-            }
 
-            // try the six possible slanted axials from this edge
-            for axis in 0..3usize {
-                let mut dir = -1;
-                while dir <= 1 {
-                    // construct a plane
-                    let mut vec2: vec3_t = [0.0; 3];
-                    vec2[axis] = dir as f32;
-                    let mut plane4: vec4_t = [0.0; 4];
-                    let cross = CrossProduct(vec, vec2);
-                    plane4[0] = cross[0];
-                    plane4[1] = cross[1];
-                    plane4[2] = cross[2];
-                    let mut plane3 = [plane4[0], plane4[1], plane4[2]];
-                    if VectorNormalize(&mut plane3) < 0.5 {
-                        dir += 2;
-                        continue;
-                    }
-                    plane4[0] = plane3[0];
-                    plane4[1] = plane3[1];
-                    plane4[2] = plane3[2];
-                    plane4[3] = DotProduct((*w).p[j as usize], plane3);
-
-                    // if all the points of the facet winding are
-                    // behind this plane, it is a proper edge bevel
-                    let mut l = 0;
-                    while l < (*w).numpoints {
-                        let d = DotProduct((*w).p[l as usize], plane3) - plane4[3];
-                        if d > 0.1 {
-                            break; // point in front
+                // Set the bounds of the terxel.
+                let mut mins = [MAX_WORLD_COORD, MAX_WORLD_COORD, MAX_WORLD_COORD];
+                let mut maxs = [MIN_WORLD_COORD, MIN_WORLD_COORD, MIN_WORLD_COORD];
+                for corner in &local_coords {
+                    for j in 0..3 {
+                        if corner[j] < mins[j] {
+                            mins[j] = corner[j];
                         }
-                        l += 1;
-                    }
-                    if l < (*w).numpoints {
-                        dir += 2;
-                        continue;
-                    }
-
-                    // if it's the surface plane
-                    if CM_PlaneEqual(&mut cm.planes[(*facet).surfacePlane as usize], plane4.as_mut_ptr(), &mut flipped) != 0 {
-                        dir += 2;
-                        continue;
-                    }
-                    // see if the plane is allready present
-                    let mut i = 0;
-                    while i < (*facet).numBorders {
-                        if CM_PlaneEqual(&mut cm.planes[(*facet).borderPlanes[i as usize] as usize], plane4.as_mut_ptr(), &mut flipped) != 0 {
-                            break;
+                        if corner[j] > maxs[j] {
+                            maxs[j] = corner[j];
                         }
-                        i += 1;
                     }
+                }
+                for j in 0..3 {
+                    mins[j] -= 1.0;
+                    maxs[j] += 1.0;
+                }
 
-                    if i == (*facet).numBorders {
-                        if (*facet).numBorders > 4 + 6 + 16 {
-                            com_printf(common, "ERROR: too many bevels\n");
+                // SAFETY: `brush_idx`/`brush_idx + 1` address this patch's
+                // own not-yet-touched terxel brushes — disjoint from every
+                // other index used this iteration.
+                unsafe {
+                    let b0 = brush_ptr(arena_ptr, self.brush_offset, brush_idx);
+                    (*b0).bounds = [mins, maxs];
+                    (*b0).contents = self.content_flags;
+                    (*b0).numsides = 5;
+                    (*b0).sides = side_ptr(arena_ptr, side_base, side_idx);
+
+                    let b1 = brush_ptr(arena_ptr, self.brush_offset, brush_idx + 1);
+                    (*b1).bounds = [mins, maxs];
+                    (*b1).contents = self.content_flags;
+                    (*b1).numsides = 5;
+                    (*b1).sides = side_ptr(arena_ptr, side_base, side_idx + 8);
+                }
+
+                // Create the planes of the 2 triangles that make up the
+                // tops of the brushes.
+                self.init_plane_at(
+                    arena_ptr,
+                    side_base,
+                    plane_base,
+                    side_idx,
+                    plane_idx,
+                    local_coords[0],
+                    local_coords[1],
+                    local_coords[2],
+                );
+                self.init_plane_at(
+                    arena_ptr,
+                    side_base,
+                    plane_base,
+                    side_idx + 8,
+                    plane_idx + 8,
+                    local_coords[3],
+                    local_coords[2],
+                    local_coords[1],
+                );
+
+                // Create the bottom face of the brushes.
+                self.init_plane_at(
+                    arena_ptr,
+                    side_base,
+                    plane_base,
+                    side_idx + 1,
+                    plane_idx + 1,
+                    local_coords[4],
+                    local_coords[6],
+                    local_coords[5],
+                );
+                self.init_plane_at(
+                    arena_ptr,
+                    side_base,
+                    plane_base,
+                    side_idx + 9,
+                    plane_idx + 9,
+                    local_coords[7],
+                    local_coords[5],
+                    local_coords[6],
+                );
+
+                // Create the 3 vertical faces.
+                self.init_plane_at(
+                    arena_ptr,
+                    side_base,
+                    plane_base,
+                    side_idx + 2,
+                    plane_idx + 2,
+                    local_coords[0],
+                    local_coords[2],
+                    local_coords[4],
+                );
+                self.init_plane_at(
+                    arena_ptr,
+                    side_base,
+                    plane_base,
+                    side_idx + 10,
+                    plane_idx + 10,
+                    local_coords[3],
+                    local_coords[1],
+                    local_coords[7],
+                );
+
+                self.init_plane_at(
+                    arena_ptr,
+                    side_base,
+                    plane_base,
+                    side_idx + 3,
+                    plane_idx + 3,
+                    local_coords[0],
+                    local_coords[4],
+                    local_coords[1],
+                );
+                self.init_plane_at(
+                    arena_ptr,
+                    side_base,
+                    plane_base,
+                    side_idx + 11,
+                    plane_idx + 11,
+                    local_coords[3],
+                    local_coords[7],
+                    local_coords[2],
+                );
+
+                self.init_plane_at(
+                    arena_ptr,
+                    side_base,
+                    plane_base,
+                    side_idx + 4,
+                    plane_idx + 4,
+                    local_coords[2],
+                    local_coords[1],
+                    local_coords[6],
+                );
+                self.init_plane_at(
+                    arena_ptr,
+                    side_base,
+                    plane_base,
+                    side_idx + 12,
+                    plane_idx + 12,
+                    local_coords[5],
+                    local_coords[1],
+                    local_coords[6],
+                );
+
+                // SAFETY: `plane_idx + 8` was initialized just above.
+                let v = unsafe {
+                    let p8 = &*plane_ptr(arena_ptr, plane_base, plane_idx + 8);
+                    dot_product(p8.normal, local_coords[0]) - p8.dist
+                };
+
+                if v < 0.0 {
+                    // SAFETY: `b0`/`b1`'s current `numsides` addresses their
+                    // own next free side/plane slot (reserved capacity,
+                    // RMG-D7's arena sizing).
+                    unsafe {
+                        let ns0 =
+                            (*brush_ptr(arena_ptr, self.brush_offset, brush_idx)).numsides as usize;
+                        self.init_plane_at(
+                            arena_ptr,
+                            side_base,
+                            plane_base,
+                            side_idx + ns0,
+                            plane_idx + ns0,
+                            local_coords[3],
+                            local_coords[2],
+                            local_coords[1],
+                        );
+                        (*brush_ptr(arena_ptr, self.brush_offset, brush_idx)).numsides += 1;
+
+                        let ns1 = (*brush_ptr(arena_ptr, self.brush_offset, brush_idx + 1)).numsides
+                            as usize;
+                        self.init_plane_at(
+                            arena_ptr,
+                            side_base,
+                            plane_base,
+                            side_idx + 8 + ns1,
+                            plane_idx + 8 + ns1,
+                            local_coords[0],
+                            local_coords[1],
+                            local_coords[2],
+                        );
+                        (*brush_ptr(arena_ptr, self.brush_offset, brush_idx + 1)).numsides += 1;
+                    }
+                }
+
+                // Determine if we need to smooth the brush transition from
+                // the brush above us.
+                if y > 0 && (y as f32) < ls.patch_size[1] - 1.0 {
+                    let cmp_coord = if (y + x) & 1 != 0 {
+                        local_coords[2]
+                    } else {
+                        local_coords[1]
+                    };
+                    let above = self.get_adjacent_brush_y(ls, x, y);
+                    let above_sides = above.sides;
+                    // SAFETY: `above_sides` was written by an earlier `Init`
+                    // (this patch's own prior terxel iteration, or an
+                    // already fully-constructed neighboring patch), so it
+                    // points at a live `cbrushside_t` with a live `plane`.
+                    let (above_normal, above_dist) = unsafe {
+                        let above_plane = (*above_sides).plane;
+                        ((*above_plane).normal, (*above_plane).dist)
+                    };
+                    let v = dot_product(above_normal, cmp_coord) - above_dist;
+
+                    if v < 0.0 {
+                        // SAFETY: `above` remains borrowed from `ls` for
+                        // this whole block; `arena_ptr` addresses this
+                        // patch's own (disjoint) terxel entry.
+                        unsafe {
+                            let b0 = brush_ptr(arena_ptr, self.brush_offset, brush_idx);
+                            let ns0 = (*b0).numsides as usize;
+                            let dst = side_ptr(arena_ptr, side_base, side_idx + ns0);
+                            copy_side(dst, above_sides);
+                            (*b0).numsides += 1;
+
+                            let ns_above = above.numsides as usize;
+                            let dst_above = above_sides.add(ns_above);
+                            let src_local = side_ptr(arena_ptr, side_base, side_idx);
+                            copy_side(dst_above, src_local);
+                            above.numsides += 1;
                         }
-                        (*facet).borderPlanes[(*facet).numBorders as usize] = CM_FindPlane2(cm, plane4.as_mut_ptr(), &mut flipped);
+                    }
+                }
 
-                        let mut k3 = 0;
-                        while k3 < (*facet).numBorders {
-                            if (*facet).borderPlanes[(*facet).numBorders as usize] == (*facet).borderPlanes[k3 as usize] {
-                                com_printf(common, "WARNING: bevel plane already used\n");
+                // Determine if we need to smooth the brush transition from
+                // the brush to the left of us.
+                if x > 0 && (x as f32) < ls.patch_size[0] - 1.0 {
+                    let above = self.get_adjacent_brush_x(ls, x, y);
+                    let above_sides = above.sides;
+                    // SAFETY: see the y-adjacent block above.
+                    let (above_normal, above_dist) = unsafe {
+                        let above_plane = (*above_sides).plane;
+                        ((*above_plane).normal, (*above_plane).dist)
+                    };
+                    let v = dot_product(above_normal, local_coords[1]) - above_dist;
+
+                    if v < 0.0 {
+                        // SAFETY: see the y-adjacent block above.
+                        unsafe {
+                            if (x + y) & 1 != 0 {
+                                let b0 = brush_ptr(arena_ptr, self.brush_offset, brush_idx);
+                                let ns0 = (*b0).numsides as usize;
+                                let dst = side_ptr(arena_ptr, side_base, side_idx + ns0);
+                                copy_side(dst, above_sides);
+                                (*b0).numsides += 1;
+
+                                let ns_above = above.numsides as usize;
+                                let dst_above = above_sides.add(ns_above);
+                                let src_local = side_ptr(arena_ptr, side_base, side_idx);
+                                copy_side(dst_above, src_local);
+                                above.numsides += 1;
+                            } else {
+                                let b1 = brush_ptr(arena_ptr, self.brush_offset, brush_idx + 1);
+                                let ns1 = (*b1).numsides as usize;
+                                let dst = side_ptr(arena_ptr, side_base, side_idx + 8 + ns1);
+                                copy_side(dst, above_sides);
+                                (*b1).numsides += 1;
+
+                                let ns_above = above.numsides as usize;
+                                let dst_above = above_sides.add(ns_above);
+                                let src_local = side_ptr(arena_ptr, side_base, side_idx + 8);
+                                copy_side(dst_above, src_local);
+                                above.numsides += 1;
                             }
-                            k3 += 1;
                         }
-
-                        (*facet).borderNoAdjust[(*facet).numBorders as usize] = qfalse;
-                        (*facet).borderInward[(*facet).numBorders as usize] = flipped;
-
-                        let w2 = CopyWinding(common, cm, rm, host, w);
-                        let mut newplane = cm.planes[(*facet).borderPlanes[(*facet).numBorders as usize] as usize].plane;
-                        if (*facet).borderInward[(*facet).numBorders as usize] == 0 {
-                            newplane = [-newplane[0], -newplane[1], -newplane[2], -newplane[3]];
-                        }
-                        let mut w2 = w2;
-                        ChopWindingInPlace(common, cm, rm, host, &mut w2, newplane.as_mut_ptr(), newplane[3], 0.1);
-                        if w2.is_null() {
-                            com_dprintf(common, "WARNING: CM_AddFacetBevels... invalid bevel\n");
-                            dir += 2;
-                            continue;
-                        } else {
-                            FreeWinding(common, cm, w2);
-                        }
-
-                        (*facet).numBorders += 1;
-                        // already got a bevel
-                        //break;
                     }
-                    dir += 2;
                 }
-            }
-            j += 1;
-        }
-        FreeWinding(common, cm, w);
 
-        // add opposite plane
-        (*facet).borderPlanes[(*facet).numBorders as usize] = (*facet).surfacePlane;
-        (*facet).borderNoAdjust[(*facet).numBorders as usize] = qfalse;
-        (*facet).borderInward[(*facet).numBorders as usize] = qtrue;
-        (*facet).numBorders += 1;
+                // Increment to next terxel.
+                brush_idx += 2;
+                side_idx += 16;
+                plane_idx += 16;
+            }
+        }
+    }
+
+    /// Private helper: builds a `cbrushside_t`/`cplane_t` pair at the given
+    /// arena indices via [`CmPatch::init_plane`]. Factored out of
+    /// [`CmPatch::create_patch_plane_data`] purely to avoid repeating the
+    /// raw-pointer-dereference boilerplate at each of that method's 8+
+    /// `InitPlane` call sites — not a Raven method.
+    #[allow(clippy::too_many_arguments)]
+    fn init_plane_at(
+        &self,
+        arena_ptr: *mut u8,
+        side_base: usize,
+        plane_base: usize,
+        side_index: usize,
+        plane_index: usize,
+        p0: vec3_t,
+        p1: vec3_t,
+        p2: vec3_t,
+    ) {
+        // SAFETY: callers only ever pass indices that address this patch's
+        // own reserved (RMG-D7-sized) side/plane slots, one at a time, with
+        // no other live reference to the same slot.
+        unsafe {
+            let side = &mut *side_ptr(arena_ptr, side_base, side_index);
+            let plane = &mut *plane_ptr(arena_ptr, plane_base, plane_index);
+            self.init_plane(side, plane, p0, p1, p2);
+        }
+    }
+
+    /// `CCMPatch::GetAdjacentBrushX` — the brush directly x-adjacent to
+    /// terxel `(x, y)`, walking into the neighboring patch (via
+    /// `ls.get_patch(...)`, RMG-D4h's threaded-owner substitute for
+    /// `owner->GetPatch(...)`) when the terxel crosses a patch boundary.
+    /// Returns `&mut` because `CreatePatchPlaneData`'s live caller mutates
+    /// the returned brush's `sides`/`numsides` (`cm_terrain.cpp:497-509`).
+    /// RMG-D7/§B5 picked the shared-arena shape precisely because this
+    /// sibling-walking read exists.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_terrain.cpp:272-300`
+    pub fn get_adjacent_brush_x<'a>(
+        &self,
+        ls: &'a mut CmLandScape,
+        x: i32,
+        y: i32,
+    ) -> &'a mut cbrush_t {
+        let (other_patch, index) = adjacent_brush_x_index(ls.terxels, x, y);
+        let brush_offset = match other_patch {
+            Some((px, py)) => ls.get_patch(px, py).brush_offset,
+            None => self.brush_offset,
+        };
+        // SAFETY: `index` addresses an already-`Init`'d terxel's brush entry
+        // — either this patch's own prior-iteration entry or a fully
+        // constructed neighboring patch's (both built earlier in
+        // `UpdatePatches`' scan order), never the terxel currently being
+        // built by the live caller (`CreatePatchPlaneData`).
+        unsafe { &mut *brush_ptr(ls.patch_brush_data.as_mut_ptr(), brush_offset, index) }
+    }
+
+    /// `CCMPatch::GetAdjacentBrushY` — the brush directly y-adjacent to
+    /// terxel `(x, y)`; see [`get_adjacent_brush_x`](Self::get_adjacent_brush_x)
+    /// for the shape rationale (sibling patch walk via `ls`, `&mut` return).
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_terrain.cpp:246-270`
+    pub fn get_adjacent_brush_y<'a>(
+        &self,
+        ls: &'a mut CmLandScape,
+        x: i32,
+        y: i32,
+    ) -> &'a mut cbrush_t {
+        let (other_patch, index) = adjacent_brush_y_index(ls.terxels, x, y);
+        let brush_offset = match other_patch {
+            Some((px, py)) => ls.get_patch(px, py).brush_offset,
+            None => self.brush_offset,
+        };
+        // SAFETY: see `get_adjacent_brush_x`.
+        unsafe { &mut *brush_ptr(ls.patch_brush_data.as_mut_ptr(), brush_offset, index) }
     }
 }
 
-/// Raven `CM_DrawDebugSurface`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:1651-1806`
-pub fn CM_DrawDebugSurface(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    drawPoly: DrawPolyFn,
-) {
-    unsafe {
-        if host.cvar_integer("r_debugSurface") != 1 {
-            BotDrawDebugPolygons(common, cm, sv, rm, host, drawPoly, host.cvar_integer("r_debugSurface"));
-            return;
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        if cm.debugPatchCollide.is_null() {
-            return;
-        }
+    // -- PlaneTypeForNormal / SetPlaneSignbits (cm_terrain.cpp:230-232) --
 
-        let cv_debug_size = host.cvar_integer("cm_debugSize");
-        let pc = cm.debugPatchCollide;
-
-        let mins: vec3_t = [-15.0, -15.0, -28.0];
-        let maxs: vec3_t = [15.0, 15.0, 28.0];
-
-        let mut facet = (*pc).facets;
-        for _i in 0..(*pc).numFacets {
-            for k in 0..=(*facet).numBorders {
-                let (planenum, inward): (c_int, c_int);
-                if k < (*facet).numBorders {
-                    planenum = (*facet).borderPlanes[k as usize];
-                    inward = (*facet).borderInward[k as usize];
-                } else {
-                    planenum = (*facet).surfacePlane;
-                    inward = qfalse;
-                }
-
-                let mut plane = (*pc).planes.add(planenum as usize).read().plane;
-
-                if inward != 0 {
-                    plane = [-plane[0], -plane[1], -plane[2], -plane[3]];
-                }
-
-                plane[3] += cv_debug_size as f32;
-                let mut v1: vec3_t = [0.0; 3];
-                for n in 0..3usize {
-                    v1[n] = if plane[n] > 0.0 { maxs[n] } else { mins[n] };
-                }
-                let v2 = [-plane[0], -plane[1], -plane[2]];
-                plane[3] += DotProduct(v1, v2).abs();
-
-                let mut w = BaseWindingForPlane(common, cm, rm, host, plane.as_mut_ptr(), plane[3]);
-                let mut j = 0;
-                while j <= (*facet).numBorders && !w.is_null() {
-                    let (curplanenum, curinward): (c_int, c_int);
-                    if j < (*facet).numBorders {
-                        curplanenum = (*facet).borderPlanes[j as usize];
-                        curinward = (*facet).borderInward[j as usize];
-                    } else {
-                        curplanenum = (*facet).surfacePlane;
-                        curinward = qfalse;
-                    }
-
-                    if curplanenum == planenum {
-                        j += 1;
-                        continue;
-                    }
-
-                    let mut plane_j = (*pc).planes.add(curplanenum as usize).read().plane;
-                    if curinward == 0 {
-                        plane_j = [-plane_j[0], -plane_j[1], -plane_j[2], -plane_j[3]];
-                    }
-                    plane_j[3] -= cv_debug_size as f32;
-                    let mut v1j: vec3_t = [0.0; 3];
-                    for n in 0..3usize {
-                        v1j[n] = if plane_j[n] > 0.0 { maxs[n] } else { mins[n] };
-                    }
-                    let v2j = [-plane_j[0], -plane_j[1], -plane_j[2]];
-                    plane_j[3] -= DotProduct(v1j, v2j).abs();
-
-                    ChopWindingInPlace(common, cm, rm, host, &mut w, plane_j.as_mut_ptr(), plane_j[3], 0.1);
-                    j += 1;
-                }
-                if !w.is_null() {
-                    if facet == cm.debugFacet as *mut facet_t {
-                        drawPoly(4, (*w).numpoints, (*w).p[0].as_ptr());
-                    } else {
-                        drawPoly(1, (*w).numpoints, (*w).p[0].as_ptr());
-                    }
-                    FreeWinding(common, cm, w);
-                } else {
-                    com_printf(common, "winding chopped away by border planes\n");
-                }
-            }
-            facet = facet.add(1);
-        }
-
-        // draw the debug block
-        {
-            let v0 = cm.debugBlockPoints[0];
-            let v1p = cm.debugBlockPoints[1];
-            let v2p = cm.debugBlockPoints[2];
-            drawPoly(2, 3, [v0, v1p, v2p][0].as_ptr());
-
-            let v0b = cm.debugBlockPoints[2];
-            let v1b = cm.debugBlockPoints[3];
-            let v2b = cm.debugBlockPoints[0];
-            drawPoly(2, 3, [v0b, v1b, v2b][0].as_ptr());
-        }
+    #[test]
+    fn plane_type_for_normal_axial() {
+        assert_eq!(plane_type_for_normal([1.0, 0.0, 0.0]), PLANE_X as u8);
+        assert_eq!(plane_type_for_normal([0.0, 1.0, 0.0]), PLANE_Y as u8);
+        assert_eq!(plane_type_for_normal([0.0, 0.0, 1.0]), PLANE_Z as u8);
     }
-}
 
-/// Raven `CM_PatchCollideFromGrid`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:983-1150`
-pub fn CM_PatchCollideFromGrid(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    grid: *mut cGrid_t,
-    pf: *mut patchCollide_t,
-) {
-    unsafe {
-        // §19: `gridPlanes` is a large uninitialized local array Raven reads
-        // via `borders[EN_TOP] == gridPlanes[i][j-1][1]` before every cell is
-        // necessarily written on this pass; zero-init it here to avoid UB.
-        let mut grid_planes = vec![[[-1i32; 2]; MAX_GRID_SIZE]; MAX_GRID_SIZE];
-        let grid_planes_ptr = grid_planes.as_mut_ptr() as *mut *mut *mut c_int;
-
-        let mut facets: Vec<facet_t> = Vec::with_capacity(MAX_FACETS);
-        cm.numPlanes = 0;
-        let mut num_facets: c_int = 0;
-
-        // find the planes for each triangle of the grid
-        for i in 0..((*grid).width - 1) {
-            for j in 0..((*grid).height - 1) {
-                let p1 = (*grid).points[i as usize][j as usize].as_mut_ptr();
-                let p2 = (*grid).points[(i + 1) as usize][j as usize].as_mut_ptr();
-                let p3 = (*grid).points[(i + 1) as usize][(j + 1) as usize].as_mut_ptr();
-                grid_planes[i as usize][j as usize][0] = CM_FindPlane(cm, p1, p2, p3);
-
-                let p1 = (*grid).points[(i + 1) as usize][(j + 1) as usize].as_mut_ptr();
-                let p2 = (*grid).points[i as usize][(j + 1) as usize].as_mut_ptr();
-                let p3 = (*grid).points[i as usize][j as usize].as_mut_ptr();
-                grid_planes[i as usize][j as usize][1] = CM_FindPlane(cm, p1, p2, p3);
-            }
-        }
-
-        // create the borders for each facet
-        for i in 0..((*grid).width - 1) {
-            for j in 0..((*grid).height - 1) {
-                let mut borders = [-1i32; 4];
-                let mut no_adjust = [0i32; 4];
-
-                const EN_TOP: usize = 0;
-                const EN_RIGHT: usize = 1;
-                const EN_BOTTOM: usize = 2;
-                const EN_LEFT: usize = 3;
-
-                borders[EN_TOP] = -1;
-                if j > 0 {
-                    borders[EN_TOP] = grid_planes[i as usize][(j - 1) as usize][1];
-                } else if (*grid).wrapHeight != qfalse {
-                    borders[EN_TOP] = grid_planes[i as usize][((*grid).height - 2) as usize][1];
-                }
-                no_adjust[EN_TOP] = (borders[EN_TOP] == grid_planes[i as usize][j as usize][0]) as i32;
-                if borders[EN_TOP] == -1 || no_adjust[EN_TOP] != 0 {
-                    borders[EN_TOP] = CM_EdgePlaneNum(common, cm, grid, grid_planes_ptr, i, j, 0);
-                }
-
-                borders[EN_BOTTOM] = -1;
-                if j < (*grid).height - 2 {
-                    borders[EN_BOTTOM] = grid_planes[i as usize][(j + 1) as usize][0];
-                } else if (*grid).wrapHeight != qfalse {
-                    borders[EN_BOTTOM] = grid_planes[i as usize][0][0];
-                }
-                no_adjust[EN_BOTTOM] = (borders[EN_BOTTOM] == grid_planes[i as usize][j as usize][1]) as i32;
-                if borders[EN_BOTTOM] == -1 || no_adjust[EN_BOTTOM] != 0 {
-                    borders[EN_BOTTOM] = CM_EdgePlaneNum(common, cm, grid, grid_planes_ptr, i, j, 2);
-                }
-
-                borders[EN_LEFT] = -1;
-                if i > 0 {
-                    borders[EN_LEFT] = grid_planes[(i - 1) as usize][j as usize][0];
-                } else if (*grid).wrapWidth != qfalse {
-                    borders[EN_LEFT] = grid_planes[((*grid).width - 2) as usize][j as usize][0];
-                }
-                no_adjust[EN_LEFT] = (borders[EN_LEFT] == grid_planes[i as usize][j as usize][1]) as i32;
-                if borders[EN_LEFT] == -1 || no_adjust[EN_LEFT] != 0 {
-                    borders[EN_LEFT] = CM_EdgePlaneNum(common, cm, grid, grid_planes_ptr, i, j, 3);
-                }
-
-                borders[EN_RIGHT] = -1;
-                if i < (*grid).width - 2 {
-                    borders[EN_RIGHT] = grid_planes[(i + 1) as usize][j as usize][1];
-                } else if (*grid).wrapWidth != qfalse {
-                    borders[EN_RIGHT] = grid_planes[0][j as usize][1];
-                }
-                no_adjust[EN_RIGHT] = (borders[EN_RIGHT] == grid_planes[i as usize][j as usize][0]) as i32;
-                if borders[EN_RIGHT] == -1 || no_adjust[EN_RIGHT] != 0 {
-                    borders[EN_RIGHT] = CM_EdgePlaneNum(common, cm, grid, grid_planes_ptr, i, j, 1);
-                }
-
-                if num_facets == MAX_FACETS as c_int {
-                    com_error(errorParm_t::ERR_DROP, "MAX_FACETS".to_string());
-                }
-                if facets.len() <= num_facets as usize {
-                    facets.resize(num_facets as usize + 1, std::mem::zeroed());
-                }
-                let facet = &mut facets[num_facets as usize];
-                *facet = std::mem::zeroed();
-
-                if grid_planes[i as usize][j as usize][0] == grid_planes[i as usize][j as usize][1] {
-                    if grid_planes[i as usize][j as usize][0] == -1 {
-                        continue; // degenrate
-                    }
-                    facet.surfacePlane = grid_planes[i as usize][j as usize][0];
-                    facet.numBorders = 4;
-                    facet.borderPlanes[0] = borders[EN_TOP];
-                    facet.borderNoAdjust[0] = no_adjust[EN_TOP];
-                    facet.borderPlanes[1] = borders[EN_RIGHT];
-                    facet.borderNoAdjust[1] = no_adjust[EN_RIGHT];
-                    facet.borderPlanes[2] = borders[EN_BOTTOM];
-                    facet.borderNoAdjust[2] = no_adjust[EN_BOTTOM];
-                    facet.borderPlanes[3] = borders[EN_LEFT];
-                    facet.borderNoAdjust[3] = no_adjust[EN_LEFT];
-                    let facet_ptr: *mut facet_t = facet;
-                    CM_SetBorderInward(common, cm, facet_ptr, grid, grid_planes_ptr, i, j, -1);
-                    if CM_ValidateFacet(common, cm, rm, host, facet_ptr) != qfalse {
-                        CM_AddFacetBevels(common, cm, rm, host, facet_ptr);
-                        num_facets += 1;
-                    }
-                } else {
-                    // two seperate triangles
-                    facet.surfacePlane = grid_planes[i as usize][j as usize][0];
-                    facet.numBorders = 3;
-                    facet.borderPlanes[0] = borders[EN_TOP];
-                    facet.borderNoAdjust[0] = no_adjust[EN_TOP];
-                    facet.borderPlanes[1] = borders[EN_RIGHT];
-                    facet.borderNoAdjust[1] = no_adjust[EN_RIGHT];
-                    facet.borderPlanes[2] = grid_planes[i as usize][j as usize][1];
-                    if facet.borderPlanes[2] == -1 {
-                        facet.borderPlanes[2] = borders[EN_BOTTOM];
-                        if facet.borderPlanes[2] == -1 {
-                            facet.borderPlanes[2] = CM_EdgePlaneNum(common, cm, grid, grid_planes_ptr, i, j, 4);
-                        }
-                    }
-                    let facet_ptr: *mut facet_t = facet;
-                    CM_SetBorderInward(common, cm, facet_ptr, grid, grid_planes_ptr, i, j, 0);
-                    if CM_ValidateFacet(common, cm, rm, host, facet_ptr) != qfalse {
-                        CM_AddFacetBevels(common, cm, rm, host, facet_ptr);
-                        num_facets += 1;
-                    }
-
-                    if num_facets == MAX_FACETS as c_int {
-                        com_error(errorParm_t::ERR_DROP, "MAX_FACETS".to_string());
-                    }
-                    if facets.len() <= num_facets as usize {
-                        facets.resize(num_facets as usize + 1, std::mem::zeroed());
-                    }
-                    let facet = &mut facets[num_facets as usize];
-                    *facet = std::mem::zeroed();
-
-                    facet.surfacePlane = grid_planes[i as usize][j as usize][1];
-                    facet.numBorders = 3;
-                    facet.borderPlanes[0] = borders[EN_BOTTOM];
-                    facet.borderNoAdjust[0] = no_adjust[EN_BOTTOM];
-                    facet.borderPlanes[1] = borders[EN_LEFT];
-                    facet.borderNoAdjust[1] = no_adjust[EN_LEFT];
-                    facet.borderPlanes[2] = grid_planes[i as usize][j as usize][0];
-                    if facet.borderPlanes[2] == -1 {
-                        facet.borderPlanes[2] = borders[EN_TOP];
-                        if facet.borderPlanes[2] == -1 {
-                            facet.borderPlanes[2] = CM_EdgePlaneNum(common, cm, grid, grid_planes_ptr, i, j, 5);
-                        }
-                    }
-                    let facet_ptr: *mut facet_t = facet;
-                    CM_SetBorderInward(common, cm, facet_ptr, grid, grid_planes_ptr, i, j, 1);
-                    if CM_ValidateFacet(common, cm, rm, host, facet_ptr) != qfalse {
-                        CM_AddFacetBevels(common, cm, rm, host, facet_ptr);
-                        num_facets += 1;
-                    }
-                }
-            }
-        }
-
-        // copy the results out
-        (*pf).numPlanes = cm.numPlanes;
-        (*pf).numFacets = num_facets;
-        if num_facets != 0 {
-            (*pf).facets = Hunk_Alloc(common, cm, rm, host, num_facets as usize * std::mem::size_of::<facet_t>(), h_high);
-            Com_Memcpy((*pf).facets.cast(), facets.as_ptr().cast(), num_facets as usize * std::mem::size_of::<facet_t>());
-        } else {
-            (*pf).facets = std::ptr::null_mut();
-        }
-        (*pf).planes = Hunk_Alloc(common, cm, rm, host, cm.numPlanes as usize * std::mem::size_of::<patchPlane_t>(), h_high);
-        Com_Memcpy((*pf).planes.cast(), cm.planes.as_ptr().cast(), cm.numPlanes as usize * std::mem::size_of::<patchPlane_t>());
-
-        Z_Free(common, facets.as_mut_ptr().cast());
+    #[test]
+    fn plane_type_for_normal_non_axial() {
+        // Raven's macro checks `x[0]==1.0` before `x[1]==1.0` before
+        // `x[2]==1.0` — a normal that is none of those exactly is
+        // PLANE_NON_AXIAL even if one axis dominates.
+        assert_eq!(
+            plane_type_for_normal([0.7071, 0.7071, 0.0]),
+            PLANE_NON_AXIAL as u8
+        );
     }
-}
 
-/// Raven `CM_GeneratePatchCollide`.
-///
-/// Source: `oracle/codemp/qcommon/cm_patch.cpp:1163-1229`
-pub fn CM_GeneratePatchCollide(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    width: c_int,
-    height: c_int,
-    points: *mut vec3_t,
-) -> *mut patchCollide_s {
-    unsafe {
-        if width <= 2 || height <= 2 || points.is_null() {
-            com_error(
-                errorParm_t::ERR_DROP,
-                format!("CM_GeneratePatchFacets: bad parameters: ({width}, {height}, {points:p})"),
-            );
-        }
-
-        if (width & 1) == 0 || (height & 1) == 0 {
-            com_error(errorParm_t::ERR_DROP, "CM_GeneratePatchFacets: even sizes are invalid for quadratic meshes".to_string());
-        }
-
-        if width > MAX_GRID_SIZE as c_int || height > MAX_GRID_SIZE as c_int {
-            com_error(errorParm_t::ERR_DROP, "CM_GeneratePatchFacets: source is > MAX_GRID_SIZE".to_string());
-        }
-
-        // build a grid
-        let mut grid: cGrid_t = std::mem::zeroed();
-        grid.width = width;
-        grid.height = height;
-        grid.wrapWidth = qfalse;
-        grid.wrapHeight = qfalse;
-        for i in 0..width {
-            for j in 0..height {
-                grid.points[i as usize][j as usize] = *points.add((j * width + i) as usize);
-            }
-        }
-
-        // subdivide the grid
-        CM_SetGridWrapWidth(&mut grid);
-        CM_SubdivideGridColumns(&mut grid);
-        CM_RemoveDegenerateColumns(&mut grid);
-
-        CM_TransposeGrid(&mut grid);
-
-        CM_SetGridWrapWidth(&mut grid);
-        CM_SubdivideGridColumns(&mut grid);
-        CM_RemoveDegenerateColumns(&mut grid);
-
-        // we now have a grid of points exactly on the curve
-        // the aproximate surface defined by these points will be
-        // collided against
-        let pf: *mut patchCollide_s =
-            Hunk_Alloc(common, cm, rm, host, std::mem::size_of::<patchCollide_s>(), h_high).cast();
-        let mut bmin: vec3_t = [0.0; 3];
-        let mut bmax: vec3_t = [0.0; 3];
-        ClearBounds(&mut bmin, &mut bmax);
-        for i in 0..grid.width {
-            for j in 0..grid.height {
-                AddPointToBounds(grid.points[i as usize][j as usize], &mut bmin, &mut bmax);
-            }
-        }
-        (*pf).bounds = [bmin, bmax];
-
-        cm.c_totalPatchBlocks += (grid.width - 1) * (grid.height - 1);
-
-        // generate a bsp tree for the surface
-        CM_PatchCollideFromGrid(common, cm, rm, host, &mut grid, pf.cast());
-
-        // expand by one unit for epsilon purposes
-        (*pf).bounds[0][0] -= 1.0;
-        (*pf).bounds[0][1] -= 1.0;
-        (*pf).bounds[0][2] -= 1.0;
-
-        (*pf).bounds[1][0] += 1.0;
-        (*pf).bounds[1][1] += 1.0;
-        (*pf).bounds[1][2] += 1.0;
-
-        pf
+    #[test]
+    fn set_plane_signbits_matches_negative_axes() {
+        let mut plane = cplane_t {
+            normal: [-1.0, 2.0, -3.0],
+            dist: 0.0,
+            r#type: 0,
+            signbits: 0,
+            pad: [0, 0],
+        };
+        set_plane_signbits(&mut plane);
+        // bit0 (x<0) | bit2 (z<0) = 0b101 = 5
+        assert_eq!(plane.signbits, 0b101);
     }
-}
 
-// PORT-NOTE(deref-arith): `plane_xyz`/`DotProductPtr` are transcription
-// helpers only (not Raven fns) — the packets' `DotProduct`/`VectorSubtract`
-// etc. resolve to the qshared free-function surface (missing_symbols); these
-// two shims read raw f32 spans the same way until that surface lands.
-fn plane_xyz(plane: vec4_t) -> vec3_t {
-    [plane[0], plane[1], plane[2]]
-}
-unsafe fn DotProductPtr(a: *const f32, b: *const f32) -> f32 {
-    unsafe { *a * *b + *a.add(1) * *b.add(1) + *a.add(2) * *b.add(2) }
+    // -- InitPlane (cm_terrain.cpp:223-241): a unit right-triangle in the
+    //    XY plane should produce a +Z-facing, axial plane. --
+
+    #[test]
+    fn init_plane_builds_expected_plane() {
+        let patch = CmPatch::default();
+        let mut side = cbrushside_t {
+            plane: core::ptr::null_mut(),
+            shaderNum: 0,
+        };
+        let mut plane = cplane_t {
+            normal: [0.0, 0.0, 0.0],
+            dist: 0.0,
+            r#type: 0,
+            signbits: 0,
+            pad: [0, 0],
+        };
+        patch.init_plane(
+            &mut side,
+            &mut plane,
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        );
+        assert!((plane.normal[2] - 1.0).abs() < 1e-5);
+        assert_eq!(plane.r#type, PLANE_Z as u8);
+        assert_eq!(plane.signbits, 0);
+        assert_eq!(side.plane, &mut plane as *mut cplane_t);
+    }
+
+    // -- adjacent_brush_{x,y}_index (cm_terrain.cpp:246-300): same-patch vs
+    //    cross-patch branch + index parity. --
+
+    #[test]
+    fn adjacent_brush_y_same_patch_when_not_crossing_boundary() {
+        // terxels=4; y=5 -> yo1=1, y-1=4 -> yo2=0; yo2(0) > yo1(1) is false
+        // => stays in `self` (Raven's `patch = this;`).
+        let (other, index) = adjacent_brush_y_index(4, 2, 5);
+        assert_eq!(other, None);
+        // yo2=0, xo=2%4=2 -> index = (0*4+2)*2+1 = 5
+        assert_eq!(index, 5);
+    }
+
+    #[test]
+    fn adjacent_brush_y_crosses_into_other_patch_at_boundary() {
+        // terxels=4; y=4 -> yo1=0, y-1=3 -> yo2=3; yo2(3) > yo1(0) is true
+        // => crosses into the patch above (Raven's owner->GetPatch branch).
+        let (other, index) = adjacent_brush_y_index(4, 2, 4);
+        assert_eq!(other, Some((0, 0))); // x/terxels=0, (y-1)/terxels=0
+        assert_eq!(index, (3 * 4 + 2) * 2 + 1);
+    }
+
+    #[test]
+    fn adjacent_brush_x_parity_selects_brush_slot() {
+        let terxels = 4;
+        // (x+y) even -> +1 (second brush of the terxel pair).
+        let (_, idx_even) = adjacent_brush_x_index(terxels, 2, 2);
+        assert_eq!(idx_even % 2, 1);
+        // (x+y) odd -> no +1 (first brush of the pair).
+        let (_, idx_odd) = adjacent_brush_x_index(terxels, 3, 2);
+        assert_eq!(idx_odd % 2, 0);
+    }
+
+    // -- terxel_corner_offsets (cm_terrain.cpp:325-341): checkerboard split. --
+
+    #[test]
+    fn terxel_corner_offsets_odd_diagonal() {
+        // (x+y) odd: [0]=TL,[1]=TR,[2]=BL,[3]=BR directly.
+        let o = terxel_corner_offsets(1, 0, 10); // x+y=1, odd
+        assert_eq!(o, [0 * 10 + 1, 0 * 10 + 2, 1 * 10 + 1, 1 * 10 + 2]);
+    }
+
+    #[test]
+    fn terxel_corner_offsets_even_diagonal_is_permuted() {
+        // (x+y) even: [0]=TR,[1]=BR,[2]=TL,[3]=BL.
+        let o = terxel_corner_offsets(0, 0, 10); // x+y=0, even
+        let tl = 0;
+        let tr = 1;
+        let bl = 10;
+        let br = 11;
+        assert_eq!(o, [tr, br, tl, bl]);
+    }
+
+    // -- brush_region_len (cm_terrain.cpp:212-215): matches the ctor's own
+    //    per-block `size` formula. --
+
+    #[test]
+    fn brush_region_len_matches_ctor_formula() {
+        let terxels = 4;
+        let num_brushes_per_patch = terxels * terxels * 2;
+        let expected = (num_brushes_per_patch as usize) * core::mem::size_of::<cbrush_t>()
+            + (num_brushes_per_patch as usize)
+                * BRUSH_SIDES_PER_TERXEL
+                * 2
+                * (core::mem::size_of::<cbrushside_t>() + core::mem::size_of::<cplane_t>());
+        assert_eq!(brush_region_len(terxels), expected);
+    }
 }

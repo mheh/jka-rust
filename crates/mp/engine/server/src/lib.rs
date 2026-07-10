@@ -5,6 +5,7 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
 pub mod gameCallbacks;
+pub mod npcnav;
 pub mod server;
 pub mod server_host;
 pub mod sv_client;

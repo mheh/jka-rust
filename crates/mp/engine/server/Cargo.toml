@@ -10,3 +10,6 @@ name = "mp_engine_server"
 mp_qshared = { path = "../../qshared" }
 mp_engine_qcommon = { path = "../qcommon" }
 mp_abi = { path = "../../abi" }
+# EngineHost trait seam consumed by the npcnav host-taking methods (NAV-D3 /
+# RULING 11/24/36; path dep authorized by ruling 56c).
+mp_host_interface = { path = "../../host-interface" }

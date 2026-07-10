@@ -1111,7 +1111,7 @@ files:
     crate: mp_engine_server
     mode: mp
     class: (GNavCallback free fns)
-    summary: The nine GNavCallback_* outbound calls as EngineHost vm_call(VmSlot::Gvm, GAME_NAV_*) shims (gameCallbacks.cpp); NAV_CvarInit/NAV_Free (cvar read-back via cvar_integer, NAV-D3).
+    summary: The nine GNavCallback_* outbound calls as EngineHost vm_call(VmSlot::Gvm, GAME_NAV_*) shims (gameCallbacks.cpp). (Corrected 2026-07-10 — this row previously also claimed NAV_CvarInit/NAV_Free, but those are navigator.cpp file-scope free fns, not GNavCallback_* members: per the class-mapping row above, NAV_Free is Navigator::free in navigator.rs and NAV_CvarInit is a no-op cvar-registration elision with the d_altRoutes/d_patched read-back done at the navigator.rs call sites via cvar_integer — none of it lives in callbacks.rs.)
   - path: crates/mp/qshared/src/shared/q_math.rs
     crate: mp_qshared
     mode: mp
