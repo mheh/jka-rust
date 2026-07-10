@@ -1,0 +1,455 @@
+== graph ==
+numNodes 9
+node 0 pos 0.000 0.000 0.000 radius 16 numEdges 2
+  edge 0 -> node 1
+  edge 1 -> node 3
+node 1 pos 100.000 0.000 0.000 radius 16 numEdges 3
+  edge 0 -> node 0
+  edge 1 -> node 2
+  edge 2 -> node 4
+node 2 pos 200.000 0.000 0.000 radius 16 numEdges 2
+  edge 0 -> node 1
+  edge 1 -> node 5
+node 3 pos 0.000 100.000 0.000 radius 16 numEdges 3
+  edge 0 -> node 4
+  edge 1 -> node 0
+  edge 2 -> node 6
+node 4 pos 100.000 100.000 0.000 radius 16 numEdges 4
+  edge 0 -> node 3
+  edge 1 -> node 5
+  edge 2 -> node 1
+  edge 3 -> node 7
+node 5 pos 200.000 100.000 0.000 radius 16 numEdges 3
+  edge 0 -> node 4
+  edge 1 -> node 2
+  edge 2 -> node 8
+node 6 pos 0.000 200.000 0.000 radius 16 numEdges 2
+  edge 0 -> node 7
+  edge 1 -> node 3
+node 7 pos 100.000 200.000 0.000 radius 16 numEdges 3
+  edge 0 -> node 6
+  edge 1 -> node 8
+  edge 2 -> node 4
+node 8 pos 200.000 200.000 0.000 radius 16 numEdges 2
+  edge 0 -> node 7
+  edge 1 -> node 5
+== rank tables (per node, pop-order; the heap-sift gate) ==
+node 0 ranks[9]: 0 1 3 2 4 6 5 7 8
+node 1 ranks[9]: 1 0 2 4 3 5 7 6 8
+node 2 ranks[9]: 3 1 0 6 4 2 8 7 5
+node 3 ranks[9]: 2 5 8 0 1 4 3 6 7
+node 4 ranks[9]: 7 2 8 1 0 4 5 3 6
+node 5 ranks[9]: 8 5 2 4 1 0 7 6 3
+node 6 ranks[9]: 5 7 8 2 4 6 0 1 3
+node 7 ranks[9]: 7 6 8 4 3 5 1 0 2
+node 8 ranks[9]: 8 7 5 6 4 2 3 1 0
+== ranks (GetPathCost s->e, all pairs) ==
+pathcost 0 0 = 0
+pathcost 0 1 = 100
+pathcost 0 2 = 200
+pathcost 0 3 = 100
+pathcost 0 4 = 200
+pathcost 0 5 = 300
+pathcost 0 6 = 200
+pathcost 0 7 = 300
+pathcost 0 8 = 400
+pathcost 1 0 = 100
+pathcost 1 1 = 0
+pathcost 1 2 = 100
+pathcost 1 3 = 200
+pathcost 1 4 = 100
+pathcost 1 5 = 200
+pathcost 1 6 = 300
+pathcost 1 7 = 200
+pathcost 1 8 = 300
+pathcost 2 0 = 200
+pathcost 2 1 = 100
+pathcost 2 2 = 0
+pathcost 2 3 = 300
+pathcost 2 4 = 200
+pathcost 2 5 = 100
+pathcost 2 6 = 400
+pathcost 2 7 = 300
+pathcost 2 8 = 200
+pathcost 3 0 = 100
+pathcost 3 1 = 200
+pathcost 3 2 = 300
+pathcost 3 3 = 0
+pathcost 3 4 = 100
+pathcost 3 5 = 200
+pathcost 3 6 = 100
+pathcost 3 7 = 200
+pathcost 3 8 = 300
+pathcost 4 0 = 200
+pathcost 4 1 = 100
+pathcost 4 2 = 200
+pathcost 4 3 = 100
+pathcost 4 4 = 0
+pathcost 4 5 = 100
+pathcost 4 6 = 200
+pathcost 4 7 = 100
+pathcost 4 8 = 200
+pathcost 5 0 = 300
+pathcost 5 1 = 200
+pathcost 5 2 = 100
+pathcost 5 3 = 200
+pathcost 5 4 = 100
+pathcost 5 5 = 0
+pathcost 5 6 = 300
+pathcost 5 7 = 200
+pathcost 5 8 = 100
+pathcost 6 0 = 200
+pathcost 6 1 = 300
+pathcost 6 2 = 400
+pathcost 6 3 = 100
+pathcost 6 4 = 200
+pathcost 6 5 = 300
+pathcost 6 6 = 0
+pathcost 6 7 = 100
+pathcost 6 8 = 200
+pathcost 7 0 = 300
+pathcost 7 1 = 200
+pathcost 7 2 = 300
+pathcost 7 3 = 200
+pathcost 7 4 = 100
+pathcost 7 5 = 200
+pathcost 7 6 = 100
+pathcost 7 7 = 0
+pathcost 7 8 = 100
+pathcost 8 0 = 400
+pathcost 8 1 = 300
+pathcost 8 2 = 200
+pathcost 8 3 = 300
+pathcost 8 4 = 200
+pathcost 8 5 = 100
+pathcost 8 6 = 200
+pathcost 8 7 = 100
+pathcost 8 8 = 0
+== GetBestNode (s,e,reject=NONE) ==
+bestnode 0 0 = 0
+bestnode 0 1 = 1
+bestnode 0 2 = 1
+bestnode 0 3 = 3
+bestnode 0 4 = 3
+bestnode 0 5 = 3
+bestnode 0 6 = 3
+bestnode 0 7 = 3
+bestnode 0 8 = 3
+bestnode 1 0 = 0
+bestnode 1 1 = 1
+bestnode 1 2 = 2
+bestnode 1 3 = 4
+bestnode 1 4 = 4
+bestnode 1 5 = 4
+bestnode 1 6 = 4
+bestnode 1 7 = 4
+bestnode 1 8 = 4
+bestnode 2 0 = 1
+bestnode 2 1 = 1
+bestnode 2 2 = 2
+bestnode 2 3 = 5
+bestnode 2 4 = 1
+bestnode 2 5 = 5
+bestnode 2 6 = 5
+bestnode 2 7 = 5
+bestnode 2 8 = 5
+bestnode 3 0 = 0
+bestnode 3 1 = 0
+bestnode 3 2 = 0
+bestnode 3 3 = 3
+bestnode 3 4 = 4
+bestnode 3 5 = 4
+bestnode 3 6 = 6
+bestnode 3 7 = 6
+bestnode 3 8 = 6
+bestnode 4 0 = 1
+bestnode 4 1 = 1
+bestnode 4 2 = 1
+bestnode 4 3 = 3
+bestnode 4 4 = 4
+bestnode 4 5 = 5
+bestnode 4 6 = 7
+bestnode 4 7 = 7
+bestnode 4 8 = 7
+bestnode 5 0 = 2
+bestnode 5 1 = 2
+bestnode 5 2 = 2
+bestnode 5 3 = 4
+bestnode 5 4 = 4
+bestnode 5 5 = 5
+bestnode 5 6 = 8
+bestnode 5 7 = 8
+bestnode 5 8 = 8
+bestnode 6 0 = 3
+bestnode 6 1 = 3
+bestnode 6 2 = 3
+bestnode 6 3 = 3
+bestnode 6 4 = 3
+bestnode 6 5 = 3
+bestnode 6 6 = 6
+bestnode 6 7 = 7
+bestnode 6 8 = 7
+bestnode 7 0 = 4
+bestnode 7 1 = 4
+bestnode 7 2 = 4
+bestnode 7 3 = 4
+bestnode 7 4 = 4
+bestnode 7 5 = 4
+bestnode 7 6 = 6
+bestnode 7 7 = 7
+bestnode 7 8 = 8
+bestnode 8 0 = 5
+bestnode 8 1 = 5
+bestnode 8 2 = 5
+bestnode 8 3 = 5
+bestnode 8 4 = 7
+bestnode 8 5 = 5
+bestnode 8 6 = 7
+bestnode 8 7 = 7
+bestnode 8 8 = 8
+== GetBestNodeAltRoute (d_altRoutes=0; s,e,reject=NONE) ==
+altroute 0 0 = 0 cost 0
+altroute 0 1 = 1 cost 100
+altroute 0 2 = 1 cost 200
+altroute 0 3 = 3 cost 100
+altroute 0 4 = 1 cost 200
+altroute 0 5 = 1 cost 300
+altroute 0 6 = 3 cost 200
+altroute 0 7 = 1 cost 300
+altroute 0 8 = 1 cost 400
+altroute 1 0 = 0 cost 100
+altroute 1 1 = 1 cost 0
+altroute 1 2 = 2 cost 100
+altroute 1 3 = 0 cost 200
+altroute 1 4 = 4 cost 100
+altroute 1 5 = 2 cost 200
+altroute 1 6 = 0 cost 300
+altroute 1 7 = 4 cost 200
+altroute 1 8 = 2 cost 300
+altroute 2 0 = 1 cost 200
+altroute 2 1 = 1 cost 100
+altroute 2 2 = 2 cost 0
+altroute 2 3 = 1 cost 300
+altroute 2 4 = 1 cost 200
+altroute 2 5 = 5 cost 100
+altroute 2 6 = 1 cost 400
+altroute 2 7 = 1 cost 300
+altroute 2 8 = 5 cost 200
+altroute 3 0 = 0 cost 100
+altroute 3 1 = 4 cost 200
+altroute 3 2 = 4 cost 300
+altroute 3 3 = 3 cost 0
+altroute 3 4 = 4 cost 100
+altroute 3 5 = 4 cost 200
+altroute 3 6 = 6 cost 100
+altroute 3 7 = 4 cost 200
+altroute 3 8 = 4 cost 300
+altroute 4 0 = 3 cost 200
+altroute 4 1 = 1 cost 100
+altroute 4 2 = 5 cost 200
+altroute 4 3 = 3 cost 100
+altroute 4 4 = 4 cost 0
+altroute 4 5 = 5 cost 100
+altroute 4 6 = 3 cost 200
+altroute 4 7 = 7 cost 100
+altroute 4 8 = 5 cost 200
+altroute 5 0 = 4 cost 300
+altroute 5 1 = 4 cost 200
+altroute 5 2 = 2 cost 100
+altroute 5 3 = 4 cost 200
+altroute 5 4 = 4 cost 100
+altroute 5 5 = 5 cost 0
+altroute 5 6 = 4 cost 300
+altroute 5 7 = 4 cost 200
+altroute 5 8 = 8 cost 100
+altroute 6 0 = 3 cost 200
+altroute 6 1 = 7 cost 300
+altroute 6 2 = 7 cost 400
+altroute 6 3 = 3 cost 100
+altroute 6 4 = 7 cost 200
+altroute 6 5 = 7 cost 300
+altroute 6 6 = 6 cost 0
+altroute 6 7 = 7 cost 100
+altroute 6 8 = 7 cost 200
+altroute 7 0 = 6 cost 300
+altroute 7 1 = 4 cost 200
+altroute 7 2 = 8 cost 300
+altroute 7 3 = 6 cost 200
+altroute 7 4 = 4 cost 100
+altroute 7 5 = 8 cost 200
+altroute 7 6 = 6 cost 100
+altroute 7 7 = 7 cost 0
+altroute 7 8 = 8 cost 100
+altroute 8 0 = 7 cost 400
+altroute 8 1 = 7 cost 300
+altroute 8 2 = 5 cost 200
+altroute 8 3 = 7 cost 300
+altroute 8 4 = 7 cost 200
+altroute 8 5 = 5 cost 100
+altroute 8 6 = 7 cost 200
+altroute 8 7 = 7 cost 100
+altroute 8 8 = 8 cost 0
+== Connected / NodesAreNeighbors ==
+conn 0 0 = 1 neigh 0
+conn 0 1 = 1 neigh 1
+conn 0 2 = 1 neigh 0
+conn 0 3 = 1 neigh 1
+conn 0 4 = 1 neigh 0
+conn 0 5 = 1 neigh 0
+conn 0 6 = 1 neigh 0
+conn 0 7 = 1 neigh 0
+conn 0 8 = 1 neigh 0
+conn 1 0 = 1 neigh 1
+conn 1 1 = 1 neigh 0
+conn 1 2 = 1 neigh 1
+conn 1 3 = 1 neigh 0
+conn 1 4 = 1 neigh 1
+conn 1 5 = 1 neigh 0
+conn 1 6 = 1 neigh 0
+conn 1 7 = 1 neigh 0
+conn 1 8 = 1 neigh 0
+conn 2 0 = 1 neigh 0
+conn 2 1 = 1 neigh 1
+conn 2 2 = 1 neigh 0
+conn 2 3 = 1 neigh 0
+conn 2 4 = 1 neigh 0
+conn 2 5 = 1 neigh 1
+conn 2 6 = 1 neigh 0
+conn 2 7 = 1 neigh 0
+conn 2 8 = 1 neigh 0
+conn 3 0 = 1 neigh 1
+conn 3 1 = 1 neigh 0
+conn 3 2 = 1 neigh 0
+conn 3 3 = 1 neigh 0
+conn 3 4 = 1 neigh 1
+conn 3 5 = 1 neigh 0
+conn 3 6 = 1 neigh 1
+conn 3 7 = 1 neigh 0
+conn 3 8 = 1 neigh 0
+conn 4 0 = 1 neigh 0
+conn 4 1 = 1 neigh 1
+conn 4 2 = 1 neigh 0
+conn 4 3 = 1 neigh 1
+conn 4 4 = 1 neigh 0
+conn 4 5 = 1 neigh 1
+conn 4 6 = 1 neigh 0
+conn 4 7 = 1 neigh 1
+conn 4 8 = 1 neigh 0
+conn 5 0 = 1 neigh 0
+conn 5 1 = 1 neigh 0
+conn 5 2 = 1 neigh 1
+conn 5 3 = 1 neigh 0
+conn 5 4 = 1 neigh 1
+conn 5 5 = 1 neigh 0
+conn 5 6 = 1 neigh 0
+conn 5 7 = 1 neigh 0
+conn 5 8 = 1 neigh 1
+conn 6 0 = 1 neigh 0
+conn 6 1 = 1 neigh 0
+conn 6 2 = 1 neigh 0
+conn 6 3 = 1 neigh 1
+conn 6 4 = 1 neigh 0
+conn 6 5 = 1 neigh 0
+conn 6 6 = 1 neigh 0
+conn 6 7 = 1 neigh 1
+conn 6 8 = 1 neigh 0
+conn 7 0 = 1 neigh 0
+conn 7 1 = 1 neigh 0
+conn 7 2 = 1 neigh 0
+conn 7 3 = 1 neigh 0
+conn 7 4 = 1 neigh 1
+conn 7 5 = 1 neigh 0
+conn 7 6 = 1 neigh 1
+conn 7 7 = 1 neigh 0
+conn 7 8 = 1 neigh 1
+conn 8 0 = 1 neigh 0
+conn 8 1 = 1 neigh 0
+conn 8 2 = 1 neigh 0
+conn 8 3 = 1 neigh 0
+conn 8 4 = 1 neigh 0
+conn 8 5 = 1 neigh 1
+conn 8 6 = 1 neigh 0
+conn 8 7 = 1 neigh 1
+conn 8 8 = 1 neigh 0
+== GetProjectedNode (origin = each node pos, from each node) ==
+proj from 0 origin@0 = -1
+proj from 0 origin@1 = 1
+proj from 0 origin@2 = 1
+proj from 0 origin@3 = 3
+proj from 0 origin@4 = 1
+proj from 0 origin@5 = 1
+proj from 0 origin@6 = 3
+proj from 0 origin@7 = 3
+proj from 0 origin@8 = 1
+proj from 1 origin@0 = 0
+proj from 1 origin@1 = -1
+proj from 1 origin@2 = 2
+proj from 1 origin@3 = 0
+proj from 1 origin@4 = 4
+proj from 1 origin@5 = 2
+proj from 1 origin@6 = 4
+proj from 1 origin@7 = 4
+proj from 1 origin@8 = 4
+proj from 2 origin@0 = 1
+proj from 2 origin@1 = 1
+proj from 2 origin@2 = -1
+proj from 2 origin@3 = 1
+proj from 2 origin@4 = 1
+proj from 2 origin@5 = 5
+proj from 2 origin@6 = 1
+proj from 2 origin@7 = 5
+proj from 2 origin@8 = 5
+proj from 3 origin@0 = 0
+proj from 3 origin@1 = 4
+proj from 3 origin@2 = 4
+proj from 3 origin@3 = -1
+proj from 3 origin@4 = 4
+proj from 3 origin@5 = 4
+proj from 3 origin@6 = 6
+proj from 3 origin@7 = 4
+proj from 3 origin@8 = 4
+proj from 4 origin@0 = 3
+proj from 4 origin@1 = 1
+proj from 4 origin@2 = 5
+proj from 4 origin@3 = 3
+proj from 4 origin@4 = -1
+proj from 4 origin@5 = 5
+proj from 4 origin@6 = 3
+proj from 4 origin@7 = 7
+proj from 4 origin@8 = 5
+proj from 5 origin@0 = 4
+proj from 5 origin@1 = 4
+proj from 5 origin@2 = 2
+proj from 5 origin@3 = 4
+proj from 5 origin@4 = 4
+proj from 5 origin@5 = -1
+proj from 5 origin@6 = 4
+proj from 5 origin@7 = 4
+proj from 5 origin@8 = 8
+proj from 6 origin@0 = 3
+proj from 6 origin@1 = 3
+proj from 6 origin@2 = 7
+proj from 6 origin@3 = 3
+proj from 6 origin@4 = 7
+proj from 6 origin@5 = 7
+proj from 6 origin@6 = -1
+proj from 6 origin@7 = 7
+proj from 6 origin@8 = 7
+proj from 7 origin@0 = 4
+proj from 7 origin@1 = 4
+proj from 7 origin@2 = 4
+proj from 7 origin@3 = 6
+proj from 7 origin@4 = 4
+proj from 7 origin@5 = 8
+proj from 7 origin@6 = 6
+proj from 7 origin@7 = -1
+proj from 7 origin@8 = 8
+proj from 8 origin@0 = 7
+proj from 8 origin@1 = 5
+proj from 8 origin@2 = 5
+proj from 8 origin@3 = 7
+proj from 8 origin@4 = 7
+proj from 8 origin@5 = 5
+proj from 8 origin@6 = 7
+proj from 8 origin@7 = 7
+proj from 8 origin@8 = -1

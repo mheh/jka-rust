@@ -1,0 +1,32 @@
+# grid9 — a 3x3 lattice (ids row-major: id = row*3 + col, at x=col*100,
+# y=row*100). The many equal-length routes between any two cells produce dense
+# equal-cost collisions in CalculatePath's priority queue, making this the
+# strongest gate on the libstdc++ heap sift order (NAV-D2 / RULING 45): any
+# tie-break mistake reorders curRank++ assignments and diverges the rank table.
+# Node 4 (centre) has degree 4. Axis-aligned, every edge cost exactly 100.
+checksum 444
+
+node    0   0 0   0   16     # 0
+node  100   0 0   0   16     # 1
+node  200   0 0   0   16     # 2
+node    0 100 0   0   16     # 3
+node  100 100 0   0   16     # 4 (centre)
+node  200 100 0   0   16     # 5
+node    0 200 0   0   16     # 6
+node  100 200 0   0   16     # 7
+node  200 200 0   0   16     # 8
+
+# horizontal edges
+connect 0 1
+connect 1 2
+connect 3 4
+connect 4 5
+connect 6 7
+connect 7 8
+# vertical edges
+connect 0 3
+connect 3 6
+connect 1 4
+connect 4 7
+connect 2 5
+connect 5 8
