@@ -613,3 +613,17 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     sv_ccmds — themselves ported Rust) call the methods. Consistent with
     ruling 40 (internal = idiomatic) and seam-is-authoritative.
     **RULING: seam methods govern; narrow SE-D2 (user, 2026-07-09)**
+
+58. **Model-buffer alignment (TRM-Q4, refines ruling 52):** the cached
+    disk image is owned by an `AlignedBytes` buffer type in `mp_renderer`
+    — `alloc::alloc` with `Layout::from_size_align(len, 16)` mirroring
+    Z_Malloc's alignment guarantee, `Drop` deallocates with the same
+    layout. Same heap-pinned/address-stable/in-place-mutable contract as
+    ruling 52's `Box<[u8]>`, alignment now explicit so the
+    `*mut mdxmHeader_t`/`*mut mdxaHeader_t` casts (tr_model.cpp:734-739,
+    857-863) are sound; casts stay unsafe confined at the seam per §D11
+    with a debug alignment assert at cast sites. TRM-Q3 (ghoul2_call's
+    exact signature) is confirmed non-blocking: shape pinned by rulings
+    43/56b, exactness lands with the wave-20 packet — inside the
+    campaign, not a deferral.
+    **RULING: AlignedBytes, 16-byte layout (user, 2026-07-10)**
