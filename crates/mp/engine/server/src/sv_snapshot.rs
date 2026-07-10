@@ -8,6 +8,7 @@ use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 
 use crate::server::snapshot_entity_numbers_t::{snapshotEntityNumbers_t, MAX_SNAPSHOT_ENTITIES};
 use crate::server::sv_entity_s::svEntity_t;
+use crate::sv_net_chan::{SV_Netchan_TransmitNextFragment, SV_RateMsec};
 use crate::Server;
 
 /// Raven `SV_AddEntToSnapshot`.
@@ -63,7 +64,7 @@ pub fn SV_SendClientMessages(
             // was too large to send at once
             if (*c).netchan.unsentFragments != 0 {
                 (*c).nextSnapshotTime = sv.svs.time
-                    + crate::sv_net_chan::SV_RateMsec(
+                    + SV_RateMsec(
                         common,
                         cm,
                         sv,
@@ -72,18 +73,12 @@ pub fn SV_SendClientMessages(
                         c,
                         (*c).netchan.unsentLength - (*c).netchan.unsentFragmentStart,
                     );
-                crate::sv_net_chan::SV_Netchan_TransmitNextFragment(
-                    common,
-                    cm,
-                    rm,
-                    host,
-                    &mut (*c).netchan,
-                );
+                SV_Netchan_TransmitNextFragment(common, cm, rm, host, &mut (*c).netchan);
                 continue;
             }
 
             // generate and send a new message
-            crate::sv_snapshot::SV_SendClientSnapshot(common, cm, sv, rm, host, c);
+            SV_SendClientSnapshot(common, cm, sv, rm, host, c);
         }
     }
 }
