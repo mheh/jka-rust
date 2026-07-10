@@ -7,9 +7,13 @@ edition = "2021"
 name = "mp_engine_qcommon"
 
 [dependencies]
+libc = "0.2"
 mp_qshared = { path = "../../qshared" }
 abi_transport = { path = "../../../abi-transport" }
 native_platform = { path = "../../../native/platform" }
+native_math = { path = "../../../native/math" }
+# EngineHost (cm_trace.rs §F callees) — authorized blanket edge (ruling 56c).
+mp_host_interface = { path = "../../host-interface" }
 
 [build-dependencies]
 # Builds the SEAM-D11 C-variadic trampoline shim (src/vm/game_syscall_trampoline.c);

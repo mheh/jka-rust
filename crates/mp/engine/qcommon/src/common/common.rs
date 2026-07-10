@@ -2,6 +2,8 @@
 
 use std::time::Instant;
 
+use mp_qshared::shared::qboolean;
+
 use super::error::ErrorState;
 use super::journal::Journal;
 use super::sys_event_queue::SysEventQueue;
@@ -40,6 +42,47 @@ pub struct Common {
     pub time_base: Instant,
     //TODO: Port Common cvars/cmd/cbuf/fs/net sub-structs + com_printf print state
     // Source: oracle/codemp/qcommon/common.cpp:32-72,128,137-171
+    /// Raven `msg.cpp` file-scope statics/globals (ruling 2/3): `msgInit`,
+    /// `msgHuff`, `oldsize`, `cl_shownet` (collapsed cvar-int read —
+    /// PORT-NOTE below), the three `MSG_Read*String*` rotating scratch
+    /// buffers, and the `entityStateFields`/`playerStateFields` net-field
+    /// tables.
+    ///
+    /// Source: `oracle/codemp/qcommon/msg.cpp:12,19,21,37`
+    pub msg_init: qboolean,
+    pub msg_huff: crate::qcommon::huffman_t::huffman_t,
+    /// Raven `oldsize` (`msg.cpp:37`).
+    pub oldsize: i32,
+    //TODO: Port cl_shownet
+    // Source: oracle/codemp/qcommon/msg.cpp:12
+    // PORT-NOTE(cvar): `cl_shownet` is a `cvar_t*` in Raven; `Common`'s
+    // cvar sub-struct isn't landed yet (see the TODO above), so its
+    // `->integer` reads collapse to a plain `i32` field here pending the
+    // cvar-registry wave.
+    pub cl_shownet: i32,
+    /// Raven `MSG_ReadString`'s `static char string[MAX_STRING_CHARS]`.
+    ///
+    /// Source: `oracle/codemp/qcommon/msg.cpp:460`
+    pub msg_read_string_buf: [u8; mp_qshared::shared::limits::MAX_STRING_CHARS],
+    /// Raven `MSG_ReadBigString`'s `static char string[BIG_INFO_STRING]`.
+    ///
+    /// Source: `oracle/codemp/qcommon/msg.cpp:498`
+    pub msg_read_big_string_buf: [u8; mp_qshared::shared::limits::BIG_INFO_STRING],
+    /// Raven `MSG_ReadStringLine`'s `static char string[MAX_STRING_CHARS]`.
+    ///
+    /// Source: `oracle/codemp/qcommon/msg.cpp:522`
+    pub msg_read_string_line_buf: [u8; mp_qshared::shared::limits::MAX_STRING_CHARS],
+    //TODO: Port netField_t
+    // Source: oracle/codemp/qcommon/qcommon.h (netField_t has no rosetta row
+    // at time of transcription — escalated as a missing symbol).
+    /// Raven `entityStateFields[]`.
+    ///
+    /// Source: `oracle/codemp/qcommon/msg.cpp:859-1051`
+    pub entity_state_fields: Vec<crate::qcommon::net_field_t::netField_t>,
+    /// Raven `playerStateFields[]`.
+    ///
+    /// Source: `oracle/codemp/qcommon/msg.cpp:1410-1568`
+    pub player_state_fields: Vec<crate::qcommon::net_field_t::netField_t>,
 }
 
 /// Raven `Com_Printf` (`common.cpp:128`). Threads `&mut Common` and lives in

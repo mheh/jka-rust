@@ -1,0 +1,1036 @@
+=== qcommon__0149_Cbuf_Init ===
+# ENGINE PORT PACKET — `Cbuf_Init`
+
+- seq **149**  ·  wave **0**  ·  unit **148**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **6**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cbuf_Init(common: &mut Common) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `Cbuf_Init` | `cmd_text` | write | `oracle/codemp/qcommon/cmd_common.cpp:17` |
+| `Cbuf_Init` | `cmd_text_buf` | read | `oracle/codemp/qcommon/cmd_common.cpp:18` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cbuf_Init` — oracle/codemp/qcommon/cmd_common.cpp:54-59 (6 LOC)
+```c
+   54 | void Cbuf_Init (void)
+   55 | {
+   56 | 	cmd_text.data = cmd_text_buf;
+   57 | 	cmd_text.maxsize = MAX_CMD_BUFFER;
+   58 | 	cmd_text.cursize = 0;
+   59 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cmd_common.cpp:17
+   17 | cmd_t		cmd_text;
+// oracle/codemp/qcommon/cmd_common.cpp:18
+   18 | byte		cmd_text_buf[MAX_CMD_BUFFER];
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `MAX_CMD_BUFFER` | `MAX_CMD_BUFFER` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/cmd/cmd_consts.rs` |
+
+=== qcommon__0150_Cmd_Argc ===
+# ENGINE PORT PACKET — `Cmd_Argc`
+
+- seq **150**  ·  wave **0**  ·  unit **149**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **3**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_Argc(common: &mut Common) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `Cmd_Argc` | `cmd_argc` | read | `oracle/codemp/qcommon/cmd_common.cpp:290` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_Argc` — oracle/codemp/qcommon/cmd_common.cpp:300-302 (3 LOC)
+```c
+  300 | int		Cmd_Argc( void ) {
+  301 | 	return cmd_argc;
+  302 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cmd_common.cpp:290
+  290 | static	int			cmd_argc;
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+=== qcommon__0151_Cmd_Argv ===
+# ENGINE PORT PACKET — `Cmd_Argv`
+
+- seq **151**  ·  wave **0**  ·  unit **150**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **6**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_Argv(common: &mut Common, arg: c_int) -> *mut c_char { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `Cmd_Argv` | `cmd_argc` | read | `oracle/codemp/qcommon/cmd_common.cpp:290` |
+| `Cmd_Argv` | `cmd_argv` | read | `oracle/codemp/qcommon/cmd_common.cpp:291` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_Argv` — oracle/codemp/qcommon/cmd_common.cpp:309-314 (6 LOC)
+```c
+  309 | char	*Cmd_Argv( int arg ) {
+  310 | 	if ( (unsigned)arg >= cmd_argc ) {
+  311 | 		return "";
+  312 | 	}
+  313 | 	return cmd_argv[arg];	
+  314 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cmd_common.cpp:290
+  290 | static	int			cmd_argc;
+// oracle/codemp/qcommon/cmd_common.cpp:291
+  291 | static	char		*cmd_argv[MAX_STRING_TOKENS];		// points into cmd_tokenized
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `MAX_STRING_TOKENS` | `MAX_STRING_TOKENS` | mp_qshared | `crates/mp/qshared/src/shared/limits.rs` |
+
+=== qcommon__0152_Cmd_Args ===
+# ENGINE PORT PACKET — `Cmd_Args`
+
+- seq **152**  ·  wave **0**  ·  unit **151**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **14**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_Args(common: &mut Common) -> *mut c_char { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `Cmd_Args` | `cmd_argc` | read | `oracle/codemp/qcommon/cmd_common.cpp:290` |
+| `Cmd_Args` | `cmd_argv` | read | `oracle/codemp/qcommon/cmd_common.cpp:291` |
+
+Function-scope statics → classify per the fork-3 three-kind rule (const table / rotating scratch → owned return / cross-frame state → host field); see `_PREAMBLE.md`:
+
+| fn | static | type |
+| --- | --- | --- |
+| `Cmd_Args` | `cmd_args` | `char[1024]` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_Args` — oracle/codemp/qcommon/cmd_common.cpp:336-349 (14 LOC)
+```c
+  336 | char	*Cmd_Args( void ) {
+  337 | 	static	char		cmd_args[MAX_STRING_CHARS];
+  338 | 	int		i;
+  339 | 
+  340 | 	cmd_args[0] = 0;
+  341 | 	for ( i = 1 ; i < cmd_argc ; i++ ) {
+  342 | 		strcat( cmd_args, cmd_argv[i] );
+  343 | 		if ( i != cmd_argc-1 ) {
+  344 | 			strcat( cmd_args, " " );
+  345 | 		}
+  346 | 	}
+  347 | 
+  348 | 	return cmd_args;
+  349 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cmd_common.cpp:290
+  290 | static	int			cmd_argc;
+// oracle/codemp/qcommon/cmd_common.cpp:291
+  291 | static	char		*cmd_argv[MAX_STRING_TOKENS];		// points into cmd_tokenized
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 1 external(s)
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`strcat`
+
+## TYPE ROSETTA — import these, never redeclare
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `MAX_STRING_CHARS` | `MAX_STRING_CHARS` | mp_qshared | `crates/mp/qshared/src/shared/limits.rs` |
+| `MAX_STRING_TOKENS` | `MAX_STRING_TOKENS` | mp_qshared | `crates/mp/qshared/src/shared/limits.rs` |
+
+=== qcommon__0153_Cmd_ArgsFrom ===
+# ENGINE PORT PACKET — `Cmd_ArgsFrom`
+
+- seq **153**  ·  wave **0**  ·  unit **152**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **16**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_ArgsFrom(common: &mut Common, arg: c_int) -> *mut c_char { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `Cmd_ArgsFrom` | `cmd_argc` | read | `oracle/codemp/qcommon/cmd_common.cpp:290` |
+| `Cmd_ArgsFrom` | `cmd_argv` | read | `oracle/codemp/qcommon/cmd_common.cpp:291` |
+
+Function-scope statics → classify per the fork-3 three-kind rule (const table / rotating scratch → owned return / cross-frame state → host field); see `_PREAMBLE.md`:
+
+| fn | static | type |
+| --- | --- | --- |
+| `Cmd_ArgsFrom` | `cmd_args` | `char[8192]` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_ArgsFrom` — oracle/codemp/qcommon/cmd_common.cpp:358-373 (16 LOC)
+```c
+  358 | char *Cmd_ArgsFrom( int arg ) {
+  359 | 	static	char		cmd_args[BIG_INFO_STRING];
+  360 | 	int		i;
+  361 | 
+  362 | 	cmd_args[0] = 0;
+  363 | 	if (arg < 0)
+  364 | 		arg = 0;
+  365 | 	for ( i = arg ; i < cmd_argc ; i++ ) {
+  366 | 		strcat( cmd_args, cmd_argv[i] );
+  367 | 		if ( i != cmd_argc-1 ) {
+  368 | 			strcat( cmd_args, " " );
+  369 | 		}
+  370 | 	}
+  371 | 
+  372 | 	return cmd_args;
+  373 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cmd_common.cpp:290
+  290 | static	int			cmd_argc;
+// oracle/codemp/qcommon/cmd_common.cpp:291
+  291 | static	char		*cmd_argv[MAX_STRING_TOKENS];		// points into cmd_tokenized
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 1 external(s)
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`strcat`
+
+## TYPE ROSETTA — import these, never redeclare
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `BIG_INFO_STRING` | `BIG_INFO_STRING` | mp_qshared | `crates/mp/qshared/src/shared/limits.rs` |
+| `MAX_STRING_TOKENS` | `MAX_STRING_TOKENS` | mp_qshared | `crates/mp/qshared/src/shared/limits.rs` |
+
+=== qcommon__0154_Cmd_TokenizeString ===
+# ENGINE PORT PACKET — `Cmd_TokenizeString`
+
+- seq **154**  ·  wave **0**  ·  unit **153**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **94**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_TokenizeString(common: &mut Common, text_in: *const c_char) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `Cmd_TokenizeString` | `cmd_argc` | write | `oracle/codemp/qcommon/cmd_common.cpp:290` |
+| `Cmd_TokenizeString` | `cmd_argv` | write | `oracle/codemp/qcommon/cmd_common.cpp:291` |
+| `Cmd_TokenizeString` | `cmd_tokenized` | read | `oracle/codemp/qcommon/cmd_common.cpp:292` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_TokenizeString` — oracle/codemp/qcommon/cmd_common.cpp:398-491 (94 LOC)
+```c
+  398 | void Cmd_TokenizeString( const char *text_in ) {
+  399 | 	const char	*text;
+  400 | 	char	*textOut;
+  401 | 
+  402 | 	// clear previous args
+  403 | 	cmd_argc = 0;
+  404 | 
+  405 | 	if ( !text_in ) {
+  406 | 		return;
+  407 | 	}
+  408 | 
+  409 | 	text = text_in;
+  410 | 	textOut = cmd_tokenized;
+  411 | 
+  412 | 	while ( 1 ) {
+  413 | 		if ( cmd_argc == MAX_STRING_TOKENS ) {
+  414 | 			return;			// this is usually something malicious
+  415 | 		}
+  416 | 
+  417 | 		while ( 1 ) {
+  418 | 			// skip whitespace
+  419 | 			while ( *text && *text <= ' ' ) {
+  420 | 				text++;
+  421 | 			}
+  422 | 			if ( !*text ) {
+  423 | 				return;			// all tokens parsed
+  424 | 			}
+  425 | 
+  426 | 			// skip // comments
+  427 | 			if ( text[0] == '/' && text[1] == '/' ) {
+  428 | 				return;			// all tokens parsed
+  429 | 			}
+  430 | 
+  431 | 			// skip /* */ comments
+  432 | 			if ( text[0] == '/' && text[1] =='*' ) {
+  433 | 				while ( *text && ( text[0] != '*' || text[1] != '/' ) ) {
+  434 | 					text++;
+  435 | 				}
+  436 | 				if ( !*text ) {
+  437 | 					return;		// all tokens parsed
+  438 | 				}
+  439 | 				text += 2;
+  440 | 			} else {
+  441 | 				break;			// we are ready to parse a token
+  442 | 			}
+  443 | 		}
+  444 | 
+  445 | 		// handle quoted strings
+  446 | 		if ( *text == '"' ) {
+  447 | 			cmd_argv[cmd_argc] = textOut;
+  448 | 			cmd_argc++;
+  449 | 			text++;
+  450 | 			while ( *text && *text != '"' ) {
+  451 | 				*textOut++ = *text++;
+  452 | 			}
+  453 | 			*textOut++ = 0;
+  454 | 			if ( !*text ) {
+  455 | 				return;		// all tokens parsed
+  456 | 			}
+  457 | 			text++;
+  458 | 			continue;
+  459 | 		}
+  460 | 
+  461 | 		// regular token
+  462 | 		cmd_argv[cmd_argc] = textOut;
+  463 | 		cmd_argc++;
+  464 | 
+  465 | 		// skip until whitespace, quote, or command
+  466 | 		while ( *(const unsigned char* /*eurofix*/)text > ' ' ) 
+  467 | 		{
+  468 | 			if ( text[0] == '"' ) {
+  469 | 				break;
+  470 | 			}
+  471 | 
+  472 | 			if ( text[0] == '/' && text[1] == '/' ) {
+  473 | 				break;
+  474 | 			}
+  475 | 
+  476 | 			// skip /* */ comments
+  477 | 			if ( text[0] == '/' && text[1] =='*' ) {
+  478 | 				break;
+  479 | 			}
+  480 | 
+  481 | 			*textOut++ = *text++;
+  482 | 		}
+  483 | 
+  484 | 		*textOut++ = 0;
+  485 | 
+  486 | 		if ( !*text ) {
+  487 | 			return;		// all tokens parsed
+  488 | 		}
+  489 | 	}
+  490 | 	
+  491 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cmd_common.cpp:290
+  290 | static	int			cmd_argc;
+// oracle/codemp/qcommon/cmd_common.cpp:291
+  291 | static	char		*cmd_argv[MAX_STRING_TOKENS];		// points into cmd_tokenized
+// oracle/codemp/qcommon/cmd_common.cpp:292
+  292 | static	char		cmd_tokenized[BIG_INFO_STRING+MAX_STRING_TOKENS];	// will have 0 bytes inserted
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `BIG_INFO_STRING` | `BIG_INFO_STRING` | mp_qshared | `crates/mp/qshared/src/shared/limits.rs` |
+| `MAX_STRING_TOKENS` | `MAX_STRING_TOKENS` | mp_qshared | `crates/mp/qshared/src/shared/limits.rs` |
+
+=== qcommon__0924_Cmd_Wait_f ===
+# ENGINE PORT PACKET — `Cmd_Wait_f`
+
+- seq **924**  ·  wave **1**  ·  unit **923**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **7**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_Wait_f(common: &mut Common) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `Cmd_Wait_f` | `cmd_wait` | write | `oracle/codemp/qcommon/cmd_common.cpp:16` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_Wait_f` — oracle/codemp/qcommon/cmd_common.cpp:32-38 (7 LOC)
+```c
+   32 | void Cmd_Wait_f( void ) {
+   33 | 	if ( Cmd_Argc() == 2 ) {
+   34 | 		cmd_wait = atoi( Cmd_Argv( 1 ) );
+   35 | 	} else {
+   36 | 		cmd_wait = 1;
+   37 | 	}
+   38 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cmd_common.cpp:16
+   16 | int			cmd_wait;
+```
+
+## RESOLVED CALL SURFACE — 2 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Cmd_Argc` | `common` | packet `qcommon__0150_Cmd_Argc.md` |
+| `Cmd_Argv` | `common` | packet `qcommon__0151_Cmd_Argv.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`atoi`
+
+## TYPE ROSETTA — import these, never redeclare
+
+=== qcommon__0925_Cmd_ArgvBuffer ===
+# ENGINE PORT PACKET — `Cmd_ArgvBuffer`
+
+- seq **925**  ·  wave **1**  ·  unit **924**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **3**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_ArgvBuffer(common: &mut Common, arg: c_int, buffer: *mut c_char, bufferLength: c_int) { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_ArgvBuffer` — oracle/codemp/qcommon/cmd_common.cpp:324-326 (3 LOC)
+```c
+  324 | void	Cmd_ArgvBuffer( int arg, char *buffer, int bufferLength ) {
+  325 | 	Q_strncpyz( buffer, Cmd_Argv( arg ), bufferLength );
+  326 | }
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Cmd_Argv` | `common` | packet `qcommon__0151_Cmd_Argv.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`Q_strncpyz`
+
+## TYPE ROSETTA — import these, never redeclare
+
+=== qcommon__0926_Cmd_ArgsBuffer ===
+# ENGINE PORT PACKET — `Cmd_ArgsBuffer`
+
+- seq **926**  ·  wave **1**  ·  unit **925**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **3**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_ArgsBuffer(common: &mut Common, buffer: *mut c_char, bufferLength: c_int) { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_ArgsBuffer` — oracle/codemp/qcommon/cmd_common.cpp:383-385 (3 LOC)
+```c
+  383 | void	Cmd_ArgsBuffer( char *buffer, int bufferLength ) {
+  384 | 	Q_strncpyz( buffer, Cmd_Args(), bufferLength );
+  385 | }
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Cmd_Args` | `common` | packet `qcommon__0152_Cmd_Args.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`Q_strncpyz`
+
+## TYPE ROSETTA — import these, never redeclare
+
+=== qcommon__1759_Cbuf_InsertText ===
+# ENGINE PORT PACKET — `Cbuf_InsertText`
+
+- seq **1759**  ·  wave **6**  ·  unit **1649**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **23**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cbuf_InsertText(common: &mut Common, text: *const c_char) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `Cbuf_InsertText` | `cmd_text` | write | `oracle/codemp/qcommon/cmd_common.cpp:17` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cbuf_InsertText` — oracle/codemp/qcommon/cmd_common.cpp:91-113 (23 LOC)
+```c
+   91 | void Cbuf_InsertText( const char *text ) {
+   92 | 	int		len;
+   93 | 	int		i;
+   94 | 
+   95 | 	len = strlen( text ) + 1;
+   96 | 	if ( len + cmd_text.cursize > cmd_text.maxsize ) {
+   97 | 		Com_Printf( "Cbuf_InsertText overflowed\n" );
+   98 | 		return;
+   99 | 	}
+  100 | 
+  101 | 	// move the existing command text
+  102 | 	for ( i = cmd_text.cursize - 1 ; i >= 0 ; i-- ) {
+  103 | 		cmd_text.data[ i + len ] = cmd_text.data[ i ];
+  104 | 	}
+  105 | 
+  106 | 	// copy the new text in
+  107 | 	Com_Memcpy( cmd_text.data, text, len - 1 );
+  108 | 
+  109 | 	// add a \n
+  110 | 	cmd_text.data[ len - 1 ] = '\n';
+  111 | 
+  112 | 	cmd_text.cursize += len;
+  113 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cmd_common.cpp:17
+   17 | cmd_t		cmd_text;
+```
+
+## RESOLVED CALL SURFACE — 2 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Com_Memcpy` | — | packet `qcommon__0165_Com_Memcpy.md` |
+| `Com_Printf` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`strlen`
+
+## TYPE ROSETTA — import these, never redeclare
+
+=== qcommon__1760_Cmd_Echo_f ===
+# ENGINE PORT PACKET — `Cmd_Echo_f`
+
+- seq **1760**  ·  wave **6**  ·  unit **1650**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **8**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_Echo_f(common: &mut Common) { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_Echo_f` — oracle/codemp/qcommon/cmd_common.cpp:271-278 (8 LOC)
+```c
+  271 | void Cmd_Echo_f (void)
+  272 | {
+  273 | 	int		i;
+  274 | 	
+  275 | 	for (i=1 ; i<Cmd_Argc() ; i++)
+  276 | 		Com_Printf ("%s ",Cmd_Argv(i));
+  277 | 	Com_Printf ("\n");
+  278 | }
+```
+
+## RESOLVED CALL SURFACE — 3 in-engine callee(s), 0 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Cmd_Argc` | `common` | packet `qcommon__0150_Cmd_Argc.md` |
+| `Cmd_Argv` | `common` | packet `qcommon__0151_Cmd_Argv.md` |
+| `Com_Printf` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+
+## TYPE ROSETTA — import these, never redeclare
+
+=== qcommon__2002_Cmd_Exec_f ===
+# ENGINE PORT PACKET — `Cmd_Exec_f`
+
+- seq **2002**  ·  wave **7**  ·  unit **1890**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **23**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_Exec_f(common: &mut Common, cm: &mut CollisionWorld, rm: &mut RenderModels, host: &mut dyn EngineHost) { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_Exec_f` — oracle/codemp/qcommon/cmd_common.cpp:219-241 (23 LOC)
+```c
+  219 | void Cmd_Exec_f( void ) {
+  220 | 	char	*f;
+  221 | 	int		len;
+  222 | 	char	filename[MAX_QPATH];
+  223 | 
+  224 | 	if (Cmd_Argc () != 2) {
+  225 | 		Com_Printf ("exec <filename> : execute a script file\n");
+  226 | 		return;
+  227 | 	}
+  228 | 
+  229 | 	Q_strncpyz( filename, Cmd_Argv(1), sizeof( filename ) );
+  230 | 	COM_DefaultExtension( filename, sizeof( filename ), ".cfg" ); 
+  231 | 	len = FS_ReadFile( filename, (void **)&f);
+  232 | 	if (!f) {
+  233 | 		Com_Printf ("couldn't exec %s\n",Cmd_Argv(1));
+  234 | 		return;
+  235 | 	}
+  236 | 	Com_Printf ("execing %s\n",Cmd_Argv(1));
+  237 | 	
+  238 | 	Cbuf_InsertText (f);
+  239 | 
+  240 | 	FS_FreeFile (f);
+  241 | }
+```
+
+## RESOLVED CALL SURFACE — 6 in-engine callee(s), 2 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Cbuf_InsertText` | `common` | packet `qcommon__1759_Cbuf_InsertText.md` |
+| `Cmd_Argc` | `common` | packet `qcommon__0150_Cmd_Argc.md` |
+| `Cmd_Argv` | `common` | packet `qcommon__0151_Cmd_Argv.md` |
+| `Com_Printf` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `FS_FreeFile` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `FS_ReadFile` | `common`, `cm`, `rm`, `host` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`COM_DefaultExtension`, `Q_strncpyz`
+
+## TYPE ROSETTA — import these, never redeclare
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `MAX_QPATH` | `MAX_QPATH` | native_types | `crates/native/types/src/lib.rs` |
+
+=== qcommon__2003_Cmd_Vstr_f ===
+# ENGINE PORT PACKET — `Cmd_Vstr_f`
+
+- seq **2003**  ·  wave **7**  ·  unit **1891**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **11**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_Vstr_f(common: &mut Common) { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_Vstr_f` — oracle/codemp/qcommon/cmd_common.cpp:251-261 (11 LOC)
+```c
+  251 | void Cmd_Vstr_f( void ) {
+  252 | 	char	*v;
+  253 | 
+  254 | 	if (Cmd_Argc () != 2) {
+  255 | 		Com_Printf ("vstr <variablename> : execute a variable command\n");
+  256 | 		return;
+  257 | 	}
+  258 | 
+  259 | 	v = Cvar_VariableString( Cmd_Argv( 1 ) );
+  260 | 	Cbuf_InsertText( va("%s\n", v ) );
+  261 | }
+```
+
+## RESOLVED CALL SURFACE — 5 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Cbuf_InsertText` | `common` | packet `qcommon__1759_Cbuf_InsertText.md` |
+| `Cmd_Argc` | `common` | packet `qcommon__0150_Cmd_Argc.md` |
+| `Cmd_Argv` | `common` | packet `qcommon__0151_Cmd_Argv.md` |
+| `Com_Printf` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `Cvar_VariableString` | `common` | packet `qcommon__1280_Cvar_VariableString.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`va`
+
+## TYPE ROSETTA — import these, never redeclare
+
+=== qcommon__2137_Cbuf_Execute ===
+# ENGINE PORT PACKET — `Cbuf_Execute`
+
+- seq **2137**  ·  wave **8**  ·  unit **2024**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **55**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cbuf_Execute(common: &mut Common, cm: &mut CollisionWorld, sv: &mut Server, rm: &mut RenderModels, host: &mut dyn EngineHost) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `Cbuf_Execute` | `cmd_text` | write | `oracle/codemp/qcommon/cmd_common.cpp:17` |
+| `Cbuf_Execute` | `cmd_wait` | write | `oracle/codemp/qcommon/cmd_common.cpp:16` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cbuf_Execute` — oracle/codemp/qcommon/cmd_common.cpp:148-202 (55 LOC)
+```c
+  148 | void Cbuf_Execute (void)
+  149 | {
+  150 | 	int		i;
+  151 | 	char	*text;
+  152 | 	char	line[MAX_CMD_LINE];
+  153 | 	int		quotes;
+  154 | 
+  155 | 	while (cmd_text.cursize)
+  156 | 	{
+  157 | 		if ( cmd_wait )	{
+  158 | 			// skip out while text still remains in buffer, leaving it
+  159 | 			// for next frame
+  160 | 			cmd_wait--;
+  161 | 			break;
+  162 | 		}
+  163 | 
+  164 | 		// find a \n or ; line break
+  165 | 		text = (char *)cmd_text.data;
+  166 | 
+  167 | 		quotes = 0;
+  168 | 		for (i=0 ; i< cmd_text.cursize ; i++)
+  169 | 		{
+  170 | 			if (text[i] == '"')
+  171 | 				quotes++;
+  172 | 			if ( !(quotes&1) &&  text[i] == ';')
+  173 | 				break;	// don't break if inside a quoted string
+  174 | 			if (text[i] == '\n' || text[i] == '\r' )
+  175 | 				break;
+  176 | 		}
+  177 | 
+  178 | 		if( i >= (MAX_CMD_LINE - 1)) {
+  179 | 			i = MAX_CMD_LINE - 1;
+  180 | 		}
+  181 | 				
+  182 | 		Com_Memcpy (line, text, i);
+  183 | 		line[i] = 0;
+  184 | 		
+  185 | // delete the text from the command buffer and move remaining commands down
+  186 | // this is necessary because commands (exec) can insert data at the
+  187 | // beginning of the text buffer
+  188 | 
+  189 | 		if (i == cmd_text.cursize)
+  190 | 			cmd_text.cursize = 0;
+  191 | 		else
+  192 | 		{
+  193 | 			i++;
+  194 | 			cmd_text.cursize -= i;
+  195 | 			memmove (text, text+i, cmd_text.cursize);
+  196 | 		}
+  197 | 
+  198 | // execute the command line
+  199 | 
+  200 | 		Cmd_ExecuteString (line);		
+  201 | 	}
+  202 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cmd_common.cpp:16
+   16 | int			cmd_wait;
+// oracle/codemp/qcommon/cmd_common.cpp:17
+   17 | cmd_t		cmd_text;
+```
+
+## RESOLVED CALL SURFACE — 2 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Cmd_ExecuteString` | `common`, `cm`, `sv`, `rm`, `host` | packet `qcommon__2004_Cmd_ExecuteString.md` |
+| `Com_Memcpy` | — | packet `qcommon__0165_Com_Memcpy.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`memmove`
+
+## TYPE ROSETTA — import these, never redeclare
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `MAX_CMD_LINE` | `MAX_CMD_LINE` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/cmd/cmd_consts.rs` |
+
+=== qcommon__2138_Cmd_Init ===
+# ENGINE PORT PACKET — `Cmd_Init`
+
+- seq **2138**  ·  wave **8**  ·  unit **2025**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **7**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cmd_Init(common: &mut Common, cm: &mut CollisionWorld, rm: &mut RenderModels, host: &mut dyn EngineHost) { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cmd_Init` — oracle/codemp/qcommon/cmd_common.cpp:501-507 (7 LOC)
+```c
+  501 | void Cmd_Init (void) {
+  502 | 	Cmd_AddCommand ("cmdlist",Cmd_List_f);
+  503 | 	Cmd_AddCommand ("exec",Cmd_Exec_f);
+  504 | 	Cmd_AddCommand ("vstr",Cmd_Vstr_f);
+  505 | 	Cmd_AddCommand ("echo",Cmd_Echo_f);
+  506 | 	Cmd_AddCommand ("wait", Cmd_Wait_f);
+  507 | }
+```
+
+## RESOLVED CALL SURFACE — 6 in-engine callee(s), 0 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Cmd_AddCommand` | `common`, `cm`, `rm`, `host` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `Cmd_Echo_f` | `common` | packet `qcommon__1760_Cmd_Echo_f.md` |
+| `Cmd_Exec_f` | `common`, `cm`, `rm`, `host` | packet `qcommon__2002_Cmd_Exec_f.md` |
+| `Cmd_List_f` | `common` | packet `qcommon__1761_Cmd_List_f.md` |
+| `Cmd_Vstr_f` | `common` | packet `qcommon__2003_Cmd_Vstr_f.md` |
+| `Cmd_Wait_f` | `common` | packet `qcommon__0924_Cmd_Wait_f.md` |
+
+## TYPE ROSETTA — import these, never redeclare
+
+=== qcommon__2220_Cbuf_ExecuteText ===
+# ENGINE PORT PACKET — `Cbuf_ExecuteText`
+
+- seq **2220**  ·  wave **9**  ·  unit **2107**  ·  subsystem **qcommon**  ·  file `cmd_common.cpp`  ·  oracle LOC **21**
+- DESTINATION: `crates/mp/engine/qcommon/src/cmd_common.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn Cbuf_ExecuteText(common: &mut Common, cm: &mut CollisionWorld, sv: &mut Server, rm: &mut RenderModels, host: &mut dyn EngineHost, exec_when: c_int, text: *const c_char) { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `Cbuf_ExecuteText` — oracle/codemp/qcommon/cmd_common.cpp:121-141 (21 LOC)
+```c
+  121 | void Cbuf_ExecuteText (int exec_when, const char *text)
+  122 | {
+  123 | 	switch (exec_when)
+  124 | 	{
+  125 | 	case EXEC_NOW:
+  126 | 		if (text && strlen(text) > 0) {
+  127 | 			Cmd_ExecuteString (text);
+  128 | 		} else {
+  129 | 			Cbuf_Execute();
+  130 | 		}
+  131 | 		break;
+  132 | 	case EXEC_INSERT:
+  133 | 		Cbuf_InsertText (text);
+  134 | 		break;
+  135 | 	case EXEC_APPEND:
+  136 | 		Cbuf_AddText (text);
+  137 | 		break;
+  138 | 	default:
+  139 | 		Com_Error (ERR_FATAL, "Cbuf_ExecuteText: bad exec_when");
+  140 | 	}
+  141 | }
+```
+
+## RESOLVED CALL SURFACE — 5 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Cbuf_AddText` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `Cbuf_Execute` | `common`, `cm`, `sv`, `rm`, `host` | packet `qcommon__2137_Cbuf_Execute.md` |
+| `Cbuf_InsertText` | `common` | packet `qcommon__1759_Cbuf_InsertText.md` |
+| `Cmd_ExecuteString` | `common`, `cm`, `sv`, `rm`, `host` | packet `qcommon__2004_Cmd_ExecuteString.md` |
+| `Com_Error` | `common`, `cm`, `sv`, `rm`, `rmg`, `host` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`strlen`
+
+## TYPE ROSETTA — import these, never redeclare
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `ERR_FATAL` | `errorParm_t::ERR_FATAL` | mp_qshared | `crates/mp/qshared/src/shared/error_parm.rs` |
+| `EXEC_APPEND` | `cbufExec_t::EXEC_APPEND` | mp_qshared | `crates/mp/qshared/src/shared/cbuf_exec.rs` |
+| `EXEC_INSERT` | `cbufExec_t::EXEC_INSERT` | mp_qshared | `crates/mp/qshared/src/shared/cbuf_exec.rs` |
+| `EXEC_NOW` | `cbufExec_t::EXEC_NOW` | mp_qshared | `crates/mp/qshared/src/shared/cbuf_exec.rs` |
+
