@@ -844,7 +844,7 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
         let len = libc::strlen(ospath);
         *ospath.add(len - 1) = 0;
 
-        let f = FS_HandleForFile(common);
+        let f = unsafe { FS_HandleForFile(common) };
         common.fsh[f as usize].zipFile = mp_qshared::shared::qfalse;
 
         if (*common.fs_debug).integer != 0 {
@@ -982,7 +982,7 @@ pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileH
         );
     }
 
-    let f = FS_HandleForFile(common);
+    let f = unsafe { FS_HandleForFile(common) };
     common.fsh[f as usize].zipFile = mp_qshared::shared::qfalse;
 
     unsafe {
@@ -1040,11 +1040,11 @@ pub fn FS_Read2(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_
     }
     if common.fsh[f as usize].streamed != mp_qshared::shared::qfalse {
         common.fsh[f as usize].streamed = mp_qshared::shared::qfalse;
-        let r = Sys_StreamedRead(buffer, len, 1, f);
+        let r = unsafe { Sys_StreamedRead(buffer, len, 1, f) };
         common.fsh[f as usize].streamed = mp_qshared::shared::qtrue;
         r
     } else {
-        FS_Read(common, buffer, len, f)
+        unsafe { FS_Read(common, buffer, len, f) }
     }
 }
 
@@ -1195,7 +1195,7 @@ pub fn FS_FileIsInPAK(
                 let mut pakFile: *mut fileInPack_t = *(*pak).hashTable.add(hash as usize);
                 loop {
                     // case and separator insensitive comparisons
-                    if crate::files_common::FS_FilenameCompare((*pakFile).name.as_ptr(), filename) == 0 {
+                    if crate::files_common::FS_FilenameCompare((*pakFile).name, filename) == 0 {
                         if !pChecksum.is_null() {
                             *pChecksum = (*pak).pure_checksum;
                         }

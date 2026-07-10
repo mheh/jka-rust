@@ -384,9 +384,8 @@ pub fn CM_PointContents(cm: &mut CollisionWorld, p: vec3_t, model: clipHandle_t)
             if i == (*b).numsides {
                 contents |= (*b).contents;
                 if !cm.cmg.landScape.is_null() && (contents & CONTENTS_TERRAIN) != 0 {
-                    let landscape = cm.cmg.landScape as *mut CCMLandScape;
-                    if p[2] < (*landscape).GetWaterHeight() {
-                        contents |= (*landscape).GetWaterContents();
+                    if p[2] < cm.terrain_water_height() {
+                        contents |= cm.terrain_water_contents();
                     }
                 }
             }

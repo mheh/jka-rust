@@ -838,7 +838,7 @@ pub fn CM_TestInLeaf(
                 continue;
             }
 
-            if cm.cm_terrainPhysics != 0
+            if (*cm.cm_terrainPhysics).integer != 0
                 && !cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
@@ -857,7 +857,7 @@ pub fn CM_TestInLeaf(
         }
 
         // test against all patches
-        if cm.cm_noCurves == 0 {
+        if (*cm.cm_noCurves).integer == 0 {
             for k in 0..(*leaf).numLeafSurfaces {
                 let patch: *mut cPatch_t = *(*local).surfaces.offset(
                     *(*local)
@@ -1235,7 +1235,7 @@ pub fn CM_TraceThroughLeaf(
                 continue;
             }
 
-            if cm.cm_terrainPhysics != 0
+            if (*cm.cm_terrainPhysics).integer != 0
                 && !cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
@@ -1254,7 +1254,7 @@ pub fn CM_TraceThroughLeaf(
         }
 
         // trace line against all patches in the leaf
-        if cm.cm_noCurves == 0 {
+        if (*cm.cm_noCurves).integer == 0 {
             for k in 0..(*leaf).numLeafSurfaces {
                 let patch: *mut cPatch_t = *(*local).surfaces.offset(
                     *(*local)
@@ -1314,7 +1314,7 @@ pub fn CM_TraceToLeaf(
                 continue;
             }
 
-            if cm.cm_terrainPhysics != 0
+            if (*cm.cm_terrainPhysics).integer != 0
                 && !cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
@@ -1334,7 +1334,7 @@ pub fn CM_TraceToLeaf(
         }
 
         // trace line against all patches in the leaf
-        if cm.cm_noCurves == 0 {
+        if (*cm.cm_noCurves).integer == 0 {
             for k in 0..(*leaf).numLeafSurfaces {
                 let patch: *mut cPatch_t = *(*local).surfaces.offset(
                     *(*local)
