@@ -366,6 +366,9 @@ pub fn Com_InitPushEvent(common: &mut Common) {
 /// `Com_Crash_f`.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1097-1099`
+// Raven deliberately writes through a null pointer to force a crash; keep that
+// faithful behavior and silence the deny-by-default `deref_nullptr` lint.
+#[allow(deref_nullptr)]
 pub fn Com_Crash_f() {
     unsafe {
         *(0 as *mut c_int) = 0x1234_5678;
@@ -963,13 +966,13 @@ pub fn Com_RunAndTimeServerPacket(
 
     unsafe {
         if (*common.com_speeds).integer != 0 {
-            t1 = host.milliseconds_sys();
+            t1 = crate::timing::sys_milliseconds(common);
         }
 
         SV_PacketEvent(common, cm, sv, rm, rmg, host, *evFrom, buf);
 
         if (*common.com_speeds).integer != 0 {
-            let t2 = host.milliseconds_sys();
+            let t2 = crate::timing::sys_milliseconds(common);
             let msec = t2 - t1;
             if (*common.com_speeds).integer == 3 {
                 crate::common::com_printf(common, &format!("SV_PacketEvent time: {msec}\n"));
@@ -1138,7 +1141,7 @@ pub fn Com_Frame(
         //
         unsafe {
             if (*common.com_speeds).integer != 0 {
-                let _time_before_first_events = host.milliseconds_sys();
+                let _time_before_first_events = crate::timing::sys_milliseconds(common);
             }
 
             // we may want to spin here if things are going too fast
@@ -1174,7 +1177,7 @@ pub fn Com_Frame(
         //
         unsafe {
             if (*common.com_speeds).integer != 0 {
-                let _time_before_server = host.milliseconds_sys();
+                let _time_before_server = crate::timing::sys_milliseconds(common);
             }
         }
 
@@ -1218,7 +1221,7 @@ pub fn Com_Frame(
                 // without a frame of latency
                 //
                 if (*common.com_speeds).integer != 0 {
-                    let _time_before_events = host.milliseconds_sys();
+                    let _time_before_events = crate::timing::sys_milliseconds(common);
                 }
                 Com_EventLoop(common, cm, sv, rm, rmg, host);
                 crate::cmd_common::Cbuf_Execute(common, cm, sv, rm, host);
@@ -1227,13 +1230,13 @@ pub fn Com_Frame(
                 // client side
                 //
                 if (*common.com_speeds).integer != 0 {
-                    let _time_before_client = host.milliseconds_sys();
+                    let _time_before_client = crate::timing::sys_milliseconds(common);
                 }
 
                 CL_Frame(msec);
 
                 if (*common.com_speeds).integer != 0 {
-                    let _time_after = host.milliseconds_sys();
+                    let _time_after = crate::timing::sys_milliseconds(common);
                 }
             }
         }
@@ -1417,7 +1420,13 @@ pub fn Com_Init(
         Com_StartupVariable(common, cm, rm, host, core::ptr::null());
 
         // Seed the random number generator
-        host.rand_init(host.milliseconds(true));
+        //TODO: Port Rand_Init — the engine-side q_math LCG (ruling 21's
+        // `common.qrand` QRand field) has NOT landed: the generator currently
+        // lives only in game-tier `BgState` (q_math_rand.rs), unreachable from
+        // qcommon. Seed value computed faithfully; the seeding lands with the
+        // engine-LCG wave.
+        // Source: oracle/codemp/qcommon/common.cpp:1248
+        let _rand_seed = crate::timing::sys_milliseconds(common);
 
         // get the developer cvar set as early as possible
         Com_StartupVariable(common, cm, rm, host, c"developer".as_ptr());

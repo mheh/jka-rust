@@ -127,7 +127,7 @@ impl Engine {
             addr_of_mut!((*p).render_models).write(Default::default());
             addr_of_mut!((*p).nav).write(Default::default());
             addr_of_mut!((*p).roff).write(Default::default());
-            // cm.shaderTextTable: Vec-backed CmHashTable placeholder, not zero-valid.
+            // cm.shaderTextTable: BTreeMap<String, usize>, not zero-valid.
             addr_of_mut!((*p).cm.shaderTextTable).write(Default::default());
             // cm.cmShaderTable: Vec-backed CmHashTable, not zero-valid.
             addr_of_mut!((*p).cm.cmShaderTable).write(Default::default());

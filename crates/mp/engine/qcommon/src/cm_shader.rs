@@ -180,12 +180,15 @@ pub fn CM_CreateShaderTextHash(
         if unsafe { *token } == 0 {
             break;
         }
-        //TODO: Port CCMShaderText
-        // Source: oracle/codemp/qcommon/cm_local.h (CCMShaderText)
-        let shader = crate::cm::ccmshader_text::CCMShaderText::CCMShaderText(rmg, host, token, p);
-        //TODO: Port shaderTextTable
-        // Source: oracle/codemp/qcommon/cm_shader.cpp:29
-        cm.shaderTextTable.insert(shader);
+        // Raven `new CCMShaderText(token, p)` captures name=token, mData=p (a
+        // pointer into `shaderText`); the idiomatic map stores name → byte
+        // offset of `p` within the `shaderText` buffer (§17).
+        // Source: `oracle/codemp/qcommon/cm_shader.cpp:16,55-56`
+        let name = unsafe { core::ffi::CStr::from_ptr(token) }
+            .to_string_lossy()
+            .into_owned();
+        let offset = (p as usize) - (cm.shaderText as usize);
+        cm.shaderTextTable.insert(name, offset);
 
         unsafe { SkipBracedSection(&mut p) };
     }
@@ -200,11 +203,13 @@ pub fn CM_GetShaderText(
     host: &mut dyn EngineHost,
     key: *const c_char,
 ) -> *const c_char {
-    //TODO: Port shaderTextTable
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:29
-    let st = cm.shaderTextTable[key];
-    if !st.is_null() {
-        return unsafe { (*st).GetData(rmg, host) };
+    // Raven `st = shaderTextTable[key]; return st ? st->GetData() : NULL`.
+    // The map yields the stored byte offset; `GetData` (the captured `mData`)
+    // is `shaderText + offset`.
+    // Source: `oracle/codemp/qcommon/cm_shader.cpp:158-168`
+    let key_str = unsafe { core::ffi::CStr::from_ptr(key) }.to_string_lossy();
+    if let Some(&offset) = cm.shaderTextTable.get(key_str.as_ref()) {
+        return unsafe { cm.shaderText.add(offset) } as *const c_char;
     }
     core::ptr::null()
 }
@@ -363,8 +368,6 @@ pub fn CM_LoadShaderFiles(
 ///
 /// Source: `oracle/codemp/qcommon/cm_shader.cpp:176-184`
 pub fn CM_FreeShaderText(common: &mut Common, cm: &mut CollisionWorld) {
-    //TODO: Port shaderTextTable
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:29
     cm.shaderTextTable.clear();
     //TODO: Port shaderText
     // Source: oracle/codemp/qcommon/cm_shader.cpp:28

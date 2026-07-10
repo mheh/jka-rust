@@ -51,6 +51,7 @@ use crate::cm::trace_work_s::{traceWork_s, traceWork_t};
 use crate::cm_load::{
     CCMLandScape, RenderModels, RmManager, CM_ClipHandleToModel, CM_ModelBounds, CM_TempBoxModel,
 };
+use crate::cm_patch_fns::{CM_PositionTestInPatchCollide, CM_TraceThroughPatchCollide};
 use crate::cm_test::{CM_BoxLeafnums_r, CM_StoreLeafs};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
@@ -487,12 +488,14 @@ pub fn CM_HandlePatchCollision(
     checkcount: c_int,
 ) {
     unsafe {
-        // Get the collision data
-        let mut brush = (*patch).GetCollisionData();
-        let numBrushes = (*patch).GetNumBrushes();
+        // Get the collision data. The patch's brush slice lives in the owning
+        // landscape's shared arena (RMG-D7); reach it through `cmg.landScape`.
+        let ls = &mut *(cm.cmg.landScape as *mut crate::cm_terrain::CmLandScape);
+        let mut brush = (*patch).get_collision_data(ls);
+        let numBrushes = (*patch).get_num_brushes();
 
         for _ in 0..numBrushes {
-            if (*brush).checkcount == checkcount {
+            if (*brush).checkcount as c_int == checkcount {
                 return;
             }
 
@@ -502,7 +505,7 @@ pub fn CM_HandlePatchCollision(
                 continue;
             }
 
-            (*brush).checkcount = checkcount;
+            (*brush).checkcount = checkcount as u16;
 
             CM_TraceThroughBrush(cm, tw, trace, brush, false);
             if trace.fraction <= 0.0 {
@@ -877,7 +880,7 @@ pub fn CM_TestInLeaf(
                     continue;
                 }
 
-                if CM_PositionTestInPatchCollide(tw, (*patch).pc) {
+                if CM_PositionTestInPatchCollide(tw, (*patch).pc) != 0 {
                     trace.startsolid = qtrue as u8;
                     trace.allsolid = qtrue as u8;
                     trace.fraction = 0.0;
@@ -935,15 +938,11 @@ pub fn CM_PositionTest(
 
         // test the contents of the leafs
         for i in 0..ll.count {
-            CM_TestInLeaf(
-                cm,
-                rmg,
-                host,
-                tw,
-                trace,
-                &mut *cm.cmg.leafs.add(leafs[i as usize] as usize),
-                &mut cm.cmg,
-            );
+            // Raw pointers (addr_of_mut) so `cm.cmg`/leaf don't alias the `cm`
+            // receiver passed to the same call (CM_PointLeafnum precedent).
+            let leaf_ptr = cm.cmg.leafs.add(leafs[i as usize] as usize);
+            let cmg = core::ptr::addr_of_mut!(cm.cmg);
+            CM_TestInLeaf(cm, rmg, host, tw, trace, leaf_ptr, cmg);
             if trace.allsolid != 0 {
                 break;
             }

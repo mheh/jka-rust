@@ -144,9 +144,9 @@ pub fn sys_milliseconds(engine: &Engine, base_time: bool) -> i32 {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0) as i32;
     }
-    // Base-relative: now − base as u64 ms truncated `as i32` — reproducing
-    // timeGetTime's practical 49.7-day wrap (LIFE-D4b).
-    engine.common.time_base.elapsed().as_millis() as u64 as i32
+    // Base-relative: the one implementation lives in qcommon (Common owns the
+    // time base; timing is not a host service) — delegate to it (LIFE-D4b).
+    mp_engine_qcommon::timing::sys_milliseconds(&engine.common)
 }
 
 /// The one-frame body wrapped by `com_frame`'s `catch_unwind` boundary. Private

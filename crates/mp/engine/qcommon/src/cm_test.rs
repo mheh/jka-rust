@@ -159,14 +159,8 @@ pub fn CM_BoxLeafnums_r(cm: &mut CollisionWorld, ll: *mut leafList_t, mut nodenu
     unsafe {
         loop {
             if nodenum < 0 {
-                // PORT-NOTE(storeLeafs-receiver): the fn-pointer field's Rust
-                // shape (`leaf_list_s.rs`) carries no `cm` receiver param —
-                // `CM_StoreLeafs`/`CM_StoreBrushes` need it (they read `cmg`),
-                // but the ported table shape can't thread it through the
-                // fn-ptr call. Escalated as a shape mismatch; transcribing the
-                // call per the existing field signature.
                 if let Some(store) = (*ll).storeLeafs {
-                    store(ll, nodenum);
+                    store(cm, ll, nodenum);
                 }
                 return;
             }
@@ -236,9 +230,6 @@ pub fn CM_BoxLeafnums(
     ll.count = 0;
     ll.maxcount = listsize;
     ll.list = boxList;
-    // SHAPE-MISMATCH: `leafList_s.storeLeafs` is a 2-arg extern "C" fn ptr
-    // (`ll, nodenum`), but `CM_StoreLeafs`'s LAW signature carries the `cm`
-    // receiver (it reads `cmg`) — arities disagree; see cm_test.rs shape note.
     ll.storeLeafs = Some(CM_StoreLeafs);
     ll.lastLeaf = 0;
     ll.overflowed = qfalse;
@@ -271,7 +262,6 @@ pub fn CM_BoxBrushes(
     ll.count = 0;
     ll.maxcount = listsize;
     ll.list = boxList as *mut c_int;
-    // SHAPE-MISMATCH: same arity disagreement as `CM_BoxLeafnums` — see note there.
     ll.storeLeafs = Some(CM_StoreBrushes);
     ll.lastLeaf = 0;
     ll.overflowed = qfalse;

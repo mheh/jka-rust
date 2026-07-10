@@ -160,15 +160,16 @@ pub struct CollisionWorld {
     ///
     /// Source: `oracle/codemp/qcommon/cm_shader.cpp:28-29`
     pub shaderText: *mut c_char,
-    // PORT-NOTE(ccmshader-text): `CCMShaderText` (`cm_local.h`) has not
-    // landed in this crate yet (referenced opaquely by `cm_shader.rs` via
-    // `crate::cm::ccmshader_text::CCMShaderText`, a module that does not
-    // exist here); the table element is left an untyped pointer pending that
-    // landing rather than inventing the type in this file.
+    // Raven `CHash<CCMShaderText> shaderTextTable`. `CCMShaderText` is a tiny
+    // vendored-container element (name + `const char *mData` into `shaderText`);
+    // per porting-rules §17 it collapses to an idiomatic map of shader name →
+    // byte offset of the text block within `shaderText` (`shaderText` is a raw
+    // `Z_Malloc` buffer, never realloc'd after load, so offsets stay stable).
+    // Source: `oracle/codemp/qcommon/cm_shader.cpp:9-33`
     //
-    // WRITELIST(cm.shaderTextTable): `Vec`-backed, not zero-valid — needs
-    // `Engine::new` to `.write(Default::default())`.
-    pub shaderTextTable: CmHashTable<*mut ()>,
+    // WRITELIST(cm.shaderTextTable): needs `Engine::new` to
+    // `.write(Default::default())`.
+    pub shaderTextTable: std::collections::BTreeMap<String, usize>,
 
     /// Raven `CHash<CCMShader> cmShaderTable` — the by-name `CCMShader`
     /// lookup/registration table.

@@ -67,7 +67,9 @@ extern "Rust" {
     fn Sys_LoadDll(
         name: *const c_char,
         entryPoint: *mut Option<unsafe extern "C" fn(callNum: c_int, ...) -> c_int>,
-        systemcalls: Option<extern "C" fn(*mut c_int) -> c_int>,
+        // Raven's `systemcalls` is the C-variadic `int (QDECL *)(int, ...)`
+        // (vm.cpp) — the SEAM-D11 trampoline type, not a `(*mut c_int)` fn.
+        systemcalls: Option<unsafe extern "C-unwind" fn(isize, ...) -> isize>,
     ) -> *mut core::ffi::c_void;
     fn Sys_UnloadDll(dllHandle: *mut core::ffi::c_void);
     fn Cmd_AddCommand(
@@ -827,7 +829,16 @@ pub fn VM_Create(
             // try to load as a system dll
             let vm_name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
             host.print(&format!("Loading dll file {vm_name}.\n"));
-            (*vm).dllHandle = Sys_LoadDll(module, &mut (*vm).entryPoint, VM_DllSyscall as _);
+            // SEAM-D11: `game_syscall_trampoline` is the C-variadic entry that
+            // unpacks the va_list and dispatches to the armed engine slot; the
+            // Rust `VM_DllSyscall` is reached through slot arming, not directly.
+            // Slot arming for the engine-side VM path lands with the sys/dll wave
+            // (`Sys_LoadDll` itself is still an unported extern).
+            (*vm).dllHandle = Sys_LoadDll(
+                module,
+                &mut (*vm).entryPoint,
+                Some(crate::vm::trampoline::game_syscall_trampoline),
+            );
             if !(*vm).dllHandle.is_null() {
                 return vm;
             }
@@ -841,7 +852,7 @@ pub fn VM_Create(
         let filename = format!("vm/{vm_name}.qvm");
         host.print(&format!("Loading vm file {filename}.\n"));
         let file_bytes = host.fs_read_file(&filename);
-        let header = match file_bytes {
+        let header = match file_bytes.as_ref() {
             Some(bytes) if !bytes.is_empty() => bytes.as_ptr() as *mut vmHeader_t,
             _ => {
                 host.print("Failed.\n");

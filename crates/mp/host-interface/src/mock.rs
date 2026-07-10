@@ -52,7 +52,7 @@ use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, MAX_GENTITIES};
-use mp_qshared::shared::{qhandle_t, vec3_t};
+use mp_qshared::shared::{qboolean, qhandle_t, vec3_t};
 
 use crate::engine_host::EngineHost;
 use crate::platform_host::PlatformHost;
@@ -341,6 +341,23 @@ impl EngineHost for MockHost {
         self.errors.push((code, msg.to_string()));
         panic!("MockHost EngineHost::error [{code:?}]: {msg}");
     }
+
+    fn sv_shownet_entity_classname(&mut self, _number: i32) -> Option<String> {
+        // No server spine in the mock; Raven's `if (sv.state)` reads as dead.
+        None
+    }
+
+    fn sys_init(&mut self) {}
+
+    fn sys_quit(&mut self) -> ! {
+        panic!("MockHost EngineHost::sys_quit");
+    }
+
+    fn sys_error(&mut self, msg: &str) -> ! {
+        panic!("MockHost EngineHost::sys_error: {msg}");
+    }
+
+    fn sys_show_console(&mut self, _level: i32, _quit_on_close: qboolean) {}
 
     fn vm_call(&mut self, vm: VmSlot, callnum: i32, args: &[isize]) -> isize {
         self.vm_calls.push((vm, callnum, args.to_vec()));

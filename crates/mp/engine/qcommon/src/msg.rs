@@ -12,6 +12,8 @@ use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::shared::{errorParm_t, qboolean, qfalse, qtrue};
 
+use mp_host_interface::engine_host::EngineHost;
+
 use crate::common::Common;
 
 // PORT-NOTE(q_math-reach): `Q_strncpyz` (q_shared primitive) is ported in
@@ -30,13 +32,9 @@ extern "C" {
     fn strlen(s: *const c_char) -> usize;
 }
 
-// PORT-NOTE(cross-crate): `Server`/`SV_GentityNum` (oracle/codemp/qcommon/../
-// server/server.h:233; server/sv_game.cpp:58) live in `mp_engine_server`,
-// which itself depends on THIS crate (`mp_engine_qcommon`) — importing them
-// here would be a dependency cycle. Referenced by bare (unqualified) name
-// per the resolved signature exactly as the packet prints it; reported as a
-// shape_mismatch for the integration pass to resolve (likely: move these two
-// fns' destination, or split a shared sub-crate).
+// The `sv`/`SV_GentityNum` cross-crate reach (server depends on qcommon) is
+// resolved through the sanctioned host edge `EngineHost::
+// sv_shownet_entity_classname` (ruling 56c); see `MSG_ReadDeltaEntity`.
 //
 // PORT-NOTE(same-file callees): `MSG_WriteBits`/`MSG_ReadBits`/`MSG_WriteByte`/
 // `MSG_WriteShort`/`MSG_WriteData`/`MSG_ReadLong` land in this SAME
@@ -944,15 +942,15 @@ pub fn MSG_ReadDeltaUsercmdKey(
 
 /// Raven `MSG_ReadDeltaEntity`.
 ///
-/// STATE: `cl_shownet` (cvar read), `entityStateFields`, `sv` — see
-/// missing_symbols/shape_mismatches for the unresolved cvar/table/cross-crate
-/// items (netField_t has no rosetta row; `Server` lives in a crate this one
-/// does not depend on).
+/// STATE: `cl_shownet` (cvar read), `entityStateFields`. The `sv`/
+/// `SV_GentityNum` classname probe (msg.cpp:1268-1270) reaches the server spine
+/// through the sanctioned host edge ([`EngineHost::sv_shownet_entity_classname`],
+/// ruling 56c) — qcommon cannot depend on `mp_engine_server` (cycle).
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:1228-1383`
 pub fn MSG_ReadDeltaEntity(
     common: &mut Common,
-    sv: &mut Server,
+    host: &mut dyn EngineHost,
     msg: *mut msg_t,
     from: *mut entityState_t,
     to: *mut entityState_t,
@@ -1001,11 +999,7 @@ pub fn MSG_ReadDeltaEntity(
         // shownet 2/3 will interleave with other printed info, -1 will
         // just print the delta records`
         let print = if common.cl_shownet >= 2 || common.cl_shownet == -1 {
-            if sv.sv.state != 0 {
-                //TODO: Port SV_GentityNum
-                // Source: oracle/codemp/server/sv_game.cpp:58
-                let classname_ptr = (*SV_GentityNum(sv, number)).classname;
-                let classname = std::ffi::CStr::from_ptr(classname_ptr).to_string_lossy();
+            if let Some(classname) = host.sv_shownet_entity_classname(number) {
                 crate::common::com_printf(
                     common,
                     &format!("{:3}: #{:<3} ({}) ", (*msg).readcount, number, classname),
@@ -1024,14 +1018,19 @@ pub fn MSG_ReadDeltaEntity(
         (*to).number = number;
 
         for i in 0..lc {
-            let field = &mut common.entity_state_fields[i as usize];
-            let fromF = (from as *const u8).add(field.offset as usize) as *const c_int;
-            let toF = (to as *mut u8).add(field.offset as usize) as *mut c_int;
+            // Copy the field's data out (all `Copy`/`'static`) so no borrow of
+            // `common.entity_state_fields` is held across the `MSG_Read*`/
+            // `com_printf` calls below, which need `&mut common`.
+            let field_offset = common.entity_state_fields[i as usize].offset;
+            let field_bits = common.entity_state_fields[i as usize].bits;
+            let field_name = common.entity_state_fields[i as usize].name;
+            let fromF = (from as *const u8).add(field_offset as usize) as *const c_int;
+            let toF = (to as *mut u8).add(field_offset as usize) as *mut c_int;
 
             if MSG_ReadBits(common, msg, 1) == 0 {
                 // no change
                 *toF = *fromF;
-            } else if field.bits == 0 {
+            } else if field_bits == 0 {
                 // float
                 if MSG_ReadBits(common, msg, 1) == 0 {
                     *(toF as *mut f32) = 0.0f32;
@@ -1043,7 +1042,7 @@ pub fn MSG_ReadDeltaEntity(
                     trunc -= crate::qcommon::msg_consts::FLOAT_INT_BIAS;
                     *(toF as *mut f32) = trunc as f32;
                     if print {
-                        crate::common::com_printf(common, &format!("{}:{} ", field.name, trunc));
+                        crate::common::com_printf(common, &format!("{}:{} ", field_name, trunc));
                     }
                 } else {
                     // full floating point value
@@ -1051,7 +1050,7 @@ pub fn MSG_ReadDeltaEntity(
                     if print {
                         crate::common::com_printf(
                             common,
-                            &format!("{}:{} ", field.name, *(toF as *mut f32)),
+                            &format!("{}:{} ", field_name, *(toF as *mut f32)),
                         );
                     }
                 }
@@ -1059,9 +1058,9 @@ pub fn MSG_ReadDeltaEntity(
                 *toF = 0;
             } else {
                 // integer
-                *toF = MSG_ReadBits(common, msg, field.bits);
+                *toF = MSG_ReadBits(common, msg, field_bits);
                 if print {
-                    crate::common::com_printf(common, &format!("{}:{} ", field.name, *toF));
+                    crate::common::com_printf(common, &format!("{}:{} ", field_name, *toF));
                 }
             }
         }
