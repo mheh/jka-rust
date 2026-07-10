@@ -1,0 +1,8 @@
+VERSION "1"
+REFERENCE MISSION01
+LANG_ENGLISH "Destroy the base."
+LANG_GERMAN "Zerstoere die Basis."
+REFERENCE MISSION02
+LANG_ENGLISH "Rescue the prisoner."
+LANG_GERMAN "#same"
+ENDMARKER

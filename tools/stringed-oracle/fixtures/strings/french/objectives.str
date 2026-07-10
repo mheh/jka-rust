@@ -1,0 +1,5 @@
+VERSION "1"
+REFERENCE MISSION01
+LANG_ENGLISH "Destroy the base."
+LANG_FRENCH "Detruisez la base."
+ENDMARKER
