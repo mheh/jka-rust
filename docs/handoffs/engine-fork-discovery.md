@@ -565,3 +565,21 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     server-side StoreShaderRequest recording is live); only the poke
     replay is client-dead.
     **RULING: §20 the dead, keep the live records (user, 2026-07-09)**
+
+55. **EngineHost extension #2 (StringEd's verified call sites; ruling-36
+    pattern):** four methods — `cvar_register(name, default, flags)`
+    (Cvar_Get's registration side; establishes defaults exactly once),
+    `cvar_string(&mut self, name) -> String` (`->string` reads),
+    `cvar_take_modified(&mut self, name) -> bool` (read-and-clear
+    `->modified`, Raven's update-check idiom, stringed_ingame.cpp:
+    1169-1171), `fs_list_files(&mut self, dir, ext, want_subs) ->
+    Vec<String>` (FS_ListFiles + FS_FreeFileList collapsed — VFS/pk3-
+    aware, distinct from PlatformHost::list_files). MockHost grows
+    matching fixtures. EngineHost = 19 methods. ALSO (mechanical,
+    evidence-forced): stringed.md's construction story is corrected —
+    there is no `Common::default()`; `Common.stringed` is written
+    explicitly in `Engine::new()`'s zeroed-alloc write-list
+    (`StringEdPackage::default()` = Raven's `Clear(SE_FALSE)`), exactly
+    the existing `modules`/`time_base` precedent, because BTreeMap/Vec/
+    String fields are NOT all-zero-valid.
+    **RULING: extend — cvar trio + fs_list_files (user, 2026-07-09)**
