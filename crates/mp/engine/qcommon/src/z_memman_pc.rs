@@ -321,10 +321,10 @@ pub fn Com_InitZoneMemory(
     host: &mut dyn EngineHost,
 ) {
     // §19: Raven's `memset(&TheZone, 0, sizeof(TheZone))` zero-inits the
-    // whole struct before setting the header magic; the Rust field is
-    // Default-zeroed by the Engine aggregate (STATE-D13), so the memset
-    // itself is a no-op here — only the magic write is transcribed.
-    common.TheZone = Default::default();
+    // whole struct before setting the header magic. `zone_t` has no `Default`
+    // impl, so the memset is transcribed directly via `zeroed()` rather than
+    // relying on aggregate zero-init.
+    common.TheZone = unsafe { core::mem::zeroed() };
     common.TheZone.Header.iMagic = ZONE_MAGIC;
 
     //#ifdef _DEBUG

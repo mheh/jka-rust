@@ -67,7 +67,7 @@ pub use add_electricity_arg::addElectricityArgStruct_t;
 pub use addbezier_arg::addbezierArgStruct_t;
 pub use addpoly_arg::addpolyArgStruct_t;
 pub use addsprite_arg::addspriteArgStruct_t;
-pub use build_ident::{CPUSTRING, MAC_STATIC, PATH_SEP, QDECL};
+pub use build_ident::{CPUSTRING, MAC_STATIC, PATH_SEP, QDECL, Q3_VERSION};
 pub use cbuf_exec::cbufExec_t;
 pub use collision::{cplane_t, CollisionRecord_t, PLANE_X, PLANE_Y, PLANE_Z};
 pub use effect_trail_arg::effectTrailArgStruct_t;

@@ -9,7 +9,7 @@
 
 #![allow(non_snake_case, non_upper_case_globals, unused_variables)]
 
-use core::ffi::{c_char, c_int, c_long, c_uint};
+use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void};
 
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
@@ -42,6 +42,103 @@ use crate::cm_load::RenderModels;
 // Source: `oracle/codemp/null/null_snddma.cpp`
 mod null {
     pub fn S_ClearSoundBuffer() {}
+}
+
+// Callees from `files.cpp` / `z_memman.cpp` not yet landed in this crate —
+// forward-declared by their exact Raven names per the crate's established
+// `extern "Rust"` forward-declare convention (`cm_load.rs`/`files_common.rs`
+// precedent), with the faithful shape inferred from the Raven call sites
+// (receivers per the packets' resolved call surface). Each is reported in
+// missing_symbols for the finisher to reconcile once the real defs land.
+// PORT-NOTE(callee-signatures): the transcriber pathed these as
+// `crate::files::<fn>`, but `crate::files` is a types-only module; re-pathed
+// to bare forward-declares here.
+extern "Rust" {
+    fn FS_HandleForFile(common: &mut Common) -> fileHandle_t;
+    fn FS_CreatePath(common: &mut Common, OSPath: *mut c_char) -> qboolean;
+    fn FS_CopyFile(common: &mut Common, fromOSPath: *mut c_char, toOSPath: *mut c_char);
+    fn FS_Read(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_t) -> c_int;
+    fn Sys_StreamedRead(buffer: *mut (), size: c_int, count: c_int, f: fileHandle_t) -> c_int;
+    fn Sys_StreamSeek(f: fileHandle_t, offset: c_long, origin: c_int);
+    fn unzOpenCurrentFile(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        file: *mut c_void,
+    ) -> c_int;
+    fn FS_FileForHandle(common: &mut Common, f: fileHandle_t) -> *mut libc::FILE;
+    fn Z_Malloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        iSize: usize,
+        eTag: memtag_t,
+        bZeroit: qboolean,
+    ) -> *mut ();
+    fn Z_Free(common: &mut Common, pvAddress: *mut ());
+    fn FS_AddGameDirectory(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        path: *const c_char,
+        dir: *const c_char,
+    );
+    fn CopyString(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        in_: *const c_char,
+    ) -> *mut c_char;
+    fn FS_Restart(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        checksumFeed: c_int,
+    );
+    fn Sys_ListFiles(
+        common: &mut Common,
+        directory: *const c_char,
+        extension: *const c_char,
+        filter: *mut c_char,
+        numfiles: *mut c_int,
+        wantSubs: qboolean,
+    ) -> *mut *mut c_char;
+    fn Sys_FreeFileList(common: &mut Common, list: *mut *mut c_char);
+    fn FS_SV_FOpenFileRead(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        filename: *const c_char,
+        fp: *mut fileHandle_t,
+    ) -> c_int;
+    fn FS_FCloseFile(common: &mut Common, f: fileHandle_t);
+    fn FS_FOpenFileRead(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        filename: *const c_char,
+        file: *mut fileHandle_t,
+        uniqueFILE: qboolean,
+    ) -> c_int;
+    fn FS_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fileHandle_t;
+    fn Sys_BeginStreamedFile(common: &mut Common, f: fileHandle_t, readAhead: c_int);
+    fn FS_ListFiles(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        directory: *const c_char,
+        extension: *const c_char,
+        numfiles: *mut c_int,
+    ) -> *mut *mut c_char;
+    fn FS_FreeFileList(common: &mut Common, list: *mut *mut c_char);
 }
 
 /// Raven `FS_PakIsPure`.
@@ -146,7 +243,7 @@ pub fn Sys_FileOutOfDate(
 
     // extra error check, report as suspicious if you find a file locally but not out on the net.,.
     // PORT-NOTE(state): com_developer is not yet a field on `Common`.
-    if common.com_developer.integer != 0 {
+    if unsafe { (*common.com_developer).integer } != 0 {
         if !Sys_GetFileTime(psDataFileName, &mut ftDataFile) {
             crate::common::com_printf(
                 common,
@@ -540,7 +637,7 @@ pub fn FS_ClearPakReferences(common: &mut Common, mut flags: c_int) {
 pub fn FS_Flush(common: &mut Common, f: fileHandle_t) {
     // PORT-NOTE(state): fsh is not yet a field on `Common`.
     unsafe {
-        libc::fflush(common.fsh[f as usize].handleFiles.file.o);
+        libc::fflush(common.fsh[f as usize].handleFiles.file.o as *mut libc::FILE);
     }
 }
 
@@ -583,9 +680,9 @@ pub fn FS_FTell(common: &mut Common, f: fileHandle_t) -> c_int {
     // PORT-NOTE(state): fsh is not yet a field on `Common`.
     unsafe {
         if common.fsh[f as usize].zipFile == mp_qshared::shared::qtrue {
-            crate::unzip::unztell(common.fsh[f as usize].handleFiles.file.z)
+            crate::unzip::unztell(common.fsh[f as usize].handleFiles.file.z) as c_int
         } else {
-            libc::ftell(common.fsh[f as usize].handleFiles.file.o) as c_int
+            libc::ftell(common.fsh[f as usize].handleFiles.file.o as *mut libc::FILE) as c_int
         }
     }
 }
@@ -598,7 +695,7 @@ pub fn FS_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
     unsafe {
         let testpath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string.as_ptr(),
+            (*common.fs_homepath).string,
             common.fs_gamedir.as_ptr(),
             file,
         );
@@ -618,7 +715,7 @@ pub fn FS_SV_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
     unsafe {
         let testpath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string.as_ptr(),
+            (*common.fs_homepath).string,
             file,
             c"".as_ptr(),
         );
@@ -731,23 +828,23 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
     // PORT-NOTE(state): fsh/fs_debug/fs_homepath/fs_searchpaths are not yet
     // fields on `Common`.
     if common.fs_searchpaths.is_null() {
-        common.error.error(
+        crate::common::com_error(
             errorParm_t::ERR_FATAL,
-            "Filesystem call made without initialization\n",
+            "Filesystem call made without initialization\n".to_string(),
         );
     }
 
     unsafe {
         let ospath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string.as_ptr(),
+            (*common.fs_homepath).string,
             filename,
             c"".as_ptr(),
         );
         let len = libc::strlen(ospath);
         *ospath.add(len - 1) = 0;
 
-        let f = crate::files::FS_HandleForFile(common);
+        let f = FS_HandleForFile(common);
         common.fsh[f as usize].zipFile = mp_qshared::shared::qfalse;
 
         if (*common.fs_debug).integer != 0 {
@@ -757,12 +854,12 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
             );
         }
 
-        if crate::files::FS_CreatePath(common, ospath) != 0 {
+        if FS_CreatePath(common, ospath) != 0 {
             return 0;
         }
 
         // Com_DPrintf( "writing to: %s\n", ospath );
-        common.fsh[f as usize].handleFiles.file.o = libc::fopen(ospath, c"wb".as_ptr());
+        common.fsh[f as usize].handleFiles.file.o = libc::fopen(ospath, c"wb".as_ptr()) as *mut c_void;
 
         copy_cname(
             common.fsh[f as usize].name.as_mut_ptr(),
@@ -783,9 +880,9 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:395-419`
 pub fn FS_SV_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
     if common.fs_searchpaths.is_null() {
-        common.error.error(
+        crate::common::com_error(
             errorParm_t::ERR_FATAL,
-            "Filesystem call made without initialization\n",
+            "Filesystem call made without initialization\n".to_string(),
         );
     }
 
@@ -795,13 +892,13 @@ pub fn FS_SV_Rename(common: &mut Common, from: *const c_char, to: *const c_char)
     unsafe {
         let from_ospath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string.as_ptr(),
+            (*common.fs_homepath).string,
             from,
             c"".as_ptr(),
         );
         let to_ospath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string.as_ptr(),
+            (*common.fs_homepath).string,
             to,
             c"".as_ptr(),
         );
@@ -821,7 +918,7 @@ pub fn FS_SV_Rename(common: &mut Common, from: *const c_char, to: *const c_char)
 
         if libc::rename(from_ospath, to_ospath) != 0 {
             // Failed, try copying it and deleting the original
-            crate::files::FS_CopyFile(common, from_ospath, to_ospath);
+            FS_CopyFile(common, from_ospath, to_ospath);
             FS_Remove(from_ospath);
         }
     }
@@ -832,9 +929,9 @@ pub fn FS_SV_Rename(common: &mut Common, from: *const c_char, to: *const c_char)
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:427-449`
 pub fn FS_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
     if common.fs_searchpaths.is_null() {
-        common.error.error(
+        crate::common::com_error(
             errorParm_t::ERR_FATAL,
-            "Filesystem call made without initialization\n",
+            "Filesystem call made without initialization\n".to_string(),
         );
     }
 
@@ -844,13 +941,13 @@ pub fn FS_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
     unsafe {
         let from_ospath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string.as_ptr(),
+            (*common.fs_homepath).string,
             common.fs_gamedir.as_ptr(),
             from,
         );
         let to_ospath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string.as_ptr(),
+            (*common.fs_homepath).string,
             common.fs_gamedir.as_ptr(),
             to,
         );
@@ -868,7 +965,7 @@ pub fn FS_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
 
         if libc::rename(from_ospath, to_ospath) != 0 {
             // Failed, try copying it and deleting the original
-            crate::files::FS_CopyFile(common, from_ospath, to_ospath);
+            FS_CopyFile(common, from_ospath, to_ospath);
             FS_Remove(from_ospath);
         }
     }
@@ -879,13 +976,13 @@ pub fn FS_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:532-564`
 pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileHandle_t {
     if common.fs_searchpaths.is_null() {
-        common.error.error(
+        crate::common::com_error(
             errorParm_t::ERR_FATAL,
-            "Filesystem call made without initialization\n",
+            "Filesystem call made without initialization\n".to_string(),
         );
     }
 
-    let f = crate::files::FS_HandleForFile(common);
+    let f = FS_HandleForFile(common);
     common.fsh[f as usize].zipFile = mp_qshared::shared::qfalse;
 
     unsafe {
@@ -902,7 +999,7 @@ pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileH
     unsafe {
         let ospath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string.as_ptr(),
+            (*common.fs_homepath).string,
             common.fs_gamedir.as_ptr(),
             filename,
         );
@@ -914,11 +1011,11 @@ pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileH
             );
         }
 
-        if crate::files::FS_CreatePath(common, ospath) != 0 {
+        if FS_CreatePath(common, ospath) != 0 {
             return 0;
         }
 
-        common.fsh[f as usize].handleFiles.file.o = libc::fopen(ospath, c"ab".as_ptr());
+        common.fsh[f as usize].handleFiles.file.o = libc::fopen(ospath, c"ab".as_ptr()) as *mut c_void;
         common.fsh[f as usize].handleSync = mp_qshared::shared::qfalse;
         if common.fsh[f as usize].handleFiles.file.o.is_null() {
             return 0;
@@ -932,9 +1029,9 @@ pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileH
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:1007-1024`
 pub fn FS_Read2(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_t) -> c_int {
     if common.fs_searchpaths.is_null() {
-        common.error.error(
+        crate::common::com_error(
             errorParm_t::ERR_FATAL,
-            "Filesystem call made without initialization\n",
+            "Filesystem call made without initialization\n".to_string(),
         );
     }
 
@@ -943,11 +1040,11 @@ pub fn FS_Read2(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_
     }
     if common.fsh[f as usize].streamed != mp_qshared::shared::qfalse {
         common.fsh[f as usize].streamed = mp_qshared::shared::qfalse;
-        let r = crate::files::Sys_StreamedRead(buffer, len, 1, f);
+        let r = Sys_StreamedRead(buffer, len, 1, f);
         common.fsh[f as usize].streamed = mp_qshared::shared::qtrue;
         r
     } else {
-        crate::files::FS_Read(common, buffer, len, f)
+        FS_Read(common, buffer, len, f)
     }
 }
 
@@ -968,16 +1065,16 @@ pub fn FS_Seek(
     let mut foo = [0u8; 65536];
 
     if common.fs_searchpaths.is_null() {
-        common.error.error(
+        crate::common::com_error(
             errorParm_t::ERR_FATAL,
-            "Filesystem call made without initialization\n",
+            "Filesystem call made without initialization\n".to_string(),
         );
         return -1;
     }
 
     if common.fsh[f as usize].streamed != mp_qshared::shared::qfalse {
         common.fsh[f as usize].streamed = mp_qshared::shared::qfalse;
-        crate::files::Sys_StreamSeek(f, offset, origin);
+        Sys_StreamSeek(f, offset, origin);
         common.fsh[f as usize].streamed = mp_qshared::shared::qtrue;
     }
 
@@ -987,10 +1084,10 @@ pub fn FS_Seek(
             unsafe {
                 crate::unzip::unzSetCurrentFileInfoPosition(
                     common.fsh[f as usize].handleFiles.file.z,
-                    common.fsh[f as usize].zipFilePos,
+                    common.fsh[f as usize].zipFilePos as c_ulong,
                 );
             }
-            crate::files::unzOpenCurrentFile(
+            unzOpenCurrentFile(
                 common,
                 cm,
                 rm,
@@ -1002,34 +1099,32 @@ pub fn FS_Seek(
             unsafe {
                 crate::unzip::unzSetCurrentFileInfoPosition(
                     common.fsh[f as usize].handleFiles.file.z,
-                    common.fsh[f as usize].zipFilePos,
+                    common.fsh[f as usize].zipFilePos as c_ulong,
                 );
             }
-            crate::files::unzOpenCurrentFile(
+            unzOpenCurrentFile(
                 common,
                 cm,
                 rm,
                 host,
                 common.fsh[f as usize].handleFiles.file.z,
             );
-            crate::files::FS_Read(common, foo.as_mut_ptr() as *mut (), offset as c_int, f)
+            FS_Read(common, foo.as_mut_ptr() as *mut (), offset as c_int, f)
         } else {
-            common.error.error(
+            crate::common::com_error(
                 errorParm_t::ERR_FATAL,
-                "ZIP FILE FSEEK NOT YET IMPLEMENTED\n",
+                "ZIP FILE FSEEK NOT YET IMPLEMENTED\n".to_string(),
             );
             -1
         }
     } else {
-        let file = crate::files::FS_FileForHandle(common, f);
+        let file = FS_FileForHandle(common, f);
         let _origin = match origin {
             x if x == fsOrigin_t::FS_SEEK_CUR as c_int => libc::SEEK_CUR,
             x if x == fsOrigin_t::FS_SEEK_END as c_int => libc::SEEK_END,
             x if x == fsOrigin_t::FS_SEEK_SET as c_int => libc::SEEK_SET,
             _ => {
-                common
-                    .error
-                    .error(errorParm_t::ERR_FATAL, "Bad origin in FS_Seek\n");
+                crate::common::com_error(errorParm_t::ERR_FATAL, "Bad origin in FS_Seek\n".to_string());
                 libc::SEEK_CUR
             }
         };
@@ -1047,16 +1142,16 @@ pub fn FS_FileIsInPAK(
     pChecksum: *mut c_int,
 ) -> c_int {
     if common.fs_searchpaths.is_null() {
-        common.error.error(
+        crate::common::com_error(
             errorParm_t::ERR_FATAL,
-            "Filesystem call made without initialization\n",
+            "Filesystem call made without initialization\n".to_string(),
         );
     }
 
     if filename.is_null() {
-        common.error.error(
+        crate::common::com_error(
             errorParm_t::ERR_FATAL,
-            "FS_FOpenFileRead: NULL 'filename' parameter passed\n",
+            "FS_FOpenFileRead: NULL 'filename' parameter passed\n".to_string(),
         );
     }
 
@@ -1137,7 +1232,7 @@ pub fn Sys_ConcatenateFileLists(
     total_length += Sys_CountFileList(list2) as usize;
 
     // Create new list.
-    let cat = crate::files::Z_Malloc(
+    let cat = Z_Malloc(
         common,
         cm,
         rm,
@@ -1181,13 +1276,13 @@ pub fn Sys_ConcatenateFileLists(
         // Free our old lists.
         // NOTE: not freeing their content, it's been merged in dst and still being used
         if !list0.is_null() {
-            crate::files::Z_Free(common, list0 as *mut ());
+            Z_Free(common, list0 as *mut ());
         }
         if !list1.is_null() {
-            crate::files::Z_Free(common, list1 as *mut ());
+            Z_Free(common, list1 as *mut ());
         }
         if !list2.is_null() {
-            crate::files::Z_Free(common, list2 as *mut ());
+            Z_Free(common, list2 as *mut ());
         }
     }
 
@@ -1204,39 +1299,39 @@ pub fn FS_UpdateGamedir(
     host: &mut dyn EngineHost,
 ) {
     unsafe {
-        let gamedirvar_str = c_str_to_string((*common.fs_gamedirvar).string.as_ptr());
+        let gamedirvar_str = c_str_to_string((*common.fs_gamedirvar).string);
         if !gamedirvar_str.is_empty() && !gamedirvar_str.eq_ignore_ascii_case(BASEGAME) {
-            let cdpath_str = c_str_to_string((*common.fs_cdpath).string.as_ptr());
+            let cdpath_str = c_str_to_string((*common.fs_cdpath).string);
             if !cdpath_str.is_empty() {
-                crate::files::FS_AddGameDirectory(
+                FS_AddGameDirectory(
                     common,
                     cm,
                     rm,
                     host,
-                    (*common.fs_cdpath).string.as_ptr(),
-                    (*common.fs_gamedirvar).string.as_ptr(),
+                    (*common.fs_cdpath).string,
+                    (*common.fs_gamedirvar).string,
                 );
             }
-            let basepath_str = c_str_to_string((*common.fs_basepath).string.as_ptr());
+            let basepath_str = c_str_to_string((*common.fs_basepath).string);
             if !basepath_str.is_empty() {
-                crate::files::FS_AddGameDirectory(
+                FS_AddGameDirectory(
                     common,
                     cm,
                     rm,
                     host,
-                    (*common.fs_basepath).string.as_ptr(),
-                    (*common.fs_gamedirvar).string.as_ptr(),
+                    (*common.fs_basepath).string,
+                    (*common.fs_gamedirvar).string,
                 );
             }
-            let homepath_str = c_str_to_string((*common.fs_homepath).string.as_ptr());
+            let homepath_str = c_str_to_string((*common.fs_homepath).string);
             if !homepath_str.is_empty() && !homepath_str.eq_ignore_ascii_case(&basepath_str) {
-                crate::files::FS_AddGameDirectory(
+                FS_AddGameDirectory(
                     common,
                     cm,
                     rm,
                     host,
-                    (*common.fs_homepath).string.as_ptr(),
-                    (*common.fs_gamedirvar).string.as_ptr(),
+                    (*common.fs_homepath).string,
+                    (*common.fs_gamedirvar).string,
                 );
             }
         }
@@ -1254,9 +1349,9 @@ pub fn FS_PureServerSetReferencedPaks(
     pakSums: *const c_char,
     pakNames: *const c_char,
 ) {
-    crate::cmd::Cmd_TokenizeString(common, pakSums);
+    crate::cmd_common::Cmd_TokenizeString(common, pakSums);
 
-    let mut c = crate::cmd::Cmd_Argc(common);
+    let mut c = crate::cmd_common::Cmd_Argc(common);
     if c > MAX_SEARCH_PATHS as c_int {
         c = MAX_SEARCH_PATHS as c_int;
     }
@@ -1264,14 +1359,14 @@ pub fn FS_PureServerSetReferencedPaks(
     common.fs_numServerReferencedPaks = c;
 
     for i in 0..c as usize {
-        let arg = crate::cmd::Cmd_Argv(common, i as c_int);
+        let arg = crate::cmd_common::Cmd_Argv(common, i as c_int);
         common.fs_serverReferencedPaks[i] = unsafe { libc::atoi(arg) };
     }
 
     for i in 0..c as usize {
         if !common.fs_serverReferencedPakNames[i].is_null() {
             unsafe {
-                crate::files::Z_Free(common, common.fs_serverReferencedPakNames[i] as *mut ())
+                Z_Free(common, common.fs_serverReferencedPakNames[i] as *mut ())
             };
         }
         common.fs_serverReferencedPakNames[i] = core::ptr::null_mut();
@@ -1284,17 +1379,17 @@ pub fn FS_PureServerSetReferencedPaks(
         }
     };
     if !names_str.is_empty() {
-        crate::cmd::Cmd_TokenizeString(common, pakNames);
+        crate::cmd_common::Cmd_TokenizeString(common, pakNames);
 
-        let mut d = crate::cmd::Cmd_Argc(common);
+        let mut d = crate::cmd_common::Cmd_Argc(common);
         if d > MAX_SEARCH_PATHS as c_int {
             d = MAX_SEARCH_PATHS as c_int;
         }
 
         for i in 0..d as usize {
-            let arg = crate::cmd::Cmd_Argv(common, i as c_int);
+            let arg = crate::cmd_common::Cmd_Argv(common, i as c_int);
             common.fs_serverReferencedPakNames[i] =
-                crate::files::CopyString(common, cm, rm, host, arg);
+                CopyString(common, cm, rm, host, arg);
         }
     }
 }
@@ -1311,7 +1406,7 @@ pub fn FS_ConditionalRestart(
 ) -> qboolean {
     unsafe {
         if (*common.fs_gamedirvar).modified != 0 || checksumFeed != common.fs_checksumFeed {
-            crate::files::FS_Restart(common, cm, rm, host, checksumFeed);
+            FS_Restart(common, cm, rm, host, checksumFeed);
             return mp_qshared::shared::qtrue;
         }
     }
@@ -1336,25 +1431,25 @@ pub fn FS_GetModList(
         *listbuf = 0;
 
         let mut dummy: c_int = 0;
-        let p_files0 = crate::files::Sys_ListFiles(
+        let p_files0 = Sys_ListFiles(
             common,
-            (*common.fs_homepath).string.as_ptr(),
+            (*common.fs_homepath).string,
             core::ptr::null(),
             core::ptr::null_mut(),
             &mut dummy,
             mp_qshared::shared::qtrue,
         );
-        let p_files1 = crate::files::Sys_ListFiles(
+        let p_files1 = Sys_ListFiles(
             common,
-            (*common.fs_basepath).string.as_ptr(),
+            (*common.fs_basepath).string,
             core::ptr::null(),
             core::ptr::null_mut(),
             &mut dummy,
             mp_qshared::shared::qtrue,
         );
-        let p_files2 = crate::files::Sys_ListFiles(
+        let p_files2 = Sys_ListFiles(
             common,
-            (*common.fs_cdpath).string.as_ptr(),
+            (*common.fs_cdpath).string,
             core::ptr::null(),
             core::ptr::null_mut(),
             &mut dummy,
@@ -1388,12 +1483,12 @@ pub fn FS_GetModList(
                 // now we need to find some .pk3 files to validate the mod
                 let mut path = crate::files_common::FS_BuildOSPath4(
                     common,
-                    (*common.fs_basepath).string.as_ptr(),
+                    (*common.fs_basepath).string,
                     name,
                     c"".as_ptr(),
                 );
                 let mut n_paks: c_int = 0;
-                let mut p_paks = crate::files::Sys_ListFiles(
+                let mut p_paks = Sys_ListFiles(
                     common,
                     path,
                     c".pk3".as_ptr(),
@@ -1401,18 +1496,18 @@ pub fn FS_GetModList(
                     &mut n_paks,
                     mp_qshared::shared::qfalse,
                 );
-                crate::files::Sys_FreeFileList(common, p_paks); // we only use Sys_ListFiles to check wether .pk3 files are present
+                Sys_FreeFileList(common, p_paks); // we only use Sys_ListFiles to check wether .pk3 files are present
 
                 // Try on cd path
                 if n_paks <= 0 {
                     path = crate::files_common::FS_BuildOSPath4(
                         common,
-                        (*common.fs_cdpath).string.as_ptr(),
+                        (*common.fs_cdpath).string,
                         name,
                         c"".as_ptr(),
                     );
                     n_paks = 0;
-                    p_paks = crate::files::Sys_ListFiles(
+                    p_paks = Sys_ListFiles(
                         common,
                         path,
                         c".pk3".as_ptr(),
@@ -1420,19 +1515,19 @@ pub fn FS_GetModList(
                         &mut n_paks,
                         mp_qshared::shared::qfalse,
                     );
-                    crate::files::Sys_FreeFileList(common, p_paks);
+                    Sys_FreeFileList(common, p_paks);
                 }
 
                 // try on home path
                 if n_paks <= 0 {
                     path = crate::files_common::FS_BuildOSPath4(
                         common,
-                        (*common.fs_homepath).string.as_ptr(),
+                        (*common.fs_homepath).string,
                         name,
                         c"".as_ptr(),
                     );
                     n_paks = 0;
-                    p_paks = crate::files::Sys_ListFiles(
+                    p_paks = Sys_ListFiles(
                         common,
                         path,
                         c".pk3".as_ptr(),
@@ -1440,7 +1535,7 @@ pub fn FS_GetModList(
                         &mut n_paks,
                         mp_qshared::shared::qfalse,
                     );
-                    crate::files::Sys_FreeFileList(common, p_paks);
+                    Sys_FreeFileList(common, p_paks);
                 }
 
                 if n_paks > 0 {
@@ -1450,7 +1545,7 @@ pub fn FS_GetModList(
                     let desc_path_str = format!("{}/description.txt", name_str);
                     let desc_path_c = std::ffi::CString::new(desc_path_str).unwrap();
                     let mut desc_handle: fileHandle_t = 0;
-                    let mut n_desc_len = crate::files::FS_SV_FOpenFileRead(
+                    let mut n_desc_len = FS_SV_FOpenFileRead(
                         common,
                         cm,
                         rm,
@@ -1460,13 +1555,13 @@ pub fn FS_GetModList(
                     );
                     let desc_str: String;
                     if n_desc_len > 0 && desc_handle != 0 {
-                        let file = crate::files::FS_FileForHandle(common, desc_handle);
+                        let file = FS_FileForHandle(common, desc_handle);
                         let mut buf = [0u8; 49];
                         n_desc_len = libc::fread(buf.as_mut_ptr() as *mut _, 1, 48, file) as c_int;
                         if n_desc_len >= 0 {
                             buf[n_desc_len as usize] = 0;
                         }
-                        crate::files::FS_FCloseFile(common, desc_handle);
+                        FS_FCloseFile(common, desc_handle);
                         desc_str = c_str_to_string(buf.as_ptr() as *const c_char);
                     } else {
                         desc_str = name_str.clone();
@@ -1486,7 +1581,7 @@ pub fn FS_GetModList(
                 }
             }
         }
-        crate::files::Sys_FreeFileList(common, p_files);
+        Sys_FreeFileList(common, p_files);
     }
 
     n_mods
@@ -1509,7 +1604,7 @@ pub fn FS_FOpenFileByMode(
     let r;
     match mode {
         m if m == FS_READ => unsafe {
-            r = crate::files::FS_FOpenFileRead(
+            r = FS_FOpenFileRead(
                 common,
                 cm,
                 rm,
@@ -1520,7 +1615,7 @@ pub fn FS_FOpenFileByMode(
             );
         },
         m if m == FS_WRITE => unsafe {
-            *f = crate::files::FS_FOpenFileWrite(common, qpath);
+            *f = FS_FOpenFileWrite(common, qpath);
             r = if *f == 0 { -1 } else { 0 };
         },
         m if m == FS_APPEND_SYNC || m == FS_APPEND => unsafe {
@@ -1533,9 +1628,7 @@ pub fn FS_FOpenFileByMode(
             r = if *f == 0 { -1 } else { 0 };
         },
         _ => {
-            common
-                .error
-                .error(errorParm_t::ERR_FATAL, "FSH_FOpenFile: bad mode");
+            crate::common::com_error(errorParm_t::ERR_FATAL, "FSH_FOpenFile: bad mode".to_string());
         }
     }
 
@@ -1547,16 +1640,16 @@ pub fn FS_FOpenFileByMode(
         if *f != 0 {
             if common.fsh[*f as usize].zipFile == mp_qshared::shared::qtrue {
                 common.fsh[*f as usize].baseOffset =
-                    crate::unzip::unztell(common.fsh[*f as usize].handleFiles.file.z);
+                    crate::unzip::unztell(common.fsh[*f as usize].handleFiles.file.z) as c_int;
             } else {
                 common.fsh[*f as usize].baseOffset =
-                    libc::ftell(common.fsh[*f as usize].handleFiles.file.o) as c_int;
+                    libc::ftell(common.fsh[*f as usize].handleFiles.file.o as *mut libc::FILE) as c_int;
             }
             common.fsh[*f as usize].fileSize = r;
             common.fsh[*f as usize].streamed = mp_qshared::shared::qfalse;
 
             if mode == FS_READ {
-                crate::files::Sys_BeginStreamedFile(common, *f, 0x4000);
+                Sys_BeginStreamedFile(common, *f, 0x4000);
                 common.fsh[*f as usize].streamed = mp_qshared::shared::qtrue;
             }
         }
@@ -1590,7 +1683,7 @@ pub fn FS_GetFileList(
 
         let mut n_files: c_int = 0;
         let p_files =
-            crate::files::FS_ListFiles(common, cm, rm, host, path, extension, &mut n_files);
+            FS_ListFiles(common, cm, rm, host, path, extension, &mut n_files);
 
         let mut i = 0;
         let mut listbuf = listbuf;
@@ -1608,7 +1701,7 @@ pub fn FS_GetFileList(
             i += 1;
         }
 
-        crate::files::FS_FreeFileList(common, p_files);
+        FS_FreeFileList(common, p_files);
 
         n_files
     }

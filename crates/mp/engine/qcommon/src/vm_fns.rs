@@ -654,7 +654,7 @@ pub fn VM_Alloc(
     host: &mut dyn EngineHost,
     size: c_int,
 ) -> *mut () {
-    Hunk_Alloc(common, cm, rm, host, size, ha_pref::h_high)
+    unsafe { Hunk_Alloc(common, cm, rm, host, size, ha_pref::h_high) }
 }
 
 /// `VM_LoadSymbols`.

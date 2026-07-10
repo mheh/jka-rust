@@ -43,3 +43,11 @@ pub const QDECL: () = ();
 ///
 /// Source: `oracle/codemp/game/q_shared.h:268` (`__linux__` branch)
 pub const MAC_STATIC: () = ();
+
+/// Raven `Q3_VERSION` — build-banner version string, `"(internal)JAmp: v" +
+/// VERSION_STRING_DOTTED` (neither `_DEBUG` nor `FINAL_BUILD` defined for
+/// this build config).
+///
+/// Source: `oracle/codemp/qcommon/game_version.h:11`,
+/// `oracle/codemp/win32/AutoVersion.h:10`
+pub const Q3_VERSION: &str = "(internal)JAmp: v1.0.1.0";

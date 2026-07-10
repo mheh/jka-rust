@@ -707,10 +707,14 @@ pub fn CM_TraceThroughTerrain(
 ) {
     unsafe {
         // At this point we know we may be colliding with a terrain brush (and we know we have a valid terrain structure)
-        let landscape = cm.cmg.landScape as *mut CCMLandScape;
+        // PORT-NOTE(landscape-receiver): the packet's `cmg.landScape->Method(...)`
+        // calls resolve through `CollisionWorld::terrain_*` (ruling 38's
+        // receiver-shape repair — `CmLandScape` lives at `cm.land_scape`, not a
+        // raw `cmg.landScape` pointer); see `cm_terrain.rs`'s `impl CollisionWorld`
+        // block.
 
         // Check for absolutely no connection
-        if !CM_GenericBoxCollide((*tw).bounds, (*landscape).GetBounds()) {
+        if !CM_GenericBoxCollide((*tw).bounds, *cm.terrain_bounds()) {
             return;
         }
         // Now we know that at least some part of the trace needs to collide with the terrain
@@ -735,7 +739,7 @@ pub fn CM_TraceThroughTerrain(
 
         // Calculate number of iterations to process
         let mut count = (VectorLength(tDistance)
-            / ((*landscape).GetPatchScalarSize() * TERRAIN_STEP_MAGIC))
+            / (cm.terrain_patch_scalar_size() * TERRAIN_STEP_MAGIC))
             .ceil() as i32;
         count = 1;
         let fraction = trace.fraction;
@@ -761,10 +765,8 @@ pub fn CM_TraceThroughTerrain(
 
             CM_CalcExtents(tBegin, (*tw).end, tw, (*tw).localBounds);
 
-            (*landscape).PatchCollide(
-                rmg,
-                host,
-                tw,
+            cm.terrain_patch_collide(
+                &mut *tw,
                 trace,
                 (*tw).start,
                 (*tw).end,
@@ -797,13 +799,12 @@ pub fn CM_TraceThroughTerrain(
 
         // Collide with any water
         if (*tw).contents & CONTENTS_WATER != 0 {
-            let fraction =
-                (*landscape).WaterCollide(rmg, host, (*tw).start, (*tw).end, trace.fraction);
+            let fraction = cm.terrain_water_collide((*tw).start, (*tw).end, trace.fraction);
             if fraction < trace.fraction {
                 VectorSet(&mut trace.plane.normal, 0.0, 0.0, 1.0);
-                trace.contents = (*landscape).GetWaterContents();
+                trace.contents = cm.terrain_water_contents();
                 trace.fraction = fraction;
-                trace.surfaceFlags = (*landscape).GetWaterSurfaceFlags();
+                trace.surfaceFlags = cm.terrain_water_surface_flags();
             }
         }
     }

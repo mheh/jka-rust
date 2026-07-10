@@ -1390,8 +1390,8 @@ pub fn Com_Init(
         common,
         &format!(
             "{} {} {}\n",
-            mp_qshared::shared::q3_version::Q3_VERSION,
-            mp_qshared::shared::cpustring::CPUSTRING,
+            mp_qshared::shared::Q3_VERSION,
+            mp_qshared::shared::CPUSTRING,
             option_env!("BUILD_DATE").unwrap_or("unknown"),
         ),
     );
@@ -1778,8 +1778,8 @@ pub fn Com_Init(
 
         let s = format!(
             "{} {} {}",
-            mp_qshared::shared::q3_version::Q3_VERSION,
-            mp_qshared::shared::cpustring::CPUSTRING,
+            mp_qshared::shared::Q3_VERSION,
+            mp_qshared::shared::CPUSTRING,
             option_env!("BUILD_DATE").unwrap_or("unknown"),
         );
         common.com_version = unsafe { Cvar_Get(
