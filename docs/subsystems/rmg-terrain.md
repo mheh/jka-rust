@@ -40,9 +40,17 @@ Links only — never restated here:
   the terrain-collision entry points become methods **on `CollisionWorld`**
   resolving `self.land_scape` internally — the E0502-proven seam repair, closing
   RMG-Q11 — and `spawn_mission` is **dropped from Seam-A** with the dead
-  syscall-arm if-body collapsed per §C10, RMG-D1), and **ruling 39d** (2026-07-09,
+  syscall-arm if-body collapsed per §C10, RMG-D1), **ruling 39d** (2026-07-09,
   sixth session: mechanical roster completions — `CCMPatch`/`CCMHeightDetails` get
-  their **own files** per §21, `TerrainHandle` gets its roster row, RMG-D2).
+  their **own files** per §21, `TerrainHandle` gets its roster row, RMG-D2),
+  **ruling 40** (2026-07-09, seventh session: the campaign-wide §F naming rule —
+  bare `C`/`CCM`/`CRM` prefixes drop for §F internal types we own; `CmLandScape`/
+  `RmArea` already conform, RMG-D6), and **ruling 41** (2026-07-09, seventh session,
+  the pass-7 headline: closes **RMG-Q10** — `CM_GetShaderInfo` is a SETTLED extern
+  `CollisionWorld` binding landing with the `cm` C-track waves — **and** the
+  wave-order type-existence gap, by ruling the campaign-wide "struct DEFINITION
+  lands at the earliest wave any method/consumer occupies; bodies follow the tool
+  order" principle, RMG-D5).
   Ruling 24 is now discharged: this doc **quotes the real, current 15-method
   `EngineHost` trait verbatim** from
   `crates/mp/host-interface/src/engine_host.rs` (commit `a9820853`, RMG-D3), it no
@@ -56,10 +64,14 @@ Links only — never restated here:
 - `docs/decisions.md` — DEC-01 (renderer deferred), DEC-04 (strict per-mode),
   DEC-09 (engine verification: TU harnesses + live peers).
 - GP2 is the §F exemplar (`crates/mp/engine/qcommon/src/gp2/`,
-  `tools/gp2-oracle/`). Under RMG-D1 it is **no longer a live dependency** of the
-  ported surface — every GP2 parse path runs through the mission/instance-file
-  load, which is §20-dropped (RMG-D1). It remains the design exemplar for the
-  §F shapes recorded in the divergences.
+  `tools/gp2-oracle/`) and **is a live dependency of the ported surface** — the
+  live `CCMLandScape::LoadTerrainDef` (In-scope item 2, `cm_terrain.cpp:39-110`,
+  unconditional) GP2-parses the terrain-def file before reading any shader flag.
+  The *mission/instance-file* GP2 paths (`CRMInstanceFile`, `CRMMission`) are
+  §20-dropped (RMG-D1); the terrain-def parse is **not** — it reaches the already-
+  ported `mp_engine_qcommon::gp2` **intra-crate** (both live in `mp_engine_qcommon`),
+  so it adds **no new pub seam and no new crate edge** (Seam definition). GP2 also
+  remains the design exemplar for the §F shapes recorded in the divergences.
 
 ## Scope & non-goals
 
@@ -86,10 +98,21 @@ early-out + collision surface).** Ruling 28 amended RMG-D1's live enumeration to
 2. **`CCMLandScape` construction under DEDICATED** (`cm_terrain.cpp:116-219`):
    config parse, bounds, heightmap/flatten allocation (`mFlattenMap` memset-0 at
    `:161`; `mHeightMap` allocated but **unpopulated** — no image load, no
-   generation, under DEDICATED), `LoadTerrainDef` (`:208`, unconditional — no
-   `#ifdef DEDICATED` guard; its `altitudetexture`/`water` cases read shader flags
-   via `CM_GetShaderInfo`, the wider-clipmap machinery — Non-goals / RMG-Q10),
-   patch build
+   generation, under DEDICATED — with the ctor's `else` branch fatalling when the
+   config's `heightMap` key is empty: `Com_Error(ERR_FATAL, "Terrain has no
+   heightmap specified\n")`, `cm_terrain.cpp:190-193`, a **live** `EngineHost::error`
+   use — the fourth live host method, Seam definition),
+   `LoadTerrainDef` (`:208`, unconditional — no `#ifdef DEDICATED` guard). **`LoadTerrainDef`
+   first GP2-parses the terrain-def file** (`cm_terrain.cpp:48-58`): `Com_ParseTextFile`
+   opens `ext_data/RMG/<terrainDef>.terrain`, **falls back to
+   `ext_data/arioche/<terrainDef>.terrain`**, and on a **double miss prints
+   `Could not open %s` and returns non-fatally** (`:53-54`) before any shader read;
+   the parse reuses the ported `mp_engine_qcommon::gp2` intra-crate (Seam definition).
+   Only after a successful parse do its `altitudetexture`/`water` cases read shader flags
+   via `CM_GetShaderInfo`, the wider-clipmap machinery — Non-goals; the Rust binding
+   it calls is the SETTLED extern `CollisionWorld::cm_get_shader_info` method,
+   ruling 41 / RMG-D5, closing the former RMG-Q10.
+   Then the patch build
    (`mPatches`, `UpdatePatches` — `:211-218`) with the `CCMPatch` collision data,
    and the seeded per-instance LCG (`holdrand = 0x89abcdef`, `:122`). Plus the
    `RmManager` lifecycle through the early-out (`new`, `SetLandScape`,
@@ -106,8 +129,10 @@ early-out + collision surface).** Ruling 28 amended RMG-D1's live enumeration to
    `CmLandScape` built in item 2 has live readers beyond construction/snapshot:
    the per-frame terrain-collision methods `PatchCollide`/`WaterCollide` + the
    `GetBounds`/water accessors the `cm-trace`/`cm-test` C-track packets call
-   (`cm_trace.cpp:283,760,789`; `cm_test.cpp:285-289`, gated
-   `com_terrainPhysics->integer && cmg.landScape && CONTENTS_TERRAIN`). Ruling 28
+   (`cm_trace.cpp:283,760,789`, gated
+   `com_terrainPhysics->integer && cmg.landScape && CONTENTS_TERRAIN`; the
+   `cm_test.cpp:285-289` water-contents read gates on `cmg.landScape && CONTENTS_TERRAIN`
+   only — it is **not** behind `com_terrainPhysics`). Ruling 28
    folded this fourth item into RMG-D1's live enumeration; by RMG-D4a (the `cm`
    C-track packets exclude `CCMLandScape`) these methods are owned by *this*
    subsystem — no other doc. **Per ruling 38** (the E0502-proven seam repair) they
@@ -155,7 +180,11 @@ generation-path or renderer-only and is §20-dropped (below).
   map load (`cm_load.cpp:733,737,796`), not by terrain. `LoadTerrainDef` (In-scope
   item 2) only *reads* through the existing `CM_GetShaderInfo` accessor, reached via
   the `CollisionWorld` the ctor/`register_terrain` already thread (§B4, STATE-D2);
-  the Rust binding it calls is the open item **RMG-Q10**.
+  the Rust binding it calls is now the **SETTLED** cm-C-track `CollisionWorld`
+  method `cm_get_shader_info` (ruling 41 / RMG-D5 — decl `cm_shader.cpp:498`,
+  `&mut self` because the `name` overload registers shader text on a miss;
+  `Option<&CCMShader>`), owned by the `cm` C-track packet, **not** ported here. This
+  closes the former RMG-Q10.
 - **Renderer-side terrain draw** (`tr_terrain*`) and everything gated on it.
   Deferred with the renderer (DEC-01); not in the dedicated link set.
 - **The four ruling-17 §20 drops** (RMG-D4c): `mCurObjective`, the dead Perlin
@@ -178,10 +207,17 @@ generation-path or renderer-only and is §20-dropped (below).
    so the `if (imageData)` body is skipped; `mRandomTerrain` stays `0` (`:169`).
 2. `CCMLandScape::CCMLandScape` seeds `holdrand = 0x89abcdef` (`cm_terrain.cpp:122`),
    memsets `mFlattenMap` to 0 (`:161`), allocates the (unpopulated) `mHeightMap`
-   (`:157`), parses the terrain def (`LoadTerrainDef`, `:208`), and builds the
+   (`:157`) — **or `Com_Error(ERR_FATAL, …)`s if the config's `heightMap` key is
+   empty** (`:190-193`, the `else` branch, a live fatal), parses the terrain def
+   (`LoadTerrainDef`, `:208`), and builds the
    patch/collision arrays (`mPatches`/`UpdatePatches`, `:211-218`). This is the
    full live construction under DEDICATED; only the heightmap-image / random-terrain
-   population is skipped.
+   population is skipped. **`LoadTerrainDef` (`:39-110`) GP2-parses the terrain-def
+   file** — `Com_ParseTextFile(ext_data/RMG/<terrainDef>.terrain)` then a
+   `ext_data/arioche/…` fallback, non-fatal `Com_Printf` + `return` on a double miss
+   (`:48-56`) — via `CGenericParser2` (`common.cpp:2179-2202`: `FS_FOpenFileByMode`
+   + `FS_Read` + `parser.Parse`), then reads shader flags through `CM_GetShaderInfo`
+   only on a successful parse (`:80,98`).
 3. The game vmcalls `trap_RMG_Init(terrainID)` (`g_syscalls.c:1478-1481`,
    `g_misc.c:608`). Case `G_RMG_INIT` (`sv_game.cpp:1624-1638`), gated on
    `com_RMG->integer`: lazily `new CRMManager`, `SetLandScape(cmg.landScape)`, then
@@ -216,8 +252,9 @@ step is a no-op that returns false. The whole live *generation* tree runs once a
 `CCMLandScape` collision/height data is touched per frame — the **caller**
 `cm_trace`/`cm_test` is out of scope (a `cm` C-track packet), but the terrain
 collision **entry points** it invokes (Raven's `landscape->PatchCollide`/
-`WaterCollide` + the `GetBounds`/water accessors, gated `com_terrainPhysics->integer`,
-`cm_trace.cpp:760,789`; `cm_test.cpp:285-289`) are owned by *this* subsystem
+`WaterCollide` + the `GetBounds`/water accessors — the `cm_trace.cpp:760,789` calls
+gated `com_terrainPhysics->integer`, the `cm_test.cpp:285-289` water read gated on
+`cmg.landScape && CONTENTS_TERRAIN` only) are owned by *this* subsystem
 (RMG-D4a) and ported here — LIVE per ruling 28 (RMG-D1). **Per ruling 38 they port
 as methods on `CollisionWorld`** (`terrain_patch_collide` etc.) that resolve the
 owned `self.land_scape` internally, with signatures **frozen** in
@@ -275,7 +312,7 @@ initialized flags) and §B. RMG-D1 marks the generation-path owners **dropped**
 | --- | --- | --- | --- | --- |
 | `TheRandomMissionManager` | `RM_Manager.cpp:23` | `mp_engine_core::Engine.rmg: RmManager` (plain direct field mandated by ruling 12; STATE-D5). **The field is not present in `engine.rs` yet** — `engine.rs:35-36` currently marks the STATE-Q2 attachment point ("rmg engine-side state is NOT yet a field here"); ruling 12 settled its placement (direct field, no `Option`/`Box`). It is added to the `mp_engine_core` `Engine` struct at the **Wave-20 `SV_GameSystemCalls`/Engine-assembly wiring** (Slice hooks, Wave 20), **not** by this Wave-16 §F roster — a cross-doc split (Gate 3). Raven lazily `new`s it under `com_RMG`; modeled with the private `RmManager.initialized: bool` (Default `false`, flipped at the `G_RMG_INIT` arm — Seam-A owned-state note), not `Option`. Its `mLandScape` cache → `RmManager.land: Option<TerrainHandle>` (RMG-D1/ruling 28: `None` until `set_landscape`, Raven's ctor leaves `mLandScape` `NULL` — `RM_Manager.cpp:34-42`) | `G_RMG_INIT` case (lazy) — `sv_game.cpp:1627-1629` | `&mut self` + `&mut impl EngineHost` from the syscall switch inward |
 | `CRMManager::mCurObjective` | `RM_Manager.cpp:16` | **dropped** — §20 dead surface (RMG-D4c/ruling 17): zero-init, never read/written | — | — |
-| `CCMLandScape*` (`cmg.landScape`) | `cm_landscape.h:135`; `cm_local.h:155`; `sv_game.cpp:1631` | `mp_engine_qcommon::CollisionWorld.land_scape: Option<CmLandScape>` (a field on the existing STATE-D2 `cmg` owner — `collision_world.rs:10`). `Option` is Raven-faithful: `cmg.landScape` is a nullable pointer set only on a terrain map. **LIVE** — constructed under DEDICATED. **The field (and the `CmLandScape` struct it names) is declared at waves 0–4** with the collision surface — the mechanical struct-existence prerequisite of rulings 28+38 (Slice hooks); the value is *populated* later by `register_terrain` / assigned at the Wave-20 arm | `CM_RegisterTerrain` — `cm_load.cpp:1036,1055` | `TerrainHandle` (wrapping `thandle_t`) across the seam; borrow inward |
+| `CCMLandScape*` (`cmg.landScape`) | `cm_landscape.h:135`; `cm_local.h:155`; `sv_game.cpp:1631` | `mp_engine_qcommon::CollisionWorld.land_scape: Option<CmLandScape>` (a field on the existing STATE-D2 `cmg` owner — `collision_world.rs:10`). `Option` is Raven-faithful: `cmg.landScape` is a nullable pointer set only on a terrain map. **LIVE** — constructed under DEDICATED. **The field (and the `CmLandScape` struct it names) is declared at waves 0–4** with the collision surface — the RMG-D5 / ruling-41 struct-definition-lands-early principle applied to rulings 28+38 (Slice hooks); the value is *populated* later by `register_terrain` / assigned at the Wave-20 arm | `CM_RegisterTerrain` — `cm_load.cpp:1036,1055` | `TerrainHandle` (wrapping `thandle_t`) across the seam; borrow inward |
 | `CRandomTerrain*` (`mRandomTerrain` / the `random_terrain` field) | `cm_landscape.h:153`, `cm_randomterrain.h:52` | **dropped** — §20 generation path (RMG-D1): `CreateRandomTerrain` is in the `#else` of `#ifdef DEDICATED` (`cm_terrain.cpp:170-188`), so `mRandomTerrain` stays `0`. No `random_terrain` field is added; `GetRandomTerrain()` is modeled as always-`None`. Shape-map entry in Divergences | (never, under DEDICATED) | — |
 | `static CTerrainMap* TerrainMap` | `cm_terrainmap.cpp:14` | **dropped** — §20 (RMG-D4c/ruling 17): only writer `CM_TM_Create` is `#ifndef DEDICATED` (`RM_Mission.cpp:1503-1504`) | — | — |
 | `noiseTable` / `noisePerm` | `cm_randomterrain.cpp:14-15` | **dropped** — §20 generation path (RMG-D1/RMG-D4c): the Perlin path is dead code and unreachable under DEDICATED | — | — |
@@ -284,7 +321,7 @@ initialized flags) and §B. RMG-D1 marks the generation-path owners **dropped**
 | `CRMArea*` — `mAreas` arena + `CRMInstance::mArea` | `RM_Area.h:74,80`; `RM_Instance.h:33` | **dropped** — §20 generation path (RMG-D1): `CRMAreaManager`/`CRMArea` are only constructed during mission spawn (never reached). The `AreaId` arena shape (RMG-D4g/ruling 21) is retained as a Divergences shape-map entry | — | — |
 | `com_RMG`, `com_terrainPhysics` | `common.cpp:72`; `cm_landscape.h:267` | `EngineCvars` handles (fork-2). `com_RMG` is LIVE (gates `G_RMG_INIT`) | `Cvar_Get` at init | read via cvar accessor |
 | `CCMLandScape::holdrand` | `cm_landscape.h:160` | `CmLandScape.holdrand: c_ulong` — an inline per-instance LCG field; seeded `0x89abcdef` in the live ctor (`cm_terrain.cpp:122`) and read by `get_rand_seed` (streamed, `sv_client.cpp:806`). `flrand`/`irand`/`rand_seed` (`cm_terrain.cpp:1548-1580`) are §20 within the class (no live caller). **Not** an external `Rng` type | `CCMLandScape` ctor (`cm_terrain.cpp:122`) | field; see RNG threading |
-| `CCMShader`/`cmg.shaders`/`numShaders`; `shaderText`/`shaderTextTable`/`cmShaderTable` | `cm_local.h:77,110-111`; `cm_shader.cpp:28-30` | **not owned here** — wider-clipmap shader machinery on the `cm` C-track qcommon packet (Non-goals). `cmg`-resident, so it lives under `CollisionWorld` (STATE-D2). `LoadTerrainDef` reads it via `CM_GetShaderInfo` — the Rust binding is **RMG-Q10** | `CM_LoadMap` (`cm_load.cpp:733,737`) — NOT terrain | `&mut CollisionWorld` (§B4) |
+| `CCMShader`/`cmg.shaders`/`numShaders`; `shaderText`/`shaderTextTable`/`cmShaderTable` | `cm_local.h:77,110-111`; `cm_shader.cpp:28-30` | **not owned here** — wider-clipmap shader machinery on the `cm` C-track qcommon packet (Non-goals). `cmg`-resident, so it lives under `CollisionWorld` (STATE-D2). `LoadTerrainDef` reads it via the SETTLED cm-C-track binding `CollisionWorld::cm_get_shader_info` (ruling 41 / RMG-D5; former RMG-Q10) | `CM_LoadMap` (`cm_load.cpp:733,737`) — NOT terrain | `&mut CollisionWorld` (§B4) |
 
 ## Seam definition
 
@@ -448,14 +485,34 @@ inject the fixture-backed `MockHost` (`crates/mp/host-interface/src/mock.rs`,
 ruling 32 — DEC-09), whose `flrand`/`irand` replicate Raven's `q_math.c`
 `holdrand` LCG. §F methods that touch a service take `&mut impl EngineHost`; the
 `CollisionWorld` state is *not* a service and stays a separate threaded param
-(§B4). **Under RMG-D1 the live host use is exactly three methods:** `EngineHost::print`
-(`Com_Printf` — the RMG banner in `LoadMission`, `RM_Manager.cpp:106-107`),
-`EngineHost::fs_read_file` (the config/FS reads inside `CM_RegisterTerrain`
-construction), and `EngineHost::flrand`/`irand` (the golden-only `RMG_CreateSeed`'s
-RNG draws). The ruling-36 additions (`cvar_integer`/`sv_time`/`fs_write_file`/
+(§B4). **Under RMG-D1 the live host use is exactly four methods:** `EngineHost::print`
+(`Com_Printf` — the RMG banner in `LoadMission`, `RM_Manager.cpp:106-107`, and
+`LoadTerrainDef`'s `Could not open %s` double-miss, `cm_terrain.cpp:53`),
+`EngineHost::fs_read_file` (the FS reads inside `CM_RegisterTerrain`
+construction — including `LoadTerrainDef`'s two `.terrain` lookups, which port
+`Com_ParseTextFile`'s `FS_FOpenFileByMode`+`FS_Read`, `common.cpp:2185-2192`),
+`EngineHost::flrand`/`irand` (the golden-only `RMG_CreateSeed`'s RNG draws), and
+`EngineHost::error` (the ctor's empty-`heightMap` `Com_Error(ERR_FATAL, "Terrain
+has no heightmap specified\n")`, `cm_terrain.cpp:190-193` — mapped to
+`host.error(errorParm_t::ERR_FATAL, msg) -> !` via the established
+`Com_Error`→`error` fork-1 panic/`catch_unwind` model, no new decision). The
+ruling-36 additions (`cvar_integer`/`sv_time`/`fs_write_file`/
 `model_mdxm`/`model_mdxa`) have **no** RMG live-surface caller — their cites are
 nav/ghoul2 sites; the terrain path's `com_RMG`/`com_terrainPhysics` reads live at
 the wave-20 syscall arm and the `cm-trace` gate, not inside an RMG method.
+
+**`LoadTerrainDef`'s GP2 parse — reuse, not a new seam.** Raven's stack-local
+`CGenericParser2 parse` (`cm_terrain.cpp:42`) ports as a **function-local**
+`mp_engine_qcommon::gp2::GenericParser2` (`crates/mp/engine/qcommon/src/gp2/
+generic_parser2.rs:21`) — the already-ported §F exemplar in the **same crate** as
+`cm_terrain.rs`, so the call is **intra-crate** and introduces **no new pub seam
+signature and no new crate edge**. `Com_ParseTextFile(file, parse)`
+(`common.cpp:2179-2202`) ports as `host.fs_read_file(file)` (Raven's
+`FS_FOpenFileByMode`+`FS_Read`; `None`/missing → `false`) followed by
+`parse.parse(&text, clean_first)` (`generic_parser2.rs:100`); the RMG→arioche
+fallback and the non-fatal `print`+return on a double miss port as straightforward
+control flow (§C10). The subsequent group walk uses the existing GP2 accessors
+(`subgroups`/`find_pair_value`, `gp_group.rs:88,152`).
 
 **Handle types (§B5, layout-free).**
 
@@ -505,10 +562,26 @@ impl RmManager {
     // collapses the provably-dead `if load_mission { spawn_mission }` to just
     // `load_mission(…)` per porting-rules §C10 (Slice hooks, Wave 20), with a §20
     // zero-execution note. No stub anywhere (GOAL-engine.md no-stub rule).
-    /// `CRMManager::GetAutomapSymbolCount` — RM_Manager.cpp:413 (returns 0 under
-    /// DEDICATED — nothing calls AddAutomapSymbol, RM_Manager.cpp:41)
+    /// `CRMManager::GetAutomapSymbolCount` — RM_Manager.cpp:413. **No backing
+    /// storage — hardcoded `0`.** Raven's `mAutomapSymbols[MAX_AUTOMAP_SYMBOLS]` /
+    /// `mAutomapSymbolCount` pair (`RM_Manager.h:20-21`) is NOT mirrored as an
+    /// `RmManager` field: its sole writer `AddAutomapSymbol` (`RM_Manager.cpp:400`,
+    /// the only site that increments the count, `:410`) is §20-dropped (never
+    /// reached under DEDICATED — it runs only on the dropped mission-spawn path), so
+    /// the count stays at its ctor value `0` (`RM_Manager.cpp:41`) for the process
+    /// lifetime and a permanently-empty array would be pure dead surface (§20). This
+    /// extends the frozen two-field set below (`initialized`/`land`) — no third
+    /// field is added; the accessor returns the constant `0`.
     pub fn automap_symbol_count(&self) -> i32;
-    /// `CRMManager::GetAutomapSymbol` — RM_Manager.cpp:418
+    /// `CRMManager::GetAutomapSymbol` — RM_Manager.cpp:418. **Returns `None`
+    /// unconditionally.** With no backing array (above) and `automap_symbol_count`
+    /// always `0`, a well-behaved caller (`SV_WriteRMGAutomapSymbols` walks
+    /// `0..count`, `sv_client.cpp:668-684`) never calls this. Raven's body is the
+    /// unchecked `&mAutomapSymbols[index]` (`RM_Manager.cpp:420`, UB on any
+    /// out-of-range/negative `index`); returning `None` for every `index` is the
+    /// §19 defined-behavior divergence the frozen `Option` return type already
+    /// implies (no index is ever valid), so no array read and no bounds/sign check
+    /// on real storage occurs.
     pub fn automap_symbol(&self, index: i32) -> Option<&RmAutomapSymbol>;
     /// `CRMManager::GetLandScape` — RM_Manager.h:39. Returns the stored handle
     /// (`self.land`); the snapshot read (Seam-C) resolves it against the owning
@@ -531,17 +604,32 @@ porters add the field and flip it at the Wave-20 syscall arm. `RmManager` also
 carries the private `land: Option<TerrainHandle>` (Raven's `mLandScape` cache,
 `RM_Manager.h:14`; `None` by Default matching the `NULL`-zeroing ctor,
 `RM_Manager.cpp:34-42`), set by `set_landscape` and read by `land()` (ruling 28 /
-RMG-D1).
+RMG-D1). **These two are the *complete* `RmManager` field set** — Raven's
+`mAutomapSymbols[MAX_AUTOMAP_SYMBOLS]` / `mAutomapSymbolCount` pair
+(`RM_Manager.h:20-21`) is **not** carried as a third field: its only writer
+`AddAutomapSymbol` is §20-dropped (never reached under DEDICATED,
+`RM_Manager.cpp:400,410`), so the array is permanently unwritten and the count is
+frozen at `0` (ctor, `RM_Manager.cpp:41`); the `automap_symbol_count`/
+`automap_symbol` accessors are the hardcoded `0`/`None` constants above (§20 dead
+surface — a stored empty array would never differ from the constant).
 
 **Seam deviation — the added `cm: &mut CollisionWorld` parameter (not a design
 change).** Raven's `LoadMission` takes only `qboolean IsServer`
-(`RM_Manager.cpp:96`) and reaches the landscape through the `cmg.landScape` file
-global. Per §B (no hidden globals), `RmManager` owns **only** a
-`land: Option<TerrainHandle>`;
+(`RM_Manager.cpp:96`) and reaches the landscape through the `RmManager` members
+`mLandScape`/`mTerrain` (set by `SetLandScape`, `RM_Manager.cpp:81-82`) — **all past
+the `if (!mTerrain) return false` early-out** (`:110-113`), so under DEDICATED no
+landscape is reached at all (RMG-D1). Per §B (no hidden globals), `RmManager` owns
+**only** a `land: Option<TerrainHandle>`;
 the `CCMLandScape` data lives in `CollisionWorld` (STATE-D2, `collision_world.rs:10`).
-So `load_mission` takes the owning `CollisionWorld` explicitly to resolve that handle
-— the state-threading form (§B4) of Raven's global reach. (This is why
-`mp_engine_rmg` needs the `mp_engine_qcommon` edge — see "Crate dependencies".)
+So `load_mission` threads the owning `CollisionWorld` as the §B4 substitute for those
+dropped members (the dead mission-construction path — `new CRMMission(mTerrain)` /
+`assert(mLandScape)`, `RM_Manager.cpp:135,168`, all past the early-out — would resolve
+the handle → `CmLandScape` through it). On the live DEDICATED path both `cm` and
+`is_server` are **unused** — the body is the `#ifndef FINAL_BUILD` banner print +
+`false`. The full signature is kept faithful; whether to trim the dead params (as
+ruling 38 collapsed the sibling dead `spawn_mission` per §C10) is a design call, not
+this gate's. (This is why `mp_engine_rmg` needs the `mp_engine_qcommon` edge — see
+"Crate dependencies".)
 (Raven's `SpawnMission(qboolean)` is dropped from this seam entirely — ruling 38;
 its would-be `cm` parameter is moot.)
 
@@ -695,8 +783,9 @@ impl CmLandScape {
 
 impl CollisionWorld {
     // --- 2. Per-frame terrain collision (cm-trace/cm-test C-track packets,
-    //        cm_trace.cpp:760,789,859,888 + cm_test.cpp:285-289, non-BSPC,
-    //        gated com_terrainPhysics->integer && cmg.landScape && CONTENTS_TERRAIN;
+    //        cm_trace.cpp:760,789,859,888 (gated com_terrainPhysics->integer &&
+    //        cmg.landScape && CONTENTS_TERRAIN) + cm_test.cpp:285-289 (gated
+    //        cmg.landScape && CONTENTS_TERRAIN only — NOT com_terrainPhysics), non-BSPC;
     //        In-scope item 4). RULING 38: these are methods ON CollisionWorld that
     //        resolve self.land_scape internally (no double borrow) — NOT CmLandScape
     //        methods taking &mut CollisionWorld (struck). Signatures stay
@@ -752,7 +841,8 @@ commented-out block `:929-969`) and `CarveLine` (its only caller is the
 pub seam method. (Corrects the prior "renderer-only / no live caller" claim for
 `SetShaders`/`CalcRealCoords`/`GetPatch`.)
 
-**`LoadTerrainDef`'s live shader reads — a cross-subsystem dependency (RMG-Q10).**
+**`LoadTerrainDef`'s live shader reads — the SETTLED `cm_get_shader_info` binding
+(ruling 41 / RMG-D5, closing RMG-Q10).**
 The LIVE `SetShaders` above takes a `CCMShader*` produced by
 `CM_GetShaderInfo(shaderName)` (`cm_terrain.cpp:80→83`); `LoadTerrainDef`'s `water`
 case likewise calls `CM_GetShaderInfo` and reads `shader->contentFlags`/
@@ -760,8 +850,29 @@ case likewise calls `CM_GetShaderInfo` and reads `shader->contentFlags`/
 exact fields Seam §C freezes as `water_contents()`/`water_surface_flags()`.
 `CCMShader`/`CM_GetShaderInfo` are **wider-clipmap machinery, not terrain-owned**
 (Non-goals / State ownership: `cm_local.h:77,303-304`, `cm_shader.cpp`, `cmg`-resident
-per STATE-D2), so this doc does not port them; the Rust binding `LoadTerrainDef`
-calls through the threaded `CollisionWorld` (§B4) is the open item **RMG-Q10**.
+per STATE-D2), so this doc does not port them. **Ruling 41 settles the binding
+`LoadTerrainDef`'s port calls: an extern method on `CollisionWorld` owned by the
+`cm` C-track packet, cited here as frozen** — the port reaches it through the
+threaded `CollisionWorld` (§B4):
+
+```rust
+impl CollisionWorld {
+    /// `CCMShader *CM_GetShaderInfo( const char *name )` — decl `cm_local.h:303`,
+    /// def `cm_shader.cpp:498`. Transcribed faithfully from the `name` overload:
+    /// `&mut self` because a miss registers a fresh `CCMShader` into `cmShaderTable`
+    /// (`Hunk_Alloc` + `CM_ParseShader`, `cm_shader.cpp:512-522`), so the call
+    /// mutates the clipmap; `Option<&CCMShader>` mirrors the returned pointer
+    /// (the `name` overload never returns NULL, but `Option` unifies with the
+    /// `int shaderNum` overload's NULL and keeps the reader gate honest).
+    /// **Owned by the `cm` C-track qcommon packet, landing with the `cm` waves —
+    /// NOT ported by this doc; cited as a SETTLED extern binding** (ruling 41).
+    pub fn cm_get_shader_info(&mut self, name: &str) -> Option<&CCMShader>;
+}
+```
+
+`CCMShader` is the cm-C-track struct (`cm_local.h:77`); it keeps its Raven name
+(the ruling-40 §F naming rule renames only the §F internal types *this* doc owns,
+not cm-packet-owned types — RMG-D6).
 
 **The `RmManager` landscape accessor is `land() -> Option<TerrainHandle>`
 (ruling 28 / RMG-D1, frozen in Seam-A).** The snapshot read above reaches the
@@ -774,6 +885,12 @@ for the caller to resolve" over "borrow `&CmLandScape` via a threaded
 `&CollisionWorld`".
 
 ## Decisions
+
+*Numbering note (pass 7).* RMG-D1…RMG-D4 are the established records (rulings ≤39),
+threaded through the whole body; the pass-7 session's two new rulings fold in as
+**RMG-D5 (ruling 41)** and **RMG-D6 (ruling 40)** so every existing cross-reference
+stays valid. Read in settlement order they are RMG-D5 (41) → RMG-D6 (40) → the
+standing RMG-D1…RMG-D4 (all of which RMG-D4's "rulings 11-39 stand" reaffirms).
 
 **RMG-D1 — RMG generation is dead under DEDICATED; §20-drop the generation
 path.** Per **ruling 25** (user, 2026-07-09, `engine-fork-discovery.md`). We port
@@ -879,7 +996,7 @@ use stays the three of Seam definition. Rejected re-deriving the seam or a
 subsystem-local test double. Because a built, green Stage-0 crate is the ground truth
 ruling 24 promised.
 
-**RMG-D4 — All rulings 11-35 stand, applied to the reduced live surface;
+**RMG-D4 — All rulings 11-39 stand, applied to the reduced live surface;
 dropped-path classes keep their shape-map entries marked §20.** The prior §F
 decisions carry forward verbatim; where RMG-D1 makes their subject dead code, the
 decision still governs the shape recorded in Divergences (the §20 shape-map),
@@ -971,6 +1088,53 @@ TUs (Verification strategy). No prior decision is re-litigated here; where RMG-D
 reduces a decision's live scope, its subject becomes a §20 shape-map entry rather
 than ported work.
 
+**RMG-D5 — `CM_GetShaderInfo` is a SETTLED extern `CollisionWorld` binding, and a
+§F struct definition lands at its earliest consumer's wave.** Per **ruling 41**
+(user, 2026-07-09, seventh session), which closes both RMG-Q10 and the wave-order
+type-existence gap. **(1) The shader binding.** `LoadTerrainDef`'s live
+`altitudetexture`/`water` cases reach shader flags through `CM_GetShaderInfo`
+(`cm_terrain.cpp:80,98`); that accessor ports as a method **on `CollisionWorld`** —
+`fn cm_get_shader_info(&mut self, name: &str) -> Option<&CCMShader>` — transcribed
+faithfully from the oracle `name`-overload decl (`cm_local.h:303`, def
+`cm_shader.cpp:498`). `&mut self` because a cache miss registers a fresh `CCMShader`
+into `cmShaderTable` (`Hunk_Alloc` + `CM_ParseShader` + `insert`,
+`cm_shader.cpp:512-522`); `Option<&CCMShader>` mirrors the returned pointer. It is
+**owned by the `cm` C-track qcommon packet and lands with the `cm` waves** — this
+doc does **not** port it, it **cites it as a frozen extern binding** the ported
+`LoadTerrainDef` calls through the threaded `CollisionWorld` (§B4). This closed
+RMG-Q10 (the open list was empty at ruling-41 time; a later dry-run reopened the
+distinct verification-fixture item RMG-Q12, Open questions). `CCMShader` keeps its Raven name (the
+ruling-40 §F rename touches only §F internal types this doc owns — RMG-D6).
+**(2) The struct-definition-lands-early principle (ruled campaign-wide).** A §F/C++
+struct **DEFINITION** (all fields, house cites, no method bodies) lands at the
+**earliest wave any of its methods or consumers occupies**; the method **bodies**
+follow the tool (`engine-port-order.tsv`) order. Applied here: the `CmLandScape`
+struct definition — and the `CollisionWorld.land_scape: Option<CmLandScape>` field
+that names it — land with the **wave-0–4 collision consumers** (so `land_scape`
+type-checks from wave 0), while the ctor / `LoadTerrainDef` / `UpdatePatches`
+**bodies** land at their tool waves (15-17). This is a *ruled principle*, not a
+mechanical consequence the doc derived: it **replaces** the earlier
+draft's ad-hoc "struct-existence prerequisite" framing wherever the Files roster and
+Slice hooks describe the early struct landing. Rejected an empty forward-declared
+shell or a stub: `GOAL-engine.md:24-28` forbids stubs, and the struct's frozen field
+set (Divergences RMG-D4a/RMG-D4h) is complete at first landing — only its populating
+logic defers.
+
+**RMG-D6 — The campaign-wide §F naming rule applies; the doc has no stragglers.**
+Per **ruling 40** (user, 2026-07-09, seventh session). Bare `C`/`CCM`/`CRM` Raven
+prefixes drop for the §F **internal** types this doc owns and reshapes:
+`CCMLandScape → CmLandScape`, `CCMPatch → CmPatch`, `CCMHeightDetails →
+CmHeightDetails`, `CArea → CmArea`, `CRMManager → RmManager`, `CRMArea → RmArea`,
+`CRMInstance → RmInstance`, `rmAutomapSymbol_t → RmAutomapSymbol`. An audit of this
+doc finds every owned type already conforms (as ruling 40 notes for
+`CmLandScape`/`RmArea`) — **no stragglers**. Types this doc does **not** own keep
+their Raven names: `CCMShader` and `CM_GetShaderInfo` are cm-C-track-owned (RMG-D5),
+`TerrainHandle`/`AreaId`/`EntityId` are §B5 idiomatic newtypes already, and the
+`class:` roster/divergence keys deliberately cite the **Raven** class name (the
+port's subject), not the Rust rename. Rejected renaming cm-packet types or the
+roster keys: the naming rule scopes to §F-owned internal types, and the roster keys
+must name the oracle class being ported.
+
 ## Verification strategy
 
 §F / DEC-09 TU-harness track (RMG-D4i), scoped to the RMG-D1 live surface:
@@ -989,7 +1153,10 @@ than ported work.
   RMG-D3) for FS/print and the `flrand`/`irand` RNG services — `MockHost` replicates
   Raven's `q_math.c` `holdrand` LCG inline (`mock.rs:53-89`), the bit-exact stand-in
   for `Engine.common.rng` (RMG-D4f) until the real `QRand` field lands; no paper-spec
-  test double.
+  test double. **The live `LoadTerrainDef` GP2 parse** (`cm_terrain.cpp:39-110`) drives
+  its two `.terrain` path lookups (`ext_data/RMG/…`, `ext_data/arioche/…`) through
+  `MockHost::fs_read_file`; **which behavior golden #4 pins — the non-fatal double-miss
+  vs. a committed terrain-def fixture — is undecided (RMG-Q12, Open questions).**
 - **Goldens** (committed, so `cargo test` needs no C++):
   1. `RMG_CreateSeed` seed-string + hash streams for a fixed `Engine.common.rng`
      (`QRand`) seed — the golden-only helper (zero live callers) pinning the engine
@@ -1041,33 +1208,39 @@ than ported work.
   collision helpers they forward to colocating in `cm_terrain.rs`. **Producible
   now:** their Seam §C signatures are frozen (rulings 28 + 38, RMG-Q11 closed).
 
-  **Struct-existence prerequisite (mechanical consequence of rulings 28 + 38 +
-  STATE-D2 — not a new sequencing decision).** Because ruling 38 makes the collision
-  entry points `CollisionWorld` methods that resolve `self.land_scape:
+  **Struct definition lands at its earliest consumer's wave (the RMG-D5 / ruling-41
+  campaign-wide principle).** Ruling 41(2) rules, campaign-wide, that a §F/C++ struct
+  **DEFINITION** (all fields, house cites, no method bodies) lands at the earliest
+  wave any of its methods or consumers occupies, with the **bodies** following the
+  tool (`engine-port-order.tsv`) order. Applied here: because ruling 38 makes the
+  collision entry points `CollisionWorld` methods that resolve `self.land_scape:
   Option<CmLandScape>` (STATE-D2, the `cmg.landScape` owner row) and ruling 28 lands
   those methods at waves 0–4, the `CmLandScape` **struct definition** and the
-  `CollisionWorld.land_scape` field must **already exist at the wave-0–4 landing** —
-  otherwise the field type and the field-reading `terrain_*` methods (water
+  `CollisionWorld.land_scape` field land **at the wave-0–4 landing** — otherwise the
+  field type and the field-reading `terrain_*` methods (water
   height/contents/surface-flags, bounds, patch-scalar, and the `PatchCollide`
-  checkcount/brush reads) cannot type-check. This is *forced* by those three settled
-  facts plus Rust's ordinary declaration-before-use, not a newly chosen split: the
-  struct's Rust field set is **already frozen** in Divergences (RMG-D4a/RMG-D4h:
-  `mHeightMap`/`mFlattenMap` → `Vec<u8>`, `mPatches` → `Vec<CmPatch>`, the inline
-  `holdrand` `c_ulong`, the dropped `owner` back-pointer, and the water/bounds/patch
-  fields the accessors read — `cm_landscape.h`), so introducing the struct here adds
-  no shape choice. The wave-16 `cm_terrain.rs` roster row (Files roster) therefore
-  fills the **construction logic** (the ctor / `LoadTerrainDef` / `UpdatePatches`
-  build + the snapshot-read accessors `height_map`/`flatten_map`/`real_area`/
-  `get_rand_seed`), it is **not** the struct's first declaration. `CmPatch` /
-  `CmHeightDetails` (their own files per RMG-D2(c) / ruling 39d) land with the
-  `CmLandScape` struct they compose, at this same wave-0–4 point, for the same
-  reason. Note `engine-port-order.tsv` orders at *function* granularity
+  checkcount/brush reads) cannot type-check. The struct's Rust field set is **frozen
+  in Divergences except one open field** (RMG-D4a/RMG-D4h: `mHeightMap`/`mFlattenMap`
+  → `Vec<u8>`, `mPatches` → `Vec<CmPatch>`, the inline `holdrand` `c_ulong`, the
+  dropped `owner` back-pointer, and the water/bounds/patch fields the accessors read
+  — `cm_landscape.h`); the **one remaining gap is the per-patch collision-brush
+  buffer `mPatchBrushData` (`cm_landscape.h:100`, `cm_terrain.cpp:213-215`), whose
+  §17 ownership shape is open (RMG-Q13)** and must settle before this wave-0–4 landing
+  can carry a *complete* definition. With that field settled the early landing carries
+  the **real definition**, not a forward-declared shell (that ad-hoc
+  "shell"/"struct-existence prerequisite" framing is retired by RMG-D5). The wave-16 `cm_terrain.rs` roster row (Files roster)
+  therefore fills only the **construction logic** (the ctor / `LoadTerrainDef` /
+  `UpdatePatches` build + the snapshot-read accessors `height_map`/`flatten_map`/
+  `real_area`/`get_rand_seed`), it is **not** the struct's first declaration.
+  `CmPatch` / `CmHeightDetails` (their own files per RMG-D2(c) / ruling 39d) land with
+  the `CmLandScape` struct they compose, at this same wave-0–4 point, for the same
+  reason. `engine-port-order.tsv` orders at *function* granularity
   (`CCMLandScape::WaterCollide` wave 0, the ctor `CCMLandScape::CCMLandScape` wave
   15), so the tool's function order legitimately *predates* the type's construction
-  wave; the struct **type** is introduced with its first use (the wave-0–4 collision
-  methods), the ctor **body** fills at wave 16 — no design decision, and no stub
-  (`GOAL-engine.md:24-28`): the early struct carries its real frozen fields, only its
-  populating logic is deferred.
+  wave; per RMG-D5 the struct **definition** is introduced with its first use (the
+  wave-0–4 collision methods), the ctor **body** fills at wave 16 — and no stub
+  (`GOAL-engine.md:24-28`), because the early definition carries its real frozen
+  fields; only its populating logic is deferred.
 - **Wave 16** (`plan §"RMG (113 fns, wave 16)"` — the subsystem-*completion* wave,
   i.e. the max wave over RMG fns, not a per-fn wave). **Mostly producible now**
   (frozen seams): the reduced live tree as one §F subsystem — `RmManager`
@@ -1076,13 +1249,16 @@ than ported work.
   accessors (`height_map`/`flatten_map`/`real_area`/`get_rand_seed`, Seam §C,
   frozen), `TerrainHandle`, `register_terrain`, `rmg_create_seed` (Seam-B). The
   generation subtree lands only as §20 Divergences shape-map entries (RMG-D1), not
-  porter code. **One open dependency (RMG-Q10):** `CmLandScape` construction includes
-  the live `LoadTerrainDef` (`cm_terrain.cpp:208`), whose `altitudetexture`/`water`
-  cases call `CM_GetShaderInfo` (wider-clipmap machinery, not ported here). The Rust
-  binding the port calls through the threaded `CollisionWorld` (§B4) must be pinned
-  before this construction path can be transcribed — a non-droppable live path under
-  the no-stub rule (`GOAL-engine.md:24-28`). Everything else in the wave is producible
-  now. **Hard prerequisites (now satisfied):** the type-rosetta entries for
+  porter code. **The former open dependency RMG-Q10 is now settled (ruling 41 /
+  RMG-D5):** `CmLandScape` construction includes the live `LoadTerrainDef`
+  (`cm_terrain.cpp:208`), whose `altitudetexture`/`water` cases call
+  `CM_GetShaderInfo` (wider-clipmap machinery, not ported here); the binding the port
+  calls through the threaded `CollisionWorld` (§B4) is the frozen extern
+  `CollisionWorld::cm_get_shader_info` (Seam §C, RMG-D5), landing with the `cm`
+  C-track waves. With that pinned, this construction path is fully transcribable — a
+  non-droppable live path under the no-stub rule (`GOAL-engine.md:24-28`) with no
+  remaining hole. Everything in the wave is producible now.
+  **Hard prerequisites (now satisfied):** the type-rosetta entries for
   `rmAutomapSymbol_t` (relocated to `crates/mp/qshared/src/common/mp/rmg/`,
   RMG-D2(b)/RMG-D4d) / `thandle_t`, and the `EngineHost` trait — **built and green**
   in the Stage-0 crate `mp_host_interface` (`crates/mp/host-interface`, extended to
@@ -1115,38 +1291,62 @@ than ported work.
 
 ## Open questions
 
-**RMG-Q10 — the Rust binding `LoadTerrainDef` uses to reach `CM_GetShaderInfo`/
-`CCMShader`.** `LoadTerrainDef` is LIVE under DEDICATED (In-scope item 2,
-`cm_terrain.cpp:208`, no `#ifdef` guard) and calls `CM_GetShaderInfo(shaderName)`
-in both its `altitudetexture` case (→ the LIVE `SetShaders`, `:80-83`) and its
-`water` case (→ `mWaterContents`/`mWaterSurfaceFlags`, the fields Seam §C freezes as
-`water_contents()`/`water_surface_flags()`, `:98-103`). The **ownership half is
-answered** from ground truth (Non-goals / State ownership): `CCMShader`/
-`CCMShaderText`/`CM_GetShaderInfo` and the shader hash tables are wider-clipmap
-machinery (`cm_local.h:77,303-304`; `cm_shader.cpp`; driven by `CM_LoadMap`,
-`cm_load.cpp:733,737`), `cmg`-resident (STATE-D2), **not** terrain-owned — so this
-doc does **not** port `cm_shader.cpp`. What is **not settled** and needs a design
-session: the exact Rust binding `LoadTerrainDef`'s port calls — whether the `cm`
-C-track qcommon packet already exposes `CM_GetShaderInfo`/`CCMShader`, where the
-Rust type lives / how to import it, and the call form through the threaded
-`CollisionWorld` (§B4). Because `LoadTerrainDef` is in-scope construction on a
-**non-droppable live path** (no stub/skip allowed — `GOAL-engine.md:24-28`), this
-must be pinned before the Wave-16 `CmLandScape` construction can be transcribed.
-Escalated (not self-resolved): confirm cm-packet ownership of the shader accessors
-and freeze the `CM_GetShaderInfo` binding this doc calls.
+RMG-Q1…RMG-Q11 are all resolved (Resolved questions). Subsequent dry-runs
+reopened **two** items — RMG-Q12 (a verification-fixture coverage choice, not a
+transcription hole: the `LoadTerrainDef` port itself is fully answered in Seam
+definition + In-scope item 2) and RMG-Q13 (the §17 ownership shape of the
+per-patch collision-brush data, a transcription-blocking hole the frozen field set
+does not yet cover). Both require a design session; Status stays DRAFT until they
+are settled.
 
-RMG-Q10 is the **only** remaining open item. It was **not** among the three rulings
-folded in at pass 6 (38 / 39d / 36) — none addresses the `CM_GetShaderInfo` binding —
-and it cannot be resolved from oracle ground truth alone: the Rust `cm` packet
-currently declares only the `CCMShader` **struct** (`crates/mp/engine/qcommon/src/cm/ccmshader.rs`),
-**not** a `CM_GetShaderInfo` accessor, so there is no existing binding to cite. It
-stays escalated to the cm-packet design session, per Gate 2.
+- **RMG-Q12 — the `tools/rmg-oracle` terrain-def fixture + golden-#4 `LoadTerrainDef`
+  coverage.** `CCMLandScape::LoadTerrainDef` (`cm_terrain.cpp:39-110`) is a **live**
+  path that GP2-parses `ext_data/RMG/<terrainDef>.terrain` (fallback
+  `ext_data/arioche/…`, non-fatal on a double miss, `:48-56`). The harness drives
+  both lookups through `MockHost::fs_read_file`, but **which behavior golden #4 pins
+  is undecided**: **(a)** both lookups return `None` → the non-fatal double-miss
+  (`print`+return; no shader read, no `CM_GetShaderInfo`) — deterministic and
+  fixture-free, and it does not change golden #4's pinned `flatten`/`seed`/`count`
+  bytes; or **(b)** a committed `.terrain` fixture that exercises the
+  `altitudetexture`/`water` parse — which additionally requires the standalone TU to
+  **stub the un-ported extern `CM_GetShaderInfo`** (cm-C-track-owned, RMG-D5; the
+  harness runs no `CM_LoadMap` to populate `cmShaderTable`) and, for the water case,
+  defines the `water_contents()`/`water_surface_flags()` the golden expects. Both are
+  ground-truth-faithful; the coverage/fixture choice (and, for (b), the extern-stub
+  shape) is a verification-design call the settled decisions don't cover. **Escalate
+  to a design session.**
 
-The pass-6 rulings closed the doc's other open item: **ruling 38 closed RMG-Q11**
-(the E0502 collision-seam borrow) by moving the collision entry points onto
-`CollisionWorld` (recorded in Resolved questions). RMG-Q7/Q8/Q9 (ruling 28) and the
-`EngineHost`-signatures Stage-0 prerequisite (rulings 31/32/33, extended by ruling
-36) are likewise recorded there.
+- **RMG-Q13 — the §17 Rust ownership shape of the per-patch collision-brush data.**
+  Raven's `CCMLandScape` ctor `Z_Malloc`s **one** shared byte buffer
+  `mPatchBrushData` sized `size * GetBlockCount()` (`cm_terrain.cpp:213-215`), and
+  each `CCMPatch` stores a raw `struct cbrush_s* mPatchBrushData`
+  (`cm_landscape.h:100`) pointing into a per-patch slice of it;
+  `CCMPatch::CreatePatchPlaneData` carves that slice into `cbrush_t` / `cbrushside_t`
+  / `cplane_t` sub-regions by pointer arithmetic
+  (`brush = mPatchBrushData; side = (cbrushside_t *)(mPatchBrushData + mNumBrushes)`,
+  `cm_terrain.cpp:320-322`), and the live patch-collision build + `terrain_patch_collide`
+  read it (including sibling-patch reads via `GetAdjacentBrushX/Y`,
+  `cm_terrain.cpp:246-256,282`). The frozen Divergences field set (RMG-D4a/RMG-D4h)
+  settles `mHeightMap`/`mFlattenMap` → `Vec<u8>`, `mPatches` → `Vec<CmPatch>`, the
+  inline `holdrand`, and the dropped `owner` back-pointer — but is **silent on this
+  buffer**, so the doc's claim that "the struct's Rust field set is already frozen"
+  (Slice hooks / Files roster) is not yet true for it. The unsettled §17 choice:
+  **(a)** `CmLandScape` owns one shared brush/brushside arena (`Vec<CmBrush>` +
+  `Vec<CmBrushSide>`, or a `Vec<u8>`) and each `CmPatch` holds an index/range into it
+  — matching Raven's single-allocation topology; or **(b)** each `CmPatch` owns
+  independent `Vec<cbrush_s>`/`Vec<cbrushside_s>` — a different allocation shape than
+  Raven's, with sibling reads resolved through the RMG-D4h-threaded `CmLandScape`'s
+  `mPatches`. Ground truth fixes only the *access pattern*, not the shape; both
+  reproduce the seam-observable collision output (the brush pointers/layout do **not**
+  leak into any referee-diffed snapshot/configstring, so fork-discovery ruling 4's
+  allocation-order parity — which binds only "wherever pointers/indices leak into
+  state the referee diffs" — does not force topology (a) here). §B5 (arena on
+  sibling-walking consumers) + RMG-D4h narrow but do not uniquely pick between (a)
+  and (b). This is load-bearing for `UpdatePatches`, `CmPatch::Init`/`InitPlane`/
+  `CreatePatchPlaneData`, `terrain_patch_collide`, and `GetAdjacentBrushX/Y` — none
+  transcribable without it, and the RMG-D5 struct-definition-lands-early principle
+  needs it settled before the wave-0–4 `CmLandScape` definition can carry a complete
+  field set. **Escalate to a design session.**
 
 ## Resolved questions
 
@@ -1185,6 +1385,18 @@ the open list):
   `get_rand_seed` → `c_ulong` (Seam §C, frozen, stay `CmLandScape` `&self` methods);
   the accessor is `RmManager::land() -> Option<TerrainHandle>` backed by the private
   `land: Option<TerrainHandle>` field, callers resolving through `CollisionWorld`.
+- **RMG-Q10 — the Rust binding `LoadTerrainDef` uses to reach
+  `CM_GetShaderInfo`/`CCMShader`.** RESOLVED by **ruling 41** → RMG-D5: it is the
+  frozen extern method `CollisionWorld::cm_get_shader_info(&mut self, name: &str) ->
+  Option<&CCMShader>`, transcribed faithfully from the `name`-overload decl
+  (`cm_local.h:303`, def `cm_shader.cpp:498`; `&mut self` because a miss registers
+  shader text). It is **owned by the `cm` C-track qcommon packet** and lands with the
+  `cm` waves; this doc cites it as settled and does not port `cm_shader.cpp`. The
+  ownership half was already answered from ground truth (Non-goals / State ownership:
+  `CCMShader`/`CM_GetShaderInfo` are `cmg`-resident wider-clipmap machinery driven by
+  `CM_LoadMap`, `cm_load.cpp:733,737`, STATE-D2); ruling 41 settled the remaining
+  binding half. RMG-Q10 was the last open item at ruling-41 time; a later dry-run
+  then reopened RMG-Q12 (a distinct verification-fixture item, Open questions).
 - **RMG-Q11 — the E0502 collision-seam borrow.** RESOLVED by **ruling 38** → RMG-D1:
   the frozen `patch_collide(&self, cm: &mut CollisionWorld, …)` `CmLandScape`-method
   shape was inexpressible in safe Rust (holding `&cm.land_scape` while passing
@@ -1244,12 +1456,25 @@ earlier draft's colocate/prose-only calls:
   the earlier "private helpers colocate into `cm_terrain.rs`" call**. They get
   Files-roster rows of their own (below).
 
+**Struct definitions land at their earliest consumer's wave (RMG-D5 / ruling 41).**
+The `cm_terrain.rs` / `cm_patch.rs` / `cm_height_details.rs` roster rows below are
+each **one file** that lands in two tool passes, per the RMG-D5 campaign-wide
+principle: the `CmLandScape` / `CmPatch` / `CmHeightDetails` **struct DEFINITIONS**
+(their frozen field sets, Divergences RMG-D4a/RMG-D4h — no method bodies; the one
+open field is the per-patch collision-brush buffer `mPatchBrushData`, RMG-Q13, which
+must settle first) land with the **wave-0–4 collision consumers** so `CollisionWorld.land_scape:
+Option<CmLandScape>` and the field-reading `terrain_*` methods type-check; the ctor
+/ `LoadTerrainDef` / `UpdatePatches` **bodies** fill at the wave-15–17 tool order.
+This is the ruled principle, **not** a "shell" — the early landing carries the real
+definition, so no stub exists at any point (`GOAL-engine.md:24-28`). The row summaries
+below describe the whole file (both passes); the porter splits by the tool wave.
+
 ```yaml
 files:
   # --- mp_engine_rmg (oracle/codemp/RMG/) — LIVE surface only ---
   - { path: crates/mp/engine/rmg/src/rm_manager.rs,  crate: mp_engine_rmg,      mode: mp, class: CRMManager,   summary: "RmManager LIVE lifecycle (RMG-D1): SIX live methods new/SetLandScape/LoadMission (early-outs false — mTerrain always NULL under DEDICATED, RM_Manager.cpp:110-113)/GetLandScape→land()→Option<TerrainHandle> + the automap-symbol seam pair GetAutomapSymbolCount/GetAutomapSymbol (return 0/None). SpawnMission is DROPPED from Seam-A entirely (ruling 38) — NOT a stub: the Wave-20 G_RMG_INIT arm collapses the provably-dead `if load_mission { spawn_mission }` to load_mission(…) per porting-rules §C10 + a §20 zero-execution note. mCurObjective/WriteAutomapSymbols/ProcessAutomapSymbols and the 12 zero-caller CRMManager methods §20-dropped (RMG-D4c, divergences). Private initialized:bool flag flipped at the G_RMG_INIT arm (ruling 12); private land:Option<TerrainHandle> (RM_Manager.h:14 mLandScape cache, None by Default)" }
   # --- mp_engine_qcommon (oracle/codemp/qcommon/) — terrain twins, RMG-D4a ---
-  - { path: crates/mp/engine/qcommon/src/cm_terrain.rs,       crate: mp_engine_qcommon, mode: mp, class: CCMLandScape,  summary: "CmLandScape LIVE construction under DEDICATED (RMG-D1, cm_terrain.cpp:116-219): config parse, bounds, heightmap(unpopulated)/flatten(memset-0) alloc, LoadTerrainDef, mPatches/UpdatePatches + CmPatch collision build, seeded holdrand=0x89abcdef; register_terrain (Seam-B) get-or-create. CmPatch (CCMPatch) and CmHeightDetails (CCMHeightDetails) get their OWN files cm_patch.rs / cm_height_details.rs per ruling 39d (§21 one class per file) — SEPARATE roster rows below; mPatches: Vec<CmPatch> is an owned field here, neither type is in any pub Seam signature. RUNTIME SURFACE split by receiver (RMG-D4a — the cm C-track packets exclude CCMLandScape): (1) snapshot-read accessors GetHeightMap/GetFlattenMap/GetRealArea/get_rand_seed stay CmLandScape &self methods (streamed sv_client.cpp:779-806; GetHeightMap/GetFlattenMap→&[u8], land with the wave-16 unit). (2) per-frame collision — PER RULING 38 these are methods ON CollisionWorld (terrain_patch_collide/terrain_water_collide + terrain_bounds/terrain_water_height/terrain_water_contents/terrain_water_surface_flags/terrain_patch_scalar_size) that resolve self.land_scape internally (NOT CmLandScape methods taking &mut CollisionWorld — struck; E0502 repair, RMG-Q11 closed); they forward to the private CmLandScape PatchCollide (cm_terrain.cpp:600)/WaterCollide (:836)+getters and land with the early clipmap-trace waves 0–4 (wave split, cm_trace.cpp:760,789,859,888 + cm_test.cpp:285-289). FROZEN in Seam §C (rulings 28+38). Private-internal §A1 helpers transcribed here (NOT pub seam): SetShaders (LIVE via LoadTerrainDef cm_terrain.cpp:83), CalcRealCoords (LIVE via UpdatePatches :914), GetPatch (LIVE via PatchCollide/WaterCollide :681,768,823 + patch-collision build :256,282). §20/dead (no live caller): GetTerxelLocalCoords (callers commented-out :948-950 in /*…*/ :929-969), CarveLine (caller the §20-dropped CarveBezierCurve :1303). LoadTerrainDef's altitudetexture/water cases read CM_GetShaderInfo/CCMShader — wider-clipmap shader machinery (Non-goals, cm_local.h:77/303-304, cm_shader.cpp; NOT terrain-owned), reached through the threaded CollisionWorld; Rust binding = RMG-Q10 (OPEN). §20-dropped: mRefCount (renderer-only, DEC-01); the twelve cm_landscape.h:247-258 area CM_* wrappers (NOT CM_InitTerrain :246, LIVE — folded into register_terrain); ALL area/carve methods FlattenArea/SaveArea/GetWorldHeight/AreaCollision/GetFirst|NextArea/FractionBelowLevel/CarveBezierCurve/GetFirst|Player|NextObjectiveArea + CArea (Rust name CmArea, ruling 28; only callers were the generation path, now §20); CM_TerrainPatchIterate; inline flrand/irand/rand_seed (no live caller)" }
+  - { path: crates/mp/engine/qcommon/src/cm_terrain.rs,       crate: mp_engine_qcommon, mode: mp, class: CCMLandScape,  summary: "CmLandScape LIVE construction under DEDICATED (RMG-D1, cm_terrain.cpp:116-219): config parse, bounds, heightmap(unpopulated)/flatten(memset-0) alloc — with the ctor else-branch empty-heightMap fatal host.error(errorParm_t::ERR_FATAL, \"Terrain has no heightmap specified\\n\") (cm_terrain.cpp:190-193, the 4th live EngineHost method), LoadTerrainDef (cm_terrain.cpp:39-110: GP2-parses ext_data/RMG/<terrainDef>.terrain, falls back to ext_data/arioche/…, non-fatal print+return on double miss :48-56 — Com_ParseTextFile ports as host.fs_read_file + a function-local mp_engine_qcommon::gp2::GenericParser2.parse, INTRA-CRATE, no new pub seam/edge; §C10 fallback control flow), mPatches/UpdatePatches + CmPatch collision build, seeded holdrand=0x89abcdef; register_terrain (Seam-B) get-or-create. CmPatch (CCMPatch) and CmHeightDetails (CCMHeightDetails) get their OWN files cm_patch.rs / cm_height_details.rs per ruling 39d (§21 one class per file) — SEPARATE roster rows below; mPatches: Vec<CmPatch> is an owned field here, neither type is in any pub Seam signature. RUNTIME SURFACE split by receiver (RMG-D4a — the cm C-track packets exclude CCMLandScape): (1) snapshot-read accessors GetHeightMap/GetFlattenMap/GetRealArea/get_rand_seed stay CmLandScape &self methods (streamed sv_client.cpp:779-806; GetHeightMap/GetFlattenMap→&[u8], land with the wave-16 unit). (2) per-frame collision — PER RULING 38 these are methods ON CollisionWorld (terrain_patch_collide/terrain_water_collide + terrain_bounds/terrain_water_height/terrain_water_contents/terrain_water_surface_flags/terrain_patch_scalar_size) that resolve self.land_scape internally (NOT CmLandScape methods taking &mut CollisionWorld — struck; E0502 repair, RMG-Q11 closed); they forward to the private CmLandScape PatchCollide (cm_terrain.cpp:600)/WaterCollide (:836)+getters and land with the early clipmap-trace waves 0–4 (wave split, cm_trace.cpp:760,789,859,888 + cm_test.cpp:285-289). FROZEN in Seam §C (rulings 28+38). Private-internal §A1 helpers transcribed here (NOT pub seam): SetShaders (LIVE via LoadTerrainDef cm_terrain.cpp:83), CalcRealCoords (LIVE via UpdatePatches :914), GetPatch (LIVE via PatchCollide/WaterCollide :681,768,823 + patch-collision build :256,282). §20/dead (no live caller): GetTerxelLocalCoords (callers commented-out :948-950 in /*…*/ :929-969), CarveLine (caller the §20-dropped CarveBezierCurve :1303). LoadTerrainDef's altitudetexture/water cases read CM_GetShaderInfo/CCMShader — wider-clipmap shader machinery (Non-goals, cm_local.h:77/303-304, cm_shader.cpp; NOT terrain-owned), reached through the threaded CollisionWorld; Rust binding = SETTLED extern CollisionWorld::cm_get_shader_info(&mut self, name:&str)->Option<&CCMShader> (ruling 41/RMG-D5, decl cm_shader.cpp:498; owned by the cm C-track packet, landing with the cm waves, NOT ported here — former RMG-Q10, now closed). §20-dropped: mRefCount (renderer-only, DEC-01); the twelve cm_landscape.h:247-258 area CM_* wrappers (NOT CM_InitTerrain :246, LIVE — folded into register_terrain); ALL area/carve methods FlattenArea/SaveArea/GetWorldHeight/AreaCollision/GetFirst|NextArea/FractionBelowLevel/CarveBezierCurve/GetFirst|Player|NextObjectiveArea + CArea (Rust name CmArea, ruling 28; only callers were the generation path, now §20); CM_TerrainPatchIterate; inline flrand/irand/rand_seed (no live caller)" }
   - { path: crates/mp/engine/qcommon/src/cm_patch.rs,         crate: mp_engine_qcommon, mode: mp, class: CCMPatch,        summary: "CmPatch (CCMPatch, cm_landscape.h) — its OWN file per ruling 39d (§21 one class per file), beside cm_terrain.rs. The per-instance collision patch built by CmLandScape::UpdatePatches; owned as mPatches: Vec<CmPatch>. Carries the patch collision data + the adjacency helpers GetAdjacentBrushX/Y (cm_terrain.cpp:246-256,282) reached from the LIVE patch-collision build and terrain_patch_collide. §B3/RMG-D4h: the owner:CCMLandScape* back-pointer (cm_landscape.h:93) is a LIVE back-pointer — DROPPED; the owning CmLandScape is threaded into the patch-build methods (§B4). Not in any pub Seam signature (private helper of CmLandScape)" }
   - { path: crates/mp/engine/qcommon/src/cm_height_details.rs, crate: mp_engine_qcommon, mode: mp, class: CCMHeightDetails, summary: "CmHeightDetails (CCMHeightDetails, cm_landscape.h) — its OWN file per ruling 39d (§21 one class per file), beside cm_terrain.rs. A per-terxel height-detail struct read during CmLandScape construction/collision; not in any pub Seam signature (private detail struct of CmLandScape)" }
   - { path: crates/mp/engine/qcommon/src/terrain_handle.rs,   crate: mp_engine_qcommon, mode: mp, class: TerrainHandle,    summary: "TerrainHandle newtype over thandle_t (type thandle_t = c_int; the ABI id GetTerrainId()/mTerrainHandle returns, cm_landscape.h:139,220). Beside collision_world.rs per the settled rmg→qcommon dependency direction (the shared handle must live in qcommon or lower). Ruling 39d gives it its OWN roster row (was prose-only). register_terrain (Seam-B) constructs it; RmManager::set_landscape consumes it; land() returns Option<TerrainHandle>" }
@@ -1272,8 +1497,8 @@ shape-map (RMG-D4).
 divergences:
   # --- LIVE reshapings ---
   - { class: CRMManager,   kind: reshape, rule: "§B/RMG-D4b", note: "mMission:CRMMission* (RM_Manager.h:13) is §20-DROPPED — no Rust field: CRMMission has no Rust type (§20-dropped, RMG-D1) and mMission is dead under DEDICATED (ctor sets it NULL, RM_Manager.cpp:38; the only reassignment `new CRMMission` at RM_Manager.cpp:135 sits AFTER LoadMission's early-out RM_Manager.cpp:110-113 and is never reached; every read at :194/317/333/351/374/394 is inside the §20-dead methods). Corrects the earlier `owned field` framing — the field is never constructed on the live path (mirrors the mLandScape/mTerrain drops below). Cached CCMLandScape* mLandScape (RM_Manager.h:14) and CRandomTerrain* mTerrain (RM_Manager.h:15) likewise NOT stored — RmManager owns only the TerrainHandle; mTerrain resolves as always-None (RMG-D1, GetRandomTerrain()==0). TheRandomMissionManager → direct Engine.rmg field (ruling 12), no Option; lazy-init via a private initialized:bool flipped at the G_RMG_INIT arm (ctor RM_Manager.cpp:34-42 only zeroes members, so new()/Default and the lazy new collapse to one construction)" }
-  - { class: CCMLandScape, kind: reshape, rule: "§B5/RMG-D4h", note: "byte* mHeightMap/mFlattenMap, CCMPatch* mPatches → owned Vec<u8>/Vec<CmPatch>; holdrand LCG stays an inline c_ulong field (Raven `unsigned long`, cm_landscape.h:160; seeded 0x89abcdef cm_terrain.cpp:122; get_rand_seed live-streamed). CCMPatch::owner:CCMLandScape* (cm_landscape.h:93) — a LIVE back-pointer on the patch-collision build (GetAdjacentBrushY, cm_terrain.cpp:246-256) — is DROPPED per §B3; the owning CmLandScape is threaded into the patch-build methods (§B4)" }
-  - { class: CCMLandScape, kind: reshape, rule: "§A1/RMG-D4a", note: "LIVE RUNTIME SURFACE — the constructed landscape has two live external readers, both owned by THIS subsystem (RMG-D4a: the cm C-track packets exclude CCMLandScape, so its methods port here, not in a cm packet nor another doc). (1) Snapshot/download read from the server (sv_client.cpp:779-806, via TheRandomMissionManager->GetLandScape()): GetHeightMap (cm_landscape.h:218 — §F.19 UB bytes, excluded from golden compare), GetFlattenMap (:219), GetRealArea (:211), get_rand_seed (:239). (2) Per-frame terrain collision from the cm-trace/cm-test C-track packets (cm_trace.cpp:283,760,789,997,1374 + cm_test.cpp:285-289, non-BSPC, gated com_terrainPhysics->integer && cmg.landScape && CONTENTS_TERRAIN): PatchCollide (decl cm_landscape.h:175, def cm_terrain.cpp:600), WaterCollide (:178 / :836), GetWaterContents (:233), GetWaterSurfaceFlags (:234), GetWaterHeight (:232), GetBounds (:112/:199), GetPatchScalarSize (:207). Idiomatic Rust signatures for all of the above are FROZEN in Seam §C per ruling 28 (scope) + ruling 38 (receiver shape): read accessors stay CmLandScape &self methods GetHeightMap/GetFlattenMap→&[u8], GetRealArea→i32, get_rand_seed→c_ulong; the collision entry points are RULING-38 methods ON CollisionWorld (terrain_patch_collide is &mut self — checkcount writes into landscape-owned brushes are legal mutation — + &mut trace_t out-param; terrain_water_collide + terrain_bounds/water accessors are &self; all resolve self.land_scape internally). The earlier CmLandScape-method-taking-&mut-CollisionWorld shape is STRUCK (E0502, RMG-Q11 closed by ruling 38). The RmManager accessor is land()→Option<TerrainHandle> (callers resolve through CollisionWorld). Collision methods land with the early clipmap-trace waves 0–4 (wave split); read accessors with the wave-16 unit. SetShaders (LIVE via LoadTerrainDef cm_terrain.cpp:83), CalcRealCoords (LIVE via UpdatePatches :914) and GetPatch (LIVE via PatchCollide/WaterCollide :681,768,823 + the patch-collision build :256,282) are private-internal (§A1) helpers transcribed here — NOT pub seam; GetTerxelLocalCoords (sole callers commented-out :948-950 in the /*…*/ block :929-969) and CarveLine (sole caller the §20-dropped CarveBezierCurve :1303) have NO live caller — §20/dead. NONE of the five is a pub seam method (corrects the prior 'no live caller / renderer-only' claim for SetShaders/CalcRealCoords/GetPatch). LoadTerrainDef's altitudetexture/water cases read CM_GetShaderInfo/CCMShader (SetShaders' CCMShader* arg :80-83; the water contentFlags/surfaceFlags reads :98-103 populating mWaterContents/mWaterSurfaceFlags, i.e. water_contents()/water_surface_flags()) — the WIDER-CLIPMAP shader machinery (cm_local.h:77/303-304, cm_shader.cpp; NOT terrain-owned, cmg-resident STATE-D2, Non-goals), reached through the threaded CollisionWorld (§B4); this doc does not port cm_shader.cpp, and the Rust binding LoadTerrainDef calls is the open item RMG-Q10" }
+  - { class: CCMLandScape, kind: reshape, rule: "§B5/RMG-D4h", note: "byte* mHeightMap/mFlattenMap, CCMPatch* mPatches → owned Vec<u8>/Vec<CmPatch>; holdrand LCG stays an inline c_ulong field (Raven `unsigned long`, cm_landscape.h:160; seeded 0x89abcdef cm_terrain.cpp:122; get_rand_seed live-streamed). CCMPatch::owner:CCMLandScape* (cm_landscape.h:93) — a LIVE back-pointer on the patch-collision build (GetAdjacentBrushY, cm_terrain.cpp:246-256) — is DROPPED per §B3; the owning CmLandScape is threaded into the patch-build methods (§B4). OPEN (RMG-Q13): the per-patch collision-brush data is NOT yet frozen here — Raven's single shared Z_Malloc buffer CCMLandScape::mPatchBrushData (cm_terrain.cpp:213-215) carved per-patch via pointer arithmetic into cbrush_t/cbrushside_t/cplane_t regions (CCMPatch::mPatchBrushData:cbrush_s*, cm_landscape.h:100; CreatePatchPlaneData carve cm_terrain.cpp:320-322), read by the live patch-collision build incl. sibling GetAdjacentBrushX/Y (cm_terrain.cpp:246-256,282). The §17 choice — one shared brush/brushside arena on CmLandScape that CmPatch indexes (Raven topology) vs. independent per-CmPatch Vec<cbrush_s>/Vec<cbrushside_s> — is a design-session escalation (ground truth fixes only the access pattern; the buffer never leaks into referee-diffed state, so fork-discovery ruling 4 does not force the shared-arena shape)" }
+  - { class: CCMLandScape, kind: reshape, rule: "§A1/RMG-D4a", note: "LIVE RUNTIME SURFACE — the constructed landscape has two live external readers, both owned by THIS subsystem (RMG-D4a: the cm C-track packets exclude CCMLandScape, so its methods port here, not in a cm packet nor another doc). (1) Snapshot/download read from the server (sv_client.cpp:779-806, via TheRandomMissionManager->GetLandScape()): GetHeightMap (cm_landscape.h:218 — §F.19 UB bytes, excluded from golden compare), GetFlattenMap (:219), GetRealArea (:211), get_rand_seed (:239). (2) Per-frame terrain collision from the cm-trace/cm-test C-track packets (cm_trace.cpp:283,760,789,997,1374 gated com_terrainPhysics->integer && cmg.landScape && CONTENTS_TERRAIN + cm_test.cpp:285-289 gated cmg.landScape && CONTENTS_TERRAIN only — NOT com_terrainPhysics, non-BSPC): PatchCollide (decl cm_landscape.h:175, def cm_terrain.cpp:600), WaterCollide (:178 / :836), GetWaterContents (:233), GetWaterSurfaceFlags (:234), GetWaterHeight (:232), GetBounds (:112/:199), GetPatchScalarSize (:207). Idiomatic Rust signatures for all of the above are FROZEN in Seam §C per ruling 28 (scope) + ruling 38 (receiver shape): read accessors stay CmLandScape &self methods GetHeightMap/GetFlattenMap→&[u8], GetRealArea→i32, get_rand_seed→c_ulong; the collision entry points are RULING-38 methods ON CollisionWorld (terrain_patch_collide is &mut self — checkcount writes into landscape-owned brushes are legal mutation — + &mut trace_t out-param; terrain_water_collide + terrain_bounds/water accessors are &self; all resolve self.land_scape internally). The earlier CmLandScape-method-taking-&mut-CollisionWorld shape is STRUCK (E0502, RMG-Q11 closed by ruling 38). The RmManager accessor is land()→Option<TerrainHandle> (callers resolve through CollisionWorld). Collision methods land with the early clipmap-trace waves 0–4 (wave split); read accessors with the wave-16 unit. SetShaders (LIVE via LoadTerrainDef cm_terrain.cpp:83), CalcRealCoords (LIVE via UpdatePatches :914) and GetPatch (LIVE via PatchCollide/WaterCollide :681,768,823 + the patch-collision build :256,282) are private-internal (§A1) helpers transcribed here — NOT pub seam; GetTerxelLocalCoords (sole callers commented-out :948-950 in the /*…*/ block :929-969) and CarveLine (sole caller the §20-dropped CarveBezierCurve :1303) have NO live caller — §20/dead. NONE of the five is a pub seam method (corrects the prior 'no live caller / renderer-only' claim for SetShaders/CalcRealCoords/GetPatch). LoadTerrainDef (cm_terrain.cpp:39-110) first GP2-parses the terrain-def file (Com_ParseTextFile opens ext_data/RMG/<terrainDef>.terrain, falls back to ext_data/arioche/…, non-fatal Com_Printf+return on a double miss, :48-56) via a function-local mp_engine_qcommon::gp2::GenericParser2 reading through the already-threaded host.fs_read_file (Com_ParseTextFile = FS_FOpenFileByMode+FS_Read+Parse, common.cpp:2179-2202) — INTRA-CRATE reuse of the ported §F GP2, NO new pub seam or crate edge (Seam definition), §C10 fallback control flow. Only on a successful parse do its altitudetexture/water cases read CM_GetShaderInfo/CCMShader (SetShaders' CCMShader* arg :80-83; the water contentFlags/surfaceFlags reads :98-103 populating mWaterContents/mWaterSurfaceFlags, i.e. water_contents()/water_surface_flags()) — the WIDER-CLIPMAP shader machinery (cm_local.h:77/303-304, cm_shader.cpp; NOT terrain-owned, cmg-resident STATE-D2, Non-goals), reached through the threaded CollisionWorld (§B4); this doc does not port cm_shader.cpp, and the Rust binding LoadTerrainDef calls is the SETTLED extern CollisionWorld::cm_get_shader_info(&mut self, name:&str)->Option<&CCMShader> (ruling 41/RMG-D5, decl cm_shader.cpp:498, &mut self because a miss registers shader text; owned by the cm C-track packet, landing with the cm waves, NOT ported here — former RMG-Q10, now closed)" }
   - { class: rmAutomapSymbol_t, kind: relocate, rule: "RMG-D4d/RMG-D2(b)", note: "ABI type (client.h:149) the rosetta ported in mp_engine_client (crates/mp/engine/client/src/client/rm_automap_symbol_t.rs:9) RELOCATES to crates/mp/qshared/src/common/mp/rmg/rm_automap_symbol_t.rs — a NEW rmg/ folder under mp_qshared mirroring oracle/codemp/RMG/RM_Manager.h ownership (RMG-D2(b)) — so mp_engine_rmg (already depends on mp_qshared) names it; RmManager::automap_symbol returns Option<&RmAutomapSymbol>. mp_engine_client import updated in the SAME commit. No rmg→mp_engine_client edge (client→rmg is the allowed direction). Seam pair is LIVE, returning count 0 under RMG-D1" }
   - { class: "flrand/irand (q_math.c:1432)", kind: reshape, rule: "§B3/RMG-D4f", note: "the free q_math LCG over file-scope holdrand → the engine's OWN mp_qshared::QRand instance Engine.common.rng (engine.rs:22, common/common.rs:20), exposed via EngineHost::flrand/irand (rulings 11+21). Only RMG consumer is the golden-only RMG_CreateSeed (cm_randomterrain.cpp:1008, zero live callers) — no live RMG path draws it (RMG-D1). The game-tier bg_channel::rng::Rng (crates/mp/game/src/bg_channel/rng.rs) is a distinct instance mp_engine_qcommon must NOT reach" }
   # --- §20 GENERATION-PATH DROPS (RMG-D1) — shape-map retained, not ported ---
