@@ -535,3 +535,33 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     fork-discovery → rulings → author-design-doc → FROZEN. It gates the
     M3 renderer waves.
     **RULING: queue it now (user, 2026-07-09)**
+
+## tr_model doc rulings, round 9 (user, 2026-07-09 — tenth session)
+
+52. **Model-memory contract:** each `CachedEndianedModelBinary` owns its
+    disk image as `Box<[u8]>` — heap-pinned/address-stable (the frozen
+    ghoul2 seam derefs raw pointers into it across frames), in-place
+    mutable for the endian swap, drop = Z_Free. Eviction stays faithful
+    (level-keyed `iLastLevelUsedOn` + pak checksum + r_modelpoolmegs) —
+    safe because ghoul2 re-resolves via `R_GetModelByHandle` each use and
+    never caches `model_t*` across level change; the doc records that
+    invariant as the contract.
+    **RULING: Box<[u8]> + faithful level eviction (user, 2026-07-09)**
+53. **Model-state homes:** the `CachedModels` map and the model pool
+    become fields of a renderer-models state struct in `mp_renderer`
+    (owner of `model_s`/`trGlobals_t`), attached to `Engine`, reached by
+    ghoul2 ONLY through the EngineHost impl (`model_mdxm`/`model_mdxa`
+    resolve through it; `mp_engine_ghoul2` never edges to `mp_renderer`).
+    The Hunk `tr.models[1024]` pool → `Vec<Box<ModelData>>` with
+    `qhandle_t` = index and a map side-index replacing the intrusive hash
+    chains; `MOD_BAD` failed-entry retention kept faithful.
+    **RULING: mp_renderer Engine field + Vec pool (user, 2026-07-09)**
+54. **tr_model dead surface:** header `LL()` swaps stay live (identity on
+    LE, golden-exercised). §20/§C10 with cites: the `#ifndef _M_IX86`
+    big-endian block, the client poke replay (`#ifndef DEDICATED`; server
+    variant commented out), and the tr_shader/tr_image/draw surface
+    (~73 fns) — classified per-function in the doc. The
+    `ShaderRegisterData` record vector STAYS on the cache struct (the
+    server-side StoreShaderRequest recording is live); only the poke
+    replay is client-dead.
+    **RULING: §20 the dead, keep the live records (user, 2026-07-09)**
