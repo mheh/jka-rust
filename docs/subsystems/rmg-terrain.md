@@ -1,5 +1,5 @@
 # RMG + qcommon terrain classes (§F idiomatic reimplementation) Design
-Status: REVIEWED     Supersedes: none
+Status: FROZEN (user sign-off 2026-07-09)     Supersedes: none
 Decision prefix: RMG     Ledger deps: DEC-01, DEC-04, DEC-09
 
 ## Standing context

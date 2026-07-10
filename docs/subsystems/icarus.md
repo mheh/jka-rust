@@ -1,5 +1,5 @@
 # ICARUS sequencer — MP engine (§F idiomatic reimplementation) Design
-Status: REVIEWED     Supersedes: none
+Status: FROZEN (user sign-off 2026-07-09)     Supersedes: none
 Decision prefix: ICARUS     Ledger deps: DEC-09, DEC-10; engine-fork-discovery forks 2, 4, 5, 7 + §F rulings 11–39, **40, 43**; STATE-Q2 (CLOSED 2026-07-09); GOAL-engine M2 gate
 
 ## Standing context

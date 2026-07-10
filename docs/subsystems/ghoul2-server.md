@@ -1,5 +1,5 @@
 # Server-side Ghoul2 + renderer bone/model internals Design
-Status: REVIEWED     Supersedes: none
+Status: FROZEN (user sign-off 2026-07-09)     Supersedes: none
 Decision prefix: G2SV     Ledger deps: DEC-04 (per-mode), DEC-09 (verification);
 engine-fork-discovery rulings 2 (state placement), 3 (fn-statics), 7 (this doc),
 11 (EngineHost), 12 (direct Engine fields), 18 (GetBoltMatrix defect), 22

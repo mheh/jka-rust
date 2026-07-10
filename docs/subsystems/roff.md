@@ -50,7 +50,7 @@ divergences:
 ---
 
 # CROFFSystem — ROFF Playback Design
-Status: REVIEWED     Supersedes: none
+Status: FROZEN (user sign-off 2026-07-09)     Supersedes: none
 Decision prefix: ROFF     Ledger deps: DEC-09 (oracle-differential parity)
 
 ## Standing context
