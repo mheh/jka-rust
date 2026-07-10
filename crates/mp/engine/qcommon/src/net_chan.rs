@@ -588,7 +588,7 @@ pub fn Netchan_Process(common: &mut Common, chan: *mut netchan_t, msg: *mut msg_
             // copy the fragment to the fragment buffer
             if fragment_length < 0
                 || (*msg).readcount + fragment_length > (*msg).cursize
-                || (*chan).fragmentLength + fragment_length > MAX_MSGLEN
+                || (*chan).fragmentLength + fragment_length > MAX_MSGLEN as i32
             {
                 if common.showdrop != 0 || common.showpackets != 0 {
                     let adr = NET_AdrToString(common, (*chan).remoteAddress);

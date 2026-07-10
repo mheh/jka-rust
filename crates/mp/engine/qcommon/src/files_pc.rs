@@ -790,7 +790,7 @@ pub fn FS_SV_Rename(common: &mut Common, from: *const c_char, to: *const c_char)
     }
 
     // don't let sound stutter
-    crate::null::S_ClearSoundBuffer();
+    null::S_ClearSoundBuffer();
 
     unsafe {
         let from_ospath = crate::files_common::FS_BuildOSPath4(
@@ -839,7 +839,7 @@ pub fn FS_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
     }
 
     // don't let sound stutter
-    crate::null::S_ClearSoundBuffer();
+    null::S_ClearSoundBuffer();
 
     unsafe {
         let from_ospath = crate::files_common::FS_BuildOSPath4(
@@ -897,7 +897,7 @@ pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileH
     }
 
     // don't let sound stutter
-    crate::null::S_ClearSoundBuffer();
+    null::S_ClearSoundBuffer();
 
     unsafe {
         let ospath = crate::files_common::FS_BuildOSPath4(

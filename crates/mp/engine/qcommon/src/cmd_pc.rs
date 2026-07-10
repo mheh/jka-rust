@@ -29,6 +29,27 @@ struct Server;
 extern "Rust" {
     fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int;
     fn Com_Printf(common: &mut Common, msg: *const c_char);
+    // PORT-NOTE(Cvar_Command): missing symbol — `qcommon::cvar` doesn't expose
+    // this yet under this name/shape; resolution packet
+    // `qcommon__1774_Cvar_Command.md`. Referenced verbatim; escalated as a
+    // missing symbol.
+    fn Cvar_Command(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+    ) -> c_int;
+    // PORT-NOTE(CL_GameCommand/UI_GameCommand/CL_ForwardCommandToServer): live
+    // in `mp_engine_client`'s `null/` stubs (`null_client.rs`), which this
+    // crate cannot depend on without cycling. Referenced verbatim per the
+    // no-stub rule; escalated as missing symbols.
+    fn CL_GameCommand() -> c_int;
+    fn UI_GameCommand() -> c_int;
+    fn CL_ForwardCommandToServer(text: *const c_char);
+    // PORT-NOTE(SV_GameCommand): lives in `mp_engine_server::sv_game`, which
+    // this crate cannot depend on without cycling. Referenced verbatim per
+    // the no-stub rule; escalated as missing symbol.
+    fn SV_GameCommand(common: &mut Common, sv: &mut Server) -> c_int;
 }
 
 // PORT-NOTE(cmd_function_t): `cmd_function_t` (linked-list node: `next`,
@@ -143,7 +164,7 @@ pub fn Cmd_ExecuteString(
     }
 
     // check cvars
-    if Cvar_Command(common, cm, rm, host) != 0 {
+    if unsafe { Cvar_Command(common, cm, rm, host) } != 0 {
         return;
     }
 
@@ -152,24 +173,21 @@ pub fn Cmd_ExecuteString(
     // fields aren't landed yet (the cvar sub-struct TODO in `common/common.rs`);
     // referenced verbatim as missing symbols.
     if !common.com_cl_running.is_null()
-        && unsafe { (*common.com_cl_running).integer != 0 }
-        && CL_GameCommand() != 0
+        && unsafe { (*common.com_cl_running).integer != 0 && CL_GameCommand() != 0 }
     {
         return;
     }
 
     // check server game commands
     if !common.com_sv_running.is_null()
-        && unsafe { (*common.com_sv_running).integer != 0 }
-        && SV_GameCommand(common, sv) != 0
+        && unsafe { (*common.com_sv_running).integer != 0 && SV_GameCommand(common, sv) != 0 }
     {
         return;
     }
 
     // check ui commands
     if !common.com_cl_running.is_null()
-        && unsafe { (*common.com_cl_running).integer != 0 }
-        && UI_GameCommand() != 0
+        && unsafe { (*common.com_cl_running).integer != 0 && UI_GameCommand() != 0 }
     {
         return;
     }
@@ -177,19 +195,7 @@ pub fn Cmd_ExecuteString(
     // send it as a server command if we are connected
     // this will usually result in a chat message
     //CL_ForwardCommandToServer ( text );
-    CL_ForwardCommandToServer(text);
+    unsafe {
+        CL_ForwardCommandToServer(text);
+    }
 }
-
-// PORT-NOTE(Cvar_Command): missing symbol — `qcommon::cvar` doesn't expose
-// this yet under this name/shape; resolution packet
-// `qcommon__1774_Cvar_Command.md`. Referenced verbatim below (never a local
-// shim); escalated as a missing symbol.
-//
-// PORT-NOTE(CL_GameCommand/UI_GameCommand/CL_ForwardCommandToServer): live in
-// `mp_engine_client`'s `null/` stubs (`null_client.rs`), which this crate
-// cannot depend on without cycling (server/client depend on qcommon).
-// Referenced verbatim per the no-stub rule; escalated as missing symbols.
-//
-// PORT-NOTE(SV_GameCommand): lives in `mp_engine_server::sv_game`, which this
-// crate cannot depend on without cycling. Referenced verbatim per the
-// no-stub rule; escalated as missing symbol.

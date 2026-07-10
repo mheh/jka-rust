@@ -462,7 +462,9 @@ pub fn CM_DeleteCachedMap(
     if bGuaranteedOkToDelete != 0 || cm.gbUsingCachedMapDataRightNow == 0 {
         // dump cached disk image...
         if !cm.gpvCachedMapDiskImage.is_null() {
-            Z_Free(common, cm.gpvCachedMapDiskImage);
+            unsafe {
+                Z_Free(common, cm.gpvCachedMapDiskImage);
+            }
             cm.gpvCachedMapDiskImage = core::ptr::null_mut();
 
             bActuallyFreedSomething = mp_qshared::shared::qtrue;
@@ -1441,7 +1443,9 @@ pub fn CM_LoadMap_Actual(
         }
 
         if header.version != BSP_VERSION {
-            Z_Free(common, cm.gpvCachedMapDiskImage);
+            unsafe {
+                Z_Free(common, cm.gpvCachedMapDiskImage);
+            }
             cm.gpvCachedMapDiskImage = core::ptr::null_mut();
 
             com_error(
@@ -1523,7 +1527,9 @@ pub fn CM_LoadMap_Actual(
         // of the map data will have been Little-Long'd, but some hasn't).
         //
         if Sys_LowPhysicalMemory() != 0 || (*common.com_dedicated).integer != 0 {
-            Z_Free(common, cm.gpvCachedMapDiskImage);
+            unsafe {
+                Z_Free(common, cm.gpvCachedMapDiskImage);
+            }
             cm.gpvCachedMapDiskImage = core::ptr::null_mut();
         } else {
             // ... do nothing, and let the renderer free it after it's finished

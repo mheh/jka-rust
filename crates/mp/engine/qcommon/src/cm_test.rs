@@ -288,7 +288,7 @@ pub fn CM_WriteAreaBits(cm: &mut CollisionWorld, buffer: *mut byte, area: c_int)
 
     // PORT-NOTE(bspc): `#ifndef BSPC` retail arm kept; `BSPC` has no rosetta row
     // (bsp-compiler-only build, not part of the engine port surface).
-    if cm.cm_noAreas.integer != 0 || area == -1 {
+    if unsafe { (*cm.cm_noAreas).integer } != 0 || area == -1 {
         // for debugging, send everything
         Com_Memset(buffer as *mut (), 255, bytes as usize);
     } else {

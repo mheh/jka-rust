@@ -265,6 +265,11 @@ pub struct Common {
     /// Source: `oracle/codemp/qcommon/cmd_common.cpp:337,359`
     pub cmd_args_buf: [c_char; MAX_STRING_CHARS],
     pub cmd_args_from_buf: [c_char; BIG_INFO_STRING],
+    /// Raven `static cmd_function_t *cmd_functions` — head of the
+    /// registered-command linked list.
+    ///
+    /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:11`
+    pub cmd_functions: *mut crate::cmd_pc::cmd_function_t,
 
     // ---- `cvar.cpp` ----
     /// Raven `cvar_modifiedFlags`.

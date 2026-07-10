@@ -62,6 +62,18 @@ extern "Rust" {
     fn FS_FreeFile(common: &mut Common, f: *mut ());
     fn Cvar_VariableString(common: &mut Common, name: *mut c_char) -> *const c_char;
     fn va(fmt: *const c_char, arg: *const c_char) -> *mut c_char;
+    // PORT-NOTE(Cmd_AddCommand): not yet landed as a callable body in this
+    // crate (`z_memman_pc.rs`/`vm_fns.rs` precedent — same signature declared
+    // there too); declared here to satisfy `Cmd_Init`'s call sites and
+    // escalated as a missing symbol.
+    fn Cmd_AddCommand(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        cmd_name: *const c_char,
+        function: *const (),
+    );
 }
 
 // PORT-NOTE(rm-types): `RenderModels`/`Server` are state-receiver types pinned
@@ -368,14 +380,9 @@ pub fn Cbuf_InsertText(common: &mut Common, text: *const c_char) {
 pub fn Cmd_Echo_f(common: &mut Common) {
     for i in 1..Cmd_Argc(common) {
         unsafe {
-            Com_Printf(
-                common,
-                format!(
-                    "{} ",
-                    core::ffi::CStr::from_ptr(Cmd_Argv(common, i)).to_string_lossy()
-                )
-                .as_ptr() as *const c_char,
-            );
+            let arg = core::ffi::CStr::from_ptr(Cmd_Argv(common, i)).to_string_lossy();
+            let msg = format!("{} ", arg);
+            Com_Printf(common, msg.as_ptr() as *const c_char);
         }
     }
     unsafe {
@@ -463,7 +470,8 @@ pub fn Cmd_Vstr_f(common: &mut Common) {
     // PORT-NOTE(Cvar_VariableString/va): neither is ported in this crate yet
     // (missing-symbol escalation) — referenced by exact Raven name.
     unsafe {
-        let v = Cvar_VariableString(common, Cmd_Argv(common, 1));
+        let arg1 = Cmd_Argv(common, 1);
+        let v = Cvar_VariableString(common, arg1);
         Cbuf_InsertText(common, va(b"%s\n\0".as_ptr() as *const c_char, v));
     }
 }
@@ -546,46 +554,48 @@ pub fn Cmd_Init(
     rm: &mut RenderModels,
     host: &mut dyn EngineHost,
 ) {
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        b"cmdlist\0".as_ptr() as *const c_char,
-        Cmd_List_f,
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        b"exec\0".as_ptr() as *const c_char,
-        Cmd_Exec_f,
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        b"vstr\0".as_ptr() as *const c_char,
-        Cmd_Vstr_f,
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        b"echo\0".as_ptr() as *const c_char,
-        Cmd_Echo_f,
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        b"wait\0".as_ptr() as *const c_char,
-        Cmd_Wait_f,
-    );
+    unsafe {
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            b"cmdlist\0".as_ptr() as *const c_char,
+            Cmd_List_f as *const (),
+        );
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            b"exec\0".as_ptr() as *const c_char,
+            Cmd_Exec_f as *const (),
+        );
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            b"vstr\0".as_ptr() as *const c_char,
+            Cmd_Vstr_f as *const (),
+        );
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            b"echo\0".as_ptr() as *const c_char,
+            Cmd_Echo_f as *const (),
+        );
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            b"wait\0".as_ptr() as *const c_char,
+            Cmd_Wait_f as *const (),
+        );
+    }
 }
 
 /// `Cbuf_ExecuteText`.

@@ -263,7 +263,10 @@ pub fn CM_LoadShaderFiles(
             Com_sprintf(
                 filename.as_mut_ptr(),
                 core::mem::size_of_val(&filename) as c_int,
-                &format!("shaders/{}", *shaderFiles1.add(i as usize)),
+                &format!(
+                    "shaders/{}",
+                    core::ffi::CStr::from_ptr(*shaderFiles1.add(i as usize)).to_string_lossy()
+                ),
             )
         };
         crate::common::com_printf(common, &format!("...loading '{}'\n", "filename"));
@@ -346,7 +349,7 @@ pub fn CM_FreeShaderText(common: &mut Common, cm: &mut CollisionWorld) {
     //TODO: Port shaderText
     // Source: oracle/codemp/qcommon/cm_shader.cpp:28
     if !cm.shaderText.is_null() {
-        Z_Free(common, cm.shaderText);
+        unsafe { Z_Free(common, cm.shaderText) };
         cm.shaderText = core::ptr::null_mut();
     }
 }
