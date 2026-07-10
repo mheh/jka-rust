@@ -48,20 +48,25 @@ referenced before it is ported).
 
 ## Prerequisite (Stage 0)
 
+- [x] All five §F subsystem design docs FROZEN (user sign-off 2026-07-09):
+  roff, ghoul2-server, icarus, rmg-terrain, npcnav — 48 rulings in
+  `docs/handoffs/engine-fork-discovery.md`.
+
 - [x] All forks in `docs/handoffs/engine-fork-discovery.md` ruled by the user
   (error-recovery/longjmp, global placement, statics, allocators, dispatch
   tables, VM stance, §F doc list, platform trait, FS semantics, print
   routing — all ten settled 2026-07-09).
-- [ ] Type rosetta regenerated and packet-referenced
+- [x] Type rosetta regenerated and packet-referenced
   (`tools/closure-prototype/typemap.py` →
   `out/engine/type-rosetta.tsv`; 2,702 items, 2,002 Raven names): porters
   import types from the listed paths, never declare them; a missing name is
   an escalation, not a stub.
 
-- [ ] Game-host interface crate: Rust traits transcribing the C seam (syscall
-  surface, vmcall driver, shared-memory contract), extracted from the mock
-  engine's behavioral spec; `sv_game_system_calls` dispatches it with a real
-  ctx (today: `null_mut()` + `todo!` arms).
+- [x] Game-host interface crate: `crates/mp/host-interface` (pkg
+  `mp_host_interface`) — 15-method `EngineHost` + `PlatformHost` + fixture
+  MockHost, built & green (rulings 24/31/33/36; commits 4b7f01b0/a9820853).
+  `sv_game_system_calls` real-ctx dispatch lands at wave 20 (EngineHostView,
+  ruling 43).
 - [ ] In-repo referee consumes the trait, so each real engine subsystem can
   replace one mock arm under `cargo test`.
 
