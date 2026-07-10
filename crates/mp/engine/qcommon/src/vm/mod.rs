@@ -1,5 +1,6 @@
 //! `vm` types.
 
+pub mod elastcommand;
 pub mod engine_slot;
 pub mod module_registry;
 pub mod module_slot;

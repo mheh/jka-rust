@@ -164,6 +164,24 @@ _ARRAY = re.compile(r"\[[^\]]*\]")
 # default is to flag, so only names with an unambiguous Rust twin go here).
 CPP_MAP = {"string": "String", "std::string": "String", "basic_string": "String"}
 
+# Externals NOT owned by the Rust port — they cross a seam the Rust host fills
+# with its own substrate, so they resolve as non-rosetta types and are
+# whitelisted out of the "missing rosetta type" referee check rather than ported:
+#   - libc `FILE`               : host stdio handle behind the filesystem seam.
+#   - minizip/zlib `uLong`/`uInt`/`unz_*` : the zip layer is a Rust-crate seam
+#                                 (DEC — zlib/minizip not transcribed).
+#   - `long double`             : no Rust twin (x87 80-bit); appears only in the
+#                                 unused NumberValue/ReadSignedFloat scan paths.
+# Anonymous function-pointer parameter types (spelled with parens, e.g.
+# `void ( )(int, int, float )`) are handled positionally in the loop below — they
+# become Rust `fn`/`extern "C" fn` pointers, not rosetta rows.
+EXTERNAL = {
+    "FILE",
+    "uLong", "uInt", "unz_file_info", "unz_global_info", "tm_unz",
+    "unz_file_info_internal", "unz_s",
+    "long double",
+}
+
 
 def normalize_base(spelling):
     """(base_name, nptr, nref, inner_const) from a clang type spelling. A C array
@@ -714,6 +732,8 @@ def main():
         if track_of[f["usr"]] != "c":
             continue
         for n in sig_type_names(f):
+            if n in EXTERNAL or "(" in n:
+                continue  # seam-external or anonymous fn-pointer param type
             if n not in rosetta and n not in SCALAR and n not in cpp_class_doc:
                 sig_miss[n].append(f["qualname"])
 

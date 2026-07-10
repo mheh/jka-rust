@@ -2,6 +2,13 @@
 
 pub mod aasfile;
 pub mod be_aas_def;
+pub mod be_aas_optimize;
+pub mod be_aas_reach;
+pub mod be_ai_char;
+pub mod be_ai_chat;
+pub mod be_ai_goal;
+pub mod be_ai_move;
+pub mod be_ai_weap;
 pub mod be_ai_weight;
 pub mod be_interface;
 pub mod l_crc;

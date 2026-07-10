@@ -142,3 +142,7 @@ const _: () = assert!(core::mem::offset_of!(entityState_t, origin) == 96);
 const _: () = assert!(core::mem::offset_of!(entityState_t, customRGBA) == 352);
 const _: () = assert!(core::mem::offset_of!(entityState_t, boneAngles1) == 428);
 const _: () = assert!(core::mem::offset_of!(entityState_t, userVec1) == 508);
+
+/// Raven's `entityState_s` struct tag (elaborated `struct entityState_s *`
+/// spellings in engine signatures resolve to the `entityState_t` typedef port).
+pub type entityState_s = entityState_t;

@@ -262,3 +262,7 @@ const _: () = assert!(core::mem::offset_of!(playerState_t, fd) == 804);
 const _: () = assert!(core::mem::offset_of!(playerState_t, forceJumpFlip) == 1268);
 const _: () = assert!(core::mem::offset_of!(playerState_t, lastHitLoc) == 1376);
 const _: () = assert!(core::mem::offset_of!(playerState_t, userVec2) == 1540);
+
+/// Raven's `playerState_s` struct tag (elaborated `struct playerState_s *`
+/// spellings in engine signatures resolve to the `playerState_t` typedef port).
+pub type playerState_s = playerState_t;

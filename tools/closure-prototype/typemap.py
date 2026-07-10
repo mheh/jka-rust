@@ -58,11 +58,30 @@ def scan(crates_dir):
                 block = "\n".join(doc)
                 raven = RAVEN_RE.search(block) or f_raven
                 cite = CITE_RE.search(block) or f_cite
+                kind, rust = m.group(1), m.group(2)
+                raven_name = raven.group(1) if raven else rust
+                # Register every Raven spelling an engine signature could use for
+                # this type. Raven's `typedef struct X_s {...} X_t;` gives two
+                # names; a signature may spell either the typedef (`X_t`) or the
+                # struct tag (`struct X_s *`). The house port declares ONE Rust
+                # item plus a `pub type` counterpart, so harvest both sides:
+                #  - the doc's `Raven `...`` name (primary, existing behavior),
+                #  - the Rust item's own name (usually the `_t` typedef), and
+                #  - a bare `pub type X = ...` alias's own name.
+                # Extra rows are harmless: load_rosetta() dedups by Raven name,
+                # preferring the identity-named (rust == raven) row.
+                names = []
                 if raven or cite:
+                    names.append(raven_name)
+                if kind in ("struct", "enum", "union") and rust != raven_name:
+                    names.append(rust)
+                if kind == "type":
+                    names.append(rust)
+                for nm in dict.fromkeys(names):
                     rows.append({
-                        "raven": raven.group(1) if raven else m.group(2),
-                        "rust": m.group(2),
-                        "kind": m.group(1),
+                        "raven": nm,
+                        "rust": rust,
+                        "kind": kind,
                         "crate": crate_of(rs),
                         "path": str(rs.relative_to(REPO)),
                         "cite": cite.group(1) if cite else "",
