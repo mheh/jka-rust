@@ -1,3 +1,5 @@
+/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/engine-cpass/crates/mp/engine/qcommon/src/files_common.rs:
+
 #![allow(
     non_snake_case,
     non_camel_case_types,
@@ -217,7 +219,11 @@ pub fn FS_BuildOSPath(common: &mut Common, mut qpath: *const c_char) -> *mut c_c
         // FIXME VVFIXME Holy crap this is wrong.
         //	Com_sprintf( temp, sizeof(temp), "/%s/%s", fs_gamedirvar->string, qpath );
         let qpath_str = core::ffi::CStr::from_ptr(qpath).to_string_lossy();
-        Com_sprintf(temp.as_mut_ptr(), temp.len() as c_int, &format!("/{}/{}", "base", qpath_str));
+        Com_sprintf(
+            temp.as_mut_ptr(),
+            temp.len() as c_int,
+            &format!("/{}/{}", "base", qpath_str),
+        );
 
         FS_ReplaceSeparators(temp.as_mut_ptr());
 
@@ -330,7 +336,11 @@ pub fn FS_WriteFile(common: &mut Common, qpath: *const c_char, buffer: *const ()
         }
 
         if qpath.is_null() || buffer.is_null() {
-            Com_Error(common, errorParm_t::ERR_FATAL as c_int, "FS_WriteFile: NULL parameter");
+            Com_Error(
+                common,
+                errorParm_t::ERR_FATAL as c_int,
+                "FS_WriteFile: NULL parameter",
+            );
         }
 
         let f = FS_FOpenFileWrite(common, qpath);
@@ -380,14 +390,24 @@ pub fn FS_InitFilesystem(
         // busted and error out now, rather than getting an unreadable
         // graphics screen when the font fails to load
         let mut buffer: *mut () = core::ptr::null_mut();
-        if FS_ReadFile(common, cm, rm, host, c"mpdefault.cfg".as_ptr(), &mut buffer as *mut *mut ())
-            <= 0
+        if FS_ReadFile(
+            common,
+            cm,
+            rm,
+            host,
+            c"mpdefault.cfg".as_ptr(),
+            &mut buffer as *mut *mut (),
+        ) <= 0
         {
             // bk001208 - SafeMode see below, FIXME?
             // PORT-NOTE(shape): Com_Error's full resolved signature
             // (qcommon__1592_CM_DeleteCachedMap.md) also carries `sv`/`rmg`;
             // not available here (shape_mismatches).
-            Com_Error(common, errorParm_t::ERR_FATAL as c_int, "Couldn't load mpdefault.cfg");
+            Com_Error(
+                common,
+                errorParm_t::ERR_FATAL as c_int,
+                "Couldn't load mpdefault.cfg",
+            );
         }
 
         // PORT-NOTE(state): `lastValidBase`/`lastValidGame`/`fs_basepath`/
