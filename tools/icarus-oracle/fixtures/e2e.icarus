@@ -1,0 +1,8 @@
+rem ( "end-to-end: variable + outbound vmcall + signal coverage" )
+declare ( FLOAT, "hp" )
+set ( "hp", 100.000 )
+sound ( CHAN_VOICE, "sound/hello.wav" )
+use ( "target_relay" )
+signal ( "go" )
+wait ( 500.000 )
+kill ( "target_dead" )

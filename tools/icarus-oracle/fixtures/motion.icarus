@@ -1,0 +1,8 @@
+rem ( "affect block + vector/move/rotate/use coverage" )
+affect ( "func_train", FLUSH )
+{
+	move ( < 128.000 256.000 64.000 >, 2000.000 )
+	rotate ( < 0.000 90.000 0.000 >, 1000.000 )
+	use ( "target_relay" )
+	wait ( 250.000 )
+}
