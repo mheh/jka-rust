@@ -1,5 +1,5 @@
 # Server-side Ghoul2 + renderer bone/model internals Design
-Status: DRAFT     Supersedes: none
+Status: REVIEWED     Supersedes: none
 Decision prefix: G2SV     Ledger deps: DEC-04 (per-mode), DEC-09 (verification);
 engine-fork-discovery rulings 2 (state placement), 3 (fn-statics), 7 (this doc),
 11 (EngineHost), 12 (direct Engine fields), 18 (GetBoltMatrix defect), 22
@@ -13,12 +13,24 @@ shape holes — `delete`/`delete_low` UP to `Ghoul2System`, ragdoll blist-**indi
 the frozen `tex` pointers — rendered as `G2SV-D13`, closing `G2SV-Q9`/`G2SV-Q10`),
 **31**+**33** (2026-07-09, pass 5: the Stage-0 `mp_host_interface` crate is BUILT
 and green, commit `4b7f01b0`; real `EngineHost` signatures + fixture-backed
-`MockHost` — rendered as `G2SV-D14`)
+`MockHost` — rendered as `G2SV-D14`), **36** (2026-07-09, pass 6: `EngineHost`
+EXTENDED and BUILT, commit `a9820853` — `+ model_mdxm`/`model_mdxa` loader
+model-block accessors, `+ cvar_integer`, `+ sv_time`, `+ fs_write_file`; closes
+**both halves** of `G2SV-Q11` — rendered as `G2SV-D15`), **39b** (2026-07-09, pass
+6: the attach-trio `G2API_AttachInstanceToEntNum`/`ClearAttachedInstance`/
+`CleanEntAttachments` are compiled **no-ops** reached by LIVE syscall arms, not §20
+drops — rendered as `G2SV-D16`)
 
-**Pass 5 (2026-07-09)** folds rulings 29/31/33 as `G2SV-D13`/`G2SV-D14`; `G2SV-D1`–
-`G2SV-D12` (rulings 11–26) stand unchanged. Ruling 29 resolves the two prior open
-questions (`G2SV-Q9`/`G2SV-Q10` → Resolved). One new gap the frozen trait exposes
-is escalated (`G2SV-Q11`, Open questions).
+**Pass 6 (2026-07-09)** folds ruling 36 as `G2SV-D15` and ruling 39b as `G2SV-D16`;
+`G2SV-D1`–`G2SV-D14` stand unchanged (the pass-5 `D13`/`D14` append numbering is
+blessed — D1–D12 are not renumbered). Ruling 36 EXTENDED `EngineHost` to **15
+methods** (commit `a9820853`, re-quoted verbatim in `## Seam definition`): the two
+absent services that pass 5 escalated — loader model-memory read and cvar read —
+are now served by `model_mdxm`/`model_mdxa` and `cvar_integer`, so **`G2SV-Q11` is
+SETTLED (both (a) and (d))** and moves to Resolved questions; `## Open questions` is
+now empty. Ruling 39b corrects the attach-trio's classification from §20-dropped to
+§C10 compiled-no-op (`G2SV-D16`). **Pass 5 (2026-07-09)** had folded rulings 29/31/33
+as `G2SV-D13`/`G2SV-D14` and resolved `G2SV-Q9`/`G2SV-Q10`.
 
 This is a C++-track (`porting-rules.md` §F) design doc. It carries the machine-
 readable `files:` roster and `divergences:` list (doc-standards rule 6) that
@@ -62,13 +74,20 @@ Links only — never restated here:
   `tex` pointers — rendered as `G2SV-D13`, closing `G2SV-Q9`/`G2SV-Q10`), and
   **rulings 31+33** (2026-07-09, pass 5: the Stage-0 `mp_host_interface` crate is
   BUILT and green, commit `4b7f01b0`; real `EngineHost` signatures quoted verbatim +
-  fixture-backed `MockHost` — rendered as `G2SV-D14`).
-- `crates/mp/host-interface/` — the BUILT, frozen Stage-0 host crate (package
-  `mp_host_interface`, commit `4b7f01b0`, rulings 31/33): `src/engine_host.rs` holds
-  the `EngineHost` trait (quoted verbatim in `## Seam definition` so this doc is
+  fixture-backed `MockHost` — rendered as `G2SV-D14`), **ruling 36** (2026-07-09,
+  pass 6: `EngineHost` EXTENDED and BUILT, commit `a9820853` — `model_mdxm`/
+  `model_mdxa` loader model-block accessors, `cvar_integer`, `sv_time`,
+  `fs_write_file`; closes both halves of `G2SV-Q11` — rendered as `G2SV-D15`), and
+  **ruling 39b** (2026-07-09, pass 6: the attach-trio is a compiled §C10 no-op, not a
+  §20 drop — rendered as `G2SV-D16`).
+- `crates/mp/host-interface/` — the BUILT, frozen host crate (package
+  `mp_host_interface`): `src/engine_host.rs` holds the **15-method** `EngineHost`
+  trait (Stage-0 at commit `4b7f01b0`, rulings 31/33; EXTENDED at commit `a9820853`,
+  ruling 36 — quoted verbatim in `## Seam definition` so this doc is
   self-contained), `src/mock.rs` the fixture-backed `MockHost` goldens vehicle
-  (ruling 32). Reading this crate is permitted; a porter `use`s
-  `mp_host_interface::EngineHost`.
+  (ruling 32; ruling-36 fixtures add the `cvars` name→i32 map and the
+  `mdxm_blocks`/`mdxa_blocks` model-byte maps). Reading this crate is permitted; a
+  porter `use`s `mp_host_interface::EngineHost`.
 - `docs/GOAL-engine.md` — M3 gate: "G2 bone/bolt/collision goldens".
 - GP2 exemplar: `crates/mp/engine/qcommon/src/gp2/`, `tools/gp2-oracle/`.
 - Already type-ported (layout frozen, this doc reuses, never re-declares):
@@ -110,46 +129,43 @@ Links only — never restated here:
 - Client/`cgame`-side rendering (`RB_SurfaceGhoul`, `R_AddGhoulSurfaces`) —
   compiled out under `DEDICATED`.
 - **The internals of the `EngineHost` trait's implementation** — the trait itself
-  is now BUILT and frozen (`G2SV-D14`, rulings 31/33, `crates/mp/host-interface/src/
-  engine_host.rs`, commit `4b7f01b0`) and its signatures are quoted verbatim in
-  `## Seam definition`; a porter `use`s `mp_host_interface::EngineHost` and does not
+  is BUILT and frozen (`G2SV-D14`/`G2SV-D15`, rulings 31/33/36,
+  `crates/mp/host-interface/src/engine_host.rs`, Stage-0 commit `4b7f01b0` +
+  ruling-36 extension commit `a9820853`) and its **15** signatures are quoted verbatim
+  in `## Seam definition`; a porter `use`s `mp_host_interface::EngineHost` and does not
   re-declare it. What this doc does **not** own is how `Engine`/the split-borrow view
-  implements each method (the aggregate-`Engine` side, ruling 11/24). The services
-  ghoul2 consumes map onto the frozen method set as: collision trace (`G2_TraceModels`,
-  `G2_GorePolys`, `Rag_Trace`'s `CM_BoxTrace`, `G2_bones.cpp:2708`) → `trace`;
-  print/error → `print`/`error`; the save/load and model file reads → `fs_read_file`/
-  `fs_free_file`. **Two services ghoul2 consumes have no method in the frozen trait**
-  — (a) the loader model-memory read of `mdxaHeader_t`/`mdxaSkel_t` (for
-  `CBoneCache::new` parent-seeding, `render/skeleton.rs`, and — per `G2SV-D13`(b) /
-  ruling 29 — the ragdoll basepose resolution), and (d) cvar register/read
-  (`cg_g2MarksAllModels`, `G2_misc.cpp:40`, **and** the renderer-owned `broadsword*`
-  ragdoll cvar family the solver reads, `G2_bones.cpp:1176-1189`; no `Cvar_*` method
-  exists in the frozen set, and `cvar_init` is still a documented no-op stub, build-out
-  plan §0.5). The frozen `EngineHost` (ruling 24's fixed roster) offers neither. How
-  ghoul2 obtains model memory and registers/reads its cvars now that Stage-0 has frozen
-  without those methods is **not settled by any input** and is escalated — see
-  `G2SV-Q11` (Open questions); it is **not** self-resolved here. (One service the doc
-  earlier mislabeled as non-ghoul2, `flrand`, **is** consumed by the ragdoll path but
-  is **available** — it maps onto the frozen `EngineHost::flrand`; see Seam definition.)
+  implements each method (the aggregate-`Engine` side, ruling 11/24). Every service
+  ghoul2 consumes now maps onto a frozen method: collision trace (`G2_TraceModels`,
+  `G2_GorePolys`, `Rag_Trace`'s `CM_BoxTrace`, `G2_bones.cpp:2709`) → `trace`;
+  print/error → `print`/`error`; save/load and model file reads → `fs_read_file`/
+  `fs_free_file`/`fs_write_file`; `flrand` (the ragdoll init/settle seeding) → `flrand`;
+  the loader model-memory read of the parsed `.glm`/`.gla` blocks (for `CBoneCache::new`
+  parent-seeding, `render/skeleton.rs`, and — per `G2SV-D13`(b) / ruling 29 — the
+  ragdoll basepose resolution) → **`model_mdxm`/`model_mdxa`** (ruling 36, `G2SV-D15`);
+  and cvar read (`cg_g2MarksAllModels`, `G2_misc.cpp:40`, **and** the renderer-owned
+  `broadsword*` ragdoll cvar family the solver reads, `G2_bones.cpp:1176-1189`) →
+  **`cvar_integer`** (ruling 36, `G2SV-D15`; a missing name reads 0, matching
+  `Cvar_VariableIntegerValue`, so the renderer-owned `broadsword` family is read
+  without any `mp_renderer` edge). The two services pass 5 escalated as `G2SV-Q11` are
+  thereby **served** — `G2SV-Q11` is SETTLED (Resolved questions), so no gap remains.
 - **Sequencing consequence.** The host-consuming bodies bind the frozen `EngineHost`
-  trait; the §F signatures freeze here and take `&mut impl EngineHost`. Bodies whose
-  consumed service maps onto a frozen method (trace, print/error, FS, `flrand`)
-  transcribe now; bodies needing the two absent services (model-memory read, cvar
-  register/read) block on `G2SV-Q11`'s resolution, not on Stage-0 (which is done). The
-  block spans **most of the roster** (the model-memory read rides in on
-  `G2_SetupModelPointers`, which nearly every `G2API_*` wrapper opens with) — the
-  authoritative per-file partition is the `## Slice hooks` M3 note, and `G2SV-Q11`'s
-  blast-radius list.
+  trait; the §F signatures freeze here and take `&mut impl EngineHost`. Because ruling
+  36 filled the two formerly-absent services, **every roster body now transcribes
+  against the built 15-method trait** — no body blocks on Stage-0 (done) any longer.
+  (Pass 5's `G2SV-Q11` block over most of the roster is discharged; the `## Slice
+  hooks` M3 note records the now-unblocked partition.)
 - **Model-memory type-location reconciliation (`G2SV-D5`-forced, not a new
-  decision).** `mdxaHeader_t`/`mdxaSkel_t` live only in `mp_renderer`
+  decision).** `mdxmHeader_t`/`mdxaHeader_t`/`mdxaSkel_t` live only in `mp_renderer`
   (`crates/mp/renderer/src/mdx_format/`, type-rosetta) and `G2SV-D5` forbids a
-  `mp_engine_ghoul2` → `mp_renderer` crate edge. Whatever return shape Stage-0
-  picks for the model-memory accessor (a re-exported `mp_renderer` struct vs
-  primitive per-bone field reads), any `mp_renderer` coupling lives in the
-  **host-interface crate**, never in `mp_engine_ghoul2`; this doc keeps those two
-  types out of every §F signature (`CBoneCache::new` takes only `qhandle_t`,
-  `G2SV-D5`), so `mp_engine_ghoul2` never names them as Rust types. The accessor's
-  exact type-crossing shape is part of the Stage-0 roster, decided there.
+  `mp_engine_ghoul2` → `mp_renderer` crate edge. Ruling 36 honors that: `model_mdxm`/
+  `model_mdxa` return `*mut c_void` (the raw parsed-block pointer), **not** an
+  `mp_renderer` struct — ghoul2 does its byte arithmetic off the returned pointer
+  unchanged (`tr_ghoul2.cpp:416-421`), and `mp_engine_ghoul2` **never names** the
+  mdxm/mdxa header types as Rust types. Any `mp_renderer` coupling lives in the
+  host-interface crate's implementation, never in `mp_engine_ghoul2`; this doc keeps
+  those types out of every §F signature (`CBoneCache::new` takes only `qhandle_t`,
+  `G2SV-D5`). The accessors return NULL exactly where Raven's `model_t` pointers are
+  NULL (`R_GetModelByHandle` → `model_t` → `->mdxm`/`->mdxa`, `G2_API.cpp:2716-2739`).
 
 ## Raven ground truth
 
@@ -363,7 +379,7 @@ elsewhere. A porter folds them per §C10/§20; none is threaded state:
 - `Rag_Trace` (`:2684`) wraps its `if (cgvm) { VM_Call(cgvm, CG_RAG_CALLBACK,
   RAG_CALLBACK_TRACELINE) }` client-callback trace in `#ifndef DEDICATED`
   (`:2688-2704`); under DEDICATED only the `#else`/fall-through arm compiles, so
-  server-side `Rag_Trace` unconditionally does the real `CM_BoxTrace` (`:2708`).
+  server-side `Rag_Trace` unconditionally does the real `CM_BoxTrace` (`:2709`).
   (The `#ifdef _DEBUG` `ragTraceTime` timing at `:2685,:2710` also drops under
   NDEBUG.)
 - `G2_BoneSnap` (`:3951`) is `#ifdef DEDICATED return; #else …cgvm… #endif` — a
@@ -403,14 +419,16 @@ nesting; lazy-init modeled with Raven's own initialized flags). There is **no
 separate `RenderG2State`** — the render-side bone state (`mBoneCache`,
 `goreShader`) folds into `Ghoul2System` because ruling 12 fixes the §F subsystem
 count at five (`icarus`, `nav`, `g2`, `roff`, `rmg`) with a single `g2`. Services
-(trace, print/error, file read) cross the **one BUILT, frozen `EngineHost` trait**
-(rulings 11/31, `crates/mp/host-interface`, package `mp_host_interface`, `G2SV-D14`;
+(trace, print/error, file read/write, `flrand`, loader model-memory read, cvar read)
+cross the **one BUILT, frozen 15-method `EngineHost` trait** (rulings 11/31/36,
+`crates/mp/host-interface`, package `mp_host_interface`, `G2SV-D14`/`G2SV-D15`;
 signatures quoted verbatim in `## Seam definition`); §F methods take `(&mut
 Ghoul2System, &mut impl EngineHost)`, and `Engine` implements `EngineHost` via a
-split-borrow view struct. Two services ghoul2 consumes — the loader model-memory
-read (`mdxaHeader_t`/`mdxaSkel_t`) and cvar register/read (`cg_g2MarksAllModels`) —
-have **no method in the frozen trait**; how ghoul2 reaches them is escalated
-(`G2SV-Q11`, Open questions), which the cvars / model-memory rows below point to.
+split-borrow view struct. The two services pass 5 left absent — the loader
+model-memory read (the parsed `.glm`/`.gla` blocks) and cvar read
+(`cg_g2MarksAllModels`) — are served by ruling 36's `model_mdxm`/`model_mdxa` and
+`cvar_integer` (`G2SV-D15`), so the cvars / model-memory rows below reach the host,
+not an open question (`G2SV-Q11` SETTLED, Resolved questions).
 
 | Raven global | oracle cite | Rust owner | constructed by | threaded via |
 |---|---|---|---|---|
@@ -425,9 +443,9 @@ have **no method in the frozen trait**; how ghoul2 reaches them is escalated
 | `GoreTouch` (persistent gen counter) | `G2_misc.cpp:795` | `GoreState.gore_touch: i32` (ruling 2, same file/subsystem; three-kind persistent). Runs server-side via the collision path (`:890`); gore-*apply* has no server caller (`G2SV-D7`) | `Ghoul2System::default` | `&mut Ghoul2System.gore` |
 | `GoreVerts`, `GoreIndexCopy`, `GoreIndecies` | `G2_misc.cpp:793,794,798` | scratch buffers (three-kind scratch; per-`G2_GorePolys` rebuild, invalidated by `gore_touch`) — impl-local, not a global; never server-driven (`G2SV-D7`: no `AddSkinGore` server trap), transcribed faithfully, goldens optional | — | — |
 | `goreModelIndex` | `G2_misc.cpp:38` | scratch (three-kind scratch; set in the `G2_TraceModels` model loop `:1539`, read as the `GoreTagsTemp` key `:959,1000`) — impl-local, threaded through the trace, not a global | — | — |
-| `cg_g2MarksAllModels` | `G2_misc.cpp:40` | `Ghoul2System.cvars: Ghoul2Cvars` (the ruling-2 per-subsystem EngineCvars sub-struct; own file `cvars.rs` per one-type-per-file, roster) | register/read is a cvar host service — but the frozen `EngineHost` (`G2SV-D14`) has **no** `Cvar_*` method (`cvar_init` is still a no-op stub, plan §0.5); how it registers/reads is escalated (`G2SV-Q11`, Open questions) | `&Ghoul2System.cvars` |
-| `broadsword`, `broadsword_kickbones`, `broadsword_kickorigin`, `broadsword_dontstopanim`, `broadsword_waitforshot`, `broadsword_playflop`, `broadsword_effcorr`, `broadsword_ragtobase`, `broadsword_dircap`, `broadsword_extra1`… (the ragdoll cvar family) | `extern` in `G2_bones.cpp:1176-1189`; defined + `Cvar_Get`-registered in `renderer/tr_init.cpp:204-216,1164-1175` | **not ghoul2-owned** — renderer-owned (ruling 2, by owning file `tr_init.cpp`), so owned by the separate `tr_model` subsystem doc (non-goals); ghoul2 only **reads** them | the RagDoll solver reads them server-side (`G2_SetRagDoll` gate `:1628`; the settle/IK passes); the read is a cvar host service with **no** method in the frozen `EngineHost` — the same gap as `cg_g2MarksAllModels`, widening `G2SV-Q11`(d) beyond one cvar | — (`G2SV-Q11`(d)) |
-| RagDoll fn-statics block (`ragBasepose`…`rag`) | `G2_bones.cpp:1214-1241` | `Ghoul2System.rag: RagDollSolver { bones: [mdxaBone_t; MAX_BONES_RAG], effectors, temp_dependents, blist_index: [i32; MAX_BONES_RAG], num_rags, bone_mins/maxs/cm, desired_pelvis_offset, have_desired_pelvis_offset, origin_change, origin_change_dir, hand_pos, hand_pos2, rag_state, rag: Vec<i32> }` — per `G2SV-D13`(b) / ruling 29 the raw-pointer arrays are **replaced by blist indices + per-call `EngineHost` resolution**, closing `G2SV-Q9`: `ragBoneData` (`boneInfo_t*`, `:1218`) and `rag` (`vector<boneInfo_t*>`, `:1241`) become `mBlist` **indices** (Raven already carries the parallel `ragBlistIndex[MAX_BONES_RAG]` `int` array `:1220`), resolved against the live model's `mBlist` at use; `ragBasepose`/`ragBaseposeInv` (`mdxaBone_t*`, `:1214-1215`) are **not stored** — the basepose/baseposeInv matrices are resolved per call via `G2_GetBoneMatrixLow` over `EngineHost` (`G2_bones.cpp:2622`, write-through pattern, ruling 21), so no raw pointer outside the ABI seam (porting-rules §B5/§D11). NB the basepose resolve needs the model-memory host service that is absent from the frozen trait (`G2SV-Q11`). The solver also consumes `flrand` server-side (ragdoll init `:1468-1469` + settle/IK `:2127-2129,3327,3925,4290`) — routed via `EngineHost::flrand` (ruling 21, a frozen method, so a service not owned state) — and reads the renderer-owned `broadsword` cvar family (row below, `G2SV-Q11`(d)) | `Ghoul2System::default` | `&mut Ghoul2System.rag` (ruling 3 cross-frame kind, `G2SV-D3`) |
+| `cg_g2MarksAllModels` | `G2_misc.cpp:40` | **no stored owner** — the frozen `cvar_integer(name) -> i32` is a stateless by-name read with no `Cvar_Get`/handle-registration step (built trait, `## Seam definition`), so there is no cvar handle to own and `Ghoul2System` carries **no** `cvars` field; the Raven `cvar_t*` global becomes a read on demand, exactly as the renderer-owned `broadsword` row below (`G2SV-D15`-forced reconciliation of the pre-ruling-36 "ruling-2 EngineCvars sub-struct" convention, **not** a new decision; the ruling-2 sub-struct convention applies only to globals that become owned state, and a stateless host read is none) | — (not stored; read on demand) | `&mut impl EngineHost` — `EngineHost::cvar_integer("cg_g2MarksAllModels")` at each call site (read at `G2_misc.cpp:1524`, a missing name reads 0 matching `Cvar_VariableIntegerValue`, `cvar.cpp:118-124`) — `G2SV-Q11`(d) SETTLED |
+| `broadsword`, `broadsword_kickbones`, `broadsword_kickorigin`, `broadsword_dontstopanim`, `broadsword_waitforshot`, `broadsword_playflop`, `broadsword_effcorr`, `broadsword_ragtobase`, `broadsword_dircap`, `broadsword_extra1`… (the ragdoll cvar family) | `extern` in `G2_bones.cpp:1176-1189`; defined + `Cvar_Get`-registered in `renderer/tr_init.cpp:204-216,1164-1175` | **not ghoul2-owned** — renderer-owned (ruling 2, by owning file `tr_init.cpp`), so owned by the separate `tr_model` subsystem doc (non-goals); ghoul2 only **reads** them | the RagDoll solver reads them server-side (`G2_SetRagDoll` gate `:1628`; the settle/IK passes); the read is a cvar host service, served by ruling-36 `EngineHost::cvar_integer` (`G2SV-D15`) — a missing name reads 0, so ghoul2 reads the renderer-owned `broadsword` family **without** a `mp_renderer` edge (`G2SV-D5`); `G2SV-Q11`(d) SETTLED | `&mut impl EngineHost` (`cvar_integer`) |
+| RagDoll fn-statics block (`ragBasepose`…`rag`) | `G2_bones.cpp:1214-1241` | `Ghoul2System.rag: RagDollSolver { bones: [mdxaBone_t; MAX_BONES_RAG], effectors, temp_dependents, blist_index: [i32; MAX_BONES_RAG], num_rags, bone_mins/maxs/cm, desired_pelvis_offset, have_desired_pelvis_offset, origin_change, origin_change_dir, hand_pos, hand_pos2, rag_state, rag: Vec<i32> }` — per `G2SV-D13`(b) / ruling 29 the raw-pointer arrays are **replaced by blist indices + per-call `EngineHost` resolution**, closing `G2SV-Q9`: `ragBoneData` (`boneInfo_t*`, `:1218`) and `rag` (`vector<boneInfo_t*>`, `:1241`) become `mBlist` **indices** (Raven already carries the parallel `ragBlistIndex[MAX_BONES_RAG]` `int` array `:1220`), resolved against the live model's `mBlist` at use; `ragBasepose`/`ragBaseposeInv` (`mdxaBone_t*`, `:1214-1215`) are **not stored** — the basepose/baseposeInv matrices are resolved per call via `G2_GetBoneMatrixLow` over `EngineHost` (`G2_bones.cpp:2622`, write-through pattern, ruling 21), so no raw pointer outside the ABI seam (porting-rules §B5/§D11). The basepose resolve reads model memory through ruling-36 `EngineHost::model_mdxa` (`G2SV-D15`; `G2SV-Q11`(a) SETTLED). The solver also consumes `flrand` server-side (ragdoll init `:1468-1469` + settle/IK `:2127-2129,3327,3925,4290`) — routed via `EngineHost::flrand` (ruling 21, a frozen method, so a service not owned state) — and reads the renderer-owned `broadsword` cvar family via `EngineHost::cvar_integer` (row below, `G2SV-D15`) | `Ghoul2System::default` | `&mut Ghoul2System.rag` (ruling 3 cross-frame kind, `G2SV-D3`) |
 | solver `static const` matrices / settle-pass `static` locals | `G2_bones.cpp:1423,3452-3475` | `const` items / function locals (three-kind rule: const-table / scratch) | — | — |
 | `CBoneCache *mBoneCache` per instance | `ghoul2_shared.h:265` | `Ghoul2System.bone_caches` — a hand-rolled owned in-crate generational arena of `CBoneCache` keyed by `BoneCacheId` (§B5 arena, same kind as `Ghoul2InfoArray`; **not** an external `slotmap` crate — `G2SV-D9`, zero workspace precedent, container shape free per §A1), folded from the former RenderG2State per ruling 12; `CGhoul2Info.mBoneCache` → `Option<BoneCacheId>` | `G2_ConstructGhoulSkeleton` on demand; freed by the **`Ghoul2System`-level** `delete`/`delete_low` teardown (`G2SV-D13`(a) / ruling 29: `DeleteLow`'s `RemoveBoneCache` loop `G2_API.cpp:319-326` moves UP to `Ghoul2System` because the sibling `bone_caches` arena is unreachable from `Ghoul2InfoArray` alone) | `&mut Ghoul2System` |
 | `worldMatrix`, `worldMatrixInv` | `tr_ghoul2.cpp:136-137` | per-construct scratch threaded through the skeleton build (three-kind: scratch), NOT a global | set by `G2_GenerateWorldMatrix` | passed into the transform chain |
@@ -443,21 +461,24 @@ Per doc-standards rule 5 the pub signatures freeze here; porters transcribe into
 them without changing them. Per ruling 11 every §F entry takes the subsystem
 state plus the services trait — `(g2: &mut Ghoul2System, host: &mut impl
 EngineHost, ...)`; `EngineHost` is the BUILT, frozen trait in
-`crates/mp/host-interface` (package `mp_host_interface`, commit `4b7f01b0`,
-`G2SV-D14`). `host` provides trace, print/error, `VM_Call`, FS read/free, the
-shared-memory window, `flrand`/`irand`, and `gentity`. There is **no
-`RenderG2State` parameter** (folded into `Ghoul2System`, ruling 12) and **no
-`mp_renderer` crate dependency** (`G2SV-D5`); the model-memory types stay out of
-these signatures (`G2SV-D5` type-location reconciliation, non-goals). Two services
-ghoul2 needs — the loader model-memory read (`mdxaHeader_t`/`mdxaSkel_t`, for
-`CBoneCache::new`/`render/skeleton.rs`/ragdoll basepose `G2SV-D13`(b)) and cvar
-register/read (`cg_g2MarksAllModels`) — have **no method in the frozen trait**;
-that gap is escalated (`G2SV-Q11`), not filled here.
+`crates/mp/host-interface` (package `mp_host_interface`, Stage-0 commit `4b7f01b0` +
+ruling-36 extension commit `a9820853`, `G2SV-D14`/`G2SV-D15`). `host` provides trace,
+print/error, `VM_Call`, FS read/free/write, the shared-memory window, `flrand`/`irand`,
+`gentity`, the loader model-memory accessors (`model_mdxm`/`model_mdxa`), `cvar_integer`,
+and `sv_time`. There is **no `RenderG2State` parameter** (folded into `Ghoul2System`,
+ruling 12) and **no `mp_renderer` crate dependency** (`G2SV-D5`); the model-memory
+types stay out of these signatures — ruling 36's `model_mdxm`/`model_mdxa` return
+`*mut c_void`, never an `mp_renderer` struct (`G2SV-D5`/`G2SV-D15` type-location
+reconciliation, non-goals). The two services pass 5 escalated — the loader model-memory
+read and cvar read — are now **served** by ruling 36 (`G2SV-Q11` SETTLED), so no gap
+remains.
 
-**The frozen `EngineHost` trait, quoted verbatim** (rulings 11/31, `G2SV-D14`) from
-`crates/mp/host-interface/src/engine_host.rs` so this doc is self-contained. Ten
-methods; dyn-compatible (ruling 24: no generics, no by-value `Self` returns). Doc
-comments elided; each `Source:` cite is the Raven host function transcribed.
+**The frozen `EngineHost` trait, quoted verbatim** (rulings 11/31/36,
+`G2SV-D14`/`G2SV-D15`) from `crates/mp/host-interface/src/engine_host.rs` so this doc
+is self-contained. **Fifteen** methods (ruling 36 extended the Stage-0 ten with
+`cvar_integer`, `sv_time`, `fs_write_file`, `model_mdxm`, `model_mdxa`);
+dyn-compatible (ruling 24: no generics, no by-value `Self` returns). Doc comments
+elided; each `Source:` cite is the Raven host function transcribed.
 
 ```rust
 // crates/mp/host-interface/src/engine_host.rs — trait EngineHost (verbatim signatures)
@@ -485,25 +506,46 @@ pub trait EngineHost {
     fn irand(&mut self, min: i32, max: i32) -> i32;
     // Raven SV_GentityNum — oracle/codemp/server/sv_game.cpp:54
     fn gentity(&mut self, ent_num: i32) -> *mut sharedEntity_t;
+    // Ruling 36 — Raven cached cvar_t->integer read; oracle/codemp/qcommon/cvar.cpp:118-124
+    // (cg_g2MarksAllModels G2_misc.cpp:40 read :1524; unregistered name reads 0)
+    fn cvar_integer(&mut self, name: &str) -> i32;
+    // Ruling 36 — Raven svs.time frame clock; oracle/codemp/server/server.h:211
+    fn sv_time(&mut self) -> i32;
+    // Ruling 36 — Raven FS_FOpenFileByMode(FS_WRITE)+FS_Write+FS_FCloseFile;
+    // oracle/codemp/server/NPCNav/navigator.cpp:670-699
+    fn fs_write_file(&mut self, qpath: &str, data: &[u8]) -> bool;
+    // Ruling 36 — Raven R_GetModelByHandle(model)->mdxm (parsed .glm block, c_void
+    // per G2SV-D5); oracle/codemp/renderer/tr_local.h:1128, chain G2_API.cpp:2716-2721
+    fn model_mdxm(&mut self, model: qhandle_t) -> *mut c_void;
+    // Ruling 36 — Raven R_GetModelByHandle(model)->mdxa (parsed .gla block, c_void;
+    // byte arithmetic off it at tr_ghoul2.cpp:416-421); tr_local.h:1129, chain :2735-2739
+    fn model_mdxa(&mut self, model: qhandle_t) -> *mut c_void;
 }
 ```
 
 Of these, ghoul2 uses `trace` (collision/gore/ragdoll — `G2_TraceModels`,
-`G2_GorePolys`, `Rag_Trace`'s `CM_BoxTrace` `G2_bones.cpp:2708`), `print`/`error`,
-`fs_read_file`/`fs_free_file` (save/load + model file reads), **and `flrand`**. The
-`flrand` use is server-live: `G2API_SetRagDoll` → `G2_SetRagDoll` (`G2_bones.cpp:1622`)
+`G2_GorePolys`, `Rag_Trace`'s `CM_BoxTrace` `G2_bones.cpp:2709`), `print`/`error`,
+`fs_read_file`/`fs_free_file`/`fs_write_file` (save/load), `flrand`, `model_mdxm`/
+`model_mdxa` (loader model memory — `CBoneCache::new` parent-seeding, `render/
+skeleton.rs`, ragdoll basepose `G2SV-D13`(b)), and `cvar_integer`
+(`cg_g2MarksAllModels` + the renderer-owned `broadsword` family). The `flrand` use is
+server-live: `G2API_SetRagDoll` → `G2_SetRagDoll` (`G2_bones.cpp:1622`)
 → `G2_Set_Bone_Angles_Rag` (`:1855`+ per PCJ bone, no DEDICATED guard) calls bare
 `flrand` (`:1468-1469`, the `#else` live arm of the `:1450` `#if 0`; the `#define
 flrand Q_flrand` at `:1212` is **commented out**, so it is the real `flrand`,
 `q_math.c:1441`, the `holdrand` LCG that `Q_flrand`/`EngineHost::flrand` `:1451`
 forwards to) to seed each PCJ bone's initial angle at ragdoll init, and again in the
-settle/IK passes (`:2127-2129,3327,3925,4290`). Ruling 21 routes it through
-`EngineHost::flrand`, so every §F ragdoll entry that reaches it takes `host` (see the
-`g2api_set_ragdoll` signature note below). `vm_call`/`shared_memory`/`irand`/`gentity`
-are **not** consumed server-side by ghoul2 (`irand` unused; `vm_call`/`shared_memory`
-appear only in the `cgvm` callback arms that are DEDICATED-dead, `G2_bones.cpp:2691,2700`
-etc.); they serve the other §F subsystems. The absent model-memory-read and cvar
-methods are `G2SV-Q11`.
+settle/IK passes (`:2127-2129,3327,3925,4290` — all `flrand`, verified). Ruling 21
+routes it through `EngineHost::flrand` — **so `flrand` IS consumed by ghoul2**
+(correcting any earlier prose that lumped it with the unused seam methods), and every
+§F ragdoll entry that reaches it takes `host` (see the `g2api_set_ragdoll` signature
+note below, ruling 36). Only `vm_call`/`shared_memory`/`irand`/`gentity` are **not**
+consumed server-side by ghoul2 (`irand` genuinely unused — grep: no `irand` token in
+`codemp/ghoul2/`; `vm_call`/`shared_memory` appear only in the `cgvm` callback arms that
+are DEDICATED-dead, `G2_bones.cpp:2691,2700` etc.); they serve the other §F subsystems.
+The formerly-absent model-memory-read and cvar methods are now `model_mdxm`/`model_mdxa`
+and `cvar_integer` (ruling 36, `G2SV-D15`; `G2SV-Q11` SETTLED), consumed as listed
+above.
 
 **ABI-crossing / already-ported types (imported, never re-declared).** `#[repr(C)]`
 layout-frozen, grouped by where the port already owns them — a porter `use`s each,
@@ -594,16 +636,15 @@ pub fn g2api_collision_detect(g2: &mut Ghoul2System, host: &mut impl EngineHost,
     ghoul2: &mut CGhoul2Info_v, angles: vec3_t, position: vec3_t, frame_number: i32,
     ent_num: i32, ray_start: vec3_t, ray_end: vec3_t, scale: vec3_t, trace_flags: i32,
     use_lod: i32, f_radius: f32) -> Vec<CollisionRecord_t>; // populated collRecMap entries (mEntityNum != -1)
-// Takes `host`: `G2_SetRagDoll` (G2_bones.cpp:1622) → `G2_Set_Bone_Angles_Rag`
-// (:1855+ per PCJ bone, no DEDICATED guard) calls `flrand` (:1468-1469) server-side
-// to seed each PCJ bone's initial angle; ruling 11/21 route that through
-// `EngineHost::flrand` (a frozen method), and a top-level free fn has no ambient
-// state to source `host` from, so it is a parameter — like `g2api_animate_g2_models_rag`
-// below. (Correcting the prior host-less draft signature, which mis-read the ragdoll
-// init path as service-free; DRAFT-stage correction under settled ruling 11/21 +
-// cited oracle, NOT a new decision.) The *completed body* additionally reads model
-// memory (`G2_GetModA`, :1644) and the renderer-owned `broadsword` cvar (:1628), so it
-// also blocks on `G2SV-Q11` (a)/(d) — but the signature freezes now.
+// Takes `host` (frozen by ruling 36, G2SV-D15): `G2_SetRagDoll` (G2_bones.cpp:1622) →
+// `G2_Set_Bone_Angles_Rag` (:1855+ per PCJ bone, no DEDICATED guard) UNCONDITIONALLY
+// calls `flrand` (:1468-1469) server-side to seed each PCJ bone's initial angle; ruling
+// 11/21 route that through `EngineHost::flrand` (a frozen method), and a top-level free
+// fn has no ambient state to source `host` from, so it is a parameter — like
+// `g2api_animate_g2_models_rag` below. The completed body ALSO reads model memory
+// (`G2_GetModA`, :1645) and the renderer-owned `broadsword` cvar (:1628) — now served by
+// ruling-36 `model_mdxa`/`cvar_integer` (G2SV-Q11 SETTLED), so the whole body
+// transcribes now, not just the signature.
 pub fn g2api_set_ragdoll(g2: &mut Ghoul2System, host: &mut impl EngineHost,
     ghoul2: &mut CGhoul2Info_v, parms: &mut CRagDollParams);
 pub fn g2api_animate_g2_models_rag(g2: &mut Ghoul2System, host: &mut impl EngineHost,
@@ -673,7 +714,7 @@ pub struct CBoneCache { /* mBones, mFinalBones, mSmoothBones, header, mod, rootB
     incomingTime, mCurrentTouch/mLastTouch/mLastLastTouch, mSmoothingActive, mUnsquash, mSmoothFactor */ }
 impl CBoneCache {
     // header read comes over EngineHost (loader-owned model memory, G2SV-D5); no mp_renderer type in the sig.
-    pub fn new(host: &impl EngineHost, a_mod: qhandle_t) -> Self;        // ctor, seeds parents from mdxaSkel_t
+    pub fn new(host: &mut impl EngineHost, a_mod: qhandle_t) -> Self;    // ctor, seeds parents from mdxaSkel_t
     pub fn eval(&mut self, index: i32) -> mdxaBone_t;                    // memoized by touch
     pub fn eval_render(&mut self, index: i32) -> mdxaBone_t;             // applies SmoothLow
     pub fn eval_unsmooth(&mut self, index: i32) -> mdxaBone_t;
@@ -765,16 +806,23 @@ functions reachable from `SV_GameSystemCalls` (the 12 ragdoll/IK arms at
 dead surface. Rejected `thread_local`/returned buffers: the arrays persist the
 settle across calls, so they are the "host-struct fields" kind, not "scratch".
 
-**G2SV-D4.** `_G2_LISTEN_SERVER_OPT` is never `#define`d in `codemp/`, so this doc
-ports **what the WinDed macro set compiles** and §20-notes the rest:
+**G2SV-D4** (attach-trio classification corrected by `G2SV-D16`/ruling 39b).
+`_G2_LISTEN_SERVER_OPT` is never `#define`d in `codemp/`, so this doc ports **what the
+WinDed macro set compiles** and §20-notes the genuinely-dropped rest:
 `G2API_OverrideServerWithClientData` keeps its live `#ifndef` arm — a trivial
 `return qfalse` (`G2_API.cpp:241-242`) → `-> bool { false }`; the compiled-out
-override body, the `g2ClientAttachments[]` array + `AttachInstanceToEntNum`/
-`ClearAttachedInstance`/`CleanEntAttachments` bodies, `CGhoul2Info::entityNum`,
-and `CopyBoneCache` are dropped with §20 zero-compile notes. Because ruling 12's
-build config pins the macro set and porting-rules §F20 governs dead surface.
-Rejected retaining an `attachments` field for a future listen-server build: it has
-zero compiled callers in this config (speculative, plan §"no dead-code").
+override body, the `g2ClientAttachments[]` array, `CGhoul2Info::entityNum`, and
+`CopyBoneCache` are dropped with §20 zero-compile notes. **The attach-trio
+`G2API_AttachInstanceToEntNum`/`ClearAttachedInstance`/`CleanEntAttachments` are NOT
+in that §20 drop** — their signatures are **unconditional** (`G2_API.cpp:200,214,221`;
+only the bodies are `#ifdef _G2_LISTEN_SERVER_OPT`), so with the macro off they compile
+as **empty-body no-op functions** that LIVE syscall arms still call
+(`sv_game.cpp:1587,1591,1594`); they are kept as callable empty-body fns per §C10
+(compiled-no-op fold), not dropped — see `G2SV-D16`. Because ruling 12's build config
+pins the macro set and porting-rules §F20 governs dead surface, while §C10 governs
+compiled-out bodies behind live signatures. Rejected retaining an `attachments` field
+for a future listen-server build: it has zero compiled callers in this config
+(speculative, plan §"no dead-code").
 
 **G2SV-D5.** State lands as **one direct `Engine.g2: Ghoul2System` field**
 (ruling 12: plain, `Default`-init, no `Option`/`Box`/nesting; lazy-init via
@@ -806,8 +854,9 @@ them. Rejected float tolerance and overload merging: parity is byte-for-byte
 
 `G2SV-D7`–`G2SV-D10` fold ruling 22 (2026-07-09); `G2SV-D11`–`G2SV-D12` fold
 rulings 26 and 24 (2026-07-09, fourth session); `G2SV-D13`–`G2SV-D14` fold rulings
-29 and 31+33 (2026-07-09, pass 5); `G2SV-D1`–`G2SV-D6` (rendering rulings 11–18) and
-the rulings-11–26 rig stand unchanged per rulings 29/31/33.
+29 and 31+33 (2026-07-09, pass 5); `G2SV-D15`–`G2SV-D16` fold rulings 36 and 39b
+(2026-07-09, pass 6); `G2SV-D1`–`G2SV-D14` stand unchanged per the pass-6 inputs
+(the pass-5 `D13`/`D14` append numbering is blessed — D1–D12 are not renumbered).
 
 **G2SV-D7.** The gore surface splits into a graph-dead *apply* set and a
 server-live *record store* (resolving `G2SV-Q4`; the record-store membership is
@@ -923,8 +972,9 @@ shapes:
   `G2SV-Q9`. Because Raven's own parallel index array shows the index is the load-bearing
   identity and the pointer a cache; §B5 forbids the raw field. Rejected storing owned
   `boneInfo_t`/`mdxaBone_t` copies: they alias live model state that other passes mutate,
-  so an index/handle read is the faithful shape. (NB the basepose resolve needs the
-  model-memory host service absent from the frozen trait — `G2SV-Q11`.)
+  so an index/handle read is the faithful shape. (The basepose resolve reads model
+  memory through ruling-36 `EngineHost::model_mdxa` — `G2SV-Q11`(a) SETTLED,
+  `G2SV-D15`.)
 - **(c) `GoreState` owns each per-LOD gore buffer as `Vec<f32>`.** Raven `Z_Malloc`s
   each `tex[TS.lod]` block (`G2_misc.cpp:1020`, freed by `Z_Free` in
   `~GoreTextureCoordinates` `G2_gore.h:25-36` and on realloc `:1028`). The frozen ABI
@@ -950,9 +1000,58 @@ goldens run against the fixture-backed `MockHost` (`src/mock.rs`, ruling 32) rat
 than a hand-written stub. Because ruling 31 built the crate and ruling 33 settled its
 `VmSlot`/UDP shape, and the doc-standards self-containment gate wants the frozen
 signatures in-doc. Rejected re-declaring the trait or citing a placeholder: the built
-crate is the ground truth a porter `use`s. This decision does **not** add the
-model-memory-read or cvar methods ghoul2 needs — the frozen roster (ruling 24) lacks
-both; that gap is `G2SV-Q11`, not resolved here.
+crate is the ground truth a porter `use`s. This pass-5 decision did **not** add the
+model-memory-read or cvar methods ghoul2 needs — that gap (`G2SV-Q11`) is closed by
+`G2SV-D15` (ruling 36).
+
+**G2SV-D15 (ruling 36, 2026-07-09, pass 6).** `EngineHost` is **EXTENDED and BUILT**
+(commit `a9820853`), superseding `G2SV-D14`'s ten-method roster with **fifteen**
+methods; the full trait is **re-quoted verbatim** into `## Seam definition`. The five
+added methods are:
+- **`model_mdxm(&mut self, model: qhandle_t) -> *mut c_void`** and
+  **`model_mdxa(&mut self, model: qhandle_t) -> *mut c_void`** — the loader's live
+  parsed `.glm`/`.gla` blocks, two accessors mirroring `R_GetModelByHandle` → `model_t`
+  → `->mdxm`/`->mdxa` (`G2_API.cpp:2716-2739`), returning NULL exactly where Raven's
+  `model_t` pointers are NULL. `c_void` because ghoul2 does its byte arithmetic off the
+  returned pointer unchanged (`tr_ghoul2.cpp:416-421`) and `mp_engine_ghoul2` **still
+  never names** the mdxm/mdxa header types as Rust types (`G2SV-D5`). These serve
+  `CBoneCache::new` parent-seeding, `render/skeleton.rs`, and the ragdoll basepose
+  resolve (`G2SV-D13`(b)) — closing **`G2SV-Q11`(a)**.
+- **`cvar_integer(&mut self, name: &str) -> i32`** — a missing name reads 0
+  (`Cvar_VariableIntegerValue`, `cvar.cpp:118-124`). `cg_g2MarksAllModels`
+  (`G2_misc.cpp:40`, read `:1524`) and the renderer-owned `broadsword*` family
+  (`G2_bones.cpp:1176-1189`) both read through it — so ghoul2 reads the renderer-owned
+  cvars **without** a `mp_renderer` edge (`G2SV-D5`) — closing **`G2SV-Q11`(d)**.
+- **`sv_time`** and **`fs_write_file`** — added for the sibling §F subsystems (nav's
+  frame-clock timers and `CNavigator::Save`); ghoul2 does not consume either but they
+  are part of the re-quoted 15-method trait.
+
+Ruling 36 also settles the **`flrand` seam**: `g2api_set_ragdoll`'s frozen signature
+**takes `host: &mut impl EngineHost`** because its body **unconditionally** reaches
+`flrand` (`G2_bones.cpp:1468-1469` via `G2_Set_Bone_Angles_Rag`), routed through
+`EngineHost::flrand` (ruling 21). This **corrects** any earlier prose claim that
+`flrand`/`irand` are not consumed by ghoul2: `flrand` **is** consumed server-side
+(`G2_bones.cpp:1468,2127-2129,3327,3925,4290` — all `flrand`, verified); `irand`
+alone is unused (grep: no `irand` token in `codemp/ghoul2/`). Because ruling 36 built
+the extension and the two pass-5-escalated services now have concrete methods; the
+whole roster's host-consuming bodies transcribe against the built 15-method trait.
+Rejected leaving `G2SV-Q11` open or re-parsing model files in `mp_engine_ghoul2`
+(`G2SV-D5` forbids the re-parse; the accessors hand back the loader's live block).
+
+**G2SV-D16 (ruling 39b, 2026-07-09, pass 6).** The attach-trio
+`G2API_AttachInstanceToEntNum`/`G2API_ClearAttachedInstance`/`G2API_CleanEntAttachments`
+are **compiled no-ops kept as callable empty-body fns in `api_bolts.rs` per §C10**, NOT
+§20-dropped — correcting `G2SV-D4`'s original classification. Because their **signatures
+are unconditional** (`G2_API.cpp:200,214,221`); only the bodies sit inside `#ifdef
+_G2_LISTEN_SERVER_OPT`, so with that macro off (`G2SV-D4`) they compile as empty-body
+functions that **LIVE syscall arms still call** (`sv_game.cpp:1587,1591,1594` behind
+`G_G2_ATTACHINSTANCETOENTNUM`/`G_G2_CLEARATTACHEDINSTANCE`/`G_G2_CLEANENTATTACHMENTS`).
+A §20 drop would remove a symbol the server dispatch reaches — an incorrect classification.
+The compiled-out **body content** (the `g2ClientAttachments[]` writes) is a §C10 dead-arm
+fold, but the fn itself must exist and be callable (an empty no-op). This differs from
+`G2API_OverrideServerWithClientData`, whose live arm returns a value (`qfalse`); the
+attach-trio return `void`, so their no-op body is genuinely empty. Rejected §20-noting
+them (the original `G2SV-D4` reading): their signatures compile and live arms call them.
 
 ## Verification strategy
 
@@ -964,16 +1063,21 @@ pattern (`tools/gp2-oracle/`): `run.sh` compiles the **unmodified** oracle TUs
 `golden/` so `cargo test` needs no C++ toolchain; Rust parity tests
 (`tests/ghoul2_parity.rs` in `mp_engine_ghoul2`) mirror the dump byte-for-byte.
 
-**Host injection (ruling 32, `G2SV-D14`).** The host-taking §F entries run their
-real frozen signature against the **fixture-backed `MockHost`**
+**Host injection (ruling 32, `G2SV-D14`/`G2SV-D15`).** The host-taking §F entries run
+their real frozen signature against the **fixture-backed `MockHost`**
 (`crates/mp/host-interface/src/mock.rs`) — no test-only constructor is added to
 ghoul2. `MockHost` is a pure function of its injected fixtures (FS path→bytes map,
 deterministic `trace` = empty space, captured `print`/`error`, holdrand LCG), so the
-oracle-vs-Rust goldens byte-compare. It is always compiled (no feature gate). The two
-services ghoul2 needs that the frozen trait lacks (model-memory read, cvar) are
-`G2SV-Q11`; until resolved, goldens for host-consuming bodies that need them
-(`bone_cache.rs` ctor, `skeleton.rs`, ragdoll basepose, `cvars.rs`) are blocked on
-that resolution, as `## Slice hooks` records.
+oracle-vs-Rust goldens byte-compare. It is always compiled (no feature gate). Ruling
+36's `MockHost` fixtures (commit `a9820853`) add the two services pass 5 lacked: a
+`cvars` name→i32 map (a missing name reads 0, `mock.rs` `cvar_integer`) and the
+`mdxm_blocks`/`mdxa_blocks` maps of caller-provided model bytes that `model_mdxm`/
+`model_mdxa` hand back pointers into (NULL where no fixture, mirroring Raven's NULL
+`model_t.mdxm`/`mdxa`). So the model-memory and cvar-consuming bodies (`bone_cache.rs`
+ctor, `skeleton.rs`, ragdoll basepose, `misc.rs` model reads + the `G2_TransformModel`
+`cg_g2MarksAllModels` gate `:569`, gore cvar gate in `gore/gore_set.rs`) now have a
+golden vehicle — `G2SV-Q11` is SETTLED, so none is blocked. (No `cvars.rs` body: the
+`cg_g2MarksAllModels` read is inlined via `cvar_integer`, State ownership.)
 
 Fixtures / goldens (the M3 gate is "G2 bone/bolt/collision goldens",
 `GOAL-engine.md:72`):
@@ -995,10 +1099,10 @@ Fixtures / goldens (the M3 gate is "G2 bone/bolt/collision goldens",
   12 ragdoll/IK arms). Determinism hinges on the `flrand` seeding (ragdoll init
   `:1468-1469` + settle/IK, Seam definition): `MockHost`'s holdrand-backed
   `EngineHost::flrand` reproduces the oracle LCG bit-for-bit, which is exactly why
-  `g2api_set_ragdoll` takes `host`. The golden itself is **gated on `G2SV-Q11`** —
-  `G2_SetRagDoll`'s body reads model memory (`G2_GetModA`) and the `broadsword` cvar,
-  neither served by the frozen trait — so it lands once that resolves, alongside the
-  other model-memory bodies.
+  `g2api_set_ragdoll` takes `host` (`G2SV-D15`). The golden runs now: `G2_SetRagDoll`'s
+  body reads model memory (`G2_GetModA`) via `MockHost.mdxa_blocks`/`model_mdxa` and the
+  `broadsword` cvar via `MockHost.cvars`/`cvar_integer` (ruling 36) — both served, so it
+  lands with the other model-memory bodies, not gated (`G2SV-Q11` SETTLED).
 - **Gore goldens** — `AllocGoreRecord`/`FindGoreSet` tag sequencing incl. the
   `MAX_GORE_RECORDS` eviction (`_G2_GORE` on). The per-LOD `tex` buffer ownership
   (`G2SV-D13`(c), `Vec<f32>` backing the frozen `tex` pointers) carries **no** server
@@ -1028,12 +1132,15 @@ files:
     crate: mp_engine_ghoul2
     mode: mp
     class: Ghoul2System
-    summary: The Engine.g2 direct field (G2SV-D5, ruling 12) — fields info_array, time_bases, gbm_no_reconstruct/gbm_use_sp_method, cvars (Ghoul2Cvars, defined in cvars.rs), gore GoreState, rag RagDollSolver, bone_caches (a hand-rolled owned in-crate generational arena of CBoneCache keyed by BoneCacheId, §B5 — same kind as Ghoul2InfoArray, no external slotmap crate, G2SV-D9; + the BoneCacheId key), gore_shader qhandle_t (both folded from the former RenderG2State). Plain Default-init. Owns the delete/delete_low methods (G2SV-D13(a)/ruling 29): free the slot's bone caches from bone_caches then Ghoul2InfoArray::clear_slot — Raven's Delete/DeleteLow (G2_API.cpp:413,315) move UP here because they touch both the arena and the sibling bone_caches. One type per file (CLAUDE.md).
-  - path: crates/mp/engine/ghoul2/src/cvars.rs
-    crate: mp_engine_ghoul2
-    mode: mp
-    class: Ghoul2Cvars
-    summary: The ghoul2-subsystem per-subsystem EngineCvars sub-struct (ruling 2) holding the cg_g2MarksAllModels handle (G2_misc.cpp:40); registered at cvar init, read via &Ghoul2System.cvars. Own file per the one-type-per-file rule (CLAUDE.md), as Ghoul2System is a distinct type in ghoul2_system.rs.
+    summary: The Engine.g2 direct field (G2SV-D5, ruling 12) — fields info_array, time_bases, gbm_no_reconstruct/gbm_use_sp_method, gore GoreState, rag RagDollSolver, bone_caches (a hand-rolled owned in-crate generational arena of CBoneCache keyed by BoneCacheId, §B5 — same kind as Ghoul2InfoArray, no external slotmap crate, G2SV-D9; + the BoneCacheId key), gore_shader qhandle_t (both folded from the former RenderG2State). Plain Default-init. Owns the delete/delete_low methods (G2SV-D13(a)/ruling 29): free the slot's bone caches from bone_caches then Ghoul2InfoArray::clear_slot — Raven's Delete/DeleteLow (G2_API.cpp:413,315) move UP here because they touch both the arena and the sibling bone_caches. One type per file (CLAUDE.md).
+  # No cvars.rs / Ghoul2Cvars: G2SV-D15's frozen cvar_integer(name) is a stateless
+  # by-name read with no Cvar_Get/handle-registration step, so there is no cvar handle
+  # to store (the pre-ruling-36 "ruling-2 EngineCvars sub-struct" purpose is void). The
+  # cg_g2MarksAllModels read is inlined at its call sites (gore/gore_set.rs G2_GorePolys,
+  # api_gore.rs) via host.cvar_integer, exactly as the renderer-owned broadsword family is
+  # already treated (state-ownership rows). Whether the "cg_g2MarksAllModels" name string
+  # is inlined or lives in a module-level const is porter internal latitude (porting-rules
+  # §A1 / §C10), not a doc-frozen point — either way carries no state field and no ABI seam.
   - path: crates/mp/engine/ghoul2/src/shared/cghoul2_info.rs
     crate: mp_engine_ghoul2
     mode: mp
@@ -1063,7 +1170,7 @@ files:
     crate: mp_engine_ghoul2
     mode: mp
     class: G2API bolts+attach
-    summary: AddBolt/AddBoltSurfNum/RemoveBolt/SetBoltInfo/GetBoltMatrix (write-through+bool, G2SV-D1; gG2_GBM* flags), AttachG2Model/DetachG2Model/AttachEnt/DetachEnt, SetNewOrigin. AttachInstanceToEntNum/ClearAttachedInstance/CleanEntAttachments bodies compile out (_G2_LISTEN_SERVER_OPT off) -> §20 note (G2SV-D4).
+    summary: AddBolt/AddBoltSurfNum/RemoveBolt/SetBoltInfo/GetBoltMatrix (write-through+bool, G2SV-D1; gG2_GBM* flags), AttachG2Model/DetachG2Model/AttachEnt/DetachEnt, SetNewOrigin. AttachInstanceToEntNum/ClearAttachedInstance/CleanEntAttachments are COMPILED NO-OPS kept as callable empty-body fns here per §C10 (G2SV-D16/ruling 39b): their signatures are unconditional (G2_API.cpp:200,214,221), only the bodies are #ifdef _G2_LISTEN_SERVER_OPT (off, G2SV-D4), and LIVE syscall arms call them (sv_game.cpp:1587,1591,1594) — NOT §20-dropped. GetBoltMatrix reads model memory via EngineHost::model_mdxa (ruling 36).
   - path: crates/mp/engine/ghoul2/src/api_surfaces.rs
     crate: mp_engine_ghoul2
     mode: mp
@@ -1073,7 +1180,7 @@ files:
     crate: mp_engine_ghoul2
     mode: mp
     class: G2API ragdoll+IK
-    summary: SetRagDoll/ResetRagDoll/AnimateG2Models(rag), RagPCJConstraint/RagPCJGradientSpeed/RagEffectorGoal/GetRagBonePos/RagEffectorKick/RagForceSolve, SetBoneIKState/IKMove, AbsurdSmoothing (server-live, G2SV-D3). params type is the RagDollUpdateParams §F17 enum (G2SV-D8, defined in ragdoll_update_params.rs). g2api_set_ragdoll takes host (&mut impl EngineHost): G2_SetRagDoll -> G2_Set_Bone_Angles_Rag calls flrand server-side (G2_bones.cpp:1468-1469, no DEDICATED guard) -> EngineHost::flrand (ruling 11/21) — its host-less draft signature was a reachability mis-read, corrected. Its completed body also reads model memory (G2_GetModA :1644) + the broadsword cvar (:1628) -> blocked on G2SV-Q11 (a)/(d); signature freezes now.
+    summary: SetRagDoll/ResetRagDoll/AnimateG2Models(rag), RagPCJConstraint/RagPCJGradientSpeed/RagEffectorGoal/GetRagBonePos/RagEffectorKick/RagForceSolve, SetBoneIKState/IKMove, AbsurdSmoothing (server-live, G2SV-D3). params type is the RagDollUpdateParams §F17 enum (G2SV-D8, defined in ragdoll_update_params.rs). g2api_set_ragdoll takes host (&mut impl EngineHost): G2_SetRagDoll -> G2_Set_Bone_Angles_Rag UNCONDITIONALLY calls flrand server-side (G2_bones.cpp:1468-1469, no DEDICATED guard) -> EngineHost::flrand (ruling 11/21/36, G2SV-D15). Its completed body also reads model memory (G2_GetModA :1645) via model_mdxa + the broadsword cvar (:1628) via cvar_integer -> both served by ruling 36 (G2SV-Q11 SETTLED), so the whole body transcribes now.
   - path: crates/mp/engine/ghoul2/src/ragdoll_update_params.rs
     crate: mp_engine_ghoul2
     mode: mp
@@ -1103,7 +1210,7 @@ files:
     crate: mp_engine_ghoul2
     mode: mp
     class: RagDollSolver
-    summary: The RagDoll + IK solver; fn-statics block -> RagDollSolver host fields (G2SV-D3, server-live). G2_RagDollSetup/RagDoll/RagDollSolve/SettlePositionNumeroTrois/RagSetState/IKSolve/DoIK/BoneSnap, SRagEffector. Per G2SV-D13(b)/ruling 29 (closing G2SV-Q9): the raw-pointer statics become blist INDICES + per-call EngineHost basepose resolve — ragBoneData/rag -> mBlist indices (Vec<i32>/[i32;MAX_BONES_RAG]; Raven's parallel ragBlistIndex :1220 already the index), ragBasepose/ragBaseposeInv NOT stored (resolved per call via G2_GetBoneMatrixLow over EngineHost, :2622, write-through). NB basepose resolve needs the model-memory host service absent from the frozen trait (G2SV-Q11(a)). The solver also calls flrand server-side (init :1468-1469 + settle/IK :2127-2129,3327,3925,4290) -> EngineHost::flrand (ruling 21, available) and reads the renderer-owned broadsword cvar family (G2_bones.cpp:1176-1189 extern; tr_init.cpp registers) -> G2SV-Q11(d).
+    summary: The RagDoll + IK solver; fn-statics block -> RagDollSolver host fields (G2SV-D3, server-live). G2_RagDollSetup/RagDoll/RagDollSolve/SettlePositionNumeroTrois/RagSetState/IKSolve/DoIK/BoneSnap, SRagEffector. Per G2SV-D13(b)/ruling 29 (closing G2SV-Q9): the raw-pointer statics become blist INDICES + per-call EngineHost basepose resolve — ragBoneData/rag -> mBlist indices (Vec<i32>/[i32;MAX_BONES_RAG]; Raven's parallel ragBlistIndex :1220 already the index), ragBasepose/ragBaseposeInv NOT stored (resolved per call via G2_GetBoneMatrixLow over EngineHost, :2622, write-through). The basepose resolve reads model memory via ruling-36 EngineHost::model_mdxa (G2SV-D15; G2SV-Q11(a) SETTLED). The solver also calls flrand server-side (init :1468-1469 + settle/IK :2127-2129,3327,3925,4290, all flrand) -> EngineHost::flrand (ruling 21) and reads the renderer-owned broadsword cvar family (G2_bones.cpp:1176-1189 extern; tr_init.cpp registers) -> EngineHost::cvar_integer (ruling 36, G2SV-D15; G2SV-Q11(d) SETTLED).
   - path: crates/mp/engine/ghoul2/src/bolts.rs
     crate: mp_engine_ghoul2
     mode: mp
@@ -1141,7 +1248,8 @@ files:
     summary: G2_ConstructGhoulSkeleton, G2_TransformGhoulBones, G2_GetBoneMatrixLow, G2_GetBoneBasepose, G2_RagGetBoneBasePoseMatrixLow, worldMatrix/worldMatrixInv scratch threading.
 
 divergences:
-  - "_G2_LISTEN_SERVER_OPT OFF in the WinDed set (G2SV-D4): CGhoul2Info::entityNum, the g2ClientAttachments[] array + AttachInstanceToEntNum/ClearAttachedInstance/CleanEntAttachments bodies, and CopyBoneCache compile out -> §20 zero-compile notes; G2API_OverrideServerWithClientData keeps its live #ifndef arm as -> bool { false } (G2_API.cpp:241-242), taking a single CGhoul2Info (=&g2[0], sv_game.cpp:1599), NOT the CGhoul2Info_v wrapper (1:1 arity, G2SV-D6)."
+  - "_G2_LISTEN_SERVER_OPT OFF in the WinDed set (G2SV-D4): CGhoul2Info::entityNum, the g2ClientAttachments[] array, and CopyBoneCache compile out -> §20 zero-compile notes; G2API_OverrideServerWithClientData keeps its live #ifndef arm as -> bool { false } (G2_API.cpp:241-242), taking a single CGhoul2Info (=&g2[0], sv_game.cpp:1599), NOT the CGhoul2Info_v wrapper (1:1 arity, G2SV-D6)."
+  - "Attach-trio is a COMPILED NO-OP, not a §20 drop (G2SV-D16/ruling 39b, correcting G2SV-D4): G2API_AttachInstanceToEntNum/ClearAttachedInstance/CleanEntAttachments have UNCONDITIONAL signatures (G2_API.cpp:200,214,221) with only their bodies inside #ifdef _G2_LISTEN_SERVER_OPT (off), so they compile as empty-body no-op fns that LIVE syscall arms still call (sv_game.cpp:1587,1591,1594 behind G_G2_ATTACHINSTANCETOENTNUM/CLEARATTACHEDINSTANCE/CLEANENTATTACHMENTS). Kept as callable empty-body fns in api_bolts.rs per §C10 (dead body-arm fold); NOT dropped. Unlike G2API_OverrideServerWithClientData (live arm returns qfalse), the trio return void, so the no-op body is genuinely empty."
   - "_XBOX OFF: CTransformBone::renderMatrix/pad, the Z_Malloc mFinalBones/mSmoothBones raw arrays, EvalFull, SetRenderMatrix dropped; the vector<> arm is the live path."
   - "_SOF2 OFF: the ghoul2_shared.h SSkinGoreData/goreEnum_t variant is dead; MP uses SSkinGoreData_s (q_shared.h:3112)."
   - "Ghoul2InfoArray::Get on an invalid handle returns a shared function-static null vector it first .clear()s (non-reentrant aliasing, G2_API.cpp:427-439) -> Rust returns an empty slice; kept out of shared fixtures (F19)."
@@ -1151,7 +1259,7 @@ divergences:
   - "boneInfo_t basepose/baseposeInv/... raw mdxaBone_t* members keep their ported ABI repr but are filled from Ghoul2System-owned matrices, not shared raw pointers (B5 seam)."
   - "_DEBUG _isnan / assert paths in SmoothLow/EvalLow are debug-only; normalized out of the dumper with a comment (F19)."
   - "HackadelicOnClient (tr_ghoul2.cpp:104) is const-false server-side: its only writers are in R_AddGhoulSurfaces, #ifndef DEDICATED (:3384-3537); the render-traversal branches fold to their false arm (C10)."
-  - "cgvm ragdoll-callback dead branches in G2_bones.cpp (client.h #include :32) all fold to their DEDICATED arm: Rag_Trace (:2684, #ifndef DEDICATED cgvm TRACELINE) -> real CM_BoxTrace else-arm (:2708); G2_BoneSnap (:3951, #ifdef DEDICATED return;) -> compiled no-op (caller G2_RagDollSolve :4244); the four RAG_CALLBACK_BONEINSOLID sites in G2_RagDollSettlePositionNumeroTrois (:3056,3085,3180,3217, #ifndef DEDICATED) compile out (surrounding if(params) logic stays); the :3826 site is doubly dead (#if 0 + #ifndef DEDICATED); G2_RagDebugBox/G2_RagDebugLine (:2884,2905, compiled via _DEBUG_BONE_NAMES #define :2577 but #ifdef DEDICATED return;) are compiled no-ops. No cgvm global resolves in this build (C10/§20)."
+  - "cgvm ragdoll-callback dead branches in G2_bones.cpp (client.h #include :32) all fold to their DEDICATED arm: Rag_Trace (:2684, #ifndef DEDICATED cgvm TRACELINE) -> real CM_BoxTrace else-arm (:2709); G2_BoneSnap (:3951, #ifdef DEDICATED return;) -> compiled no-op (caller G2_RagDollSolve :4244); the four RAG_CALLBACK_BONEINSOLID sites in G2_RagDollSettlePositionNumeroTrois (:3056,3085,3180,3217, #ifndef DEDICATED) compile out (surrounding if(params) logic stays); the :3826 site is doubly dead (#if 0 + #ifndef DEDICATED); G2_RagDebugBox/G2_RagDebugLine (:2884,2905, compiled via _DEBUG_BONE_NAMES #define :2577 but #ifdef DEDICATED return;) are compiled no-ops. No cgvm global resolves in this build (C10/§20)."
   - "RSStorage/NextRS/AllocRS render-surface pool dropped: dead server-side (sole caller tr_ghoul2.cpp:2660 is #ifndef DEDICATED); the #else non-_G2_GORE second GoreVerts (G2_misc.cpp:1088) is also dead (_G2_GORE ON)."
   - "G2_PERFORMANCE_ANALYSIS ON (FINAL_BUILD undefined) but its G2Time_*/G2PerformanceCounter_*/G2PerformanceTimer_* globals are timing instrumentation with no parity surface; dropped (F20), same as the leak-checking globals."
   - "Gore apply/record split (G2SV-D7, ruling 22; corrected by G2SV-D11/ruling 26): the gore-APPLY entries — and ONLY these three — G2API_AddSkinGore (G2_API.cpp:2569), ResetGoreTag (G2_misc.cpp:96, sole caller AddSkinGore:2590), G2_GetGoreRecord (G2_misc.cpp:113, no caller) are graph-dead server-side (only client CG_G2_ADDSKINGORE trap, no G_G2_* arm) -> §20 zero-caller notes, not ported. The record store (AllocGoreRecord/FindGoreRecord/DeleteGoreRecord/DestroyGoreTexCoordinates, FindGoreSet/NewGoreSet/DeleteGoreSet, ~CGoreSet, G2API_ClearSkinGore, G2_GorePolys) is server-live (ClearSkinGore via G_G2_CLEANMODELS :545 + the save/load destruct path :2493; the record-store DeleteGoreSet also reached directly from the REMOVEGHOUL2MODEL/MODELS removal paths :814,901; GorePolys via collision trace G2_misc.cpp:1494) and ports fully. Ruling 26 moved DestroyGoreTexCoordinates (G2_misc.cpp:43) and DeleteGoreRecord (:118) into this live bucket (reached via ~CGoreSet :174/:179 -> :120): the ruling-22 dead-listing was an engineorder graph blind spot — an implicit C++ destructor call (~CGoreSet on delete, :163) is not a reachability edge (G2SV-Q8 SETTLED). AddSkinGore vert-buffer/GoreTouch goldens are not M3-gating (G2SV-Q4)."
@@ -1161,7 +1269,7 @@ divergences:
   - "delete/delete_low move UP from Ghoul2InfoArray to Ghoul2System methods (G2SV-D13(a)/ruling 29): Raven's Delete/DeleteLow (G2_API.cpp:413,315) frees each instance's bone cache (RemoveBoneCache, :319-326) then clears the slot + bumps generation (:328-339); the bone caches live in the sibling Ghoul2System.bone_caches arena (G2SV-D9) unreachable from the array, so the system method owns both — free bone caches, then Ghoul2InfoArray::clear_slot. No &mut Ghoul2InfoArray-only delete; behavior (bit-exact generation/free-list, G2SV-D6) matches the oracle."
   - "RagDollSolver stores mBlist INDICES + resolves basepose per call via EngineHost (G2SV-D13(b)/ruling 29, closing G2SV-Q9): the fn-statics' raw pointers ragBoneData (boneInfo_t*, G2_bones.cpp:1218) and rag (vector<boneInfo_t*>, :1241) become mBlist indices (Vec<i32>/[i32;MAX_BONES_RAG]; Raven's parallel ragBlistIndex :1220 is already the index); ragBasepose/ragBaseposeInv (mdxaBone_t*, :1214-1215) are NOT stored — resolved per call through G2_GetBoneMatrixLow over EngineHost (:2622, write-through GetBoltMatrix pattern, ruling 21). No aliasing raw pointers on the §F type (§B5/§D11)."
   - "GoreState owns each per-LOD gore buffer as Vec<f32> (G2SV-D13(c)/ruling 29, closing G2SV-Q10): the ABI-frozen GoreTextureCoordinates.tex [*mut c_float; MAX_LODS] pointers point INTO GoreState.tex_buffers; Raven Z_Mallocs each tex[TS.lod] (G2_misc.cpp:1020) and Z_Frees in ~GoreTextureCoordinates (G2_gore.h:25-36)/on realloc (:1028) -> owned Vec + Drop mirroring Z_Free order (§9/§D11). Server slice is all-null (no TS.gore setter, G2SV-Q4): no golden surface, but G2_GorePolys ports fully so the alloc code is transcribed."
-  - "EngineHost is the BUILT, frozen trait (G2SV-D14, rulings 31/33, mp_host_interface, commit 4b7f01b0); its 10 signatures are quoted verbatim in Seam definition and goldens run against the fixture-backed MockHost (src/mock.rs, ruling 32). The frozen roster (ruling 24) has NO model-memory-read and NO cvar register/read method — the two services ghoul2 still needs — so those host-consuming bodies are gated on G2SV-Q11 (Open questions), not on Stage-0."
+  - "EngineHost is the BUILT, frozen trait, EXTENDED to 15 methods by ruling 36 (G2SV-D14/G2SV-D15, rulings 31/33/36, mp_host_interface, Stage-0 commit 4b7f01b0 + extension commit a9820853); all 15 signatures are quoted verbatim in Seam definition and goldens run against the fixture-backed MockHost (src/mock.rs, ruling 32 + ruling-36 cvars/mdxm_blocks/mdxa_blocks fixtures). Ruling 36 added the two services ghoul2 needed that pass 5 lacked — model_mdxm/model_mdxa (loader model memory, *mut c_void, G2SV-D5: mp_engine_ghoul2 never names the mdxm/mdxa header types) and cvar_integer (missing name reads 0) — plus sv_time and fs_write_file for the sibling §F subsystems. So G2SV-Q11 is SETTLED (both halves): every roster body transcribes against the built 15-method trait, none blocked. flrand IS consumed by ghoul2 (g2api_set_ragdoll takes host, G2SV-D15); only irand/vm_call/shared_memory/gentity are unused server-side by ghoul2."
   - "Gore record-store file placement (mechanical, not a new decision): CGoreSet + GoreState + the record-store free fns land as a new submodule INSIDE the existing gore/ directory module — file crates/mp/engine/ghoul2/src/gore/gore_set.rs, declared `pub mod gore_set;` in gore/mod.rs — NOT a top-level src/gore.rs, which collides at compile time with gore/mod.rs (Rust cannot resolve a module from both gore.rs and gore/mod.rs). Forced by the standing rules alone: one-type-per-file + folder-mirrors-owning-Raven-header (CLAUDE.md; CGoreSet is declared in G2_gore.h -> gore/), file named after its primary class as render/bone_cache.rs <- CBoneCache, colocated with the already-type-ported gore/ data types per the G2SV-D10 pattern. Folding into gore/mod.rs (violates one-type-per-file — mod.rs is module glue) and renaming the frozen gore/ directory (disturbs the already-type-ported layout pinned as src/gore/) are both rejected by those same rules."
 ```
 
@@ -1180,6 +1288,7 @@ row is one transcription target.
 | `CGhoul2Info_v::Alloc/Free/clear/DeepCopy/operator=` (lifecycle) | `ghoul2_shared.h:335-435` (`clear` at `:426`) | `shared/cghoul2_info_v.rs` | colocated (G2SV-D10); `New`/`Delete` + DeepCopy runtime-state zeroing (`:385-397`); `operator=` = handle copy |
 | `G2API_GetBoltMatrix` | `G2_API.cpp:1795` | `api_bolts.rs` | write-through out-matrix + `bool` (G2SV-D1) |
 | `G2API_OverrideServerWithClientData` | `G2_API.cpp:239` | `api_collision.rs` | takes a single `CGhoul2Info *serverInstance` (`=&g2[0]`, sv_game.cpp:1599), NOT the wrapper (1:1, G2SV-D6); WinDed live arm = `return qfalse` (G2SV-D4) |
+| `G2API_AttachInstanceToEntNum` / `ClearAttachedInstance` / `CleanEntAttachments` | `G2_API.cpp:200,214,221` | `api_bolts.rs` | compiled empty-body no-ops (§C10, G2SV-D16/ruling 39b): unconditional signatures, bodies `#ifdef _G2_LISTEN_SERVER_OPT` (off); LIVE arms call them (`sv_game.cpp:1587,1591,1594`) — NOT §20-dropped |
 | `CBoneCache::EvalLow` | `tr_ghoul2.cpp:236` | `render/bone_cache.rs` | recurse-parent, memoize by `touch` |
 | `CBoneCache::Eval / EvalRender / EvalUnsmooth` | `tr_ghoul2.cpp:455,520,446` | `render/bone_cache.rs` | public read paths; `EvalRender`→`SmoothLow` |
 | `CBoneCache::SmoothLow` | `tr_ghoul2.cpp:267` | `render/bone_cache.rs` | render smoothing; `_isnan` asserts dropped (F19) |
@@ -1209,64 +1318,58 @@ row is one transcription target.
 - **M3 waves 13–19** (`GOAL-engine.md:71`) — "renderer, RMG, botlib, ghoul2
   complete"; gate = the bone/bolt/collision goldens above. Needs frozen first:
   the already-ported `shared/` + `gore/` layout types (done), and the **`EngineHost`
-  trait** (rulings 11/31) — now **BUILT** (`G2SV-D14`, `mp_host_interface`, commit
-  `4b7f01b0`), so the trace / print-error / FS services ghoul2 consumes are available
-  and their bodies transcribe now. **Two consumed services have no frozen method**
-  (`G2SV-Q11`): the loader model-memory read (`mdxaHeader_t`/`mdxaSkel_t`, for the
-  bone ctor / `render/skeleton.rs` / the ragdoll basepose resolve `G2SV-D13`(b)) and
-  cvar register/read (`cg_g2MarksAllModels`); bodies needing either wait on
-  `G2SV-Q11`, not on Stage-0 (done). The loader model-registration/file-read
-  (`RE_RegisterModel`/`R_GetModelByHandle`, `G2_API.cpp:593`, `G2_surfaces.cpp:426`,
-  save/load buffers `G2_API.cpp:2472,2477`) is the same absent model-memory service
-  facet. §F signatures freeze here; goldens run against `MockHost` (ruling 32).
-- **Per-file host-dependency partition** (which roster files transcribe fully now vs.
-  which block on `G2SV-Q11`). Two pervasive host edges cut across the whole surface:
-  (i) nearly every `G2API_*` wrapper opens with `G2_SetupModelPointers`
-  (`G2_misc.cpp:1839`), a loader model-memory read — a `G2SV-Q11` (a) edge, so its
-  *completed* body blocks on `G2SV-Q11`; (ii) print/error (`Com_Printf`/`Com_Error`)
-  maps onto the frozen `print`/`error` methods, so error arms are now unblocked.
-  - **Host-free — transcribe fully now (no live body touches any host service):**
-    `ghoul2_system.rs` (state struct, `Default`-init), `shared/cghoul2_info.rs`
-    (per-instance data class + `DeepCopy` zeroing), `shared/cghoul2_info_v.rs`
-    (wrapper forwarding into the in-crate arena, `G2SV-D10`), `info_array.rs`
-    (arena `New`/`IsValid`/`Get`/`clear_slot`; `delete`/`delete_low` live on
-    `ghoul2_system.rs` per `G2SV-D13`(a) and are equally host-free — they free
-    bone caches + clear the slot, no host; the `OutputDebugString` leak report is
-    `_FULL_G2_LEAK_CHECKING` debug-only, dropped §F20), `ragdoll_update_params.rs`
-    (the §F17 enum), `bolts.rs` (internal bolt-list ops — its one apparent host
-    line `G2_bolts.cpp:194` is a **commented-out** `Com_Printf`, so genuinely
-    host-free), and `render/bone_transform.rs` (pure `-ffp-contract=off` matrix/
-    quaternion math, no host).
-  - **`G2SV-Q11`-blocked — §F signature freezes now; the body needs the absent
-    model-memory (a) or cvar (d) service (their trace/print/FS sub-bodies are already
-    unblocked against the built trait):** `render/bone_cache.rs` (ctor header read,
-    a), `render/skeleton.rs` (model-memory read, a), `misc.rs` (`G2_TraceModels`
-    trace b — **available** — but `G2_SetupModelPointers` model read a — blocked;
-    print/error c available), `gore/gore_set.rs` (`G2_GorePolys` reads `cg_g2MarksAllModels`
-    via `Cvar_Get`, `G2_misc.cpp:1524`, cvar d), `cvars.rs` (cvar register/read d),
-    `api_gore.rs` (cvar d), `api_ragdoll.rs` (`g2api_set_ragdoll` → `G2_SetRagDoll`
-    reads `broadsword`, cvar d, and `G2_GetModA` model memory, a; its `flrand` seeding
-    is **available** via the frozen `EngineHost::flrand`, which is why the §F signature
-    now takes `host` — Seam definition), `api_collision.rs` (`CollisionDetect` → `G2_TraceModels`
-    trace b available, but the opening `G2_SetupModelPointers` model read a blocks),
-    `api_models.rs` (`RE_RegisterModel` loader-register a; `Com_Printf` c available),
-    `api_bolts.rs` (`GetBoltMatrix` model-memory read a), `api_saveload.rs`
-    (save/load file buffer via `fs_read_file` — **available** — but the model-touching
-    load path needs a), `surfaces.rs` (`R_GetModelByHandle(RE_RegisterModel(...))`,
-    `G2_surfaces.cpp:426`, loader-register a — blocked despite being an "internal"
-    file), and `ragdoll.rs` (`Rag_Trace` → `CM_BoxTrace` trace b **available**, but
-    the basepose resolve `G2_GetBoneMatrixLow` needs model memory a, `G2SV-D13`(b); its
-    `flrand` seeding `:1468-1469`/settle-pass `flrand` is **available** via
-    `EngineHost::flrand`, and it reads the `broadsword` cvar `:1628`, d).
-  - **Mostly host-free — start the host-free bodies now, defer isolated host arms:**
-    `bones.rs` (internal bone-anim list logic is pure, but `G2_bones.cpp` carries a
-    few live `Com_Printf` error arms among its 14 host tokens — the non-error
-    bodies transcribe now, the error arms bind print/error), and the thin 1:1
-    wrappers `api_bones.rs`/`api_surfaces.rs` (their own §C7 marshalling is host-free,
-    but each opens with `G2_SetupModelPointers` (a) and forwards into a blocked
-    internal, so the completed body binds `G2SV-Q11`). `api_ragdoll.rs` is likewise a
-    thin wrapper but is listed under the `G2SV-Q11`-blocked bucket above (its
-    `broadsword` cvar + `G2_GetModA` reads).
+  trait** (rulings 11/31/36) — now **BUILT and EXTENDED to 15 methods**
+  (`G2SV-D14`/`G2SV-D15`, `mp_host_interface`, Stage-0 commit `4b7f01b0` + ruling-36
+  extension commit `a9820853`), so **every** service ghoul2 consumes is available: trace,
+  print/error, FS read/free/write, `flrand`, the loader model-memory accessors
+  (`model_mdxm`/`model_mdxa` — for the bone ctor / `render/skeleton.rs` / the ragdoll
+  basepose resolve `G2SV-D13`(b) / the `RE_RegisterModel`→`R_GetModelByHandle` model
+  read at `G2_API.cpp:593`, `G2_surfaces.cpp:426`, save/load buffers `:2472,2477`), and
+  `cvar_integer`. **`G2SV-Q11` is SETTLED (both halves)** — no consumed service lacks a
+  method, so no body blocks on Stage-0 any longer. §F signatures freeze here; goldens run
+  against `MockHost` (ruling 32 + ruling-36 model/cvar fixtures).
+- **Per-file host-service map** (every roster file transcribes fully now; this records
+  which host methods each body binds, no longer a blocked/unblocked split). Two
+  pervasive host edges cut across the whole surface: (i) nearly every `G2API_*` wrapper
+  opens with `G2_SetupModelPointers` (`G2_misc.cpp:1839`), a loader model-memory read →
+  `model_mdxm`/`model_mdxa` (ruling 36); (ii) print/error (`Com_Printf`/`Com_Error`) →
+  the frozen `print`/`error` methods.
+  - **Host-free (no live body touches any host service):** `ghoul2_system.rs` (state
+    struct, `Default`-init), `shared/cghoul2_info.rs` (per-instance data class +
+    `DeepCopy` zeroing), `shared/cghoul2_info_v.rs` (wrapper forwarding into the in-crate
+    arena, `G2SV-D10`), `info_array.rs` (arena `New`/`IsValid`/`Get`/`clear_slot`;
+    `delete`/`delete_low` live on `ghoul2_system.rs` per `G2SV-D13`(a) and are equally
+    host-free — they free bone caches + clear the slot; the `OutputDebugString` leak
+    report is `_FULL_G2_LEAK_CHECKING` debug-only, dropped §F20), `ragdoll_update_params.rs`
+    (the §F17 enum), `bolts.rs` (internal bolt-list ops — its one apparent host line
+    `G2_bolts.cpp:194` is a **commented-out** `Com_Printf`, so genuinely host-free), and
+    `render/bone_transform.rs` (pure `-ffp-contract=off` matrix/quaternion math).
+  - **Host-consuming (all methods now available — transcribe fully):**
+    `render/bone_cache.rs` (ctor header read → `model_mdxa`), `render/skeleton.rs`
+    (model-memory read → `model_mdxm`/`model_mdxa`), `misc.rs` (`G2_TraceModels` →
+    `trace`; `G2_SetupModelPointers` model read → `model_mdxm`/`model_mdxa`; print/error),
+    `gore/gore_set.rs` (`G2_GorePolys` reads `cg_g2MarksAllModels` via `cvar_integer`,
+    `G2_misc.cpp:1524`; `cg_g2MarksAllModels` is also read in `G2_TransformModel`
+    `:569` — inlined at each read site via `host.cvar_integer`, no `cvars.rs` file per
+    the roster note), `api_gore.rs`
+    (`cvar_integer`), `api_ragdoll.rs` (`g2api_set_ragdoll` → `G2_SetRagDoll`: `flrand`
+    seeding, `broadsword` cvar → `cvar_integer`, `G2_GetModA` model memory → `model_mdxa`
+    — the §F signature takes `host`, Seam definition/`G2SV-D15`), `api_collision.rs`
+    (`CollisionDetect` → `G2_TraceModels` `trace` + opening `G2_SetupModelPointers`
+    model read), `api_models.rs` (`RE_RegisterModel` loader-register → model accessors;
+    `print`), `api_bolts.rs` (`GetBoltMatrix` model-memory read → `model_mdxa`; **plus
+    the attach-trio compiled no-ops, `G2SV-D16`**), `api_saveload.rs` (save/load file
+    buffer → `fs_read_file`/`fs_write_file` + the model-touching load path → model
+    accessors), `surfaces.rs` (`R_GetModelByHandle(RE_RegisterModel(...))`,
+    `G2_surfaces.cpp:426`, model accessors), and `ragdoll.rs` (`Rag_Trace` →
+    `CM_BoxTrace` `trace`; basepose resolve `G2_GetBoneMatrixLow` → `model_mdxa`,
+    `G2SV-D13`(b); `flrand` seeding `:1468-1469`/settle-pass; `broadsword` cvar `:1628`
+    → `cvar_integer`).
+  - **Thin wrappers (host-free marshalling + a forwarded host edge):** `bones.rs`
+    (internal bone-anim list logic is pure, plus a few live `Com_Printf` error arms →
+    `print`), and `api_bones.rs`/`api_surfaces.rs` (their §C7 marshalling is host-free;
+    each opens with `G2_SetupModelPointers` → model accessors and forwards into an
+    internal). All transcribe fully against the 15-method trait.
 - **`SV_GameSystemCalls`** (wave 20, plan §"server is the integrator") — the
   server→ghoul2 edges call the `G2API_*` surface frozen by `G2SV-D6` (incl. the 12
   rag/IK arms, `G2SV-D3`); that seam must be stable before the switch arm ports.
@@ -1275,7 +1378,9 @@ row is one transcription target.
 
 Questions the 2026-07-09 fork session and its evidence queries closed (were open
 in the prior draft), plus `G2SV-Q4` and `G2SV-Q5` closed by ruling 22
-(`G2SV-D7`/`G2SV-D8`) and `G2SV-Q8` closed by ruling 26 (`G2SV-D11`):
+(`G2SV-D7`/`G2SV-D8`), `G2SV-Q8` closed by ruling 26 (`G2SV-D11`), `G2SV-Q9`/`G2SV-Q10`
+closed by ruling 29 (`G2SV-D13`, pass 5), and `G2SV-Q11` closed by ruling 36
+(`G2SV-D15`, pass 6):
 - **G2SV-Q1** (renderer-subset boundary) — **RESOLVED by `G2SV-D2`**: the 8 WinDed
   vcproj renderer TUs, fn-extent LOC per `engine-fork-discovery.md:162-164`; this
   doc owns the `tr_ghoul2` bone subset, the loader is a `tr_model` sibling doc.
@@ -1339,8 +1444,9 @@ in the prior draft), plus `G2SV-Q4` and `G2SV-Q5` closed by ruling 22
   the live model's `mBlist` at use; `ragBasepose`/`ragBaseposeInv` are **not stored** —
   the basepose/baseposeInv matrices are resolved per call through `G2_GetBoneMatrixLow`
   over `EngineHost` (`:2622`, write-through `GetBoltMatrix` pattern, ruling 21). No
-  aliasing raw pointers outside the ABI seam (§B5/§D11). (The basepose resolve depends
-  on the model-memory host service the frozen trait lacks — `G2SV-Q11`.)
+  aliasing raw pointers outside the ABI seam (§B5/§D11). (The basepose resolve reads
+  model memory through ruling-36 `EngineHost::model_mdxa` — `G2SV-Q11`(a) SETTLED,
+  `G2SV-D15`.)
 - **G2SV-Q10** (`GoreTextureCoordinates.tex` per-LOD buffer ownership,
   `G2_misc.cpp:1020`, `G2_gore.h:25-36`) — **RESOLVED by `G2SV-D13`(c)** (ruling 29,
   pass 5): `GoreState` **owns** each per-LOD buffer as a `Vec<f32>` (`tex_buffers`) and
@@ -1350,61 +1456,34 @@ in the prior draft), plus `G2SV-Q4` and `G2SV-Q5` closed by ruling 22
   mirroring unsafe in the internal type (§9/§D11). Carries no server golden surface
   (all-null store, `G2SV-Q4`), but `G2_GorePolys` ports fully so the alloc code is
   transcribed against this shape.
+- **G2SV-Q11** (two services ghoul2 consumes — the loader model-memory read and cvar
+  read — had no method in the pass-5 frozen `EngineHost` trait) — **RESOLVED by
+  `G2SV-D15`** (ruling 36, pass 6): the trait is EXTENDED and BUILT (commit `a9820853`)
+  with the two missing methods, closing **both** halves.
+  - **(a) loader model-memory read** — served by `model_mdxm`/`model_mdxa`
+    (`-> *mut c_void`), two accessors mirroring `R_GetModelByHandle` → `model_t` →
+    `->mdxm`/`->mdxa` (`G2_API.cpp:2716-2739`) that hand back the loader's live parsed
+    block, NULL exactly where Raven's `model_t` pointer is NULL. Ghoul2 does its byte
+    arithmetic off the returned pointer unchanged (`tr_ghoul2.cpp:416-421`) and
+    `mp_engine_ghoul2` still **never names** the mdxm/mdxa header types (`G2SV-D5`); no
+    re-parse (`fs_read_file` returns raw bytes, a different thing — the accessors return
+    the loader's cached model). Serves the bone ctor parent-seeding, `render/skeleton.rs`,
+    and the ragdoll basepose resolve (`G2SV-D13`(b)).
+  - **(d) cvar read** — served by `cvar_integer(name) -> i32` (a missing name reads 0,
+    `Cvar_VariableIntegerValue`, `cvar.cpp:118-124`): `cg_g2MarksAllModels`
+    (`G2_misc.cpp:40`, read `:1524`) and the renderer-owned `broadsword*` family
+    (`G2_bones.cpp:1176-1189`) both read through it, so ghoul2 reads a renderer-owned
+    cvar **without** a `mp_renderer` edge (`G2SV-D5`).
+  The pass-5 blast radius (most of the 20-file roster) is discharged — every roster body
+  now transcribes against the built 15-method trait; the `## Slice hooks` per-file
+  host-service map records which methods each binds. The interface-ownership gap resolved
+  exactly as pass 5 predicted (by amending the `EngineHost` roster, the Stage-0 crate's
+  decision) via ruling 36.
 
 ## Open questions
 
-`G2SV-Q9` and `G2SV-Q10` (the prior two items) are **SETTLED by ruling 29**
-(`G2SV-D13`(b)/(c), 2026-07-09, pass 5 — see Resolved questions). One new item,
-surfaced by pass 5 folding the BUILT `mp_host_interface` crate (`G2SV-D14`, rulings
-31/33), remains and **escalates to a design session** (doc-standards Gate 2/3:
-contested points escalate, never self-resolve). It is not answerable from cited
-oracle behavior or any settled decision, so a drafting agent may not pick one
-(doc-standards, drafting rule).
-
-- **`G2SV-Q11` — two services ghoul2 consumes have no method in the frozen
-  `EngineHost` trait (surfaced by `G2SV-D14`; bears on `G2SV-D5`/`G2SV-D13`(b)).**
-  Pass 5 quoted the BUILT trait verbatim (`crates/mp/host-interface/src/engine_host.rs`,
-  commit `4b7f01b0`): its ten methods are `trace`, `fs_read_file`, `fs_free_file`,
-  `print`, `error`, `vm_call`, `shared_memory`, `flrand`, `irand`, `gentity`. Ghoul2
-  needs two services with **no matching method**:
-  - **(a) the loader model-memory read of `mdxaHeader_t`/`mdxaSkel_t`.** `G2SV-D5`
-    routes the bone ctor's parent-seeding (`CBoneCache::new`, `tr_ghoul2.cpp:419-425`),
-    the skeleton accessors (`render/skeleton.rs`), and — per `G2SV-D13`(b) / ruling 29 —
-    the ragdoll basepose resolution (`G2_GetBoneMatrixLow`, `G2_bones.cpp:2622`) through
-    an `EngineHost` model-memory accessor. The frozen roster (ruling 24) has none, and
-    `fs_read_file` returns raw file bytes, not the loader's parsed/cached model
-    (`RE_RegisterModel`→`R_GetModelByHandle`, `G2_API.cpp:593`, `G2_surfaces.cpp:426`) —
-    a different thing (`G2SV-D5` explicitly forbids re-parsing in `mp_engine_ghoul2`).
-    Whether the model-memory accessor is a to-be-added `EngineHost` method, a
-    separate host trait, or another route is unsettled.
-  - **(d) cvar register/read.** Two ghoul2-consumed cvar surfaces have no `Cvar_*`
-    method in the frozen trait (`cvar_init` is still a documented no-op stub, build-out
-    plan §0.5): `cg_g2MarksAllModels` (`G2_misc.cpp:40`, read at `:1524`), and the
-    renderer-owned `broadsword*` ragdoll cvar family (`extern` `G2_bones.cpp:1176-1189`,
-    defined/registered in `renderer/tr_init.cpp:204-216,1164-1175`) that the RagDoll
-    solver **reads** server-side (`G2_SetRagDoll` gate `:1628` + settle/IK passes). How
-    `Ghoul2Cvars` registers/reads, and how ghoul2 reads a renderer-owned cvar without a
-    `mp_renderer` edge (`G2SV-D5`), is unsettled.
-
-  Both were previously punted as "the exact host method roster is Stage-0's"
-  (non-goals); pass 5 discharges that punt against the BUILT crate and the punt's
-  target came back **without these two methods**, converting a benign cross-doc
-  deferral into a real gap. Neither ruling 29 nor rulings 31/33 (the pass-5 inputs)
-  adds them, and no cited oracle behavior forces one Rust route, so this is escalated.
-  **Blast radius (authoritative list = the `## Slice hooks` per-file partition).** This
-  is not a narrow gap: the model-memory read (a) rides in on `G2_SetupModelPointers`
-  (`G2_misc.cpp:1839`), which nearly every `G2API_*` wrapper opens with, so the block
-  spans **most of the 20-file roster** — every file in the `## Slice hooks`
-  "`G2SV-Q11`-blocked" bucket (`render/bone_cache.rs`, `render/skeleton.rs`, `misc.rs`,
-  `gore/gore_set.rs`, `cvars.rs`, `api_gore.rs`, `api_collision.rs`, `api_models.rs`,
-  `api_bolts.rs`, `api_saveload.rs`, `surfaces.rs`, `ragdoll.rs`) plus the "mostly
-  host-free" wrappers whose completed bodies forward through a blocked internal
-  (`api_bones.rs`/`api_surfaces.rs`/`api_ragdoll.rs`, `bones.rs`). Only the small
-  "host-free" bucket (`ghoul2_system.rs`, `shared/cghoul2_info.rs`,
-  `shared/cghoul2_info_v.rs`, `info_array.rs`, `ragdoll_update_params.rs`, `bolts.rs`,
-  `render/bone_transform.rs`) transcribes fully without a `G2SV-Q11` resolution. §F
-  signatures still freeze now; a porter outside the host-free bucket hits this wall
-  immediately and cannot proceed without a human amending the roster. (This is an
-  interface-ownership gap between this doc and the Stage-0 crate design, not an internal
-  shape choice — it likely resolves by amending the `EngineHost` roster, which is the
-  Stage-0 crate's decision, not this doc's.)
+**None.** `G2SV-Q11` (the sole pass-5 open item) is **SETTLED by ruling 36**
+(`G2SV-D15`, both halves — see Resolved questions); `G2SV-Q9`/`G2SV-Q10` were settled
+by ruling 29 (pass 5), and `G2SV-Q1`–`G2SV-Q8` earlier. No item remains open, so this
+section is empty (doc-standards: `## Open questions` MUST be empty at FROZEN — it is
+already empty at DRAFT).

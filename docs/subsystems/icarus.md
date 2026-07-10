@@ -1,6 +1,6 @@
 # ICARUS sequencer — MP engine (§F idiomatic reimplementation) Design
 Status: DRAFT     Supersedes: none
-Decision prefix: ICARUS     Ledger deps: DEC-09, DEC-10; engine-fork-discovery forks 2, 4, 5, 7 + §F rulings 11–15, 17, 19, 20, 23, 24, 27, 31, 32, 33; GOAL-engine M2 gate
+Decision prefix: ICARUS     Ledger deps: DEC-09, DEC-10; engine-fork-discovery forks 2, 4, 5, 7 + §F rulings 11–17, 19, 20, 23, 24, 27, 31, 32, 33, **36, 37, 39a, 39d**; GOAL-engine M2 gate
 
 ## Standing context
 
@@ -17,41 +17,24 @@ Links only — never restate:
 - `docs/handoffs/engine-fork-discovery.md` — fork-2 (global placement → Engine
   fields, no `static mut`), fork-4 (faithful owned arenas), fork-5 (dispatch
   tables → plain Rust structs of `fn` items), fork-7 (the 5-doc §F list, ICARUS
-  named); and the §F doc-session **rulings 11–15, 17, 19, 20, 23, 24, 27, 31, 32,
-  33** (user, 2026-07-09) that settle this doc's open questions. **Ruling 27**
-  (ledger `:250-262`) closes the last two open items — **ICARUS-Q10/Q11** — with
-  faithful `Vec` arenas + id newtypes (ICARUS-D11): `IcarusInstance` owns
-  `Vec<Sequence>`/`Vec<Sequencer>`, `SequenceId(i32)`/`SequencerId(i32)` carry
-  Raven's monotonic never-reused `m_GUID`, and `TaskManager` collapses its three
-  parallel `CTaskGroup*` indexes to one `Vec<TaskGroup>` owner + `BTreeMap`
-  side-indexes of ids (rulings 21/22 precedent). **Rulings 31 + 33** (ledger
-  `:296-347`) build the Stage-0 crate as real compiled code *before* this
-  relaunch: `crates/mp/host-interface` (package `mp_host_interface`, commit
-  `4b7f01b0`) is green, so § Seam definition now quotes the crate's **actual**
-  `EngineHost` signatures verbatim from
-  `crates/mp/host-interface/src/engine_host.rs`, not a paper spec (ICARUS-D12);
-  ruling 32's fixture-backed `MockHost`
-  (`crates/mp/host-interface/src/mock.rs`) is the goldens vehicle
-  (§ Verification strategy). **Ruling 23 corrects
-  ruling 19's premise**: the entity-field `G_ICARUS_*` arms pass a
-  `sharedEntity_t *` pointer, not an entnum (ICARUS-D1, rewritten); the
-  `gentity()` EngineHost service survives only for the genuinely index-based
-  `SV_GentityNum(ent->s.number)` access inside `ICARUS_ValidEnt` (its behaviorSet
-write-back, `GameInterface.cpp:288`/`:291`). **Ruling 24**
-  settles the two dry-run holes: the ~194 internal `I_*` dispatch sites and the
-  `InterfaceExport` slots resolve on `&mut dyn EngineHost` free fns (ICARUS-Q8/Q9
-  → ICARUS-D9/D10), and pins the Stage-0 crate as `crates/mp/host-interface`
-  (package `mp_host_interface`). Ruling 20 (Icarus arena dropped entirely,
-  ICARUS-D3) stands (ledger `:114-176`).
+  named); and the §F doc-session **rulings 11–17, 19, 20, 23, 24, 27, 31, 32, 33**
+  plus the final-revision **rulings 36, 37, 39a, 39d** (user, 2026-07-09) that
+  settle this doc. This pass-6 revision folds in the four final rulings:
+  **ruling 37** (ICARUS-D1) — `ConvertedEntity` is ported **faithfully** (it
+  returns a pointer to a by-value **copy**, `gLocalModifier`; writes to the copy
+  are dropped, exactly as retail), which **corrects ruling 23's rationale** (the
+  "shuffle is a no-op" claim is struck); **ruling 36** (ICARUS-D2) — the Stage-0
+  `EngineHost` trait is **extended and built to 15 methods** (commit `a9820853`),
+  adding `cvar_integer` which **closes** the former ICARUS-Q12 `com_developer`
+  hole; **ruling 39a** (ICARUS-D3) — BlockStream's **whole writer/duplicator
+  half** is §20-dropped (reverses pass-5's ICARUS-D13 retention); **ruling 39d**
+  (ICARUS-D4) — the id newtypes are declared beside their owning arena. All prior
+  rulings 11–35 **stand** (ICARUS-D5).
 - `docs/GOAL-engine.md` — Stage-0 game-host interface crate checklist (`:43-55`,
-  an unchecked prerequisite bullet — it names the crate's *role*), M2 gate
-  ("icarus differential goldens"). Ruling 24 **pins** the crate's importable path
-  as `crates/mp/host-interface`, package `mp_host_interface` (`use
-  mp_host_interface::EngineHost;`); the full `EngineHost` method roster remains
-  owned by the Stage-0 interface-crate design
-  (`docs/plans/2026-07-08-mp-engine-build-out.md:250`, handoff ruling 11), but the
-  method surface ICARUS consumes is now listed as Rust signatures in § Seam
-  definition (ruling 24) — see also ICARUS-D1/D10.
+  the crate's *role* bullet), M2 gate ("icarus differential goldens"). Ruling 24
+  pinned the crate path `crates/mp/host-interface` / package `mp_host_interface`
+  (`use mp_host_interface::EngineHost;`); ruling 36 extended and rebuilt it to the
+  15-method surface (commit `a9820853`), which § Seam definition quotes verbatim.
 - GP2 exemplar: `crates/mp/engine/qcommon/src/gp2/`, `tools/gp2-oracle/`.
 
 ## Scope & non-goals
@@ -61,77 +44,95 @@ write-back, `GameInterface.cpp:288`/`:291`). **Ruling 24**
 `Instance.cpp`, `Interface.cpp`, `Memory.cpp`, `Q3_Interface.cpp`,
 `Q3_Registers.cpp`, `Sequence.cpp`, `Sequencer.cpp`, `TaskManager.cpp` —
 253 fns / 6,749 LOC (plan §graph row). Every method ports except the
-zero-caller fns §20-drops (§F: only zero-caller API is droppable per §20) —
-`Svcmd_ICARUS_f` (ICARUS-D6), `ICARUS_Malloc`/`ICARUS_Free` (ICARUS-D3 as
-amended by ruling 20, the arena being dropped), and the **two BlockStream
-duplicators** `CBlock::Duplicate` (`blockstream.h:138`, `BlockStream.cpp:359`) +
-`CBlockMember::Duplicate` (`blockstream.h:74`, `BlockStream.cpp:148`) —
-zero callers **anywhere** in `oracle/codemp/icarus/` (grep: only `CBlock::Duplicate`'s
-own internal member-`Duplicate` self-call at `BlockStream.cpp:374` + a `"Duplicate
-symbol"` string literal in `Tokenizer.cpp:46`; not in `Interpreter.cpp`), and not
-exercised by the BlockStream verification round-trip (§ Verification, which uses
-`ReadBlock`→`WriteBlock`, not `Duplicate`) — §20-dropped with a module-doc note
-(ICARUS-D13). Target crate: `mp_engine_icarus` (MP only).
+zero-caller / writer-only fns that porting-rules §20 makes droppable (§20: only
+zero-caller — or transitively caller-less — API is droppable). Target crate:
+`mp_engine_icarus` (MP only).
 
-**BlockStream writer surface is retained, not dead (ICARUS-D13).** The remaining
-`.IBI`-writer methods — `CBlockStream::Create(char *)` (the `fopen("wb")` file
-writer, `blockstream.h:167`), `CBlockStream::WriteBlock` (`:174`),
-`CBlockMember::WriteMember` (`:47`), `CBlockMember::WriteData`/`WriteDataPointer`
-(`:76`/`:88`), and `CBlock::Write` overloads (`:125-129`) — have their only
-**production** callers in the excluded compiler TUs (`Interpreter.cpp`/
-`Tokenizer.cpp`, the offline `.txt`→`.IBI` path), yet are **ported, not dropped**:
-settled decisions reference them as in-scope surface — the § Verification round-trip
-exercises `ReadBlock`→re-`WriteBlock`→`WriteMember` byte-identical, and ICARUS-D3
-preserves `WriteDataPointer`'s exact-byte `memcpy` for content parity. So a porter
-ports them per the Files roster; only the two caller-less `Duplicate` methods drop.
-(`CBlockStream::Init`, `blockstream.h:165`, is **live** — `CBlockStream::Open` calls
-it at `BlockStream.cpp:670` — and is not a drop candidate.)
+**§20-dropped surface (updated by ruling 39a, ICARUS-D3).** Not ported, each
+recorded with a module-doc zero-caller note:
+- `Svcmd_ICARUS_f` (`GameInterface.h:32`, `GameInterface.cpp:700-730`) — ICARUS-D5
+  (ruling 17): commented-out body, zero callers/registrations, no `G_ICARUS_*` arm.
+- `ICARUS_Malloc` / `ICARUS_Free` (`Memory.cpp:8-20`, `icarus.h:29-30`) — ICARUS-D5
+  (ruling 20): the arena is dropped entirely, so these have zero live callers under
+  the owned-buffer shape.
+- **BlockStream's writer/duplicator half (ruling 39a, ICARUS-D3):**
+  `CBlockStream::Create(char *)` (`blockstream.h:167`, def `BlockStream.cpp:525`,
+  the `fopen("wb")` file writer) — **zero callers** in `oracle/codemp/icarus/`
+  (grep for `.Create(`/`->Create(` finds only `CBlock::Create(int)` sites, none
+  reach `CBlockStream::Create`); `CBlockStream::WriteBlock` (`blockstream.h:174`,
+  def `:577`) — only callers in the excluded `Interpreter.cpp`;
+  `CBlockMember::WriteMember` (`blockstream.h:47`, def `:133`) — only caller is the
+  dead `WriteBlock` (`BlockStream.cpp:597`, `bMember->WriteMember(m_fileHandle)`);
+  `CBlock::Duplicate` (`blockstream.h:138`, def `:359`) and `CBlockMember::Duplicate`
+  (`blockstream.h:74`, def `:148`) — **zero callers anywhere** (grep finds only
+  `CBlock::Duplicate`'s internal member-`Duplicate` self-call `:374` and a `"Duplicate
+  symbol"` string literal `Tokenizer.cpp:46`; nothing in `Interpreter.cpp`). All
+  §20-dropped with a `blockstream/` module-doc note.
+- **`CBlockStream::Init` (`blockstream.h:165`, def `BlockStream.cpp:558`) ports as a
+  live reader-path helper — it is *not* in ruling 39a's drop set (ICARUS-D3).**
+  Ruling 39a §20-drops the **zero-caller** writer/duplicator methods, and §20's
+  criterion is zero callers. The oracle shows the **live reader** `CBlockStream::Open`
+  (`:665`, called `GameInterface.cpp:465`, `Sequencer.cpp:318`, `:370`) calls
+  `Init()` at `BlockStream.cpp:670`, while the writer `Create(char *)` does **not**
+  (`:525-550`) — so `Init` has a live caller and does not meet §20's zero-caller test.
+  Its inclusion among the "zero callers" in ruling 39a rests on a premise the cited
+  oracle contradicts, so by §20's actual criterion no drop reaches it — a factual
+  set-membership correction (like the "sole `ValidEnt` site" one below), not a
+  re-decision of ruling 39a, whose genuine zero-caller drops all stand. `Init` ports
+  on the reader path; its four field resets run at `Open` start regardless, so there
+  is no behavioural fork, and transcription-first (ruling 27, §21) keeps it a method.
+
+The reader half — `CBlockStream::Open` (`:665`), `ReadBlock` (`:619`),
+`BlockAvailable` (`:605`), `Init` (`:558`, live — `Open` calls it `:670`), `CBlock::Create(int)`
+(`:201`), `CBlock::Init`/`Free`/`AddMember`/`GetMember`, `CBlockMember::ReadMember`
+(`:102`) — is **live** (drives `ICARUS_InterrogateScript` `GameInterface.cpp:465-476`
+and `CSequencer::Route` `Sequencer.cpp:318,799-802`) and ports in full.
 
 **Out of scope.** `Interpreter.cpp` and `Tokenizer.cpp` are **not** in the link
 set. The dedicated server never compiles scripts: `ICARUS_RegisterScript`
 appends `.IBI` and `FS_ReadFile`s a **precompiled** block-instruction blob
 (`oracle/codemp/icarus/GameInterface.cpp:346-395`); the `.txt`→`.IBI` compiler
 (interpreter/tokenizer) is an offline/SP tool — reused only once, out-of-tree,
-to build the golden corpus (ICARUS-D4). The type-port skeletons under
+to build the golden corpus (ICARUS-D5, ruling 14). The type-port skeletons under
 `crates/mp/engine/icarus/src/interpreter/` and `.../tokenizer/` stay untouched
 by this port. SP (`oracle/code/icarus/`) is a later SP-diff pass (DEC-04/§20),
-not a unification now — see § Verification strategy and ICARUS-D8.
+not a unification now — see § Verification strategy.
 
 **Punts.** The server-side syscall dispatch that routes `G_ICARUS_*` into this
 crate's public fns lives in `SV_GameSystemCalls`
 (`oracle/codemp/server/sv_game.cpp:739-832`), owned by the server crate, not
 here — this doc pins the *callee* signatures (§ Seam definition), the server
-doc pins the switch. **Flag for the server-dispatch doc:** the three `G_ICARUS_TASKID*`
-arms pass `(taskID_t)args[2]` — an unchecked int→enum cast of an arbitrary
-`intptr_t` (`sv_game.cpp:786`, `:808`, `:813`). Constructing a `taskID_t` (repr
-enum) from an out-of-range `args[2]` is Raven UB the server crate must resolve as a
-porting-rules §19 checked conversion **before** it calls this crate's `task_type:
-taskID_t` callees; Raven's own callee guard (`taskType < TID_CHAN_VOICE || taskType
->= NUM_TIDS` → no-op/`qfalse`, `Q3_Interface.cpp:116-118`/`:136-138`/`:169-171`) pins
-the out-of-range outcome, so the server-side pick is not open-ended (see § Seam
-definition task-id note, Divergences). Frame driving (per-entity
-`CTaskManager::Update`) is the game module's `G_ICARUS_MAINTAINTASKMANAGER` trap each
-frame (`sv_game.cpp:763-773`); this doc owns `Update`, the server owns the trap arm.
+doc pins the switch. **`ConvertedEntity` (`sv_game.cpp:420-451`) is ported by
+the server crate, faithfully (ruling 37, ICARUS-D1).** It is in the 2,481-fn
+engine-port-order list (sv_game.cpp wave-20 territory); the server crate ports it
+1:1 and routes the five entity-field `G_ICARUS_*` arms through it exactly as Raven.
+This doc owns only the ICARUS callee signatures (which take the pointer
+`ConvertedEntity` returns — a pointer to the copy). **Flag for the
+server-dispatch doc:** the three `G_ICARUS_TASKID*` arms pass `(taskID_t)args[2]`
+— an unchecked int→enum cast of an arbitrary `intptr_t` (`sv_game.cpp:786`,
+`:808`, `:813`). Constructing a `taskID_t` (repr enum) from an out-of-range
+`args[2]` is Raven UB the server crate must resolve as a porting-rules §19 checked
+conversion **before** it calls this crate's `task_type: taskID_t` callees; Raven's
+own callee guard (`taskType < TID_CHAN_VOICE || taskType >= NUM_TIDS` → no-op /
+`qfalse`, `Q3_Interface.cpp:116-118` / `:136-138` / `:169-171`) pins the
+out-of-range outcome (see § Seam definition task-id note, Divergences). Frame
+driving (per-entity `CTaskManager::Update`) is the game module's
+`G_ICARUS_MAINTAINTASKMANAGER` trap each frame (`sv_game.cpp:763-773`); this doc
+owns `Update`, the server owns the trap arm.
 
-**The Stage-0 `EngineHost` crate now EXISTS as compiled code (rulings 31 + 33,
-ICARUS-D12); its full method roster and the surface ICARUS consumes are pinned
-here.** The trait lives in the built, green Stage-0 crate `crates/mp/host-interface`,
-package `mp_host_interface` (commit `4b7f01b0`; `use mp_host_interface::EngineHost;`;
-ruling 24 pinned the path, ruling 31 built it before this relaunch;
-`docs/plans/2026-07-08-mp-engine-build-out.md:250-251`, handoff ruling 11) — a
-crate of Rust traits transcribing the C seam (syscall surface, vmcall driver,
-shared-memory contract). Because the crate is real code, § Seam definition quotes
-its **actual** `EngineHost` signatures verbatim from
-`crates/mp/host-interface/src/engine_host.rs` (ruling 33's "no deferrals" surface:
-`trace`, `fs_read_file`/`fs_free_file`, `print`/`error`, `vm_call(VmSlot, …)`,
-`shared_memory() -> *mut c_char`, `flrand`/`irand`, `gentity`); ICARUS binds a
-subset of that already-frozen roster, not a paper spec. Every §F fn takes `(&mut
-Icarus, &mut dyn EngineHost)` (ICARUS-D1/D9/D10 — `dyn`, not `impl`, forced by the
-fn-pointer `InterfaceExport` table, ICARUS-Q9 → ICARUS-D10). Porters `use` the
-crate directly (it precedes ICARUS in the port order, § Slice hooks), never a
-stub. This mirrors the sibling §F docs, which reach the same crate
-(`docs/subsystems/roff.md` non-goals, `docs/subsystems/ghoul2-server.md`
-non-goals).
+**The Stage-0 `EngineHost` crate is built, extended compiled code (rulings 31 +
+33 + 36, ICARUS-D2).** The trait lives in the green Stage-0 crate
+`crates/mp/host-interface`, package `mp_host_interface` (commit `a9820853`; `use
+mp_host_interface::EngineHost;`) — a crate of Rust traits transcribing the C seam
+(syscall surface, vmcall driver, shared-memory contract). Ruling 36 extended it
+from 10 to **15** methods; § Seam definition quotes the **actual** 15-method trait
+**verbatim** from `crates/mp/host-interface/src/engine_host.rs`. ICARUS binds a
+subset of that frozen roster, not a paper spec. Every §F fn takes `(&mut Icarus,
+&mut dyn EngineHost)` (ICARUS-D5, ruling 24 — `dyn`, not `impl`, forced by the
+fn-pointer `InterfaceExport` table). Porters `use` the crate directly (it
+precedes ICARUS in the port order, § Slice hooks), never a stub. This mirrors the
+sibling §F docs, which reach the same crate (`docs/subsystems/roff.md`,
+`docs/subsystems/ghoul2-server.md` non-goals).
 
 ## Raven ground truth
 
@@ -174,77 +175,138 @@ both ways:
 `iICARUS->DeleteSequencer(...)` and nulls both tables (`:252-256`);
 `ICARUS_Shutdown` (`GameInterface.cpp:166-…`) walks and frees.
 
-**Init flags Raven itself uses** (ground truth for ICARUS-D2's "Raven's own
-initialized flags"): the instance is live iff `iICARUS != NULL` — the NULL
-guard gates `ICARUS_Init`'s error path (`:151`), `ICARUS_Shutdown` (`:202`),
+**Init flags Raven itself uses** (ground truth for ICARUS-D5's "Raven's own
+initialized flags", ruling 12): the instance is live iff `iICARUS != NULL` — the
+NULL guard gates `ICARUS_Init`'s error path (`:151`), `ICARUS_Shutdown` (`:202`),
 and `assert( iICARUS )` in `InitEnt`/`FreeEnt` (`:649`, `:222`). A per-entity
 sequencer/taskmanager is live iff `gSequencers[n]`/`gTaskManagers[n] != NULL` —
 the exact flag the `ISINITIALIZED`/`MAINTAINTASKMANAGER`/`ISRUNNING` arms read
 (`sv_game.cpp:756`, `:767`, `:778`) and the `RunScript`/`InitEnt`/`FreeEnt`
 NULL checks use (`GameInterface.cpp:75`, `:653`, `:232`). These pointer-NULL
 flags are Raven's initialized state; the port models them, not a redundant
-Rust wrapper (ICARUS-D2).
+Rust wrapper.
 
-**Entity-field access — the entity-field arms carry the `sharedEntity_t *`
-pointer; only the three presence-check arms carry an int entnum** (ground truth
-for ICARUS-D1 as corrected by ruling 23; **supersedes the ruling-19 premise**,
-which wrongly claimed the arms pass an entnum resolved through `SV_GentityNum`).
-The C ICARUS ent-fns and task-id helpers take a `sharedEntity_t *ent` and
-dereference fields on it: `ICARUS_RunScript` reads `ent->classname`/
+**Entity-field access — the five entity-field arms carry a `sharedEntity_t *`
+that points to `ConvertedEntity`'s by-value copy; the three task-id arms carry a
+bare real-entity pointer; only the three presence-check arms carry an int
+entnum** (ground truth for ICARUS-D1, ruling 37, which corrects ruling 23's
+rationale). The C ICARUS ent-fns and task-id helpers take a `sharedEntity_t *ent`
+and dereference fields on it: `ICARUS_RunScript` reads `ent->classname`/
 `ent->targetname` for its verbose log (`GameInterface.cpp:129`) and indexes
 `gSequencers[ent->s.number]` (`:75`); `ICARUS_InitEnt` walks `ent->s.number`/
-`ent->taskID` (`GameInterface.cpp:178-181`, `:660`); `ICARUS_FreeEnt`/
-`ICARUS_AssociateEnt`/`ICARUS_ValidEnt` read `ent->script_targetname`/
-`ent->targetname` (`:236`, `:311`, `:273`); `Q3_TaskIDPending`/`Complete`/`Set`
-read and write `ent->taskID[taskType]` and `ent->s.number`
-(`Q3_Interface.cpp:111-183`). These fields live on `sharedEntity_t`
-(`taskID[NUM_TIDS]` at `oracle/codemp/game/g_public.h:694`, `script_targetname`
-`:697`, `classname` `:703`; ported at
+`ent->taskID` and `memset( &ent->taskID, -1, sizeof( ent->taskID ) )`
+(`GameInterface.cpp:660`, `:664`); `ICARUS_FreeEnt`/`ICARUS_AssociateEnt`/
+`ICARUS_ValidEnt` read `ent->script_targetname`/`ent->targetname` (`:236`, `:311`,
+`:273`); `Q3_TaskIDPending`/`Complete`/`Set` read and write `ent->taskID[taskType]`
+and `ent->s.number` (`Q3_Interface.cpp:111-183`). These fields live on
+`sharedEntity_t` (`taskID[NUM_TIDS]` at `oracle/codemp/game/g_public.h:694`,
+`script_targetname` `:697`, `classname` `:703`; ported at
 `crates/mp/qshared/src/common/mp/qcommon/shared_entity_t.rs`).
 
-**The `G_ICARUS_*` arms hand these fns the pointer directly, not an entnum**
-(`sv_game.cpp:739-832`). The five ent-fns get `ConvertedEntity((sharedEntity_t
-*)VMA(1))` — `ICARUS_RunScript` (`:740`), `ICARUS_ValidEnt` (`:750`),
-`ICARUS_InitEnt` (`:789`), `ICARUS_FreeEnt` (`:793`), `ICARUS_AssociateEnt`
-(`:797`); the three task-id helpers get a bare cast `(sharedEntity_t *)VMA(1)` —
-`Q3_TaskIDPending` (`:786`), `Q3_TaskIDSet` (`:808`), `Q3_TaskIDComplete`
-(`:813`). `ConvertedEntity` (`sv_game.cpp:422-451`) copies `ent->s`/`ent->r`/
-`ent->taskID` into a file-static `gLocalModifier` and re-points its string/parms
-fields through `VM_ArgPtr(...)` (`:444-448`), returning `&gLocalModifier` — a
-VM-address shuffle whose `VM_ArgPtr` is **identity in the native-dylib model** (no
-VM heap to relocate against), so `ConvertedEntity` is effectively a pass-through
-of the same entity pointer; the port carries `*mut sharedEntity_t` straight
-through the seam and need not replicate the shuffle (Divergences). Only the three
-**presence-check** arms carry an int: `G_ICARUS_ISINITIALIZED` (`:752`),
-`G_ICARUS_MAINTAINTASKMANAGER` (`:763`), `G_ICARUS_ISRUNNING` (`:774`) each read
-`int entID = args[1]` and index `gSequencers[entID]`/`gTaskManagers[entID]`
-inline (`:754-782`).
+**`ConvertedEntity` returns a pointer to a by-value copy — and its writes are
+dropped** (`sv_game.cpp:420-451`, ground truth for ruling 37 / ICARUS-D1). The
+function copies `ent->s`, `ent->r`, and the whole `taskID[NUM_TIDS]` array **by
+value** into a file-static `sharedEntity_t gLocalModifier` (`:426-433`), re-points
+its pointer fields (`parms`, `behaviorSet[]`, `script_targetname`, `fullName`,
+`targetname`, `classname`) through `VM_ArgPtr(...)` (`:435-448`), copies `ghoul2`,
+and **returns `&gLocalModifier`** (`:450`) — a pointer to the copy, **not** to the
+caller's entity. Consequently, any field a callee **writes** through that pointer
+lands in `gLocalModifier` and is **discarded** when the next `ConvertedEntity`
+call overwrites it — including `ICARUS_InitEnt`'s `memset( &ent->taskID, -1, … )`
+(`GameInterface.cpp:664`), which in retail therefore never zeroes the *real*
+entity's task IDs. The port reproduces this exactly: the server crate ports
+`ConvertedEntity` faithfully and hands the copy pointer to the five entity-field
+callees, whose bodies write through it as Raven does, so the drop is emergent, not
+special-cased. (This is why the "shuffle is a no-op / pass-through" rationale of
+ruling 23 is **struck** — the copy is a distinct object whose writes do not reach
+the real entity.)
 
-**The `gentity()` service survives for genuinely index-based access only.** The
-sole ICARUS site that turns a number back into a pointer is `ICARUS_ValidEnt`
-(`GameInterface.cpp:268-297`), which — for an entity that carries a `behaviorSet`
-but no `script_targetname` (`:277-294`), and because `ConvertedEntity` handed it a
-shuffled copy whose pointer fields cannot be written back into the real VM entity
-(`:284-290`) — reaches the true entity through `SV_GentityNum(ent->s.number)`
-(`:288`) to assign `trueEntity->script_targetname = trueEntity->targetname`
-(`:291`). That `s.number → *mut sharedEntity_t` step is the `EngineHost::gentity`
+**Which arm carries what** (`sv_game.cpp:739-832`). The **five** ent-fns get
+`ConvertedEntity((sharedEntity_t *)VMA(1))` — `ICARUS_RunScript` (`:740`),
+`ICARUS_ValidEnt` (`:750`), `ICARUS_InitEnt` (`:789`), `ICARUS_FreeEnt` (`:793`),
+`ICARUS_AssociateEnt` (`:797`) — so their `ent` is the **copy** pointer. The
+**three** task-id helpers get a **bare** cast `(sharedEntity_t *)VMA(1)` —
+`Q3_TaskIDPending` (`:786`), `Q3_TaskIDSet` (`:808`), `Q3_TaskIDComplete` (`:813`)
+— so their `ent` is the **real** entity (their `ent->taskID[]` writes therefore
+persist, unlike `InitEnt`'s dropped `memset`). The **three** presence-check arms
+carry an int: `G_ICARUS_ISINITIALIZED` (`:752`), `G_ICARUS_MAINTAINTASKMANAGER`
+(`:763`), `G_ICARUS_ISRUNNING` (`:774`) each read `int entID = args[1]` and index
+`gSequencers[entID]`/`gTaskManagers[entID]` inline (`:754-782`).
+
+**The `gentity()` service is reached from six ICARUS sites — one write-back, one
+teardown sweep, two outbound `I_*` slots, one per-frame freeze gate, and one
+debug-log read** (oracle re-grep of `SV_GentityNum` in `oracle/codemp/icarus/*.cpp`
+finds `GameInterface.cpp:169`,`:174`,`:288`,`:681`; `Q3_Interface.cpp:238`,`:679`;
+`TaskManager.cpp:324` — this **corrects the prior "sole `ICARUS_ValidEnt` site"
+claim**). The `s.number → *mut sharedEntity_t` step is the `EngineHost::gentity`
 service (`SV_GentityNum`, `sv_game.cpp:54-59`, over the `G_LOCATE_GAME_DATA` base
-`SV_LocateGameData` installs, `:329-330`, arm `:567`). `ICARUS_AssociateEnt`
-(`:307-318`) is **not** such a site: it only reads `ent->s.number` into
-`ICARUS_EntList[…]` (`:317`) — a read of the seam pointer, no write-through, so no
-`gentity` — and neither does any other ICARUS fn; the rest receive the pointer at
-the seam (ICARUS-D1).
+`SV_LocateGameData` installs, `:329-330`, arm `:567`). Every site below reaches that
+one service; **none changes a public seam signature** (all keep the shapes § Seam
+definition already freezes — the correction is which fn bodies bind `gentity`):
+
+1. **`ICARUS_ValidEnt`** (`GameInterface.cpp:268-297`, `SV_GentityNum(ent->s.number)`
+   `:288`) — for an entity carrying a `behaviorSet` but no `script_targetname`
+   (`:277-294`) it must write `trueEntity->script_targetname = trueEntity->targetname`
+   (`:291`); because `ConvertedEntity` handed it the **copy**, that write must reach
+   the *true* entity through `gentity`, not through `ent`.
+2. **`ICARUS_Shutdown`** (`GameInterface.cpp:166-186`) — carries **no** entity arg,
+   so it walks `SV_GentityNum(i)` over all `MAX_GENTITIES` (`:169`,`:174`) and feeds
+   the **real** pointer into `ICARUS_FreeEnt(ent)` (`:184`) wherever `gSequencers[i]`
+   is live; genuinely index-based (`icarus_shutdown(icarus, host)` calls
+   `host.gentity(i)` per slot, unlike the arm-fed copy `FreeEnt` gets inbound).
+3. **`ICARUS_LinkEntity`** (`GameInterface.cpp:679-692`, `SV_GentityNum(entID)` `:681`)
+   — the **outbound** `I_LinkEntity` slot (wired `Q3_Interface.cpp:1008`, called live
+   from `Sequencer.cpp:2413`); resolves `entID`, wires `gSequencers`/`gTaskManagers`,
+   then `ICARUS_AssociateEnt(ent)` on the real pointer (`:686-689`).
+4. **`Q3_GetEntityByName`** (`Q3_Interface.cpp:221-241`, `SV_GentityNum((*ei).second)`
+   `:238`) — the **outbound** `I_GetEntityByName` slot (wired `:964`, called live from
+   `Sequencer.cpp:605`,`:673`,`:1733`,`:1795` — core script entity-targeting): name →
+   `ICARUS_EntList` entnum → real entity pointer returned to the sequencer.
+5. **`CTaskManager::Update`** (`TaskManager.cpp:322-338`, `SV_GentityNum(m_ownerID)`
+   `:324`) — a **per-frame** gate: reads `owner->r.svFlags & SVF_ICARUS_FREEZE`
+   (`g_public.h:35`) and short-circuits to `TASK_FAILED` before `Go()` (`:326-329`);
+   reached each frame via `icarus_maintain_task_manager` (`m_ownerID` is the int
+   entnum, `taskmanager.h:173`).
+6. **`Q3_DebugPrint`** (`Q3_Interface.cpp:679`, `SV_GentityNum(entNum)->script_targetname`)
+   — only in the `WL_DEBUG` branch and only past the `com_developer` gate (`:642`,
+   ICARUS-D2): reads the owner's `script_targetname` for the log line.
+
+`ICARUS_AssociateEnt` (`:307-318`) is **not** a `gentity` site: it only **reads**
+`ent->s.number` into `ICARUS_EntList[…]` (`:317`) — present in the copy (copied by
+value), so the read is faithful and no re-fetch is needed. Under ruling 37 this
+aligns: reads off the copy are correct, writes off the copy are dropped, and only
+`ValidEnt` writes back to the true entity.
+
+**Debug-print developer gate** (ground truth for ICARUS-D2, ruling 36).
+`Q3_DebugPrint` gates **all** output on the engine cvar `com_developer` before
+touching `Com_Printf`: `if (!com_developer || !com_developer->integer) return;`
+(`Q3_Interface.cpp:638-643`, esp. `:642`). `com_developer` is an engine cvar
+(`extern cvar_t *com_developer`, `oracle/codemp/qcommon/qcommon.h:688`; defined
+`common.cpp:39`, registered `Cvar_Get("developer","0",CVAR_TEMP)` `common.cpp:1307`)
+— settable at runtime, so it is **not** safely assumable `0` in the dedicated
+build. `Q3_DebugPrint` is live and reached in-scope (called from
+`Q3_Registers.cpp:58,77,199`, `GameInterface.cpp:129`, and ~15 `Q3_Interface.cpp`
+verbose/warning/error sites). Ruling 36 added `EngineHost::cvar_integer`, which
+collapses Raven's `com_developer->integer` read to `Cvar_VariableIntegerValue`
+(`cvar.cpp:118-124`, unregistered name → 0); the gate ports as
+`host.cvar_integer("developer") != 0` before any `host.print(...)`.
 
 **Class tree.** Closed hierarchies, intrusive `std::` containers:
 - `CBlockMember` (`blockstream.h:38-105`): `{int m_id; int m_size; void*
   m_data}` — one ID/size/data record; `WriteData<T>`/`WriteDataPointer<T>`
   templates malloc via `ICARUS_Malloc`; `operator new` = `Z_Malloc(TAG_ICARUS4,
-  qtrue)`.
+  qtrue)`. `ReadMember` (reader) is live; `WriteMember`/`Duplicate` §20-dropped
+  (ICARUS-D3).
 - `CBlock` (`blockstream.h:109-154`): owns `vector<CBlockMember*> m_members`,
-  `int m_id`, `unsigned char m_flags`.
+  `int m_id`, `unsigned char m_flags`. `Create(int)`/`Init`/`Free`/`AddMember`/
+  `GetMember` live; `Write` overloads (`:125-129`, def `BlockStream.cpp:244-300`)
+  and `Duplicate` §20-dropped (ICARUS-D3).
 - `CBlockStream` (`blockstream.h:158-196`): `.IBI` reader/writer over
   `FILE* m_fileHandle` + `char* m_stream`; `IBI_HEADER_ID "IBI"`,
-  `IBI_VERSION 1.57f`.
+  `IBI_VERSION 1.57f`. Reader `Open`/`ReadBlock`/`BlockAvailable` live; writer
+  `Create(char *)`/`WriteBlock` §20-dropped (ICARUS-D3); `Init` ports as a live
+  reader helper (`Open` calls it at `:670`, so it fails §20's zero-caller test —
+  ICARUS-D3).
 - `CSequence` (`sequence.h:12-96`): tree node — `list<CSequence*> m_children`,
   `m_parent`, `m_return`, `list<CBlock*> m_commands`, `m_flags`, `m_iterations`,
   `m_id`; `operator new` = `Z_Malloc(TAG_ICARUS3)`.
@@ -294,20 +356,22 @@ contributes no live code to the link.
 Every file-scope global the survey found (fork-2: fields on the owning
 subsystem struct, no `static mut`). Rust owner = the ICARUS subsystem struct
 `mp_engine_icarus::Icarus` — the cross-cutting aggregate that names the
-per-class modules below as fields. Per **ICARUS-D7** the `pub struct Icarus` is
+per-class modules below as fields. Per ICARUS-D5 the `pub struct Icarus` is
 defined in `crates/mp/engine/icarus/src/lib.rs` (the crate root), which also
-declares the per-class module dirs. Per **ICARUS-D2** the aggregate attaches to
-the engine as a **plain, `Default`-initialized `icarus` field directly on
-`mp_engine_core::Engine`** — no `Option`, no `Box`, no nesting
-(`crates/mp/engine/core/src/engine.rs:35-36`; ruling 12). "Is ICARUS
-initialized?" is answered by Raven's own NULL-flags (Raven-ground-truth §Init
-flags), not by wrapping the subsystem in `Option`.
+declares the per-class module dirs, and attaches to the engine as a **plain,
+`Default`-initialized `icarus` field directly on `mp_engine_core::Engine`** —
+no `Option`, no `Box`, no nesting (ruling 12,
+`docs/handoffs/engine-fork-discovery.md:126-130`; the field is added by the
+engine-aggregate slice — § Slice hooks — since `engine.rs` does not yet carry it,
+its lines 34-36 being a stale pre-ruling-12 STATE-Q2 placeholder comment).
+"Is ICARUS initialized?" is answered by Raven's own NULL-flags
+(Raven-ground-truth §Init flags), not by wrapping the subsystem in `Option`.
 
 | Raven global | oracle cite | Rust owner (`Icarus.field`) | constructed by | threaded via |
 | --- | --- | --- | --- | --- |
-| `ICARUS_Instance *iICARUS` | `GameInterface.cpp:16` | `Icarus.instance: Option<IcarusInstance>` (the `Option` mirrors Raven's own `iICARUS != NULL` flag, not a subsystem wrapper). Per **ICARUS-D11** (ruling 27) `IcarusInstance` **owns** `sequences: Vec<Sequence>` + `sequencers: Vec<Sequencer>` — its Raven `m_sequences`/`m_sequencers` lists (`instance.h:62-63`) — keyed by `SequenceId`/`SequencerId` newtypes carrying `m_GUID` | `ICARUS_Init` | `&mut Icarus` into ICARUS_* fns |
-| `CSequencer *gSequencers[MAX_GENTITIES]` | `Instance.cpp:19`, `g_public.h:723` | `Icarus.sequencers: Box<[Option<SequencerId>; MAX_GENTITIES]>` — **non-owning** per-entity index into `IcarusInstance.sequencers` (ICARUS-D11, ruling 27; the object is owned by the instance arena, `GetSequencer` `STL_INSERT( m_sequencers, … )` `Instance.cpp:174`; `Option`/`None` = Raven's per-entity NULL flag) | `ICARUS_InitEnt` | index by `ent.s.number` → `SequencerId` |
-| `CTaskManager *gTaskManagers[MAX_GENTITIES]` | `Instance.cpp:20` | `Icarus.task_managers: Box<[Option<CTaskManager>; MAX_GENTITIES]>` — **owning** (ruling 27 leaves task-manager objects here; Raven inserts them in no instance list — `GetSequencer` creates one per sequencer, `Instance.cpp:166-182` — and ICARUS-D9 stores no sequencer→taskmanager handle, so they are reached by ent index) | `ICARUS_InitEnt` | index by `ent.s.number` |
+| `ICARUS_Instance *iICARUS` | `GameInterface.cpp:16` | `Icarus.instance: Option<IcarusInstance>` (the `Option` mirrors Raven's own `iICARUS != NULL` flag, not a subsystem wrapper). Per ICARUS-D5 (ruling 27) `IcarusInstance` **owns** `sequences: Vec<Sequence>` + `sequencers: Vec<Sequencer>` — its Raven `m_sequences`/`m_sequencers` lists (`instance.h:62-63`) — keyed by `SequenceId`/`SequencerId` newtypes carrying `m_GUID` | `ICARUS_Init` | `&mut Icarus` into ICARUS_* fns |
+| `CSequencer *gSequencers[MAX_GENTITIES]` | `Instance.cpp:19`, `g_public.h:723` | `Icarus.sequencers: Box<[Option<SequencerId>; MAX_GENTITIES]>` — **non-owning** per-entity index into `IcarusInstance.sequencers` (ICARUS-D5, ruling 27; the object is owned by the instance arena, `GetSequencer` `STL_INSERT( m_sequencers, … )` `Instance.cpp:174`; `Option`/`None` = Raven's per-entity NULL flag) | `ICARUS_InitEnt` | index by `ent.s.number` → `SequencerId` |
+| `CTaskManager *gTaskManagers[MAX_GENTITIES]` | `Instance.cpp:20` | `Icarus.task_managers: Box<[Option<TaskManager>; MAX_GENTITIES]>` — **owning** (ruling 27 leaves task-manager objects here; Raven inserts them in no instance list — `GetSequencer` creates one per sequencer, `Instance.cpp:166-182` — and no sequencer→taskmanager handle is stored, so they are reached by ent index) | `ICARUS_InitEnt` | index by `ent.s.number` |
 | `bufferlist_t ICARUS_BufferList` | `GameInterface.cpp:17` | `Icarus.buffer_list: HashMap<String, Pscript>` | `ICARUS_RegisterScript` | `&mut Icarus` |
 | `entlist_t ICARUS_EntList` | `GameInterface.cpp:18` | `Icarus.ent_list: HashMap<String, i32>` | `ICARUS_Init`/interrogate | `&mut Icarus` |
 | `int ICARUS_entFilter = -1` | `GameInterface.cpp:23` | `Icarus.ent_filter: i32` | init `= -1` | `&Icarus` |
@@ -316,13 +380,13 @@ flags), not by wrapping the subsystem in `Option`.
 | `varFloat_m varFloats` | `Q3_Registers.cpp:10` | `Icarus.var_floats: HashMap<String, f32>` | `Q3_InitVariables` | `&mut Icarus` |
 | `varString_m varVectors` | `Q3_Registers.cpp:11` | `Icarus.var_vectors: HashMap<String, String>` | `Q3_InitVariables` | `&mut Icarus` |
 | `int numVariables = 0` | `Q3_Registers.cpp:13` | `Icarus.num_variables: i32` | `Q3_InitVariables` (reset), inc/dec in `Q3_Declare/FreeVariable` | `&mut Icarus` |
-| ICARUS Zone allocations (`TAG_ICARUS2-5`) | `Memory.cpp:12`, `blockstream.h:66` etc. | `TAG_ICARUS2/3/4` class allocs → owned Rust objects; `TAG_ICARUS5` raw blobs → owned `Vec<u8>` on their owning types (`CBlockMember::m_data`, `pscript_t::buffer`) — **no arena** (ICARUS-D3 as amended by ruling 20; `ICARUS_Malloc`/`ICARUS_Free` are §20-dropped, not ported) | object construction | ownership |
+| ICARUS Zone allocations (`TAG_ICARUS2-5`) | `Memory.cpp:12`, `blockstream.h:66` etc. | `TAG_ICARUS2/3/4` class allocs → owned Rust objects; `TAG_ICARUS5` raw blobs → owned `Vec<u8>` on their owning types (`CBlockMember::m_data`, `pscript_t::buffer`) — **no arena** (ICARUS-D5, ruling 20; `ICARUS_Malloc`/`ICARUS_Free` §20-dropped) | object construction | ownership |
 
 Container-internal counters (`m_GUID`, `m_count`, `m_numCommands`, group
 completion maps) stay fields of their owning Rust type — not globals.
 
-**`Icarus::default()` is hand-written, not derived.** ICARUS-D2 fixes `Icarus`
-as a `Default`-initialized field on `Engine`, but `#[derive(Default)]` on
+**`Icarus::default()` is hand-written, not derived.** ICARUS-D5 (ruling 12) fixes
+`Icarus` as a `Default`-initialized field on `Engine`, but `#[derive(Default)]` on
 `Icarus` is both unavailable and wrong: (1) the two `Box<[Option<_>;
 MAX_GENTITIES]>` slot arrays have no blanket `[T; N]: Default` impl (N>0) and
 must be constructed explicitly (e.g. `Box::new(std::array::from_fn(|_| None))`),
@@ -330,22 +394,20 @@ and (2) `ent_filter` must seed `-1` — derive yields `0`, diverging from Raven'
 `int ICARUS_entFilter = -1` (`GameInterface.cpp:23`). This is parity-visible,
 not cosmetic: `ICARUS_entFilter` is read at two `Com_Printf`/`Q3_DebugPrint`
 verbose-gate sites (`GameInterface.cpp:127`, `Q3_Interface.cpp:670`) and its
-**only** writer is `Svcmd_ICARUS_f` (`GameInterface.cpp:722`) — the fn ICARUS-D6
-§20-drops. So in this MP-dedicated build `ent_filter` stays `-1` for the process
-lifetime; a `0` seed would flip the debug-print gating, which the engine plan's
-console routing feeds into the referee syscall digest. The hand-written
-`impl Default` therefore seeds `ent_filter = -1` and `interface_export` with the
-real `Q3_*`/`I_*` fns (see `interface/interface_export_s.rs`); this reconciles
-the lib.rs roster entry with this table without a new decision (both the `-1`
-seed and the §20-drop of its writer are already settled). Seeding
-`interface_export` at `Default` time is not an invented pre-init state (ruling
-20): Raven's own initialized flag is `iICARUS != NULL`
-(`Icarus.instance: Some(_)`), which flips **only after** `ICARUS_Init` runs
-`Interface_Init(&interface_export)` and then `ICARUS_Instance::Create`
-(`GameInterface.cpp:143-156`) — so no `I_*` slot is ever observed before
-`Interface_Init` (re-)assigns the identical fn; the seed just satisfies Rust's
-construct-before-use for a bare-`fn` table (fork-5) and preserves Raven's
-Interface-Init timing.
+**only** writer is `Svcmd_ICARUS_f` (`GameInterface.cpp:722`) — the fn ICARUS-D5
+(ruling 17) §20-drops. So in this MP-dedicated build `ent_filter` stays `-1` for
+the process lifetime; a `0` seed would flip the debug-print gating, which the
+engine plan's console routing feeds into the referee syscall digest. The
+hand-written `impl Default` therefore seeds `ent_filter = -1` and
+`interface_export` with the real `Q3_*`/`I_*` fns (see
+`interface/interface_export_s.rs`). Seeding `interface_export` at `Default` time
+is not an invented pre-init state (ruling 20): Raven's own initialized flag is
+`iICARUS != NULL` (`Icarus.instance: Some(_)`), which flips **only after**
+`ICARUS_Init` runs `Interface_Init(&interface_export)` and then
+`ICARUS_Instance::Create` (`GameInterface.cpp:143-156`) — so no `I_*` slot is ever
+observed before `Interface_Init` (re-)assigns the identical fn; the seed just
+satisfies Rust's construct-before-use for a bare-`fn` table (fork-5) and preserves
+Raven's Interface-Init timing.
 
 The remaining two file-scope symbols the survey found are not mutable state:
 `BSTable[]` (`GameInterface.cpp:592`, a `stringID_table_t` behavior-state
@@ -365,29 +427,31 @@ value (owned `String`/buffer), not an `Icarus` field.
 This is what freezes. Two seam directions; the `#[repr(C)]` layout types are
 already ported (they don't change here).
 
-**Host services — `EngineHost`** (ICARUS-D1, rulings 11 + 23 + 24 + 31 + 33). Every
-engine service ICARUS needs is reached **only** through the single `EngineHost`
-trait in the built Stage-0 crate `crates/mp/host-interface`, package
-`mp_host_interface` (ruling 24 pinned the path, ruling 31 built it, commit
-`4b7f01b0`; `docs/plans/2026-07-08-mp-engine-build-out.md:250-251`,
-`docs/GOAL-engine.md:43-55`; handoff ruling 11). A porter imports it verbatim:
+**Host services — `EngineHost`** (ICARUS-D2, ruling 36; ICARUS-D5, rulings 11 +
+24). Every engine service ICARUS needs is reached **only** through the single
+`EngineHost` trait in the built Stage-0 crate `crates/mp/host-interface`, package
+`mp_host_interface` (commit `a9820853`; `docs/plans/2026-07-08-mp-engine-build-out.md:250-251`,
+`docs/GOAL-engine.md:43-55`). A porter imports it verbatim:
 
 ```rust
 use mp_host_interface::EngineHost;
 ```
 
-Because the crate is real compiled code (rulings 31 + 33), the roster below is the
-trait's **actual** signature set, quoted **verbatim** from
-`crates/mp/host-interface/src/engine_host.rs:23-106` (ruling 33's "no deferrals"
-surface — do not re-derive it). ICARUS binds the annotated subset; the rest are
-listed because the trait is one shared surface across all five §F subsystems:
+Ruling 36 **extended** the trait from 10 to **15** methods (adding `cvar_integer`,
+`sv_time`, `fs_write_file`, `model_mdxm`, `model_mdxa`) and rebuilt it. The roster
+below is the trait's **actual** signature set, quoted **verbatim** from
+`crates/mp/host-interface/src/engine_host.rs`. ICARUS binds the subset noted after
+the quote; the rest are listed because the trait is one shared surface across all
+five §F subsystems.
 
 ```rust
-// VERBATIM from crates/mp/host-interface/src/engine_host.rs (rulings 31 + 33).
-// `// ICARUS:` annotations mark this crate's use; unmarked methods serve sibling §F subsystems.
+// VERBATIM from crates/mp/host-interface/src/engine_host.rs (rulings 24 + 33 + 36).
 pub trait EngineHost {
-    // SV_Trace, out-param result (sv_world.cpp:803). ICARUS binds no trace site
-    // (roster continuity across the five §F subsystems).
+    /// Raven `SV_Trace` — sweep a box through the collision world, writing the
+    /// result into `results` (kept as an out-param to transcribe the NPCNav
+    /// call sites `SV_Trace( &trace, ... )` 1:1; `capsule` is Raven's
+    /// `qboolean`, idiomatic `bool` per porting-rules §C7).
+    /// Source: `oracle/codemp/server/sv_world.cpp:803`
     #[allow(clippy::too_many_arguments)]
     fn trace(
         &mut self,
@@ -403,102 +467,198 @@ pub trait EngineHost {
         use_lod: i32,
     );
 
-    // FS_ReadFile → owned buffer; None = Raven's -1/NULL (files.cpp:1670).
-    // ICARUS: ICARUS_RegisterScript reads the precompiled .IBI blob (GameInterface.cpp:374).
+    /// Raven `FS_ReadFile` — read a file whole; `None` mirrors Raven's `-1`
+    /// length / `NULL` buffer (missing file). The returned `Vec` is the file
+    /// bytes (its `len()` is Raven's returned length); FS_ReadFile's trailing
+    /// NUL is an FS-impl detail, not part of the contract.
+    /// Source: `oracle/codemp/qcommon/files.cpp:1670`
     fn fs_read_file(&mut self, qpath: &str) -> Option<Vec<u8>>;
 
-    // FS_FreeFile — consuming the Vec is the free (files.cpp:1798).
-    // ICARUS: ICARUS_RegisterScript's FS_FreeFile (GameInterface.cpp:393).
+    /// Raven `FS_FreeFile` — release a buffer from [`fs_read_file`]. Consuming
+    /// the `Vec` keeps the read/free pairing at the call site; ownership makes
+    /// the free itself a drop (default no-op).
+    /// Source: `oracle/codemp/qcommon/files.cpp:1798`
+    ///
+    /// [`fs_read_file`]: EngineHost::fs_read_file
     fn fs_free_file(&mut self, _buffer: Vec<u8>) {}
 
-    // Com_Printf — pre-formatted text (common.cpp:128).
-    // ICARUS: the verbose logs / Q3_DebugPrint (GameInterface.cpp:129, Q3_Registers Q3_DebugPrint).
-    // NOTE: `print` emits text but CANNOT answer Q3_DebugPrint's `com_developer` gate
-    // (Q3_Interface.cpp:642) — no cvar/developer read exists on this frozen trait. OPEN
-    // per ICARUS-Q12 (needs a design session; ruling 33 forbids adding a method here).
+    /// Raven `Com_Printf` — print pre-formatted text. Raven's varargs collapse
+    /// to a formatted `&str` at the call site (porting-rules §C).
+    /// Source: `oracle/codemp/qcommon/common.cpp:128`
     fn print(&mut self, msg: &str);
 
-    // Com_Error — panic + catch_unwind, never returns; code is errorParm_t (common.cpp:249).
-    // ICARUS: ICARUS_Init's NULL-instance ERR_DROP (GameInterface.cpp:151-155).
+    /// Raven `Com_Error` — diverts through the panic + `catch_unwind` model
+    /// (ruling fork-1): the payload carries `code` + `msg`, so this never
+    /// returns. `code` is `errorParm_t` (enum fidelity over Raven's `int`).
+    /// Source: `oracle/codemp/qcommon/common.cpp:249`
     fn error(&mut self, code: errorParm_t, msg: &str) -> !;
 
-    // VM_Call(vm, callnum, args) → intptr_t (vm.cpp:787). vm is VmSlot::Gvm/Cgvm.
-    // ICARUS: the outbound Q3_* path — VM_Call(gvm, GAME_ICARUS_*) after the shared-mem
-    // write (e.g. Q3_PlaySound Q3_Interface.cpp:322). The icarus arms pass no args
-    // (the request travels through shared_memory()).
+    /// Raven `VM_Call( vm, callnum, ... )` — invoke a loaded module. `vm`
+    /// mirrors Raven's first parameter ([`VmSlot::Gvm`]/[`VmSlot::Cgvm`],
+    /// ruling 33b); args are `intptr_t`-width slots (ruling 6); the return is
+    /// `intptr_t` too, since ROFF casts it straight to a pointer
+    /// (`RoffSystem.cpp:837`). The icarus arms pass no args (their request
+    /// travels through [`shared_memory`]); NPCNav's `gameCallbacks` pass up
+    /// to seven.
+    /// Source: `oracle/codemp/qcommon/vm.cpp:787`
+    ///
+    /// [`shared_memory`]: EngineHost::shared_memory
     fn vm_call(&mut self, vm: VmSlot, callnum: i32, args: &[isize]) -> isize;
 
-    // sv.mSharedMemory window — raw char* the game handed over (server.h:87).
-    // ICARUS: the Q3_* outbound structs write here before vm_call (Q3_Interface.cpp:315).
+    /// Raven `sv.mSharedMemory` — the `char *` window the game handed over via
+    /// `G_SET_SHARED_BUFFER`. A subsystem writes its `T_G_ICARUS_*` request
+    /// struct here, then [`vm_call`]s the matching game export.
+    /// Source: `oracle/codemp/server/server.h:87` (`sv_game.cpp:940` arms it)
+    ///
+    /// [`vm_call`]: EngineHost::vm_call
     fn shared_memory(&mut self) -> *mut c_char;
 
-    // Q_flrand — float min<=x<max off the engine holdrand LCG (q_math.c:1451).
-    // ICARUS: the I_Random slot (Q3_Interface.cpp:978, called Sequencer.cpp:532 etc.).
+    /// Raven `Q_flrand` — a float `min <= x < max` off the engine's own
+    /// `q_math.c` `holdrand` LCG instance (ruling 21: a qshared `QRand`-type
+    /// field on `Engine.common`, reached through this method).
+    /// Source: `oracle/codemp/game/q_math.c:1451`
     fn flrand(&mut self, min: f32, max: f32) -> f32;
 
-    // Q_irand — integer min<=x<=max off the same LCG (q_math.c:1471).
+    /// Raven `Q_irand` — an integer `min <= x <= max` off the same LCG.
+    /// Source: `oracle/codemp/game/q_math.c:1471`
     fn irand(&mut self, min: i32, max: i32) -> i32;
 
-    // SV_GentityNum — raw *mut sharedEntity_t at ent_num (sv_game.cpp:54).
-    // ICARUS: index-based access; the ONLY caller is ICARUS_ValidEnt's
-    // SV_GentityNum(ent->s.number) write-back (GameInterface.cpp:288/291, ruling 23).
+    /// Raven `SV_GentityNum` — the game entity at slot `ent_num`. Returns the
+    /// raw `*mut sharedEntity_t` exactly as the trap marshals it (rulings
+    /// 19/23/30, transcription-first): the entity-taking icarus/NPCNav arms
+    /// already carry the pointer, this serves genuinely index-based access.
+    /// Source: `oracle/codemp/server/sv_game.cpp:54`
     fn gentity(&mut self, ent_num: i32) -> *mut sharedEntity_t;
+
+    /// Per-call integer cvar read (ruling 36) — collapses Raven's cached
+    /// `cvar_t->integer` pattern (a `Cvar_Get`-seeded file-static read at each
+    /// gate): `com_developer` (`Q3_Interface.cpp:638-643`),
+    /// `cg_g2MarksAllModels` (`G2_misc.cpp:40`, read `:1524`), nav's
+    /// `d_altRoutes`/`d_patched` (`navigator.cpp:480,1403,1933`). An
+    /// unregistered name reads 0, as `Cvar_VariableIntegerValue` does.
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:118-124`
+    fn cvar_integer(&mut self, name: &str) -> i32;
+
+    /// Raven `svs.time` — the `serverStatic_t` frame clock ("strictly
+    /// increasing across level changes"), consumed by nav's failed-node/edge
+    /// recheck timers (`navigator.cpp:1733,1763,1778,1797,1987,2010,2065,
+    /// 2137`). NOT the same clock as `PlatformHost::milliseconds`
+    /// (`Sys_Milliseconds`, the wall/profiling clock): `svs.time` advances in
+    /// fixed frame steps and only while the server runs frames.
+    /// Source: `oracle/codemp/server/server.h:211` (`extern svs`: `:232`)
+    fn sv_time(&mut self) -> i32;
+
+    /// Whole-file write (ruling 36) — Raven's
+    /// `FS_FOpenFileByMode(qpath, &f, FS_WRITE)` + `FS_Write` calls +
+    /// `FS_FCloseFile` sequence collapsed; `false` mirrors the NULL-handle
+    /// open failure (`CNavigator::Save` returns false there, the live
+    /// `G_NAV_SAVE` arm).
+    /// Source: `oracle/codemp/server/NPCNav/navigator.cpp:670-699`
+    /// (`FS_FOpenFileByMode`: `files.cpp:3547`, `FS_Write`: `files.cpp:1477`)
+    fn fs_write_file(&mut self, qpath: &str, data: &[u8]) -> bool;
+
+    /// Loader model memory, mesh half (ruling 36 / G2SV-D5) — Raven
+    /// `R_GetModelByHandle( model )->mdxm`: the raw pointer to the parsed
+    /// `.glm` block (`mdxmHeader_t` at offset 0). `c_void` because the mdx
+    /// header types are `mp_renderer`-owned and never named at this seam
+    /// (G2SV-D5); NULL exactly where Raven's pointer is NULL (not a GL2M
+    /// model). No re-parsing — this is the loader's live block.
+    /// Source: `oracle/codemp/renderer/tr_local.h:1128` (`model_t.mdxm`);
+    /// chain: `oracle/codemp/ghoul2/G2_API.cpp:2716-2721`
+    /// (`R_GetModelByHandle`: `tr_model.cpp:593`)
+    fn model_mdxm(&mut self, model: qhandle_t) -> *mut c_void;
+
+    /// Loader model memory, animation half (ruling 36 / G2SV-D5) — Raven
+    /// `R_GetModelByHandle( model )->mdxa`: the raw pointer to the parsed
+    /// `.gla` block (`mdxaHeader_t` at offset 0; `CBoneCache` parent seeding,
+    /// skeleton build, and ragdoll basepose resolve do byte arithmetic off
+    /// it, `tr_ghoul2.cpp:416-421,614-615`). Callers reach the anim handle
+    /// via the mesh header's `animIndex`, as `G2_SetupModelPointers` does.
+    /// Source: `oracle/codemp/renderer/tr_local.h:1129` (`model_t.mdxa`);
+    /// chain: `oracle/codemp/ghoul2/G2_API.cpp:2735-2739`
+    fn model_mdxa(&mut self, model: qhandle_t) -> *mut c_void;
 }
 ```
 
-The verbatim quote replaces the earlier paper sketch: the built methods are
-`print`/`error` (not `com_printf`/`com_error`), `vm_call(VmSlot, i32, &[isize]) ->
-isize` (not `vm_call_game(i32) -> i32`), and `shared_memory() -> *mut c_char` (not
-`&mut [u8]`). ICARUS's outbound Q3_* bodies therefore write the `T_G_ICARUS_*`
-struct through the raw `*mut c_char` window (the confined ABI-seam `unsafe`, §D11)
-and issue `vm_call(VmSlot::Gvm, GAME_ICARUS_*, &[])` — no args, since the request
-travels in shared memory (`engine_host.rs:71-80`).
+**ICARUS binds** (annotations, not edits to the verbatim quote): `fs_read_file`/
+`fs_free_file` — `ICARUS_RegisterScript` reads/frees the precompiled `.IBI` blob
+(`GameInterface.cpp:374`, `:393`); `print` — the verbose logs and `Q3_DebugPrint`
+output (`GameInterface.cpp:129`, `Q3_Interface.cpp` sites); **`cvar_integer` —
+`Q3_DebugPrint`'s `com_developer` gate** (`Q3_Interface.cpp:642`), ported as
+`host.cvar_integer("developer") != 0` (ICARUS-D2, ruling 36; **closes former
+ICARUS-Q12**); `error` — `ICARUS_Init`'s NULL-instance `ERR_DROP`
+(`GameInterface.cpp:151-155`); `vm_call(VmSlot::Gvm, GAME_ICARUS_*, &[])` +
+`shared_memory()` — the outbound `Q3_*` path (write the `T_G_ICARUS_*` struct
+through the raw `*mut c_char` window, then `VM_Call` with no args since the request
+travels in shared memory, e.g. `Q3_PlaySound` `Q3_Interface.cpp:315-322`);
+`flrand`/`irand` — the `I_Random` slot (`Q3_Interface.cpp:978`, called
+`Sequencer.cpp:532` etc.); `gentity(ent_num)` — reached from **six** bodies
+(§ Raven ground truth, the gentity-site inventory): `icarus_valid_ent`'s
+behaviorSet write-back (`GameInterface.cpp:288`), `icarus_shutdown`'s per-slot
+teardown sweep (`:169`/`:174`), `icarus_maintain_task_manager` →
+`CTaskManager::Update`'s `SVF_ICARUS_FREEZE` gate (`TaskManager.cpp:324`),
+`Q3_DebugPrint`'s `WL_DEBUG` log line (`Q3_Interface.cpp:679`), and the two
+**outbound** `InterfaceExport` slots `I_LinkEntity` (`GameInterface.cpp:681`) and
+`I_GetEntityByName` (`Q3_Interface.cpp:238`). The remaining methods (`trace`,
+`sv_time`, `fs_write_file`, `model_mdxm`, `model_mdxa`) serve sibling §F subsystems
+(NPCNav, ghoul2); ICARUS binds none of them (roster continuity across the five §F
+subsystems).
 
 Every §F fn takes `(&mut Icarus, &mut dyn EngineHost, …)` — `dyn`, not `impl`,
-because the `InterfaceExport` slot fns are stored `fn` pointers that ICARUS-D10
-fixes on `&mut dyn EngineHost` and several pub seam fns double as those slot
-targets (ICARUS-Q9 → ICARUS-D10; a bare `fn` pointer cannot be generic over `impl
-EngineHost`). `Engine` implements `EngineHost` via a split-borrow view struct so
-the `&mut Icarus` field and the rest of `Engine` borrow disjointly; the goldens
-inject ruling 32's fixture-backed `MockHost`
-(`crates/mp/host-interface/src/mock.rs`) — deterministic `flrand`/`irand` off the
-replicated `holdrand` LCG, a recording `vm_call`, and a strided `gentity` arena.
+because the `InterfaceExport` slot fns are stored `fn` pointers that ICARUS-D5
+(ruling 24) fixes on `&mut dyn EngineHost` and several pub seam fns double as those
+slot targets (a bare `fn` pointer cannot be generic over `impl EngineHost`).
+`Engine` implements `EngineHost` via a split-borrow view struct so the `&mut
+Icarus` field and the rest of `Engine` borrow disjointly; the goldens inject
+ruling 32's fixture-backed `MockHost` (`crates/mp/host-interface/src/mock.rs`) —
+deterministic `flrand`/`irand` off the replicated `holdrand` LCG, a recording
+`vm_call`, a strided `gentity` arena, and (ruling 36) a `cvars: BTreeMap<String,
+i32>` fixture that answers `cvar_integer` (`mock.rs:121`, `:260`; missing name → 0).
 This crate declares no engine globals and calls no `sv`/`svs`/`gvm` singletons
 directly — they arrive through `host`.
 
 **Inbound — this crate's public API** (callees of `SV_GameSystemCalls`
-`G_ICARUS_*` arms, `sv_game.cpp:739-832`). Uniform §F shape per ICARUS-D1/D10
-(`&mut Icarus, &mut dyn EngineHost`, then the arm's args):
+`G_ICARUS_*` arms, `sv_game.cpp:739-832`). Uniform §F shape (`&mut Icarus, &mut
+dyn EngineHost`, then the arm's args):
 
-Body note (ruling 23, corrects ruling 19): the fns that read entity fields carry
-the **pointer** their arm passes — `*mut sharedEntity_t`, exactly the trap
-payload (`ConvertedEntity((sharedEntity_t *)VMA(1))` / `(sharedEntity_t
-*)VMA(1)`, Raven-ground-truth §Entity-field access). Dereferencing that pointer is
-the confined ABI-seam `unsafe` (porting-rules §D11); everything above it is safe.
-They do **not** take an `ent_num: i32`. The **three presence-check** callees
-(`icarus_is_initialized`/`icarus_maintain_task_manager`/`icarus_is_running`) keep
-`ent_num: i32` — their arms read `int entID = args[1]` (`sv_game.cpp:752-782`).
-`gentity(ent_num)` is reached from a body only inside `icarus_valid_ent`
-(`SV_GentityNum(ent->s.number)`, `GameInterface.cpp:288`, for the behaviorSet
-write-back `:291`); `icarus_associate_ent` does **not** call it (`:307-318`).
+Body note (ICARUS-D1, ruling 37): the five entity-field fns carry the **pointer**
+their arm passes — `*mut sharedEntity_t`, exactly the trap payload
+(`ConvertedEntity((sharedEntity_t *)VMA(1))`), which **points to the by-value copy**
+`gLocalModifier`. Reads off it are faithful (fields copied by value); **writes off
+it are dropped** exactly as retail (`ICARUS_InitEnt`'s `memset(&ent->taskID,-1)`).
+The three task-id helpers carry the **bare** `(sharedEntity_t *)VMA(1)` cast — the
+**real** entity, so their `ent->taskID[]` writes persist. Dereferencing any of
+these pointers is the confined ABI-seam `unsafe` (porting-rules §D11). They do
+**not** take an `ent_num: i32`. The **three presence-check** callees keep `ent_num:
+i32` — their arms read `int entID = args[1]` (`sv_game.cpp:752-782`).
+Among the inbound entity-field callees, `gentity(ent_num)` is reached only inside
+`icarus_valid_ent` (`SV_GentityNum(ent->s.number)` for the behaviorSet write-back to
+the *true* entity, since the copy's write would be dropped, `GameInterface.cpp:288`/
+`:291`); `icarus_associate_ent` does **not** call it — it only reads `ent->s.number`
+off the copy (`:317`). The other five `gentity` bodies are the no-arg
+`icarus_shutdown` sweep, the per-frame `icarus_maintain_task_manager`
+(`CTaskManager::Update`), `Q3_DebugPrint`, and the two outbound `I_*` slots
+(`I_LinkEntity`, `I_GetEntityByName`) — see the § Raven ground truth gentity-site
+inventory; none takes an `ent: *mut sharedEntity_t` seam arg, so this correction
+touches no signature here.
 
 ```rust
-// game_interface — the G_ICARUS_* callees. Entity-field arms carry the pointer
-// (ruling 23); presence-check arms carry int entID.
+// game_interface — the G_ICARUS_* callees. Entity-field arms carry the copy
+// pointer (ICARUS-D1/ruling 37); presence-check arms carry int entID.
 pub fn icarus_init(icarus: &mut Icarus, host: &mut dyn EngineHost);
 pub fn icarus_shutdown(icarus: &mut Icarus, host: &mut dyn EngineHost);
-pub fn icarus_run_script(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t, name: &str) -> bool;  // arm :740
+pub fn icarus_run_script(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t, name: &str) -> bool;  // arm :740 (ConvertedEntity copy)
 pub fn icarus_register_script(icarus: &mut Icarus, host: &mut dyn EngineHost, name: &str, called_during_interrogate: bool) -> bool; // arm :743, no ent
-pub fn icarus_valid_ent(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t) -> bool;   // arm :750; host.gentity(ent.s.number) inside (behaviorSet write-back, GameInterface.cpp:288/291)
-pub fn icarus_init_ent(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t);            // arm :789
+pub fn icarus_valid_ent(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t) -> bool;   // arm :750; host.gentity(ent.s.number) inside for behaviorSet write-back to the TRUE entity (:288/:291)
+pub fn icarus_init_ent(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t);            // arm :789; memset(&ent.taskID,-1) writes the copy -> dropped, faithfully (:664)
 pub fn icarus_free_ent(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t);            // arm :793
-pub fn icarus_associate_ent(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t);       // arm :797; reads ent.s.number into ent_list (:317), no host.gentity
+pub fn icarus_associate_ent(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t);       // arm :797; reads ent.s.number off the copy into ent_list (:317), no host.gentity
 pub fn icarus_is_initialized(icarus: &mut Icarus, host: &mut dyn EngineHost, ent_num: i32) -> bool;   // arm :752, int entID; gSequencers/gTaskManagers presence
 pub fn icarus_maintain_task_manager(icarus: &mut Icarus, host: &mut dyn EngineHost, ent_num: i32) -> bool; // arm :763, int entID; -> CTaskManager::Update
 pub fn icarus_is_running(icarus: &mut Icarus, host: &mut dyn EngineHost, ent_num: i32) -> bool;       // arm :774, int entID
 // `Svcmd_ICARUS_f` (GameInterface.h:32, GameInterface.cpp:700) is §20-dropped
-// per ICARUS-D6 — zero callers, no G_ICARUS_* arm — and is intentionally absent
-// from this seam. See Divergences.
+// per ICARUS-D5 (ruling 17) — zero callers, no G_ICARUS_* arm — and is
+// intentionally absent from this seam. See Divergences.
 
 // q3_registers — variable store. q3_variable_declared / q3_get_* / q3_declare_variable
 // / q3_free_variable are the Q3_Registers.cpp store fns (home q3_registers/mod.rs:
@@ -507,17 +667,14 @@ pub fn icarus_is_running(icarus: &mut Icarus, host: &mut dyn EngineHost, ent_num
 // carry only ints/strings — no entity pointer. q3_variable_declared / q3_get_* are
 // the G_ICARUS_VARIABLEDECLARED / GET*VARIABLE arm callees; q3_declare_variable /
 // q3_free_variable have NO G_ICARUS_* arm — they are the OUTBOUND I_DeclareVariable
-// / I_FreeVariable interface_export targets (Interface_Init, Q3_Interface.cpp:1002-1003),
-// reached only through the InterfaceExport table, not the server syscall switch.
+// / I_FreeVariable interface_export targets (Interface_Init, Q3_Interface.cpp:1002-1003).
 //
 // q3_set_var is NOT a Q3_Registers.cpp store fn — its source is Q3_SetVar
-// (Q3_Interface.cpp:337), so its home is q3_interface/mod.rs (the Q3_Interface.cpp
-// unit, Files roster), not q3_registers/mod.rs. It is a thin G_ICARUS_SETVAR arm
-// dispatcher (Q3_SetVar(args[1], args[2], VMA(3), VMA(4)), sv_game.cpp:817) that
-// resolves type_name and calls the Q3_Registers.cpp store (Q3_GetFloatVariable etc.,
-// Q3_Interface.cpp:352); it carries only ints/strings, no entity pointer. Listed in
-// this seam block with the other variable-facing arm callees for reader locality; the
-// callee's compilation unit is q3_interface, per its source file.
+// (Q3_Interface.cpp:337), so its home is q3_interface/mod.rs. It is a thin
+// G_ICARUS_SETVAR arm dispatcher (Q3_SetVar(args[1], args[2], VMA(3), VMA(4)),
+// sv_game.cpp:817); it carries only ints/strings, no entity pointer. Listed here
+// with the other variable-facing arm callees for reader locality; its compilation
+// unit is q3_interface, per its source file.
 pub fn q3_declare_variable(icarus: &mut Icarus, host: &mut dyn EngineHost, var_type: i32, name: &str);  // I_DeclareVariable target
 pub fn q3_free_variable(icarus: &mut Icarus, host: &mut dyn EngineHost, name: &str);                    // I_FreeVariable target
 pub fn q3_variable_declared(icarus: &mut Icarus, host: &mut dyn EngineHost, name: &str) -> i32;
@@ -526,40 +683,34 @@ pub fn q3_get_float_variable(icarus: &mut Icarus, host: &mut dyn EngineHost, nam
 pub fn q3_get_string_variable(icarus: &mut Icarus, host: &mut dyn EngineHost, name: &str) -> Option<String>;
 pub fn q3_get_vector_variable(icarus: &mut Icarus, host: &mut dyn EngineHost, name: &str) -> Option<[f32; 3]>;
 
-// q3_interface — task-id helpers (G_ICARUS_TASKID*). Arms carry the pointer
-// (bare (sharedEntity_t *)VMA(1)): PENDING :786, SET :808, COMPLETE :813.
+// q3_interface — task-id helpers (G_ICARUS_TASKID*). Arms carry the BARE real
+// pointer (sharedEntity_t *)VMA(1): PENDING :786, SET :808, COMPLETE :813.
 //
-// task_type: the arm passes `(taskID_t)args[2]` — an UNCHECKED int→enum cast of an
-// arbitrary intptr_t (sv_game.cpp:786/808/813). Each callee body already reproduces
-// Raven's own defined guard: `if ( taskType < TID_CHAN_VOICE || taskType >= NUM_TIDS )
-// return`/`return qfalse` BEFORE indexing ent->taskID[taskType] (Q3_TaskIDPending
-// Q3_Interface.cpp:116-118, Q3_TaskIDComplete :136-138, Q3_TaskIDSet :169-171), so
-// Raven's behavior for out-of-range task_type is pinned (no-op / qfalse), not an
-// undecided §19 fork — the port transcribes that guard. The residual §19 point is the
-// int→enum CONVERSION itself: Rust cannot construct an invalid `taskID_t` (repr enum)
-// from an out-of-range `args[2]` the way C's cast does. That checked conversion lives
-// at the server-dispatch boundary that owns the arm (§ Scope Punts; Divergences), and
-// Raven's callee guard pins its out-of-range outcome (no-op / false). This crate's
-// callees take `task_type: taskID_t` already in-range (contrast q3_declare_variable's
-// deliberately raw i32 var_type, runtime-validated by Q3_VariableDeclared's own check).
+// task_type: the arm passes `(taskID_t)args[2]` — an UNCHECKED int→enum cast
+// (sv_game.cpp:786/808/813). Each callee body reproduces Raven's own defined
+// guard: `if ( taskType < TID_CHAN_VOICE || taskType >= NUM_TIDS ) return`/
+// `return qfalse` BEFORE indexing ent->taskID[taskType] (Q3_TaskIDPending
+// Q3_Interface.cpp:116-118, Q3_TaskIDComplete :136-138, Q3_TaskIDSet :169-171).
+// The residual §19 point is the int→enum CONVERSION itself, which lives at the
+// server-dispatch boundary (§ Scope Punts; Divergences); this crate's callees take
+// an already-in-range `task_type: taskID_t`.
 pub fn q3_task_id_set(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t, task_type: taskID_t, task_id: i32);
 pub fn q3_task_id_complete(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t, task_type: taskID_t);
 pub fn q3_task_id_pending(icarus: &mut Icarus, host: &mut dyn EngineHost, ent: *mut sharedEntity_t, task_type: taskID_t) -> bool;
 ```
 
-**Outbound — `InterfaceExport`** (ICARUS-D8 + D10: plain Rust struct of `fn`
-items, fork-5; **not** `#[repr(C)]` — it never crosses the module ABI). The `I_*`
-signatures mirror `interface.h:17-70`; each impl writes a `T_G_ICARUS_*` struct
-into the host's shared-memory window and issues `VM_Call(gvm, GAME_ICARUS_*)`,
-both reached through the `EngineHost` passed alongside `&mut Icarus`
-(ICARUS-D1). The `T_G_ICARUS_*` payloads and `GAME_ICARUS_*` ids are reused
-from `mp_qshared` verbatim (already ported); this crate does not redefine them.
-Per **ICARUS-D10** (ruling 24) each stored slot is a
+**Outbound — `InterfaceExport`** (ICARUS-D5, rulings 24 + fork-5: plain Rust
+struct of `fn` items; **not** `#[repr(C)]` — it never crosses the module ABI).
+The `I_*` signatures mirror `interface.h:17-70`; each impl writes a `T_G_ICARUS_*`
+struct into the host's shared-memory window and issues `VM_Call(gvm, GAME_ICARUS_*)`,
+both reached through the `EngineHost` passed alongside `&mut Icarus`. The
+`T_G_ICARUS_*` payloads and `GAME_ICARUS_*` ids are reused from `mp_qshared`
+verbatim (already ported). Each stored slot is a
 `fn(&mut Icarus, &mut dyn EngineHost, …)` pointer — `dyn` because a bare `fn`
 pointer is a concrete type and cannot be generic over `impl EngineHost`:
 
 ```rust
-// interface_export_s.rs — the I_* table (fork-5 bare-fn slots, host param &mut dyn, ICARUS-D10)
+// interface_export_s.rs — the I_* table (fork-5 bare-fn slots, host param &mut dyn)
 pub struct InterfaceExport {
     pub i_play_sound: fn(&mut Icarus, &mut dyn EngineHost, /* T_G_ICARUS_PLAYSOUND args */),
     pub i_random:     fn(&mut Icarus, &mut dyn EngineHost, min: f32, max: f32) -> f32, // → host.flrand
@@ -570,356 +721,249 @@ pub struct InterfaceExport {
 
 That `dyn` slot type propagates to every pub seam fn that doubles as a slot target
 (e.g. `q3_declare_variable`/`q3_free_variable` are the `I_DeclareVariable`/
-`I_FreeVariable` targets), which is why § inbound signatures above all take
-`&mut dyn EngineHost` (ICARUS-D10).
+`I_FreeVariable` targets), which is why the inbound signatures above all take
+`&mut dyn EngineHost`.
 
 **Traps / cross-crate calls used by this crate** — all reached through
-`EngineHost` (ICARUS-D1), never as direct globals; the Raven-name → real
-`EngineHost` method map (ICARUS-D12): `FS_ReadFile`/`FS_FreeFile`
-(`GameInterface.cpp:374`, `:393`) → `fs_read_file`/`fs_free_file`,
-`Com_Printf`/`Com_Error` → `print`/`error`, `Q_flrand`
-(`I_Random`, `Q3_Interface.cpp:978`) → `flrand`/`irand`, `VM_Call(gvm, …)` →
-`vm_call(VmSlot::Gvm, …)` plus the `shared_memory() -> *mut c_char`
-window (the outbound path), and `gentity(ent_num)` — reached from a body **only**
-by `icarus_valid_ent`'s `SV_GentityNum(ent->s.number)` behaviorSet write-back
-(`GameInterface.cpp:288`/`:291`; `SV_GentityNum`, `sv_game.cpp:54-59`, over the
-`G_LOCATE_GAME_DATA` base `:329-330`, ruling 23). The other entity-field fns need
-**no** `gentity` — including `icarus_associate_ent`, which only reads `ent.s.number`
-into the ent-list (`:317`): they carry the `*mut sharedEntity_t` at the seam (ruling 23).
+`EngineHost`, never as direct globals; the Raven-name → real `EngineHost` method
+map: `FS_ReadFile`/`FS_FreeFile` (`GameInterface.cpp:374`, `:393`) →
+`fs_read_file`/`fs_free_file`, `Com_Printf` → `print`, `com_developer->integer`
+(`Q3_Interface.cpp:642`) → `cvar_integer("developer")` (ICARUS-D2, ruling 36),
+`Com_Error` → `error`, `Q_flrand` (`I_Random`, `Q3_Interface.cpp:978`) →
+`flrand`/`irand`, `VM_Call(gvm, …)` → `vm_call(VmSlot::Gvm, …)` plus the
+`shared_memory() -> *mut c_char` window (the outbound path), and `gentity(ent_num)`
+— reached from **six** bodies (§ Raven ground truth inventory): `icarus_valid_ent`'s
+behaviorSet write-back (`GameInterface.cpp:288`/`:291`), `icarus_shutdown`'s teardown
+sweep (`:169`/`:174`), `ICARUS_LinkEntity`/`I_LinkEntity` (`:681`),
+`Q3_GetEntityByName`/`I_GetEntityByName` (`Q3_Interface.cpp:238`), `Q3_DebugPrint`'s
+`WL_DEBUG` line (`:679`), and `CTaskManager::Update`'s `SVF_ICARUS_FREEZE` gate
+(`TaskManager.cpp:324`) — all through the one service (`SV_GentityNum`,
+`sv_game.cpp:54-59`, over the `G_LOCATE_GAME_DATA` base `:329-330`, ruling 23/37).
+Among the entity-field fns, `icarus_associate_ent` still needs **no** `gentity` — it
+only reads `ent.s.number` off the copy into the ent-list (`:317`).
 `Z_Malloc`/`Z_Free` (`Memory.cpp`) are subsumed by owned Rust objects — no arena
-(ICARUS-D3 as amended by ruling 20; `ICARUS_Malloc`/`ICARUS_Free` §20-dropped) —
-and are not a trap surface.
+(ICARUS-D5, ruling 20; `ICARUS_Malloc`/`ICARUS_Free` §20-dropped) — and are not a
+trap surface.
 
 **Layout types (unchanged, already ported).** `T_G_ICARUS_*` structs +
 `game_export_t` + `taskID_t` (the `q3_task_id_*` enum arg,
 `oracle/codemp/game/g_public.h:625-639`, ported at
 `crates/mp/qshared/src/common/mp/qcommon/task_id_t.rs`) + `sharedEntity_t` (the
-entity-field seam arg `*mut sharedEntity_t` and the `gentity` service's return
-target, ruling 23,
+entity-field seam arg `*mut sharedEntity_t` — pointing to `ConvertedEntity`'s copy
+for the five ent-fns, to the real entity for the task-id helpers — and the
+`gentity` service's return target, ruling 37,
 `crates/mp/qshared/src/common/mp/qcommon/shared_entity_t.rs`) — all in
-`mp_qshared`;
-`setType_e`, `playType_e`, `pscript_t`, `vector_t` skeletons already in
-`crates/mp/engine/icarus/src/`. The existing
-`#[repr(C)] interface_export_s` skeleton
-(`crates/mp/engine/icarus/src/interface/interface_export_s.rs`) is a type-port
-artifact **superseded** by the plain `fn`-item `InterfaceExport` under
-ICARUS-D8 (ICARUS internal types are not ABI-crossing, so layout is free — §F).
+`mp_qshared`; `setType_e`, `playType_e`, `pscript_t`, `vector_t` skeletons already
+in `crates/mp/engine/icarus/src/`. The existing `#[repr(C)] interface_export_s`
+skeleton (`crates/mp/engine/icarus/src/interface/interface_export_s.rs`) is a
+type-port artifact **superseded** by the plain `fn`-item `InterfaceExport`
+(ICARUS-D5, ruling 24; ICARUS internal types are not ABI-crossing, so layout is
+free — §F).
 
 ## Decisions
 
-**ICARUS-D1.** Host services reach ICARUS through **one `EngineHost` services
-trait** in the Stage-0 interface crate `crates/mp/host-interface` / package
-`mp_host_interface` (ruling 24; trace, FS read/free, print/error, `VM_Call`,
-shared-memory window, `flrand`/`irand`, `gentity`); every §F fn takes `(&mut
-Icarus, &mut dyn EngineHost)`, and `Engine` implements the trait via a
-split-borrow view struct (handoff ruling 11). Because fork-2 removes the
-`sv`/`svs`/`gvm` globals the `I_*` bodies and inbound `ICARUS_*` fns reach, and
-a bare `fn`-item table (ICARUS-D8) cannot capture relocated state, the context
-must be threaded — one shared trait keeps every subsystem's seam uniform and
-lets the referee inject a deterministic impl. The host param is `&mut dyn` (not
-`impl`) per ICARUS-D10. Rejected a per-subsystem `IcarusHost` handle and a `&mut
-Engine` first parameter — ruling 11 unified all five §F subsystems on the single
-`EngineHost` trait. Settles former ICARUS-Q1.
-**Ruling 23 correction (2026-07-09) — supersedes the ruling-19 amendment.**
-Ruling 19 wrongly premised that the `G_ICARUS_*` arms hand these fns an entnum
-resolved through `SV_GentityNum`. The oracle shows the opposite: the entity-field
-arms **carry the `sharedEntity_t *` pointer** — `ICARUS_RunScript` (`:740`),
-`ICARUS_ValidEnt` (`:750`), `ICARUS_InitEnt` (`:789`), `ICARUS_FreeEnt` (`:793`),
-`ICARUS_AssociateEnt` (`:797`) via `ConvertedEntity((sharedEntity_t *)VMA(1))`,
-and `Q3_TaskIDPending` (`:786`), `Q3_TaskIDSet` (`:808`), `Q3_TaskIDComplete`
-(`:813`) via a bare `(sharedEntity_t *)VMA(1)` cast (Raven-ground-truth
-§Entity-field access). So the inbound seam **carries the pointer**: those fns take
-`ent: *mut sharedEntity_t` (the trap payload verbatim; the deref is the confined
-seam `unsafe`, §D11), **not** `ent_num: i32`. `ConvertedEntity`'s VM-address
-shuffle (`sv_game.cpp:422-451`) is a **no-op in the native-dylib model** —
-`VM_ArgPtr` is identity — so the port carries the pointer straight and skips the
-shuffle. The three **presence-check** arms (`ISINITIALIZED` `:752`,
-`MAINTAINTASKMANAGER` `:763`, `ISRUNNING` `:774`) keep `int entID = args[1]`, so
-those callees keep `ent_num: i32`. The `gentity(ent_num) -> *mut sharedEntity_t`
-service (`SV_GentityNum`, `sv_game.cpp:54-59`, over the `G_LOCATE_GAME_DATA` base
-`:329-330`) **survives** for the one genuinely index-based access:
-`ICARUS_ValidEnt`'s `SV_GentityNum(ent->s.number)` behaviorSet write-back
-(`GameInterface.cpp:288`/`:291`), which the shuffled `ConvertedEntity` copy cannot
-serve; `ICARUS_AssociateEnt` needs **no** `gentity` — it only reads `ent->s.number`
-into `ICARUS_EntList` (`:317`). Rejected keeping the
-ruling-19 `ent_num`+`host.gentity` shape for every fn — it contradicts the arms,
-which pass pointers. Settles the entity-field seam gap.
+Numbered records. This pass-6 revision folds in the four final rulings (37, 36,
+39a, 39d); all prior rulings 11–35 are consolidated in ICARUS-D5.
 
-**ICARUS-D2.** ICARUS state is a **plain, `Default`-initialized `icarus` field
-directly on `mp_engine_core::Engine`** — no `Option`, no `Box`, no nesting
-(handoff ruling 12; `engine.rs:35-36`). Lazy-init timing is modeled with
-Raven's own initialized flags (`iICARUS != NULL`, per-entity `gSequencers[n]`/
-`gTaskManagers[n] != NULL`; Raven-ground-truth §Init flags), not by wrapping
-the subsystem in `Option`. Because fork-2 relocated every engine global to its
-owning subsystem struct and ruling 12 fixed the attachment point uniformly for
-all five §F states. Rejected `Option<Icarus>`/`Box<Icarus>` lazy attachment and
-`static mut` — ruling 12 chose direct fields; internal `Option`s that mirror
-Raven's own NULL-able pointers (the instance, the per-entity slots) are the
-faithful flag model and stay. Settles former ICARUS-Q6 / STATE-Q2 (placement
-half).
+**ICARUS-D1 (ruling 37, 2026-07-09 — corrects ruling 23's rationale).** We port
+`ConvertedEntity` (`sv_game.cpp:420-451`) **faithfully** and route the five
+entity-field ICARUS arms through it exactly as Raven does. Because `ConvertedEntity`
+copies `ent->s`/`ent->r`/`ent->taskID` **by value** into the file-static
+`gLocalModifier` and returns `&gLocalModifier` (the **copy**), retail C **drops**
+writes to it — including `ICARUS_InitEnt`'s `memset(&ent->taskID,-1)`
+(`GameInterface.cpp:664`); reproducing the copy reproduces the drop, so the port is
+byte-faithful at M4/M5 (zero divergence vs retail). The pointer-carrying seam
+**stands** — the five ent-fns take `ent: *mut sharedEntity_t` (the trap payload,
+now understood to point at the copy) — but the **"shuffle is a no-op / pass-through"
+rationale of ruling 23 is STRUCK** (the copy is a distinct object; its writes do not
+reach the real entity). `ConvertedEntity` itself is ported by the **server crate**
+(it is in the 2,481-fn engine-port-order list, sv_game.cpp wave-20). The three
+task-id helpers use the **bare** `(sharedEntity_t *)VMA(1)` cast — the real entity
+— so their `ent->taskID[]` writes persist. The `ICARUS_ValidEnt` `gentity` re-fetch
+(`SV_GentityNum(ent->s.number)`, `:288`/`:291`) **stays and now aligns**: it needs
+the true entity precisely because the copy's write would be dropped;
+`ICARUS_AssociateEnt` needs no `gentity` (it only reads `ent->s.number` off the
+copy, `:317`). Rejected the struck ruling-23 "identity `VM_ArgPtr` → same pointer"
+rationale (the by-value copy makes it false) and rejected special-casing the dropped
+writes (faithfulness comes free from routing through the copy).
 
-**ICARUS-D3.** Owned Rust objects replace **all** ICARUS Zone allocations, and
-the ICARUS arena is **dropped entirely** (handoff ruling 13, as amended by
-ruling 20). Ground truth: `operator new` uses `Z_Malloc(TAG_ICARUS2/3/4, qtrue)`
-(`blockstream.h:66`, `sequence.h`, `sequencer.h`) for the class instances, while
-`ICARUS_Malloc` uses `Z_Malloc(TAG_ICARUS5, qfalse)` (`Memory.cpp:12`) for the
-raw `WriteDataPointer` blobs. Ruling 13 owned the class instances (removing
-`TAG_ICARUS2/3/4`) and originally kept a faithful arena for the residual
-`TAG_ICARUS5` blobs. The oracle exhibits exactly three `TAG_ICARUS5` call-site
-families (`grep ICARUS_Malloc oracle/codemp/icarus/`) — `CBlockMember::m_data`
-(`WriteData`/`WriteDataPointer`, `blockstream.h:80-95`, `BlockStream.cpp:48,
-87-89,111,119`), `pscript_t::buffer` (`GameInterface.cpp:389`, freed `:192`),
-and the `bData` `Save`/`Load` scratch (`Sequence.cpp:490/548`,
-`TaskManager.cpp:1850/1897`) — and all three take owned storage: the two
-long-lived fields become owned `Vec<u8>` on their types, and the scratch folds
-to a function-local `Vec<u8>` (§C7, and inert in MP anyway — Divergences). With
-every `TAG_ICARUS5` user owned, **ruling 20 drops the arena** (`Icarus.arena`
-does not exist) and `ICARUS_Malloc`/`ICARUS_Free` are **§20-dropped, not
-ported** — they have zero live callers under the owned-buffer shape (recorded as
-a module-doc note in `memory/mod.rs`). This changes no referee-diffed state: the
-Zone allocations never crossed the game seam, MP save/load is inert
-(`Q3_Interface.cpp:695-704`), and content parity is preserved because
-`WriteDataPointer` still `memcpy`s the exact bytes into the owned `Vec<u8>`.
-Rejected a private arena for the whole class tree (ruling 13 scoped it away) and
-rejected keeping a vestigial arena that holds nothing (ruling 20's option (b)).
-Settles former ICARUS-Q2 and ICARUS-Q7.
+**ICARUS-D2 (ruling 36, 2026-07-09 — closes former ICARUS-Q12).** The Stage-0
+`EngineHost` trait is **extended and rebuilt to 15 methods** (commit `a9820853`),
+adding `cvar_integer(&mut self, name: &str) -> i32`, `sv_time`, `fs_write_file`,
+`model_mdxm`, and `model_mdxa`. ICARUS binds the new **`cvar_integer`** to port
+`Q3_DebugPrint`'s `com_developer` gate — `if (!com_developer || !com_developer->integer)
+return;` (`Q3_Interface.cpp:638-643`) becomes `host.cvar_integer("developer") != 0`
+(unregistered name → 0, matching `Cvar_VariableIntegerValue`, `cvar.cpp:118-124`).
+§ Seam definition **re-quotes the full 15-method trait verbatim** from
+`crates/mp/host-interface/src/engine_host.rs`; the goldens' `MockHost` carries a
+`cvars: BTreeMap<String, i32>` fixture answering `cvar_integer` (`mock.rs:121`,
+`:260`; ruling 32 + 36). The other four new methods serve sibling §F subsystems
+(NPCNav `sv_time`/`fs_write_file`, ghoul2 `model_mdxm`/`model_mdxa`); ICARUS binds
+none of them. Because the former ICARUS-Q12 escalation (no seam method could answer
+the `com_developer` gate on the frozen 10-method trait) is now resolved by an
+interface-crate extension owned outside this doc (handoff ruling 11). Rejected
+assuming `com_developer == 0` in dedicated (runtime-settable cvar) and routing the
+developer state through the split-borrow `Engine` view off-seam (ruling 36 put it on
+the trait).
 
-**ICARUS-D4.** Golden `.IBI` fixtures are **hand-authored scripts compiled once
-by a `tools/ibi-gen` harness** built from the oracle's out-of-set
-`Interpreter.cpp`/`Tokenizer.cpp`; the compiled blobs are committed, and **no
-retail `.IBI` assets are committed** (a retail corpus may run locally,
-uncommitted) (handoff ruling 14). Because §18 requires committed goldens so
-`cargo test` needs no C++ toolchain, but the compiler is out of the link set and
-retail blobs are not redistributable — reusing the oracle's own compiler once,
-offline, on authored scripts yields byte-faithful, redistributable fixtures.
-Rejected committing retail blobs and rejected hand-hexing `.IBI` by hand — the
-former is non-redistributable, the latter drifts from the real format. Settles
-former ICARUS-Q3.
+**ICARUS-D3 (ruling 39a, 2026-07-09 — corrects the "3 drops total" claim;
+supersedes pass-5's ICARUS-D13).** BlockStream's **writer/duplicator half** is
+§20-dropped with zero-caller notes: `CBlockStream::Create(char *)` (`blockstream.h:167`,
+def `BlockStream.cpp:525`, zero callers), `CBlockStream::WriteBlock` (`:174`, def
+`:577`, only callers in the excluded `Interpreter.cpp`), `CBlockMember::WriteMember`
+(`:47`, def `:133`, only caller is the dropped `WriteBlock`), and
+`CBlock::Duplicate` (`:138`, def `:359`) / `CBlockMember::Duplicate` (`:74`, def
+`:148`) (only callers in excluded `Interpreter.cpp`/`Tokenizer.cpp`). This reverses
+pass-5's ICARUS-D13, which **retained** the writer methods on the belief the §
+Verification round-trip re-wrote blocks; ruling 39a drops them, so verification is
+**read-only** (dump the parsed record stream; no re-`WriteBlock`). Because §20
+forbids porting genuinely dead/writer-only surface into a dedicated build that never
+writes `.IBI`. Rejected retaining the writer half for a re-write round-trip (the
+round-trip is not needed — a ReadBlock record-stream dump verifies parse parity).
+**Carve-out — `CBlockStream::Init` ports as a live reader helper; it is not in this
+drop set.** Ruling 39a's drop set is defined by §20's zero-caller criterion. The
+oracle shows the live reader `CBlockStream::Open` (`:665`, called `GameInterface.cpp:465`,
+`Sequencer.cpp:318`, `:370`) calls `Init()` at `BlockStream.cpp:670`, and the writer
+`Create(char *)` does not — so `Init` has a live caller and fails §20's zero-caller
+test. Its appearance in ruling 39a's "zero callers" list rests on a premise the cited
+oracle contradicts; by §20's actual criterion no drop reaches `Init`, so it ports (a
+factual set-membership correction, not a re-decision — ruling 39a's genuine
+zero-caller drops all stand). Behaviour is identical whether `Init` stays a method or
+is inlined into `Open`; transcription-first (ruling 27, §21) keeps it a method.
 
-**ICARUS-D5.** The **5 unchecked `gSequencers[ent_num]`/`gTaskManagers[ent_num]`
-paths guard-and-return** per §19, with a ≤2-line note at each site (handoff
-ruling 15). Ground truth: `icarus_is_initialized`/`icarus_maintain_task_manager`/
-`icarus_is_running` take `ent_num` straight from `args[1]` unchecked
-(`sv_game.cpp:752-782`), and `icarus_run_script`/`icarus_init_ent` index
-`gSequencers[ent->s.number]` unchecked (`GameInterface.cpp:75`, `:660`); only
-`ICARUS_FreeEnt` bounds-checks (`GameInterface.cpp:224-229`). In C an
-out-of-range entnum is an OOB pointer read (UB); on the Rust
-`[Option<_>; MAX_GENTITIES]` owner the same index panics, so §19 requires one
-defined behavior. We adopt the `FreeEnt` idiom (`s.number < 0 ||
->= MAX_GENTITIES` → treat as absent/return) at all five sites — the only path
-Raven itself already bounds-checks. Rejected clamp/mask and accept-the-panic —
-ruling 15 chose guard-and-return. Settles former ICARUS-Q4.
+**ICARUS-D4 (ruling 39d, 2026-07-09 — mechanical).** The id newtypes are **declared
+beside their owning arena** (§B5 / RMG `AreaId` precedent): `pub struct
+SequenceId(i32)` and `pub struct SequencerId(i32)` in
+`instance/icarus_instance.rs`, beside the `IcarusInstance` `sequences`/`sequencers`
+arenas they index; `pub struct TaskGroupId(i32)` in `taskmanager/ctask_manager.rs`,
+beside its `m_taskGroups: Vec<TaskGroup>` arena. No newtype is a standalone module.
+Because a porter needs the declaring file pinned to place the newtype (this is the
+same placement the Files roster already describes; ruling 39d makes it explicit,
+mirroring the §B5 co-location precedent). Rejected a shared `ids.rs` module (loses
+the arena-owner locality §B5 established).
 
-**ICARUS-D6.** `Svcmd_ICARUS_f` (decl `GameInterface.h:32`, def
-`GameInterface.cpp:700-730`) is **§20-dropped with a zero-caller note, not
-ported** (handoff ruling 17). Ground truth: its body is entirely commented out
-(a `rwwFIXMEFIXME` debug stub) and it has **zero** callers or command-table
-registrations anywhere in codemp — no `G_ICARUS_*` arm exists for it
-(`sv_game.cpp:739-832`), and grep across `server/`/`game/`/`qcommon/`/`cgame/`
-finds only its own decl + def. §20 makes zero-caller API droppable with a
-module-doc note. Rejected keeping it structurally-present — there is no
-registration site to wire it to. Settles former ICARUS-Q5.
-
-**ICARUS-D7.** The top-level `pub struct Icarus` is defined in
-`crates/mp/engine/icarus/src/lib.rs` (the crate root), which also carries the
-`pub mod` declarations for the new per-class module dirs (`instance/`,
-`taskmanager/`, `memory/`, `q3_registers/`, `sequence/`) alongside the existing
-`blockstream`/`game_interface`/`interface`/`q3_interface`/`sequencer` and the
-out-of-scope `interpreter`/`tokenizer` skeletons. Because the roster otherwise
-had no home for the fork-2 aggregate owner and the new module dirs need root
-declarations to compile. Rejected a separate `icarus.rs` re-exported from root —
-the crate root is the natural, single home for the subsystem aggregate and its
-module tree (roster-hole fix).
-
-**ICARUS-D8.** All prior settled §F conventions stand: closed C++ class
-hierarchies → Rust structs / enums with owned `Vec`/`VecDeque`/`HashMap`/
-`String` members (entities by index; layout free because §F internals are
-non-ABI, GP2 exemplar, porting-rules §17); `interface_export_t` → a plain
-`InterfaceExport` struct of `fn` items populated at `Interface_Init` (fork-5,
-not `#[repr(C)]`) — the concrete host-param type of those bare `fn` items is
-`&mut dyn EngineHost` (**ICARUS-D10**, ruling 24, formerly ICARUS-Q9);
-verification = differential goldens against the unmodified
-oracle TUs under `tools/icarus-oracle/` (§18, DEC-09 layer 1), MP-only with the
-SP tree (`oracle/code/icarus/`) a later SP-diff pass (DEC-04/§20), not unified
-now; and transcription-first — method bodies transcribe with no safety
-refactoring, parity green first, refactor behind the passing diff (§A2). Because
-these were settled in the first §F design session and the second session's
-rulings 11–17 amend, not overturn, them. Rejected re-litigating any of them —
-they are the standing §F baseline this doc builds on.
-
-**ICARUS-D9.** The ~194 internal interface-dispatch sites — `m_ie->I_*` in
-`CSequencer` (**73×**, `Sequencer.cpp`) and `(m_owner->GetInterface())->I_*` in
-`CTaskManager` (**121×**, `TaskManager.cpp`) — become **free functions taking
-`(&mut Icarus, &mut dyn EngineHost, …)` with no stored back-refs** (handoff
-ruling 24). `CSequencer`/`CTaskManager` hold **no** `m_ie`/`m_owner`/`m_taskManager`
-handle; each method and each `I_*` target is a free fn that re-derives the
-disjoint field borrows it needs from `&mut Icarus` on every call (Q8 candidate
-(a)). Because ICARUS-D2 stores `sequencers`, `task_managers`, and
-`interface_export` as sibling fields on one `Icarus`, a method that held `&mut
-icarus.sequencers[n]` across an `I_*` call needing `&mut icarus.var_strings` (e.g.
-`I_DeclareVariable`) would be two live `&mut Icarus` borrows — porting-rules §17
-requires this sibling-pointer shape be settled before transcription. The free-fn /
-re-index-per-call shape never holds a persistent `&mut CSequencer`/`&mut
-CTaskManager` across a dispatch, so the borrows stay disjoint. Rejected
-take-and-restore (move the slot out of the `[Option<_>; N]` array and back) and
-`Rc<RefCell<…>>` handles (ruling 24 chose the borrow-free free-fn shape). The
-`csequencer.rs` roster phrase "holds interface + taskmanager handles" is
-superseded — no handles are stored. Settles former ICARUS-Q8.
-
-**ICARUS-D10.** The `InterfaceExport` table's stored slots are
-`fn(&mut Icarus, &mut dyn EngineHost, …)` **pointers — `&mut dyn EngineHost`, not
-`impl`** (handoff ruling 24), and the Stage-0 crate is **pinned** as
-`crates/mp/host-interface`, package `mp_host_interface` (`use
-mp_host_interface::EngineHost;`). A bare `fn`-item slot (ICARUS-D8/fork-5) is a
-concrete type and cannot be generic over `impl EngineHost`, so the host param must
-be monomorphic; `&mut dyn EngineHost` keeps one uniform host type across the table
-and every pub seam fn (several pub `Q3_*` fns double as `I_*` slot targets, so the
-`dyn` propagates to them — hence § Seam definition types every fn `&mut dyn
-EngineHost`). Rejected a generic `InterfaceExport<H: EngineHost>` (monomorphising
-the whole table per host type — needless, one host exists) and a concrete
-monomorphic host handle (loses the referee's injectable impl). Settles former
-ICARUS-Q9 and the Stage-0 crate-path hole.
-
-**ICARUS-D11.** The two ICARUS ownership graphs are **faithful `Vec` arenas +
-id newtypes** (handoff ruling 27; matches the RMG `AreaId` (ruling 21) and Ghoul2
-`SlotMap` (ruling 22) precedents). Concretely: **(a)** `IcarusInstance` **owns**
-`sequences: Vec<Sequence>` and `sequencers: Vec<Sequencer>` — Raven's
-`list<CSequence*> m_sequences` / `list<CSequencer*> m_sequencers`
-(`instance.h:62-63`, owned via `STL_INSERT`, `Instance.cpp:174`, `:231`);
-`SequenceId(i32)` / `SequencerId(i32)` newtypes carry Raven's **monotonic,
-never-reused** `m_GUID` (`m_GUID = 0` `Instance.cpp:26`, `SetID( m_GUID++ )`
-`:228`); `GetSequence(id)` stays a **linear scan** (`STL_ITERATE( … m_sequences )`
-`Instance.cpp:248-258`) — faithful `O(n)`, insertion-ordered iteration, **not**
-upgraded to a keyed map (an §A2-permissible change the doc declines, to keep
-iteration order and GUID semantics parity-exact). `CSequence`'s
-`m_parent`/`m_return`/`m_children` (raw pointers reconstructed on `Load` via
-`m_owner->GetSequence(id)`, `sequence.h:86-90`, `Sequence.cpp:427-450`) become
-`Option<SequenceId>` / `Option<SequenceId>` / `Vec<SequenceId>`; its
-`block_l m_commands` has no cross-object aliasing → owned `Vec<CBlock>` (literal
-transcription, standing ICARUS-D8). **(b)** `CSequencer`'s **own non-owning**
-`sequence_l m_sequences` membership subset (`sequencer.h:176`) becomes
-`Vec<SequenceId>`; its `map<CTaskGroup*,CSequence*> m_taskSequences` cross-index
-(`sequencer.h:177`) becomes `BTreeMap<TaskGroupId, SequenceId>`. **(c)**
-`CTaskManager` has **ONE owning `Vec<TaskGroup>` arena** (Raven's
-`vector<CTaskGroup*> m_taskGroups`, `taskmanager.h:177`) + `TaskGroupId`; its two
-other parallel `CTaskGroup*` indexes — `map<string,CTaskGroup*> m_taskGroupNameMap`
-and `map<int,CTaskGroup*> m_taskGroupIDMap` (`taskmanager.h:183-184`) — become
-`BTreeMap<String, TaskGroupId>` / `BTreeMap<i32, TaskGroupId>` **side-indexes of
-ids** (three parallel owners collapse to owner + side-indexes). `CTaskManager`'s
-`list<CTask*> m_tasks` (`taskmanager.h:178`) has no pointer cross-reference —
-`CTaskGroup` tracks completion by **int GUID**, not pointer (`map<int,bool>
-m_completedTasks`, `taskmanager.h:87`) — so it transcribes literally to an owned
-`Vec<Task>` with `m_completedTasks` a `BTreeMap<i32, bool>` (standing ICARUS-D8, no
-new decision). **Definition sites** (roster-hole fix, following the RMG `AreaId`
-§B5 precedent of co-locating the index newtype with its arena owner —
-RMG-D4g/ruling 21: `AreaId` is defined with `CRMAreaManager`, the arena that owns
-it): `SequenceId(i32)` and `SequencerId(i32)` are declared in
-`instance/icarus_instance.rs` beside the `IcarusInstance` `sequences`/`sequencers`
-arenas they index (ICARUS-D11(a)); `TaskGroupId(i32)` is declared in
-`taskmanager/ctask_manager.rs` beside its `m_taskGroups: Vec<TaskGroup>` arena
-(ICARUS-D11(c)). No newtype is a standalone module — this is the same placement
-the Files roster's `icarus_instance.rs`/`ctask_manager.rs` entries already describe;
-pinning the declaring file makes it explicit (mirrors ICARUS-D7's roster-hole fix),
-not a new decision. Because a porter cannot invent the §17/§B5 arena-owner type,
-id-newtype, and lookup semantics — the sibling §F docs pinned theirs, ICARUS had
-not. Rejected keying `GetSequence` by a `HashMap` (loses Raven's linear-scan
-iteration order / GUID monotonicity, §A2 change the doc declines) and transcribing
-the three `CTaskGroup*` indexes as three literal owning containers (double-owns the
-group). Settles former **ICARUS-Q10** and **ICARUS-Q11**.
-
-**ICARUS-D12.** The Stage-0 `EngineHost` crate is **built, green compiled code** —
-`crates/mp/host-interface`, package `mp_host_interface`, commit `4b7f01b0` (handoff
-rulings 31 + 33) — so § Seam definition quotes its **actual** trait signatures
-**verbatim** from `crates/mp/host-interface/src/engine_host.rs:23-106`, and the
-goldens run against ruling 32's fixture-backed `MockHost`
-(`crates/mp/host-interface/src/mock.rs`), not a paper spec. Ruling 33 forbids
-deferrals in the seam, so the real names differ from this doc's earlier sketch and
-the port binds them exactly: `print`/`error(errorParm_t, &str) -> !` (not
-`com_printf`/`com_error`), `vm_call(VmSlot, i32, &[isize]) -> isize` (not
-`vm_call_game(i32) -> i32` — the `VmSlot::Gvm` selector mirrors Raven's `VM_Call(vm,
-…)` first param, ruling 33b; icarus arms pass no args, the request travels through
-`shared_memory`), and `shared_memory() -> *mut c_char` (a raw `char*` window, not a
-`&mut [u8]` — the Q3_* bodies write the `T_G_ICARUS_*` struct through it under the
-confined ABI-seam `unsafe`, §D11). Because a real, layout-frozen crate exists, the
-doc must be self-contained against it rather than against a provisional spec that
-would drift. Rejected keeping the paper method names (they never existed in the
-built trait) and adding a test-only constructor to ICARUS (ruling 32 makes
-`MockHost` the reusable goldens front door for every host-taking §F subsystem —
-`Load`/first-slice ports run with the real frozen signature). Settles the Stage-0
-signature gap.
-
-**ICARUS-D13.** BlockStream's writer/duplicator surface splits by ground-truth
-caller count (scope-hole fix; no new decision — applies settled §20 + the §
-Verification round-trip + ICARUS-D3). The `.IBI` write path exists only to serve
-the offline compiler, whose TUs (`Interpreter.cpp`/`Tokenizer.cpp`) are out of the
-WinDed link set (Scope), so its methods have **no production callers** in-scope. But
-they are **not** uniformly droppable: (a) `CBlock::Duplicate` (`blockstream.h:138`,
-`BlockStream.cpp:359`) and `CBlockMember::Duplicate` (`:74`, `:148`) have **zero
-callers anywhere** in `oracle/codemp/icarus/` — grep finds only `CBlock::Duplicate`'s
-internal member-`Duplicate` self-call (`BlockStream.cpp:374`) and a `"Duplicate
-symbol"` string literal (`Tokenizer.cpp:46`), nothing in `Interpreter.cpp` — and
-**no** settled decision or verification path references them, so they are
-**§20-dropped** with a `blockstream/` module-doc zero-caller note (mirrors the
-`Svcmd_ICARUS_f`/`ICARUS_Malloc` drops, ICARUS-D6/D3); (b) `CBlockStream::Create(char
-*)` (`:167`), `WriteBlock` (`:174`), `CBlockMember::WriteMember` (`:47`),
-`WriteData`/`WriteDataPointer` (`:76`/`:88`), and `CBlock::Write` overloads
-(`:125-129`) are **retained** — the § Verification BlockStream round-trip exercises
-`ReadBlock`→re-`WriteBlock`→`WriteMember` byte-identical and ICARUS-D3 preserves
-`WriteDataPointer`'s exact-byte `memcpy` for content parity, both settled, making the
-in-scope §F harness their caller. `CBlockStream::Init` (`:165`) is live (`Open` calls
-it, `:670`) and never a drop candidate. Because §20 forbids porting genuinely
-dead surface speculatively **and** forbids dropping surface a settled decision still
-exercises — the caller counts decide, not the module. Rejected dropping the whole
-writer half (verification and ICARUS-D3 reference it) and porting the two
-`Duplicate` methods (zero callers, §20). Settles the writer/duplicator scope gap
-the dry-run flagged; the "three §20-drops" count in the prior draft was a survey
-undercount (two `Duplicate` fns were missed), corrected here.
+**ICARUS-D5 (all rulings 11–35 stand).** The prior settled decisions are unchanged
+by the pass-6 revision; they are consolidated here by ruling number so the body can
+cite them:
+- **ruling 11** — one `EngineHost` services trait; every §F fn takes `(&mut Icarus,
+  &mut dyn EngineHost)`, `Engine` implements it via a split-borrow view struct.
+- **ruling 12** — `Icarus` is a plain, `Default`-initialized `icarus` field
+  directly on `mp_engine_core::Engine` (ruling 12,
+  `docs/handoffs/engine-fork-discovery.md:126-130`); no `Option`/`Box` wrapper.
+  Added by the engine-aggregate slice (`engine.rs` does not yet carry it — its
+  stale STATE-Q2 comment predates ruling 12). Lazy-init is modeled by Raven's own
+  NULL-flags.
+- **ruling 13 + 20** — owned Rust objects replace all `TAG_ICARUS2/3/4` class
+  allocs and the `TAG_ICARUS5` blobs (`CBlockMember::m_data`, `pscript_t::buffer`
+  → owned `Vec<u8>`; `bData` scratch → function-local `Vec<u8>`); the ICARUS **arena
+  is dropped entirely** and `ICARUS_Malloc`/`ICARUS_Free` are §20-dropped.
+- **ruling 14** — golden `.IBI` fixtures are hand-authored scripts compiled once by
+  a `tools/ibi-gen` harness (built from the out-of-set `Interpreter.cpp`/
+  `Tokenizer.cpp`); compiled blobs committed, no retail `.IBI` assets committed.
+- **ruling 15** — the unchecked `gSequencers`/`gTaskManagers[ent_num]` paths
+  **guard-and-return** per §19 (adopt the `ICARUS_FreeEnt` bounds-check idiom,
+  `s.number < 0 || >= MAX_GENTITIES` → absent), ≤2-line note per site.
+- **ruling 17** — `Svcmd_ICARUS_f` (`GameInterface.cpp:700-730`) is §20-dropped
+  (commented-out body, zero callers/registrations, no `G_ICARUS_*` arm).
+- **ruling 19** — superseded on the entity-field seam by rulings 23 + 37
+  (ICARUS-D1).
+- **ruling 23** — the entity-field arms carry a `*mut sharedEntity_t` pointer (not
+  an entnum); `gentity` survives as the index→pointer service. (Its "shuffle no-op"
+  rationale is corrected by ruling 37, ICARUS-D1; and its scope claim is corrected by
+  this revision — `gentity` is reached from six bodies, not `icarus_valid_ent` alone,
+  see the § Raven ground truth gentity-site inventory.)
+- **ruling 24** — the ~194 internal `I_*` dispatch sites (73× `m_ie->I_*` in
+  `CSequencer`, 121× `(m_owner->GetInterface())->I_*` in `CTaskManager`) become
+  **free fns `(&mut Icarus, &mut dyn EngineHost, …)` with no stored back-refs**
+  (re-index disjoint field borrows per call); the `InterfaceExport` slots and every
+  pub seam fn take `&mut dyn EngineHost` (a bare `fn` cannot be generic over `impl`);
+  the Stage-0 crate is pinned as `crates/mp/host-interface` / `mp_host_interface`.
+- **ruling 27** — the two ICARUS ownership graphs are **faithful `Vec` arenas + id
+  newtypes**: `IcarusInstance` owns `sequences: Vec<Sequence>` + `sequencers:
+  Vec<Sequencer>` keyed by `SequenceId`/`SequencerId` carrying the monotonic
+  never-reused `m_GUID` (`Instance.cpp:26,228`); `GetSequence(id)` stays a faithful
+  linear scan (`Instance.cpp:248-258`, insertion-ordered, not a keyed map — an §A2
+  change the doc declines); `CSequence`'s `m_parent`/`m_return`/`m_children` →
+  `Option<SequenceId>`/`Option<SequenceId>`/`Vec<SequenceId>`; `CSequencer`'s
+  non-owning `m_sequences` → `Vec<SequenceId>` and `m_taskSequences` →
+  `BTreeMap<TaskGroupId, SequenceId>`; `CTaskManager` has **one** owning
+  `m_taskGroups: Vec<TaskGroup>` + `TaskGroupId` with `m_taskGroupNameMap`/
+  `m_taskGroupIDMap` → `BTreeMap<String, TaskGroupId>`/`BTreeMap<i32, TaskGroupId>`
+  side-indexes; `m_tasks: Vec<Task>` and `m_completedTasks: BTreeMap<i32, bool>`
+  transcribe literally (groups track completion by int GUID, no pointer aliasing).
+  (Definition sites pinned by ruling 39d, ICARUS-D4.)
+- **rulings 31 + 33** — the Stage-0 `EngineHost` crate was built as real compiled
+  code before this relaunch (ruling 36 later extended it to 15 methods, ICARUS-D2);
+  § Seam definition quotes its actual signatures verbatim, no paper spec.
+- **ruling 32** — the fixture-backed `MockHost` (`crates/mp/host-interface/src/mock.rs`)
+  is the goldens vehicle; **it now also carries the `cvars` map fixture** for
+  `cvar_integer` (ruling 36, ICARUS-D2).
+- **standing §F conventions** — closed C++ hierarchies → Rust structs/enums with
+  owned `Vec`/`VecDeque`/`HashMap`/`String` (entities by index, layout free);
+  `interface_export_t` → plain `InterfaceExport` struct of `fn` items at
+  `Interface_Init` (fork-5); MP-only, SP a later diff (DEC-04/§20);
+  transcription-first (§A2). **Internal-type naming (porting-rules §12; the shape
+  ruling 27 already applies).** Every ICARUS class is a §12 internal-only type — none
+  crosses the ABI seam (layout free, §F) — so each takes an idiomatic UpperCamelCase
+  Rust name with Raven's Hungarian affixes stripped: the `C` class-prefix, the
+  `_t`/`_e` suffix, and the `ICARUS_` prefix all drop. Thus (as ruling 27 already
+  writes them) `CSequence`→`Sequence`, `CSequencer`→`Sequencer`, `CTask`→`Task`,
+  `CTaskGroup`→`TaskGroup`, and likewise `CBlock`→`Block`, `CBlockMember`→`BlockMember`,
+  `CBlockStream`→`BlockStream`, `CTaskManager`→`TaskManager`,
+  `ICARUS_Instance`→`IcarusInstance`, `pscript_t`→`Pscript`. Two things keep the
+  Raven spelling and are **not** the Rust type name: the Files-roster `class:` column
+  (it records the Raven source class for `port-cpp-subsystem`) and the `.rs` filename
+  (Raven-derived snake_case — `cblock.rs` holds `pub struct Block`, mirroring
+  `csequence.rs`→`Sequence`); prose that cites a Raven class or method
+  (`CTaskManager::Update`, "the class `CBlockStream`") likewise keeps the `C` because
+  it names Raven, not the Rust type. `Icarus` lives in `lib.rs` (crate root) with the
+  per-class module dirs (`instance/`, `taskmanager/`, `memory/`, `q3_registers/`,
+  `sequence/` new; `blockstream`/`game_interface`/`interface`/`q3_interface`/
+  `sequencer` existing).
 
 ## Files roster
 
 C++-track roster for `port-cpp-subsystem` (`designPath` consumer). All
 `crate: mp_engine_icarus`, `mode: mp`. Existing type-port files are reshaped in
-place under ICARUS-D3/D8; new files mirror the owning Raven header subsystem
-(one class per file, porting-rules §21).
+place under ICARUS-D5 (rulings 13/24/27); new files mirror the owning Raven header
+subsystem (one class per file, porting-rules §21).
 
 files:
-- path: `crates/mp/engine/icarus/src/lib.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `Icarus`, summary: crate root — defines the fork-2 subsystem aggregate `pub struct Icarus` (fields per the State-ownership table: `instance`, `sequencers`, `task_managers`, `buffer_list`, `ent_list`, `ent_filter`, `interface_export`, `var_strings/floats/vectors`, `num_variables` — **no `arena` field**, dropped per ICARUS-D3/ruling 20) with a **hand-written `impl Default`, not `#[derive(Default)]`** (ICARUS-D2 requires `Icarus` be `Default`-constructible; derive is unavailable/wrong on three fields — see the note under State ownership): the `Box<[Option<SequencerId>; MAX_GENTITIES]>` (non-owning index into `IcarusInstance.sequencers`, ICARUS-D11) / `Box<[Option<CTaskManager>; MAX_GENTITIES]>` slot arrays have no blanket `[T; N]: Default` impl and are built explicitly (e.g. `Box::new(std::array::from_fn(|_| None))`); `ent_filter` seeds `-1`, not derive's `0` (`ICARUS_entFilter = -1`, `GameInterface.cpp:23`; see State ownership); and `interface_export` seeds the real `Q3_*`/`I_*` fns per ICARUS-D8/ruling 20 (see `interface/interface_export_s.rs`). Adds the module declarations the roster requires — new `pub mod sequence; pub mod taskmanager; pub mod instance; pub mod memory; pub mod q3_registers;` alongside existing `blockstream`/`game_interface`/`interface`/`q3_interface`/`sequencer` (and untouched `interpreter`/`tokenizer` skeletons per Scope). `Icarus` is not a Raven class — it is the synthesized owner of every ICARUS file-scope global; it attaches to `mp_engine_core::Engine` as a plain `icarus` field per ICARUS-D2/D7.
-- path: `crates/mp/engine/icarus/src/blockstream/cblock_member.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CBlockMember`, summary: one ID/size/data record; owned `Vec<u8>` data replacing `void* m_data`; `WriteMember`/`ReadMember` IBI serialization, `WriteData`/`WriteDataPointer` (all retained per ICARUS-D13/ICARUS-D3 — the § Verification round-trip and ICARUS-D3's content-parity `memcpy` reference them, though their only production callers are the excluded compiler TUs) (`blockstream.h:38-105`, `BlockStream.cpp`). `CBlockMember::Duplicate` (`:74`) is **§20-dropped** (ICARUS-D13) — its only caller is `CBlock::Duplicate`, itself caller-less — with a module-doc zero-caller note, not ported. `m_data` is an owned `Vec<u8>` (settled — ICARUS-D3/ruling 20 drops the arena, so this `TAG_ICARUS5` blob is owned here); `WriteDataPointer` `memcpy`s exact bytes into it (content parity, Divergences).
-- path: `crates/mp/engine/icarus/src/blockstream/cblock.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CBlock`, summary: owns `Vec<CBlockMember>`; block id + flags; `Create(int)` (live — reader/`ReadBlock` path, `BlockStream.cpp:635`), `Write` overloads (retained per ICARUS-D13/ICARUS-D3), `AddMember`/`GetMember` (`blockstream.h:109-154`). `CBlock::Duplicate` (`:138`) is **§20-dropped** (ICARUS-D13) — zero callers anywhere — with a module-doc zero-caller note, not ported.
-- path: `crates/mp/engine/icarus/src/blockstream/cblock_stream.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CBlockStream`, summary: `.IBI` reader/writer over an owned byte buffer; `Open`/`ReadBlock`/`BlockAvailable`/`Init` (reader path; `Init` is live — `Open` calls it, `BlockStream.cpp:670`), `IBI` header+version check (`blockstream.h:158-196`). The writer methods `Create(char *)` (`fopen("wb")`, `:167`) and `WriteBlock` (`:174`) are **retained, not dropped** (ICARUS-D13): their only production callers are the excluded compiler TUs, but the § Verification round-trip exercises `ReadBlock`→re-`WriteBlock` byte-identical, so they port per the roster.
-- path: `crates/mp/engine/icarus/src/blockstream/vector_t.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `vector_t`, summary: `[f32; 3]` alias used by block writes (existing skeleton, kept).
-- path: `crates/mp/engine/icarus/src/blockstream/file.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CBlockStream::file`, summary: owned file-handle helper for `.IBI` I/O replacing `FILE*` (existing skeleton).
-- path: `crates/mp/engine/icarus/src/sequence/csequence.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CSequence`, summary: command/child tree node; flags/iterations, `Save/Load` (inert) (`sequence.h:12-96`, `Sequence.cpp`). **Shape settled by ICARUS-D11 (ruling 27):** `m_children: Vec<SequenceId>`, `m_parent: Option<SequenceId>`, `m_return: Option<SequenceId>` (pointer graph → id newtypes into the `IcarusInstance.sequences` arena, reconstructed on `Load` via a `GetSequence(id)` linear scan); `m_commands: Vec<CBlock>` owned (no cross-object aliasing, literal transcription per ICARUS-D8).
-- path: `crates/mp/engine/icarus/src/sequencer/csequencer.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CSequencer`, summary: per-entity script driver; parses IBI blocks into sequences; `Run`/`Callback`/`Parse*`/`Check*`/`Push/PopCommand` (`sequencer.h:68-187`, `Sequencer.cpp`, ~43 fns). Per **ICARUS-D9** (ruling 24) it holds **no** `m_ie`/`m_owner`/taskmanager handles — the 73 `m_ie->I_*` dispatch sites become free fns `(&mut Icarus, &mut dyn EngineHost, …)` that re-index disjoint `Icarus` field borrows per call (the former "holds handles" is superseded). Dispatch shape settled (ICARUS-D9); **member-storage shape settled by ICARUS-D11 (ruling 27):** `CSequencer`'s own non-owning `m_sequences` membership subset (`sequencer.h:176`) is `Vec<SequenceId>` and its `map<CTaskGroup*,CSequence*> m_taskSequences` (`sequencer.h:177`) is `BTreeMap<TaskGroupId, SequenceId>` — ids into the `IcarusInstance` arenas, not owning containers.
+- path: `crates/mp/engine/icarus/src/lib.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `Icarus`, summary: crate root — defines the fork-2 subsystem aggregate `pub struct Icarus` (fields per the State-ownership table: `instance`, `sequencers`, `task_managers`, `buffer_list`, `ent_list`, `ent_filter`, `interface_export`, `var_strings/floats/vectors`, `num_variables` — **no `arena` field**, dropped per ICARUS-D5/ruling 20) with a **hand-written `impl Default`, not `#[derive(Default)]`** (see the note under State ownership): the `Box<[Option<SequencerId>; MAX_GENTITIES]>` (non-owning index into `IcarusInstance.sequencers`) / `Box<[Option<TaskManager>; MAX_GENTITIES]>` slot arrays are built explicitly (e.g. `Box::new(std::array::from_fn(|_| None))`); `ent_filter` seeds `-1`, not derive's `0` (`ICARUS_entFilter = -1`, `GameInterface.cpp:23`); and `interface_export` seeds the real `Q3_*`/`I_*` fns (see `interface/interface_export_s.rs`). Adds the module declarations the roster requires — new `pub mod sequence; pub mod taskmanager; pub mod instance; pub mod memory; pub mod q3_registers;` alongside existing `blockstream`/`game_interface`/`interface`/`q3_interface`/`sequencer` (and untouched `interpreter`/`tokenizer` skeletons per Scope). `Icarus` is not a Raven class — it is the synthesized owner of every ICARUS file-scope global; it attaches to `mp_engine_core::Engine` as a plain `icarus` field per ICARUS-D5 (rulings 11/12).
+- path: `crates/mp/engine/icarus/src/blockstream/cblock_member.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CBlockMember`, summary: one ID/size/data record; owned `Vec<u8>` data replacing `void* m_data` (ICARUS-D5/ruling 20 drops the arena, so this `TAG_ICARUS5` blob is owned here); `ReadMember` (reader, live) ports. `WriteMember` (`:47`, def `BlockStream.cpp:133`), `WriteData`/`WriteDataPointer` (`:76`/`:88`), and `Duplicate` (`:74`, def `:148`) are **§20-dropped per ICARUS-D3 (ruling 39a)** — writer/duplicator half, callers only in the excluded compiler TUs (`WriteMember`'s only caller is the dropped `WriteBlock`; `Duplicate` zero callers) — recorded with a `blockstream/` module-doc zero-caller note (`blockstream.h:38-105`, `BlockStream.cpp`).
+- path: `crates/mp/engine/icarus/src/blockstream/cblock.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CBlock`, summary: owns `Vec<BlockMember>`; block id + flags; `Create(int)` (live — reader/`ReadBlock` path, `BlockStream.cpp:201`), `Init`/`Free`/`AddMember`/`GetMember` (live, `blockstream.h:109-154`). The `Write` overloads (`:125-129`, def `BlockStream.cpp:244-300`) and `Duplicate` (`:138`, def `:359`) are **§20-dropped per ICARUS-D3 (ruling 39a)** — writer/duplicator half, zero in-scope callers — with a module-doc zero-caller note, not ported.
+- path: `crates/mp/engine/icarus/src/blockstream/cblock_stream.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CBlockStream`, summary: `.IBI` **reader** over an owned byte buffer; `Open` (`:665`, live — `GameInterface.cpp:465`, `Sequencer.cpp:318`/`:370`), `ReadBlock` (`:619`), `BlockAvailable` (`:605`), the `IBI` header+version check, and the `Get*` stream primitives (`blockstream.h:158-196`). The **writer methods `Create(char *)` (`:167`, def `:525`) and `WriteBlock` (`:174`, def `:577`) are §20-dropped per ICARUS-D3 (ruling 39a)** — zero / excluded-TU callers — with a module-doc zero-caller note. **`Init` (`:165`, def `:558`) ports as a live reader helper — not in ruling 39a's drop set (ICARUS-D3)**: it has a live caller (`Open` calls it at `:670`), so it fails §20's zero-caller test; ruling 39a's "zero callers" listing of it is a mis-classification the cited oracle corrects. Port it as a method (transcription-first, §21).
+- path: `crates/mp/engine/icarus/src/blockstream/vector_t.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `vector_t`, summary: `[f32; 3]` alias used by block reads (existing skeleton, kept).
+- path: `crates/mp/engine/icarus/src/blockstream/file.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CBlockStream::file`, summary: owned file-handle helper replacing `FILE*` — reader-only under ICARUS-D3 (the writer `fopen("wb")` path drops); kept for the reader's owned-buffer I/O (existing skeleton).
+- path: `crates/mp/engine/icarus/src/sequence/csequence.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CSequence`, summary: command/child tree node; flags/iterations, `Save/Load` (inert) (`sequence.h:12-96`, `Sequence.cpp`). **Shape settled by ICARUS-D5 (ruling 27):** `m_children: Vec<SequenceId>`, `m_parent: Option<SequenceId>`, `m_return: Option<SequenceId>` (pointer graph → id newtypes into the `IcarusInstance.sequences` arena, reconstructed on `Load` via a `GetSequence(id)` linear scan); `m_commands: Vec<Block>` owned (no cross-object aliasing, literal transcription).
+- path: `crates/mp/engine/icarus/src/sequencer/csequencer.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CSequencer`, summary: per-entity script driver; parses IBI blocks into sequences; `Run`/`Callback`/`Parse*`/`Check*`/`Push/PopCommand` (`sequencer.h:68-187`, `Sequencer.cpp`, ~43 fns). Per ICARUS-D5 (ruling 24) it holds **no** `m_ie`/`m_owner`/taskmanager handles — the 73 `m_ie->I_*` dispatch sites become free fns `(&mut Icarus, &mut dyn EngineHost, …)` that re-index disjoint `Icarus` field borrows per call. **Member-storage shape settled by ICARUS-D5 (ruling 27):** `CSequencer`'s own non-owning `m_sequences` subset (`sequencer.h:176`) is `Vec<SequenceId>`; its `map<CTaskGroup*,CSequence*> m_taskSequences` (`:177`) is `BTreeMap<TaskGroupId, SequenceId>`.
 - path: `crates/mp/engine/icarus/src/sequencer/bstream_s.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `bstream_t`, summary: internal stream-stack node; intrusive `last` pointer folds into the sequencer's owned `Vec` (existing skeleton, `sequencer.h:42-46`).
-- path: `crates/mp/engine/icarus/src/taskmanager/ctask.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CTask`, summary: a scheduled task (GUID, timestamp, owned `CBlock`) (`taskmanager.h:33-58`). **Ownership shape settled by ICARUS-D11 (ruling 27):** `CTask` is owned in `CTaskManager`'s `m_tasks: Vec<Task>` (Raven's `list<CTask*> m_tasks`, `taskmanager.h:178`); no cross-object pointer aliasing (groups track completion by int GUID), so this is literal transcription per ICARUS-D8, no id newtype needed.
-- path: `crates/mp/engine/icarus/src/taskmanager/ctask_group.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CTaskGroup`, summary: completion-tracking group; `MarkTaskComplete`/`Complete` (`taskmanager.h:62-93`). **Shape settled by ICARUS-D11 (ruling 27):** owned in `CTaskManager`'s `Vec<TaskGroup>` arena keyed by `TaskGroupId`; `m_completedTasks` (Raven's already-int-keyed `map<int,bool>`, `taskmanager.h:87`) → `BTreeMap<i32, bool>`; `m_parent: Option<TaskGroupId>` (raw `CTaskGroup*` back-pointer → id).
-- path: `crates/mp/engine/icarus/src/taskmanager/ctask_manager.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CTaskManager`, summary: per-entity scheduler; `Update` heartbeat (`Go`, `RUNAWAY_LIMIT`), the `Rotate/Camera/Print/Sound/Move/Set/Use/…/Wait/WaitSignal` handlers, owned task maps/lists; `Get` scratch out-param folds to an owned return (`taskmanager.h:97-189`, `TaskManager.cpp`, ~52 fns). Per **ICARUS-D9** (ruling 24) it holds **no** `m_owner` back-ref — the 121 `(m_owner->GetInterface())->I_*` dispatch sites become free fns `(&mut Icarus, &mut dyn EngineHost, …)` that re-index disjoint `Icarus` field borrows per call. Dispatch shape settled (ICARUS-D9); **member-storage shape settled by ICARUS-D11 (ruling 27):** the three parallel `CTaskGroup*` indexes collapse to **one owner** `m_taskGroups: Vec<TaskGroup>` (Raven's `vector<CTaskGroup*>`, `taskmanager.h:177`) + `TaskGroupId` — **this file also declares `pub struct TaskGroupId(i32)`**, co-located with the `Vec<TaskGroup>` arena it indexes per ICARUS-D11's definition-site pin (RMG `AreaId` §B5 precedent) — with `m_taskGroupNameMap` / `m_taskGroupIDMap` (`taskmanager.h:183-184`) as `BTreeMap<String, TaskGroupId>` / `BTreeMap<i32, TaskGroupId>` **side-indexes of ids**; `m_tasks: Vec<Task>` owns the tasks (literal, ICARUS-D8).
-- path: `crates/mp/engine/icarus/src/instance/icarus_instance.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `ICARUS_Instance`, summary: top singleton; **owns** its sequence/sequencer arenas + signal map; `Create`/`Delete`, `Signal`/`CheckSignal`/`ClearSignal`, inert `Save*/Load*` (`instance.h:12-79`, `Instance.cpp`, ~24 fns). **Pool container + lookup shape settled by ICARUS-D11 (ruling 27):** `sequences: Vec<Sequence>` + `sequencers: Vec<Sequencer>` owning arenas (Raven's `m_sequences`/`m_sequencers`, `instance.h:62-63`); **this file also declares `pub struct SequenceId(i32)` and `pub struct SequencerId(i32)`** — the newtypes carrying the monotonic never-reused `m_GUID` (`Instance.cpp:26,228`), co-located with the arenas they index per ICARUS-D11's definition-site pin (RMG `AreaId` §B5 precedent); `GetSequence(id)` stays a **faithful linear scan** (`Instance.cpp:248-258`), insertion-ordered, **not** upgraded to a keyed map (§A2 change the doc declines); `m_signals: BTreeMap<String, u8>`. The per-entity `gSequencers`/`gTaskManagers` arrays are file-scope globals (`Instance.cpp:19-20`), not `ICARUS_Instance` members — `Icarus.sequencers` is a non-owning `SequencerId` index into this arena, `Icarus.task_managers` owns the task managers (State-ownership table, ICARUS-D2/D11).
-- path: `crates/mp/engine/icarus/src/interface/interface_export_s.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `interface_export_t`, summary: reshape the `#[repr(C)]` type-port skeleton into the plain `fn`-item `InterfaceExport` table (ICARUS-D8) (`interface.h:17-70`). Because ICARUS-D8/fork-5 make the fields **bare `fn` items (not `Option<fn>`)**, the struct has no null/None state, yet ICARUS-D2 requires `Icarus` (hence this field) be `Default`-constructible — so its `impl Default` seeds every slot with the real crate `Q3_*`/`I_*` fn, identical to `Interface_Init`'s 1:1 assignment (`Q3_Interface.cpp:956-1008`). This is faithful, not an invented pre-init state: init order runs `Interface_Init(&interface_export)` to (re-)populate the table before `ICARUS_Instance::Create` and before any `I_*` call (`GameInterface.cpp:143-156`), so the seed is overwritten with the same fns before it is ever observed. `Interface_Init` in `q3_interface/mod.rs` remains the live wiring; the seed only satisfies Rust's construct-before-use requirement for the bare-`fn` table. Per **ICARUS-D10** (ruling 24) each stored slot is a `fn(&mut Icarus, &mut dyn EngineHost, …)` pointer (`&mut dyn`, not `impl` — a bare `fn` cannot be generic); the `impl Default` seed and 1:1 `Interface_Init` wiring hold under it.
-- path: `crates/mp/engine/icarus/src/memory/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(none — §20 note)`, summary: **no `IcarusArena` type** — ICARUS-D3/ruling 20 drops the arena entirely (all three `TAG_ICARUS5` families are owned buffers: `CBlockMember::m_data`, `pscript_t::buffer` owned `Vec<u8>`, and `bData` `Save`/`Load` scratch folded to a local). `ICARUS_Malloc`/`ICARUS_Free` (`Memory.cpp:8-20`, `icarus.h:29-30`) have zero live callers under the owned-buffer shape and are **§20-dropped, not ported**; this file carries only the module-doc zero-caller note recording that (porting-rules §20). ICARUS-Q7 settled.
-- path: `crates/mp/engine/icarus/src/q3_interface/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `Q3Interface`, summary: the `Q3_*` `I_*` implementations (shared-memory write + `VM_Call`, both via `EngineHost` per ICARUS-D1) and `Interface_Init` wiring; `Q3_Evaluate`, camera stubs, and the `Q3_TaskIDSet`/`Complete`/`Pending` task-id helpers (which read/write `ent->taskID[]`/`s.number` on the `ent: *mut sharedEntity_t` the seam carries, per ICARUS-D1/ruling 23 — no `host.gentity`) (`Q3_Interface.cpp`, ~49 fns). The `I_*` slot fns' host-param type is `&mut dyn EngineHost` (ICARUS-D10) and internal dispatch is via free fns re-indexing `&mut Icarus` (ICARUS-D9); both settled.
+- path: `crates/mp/engine/icarus/src/taskmanager/ctask.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CTask`, summary: a scheduled task (GUID, timestamp, owned `Block`) (`taskmanager.h:33-58`). **Ownership shape settled by ICARUS-D5 (ruling 27):** owned in `CTaskManager`'s `m_tasks: Vec<Task>` (Raven's `list<CTask*> m_tasks`, `taskmanager.h:178`); no cross-object pointer aliasing (groups track completion by int GUID), so literal transcription, no id newtype needed.
+- path: `crates/mp/engine/icarus/src/taskmanager/ctask_group.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CTaskGroup`, summary: completion-tracking group; `MarkTaskComplete`/`Complete` (`taskmanager.h:62-93`). **Shape settled by ICARUS-D5 (ruling 27):** owned in `CTaskManager`'s `Vec<TaskGroup>` arena keyed by `TaskGroupId`; `m_completedTasks` (Raven's already-int-keyed `map<int,bool>`, `:87`) → `BTreeMap<i32, bool>`; `m_parent: Option<TaskGroupId>` (raw `CTaskGroup*` back-pointer → id).
+- path: `crates/mp/engine/icarus/src/taskmanager/ctask_manager.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `CTaskManager`, summary: per-entity scheduler; `Update` heartbeat (`Go`, `RUNAWAY_LIMIT`) — which **opens with a per-frame `host.gentity(m_ownerID)` freeze gate**: `SV_GentityNum(m_ownerID)` then `owner->r.svFlags & SVF_ICARUS_FREEZE` → return `TASK_FAILED` before `Go()` (`TaskManager.cpp:322-329`, `m_ownerID: i32` at `taskmanager.h:173`; § Raven ground truth gentity-site inventory) — the `Rotate/Camera/Print/Sound/Move/Set/Use/…/Wait/WaitSignal` handlers, owned task maps/lists; `Get` scratch out-param folds to an owned return (`taskmanager.h:97-189`, `TaskManager.cpp`, ~52 fns). Per ICARUS-D5 (ruling 24) it holds **no** `m_owner` back-ref — the 121 `(m_owner->GetInterface())->I_*` dispatch sites become free fns `(&mut Icarus, &mut dyn EngineHost, …)` re-indexing disjoint `Icarus` field borrows per call. **Member-storage shape settled by ICARUS-D5 (ruling 27):** the three parallel `CTaskGroup*` indexes collapse to **one owner** `m_taskGroups: Vec<TaskGroup>` (`:177`) + `TaskGroupId` — **this file also declares `pub struct TaskGroupId(i32)`**, co-located with the `Vec<TaskGroup>` arena it indexes per **ICARUS-D4 (ruling 39d)** (RMG `AreaId` §B5 precedent) — with `m_taskGroupNameMap`/`m_taskGroupIDMap` (`:183-184`) as `BTreeMap<String, TaskGroupId>`/`BTreeMap<i32, TaskGroupId>` side-indexes; `m_tasks: Vec<Task>` owns the tasks (literal).
+- path: `crates/mp/engine/icarus/src/instance/icarus_instance.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `ICARUS_Instance`, summary: top singleton; **owns** its sequence/sequencer arenas + signal map; `Create`/`Delete`, `Signal`/`CheckSignal`/`ClearSignal`, inert `Save*/Load*` (`instance.h:12-79`, `Instance.cpp`, ~24 fns). **Pool container + lookup shape settled by ICARUS-D5 (ruling 27):** `sequences: Vec<Sequence>` + `sequencers: Vec<Sequencer>` owning arenas (`instance.h:62-63`); **this file also declares `pub struct SequenceId(i32)` and `pub struct SequencerId(i32)`** — the newtypes carrying the monotonic never-reused `m_GUID` (`Instance.cpp:26,228`), co-located with the arenas they index per **ICARUS-D4 (ruling 39d)** (RMG `AreaId` §B5 precedent); `GetSequence(id)` stays a **faithful linear scan** (`Instance.cpp:248-258`), insertion-ordered, **not** a keyed map (§A2 change declined); `m_signals: BTreeMap<String, u8>`. The per-entity `gSequencers`/`gTaskManagers` arrays are file-scope globals (`Instance.cpp:19-20`), not `ICARUS_Instance` members — `Icarus.sequencers` is a non-owning `SequencerId` index into this arena, `Icarus.task_managers` owns the task managers (State-ownership table).
+- path: `crates/mp/engine/icarus/src/interface/interface_export_s.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `interface_export_t`, summary: reshape the `#[repr(C)]` type-port skeleton into the plain `fn`-item `InterfaceExport` table (ICARUS-D5, rulings 24/fork-5) (`interface.h:17-70`). The fields are **bare `fn` items (not `Option<fn>`)**, so the struct has no null/None state, yet `Icarus` (hence this field) must be `Default`-constructible — so its `impl Default` seeds every slot with the real crate `Q3_*`/`I_*` fn, identical to `Interface_Init`'s 1:1 assignment (`Q3_Interface.cpp:956-1008`), which (re-)populates the table before any `I_*` call (`GameInterface.cpp:143-156`), so the seed is overwritten with the same fns before it is ever observed. Per ICARUS-D5 (ruling 24) each stored slot is a `fn(&mut Icarus, &mut dyn EngineHost, …)` pointer (`&mut dyn`, not `impl`).
+- path: `crates/mp/engine/icarus/src/memory/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(none — §20 note)`, summary: **no `IcarusArena` type** — ICARUS-D5 (ruling 20) drops the arena entirely (all three `TAG_ICARUS5` families are owned buffers: `CBlockMember::m_data`, `pscript_t::buffer` owned `Vec<u8>`, and `bData` `Save`/`Load` scratch folded to a local). `ICARUS_Malloc`/`ICARUS_Free` (`Memory.cpp:8-20`, `icarus.h:29-30`) have zero live callers under the owned-buffer shape and are **§20-dropped, not ported**; this file carries only the module-doc zero-caller note recording that (porting-rules §20).
+- path: `crates/mp/engine/icarus/src/q3_interface/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `Q3Interface`, summary: the `Q3_*` `I_*` implementations (shared-memory write + `VM_Call`, both via `EngineHost`) and `Interface_Init` wiring; `Q3_Evaluate`, `Q3_DebugPrint` (its `com_developer` gate ports through `host.cvar_integer("developer")` per **ICARUS-D2 (ruling 36)**; its `WL_DEBUG` branch then reaches `host.gentity(entNum)` for the log line, `Q3_Interface.cpp:679`), `Q3_GetEntityByName` (the outbound `I_GetEntityByName` slot, `:238`, wired `:964`) which resolves a script name to a real entity via `host.gentity` — both per the § Raven ground truth gentity-site inventory — camera stubs, and the `Q3_TaskIDSet`/`Complete`/`Pending` task-id helpers (which read/write `ent->taskID[]`/`s.number` on the **bare real-entity** `ent: *mut sharedEntity_t` the seam carries — writes persist, unlike the ConvertedEntity-copy arms — per ICARUS-D1/ruling 37; no `host.gentity`) (`Q3_Interface.cpp`, ~49 fns). The `I_*` slot fns' host-param type is `&mut dyn EngineHost` and internal dispatch is via free fns re-indexing `&mut Icarus` (ICARUS-D5, ruling 24).
 - path: `crates/mp/engine/icarus/src/q3_interface/set_type_t.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `setType_e`, summary: SET_* enum (existing skeleton, kept).
 - path: `crates/mp/engine/icarus/src/q3_interface/play_type_t.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `playType_e`, summary: PLAY_* enum (existing skeleton, kept).
-- path: `crates/mp/engine/icarus/src/q3_registers/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `Q3Registers`, summary: `varStrings`/`varFloats`/`varVectors` stores + `Q3_InitVariables`/`Q3_Declare/Free/Get/Set*Variable`, `MAX_VARIABLES`, `VTYPE_*`; `Q3_DebugPrint` reaches `Com_Printf` via `EngineHost::print` (ICARUS-D1) — **but its `com_developer` gate (`Q3_Interface.cpp:642`) has NO `EngineHost` method; OPEN per ICARUS-Q12**, blocking these ~16 fns' debug-print sites until resolved (`Q3_Registers.cpp`, `.h:4-32`, ~16 fns).
-- path: `crates/mp/engine/icarus/src/game_interface/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `GameInterface`, summary: `ICARUS_RunScript`/`RegisterScript`/`GetScript`/`Init`/`InitEnt`/`FreeEnt`/`ValidEnt`/`AssociateEnt`/`Shutdown`/`LinkEntity`/`SoundPrecache`/`InterrogateScript` + the buffer/ent-list state; the 5 unchecked entnum paths guard-and-return per ICARUS-D5; `Svcmd_ICARUS_f` is §20-dropped per ICARUS-D6 (zero-caller module-doc note, not ported); `RunScript`/`InitEnt`/`FreeEnt`/`ValidEnt`/`AssociateEnt` read `ent->classname`/`taskID`/`script_targetname`/`targetname` on the `ent: *mut sharedEntity_t` the seam carries (ICARUS-D1/ruling 23); only `ValidEnt` additionally calls `host.gentity(ent.s.number)` for the true entity, its behaviorSet write-back `trueEntity->script_targetname = trueEntity->targetname` (`GameInterface.cpp:288`/`:291`) — `AssociateEnt` does **not** (it only reads `ent.s.number` into the ent-list, `:317`) (`GameInterface.cpp`, ~14 live fns).
-- path: `crates/mp/engine/icarus/src/game_interface/pscript_s.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `pscript_t`, summary: cached script record; `buffer` is an owned `Vec<u8>` replacing `char* buffer` (settled — ICARUS-D3/ruling 20 drops the arena, so this `TAG_ICARUS5` blob is owned here) (existing skeleton, `GameInterface.h:4-8`).
+- path: `crates/mp/engine/icarus/src/q3_registers/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `Q3Registers`, summary: `varStrings`/`varFloats`/`varVectors` stores + `Q3_InitVariables`/`Q3_Declare/Free/Get/Set*Variable`, `MAX_VARIABLES`, `VTYPE_*`; `Q3_DebugPrint`-gated diagnostics reach `Com_Printf` via `EngineHost::print` and gate on `EngineHost::cvar_integer("developer")` (**ICARUS-D2 (ruling 36)** — former ICARUS-Q12 resolved) (`Q3_Registers.cpp`, `.h:4-32`, ~16 fns).
+- path: `crates/mp/engine/icarus/src/game_interface/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `GameInterface`, summary: `ICARUS_RunScript`/`RegisterScript`/`GetScript`/`Init`/`InitEnt`/`FreeEnt`/`ValidEnt`/`AssociateEnt`/`Shutdown`/`LinkEntity`/`SoundPrecache`/`InterrogateScript` + the buffer/ent-list state; the 5 unchecked entnum paths guard-and-return per ICARUS-D5 (ruling 15); `Svcmd_ICARUS_f` §20-dropped per ICARUS-D5 (ruling 17). `RunScript`/`InitEnt`/`FreeEnt`/`ValidEnt`/`AssociateEnt` read `ent->classname`/`taskID`/`script_targetname`/`targetname` on the `ent: *mut sharedEntity_t` the seam carries — which **points to `ConvertedEntity`'s by-value copy** (ICARUS-D1/ruling 37), so `InitEnt`'s `memset(&ent.taskID,-1)` writes the copy and is dropped, faithfully (`GameInterface.cpp:664`). Three fns in **this file** call `host.gentity` (§ Raven ground truth inventory): `ValidEnt` (`:288`/`:291`, behaviorSet write-back `trueEntity->script_targetname = trueEntity->targetname` to the *true* entity), the no-arg `Shutdown` sweep (`:169`/`:174`, feeding the real pointer into `FreeEnt` `:184`), and `LinkEntity` (`:681`, the outbound `I_LinkEntity` slot resolving `entID`). `AssociateEnt` does **not** (it only reads `ent.s.number` off the copy into the ent-list, `:317`) (`GameInterface.cpp`, ~14 live fns).
+- path: `crates/mp/engine/icarus/src/game_interface/pscript_s.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `pscript_t`, summary: cached script record; `buffer` is an owned `Vec<u8>` replacing `char* buffer` (ICARUS-D5/ruling 20 drops the arena, so this `TAG_ICARUS5` blob is owned here) (existing skeleton, `GameInterface.h:4-8`).
 
 **Module-declaration files (boilerplate, not classes).** Each one-class-per-file
 directory (porting-rules §21) needs a `mod.rs` that only `pub mod`s its per-class
-files; these carry no logic and make no decision — they realize the module tree
-ICARUS-D7 fixes. Listed for roster completeness so the skeleton compiles
-(`blockstream/mod.rs`, `sequencer/mod.rs`, and `interface/mod.rs` already exist on
-disk from the type port; `sequence/mod.rs`, `taskmanager/mod.rs`, `instance/mod.rs`
-are new dirs under ICARUS-D7). `game_interface/mod.rs`, `q3_interface/mod.rs`,
-`q3_registers/mod.rs`, and `memory/mod.rs` are **not** here — they are the
-class-bearing units already rostered above (`GameInterface`/`Q3Interface`/
-`Q3Registers`/§20-note), not declaration-only files.
+files; these carry no logic and make no decision. Listed for roster completeness so
+the skeleton compiles (`blockstream/mod.rs`, `sequencer/mod.rs`, `interface/mod.rs`
+already exist from the type port; `sequence/mod.rs`, `taskmanager/mod.rs`,
+`instance/mod.rs` are new dirs per ICARUS-D5). `game_interface/mod.rs`,
+`q3_interface/mod.rs`, `q3_registers/mod.rs`, and `memory/mod.rs` are **not** here —
+they are the class-bearing units already rostered above.
 - path: `crates/mp/engine/icarus/src/blockstream/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(mod decl)`, summary: `pub mod cblock_member; pub mod cblock; pub mod cblock_stream; pub mod vector_t; pub mod file;` — declaration-only (existing skeleton, extend for the reshaped roster).
-- path: `crates/mp/engine/icarus/src/sequence/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(mod decl)`, summary: `pub mod csequence;` — declaration-only (new dir, ICARUS-D7).
+- path: `crates/mp/engine/icarus/src/sequence/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(mod decl)`, summary: `pub mod csequence;` — declaration-only (new dir, ICARUS-D5).
 - path: `crates/mp/engine/icarus/src/sequencer/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(mod decl)`, summary: `pub mod csequencer; pub mod bstream_s;` — declaration-only (existing skeleton, extend for the reshaped roster).
-- path: `crates/mp/engine/icarus/src/taskmanager/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(mod decl)`, summary: `pub mod ctask; pub mod ctask_group; pub mod ctask_manager;` — declaration-only (new dir, ICARUS-D7).
-- path: `crates/mp/engine/icarus/src/instance/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(mod decl)`, summary: `pub mod icarus_instance;` — declaration-only (new dir, ICARUS-D7).
+- path: `crates/mp/engine/icarus/src/taskmanager/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(mod decl)`, summary: `pub mod ctask; pub mod ctask_group; pub mod ctask_manager;` — declaration-only (new dir, ICARUS-D5).
+- path: `crates/mp/engine/icarus/src/instance/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(mod decl)`, summary: `pub mod icarus_instance;` — declaration-only (new dir, ICARUS-D5).
 - path: `crates/mp/engine/icarus/src/interface/mod.rs`, crate: `mp_engine_icarus`, mode: `mp`, class: `(mod decl)`, summary: `pub mod interface_export_s;` — declaration-only (existing skeleton, kept).
 
 `Interface.cpp` produces **no** Rust file — its `Interface_Init` is commented
@@ -934,13 +978,13 @@ Raven-UB / dead-surface points where the port picks one defined behavior
 
 - MP save/load is inert: `AppendToSaveGame`/`ReadFromSaveGame` (`I_WriteSaveData`/`I_ReadSaveData` targets) both `return 1;` with no I/O (`Q3_Interface.cpp:695-704`); the `ICARUS_Instance`/`CSequencer`/`CSequence`/`CTaskManager` `Save`/`Load` methods port as structurally-present but effect-free, and are excluded from the golden corpus.
 - `Interface.cpp`'s `Interface_Init` is commented out (`Interface.cpp:14-24`); it links no code. The port emits no Rust unit for it — the live table wiring lives in `q3_interface/mod.rs` (`Q3_Interface.cpp:956`).
-- `ConvertedEntity`'s VM-address shuffle (`sv_game.cpp:422-451`) is **not** replicated (ruling 23). It copies `ent->s`/`r`/`taskID` into a file-static `gLocalModifier` and re-points string/`parms` fields through `VM_ArgPtr` (`:444-448`), returning `&gLocalModifier`; `VM_ArgPtr` is **identity in the native-dylib model** (no VM heap to relocate against), so the shuffle is a no-op and the seam carries the original `*mut sharedEntity_t` straight to the ICARUS fns. This lives in the server crate's `G_ICARUS_*` dispatch, not this crate — noted here because it is why the entity-field seam args are `*mut sharedEntity_t` (ICARUS-D1). The `ICARUS_ValidEnt` write-back hack (`GameInterface.cpp:288-291`, the behaviorSet branch) — which in C needs the *true* entity because `gLocalModifier`'s pointer fields cannot be stored back — resolves through the `host.gentity(ent.s.number)` service (ruling 23); under the identity `VM_ArgPtr`, that true entity is the same pointer the seam carried. (`ICARUS_AssociateEnt` has no such hack — it only reads `ent.s.number` into `ICARUS_EntList`, `:317`, so it needs no `gentity`.)
-- Out-of-range entnum on the 5 unchecked `gSequencers`/`gTaskManagers` paths → **guard-and-return** (resolved per ICARUS-D5, ruling 15). The `ISINITIALIZED`/`MAINTAINTASKMANAGER`/`ISRUNNING` arms index `gSequencers[entID]`/`gTaskManagers[entID]` with `entID = args[1]` unchecked (`sv_game.cpp:752-782`), and `ICARUS_RunScript`/`ICARUS_InitEnt` index `gSequencers[ent->s.number]` unchecked (`GameInterface.cpp:75`, `:660`); only `ICARUS_FreeEnt` guards `s.number >= MAX_GENTITIES || < 0` (`GameInterface.cpp:224-229`). In C a negative/`>= MAX_GENTITIES` entnum is an OOB pointer read (UB); on the Rust `[Option<_>; MAX_GENTITIES]` arrays each of the five ports the `FreeEnt` bounds-check and returns the "absent" result (`false`/no-op), with a ≤2-line §19 note per site. Excluded from / normalized in the shared corpus.
-- `ICARUS_Malloc` is non-zeroed (`Z_Malloc(...,qfalse)`, `Memory.cpp:12`) while class `operator new` is zeroed (`Z_Malloc(...,qtrue)`, `blockstream.h:66`); under ICARUS-D3/ruling 20 both class instances and the `TAG_ICARUS5` blobs (`CBlockMember::m_data`, `pscript_t::buffer`) are owned Rust objects/`Vec<u8>`, always value-initialized, so the zero/non-zero distinction collapses to defined initialization — `WriteDataPointer` still `memcpy`s exact bytes, preserving content parity.
-- `ICARUS_Malloc`/`ICARUS_Free` (`Memory.cpp:8-20`, `icarus.h:29-30`) are §20-dropped per ICARUS-D3/ruling 20: with every `TAG_ICARUS5` user owned, the arena is dropped entirely and these two fns have zero live callers. Recorded with a module-doc zero-caller note in `memory/mod.rs`, not ported (`Icarus.arena` does not exist).
-- `Svcmd_ICARUS_f` (`GameInterface.h:32`, `GameInterface.cpp:700-730`) is §20-dropped per ICARUS-D6: commented-out body, zero callers/registrations, no `G_ICARUS_*` arm. Recorded with a module-doc zero-caller note, not ported.
-- BlockStream duplicators `CBlock::Duplicate` (`blockstream.h:138`, `BlockStream.cpp:359`) and `CBlockMember::Duplicate` (`:74`, `:148`) are §20-dropped per ICARUS-D13: zero callers anywhere in `oracle/codemp/icarus/` (only `CBlock::Duplicate`'s internal member-`Duplicate` self-call `:374` + a `Tokenizer.cpp:46` string literal; nothing in `Interpreter.cpp`), unused by the § Verification round-trip. Recorded with a `blockstream/` module-doc zero-caller note, not ported. The rest of the writer surface (`Create(char *)`/`WriteBlock`/`WriteMember`/`WriteData`/`WriteDataPointer`/`CBlock::Write`) is **retained** — production-dead but exercised by the settled § Verification round-trip and ICARUS-D3 content-parity (ICARUS-D13), so it is not a divergence, just non-production-reached in-scope surface.
-- Out-of-range `task_type` on the three `G_ICARUS_TASKID*` arms → **guard-and-return** is Raven's own defined behavior, not an undecided fork. The arms cast `(taskID_t)args[2]` unchecked (`sv_game.cpp:786`, `:808`, `:813`), but each callee guards `taskType < TID_CHAN_VOICE || taskType >= NUM_TIDS` and returns before indexing `ent->taskID[taskType]` (`Q3_TaskIDPending` `Q3_Interface.cpp:116-118`, `Q3_TaskIDComplete` `:136-138`, `Q3_TaskIDSet` `:169-171`), so the port transcribes that guard. The only genuine §19 point is the int→enum conversion (Rust cannot build an invalid `taskID_t` from an arbitrary int); that checked conversion lives at the server-dispatch boundary that owns the arm (Punts, § Seam definition task-id note), with Raven's guard pinning the out-of-range outcome. This crate's callees receive an in-range `taskID_t`.
+- **`ConvertedEntity` is ported FAITHFULLY, NOT diverged — the pass-5 "shuffle is a no-op" divergence is STRUCK (ICARUS-D1, ruling 37).** `ConvertedEntity` (`sv_game.cpp:420-451`) copies `ent->s`/`r`/`taskID` **by value** into the file-static `gLocalModifier` and returns `&gLocalModifier` (the copy); the server crate ports it 1:1 and routes the five entity-field ICARUS arms through it. Writes through the copy are **dropped** exactly as retail — including `ICARUS_InitEnt`'s `memset(&ent->taskID,-1)` (`GameInterface.cpp:664`), which never reaches the real entity. This is **zero divergence vs retail** at M4/M5 (listed here only because it is why the entity-field seam args are `*mut sharedEntity_t` and why `ICARUS_ValidEnt` needs `host.gentity`). The `ICARUS_ValidEnt` behaviorSet write-back (`:288`/`:291`) reaches the *true* entity via `host.gentity(ent.s.number)` precisely because the copy's write would be dropped; `ICARUS_AssociateEnt` reads `ent.s.number` off the copy (`:317`), faithful, no `gentity`. (The three task-id helpers take the bare real pointer, so their writes persist — also faithful.)
+- Out-of-range entnum on the 5 unchecked `gSequencers`/`gTaskManagers` paths → **guard-and-return** (resolved per ICARUS-D5, ruling 15). The `ISINITIALIZED`/`MAINTAINTASKMANAGER`/`ISRUNNING` arms index `gSequencers[entID]`/`gTaskManagers[entID]` with `entID = args[1]` unchecked (`sv_game.cpp:752-782`), and `ICARUS_RunScript`/`ICARUS_InitEnt` index `gSequencers[ent->s.number]` unchecked (`GameInterface.cpp:75`, `:660`); only `ICARUS_FreeEnt` guards `s.number >= MAX_GENTITIES || < 0` (`:224-229`). In C a negative/`>= MAX_GENTITIES` entnum is an OOB pointer read (UB); on the Rust `[Option<_>; MAX_GENTITIES]` arrays each of the five ports the `FreeEnt` bounds-check and returns the "absent" result (`false`/no-op), with a ≤2-line §19 note per site. Excluded from / normalized in the shared corpus.
+- `ICARUS_Malloc` is non-zeroed (`Z_Malloc(...,qfalse)`, `Memory.cpp:12`) while class `operator new` is zeroed (`Z_Malloc(...,qtrue)`, `blockstream.h:66`); under ICARUS-D5 (rulings 13/20) both class instances and the `TAG_ICARUS5` blobs (`CBlockMember::m_data`, `pscript_t::buffer`) are owned Rust objects/`Vec<u8>`, always value-initialized, so the zero/non-zero distinction collapses to defined initialization — `WriteDataPointer`'s exact-byte `memcpy` is dropped with the writer half (ICARUS-D3), so content-parity now rides on `ReadMember` reading the committed golden bytes, not a re-write.
+- `ICARUS_Malloc`/`ICARUS_Free` (`Memory.cpp:8-20`, `icarus.h:29-30`) are §20-dropped per ICARUS-D5 (ruling 20): with every `TAG_ICARUS5` user owned, the arena is dropped entirely and these two fns have zero live callers. Recorded with a module-doc zero-caller note in `memory/mod.rs`, not ported (`Icarus.arena` does not exist).
+- `Svcmd_ICARUS_f` (`GameInterface.h:32`, `GameInterface.cpp:700-730`) is §20-dropped per ICARUS-D5 (ruling 17): commented-out body, zero callers/registrations, no `G_ICARUS_*` arm. Recorded with a module-doc zero-caller note, not ported.
+- **BlockStream writer/duplicator half §20-dropped per ICARUS-D3 (ruling 39a):** `CBlockStream::Create(char *)` (`blockstream.h:167`, def `BlockStream.cpp:525`, zero callers), `CBlockStream::WriteBlock` (`:174`, def `:577`, callers only in excluded `Interpreter.cpp`), `CBlockMember::WriteMember` (`:47`, def `:133`, only caller the dropped `WriteBlock`), `CBlock::Write` overloads (`:125-129`, def `:244-300`), `CBlock::Duplicate` (`:138`, def `:359`, zero callers) and `CBlockMember::Duplicate` (`:74`, def `:148`, zero callers). Recorded with a `blockstream/` module-doc zero-caller note, not ported. The dedicated server never writes `.IBI`. **NOTE — `CBlockStream::Init` (`:165`, def `:558`) is NOT dropped; it ports faithfully on the reader path:** ruling 39a lists it among the zero-caller writer/dup half, but the oracle shows the live reader `Open` (`:665`) calls it at `:670`, so it fails §20's zero-caller criterion and no drop reaches it (ICARUS-D3 — a factual set-membership correction, not a re-decision of ruling 39a). This is not a §19 divergence (`Init` is fully faithful); it is noted here only beside the writer-half drops it was mistakenly grouped with.
+- Out-of-range `task_type` on the three `G_ICARUS_TASKID*` arms → **guard-and-return** is Raven's own defined behavior, not an undecided fork. The arms cast `(taskID_t)args[2]` unchecked (`sv_game.cpp:786`, `:808`, `:813`), but each callee guards `taskType < TID_CHAN_VOICE || taskType >= NUM_TIDS` and returns before indexing `ent->taskID[taskType]` (`Q3_TaskIDPending` `Q3_Interface.cpp:116-118`, `Q3_TaskIDComplete` `:136-138`, `Q3_TaskIDSet` `:169-171`), so the port transcribes that guard. The only genuine §19 point is the int→enum conversion (Rust cannot build an invalid `taskID_t`); that checked conversion lives at the server-dispatch boundary that owns the arm (Punts, § Seam definition task-id note). This crate's callees receive an in-range `taskID_t`.
 
 Scout/harness phases may surface further §19 sites; each gets a ≤2-line
 site note at the port, per porting-rules §19.
@@ -954,209 +998,125 @@ committed so `cargo test` needs no C++ toolchain. Gate: GOAL-engine M2
 ("icarus differential goldens"). Skeleton build/checkpoint semantics per DEC-10.
 
 Standalone-diffable units and their canonical dumps:
-- **BlockStream** — round-trip a corpus of `.IBI` blobs: `ReadBlock` →
-  re-`WriteBlock` → byte-identical; dump the parsed `(id, member-type, size,
-  bytes)` record stream. Cleanest TU (its only allocation is the
-  `CBlockMember::m_data` owned `Vec<u8>` that replaces the `TAG_ICARUS5` blob —
-  ICARUS-D3/ruling 20; no arena/`Z_Malloc` dep).
+- **BlockStream (read-only, ICARUS-D3/ruling 39a)** — parse a corpus of `.IBI`
+  blobs and dump the parsed `(id, member-type, size, bytes)` record stream via
+  `Open`→`BlockAvailable`→`ReadBlock`→`ReadMember`. The pass-5 re-`WriteBlock`
+  round-trip is **removed** — the writer half is §20-dropped, so parse parity is
+  verified by the ReadBlock record-stream dump against the oracle's own parse.
+  Cleanest TU (its only allocation is the `CBlockMember::m_data` owned `Vec<u8>`
+  that replaces the `TAG_ICARUS5` blob — ICARUS-D5/ruling 20; no arena/`Z_Malloc`
+  dep).
 - **Q3_Registers** — script variable operations: dump `varStrings/varFloats/
   varVectors` state after a scripted `Declare/Set/Get/Free` sequence.
 - **Sequencer + TaskManager + Instance (end-to-end)** — drive
   `ICARUS_RunScript` on a committed `.IBI` fixture through ruling 32's
-  fixture-backed `MockHost` (`crates/mp/host-interface/src/mock.rs`, ICARUS-D12):
+  fixture-backed `MockHost` (`crates/mp/host-interface/src/mock.rs`, ICARUS-D2):
   `.IBI` bytes served from `MockHost.files`, deterministic `flrand`/`irand` off the
-  replicated `holdrand` LCG, and `MockHost.vm_calls` recording the ordered
-  `vm_call(VmSlot::Gvm, GAME_ICARUS_*, …)` trace (`vm_call_return` scripts the
-  reply). No test-only ICARUS constructor is added — `ICARUS_RunScript` ports with
-  its real frozen signature and reaches the world through the mock's front door
-  (ruling 32). The golden is that ordered `vm_call`/`I_*` callback stream plus final
-  variable/signal state, exercising `Parse*`/`Check*`, task scheduling,
-  `Wait`/`WaitSignal`, and `Callback`.
+  replicated `holdrand` LCG, `MockHost.cvars` answering `cvar_integer("developer")`
+  (ruling 36), and `MockHost.vm_calls` recording the ordered
+  `vm_call(VmSlot::Gvm, GAME_ICARUS_*, …)` trace. The end-to-end run exercises
+  `gentity` beyond `icarus_valid_ent` (§ Raven ground truth inventory), so the
+  `MockHost.gentity` arena must supply the owner entity with the right
+  `r.svFlags` for `CTaskManager::Update`'s `SVF_ICARUS_FREEZE` gate and any
+  `script_targetname`-named entities the fixture's `I_GetEntityByName` /
+  `I_LinkEntity` calls resolve — provision the strided arena accordingly. No test-only ICARUS constructor is
+  added — `ICARUS_RunScript` ports with its real frozen signature and reaches the
+  world through the mock's front door (ruling 32). The golden is that ordered
+  `vm_call`/`I_*` callback stream plus final variable/signal state, exercising
+  `Parse*`/`Check*`, task scheduling, `Wait`/`WaitSignal`, and `Callback`.
 
-Fixture provenance (ICARUS-D4, ruling 14): the committed `.IBI` goldens are
+Fixture provenance (ICARUS-D5, ruling 14): the committed `.IBI` goldens are
 hand-authored scripts compiled **once** by a `tools/ibi-gen` harness built from
 the oracle's out-of-set `Interpreter.cpp`/`Tokenizer.cpp`; the compiled blobs
 are committed, **no** retail `.IBI` assets are committed, and a retail corpus
 may run locally, uncommitted.
 
 Live-peer acceptance (DEC-09 layer 2) is the server-crate/full-engine gate
-(M4-M5), not this subsystem's unit gate.
+(M4-M5), not this subsystem's unit gate — where ruling 37's faithful
+`ConvertedEntity` routing is proven to be zero-divergence vs retail against the
+live oracle dylib.
 
 ## Slice hooks
 
 - **M2 (waves 7-12), GOAL-engine** — "icarus complete … icarus differential
   goldens." The § Seam definition pub API is frozen on the `EngineHost` shape
-  (ICARUS-D1, `&mut dyn EngineHost`) and the `tools/icarus-oracle` harness /
-  `tools/ibi-gen` fixture corpus (ICARUS-D4) are the remaining build items.
-  The `CSequencer`/`CTaskManager`/`InterfaceExport` **dispatch** internals are
-  **unblocked** — ICARUS-Q8/Q9 settled by ICARUS-D9/D10 (ruling 24: free-fn
-  dispatch, `&mut dyn EngineHost` slots). Their **member-storage** shape is now
-  **also settled** — **ICARUS-Q10/Q11 are closed by ICARUS-D11** (ruling 27:
-  `Vec` arenas + `SequenceId`/`SequencerId`/`TaskGroupId` newtypes) — so
-  `csequence.rs`/`csequencer.rs`/`icarus_instance.rs`/`ctask*.rs` are transcribable
-  with no remaining escalation.
+  (ICARUS-D5, `&mut dyn EngineHost`; ICARUS-D2 15-method trait) and the
+  `tools/icarus-oracle` harness / `tools/ibi-gen` fixture corpus (ICARUS-D5, ruling
+  14) are the remaining build items. Dispatch (ruling 24) and member-storage (ruling
+  27) internals are settled, so `csequence.rs`/`csequencer.rs`/`icarus_instance.rs`/
+  `ctask*.rs` are transcribable. The `com_developer` gate is unblocked by
+  `cvar_integer` (ICARUS-D2), and the BlockStream `Init` disposition is settled
+  (ICARUS-D3: `Init` ports as a live reader helper, not dropped). No ICARUS open
+  questions remain.
 - **Stage-0 interface crate** (`crates/mp/host-interface`, package
-  `mp_host_interface`; **built, commit `4b7f01b0`**, rulings 24 + 31 + 33;
-  `docs/plans/2026-07-08-mp-engine-build-out.md:250-251`) — the `EngineHost` trait
-  is already compiled code (`src/engine_host.rs`) with its **full** method roster
-  frozen; this doc `use`s the crate directly and quotes the ICARUS-consumed subset
-  verbatim (§ Seam definition, ICARUS-D12). Already landed — precedes ICARUS in the
-  port order, no longer a pending dependency.
-- **Server crate `SV_GameSystemCalls`** — the `G_ICARUS_*` dispatch arms
-  (`sv_game.cpp:739-832`) call this crate's inbound public API; that switch
-  ports in the server slice and depends on the inbound signatures + the
-  `EngineHost` shape here. The outbound `GAME_ICARUS_*` handlers already exist
-  in `mp_game`.
+  `mp_host_interface`; **built + extended to 15 methods, commit `a9820853`**,
+  rulings 24 + 31 + 33 + 36) — the `EngineHost` trait is compiled code
+  (`src/engine_host.rs`); this doc `use`s it directly and quotes it verbatim
+  (§ Seam definition, ICARUS-D2). Already landed — precedes ICARUS in the port
+  order, no longer a pending dependency.
+- **Server crate `SV_GameSystemCalls` + `ConvertedEntity`** — the `G_ICARUS_*`
+  dispatch arms (`sv_game.cpp:739-832`) call this crate's inbound public API; that
+  switch, **and the faithful `ConvertedEntity` port (`sv_game.cpp:420-451`, ruling
+  37, sv_game.cpp wave-20)** the five entity-field arms route through, port in the
+  server slice and depend on the inbound signatures + the `EngineHost` shape here.
+  The outbound `GAME_ICARUS_*` handlers already exist in `mp_game`.
 - **Engine aggregate** — `mp_engine_core::Engine` gains the plain `icarus`
-  field (ICARUS-D2) and the split-borrow view struct that implements
-  `EngineHost` (ICARUS-D1) — including its `gentity(ent_num)` service
-  (ruling 23, used only by `icarus_valid_ent`'s behaviorSet write-back);
-  `crates/mp/engine/core/src/engine.rs:35-36`.
-- **Memory/Zone** — no dependency: ICARUS-D3/ruling 20 drops the arena and
+  field (ICARUS-D5, ruling 12) and the split-borrow view struct that implements
+  the 15-method `EngineHost` (ICARUS-D2) — including its `gentity(ent_num)` service
+  (ruling 23/37, reached from six ICARUS bodies — § Raven ground truth gentity-site
+  inventory — not `icarus_valid_ent` alone) and `cvar_integer` (ruling 36). Ruling 12
+  (`docs/handoffs/engine-fork-discovery.md:126-130`) fixes it as a plain direct
+  field; `engine.rs` does not yet carry it (its lines 34-36 are a stale
+  pre-ruling-12 STATE-Q2 placeholder comment), so adding the field is this slice's
+  work item.
+- **Memory/Zone** — no dependency: ICARUS-D5 (ruling 20) drops the arena and
   §20-drops `ICARUS_Malloc`/`ICARUS_Free`, so ICARUS owns all its storage and
   needs no engine-Zone hook.
 - **`G_LOCATE_GAME_DATA`/`SV_GentityNum`** (server crate) — installs the
   `sv.gentities`/`sv.gentitySize` base (`sv_game.cpp:329-330`) that the
-  `EngineHost::gentity` service reads (ICARUS-D1/ruling 23) and that
+  `EngineHost::gentity` service reads (ruling 23/37) and that
   `ConvertedEntity`/the entity-field arms build their `*mut sharedEntity_t` over;
   lands with the server slice, before ICARUS's entity-field fns run live.
 
 ## Open questions
 
-MUST be empty at FROZEN. **ICARUS-Q1–Q11 are all resolved; one new item —
-ICARUS-Q12 (the `com_developer` debug-print gate has no `EngineHost` seam method) —
-was surfaced by the dry-run and remains OPEN, blocking FROZEN until an interactive
-design session settles it.**
-Q1–Q6 by the second §F design-session rulings (handoff ledger `:114-158`); Q7 by
-ruling 20; the entity-field **seam gap**, **ICARUS-Q8**, and **ICARUS-Q9** by the
-rulings 23 + 24 (2026-07-09) — ICARUS-D1, ICARUS-D9, ICARUS-D10 respectively; and
-the last two items, **ICARUS-Q10 and ICARUS-Q11**, by the final-revision
-**ruling 27** (2026-07-09, ICARUS-D11) — faithful `Vec` arenas + id newtypes
-(`SequenceId`/`SequencerId`/`TaskGroupId`), matching the RMG (ruling 21) and
-Ghoul2 (ruling 22) precedents that these two questions had flagged as unmatched.
-Ruling 27 pins the specific §17/§B5 arena-owner types, id newtypes, and lookup
-semantics the porter could not invent, so `csequence.rs`/`csequencer.rs`/
-`icarus_instance.rs`/`ctask.rs`/`ctask_group.rs`/`ctask_manager.rs` are
-transcribable. Separately, **rulings 31 + 33** (2026-07-09, ICARUS-D12) built the
-Stage-0 `EngineHost` crate as real compiled code (`crates/mp/host-interface`,
-commit `4b7f01b0`), so § Seam definition quotes its actual signatures verbatim
-rather than a paper spec. The Q1–Q11 closures leave the port transcribable, but
-**ICARUS-Q12** (dry-run-surfaced: `Q3_DebugPrint`'s `com_developer` gate has no
-`EngineHost` seam method) is **OPEN and must be settled in an interactive session
-before this doc can reach FROZEN** — it cannot self-resolve (ruling 33 freezes the
-seam).
+MUST be empty at FROZEN. **ICARUS-Q1–Q13 are all resolved.** Q12 by ruling 36
+(ICARUS-D2 — `cvar_integer` answers the `com_developer` gate); Q13 — surfaced by
+this revision's oracle re-check of ruling 39a — is resolved in place from cited
+oracle ground truth plus porting-rules §20 (ICARUS-D3), not by a new decision:
+`Init` has a live caller, so §20's zero-caller drop criterion does not reach it.
 
-- **ICARUS-Q1** (host/context threading) → resolved by **ICARUS-D1** (ruling 11:
-  one `EngineHost` trait, `(&mut Icarus, &mut dyn EngineHost)`; ruling 23 corrects
-  the entity-field seam to carry `*mut sharedEntity_t`, keeping `gentity` only for
-  `icarus_valid_ent`'s behaviorSet write-back).
-- **ICARUS-Q2** (arena scope vs. class allocs) → resolved by **ICARUS-D3**
-  (ruling 13: owned objects for `TAG_ICARUS2/3/4`; ruling 20 then drops the
-  arena for `TAG_ICARUS5` too — see Q7).
-- **ICARUS-Q3** (golden-fixture provenance) → resolved by **ICARUS-D4**
-  (ruling 14: hand-authored, `tools/ibi-gen`-compiled, no retail blobs).
-- **ICARUS-Q4** (out-of-range entnum §19 fork) → resolved by **ICARUS-D5**
-  (ruling 15: guard-and-return at all 5 sites).
-- **ICARUS-Q5** (`Svcmd_ICARUS_f` drop-vs-keep §20 fork) → resolved by
-  **ICARUS-D6** (ruling 17: §20-drop, zero-caller note).
-- **ICARUS-Q6 / STATE-Q2** (`Icarus` attachment to the `Engine` island) →
-  resolved by **ICARUS-D2** (ruling 12: plain `Default`-initialized `icarus`
-  field directly on `Engine`).
-- **ICARUS-Q7** (residual `TAG_ICARUS5` blob home — arena handle vs. owned
-  buffer — and the fate of `ICARUS_Malloc`/`ICARUS_Free`) → **resolved by
-  ICARUS-D3 as amended by ruling 20** (2026-07-09): option (b) — the Icarus
-  arena is **dropped entirely**. All three `TAG_ICARUS5` families take owned
-  storage (`CBlockMember::m_data` and `pscript_t::buffer` owned `Vec<u8>`; the
-  `bData` `Save`/`Load` scratch folds to a function-local `Vec<u8>`, inert in MP
-  anyway), so `Icarus.arena` does not exist and `ICARUS_Malloc`/`ICARUS_Free`
-  are §20-dropped with a `memory/mod.rs` zero-caller note. No handle
-  representation is needed, and the BlockStream first-TU blocker is cleared:
-  `cblock_member.rs`'s `m_data` is simply an owned `Vec<u8>` (State ownership,
-  ICARUS-D3, Files roster).
-- **Entity-field seam gap** (do the entity-field fns take an entnum or a pointer?)
-  → **resolved by ICARUS-D1 as corrected by ruling 23** (2026-07-09). The
-  `G_ICARUS_*` entity-field arms carry the `sharedEntity_t *` pointer directly
-  (`sv_game.cpp:740/750/786/789/793/797/808/813`), not an entnum; those fns take
-  `ent: *mut sharedEntity_t`. Only the three presence-check arms (`:752/:763/:774`)
-  carry `int entID`. `gentity` survives for `icarus_valid_ent`'s
-  `SV_GentityNum(ent->s.number)` behaviorSet write-back alone (`GameInterface.cpp:288`/`:291`);
-  `icarus_associate_ent` needs none (it only reads `ent.s.number` into the ent-list, `:317`).
-  This supersedes the ruling-19 premise that every entity-field fn took an entnum + `host.gentity`.
-- **ICARUS-Q8** (internal interface/host dispatch convention for `CSequencer`/
-  `CTaskManager`) → **resolved by ICARUS-D9** (ruling 24, 2026-07-09). The ~194
-  `m_ie->I_*` (73×, `Sequencer.cpp`) / `(m_owner->GetInterface())->I_*` (121×,
-  `TaskManager.cpp`) dispatch sites become **free fns `(&mut Icarus, &mut dyn
-  EngineHost, …)` with no stored back-refs** — candidate (a), re-index-per-call,
-  which keeps the sibling-field borrows disjoint (no two live `&mut Icarus`).
-  Rejected take-and-restore and `Rc<RefCell<…>>`.
-- **ICARUS-Q9** (host-param type of the stored `InterfaceExport` `fn` items) →
-  **resolved by ICARUS-D10** (ruling 24, 2026-07-09). The bare `fn`-pointer slots
-  take **`&mut dyn EngineHost`** (candidate (a), trait-object dispatch); a bare
-  `fn` cannot be generic over `impl EngineHost`, and the `dyn` slot type propagates
-  to the pub seam fns that double as `I_*` targets — so § Seam definition types
-  every fn `&mut dyn EngineHost` (superseding ICARUS-D1's original `impl`).
-  Ruling 24 also pins the Stage-0 crate as `crates/mp/host-interface` /
-  `mp_host_interface`, closing the crate-path hole.
-- **ICARUS-Q10** (the `ICARUS_Instance` → `CSequencer`/`CSequence`
-  ownership-graph shape) → **resolved by ICARUS-D11** (ruling 27, 2026-07-09).
-  Ground truth the ruling settles against: `ICARUS_Instance` truly **owns** every
-  `CSequence`/`CSequencer` via `list<CSequence*> m_sequences` / `list<CSequencer*>
-  m_sequencers` (`instance.h:16-31,59-65`), hands out fresh objects via `GetSequence()`
-  with a monotonic **never-reused** `m_GUID++` (`Instance.cpp:223-258`,
-  `Sequence.cpp:60-78`), and looks them up by id through a **linear scan**
-  `GetSequence(int id)`; `CSequence`'s `m_parent`/`m_return`/`m_children` are raw
-  pointers reconstructed from int ids on Load via `m_owner->GetSequence(id)`
-  (`sequence.h:14-90`, `Sequence.cpp:427-450`); and `CSequencer` keeps its **own
-  separate non-owning** `sequence_l m_sequences` membership subset plus a
-  `map<CTaskGroup*,CSequence*> m_taskSequences` cross-index (`sequencer.h:70-187`).
-  ICARUS-D11 pins the three points a porter could not invent: (a) `IcarusInstance`
-  owns `sequences: Vec<Sequence>` + `sequencers: Vec<Sequencer>` keyed by
-  `SequenceId(i32)`/`SequencerId(i32)` newtypes carrying the monotonic never-reused
-  `m_GUID`; (b) `GetSequence(id)` stays a **faithful linear scan** (insertion-ordered,
-  **not** upgraded to a keyed map — an §A2 change the doc explicitly declines to keep
-  GUID/iteration parity); (c) `CSequencer`'s non-owning `m_sequences` subset →
-  `Vec<SequenceId>` and `m_taskSequences` → `BTreeMap<TaskGroupId, SequenceId>`; and
-  `CSequence`'s `m_parent`/`m_return`/`m_children` → `Option<SequenceId>` /
-  `Option<SequenceId>` / `Vec<SequenceId>`. Unblocks `csequence.rs`, `csequencer.rs`,
-  `icarus_instance.rs`.
-- **ICARUS-Q11** (the `CTaskManager` fan-out shape) → **resolved by ICARUS-D11**
-  (ruling 27, 2026-07-09). Ground truth: `CTaskManager` fans one `CTaskGroup*` out to
-  **three parallel indexes** — `vector<CTaskGroup*> m_taskGroups` (`taskmanager.h:177`),
-  `map<string,CTaskGroup*> m_taskGroupNameMap` and `map<int,CTaskGroup*>
-  m_taskGroupIDMap` (`taskmanager.h:183-184`) — plus a `list<CTask*> m_tasks` task list
-  and per-group `map<int,bool> m_completedTasks` completion tracking
-  (`taskmanager.h:87,97-189`). ICARUS-D11 collapses the three parallel `CTaskGroup*`
-  indexes to **one owner** `m_taskGroups: Vec<TaskGroup>` + `TaskGroupId`, with
-  `m_taskGroupNameMap`/`m_taskGroupIDMap` → `BTreeMap<String, TaskGroupId>` /
-  `BTreeMap<i32, TaskGroupId>` **side-indexes of ids**; `m_tasks` → owned `Vec<Task>`
-  (literal transcription — groups track completion by int GUID, no pointer aliasing —
-  per standing ICARUS-D8) and `m_completedTasks` → `BTreeMap<i32, bool>`. Unblocks
-  `ctask.rs`, `ctask_group.rs`, `ctask_manager.rs`.
-- **ICARUS-Q12** (the `com_developer` debug-print gate has no `EngineHost` seam
-  method) — **OPEN, needs an interactive design session; not self-resolvable.**
-  `Q3_DebugPrint` gates **all** its output on the engine cvar `com_developer`
-  before touching `Com_Printf`: `if (!com_developer || !com_developer->integer)
-  return;` (`Q3_Interface.cpp:638-643`, esp. `:642`). `com_developer` is an engine
-  cvar (`extern cvar_t *com_developer`, `oracle/codemp/qcommon/qcommon.h:688`;
-  defined `common.cpp:39`, registered `Cvar_Get("developer","0",CVAR_TEMP)`
-  `common.cpp:1307`) — settable at runtime, so it is **not** safely assumable as
-  `0` in the dedicated build. `Q3_DebugPrint` is **live and reached in-scope** —
-  called from `Q3_Registers.cpp:58,77,199`, `GameInterface.cpp:129`, and ~15
-  `Q3_Interface.cpp` verbose/warning/error sites — so this gate is on the path of
-  essentially every `q3_registers/mod.rs`/`q3_interface/mod.rs` diagnostic call.
-  But the **frozen** `EngineHost` trait (`crates/mp/host-interface/src/engine_host.rs:23-106`,
-  ICARUS-D12) has **no cvar/developer read** — its 9 methods are
-  `trace`/`fs_read_file`/`fs_free_file`/`print`/`error`/`vm_call`/`shared_memory`/
-  `flrand`/`irand`/`gentity`; `print` takes only pre-formatted text and cannot
-  answer the gate. Ruling 33 ("no deferrals", frozen seam) forbids a porter adding
-  a method speculatively. **This contradicts** the § Seam definition `print`
-  annotation and the Files-roster `q3_registers/mod.rs` entry, both of which assert
-  "`Q3_DebugPrint` reaches `Com_Printf`/`com_developer` via `EngineHost`
-  (ICARUS-D1)" — there is no such seam method. Escalate: how does `Q3_DebugPrint`
-  read `com_developer` through the seam? A porter cannot pick among the candidate
-  resolutions (add a `developer()`/cvar-read method to the Stage-0 `EngineHost` crate
-  — a change to the interface-crate design owned outside this doc, handoff ruling 11;
-  route the developer state through the split-borrow `Engine` view another way; or
-  gate the debug print elsewhere), because each changes the frozen seam. Until
-  settled, the § Seam definition `print` note and the `q3_registers/mod.rs` roster
-  entry overclaim; they are flagged inline pending ICARUS-Q12.
+- **ICARUS-Q1–Q11** — resolved by rulings 11–27 (see ICARUS-D5): host/context
+  threading (ruling 11), arena vs. class allocs (rulings 13/20), golden-fixture
+  provenance (ruling 14), out-of-range entnum §19 (ruling 15), `Svcmd_ICARUS_f`
+  drop (ruling 17), `Icarus` attachment (ruling 12), residual `TAG_ICARUS5` blob
+  home + `ICARUS_Malloc`/`Free` fate (ruling 20), the entity-field seam gap
+  (rulings 23 + 37, ICARUS-D1), internal dispatch convention (ruling 24), the
+  `InterfaceExport` host-param type (ruling 24), and the two ownership-graph shapes
+  (`ICARUS_Instance`→`CSequencer`/`CSequence` and `CTaskManager` fan-out, ruling 27).
+- **ICARUS-Q12** (the `com_developer` debug-print gate had no `EngineHost` seam
+  method) — **RESOLVED by ruling 36 (ICARUS-D2).** The trait was extended with
+  `cvar_integer(&mut self, name: &str) -> i32` (`engine_host.rs`, commit `a9820853`),
+  so `Q3_DebugPrint`'s gate `if (!com_developer || !com_developer->integer) return;`
+  (`Q3_Interface.cpp:638-643`) ports as `host.cvar_integer("developer") != 0`;
+  `MockHost` carries a `cvars` fixture answering it (`mock.rs:121`, `:260`). The
+  former overclaim in the § Seam `print` note and the `q3_registers/mod.rs` roster
+  entry is corrected in this revision.
+- **ICARUS-Q13** (BlockStream `Init` — ruling 39a's drop-list named a live-called
+  function) — **RESOLVED in place (ICARUS-D3), from cited oracle ground truth +
+  porting-rules §20; no new decision.** Ruling 39a (ICARUS-D3) §20-drops
+  BlockStream's writer/duplicator half by §20's **zero-caller** criterion, and lists
+  `CBlockStream::Init` (`blockstream.h:165`, def `BlockStream.cpp:558`) among it. But
+  the oracle shows the **live reader** `CBlockStream::Open` (`:665`, called from
+  `ICARUS_InterrogateScript` `GameInterface.cpp:465` and `CSequencer::Route`/parse
+  `Sequencer.cpp:318`,`:370`) calls `Init()` at `BlockStream.cpp:670`, and the writer
+  `Create(char *)` (def `:525-550`) does **not** — so `Init` has a live caller and
+  fails §20's zero-caller test. Whether a function meets §20's criterion is a factual
+  set-membership question the cited oracle answers, not a design fork: `Init` is a
+  live reader-path helper, so no drop reaches it and it ports (mirroring the doc's
+  other factual corrections, e.g. the "sole `ValidEnt` site" fix). Ruling 39a's
+  genuine zero-caller drops (`Create(char *)`, `WriteBlock`, `WriteMember`,
+  `Duplicate`×2) are unaffected and stand. There is no behavioural fork — `Init`'s
+  four field resets run at `Open` start whether `Init` is a kept method or inlined —
+  and the subsystem's transcription-first convention (ruling 27, §21) keeps it a
+  method, so nothing here needs an interactive session.
