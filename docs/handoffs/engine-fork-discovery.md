@@ -371,3 +371,50 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     audits/dossiers keep their point-in-time references; living docs are
     scrubbed. DEC-05 gets a dated reversal amendment, not a rewrite.
     **RULING: drop wasm, remove all of it (user, 2026-07-09)**
+
+## §F doc-session rulings, round 5 (user, 2026-07-09 — sixth session)
+
+36. **EngineHost extension (no-deferrals applied to verified call sites):**
+    the trait gains `cvar_integer(&mut self, name: &str) -> i32` (per-call
+    lookup; Raven's cached `cvar_t->integer` reads collapse to it — serves
+    com_developer/cg_g2MarksAllModels/d_altRoutes/d_patched),
+    `sv_time(&mut self) -> i32` (`svs.time` — nav recheck timers),
+    `fs_write_file(&mut self, qpath: &str, data: &[u8]) -> bool`
+    (FS_Write semantics — CNavigator::Save, live G_NAV_SAVE arm), and a
+    loader-model-memory accessor (raw seam pointer to the parsed model
+    block per G2SV-D5's usage sites; exact shape derived from the cites,
+    no re-parsing). `g2api_set_ragdoll` gains the host param its
+    unconditional flrand calls require. MockHost grows matching fixtures.
+    **RULING: extend EngineHost with all of it (user, 2026-07-09)**
+37. **ConvertedEntity write-drop (corrects ruling 23's rationale):**
+    `ConvertedEntity` copies `ent->s`/`r`/`taskID` BY VALUE into a
+    file-static and returns the copy (sv_game.cpp:420-451) — retail C
+    DROPS writes to it (ICARUS_InitEnt's `memset(taskID,-1)` included).
+    Port ConvertedEntity itself faithfully (it is in the 2,481-fn list)
+    and route the 5 entity-field ICARUS arms through it exactly as Raven
+    does; the pointer-carrying seam stands, the "no-op shuffle" rationale
+    is struck. Zero divergence vs retail at M4/M5.
+    **RULING: faithful copy semantics, port ConvertedEntity (user, 2026-07-09)**
+38. **RMG seam repair (E0502-proven):** the terrain-collision entry points
+    become `&mut self` methods ON `CollisionWorld`
+    (`cm.terrain_patch_collide(...)` etc.) resolving `self.land_scape`
+    internally — no double borrow; mutation (checkcount writes into
+    landscape-owned brushes) legal. `spawn_mission` is DROPPED from
+    Seam-A: the syscall arm ports with the provably-dead if-body collapsed
+    per §C10 (`load_mission` always false under DEDICATED) + §20 note —
+    no stub.
+    **RULING: CollisionWorld methods + collapse dead arm (user, 2026-07-09)**
+39. **Evidence-driven corrections bundle:** (a) BlockStream's
+    writer/duplicator half (Create/Init/WriteBlock/WriteMember/Duplicate)
+    is zero-caller in the WinDed link set → §20-drop (icarus's "3 drops
+    total" corrected). (b) The three ghoul2 attach fns
+    (AttachInstanceToEntNum/ClearAttachedInstance/CleanEntAttachments) are
+    compiled NO-OPS reached by live syscall arms → keep as callable
+    empty-body fns per §C10, NOT §20. (c) Engine-side nav RNG routes
+    through `host.irand` (ruling 21's engine-owned LCG), never the qshared
+    free fn. (d) Mechanical: id newtypes declared beside their owning
+    arena; CCMPatch/CCMHeightDetails get their own files per §21;
+    TerrainHandle gets its roster row; NAV-D6 is the full cross-crate edit
+    at its verified file counts; moved vec3 fns keep Raven's
+    underscore-prefixed names (`_DotProduct` etc.).
+    **RULING: bless all four (user, 2026-07-09)**
