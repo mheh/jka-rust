@@ -1,0 +1,20 @@
+terrainDef
+{
+	altitudetexture
+	{
+		height		64
+		shader		textures/rmg/cliff
+	}
+
+	altitudetexture
+	{
+		height		0
+		shader		textures/rmg/ground
+	}
+
+	water
+	{
+		height		32
+		shader		textures/rmg/water
+	}
+}
