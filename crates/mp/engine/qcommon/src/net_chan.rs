@@ -22,6 +22,7 @@ use crate::qcommon::netchan_t::netchan_t;
 use crate::qcommon::protocol::PORT_SERVER;
 
 use mp_host_interface::engine_host::EngineHost;
+use mp_qshared::shared::cvar::cvar_t;
 
 // PORT-NOTE(engine-host-state): `RenderModels`'s real definition
 // (`mp_renderer::tr_model::render_models::RenderModels`) is unreachable —
@@ -82,6 +83,33 @@ const NETSRC_STRING: [&str; 2] = ["client", "server"];
 // `Com_sprintf` precedent exactly.
 extern "Rust" {
     fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: &str);
+}
+
+// PORT-NOTE(cvar-get-reach): `Cvar_Get` (cvar.cpp) has no ported body reachable
+// from this file (`crate::cvar` is still an empty stub module) — same
+// unlanded-callee gap as `vm_fns.rs`/`cm_load.rs`'s own local `Cvar_Get`
+// forward-declares. Narrowed to this file's own call-site shape (`&str`
+// name/value); escalated as a missing symbol for the finisher.
+extern "Rust" {
+    fn Cvar_Get(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        var_name: &str,
+        var_value: &str,
+        flags: c_int,
+    ) -> *mut cvar_t;
+}
+
+// PORT-NOTE(sys-string-to-adr-reach): `Sys_StringToAdr` is `PlatformHost::
+// string_to_adr` (host-interface/src/platform_host.rs), a distinct trait from
+// this file's `&mut dyn EngineHost` receiver — no `PlatformHost` receiver is
+// threaded through `NET_StringToAdr`'s pinned signature. Forward-declared
+// here by its exact Raven name/call-site shape (no-stub rule); escalated as a
+// shape mismatch for the finisher to wire a `PlatformHost` receiver through.
+extern "Rust" {
+    fn Sys_StringToAdr(s: &str, a: &mut netadr_t) -> bool;
 }
 
 /// Raven `NET_AdrToString`.
@@ -315,14 +343,13 @@ pub fn Netchan_Init(
         // PORT-NOTE(cvar-globals): see the file-level note — `->integer`
         // reads collapse the not-yet-landed cvar registry to plain `i32`
         // fields, following `common.rs`'s existing `cl_shownet` precedent.
-        let showpackets_cvar =
-            crate::cvar::Cvar_Get(common, cm, rm, host, "showpackets", "0", CVAR_TEMP);
+        let showpackets_cvar = Cvar_Get(common, cm, rm, host, "showpackets", "0", CVAR_TEMP);
         common.showpackets = (*showpackets_cvar).integer;
 
-        let showdrop_cvar = crate::cvar::Cvar_Get(common, cm, rm, host, "showdrop", "0", CVAR_TEMP);
+        let showdrop_cvar = Cvar_Get(common, cm, rm, host, "showdrop", "0", CVAR_TEMP);
         common.showdrop = (*showdrop_cvar).integer;
 
-        let qport_cvar = crate::cvar::Cvar_Get(
+        let qport_cvar = Cvar_Get(
             common,
             cm,
             rm,
@@ -333,7 +360,7 @@ pub fn Netchan_Init(
         );
         common.net_qport = (*qport_cvar).integer;
 
-        let killdropped_cvar = crate::cvar::Cvar_Get(
+        let killdropped_cvar = Cvar_Get(
             common,
             cm,
             rm,

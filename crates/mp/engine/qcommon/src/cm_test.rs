@@ -4,12 +4,14 @@
 //!
 //! Source: `oracle/codemp/qcommon/cm_test.cpp`
 //!
-//! PORT-NOTE(vector-math): `DotProduct`/`VectorCopy`/`VectorSubtract`/`AngleVectors`/
-//! `BoxOnPlaneSide` (q_math primitives) have no reachable home in this crate's
-//! dependency graph yet (their only Rust port lives in `mp_game`, a tier above
-//! the engine) — same PORT-NOTE precedent as `cm_trace.rs`. Called here by their
-//! exact Raven names/shapes per the no-stub rule; reported as missing symbols for
-//! the finisher to wire to a q_math home reachable from `mp_engine_qcommon`.
+//! PORT-NOTE(vector-math): `DotProduct`/`VectorCopy`/`VectorSubtract` route
+//! through `mp_qshared::shared::q_math`'s reachable `_DotProduct`/
+//! `_VectorCopy`/`_VectorSubtract` (rosetta vec3/q_math mapping).
+//! `AngleVectors`/`BoxOnPlaneSide` still have no reachable home in this
+//! crate's dependency graph (their only Rust port lives in `mp_game`, a tier
+//! above the engine) — forward-declared below; escalated as missing symbols
+//! for the finisher to wire to a q_math home reachable from
+//! `mp_engine_qcommon`.
 
 use core::ffi::c_int;
 
@@ -25,14 +27,30 @@ use crate::cm::clip_map_t::clipMap_t;
 use crate::cm::cm_local_consts::BOX_MODEL_HANDLE;
 use crate::cm::cmodel_s::cmodel_t;
 use crate::cm::leaf_list_s::leafList_t;
+use crate::cm_load::{CCMLandScape, CM_ClipHandleToModel};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use crate::common_fns::Com_Memset;
+use mp_qshared::shared::q_math::{_DotProduct, _VectorCopy, _VectorSubtract};
 
-// PORT-NOTE(landscape): `CCMLandScape` is the rmg-terrain.md §F type owning
-// `cmg.landScape` (currently a `*mut c_void` placeholder on `clipMap_t`) —
-// same precedent as `cm_trace.rs`; referenced by name only, reported as a
-// missing symbol.
+// PORT-NOTE(q_math-reach continued): `BoxOnPlaneSide`/`AngleVectors` have no
+// home reachable from this crate (only ported in `mp_game`, a tier above);
+// forward-declared here in the established `extern "Rust"` shape (vm_fns.rs/
+// cm_load.rs precedent), narrowed to their `mp_game::q_math` signatures;
+// escalated as missing symbols for the finisher.
+extern "Rust" {
+    fn BoxOnPlaneSide(
+        emins: vec3_t,
+        emaxs: vec3_t,
+        p: *mut mp_qshared::shared::collision::cplane_t,
+    ) -> c_int;
+    fn AngleVectors(
+        angles: vec3_t,
+        forward: Option<&mut vec3_t>,
+        right: Option<&mut vec3_t>,
+        up: Option<&mut vec3_t>,
+    );
+}
 
 /// Raven `byte`.
 type byte = u8;
@@ -54,7 +72,7 @@ pub fn CM_PointLeafnum_r(
             let d = if (*plane).r#type < 3 {
                 p[(*plane).r#type as usize] - (*plane).dist
             } else {
-                DotProduct((*plane).normal, p) - (*plane).dist
+                _DotProduct((*plane).normal, p) - (*plane).dist
             };
             if d < 0.0 {
                 num = (*node).children[1];
@@ -212,8 +230,8 @@ pub fn CM_BoxLeafnums(
 
     cm.cmg.checkcount += 1;
 
-    VectorCopy(mins, &mut ll.bounds[0]);
-    VectorCopy(maxs, &mut ll.bounds[1]);
+    _VectorCopy(mins, &mut ll.bounds[0]);
+    _VectorCopy(maxs, &mut ll.bounds[1]);
     ll.count = 0;
     ll.maxcount = listsize;
     ll.list = boxList;
@@ -247,8 +265,8 @@ pub fn CM_BoxBrushes(
 
     cm.cmg.checkcount += 1;
 
-    VectorCopy(mins, &mut ll.bounds[0]);
-    VectorCopy(maxs, &mut ll.bounds[1]);
+    _VectorCopy(mins, &mut ll.bounds[0]);
+    _VectorCopy(maxs, &mut ll.bounds[1]);
     ll.count = 0;
     ll.maxcount = listsize;
     ll.list = boxList as *mut c_int;
@@ -354,7 +372,7 @@ pub fn CM_PointContents(cm: &mut CollisionWorld, p: vec3_t, model: clipHandle_t)
             let mut i: u16 = 0;
             while i < (*b).numsides {
                 let side = (*b).sides.add(i as usize);
-                let d = DotProduct(p, (*(*side).plane).normal);
+                let d = _DotProduct(p, (*(*side).plane).normal);
                 // FIXME test for Cash
                 // if ( d >= b->sides[i].plane->dist ) {
                 if d > (*(*side).plane).dist {
@@ -410,7 +428,7 @@ pub fn CM_TransformedPointContents(
     let mut temp: vec3_t;
 
     // subtract origin offset
-    VectorSubtract(p, origin, &mut p_l);
+    _VectorSubtract(p, origin, &mut p_l);
 
     // rotate start and end into the models frame of reference
     if model != BOX_MODEL_HANDLE as clipHandle_t
@@ -419,12 +437,14 @@ pub fn CM_TransformedPointContents(
         let mut forward: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
         let mut up: vec3_t = [0.0; 3];
-        AngleVectors(angles, Some(&mut forward), Some(&mut right), Some(&mut up));
+        unsafe {
+            AngleVectors(angles, Some(&mut forward), Some(&mut right), Some(&mut up));
+        }
 
         temp = p_l;
-        p_l[0] = DotProduct(temp, forward);
-        p_l[1] = -DotProduct(temp, right);
-        p_l[2] = DotProduct(temp, up);
+        p_l[0] = _DotProduct(temp, forward);
+        p_l[1] = -_DotProduct(temp, right);
+        p_l[2] = _DotProduct(temp, up);
     }
 
     CM_PointContents(cm, p_l, model)

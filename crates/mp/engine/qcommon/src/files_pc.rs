@@ -14,7 +14,7 @@ use core::ffi::{c_char, c_int, c_long, c_uint};
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::fsMode_t::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
+use mp_qshared::shared::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
 use mp_qshared::shared::fs_origin::fsOrigin_t;
 use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_STRING_TOKENS};
 use mp_qshared::shared::qboolean;
@@ -33,6 +33,16 @@ use crate::qcommon::filesystem_limits::{
 // pinned by the preamble's state-receiver order (ruling 53); not yet landed
 // in the tree. Reported in missing_symbols.
 use crate::cm_load::RenderModels;
+
+// Raven `S_ClearSoundBuffer` (Raven: `return;` in the null/no-sound build) is
+// canonically ported at `mp_engine_client::null::null_snddma::S_ClearSoundBuffer`,
+// but `qcommon` cannot depend on `client` (client already depends on qcommon;
+// that would be a cycle). Duplicated here as the same no-op per the
+// deliberately-callable-no-op allowance.
+// Source: `oracle/codemp/null/null_snddma.cpp`
+mod null {
+    pub fn S_ClearSoundBuffer() {}
+}
 
 /// Raven `FS_PakIsPure`.
 ///
@@ -554,7 +564,7 @@ pub fn FS_idPak(pak: *mut c_char, base: *mut c_char) -> qboolean {
     while i < NUM_ID_PAKS {
         let candidate = format!("{}/assets{}", base_str, i);
         let candidate_c = std::ffi::CString::new(candidate).unwrap();
-        if unsafe { crate::files::FS_FilenameCompare(pak, candidate_c.as_ptr()) } == 0 {
+        if unsafe { crate::files_common::FS_FilenameCompare(pak, candidate_c.as_ptr()) } == 0 {
             break;
         }
         i += 1;
@@ -573,7 +583,7 @@ pub fn FS_FTell(common: &mut Common, f: fileHandle_t) -> c_int {
     // PORT-NOTE(state): fsh is not yet a field on `Common`.
     unsafe {
         if common.fsh[f as usize].zipFile == mp_qshared::shared::qtrue {
-            crate::files::unztell(common.fsh[f as usize].handleFiles.file.z)
+            crate::unzip::unztell(common.fsh[f as usize].handleFiles.file.z)
         } else {
             libc::ftell(common.fsh[f as usize].handleFiles.file.o) as c_int
         }
@@ -586,7 +596,7 @@ pub fn FS_FTell(common: &mut Common, f: fileHandle_t) -> c_int {
 pub fn FS_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
     // PORT-NOTE(state): fs_gamedir/fs_homepath are not yet fields on `Common`.
     unsafe {
-        let testpath = crate::files::FS_BuildOSPath(
+        let testpath = crate::files_common::FS_BuildOSPath4(
             common,
             (*common.fs_homepath).string.as_ptr(),
             common.fs_gamedir.as_ptr(),
@@ -606,7 +616,7 @@ pub fn FS_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:249-263`
 pub fn FS_SV_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
     unsafe {
-        let testpath = crate::files::FS_BuildOSPath(
+        let testpath = crate::files_common::FS_BuildOSPath4(
             common,
             (*common.fs_homepath).string.as_ptr(),
             file,
@@ -728,7 +738,7 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
     }
 
     unsafe {
-        let ospath = crate::files::FS_BuildOSPath(
+        let ospath = crate::files_common::FS_BuildOSPath4(
             common,
             (*common.fs_homepath).string.as_ptr(),
             filename,
@@ -783,13 +793,13 @@ pub fn FS_SV_Rename(common: &mut Common, from: *const c_char, to: *const c_char)
     crate::null::S_ClearSoundBuffer();
 
     unsafe {
-        let from_ospath = crate::files::FS_BuildOSPath(
+        let from_ospath = crate::files_common::FS_BuildOSPath4(
             common,
             (*common.fs_homepath).string.as_ptr(),
             from,
             c"".as_ptr(),
         );
-        let to_ospath = crate::files::FS_BuildOSPath(
+        let to_ospath = crate::files_common::FS_BuildOSPath4(
             common,
             (*common.fs_homepath).string.as_ptr(),
             to,
@@ -832,13 +842,13 @@ pub fn FS_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
     crate::null::S_ClearSoundBuffer();
 
     unsafe {
-        let from_ospath = crate::files::FS_BuildOSPath(
+        let from_ospath = crate::files_common::FS_BuildOSPath4(
             common,
             (*common.fs_homepath).string.as_ptr(),
             common.fs_gamedir.as_ptr(),
             from,
         );
-        let to_ospath = crate::files::FS_BuildOSPath(
+        let to_ospath = crate::files_common::FS_BuildOSPath4(
             common,
             (*common.fs_homepath).string.as_ptr(),
             common.fs_gamedir.as_ptr(),
@@ -890,7 +900,7 @@ pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileH
     crate::null::S_ClearSoundBuffer();
 
     unsafe {
-        let ospath = crate::files::FS_BuildOSPath(
+        let ospath = crate::files_common::FS_BuildOSPath4(
             common,
             (*common.fs_homepath).string.as_ptr(),
             common.fs_gamedir.as_ptr(),
@@ -975,7 +985,7 @@ pub fn FS_Seek(
         if offset == 0 && origin == fsOrigin_t::FS_SEEK_SET as c_int {
             // set the file position in the zip file (also sets the current file info)
             unsafe {
-                crate::files::unzSetCurrentFileInfoPosition(
+                crate::unzip::unzSetCurrentFileInfoPosition(
                     common.fsh[f as usize].handleFiles.file.z,
                     common.fsh[f as usize].zipFilePos,
                 );
@@ -990,7 +1000,7 @@ pub fn FS_Seek(
         } else if offset < 65536 {
             // set the file position in the zip file (also sets the current file info)
             unsafe {
-                crate::files::unzSetCurrentFileInfoPosition(
+                crate::unzip::unzSetCurrentFileInfoPosition(
                     common.fsh[f as usize].handleFiles.file.z,
                     common.fsh[f as usize].zipFilePos,
                 );
@@ -1090,7 +1100,7 @@ pub fn FS_FileIsInPAK(
                 let mut pakFile: *mut fileInPack_t = *(*pak).hashTable.add(hash as usize);
                 loop {
                     // case and separator insensitive comparisons
-                    if crate::files::FS_FilenameCompare((*pakFile).name.as_ptr(), filename) == 0 {
+                    if crate::files_common::FS_FilenameCompare((*pakFile).name.as_ptr(), filename) == 0 {
                         if !pChecksum.is_null() {
                             *pChecksum = (*pak).pure_checksum;
                         }
@@ -1376,7 +1386,7 @@ pub fn FS_GetModList(
             // we drop "base" "." and ".."
             if !name_str.eq_ignore_ascii_case(BASEGAME) && !name_str.starts_with('.') {
                 // now we need to find some .pk3 files to validate the mod
-                let mut path = crate::files::FS_BuildOSPath(
+                let mut path = crate::files_common::FS_BuildOSPath4(
                     common,
                     (*common.fs_basepath).string.as_ptr(),
                     name,
@@ -1395,7 +1405,7 @@ pub fn FS_GetModList(
 
                 // Try on cd path
                 if n_paks <= 0 {
-                    path = crate::files::FS_BuildOSPath(
+                    path = crate::files_common::FS_BuildOSPath4(
                         common,
                         (*common.fs_cdpath).string.as_ptr(),
                         name,
@@ -1415,7 +1425,7 @@ pub fn FS_GetModList(
 
                 // try on home path
                 if n_paks <= 0 {
-                    path = crate::files::FS_BuildOSPath(
+                    path = crate::files_common::FS_BuildOSPath4(
                         common,
                         (*common.fs_homepath).string.as_ptr(),
                         name,
@@ -1537,7 +1547,7 @@ pub fn FS_FOpenFileByMode(
         if *f != 0 {
             if common.fsh[*f as usize].zipFile == mp_qshared::shared::qtrue {
                 common.fsh[*f as usize].baseOffset =
-                    crate::files::unztell(common.fsh[*f as usize].handleFiles.file.z);
+                    crate::unzip::unztell(common.fsh[*f as usize].handleFiles.file.z);
             } else {
                 common.fsh[*f as usize].baseOffset =
                     libc::ftell(common.fsh[*f as usize].handleFiles.file.o) as c_int;

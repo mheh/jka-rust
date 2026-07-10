@@ -33,7 +33,7 @@
 //! global names per the STATE THREADED tables (STATE FIELDS rule) — reported
 //! in missing_symbols for the finisher to add once the struct lands.
 
-use core::ffi::{c_char, c_int, c_uint};
+use core::ffi::{c_char, c_int, c_uint, c_void};
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::collision::cplane_t;
@@ -287,13 +287,13 @@ pub fn CM_InitBoxHull(cm: &mut CollisionWorld) {
 
             // planes
             let p = cm.box_planes.offset((i * 2) as isize);
-            (*p).ptype = (i >> 1) as u8;
+            (*p).r#type = (i >> 1) as u8;
             (*p).signbits = 0;
             (*p).normal = [0.0; 3];
             (*p).normal[(i >> 1) as usize] = 1.0;
 
             let p = cm.box_planes.offset((i * 2 + 1) as isize);
-            (*p).ptype = (3 + (i >> 1)) as u8;
+            (*p).r#type = (3 + (i >> 1)) as u8;
             (*p).signbits = 0;
             (*p).normal = [0.0; 3];
             (*p).normal[(i >> 1) as usize] = -1.0;
@@ -345,7 +345,7 @@ pub fn CM_TempBoxModel(
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:1065-1080`
 pub fn CM_ShutdownTerrain(cm: &mut CollisionWorld, terrainId: thandle_t) {
     unsafe {
-        let landscape = cm.cmg.landScape;
+        let landscape = cm.cmg.landScape as *mut CCMLandScape;
 
         if !landscape.is_null() {
             // PORT-NOTE(cpp-methods): `CCMLandScape::DecreaseRefCount`/
@@ -413,7 +413,7 @@ pub fn CM_ClearMap(cm: &mut CollisionWorld, rmg: &mut RmManager) {
         }
 
         if !cm.cmg.landScape.is_null() {
-            CCMLandScape_delete(cm.cmg.landScape);
+            CCMLandScape_delete(cm.cmg.landScape as *mut CCMLandScape);
             cm.cmg.landScape = core::ptr::null_mut();
         }
 
@@ -941,7 +941,7 @@ pub fn CMod_LoadPlanes(
             }
 
             (*out).dist = f32::from_le_bytes((*r#in).dist.to_le_bytes());
-            (*out).ptype = PlaneTypeForNormal((*out).normal) as u8;
+            (*out).r#type = PlaneTypeForNormal((*out).normal) as u8;
             (*out).signbits = bits;
 
             out = out.offset(1);
@@ -1638,7 +1638,7 @@ pub fn CM_RegisterTerrain(
     unsafe {
         if !cm.cmg.landScape.is_null() {
             // Already spawned so just return
-            let ls = cm.cmg.landScape;
+            let ls = cm.cmg.landScape as *mut CCMLandScape;
             CCMLandScape_IncreaseRefCount(ls);
             return ls;
         }
@@ -1652,7 +1652,7 @@ pub fn CM_RegisterTerrain(
                 "You cannot have more than one terrain brush.\n".into(),
             );
         }
-        cm.cmg.landScape = ls;
+        cm.cmg.landScape = ls as *mut c_void;
         ls
     }
 }

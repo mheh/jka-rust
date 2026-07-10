@@ -289,14 +289,18 @@ pub fn Cmd_ArgvBuffer(common: &mut Common, arg: c_int, buffer: *mut c_char, buff
     // `mp_game` tier (`crates/mp/game/src/q_shared.rs`); the engine crate
     // cannot depend on it (layering: game sits above engine). Referenced by
     // its exact Raven name per the no-stub rule — missing-symbol escalation.
-    Q_strncpyz(buffer, Cmd_Argv(common, arg), bufferLength);
+    unsafe {
+        Q_strncpyz(buffer, Cmd_Argv(common, arg), bufferLength);
+    }
 }
 
 /// `Cmd_ArgsBuffer`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:383-385`
 pub fn Cmd_ArgsBuffer(common: &mut Common, buffer: *mut c_char, bufferLength: c_int) {
-    Q_strncpyz(buffer, Cmd_Args(common), bufferLength);
+    unsafe {
+        Q_strncpyz(buffer, Cmd_Args(common), bufferLength);
+    }
 }
 
 /// `Cbuf_AddText`.
@@ -363,15 +367,20 @@ pub fn Cbuf_InsertText(common: &mut Common, text: *const c_char) {
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:271-278`
 pub fn Cmd_Echo_f(common: &mut Common) {
     for i in 1..Cmd_Argc(common) {
-        Com_Printf(
-            common,
-            format!("{} ", unsafe {
-                core::ffi::CStr::from_ptr(Cmd_Argv(common, i)).to_string_lossy()
-            })
-            .as_ptr() as *const c_char,
-        );
+        unsafe {
+            Com_Printf(
+                common,
+                format!(
+                    "{} ",
+                    core::ffi::CStr::from_ptr(Cmd_Argv(common, i)).to_string_lossy()
+                )
+                .as_ptr() as *const c_char,
+            );
+        }
     }
-    Com_Printf(common, b"\n\0".as_ptr() as *const c_char);
+    unsafe {
+        Com_Printf(common, b"\n\0".as_ptr() as *const c_char);
+    }
 }
 
 /// `Cmd_Exec_f`.
@@ -387,10 +396,12 @@ pub fn Cmd_Exec_f(
         [0; native_types::MAX_QPATH as usize];
 
     if Cmd_Argc(common) != 2 {
-        Com_Printf(
-            common,
-            b"exec <filename> : execute a script file\n\0".as_ptr() as *const c_char,
-        );
+        unsafe {
+            Com_Printf(
+                common,
+                b"exec <filename> : execute a script file\n\0".as_ptr() as *const c_char,
+            );
+        }
         return;
     }
 
@@ -408,23 +419,31 @@ pub fn Cmd_Exec_f(
     }
 
     let mut f: *mut c_char = core::ptr::null_mut();
-    let _len = FS_ReadFile(
-        common,
-        cm,
-        rm,
-        host,
-        filename.as_ptr(),
-        &mut f as *mut _ as *mut *mut (),
-    );
+    let _len = unsafe {
+        FS_ReadFile(
+            common,
+            cm,
+            rm,
+            host,
+            filename.as_ptr(),
+            &mut f as *mut _ as *mut *mut (),
+        )
+    };
     if f.is_null() {
-        Com_Printf(common, b"couldn't exec %s\n\0".as_ptr() as *const c_char);
+        unsafe {
+            Com_Printf(common, b"couldn't exec %s\n\0".as_ptr() as *const c_char);
+        }
         return;
     }
-    Com_Printf(common, b"execing %s\n\0".as_ptr() as *const c_char);
+    unsafe {
+        Com_Printf(common, b"execing %s\n\0".as_ptr() as *const c_char);
+    }
 
     Cbuf_InsertText(common, f as *const c_char);
 
-    FS_FreeFile(common, f as *mut ());
+    unsafe {
+        FS_FreeFile(common, f as *mut ());
+    }
 }
 
 /// `Cmd_Vstr_f`.
@@ -432,17 +451,21 @@ pub fn Cmd_Exec_f(
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:251-261`
 pub fn Cmd_Vstr_f(common: &mut Common) {
     if Cmd_Argc(common) != 2 {
-        Com_Printf(
-            common,
-            b"vstr <variablename> : execute a variable command\n\0".as_ptr() as *const c_char,
-        );
+        unsafe {
+            Com_Printf(
+                common,
+                b"vstr <variablename> : execute a variable command\n\0".as_ptr() as *const c_char,
+            );
+        }
         return;
     }
 
     // PORT-NOTE(Cvar_VariableString/va): neither is ported in this crate yet
     // (missing-symbol escalation) — referenced by exact Raven name.
-    let v = Cvar_VariableString(common, Cmd_Argv(common, 1));
-    Cbuf_InsertText(common, va(b"%s\n\0".as_ptr() as *const c_char, v));
+    unsafe {
+        let v = Cvar_VariableString(common, Cmd_Argv(common, 1));
+        Cbuf_InsertText(common, va(b"%s\n\0".as_ptr() as *const c_char, v));
+    }
 }
 
 /// `Cbuf_Execute`.
@@ -594,7 +617,7 @@ pub fn Cbuf_ExecuteText(
         x if x == cbufExec_t::EXEC_APPEND as c_int => {
             Cbuf_AddText(common, text);
         }
-        _ => {
+        _ => unsafe {
             Com_Error(
                 common,
                 cm,
@@ -604,6 +627,6 @@ pub fn Cbuf_ExecuteText(
                 errorParm_t::ERR_FATAL,
                 b"Cbuf_ExecuteText: bad exec_when\0".as_ptr() as *const c_char,
             );
-        }
+        },
     }
 }

@@ -42,6 +42,59 @@ struct Ghoul2System;
 #[allow(dead_code)]
 struct Server;
 
+// PORT-NOTE(unlanded-callees): `Com_Printf` (com_common.cpp), `Cvar_Get`
+// (cvar.cpp), `Cmd_AddCommand`/`Cmd_RemoveCommand` (cmd_pc.cpp),
+// `SV_ShutdownGameProgs` (sv_game.cpp), `R_HunkClearCrap` (tr_init.cpp) have
+// no ported body reachable from this file — same unlanded-callee gap as
+// `vm_fns.rs`'s own local forward-declares for the same symbols. Narrowed to
+// this file's own call-site shapes; escalated as missing symbols for the
+// finisher.
+extern "Rust" {
+    fn Com_Printf(common: &mut Common, msg: &str);
+    fn Cvar_Get(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        var_name: &str,
+        var_value: &str,
+        flags: c_int,
+    ) -> *mut mp_qshared::shared::cvar::cvar_t;
+    fn Cmd_AddCommand(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        cmd_name: &str,
+        function: *const (),
+    );
+    fn Cmd_RemoveCommand(common: &mut Common, cmd_name: &str);
+    fn SV_ShutdownGameProgs(common: &mut Common, sv: &mut Server);
+    fn R_HunkClearCrap(rm: &mut RenderModels, host: &mut dyn EngineHost);
+}
+
+// PORT-NOTE(zmemman-body-gap): `Z_Malloc`/`Z_Free`/`Z_Validate` are
+// `z_memman_pc.cpp`-native functions (this file's own subject) with no
+// transcribed body anywhere in the tree yet — only forward-declared as
+// unlanded callees by other files (`vm_fns.rs`/`vm_x86.rs`/`cm_load.rs`
+// precedent for `Z_Malloc`/`Z_Free`). Declared here in the same shape;
+// escalated as missing symbols (genuine logic port, not mechanical) for the
+// finisher.
+extern "Rust" {
+    fn Z_Malloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        iSize: c_int,
+        eTag: memtag_t,
+        bZeroit: qboolean,
+        iUnusedAlign: c_int,
+    ) -> *mut ();
+    fn Z_Free(common: &mut Common, pvAddress: *mut ());
+    fn Z_Validate(common: &mut Common);
+}
+
 /// Raven `ZoneTailFromHeader`.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:45-48`
@@ -235,17 +288,22 @@ pub fn Z_Size(pvAddress: *mut ()) -> c_int {
 pub fn Com_ShutdownZoneMemory(common: &mut Common) {
     //	Com_Printf("Shutting down zone memory .....\n");
 
-    Cmd_RemoveCommand(common, "zone_stats");
-    Cmd_RemoveCommand(common, "zone_details");
+    unsafe {
+        Cmd_RemoveCommand(common, "zone_stats");
+        Cmd_RemoveCommand(common, "zone_details");
+    }
 
     if common.TheZone.Stats.iCount != 0 {
-        Com_Printf(
-            common,
-            &format!(
-                "Automatically freeing {} blocks making up {} bytes\n",
-                common.TheZone.Stats.iCount, common.TheZone.Stats.iCurrent
-            ),
-        );
+        // §E0382: `common` moves into the call as the first arg, so the
+        // fields it needs must be read into locals before the call.
+        let count = common.TheZone.Stats.iCount;
+        let current = common.TheZone.Stats.iCurrent;
+        unsafe {
+            Com_Printf(
+                common,
+                &format!("Automatically freeing {count} blocks making up {current} bytes\n"),
+            );
+        }
         Z_TagFree(common, memtag_t::TAG_ALL);
 
         assert!(common.TheZone.Stats.iCount == 0);
@@ -272,11 +330,29 @@ pub fn Com_InitZoneMemory(
     //#ifdef _DEBUG
     //	com_validateZone = Cvar_Get("com_validateZone", "1", 0);
     //#else
-    common.com_validateZone = Cvar_Get(common, cm, rm, host, "com_validateZone", "0", 0);
+    unsafe {
+        common.com_validateZone = Cvar_Get(common, cm, rm, host, "com_validateZone", "0", 0);
+    }
     //#endif
 
-    Cmd_AddCommand(common, cm, rm, host, "zone_stats", Z_Stats_f);
-    Cmd_AddCommand(common, cm, rm, host, "zone_details", Z_Details_f);
+    // PORT-NOTE(z-stats-details-body-gap): `Z_Stats_f`/`Z_Details_f`
+    // (z_memman_pc.cpp:510-524) have no transcribed body anywhere in the
+    // tree — genuine logic port, not a mechanical call-site fix; escalated
+    // as missing symbols for the finisher.
+    // Source: `oracle/codemp/qcommon/z_memman_pc.cpp:588-589`
+    //TODO: Port Z_Stats_f
+    //TODO: Port Z_Details_f
+    unsafe {
+        Cmd_AddCommand(common, cm, rm, host, "zone_stats", Z_Stats_f as *const ());
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            "zone_details",
+            Z_Details_f as *const (),
+        );
+    }
 
     // #ifdef _DEBUG: zone_memrecovertest is a debug-only command; this is a
     // release build, so the block is dropped per its own guard.
@@ -290,7 +366,9 @@ pub fn Com_TouchMemory(common: &mut Common) {
     let mut sum: i32;
 
     //	start = Sys_Milliseconds();
-    Z_Validate(common);
+    unsafe {
+        Z_Validate(common);
+    }
 
     sum = 0;
 
@@ -326,22 +404,19 @@ pub fn Hunk_Alloc(
     preference: ha_pref,
 ) -> *mut () {
     let _ = preference;
-    Z_Malloc(
-        common,
-        cm,
-        rm,
-        host,
-        size,
-        common.hunk_tag,
-        native_types::qtrue,
-    )
+    // §E0382: `common` moves into the call as the first arg, so its
+    // `hunk_tag` field must be read into a local before the call, not inline.
+    let hunk_tag = common.hunk_tag;
+    unsafe { Z_Malloc(common, cm, rm, host, size, hunk_tag, native_types::qtrue, 4) }
 }
 
 /// Raven `Hunk_FreeTempMemory`.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:815-818`
 pub fn Hunk_FreeTempMemory(common: &mut Common, buf: *mut ()) {
-    Z_Free(common, buf);
+    unsafe {
+        Z_Free(common, buf);
+    }
 }
 
 /// Raven `Hunk_Clear`.
@@ -358,13 +433,17 @@ pub fn Hunk_Clear(
     // the engine-fork-discovery rulings treat DEDICATED as the live
     // configuration), so the `#ifndef DEDICATED` client blocks
     // (CL_ShutdownCGame/CL_ShutdownUI/CIN_CloseAllVideos) are dropped.
-    SV_ShutdownGameProgs(common, sv);
+    unsafe {
+        SV_ShutdownGameProgs(common, sv);
+    }
 
     common.hunk_tag = memtag_t::TAG_HUNK_MARK1;
     Z_TagFree(common, memtag_t::TAG_HUNK_MARK1);
     Z_TagFree(common, memtag_t::TAG_HUNK_MARK2);
 
-    R_HunkClearCrap(rm, host);
+    unsafe {
+        R_HunkClearCrap(rm, host);
+    }
 
     //	Com_Printf( "Hunk_Clear: reset the hunk ok\n" );
     VM_Clear(common);

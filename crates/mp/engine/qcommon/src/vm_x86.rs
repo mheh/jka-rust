@@ -14,7 +14,7 @@ use std::ffi::CStr;
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::ha_pref::ha_pref;
+use mp_qshared::shared::ha_pref;
 use native_types::{byte, qboolean, qfalse, qtrue};
 
 use crate::collision_world::CollisionWorld;

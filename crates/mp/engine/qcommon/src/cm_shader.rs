@@ -56,6 +56,51 @@ extern "Rust" {
     fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
     fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: &str);
     fn Com_Error(common: &mut Common, code: c_int, msg: &str);
+
+    // `FS_ListFiles`/`FS_ReadFile`/`FS_FreeFile`/`FS_FreeFileList` (files.cpp)
+    // and `Z_Malloc`/`Z_Free`/`Hunk_Alloc` (z_memman_pc.cpp) have no ported
+    // body reachable from this file yet (`crate::files`/`crate::z_memman`
+    // modules exist but don't export these under this crate's current
+    // landing state — vm_fns.rs precedent for the same reachability gap).
+    // Narrowed to each call site's own shape; escalated as missing symbols
+    // for the finisher.
+    fn FS_ListFiles(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        path: &str,
+        extension: &str,
+        numfiles: *mut c_int,
+    ) -> *mut *const c_char;
+    fn FS_ReadFile(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        qpath: &str,
+        buffer: *mut *mut core::ffi::c_void,
+    ) -> c_int;
+    fn FS_FreeFile(common: &mut Common, f: *mut c_char);
+    fn FS_FreeFileList(common: &mut Common, filelist: *mut *const c_char);
+    fn Z_Malloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        iSize: usize,
+        eTag: memtag_t,
+        bZeroit: bool,
+    ) -> *mut ();
+    fn Z_Free(common: &mut Common, pvAddress: *mut c_char);
+    fn Hunk_Alloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        size: usize,
+        preference: &str,
+    ) -> *mut ();
 }
 
 /// Raven `SV_ParseSurfaceParm` — match the next token against `svInfoParms`,
@@ -178,11 +223,11 @@ pub fn CM_LoadShaderFiles(
     let mut numShaders1: c_int = 0;
     // scan for shader files
     let shaderFiles1 =
-        crate::files::FS_ListFiles(common, cm, rm, host, "shaders", ".shader", &mut numShaders1);
+        FS_ListFiles(common, cm, rm, host, "shaders", ".shader", &mut numShaders1);
     //TODO: Port FINAL_BUILD
     // Source: oracle/codemp/qcommon/cm_shader.cpp:75
     let mut numShaders2: c_int = 0;
-    let shaderFiles2 = crate::files::FS_ListFiles(
+    let shaderFiles2 = FS_ListFiles(
         common,
         cm,
         rm,
@@ -195,7 +240,7 @@ pub fn CM_LoadShaderFiles(
     if shaderFiles1.is_null() || numShaders1 == 0 {
         //TODO: Port WARNING
         // Source: oracle/codemp/qcommon/cm_shader.cpp:92
-        crate::common::com_printf::Com_Printf(
+        crate::common::com_printf(
             common,
             &format!("{}WARNING: no shader files found\n", S_COLOR_YELLOW),
         );
@@ -221,8 +266,8 @@ pub fn CM_LoadShaderFiles(
                 &format!("shaders/{}", *shaderFiles1.add(i as usize)),
             )
         };
-        crate::common::com_printf::Com_DPrintf(common, &format!("...loading '{}'\n", "filename"));
-        sum += crate::files::FS_ReadFile(common, cm, rm, host, "filename", unsafe {
+        crate::common::com_printf(common, &format!("...loading '{}'\n", "filename"));
+        sum += FS_ReadFile(common, cm, rm, host, "filename", unsafe {
             buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void
         });
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
@@ -245,8 +290,8 @@ pub fn CM_LoadShaderFiles(
                 &format!("shaders/test/{}", "shaderFiles2[i - numShaders1]"),
             )
         };
-        crate::common::com_printf::Com_DPrintf(common, &format!("...loading '{}'\n", "filename"));
-        sum += crate::files::FS_ReadFile(common, cm, rm, host, "filename", unsafe {
+        crate::common::com_printf(common, &format!("...loading '{}'\n", "filename"));
+        sum += FS_ReadFile(common, cm, rm, host, "filename", unsafe {
             buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void
         });
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
@@ -264,7 +309,7 @@ pub fn CM_LoadShaderFiles(
     // build single large buffer
     //TODO: Port shaderText
     // Source: oracle/codemp/qcommon/cm_shader.cpp:28
-    cm.shaderText = crate::z_memman::Z_Malloc(
+    cm.shaderText = Z_Malloc(
         common,
         cm,
         rm,
@@ -281,13 +326,13 @@ pub fn CM_LoadShaderFiles(
             libc::strcat(cm.shaderText, c"\n".as_ptr());
             libc::strcat(cm.shaderText, buffers[j as usize]);
         }
-        crate::files::FS_FreeFile(common, buffers[j as usize]);
+        FS_FreeFile(common, buffers[j as usize]);
         j -= 1;
     }
 
     // free up memory
-    crate::files::FS_FreeFileList(common, shaderFiles1);
-    crate::files::FS_FreeFileList(common, shaderFiles2);
+    FS_FreeFileList(common, shaderFiles1);
+    FS_FreeFileList(common, shaderFiles2);
 }
 
 /// Raven `CM_FreeShaderText` — release the cached shader-text buffer and
@@ -301,7 +346,7 @@ pub fn CM_FreeShaderText(common: &mut Common, cm: &mut CollisionWorld) {
     //TODO: Port shaderText
     // Source: oracle/codemp/qcommon/cm_shader.cpp:28
     if !cm.shaderText.is_null() {
-        crate::z_memman::Z_Free(common, cm.shaderText);
+        Z_Free(common, cm.shaderText);
         cm.shaderText = core::ptr::null_mut();
     }
 }
@@ -318,7 +363,7 @@ pub fn SV_ParseMaterial(
 ) {
     let token = unsafe { COM_ParseExt(text, qfalse) };
     if unsafe { *token } == 0 {
-        crate::common::com_printf::Com_Printf(
+        crate::common::com_printf(
             common,
             &format!(
                 "{}WARNING: missing material in shader '{}'\n",
@@ -353,7 +398,7 @@ pub fn CM_ParseVector(
 ) -> qboolean {
     let mut token = unsafe { COM_ParseExt(text, qfalse) };
     if unsafe { libc::strcmp(token, c"(".as_ptr()) } != 0 {
-        crate::common::com_printf::Com_Printf(
+        crate::common::com_printf(
             common,
             &format!(
                 "{}WARNING: missing parenthesis in shader '{}'\n",
@@ -367,7 +412,7 @@ pub fn CM_ParseVector(
     for i in 0..count {
         token = unsafe { COM_ParseExt(text, qfalse) };
         if unsafe { *token } == 0 {
-            crate::common::com_printf::Com_Printf(
+            crate::common::com_printf(
                 common,
                 &format!(
                     "{}WARNING: missing vector element in shader '{}'\n",
@@ -386,7 +431,7 @@ pub fn CM_ParseVector(
 
     token = unsafe { COM_ParseExt(text, qfalse) };
     if unsafe { libc::strcmp(token, c")".as_ptr()) } != 0 {
-        crate::common::com_printf::Com_Printf(
+        crate::common::com_printf(
             common,
             &format!(
                 "{}WARNING: missing parenthesis in shader '{}'\n",
@@ -439,7 +484,7 @@ pub fn CM_ParseShader(
 ) {
     let mut token = unsafe { COM_ParseExt(text, qtrue) };
     if unsafe { *token } != b'{' as c_char {
-        crate::common::com_printf::Com_Printf(
+        crate::common::com_printf(
             common,
             &format!(
                 "{}WARNING: expecting '{{', found '{}' instead in shader '{}'\n",
@@ -454,7 +499,7 @@ pub fn CM_ParseShader(
     loop {
         token = unsafe { COM_ParseExt(text, qtrue) };
         if unsafe { *token } == 0 {
-            crate::common::com_printf::Com_Printf(
+            crate::common::com_printf(
                 common,
                 &format!(
                     "{}WARNING: no concluding '}}' in shader {}\n",
@@ -526,7 +571,7 @@ pub fn CM_ParseShader(
 
             token = unsafe { COM_ParseExt(text, qfalse) };
             if unsafe { *token } == 0 {
-                crate::common::com_printf::Com_Printf(
+                crate::common::com_printf(
                     common,
                     &format!(
                         "{}WARNING: missing parm for 'fogParms' keyword in shader '{}'\n",
@@ -603,7 +648,7 @@ pub fn CM_GetShaderInfo_ByName(
     // Create a new CCMShader class
     //TODO: Port h_high
     // Source: oracle/codemp/qcommon/cm_shader.cpp:510
-    out = crate::z_memman::Hunk_Alloc(
+    out = Hunk_Alloc(
         common,
         cm,
         rm,

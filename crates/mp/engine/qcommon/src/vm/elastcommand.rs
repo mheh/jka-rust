@@ -4,6 +4,7 @@
 /// VM JIT peephole optimizer.
 ///
 /// Type definition source: `oracle/codemp/qcommon/vm_x86.cpp:76-82`
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum ELastCommand {
 	LAST_COMMAND_NONE = 0,

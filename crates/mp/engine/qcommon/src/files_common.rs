@@ -41,17 +41,18 @@ use native_types::fileHandle_t;
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use crate::files::files_consts::BASEGAME;
-// PORT-NOTE(rm-types): see module doc above.
-use crate::render_models::RenderModels;
+// PORT-NOTE(rm-types): see module doc above; `RenderModels` lands via the
+// cm_load.rs precedent (files_pc.rs imports it the same way), since qcommon
+// has no Cargo edge to the renderer's real render_models.rs.
+use crate::cm_load::RenderModels;
 // PORT-NOTE(MAX_OSPATH): the packet's rosetta row points at
 // `mp_engine_client::client::client_connection_t::MAX_OSPATH`, but that
 // const is a private, file-local `const MAX_OSPATH: usize = 1024;` inside a
 // crate `mp_engine_qcommon` has no Cargo dependency on — not importable as
-// printed. Referenced by name anyway per the no-invent rule; reported in
-// both missing_symbols and shape_mismatches for the finisher (likely fix:
-// promote it to `pub` in a shared qcommon/qshared home and add the edge, or
-// land a qcommon-local `MAX_OSPATH` at the same value).
-use mp_engine_client::client::client_connection_t::MAX_OSPATH;
+// printed. Landed here as a qcommon-local const at the same value per the
+// module doc's own suggested fix.
+// Source: `mp_engine_client::client::client_connection_t::MAX_OSPATH` (value 1024)
+const MAX_OSPATH: usize = 1024;
 
 // Callees not yet landed in this crate (stub-free order violated by
 // concurrent parallel porting — referenced by exact Raven name per the

@@ -20,6 +20,14 @@ use crate::common::Common;
 // Raven name.
 extern "Rust" {
     fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
+    // `Com_Error` — ruling 1's `longjmp`-as-panic landing pad, narrowed to
+    // `(common, code, msg)` matching the files_common.rs/cm_shader.rs
+    // precedent (its full resolved shape also carries cm/sv/rm/host).
+    fn Com_Error(common: &mut Common, code: errorParm_t, msg: &str);
+}
+
+extern "C" {
+    fn strlen(s: *const c_char) -> usize;
 }
 
 // PORT-NOTE(cross-crate): `Server`/`SV_GentityNum` (oracle/codemp/qcommon/../
@@ -159,7 +167,7 @@ pub fn MSG_WriteBigString(common: &mut Common, sb: *mut msg_t, s: *const c_char)
         if s.is_null() {
             MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
         } else {
-            let l = crate::common_fns::strlen(s);
+            let l = strlen(s);
             if l >= mp_qshared::shared::limits::BIG_INFO_STRING {
                 crate::common::com_printf(common, "MSG_WriteString: BIG_INFO_STRING");
                 MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
@@ -773,6 +781,7 @@ pub fn MSG_ReadDeltaEntity(
             //TODO: Port Com_Error
             // Source: oracle/codemp/qcommon/msg.cpp:1239 (ruling 1: receiverless panic)
             Com_Error(
+                common,
                 errorParm_t::ERR_DROP,
                 &format!("Bad delta entity number: {number}"),
             );
@@ -916,9 +925,9 @@ pub fn MSG_ReadDeltaPlayerstate(
         *to = *from;
 
         let startBit = if (*msg).bit == 0 {
-            (*msg).readcount * 8 - crate::qcommon::msg_consts::GENTITYNUM_BITS
+            (*msg).readcount * 8 - mp_qshared::shared::limits::GENTITYNUM_BITS
         } else {
-            ((*msg).readcount - 1) * 8 + (*msg).bit - crate::qcommon::msg_consts::GENTITYNUM_BITS
+            ((*msg).readcount - 1) * 8 + (*msg).bit - mp_qshared::shared::limits::GENTITYNUM_BITS
         };
 
         // shownet 2/3 will interleave with other printed info, -2 will
@@ -992,7 +1001,11 @@ pub fn MSG_ReadDeltaPlayerstate(
                 let bits = MSG_ReadShort(common, msg);
                 for i in 0..16 {
                     if bits & (1 << i) != 0 {
-                        if i == crate::qcommon::msg_consts::STAT_WEAPONS {
+                        // `STAT_WEAPONS` — bg_public.h statIndex_t; mirrored here since
+                        // mp_bg (game tier) is above this crate's dependency graph.
+                        // Source: oracle/codemp/game/bg_public.h:520-532
+                        const STAT_WEAPONS: c_int = 4;
+                        if i == STAT_WEAPONS {
                             (*to).stats[i as usize] = MSG_ReadBits(
                                 common,
                                 msg,
@@ -1044,10 +1057,10 @@ pub fn MSG_ReadDeltaPlayerstate(
 
         if print {
             let endBit = if (*msg).bit == 0 {
-                (*msg).readcount * 8 - crate::qcommon::msg_consts::GENTITYNUM_BITS
+                (*msg).readcount * 8 - mp_qshared::shared::limits::GENTITYNUM_BITS
             } else {
                 ((*msg).readcount - 1) * 8 + (*msg).bit
-                    - crate::qcommon::msg_consts::GENTITYNUM_BITS
+                    - mp_qshared::shared::limits::GENTITYNUM_BITS
             };
             crate::common::com_printf(common, &format!(" ({} bits)\n", endBit - startBit));
         }

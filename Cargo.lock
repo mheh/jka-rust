@@ -175,6 +175,7 @@ dependencies = [
  "mp_qshared",
  "native_math",
  "native_platform",
+ "native_types",
 ]
 
 [[package]]

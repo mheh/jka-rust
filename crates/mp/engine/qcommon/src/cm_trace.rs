@@ -22,6 +22,18 @@ use mp_qshared::shared::{
     clipHandle_t, qfalse, qtrue, vec3_t, vec3pair_t, CONTENTS_BODY, CONTENTS_TERRAIN,
     CONTENTS_WATER,
 };
+// PORT-NOTE(vector-math): the file-level PORT-NOTE's q_math primitives now have a
+// reachable home — the NAV-D3/RULING 39d migration relocated Raven's `q_math.c`
+// vec3 helpers into `mp_qshared::shared::q_math` (the single engine-reachable,
+// referee-compared definition). Raven's `Vector*`/`DotProduct`/`Square` MACRO
+// names bind here to the reshaped `_`-prefixed / plain fns (inputs by value,
+// outputs `&mut`) per the rosetta vec3 stanza.
+use mp_qshared::shared::q_math::{
+    AngleVectors, Square, VectorAdvance, VectorClear, VectorInverse, VectorLength,
+    VectorLengthSquared, VectorNormalize, VectorSet, _DotProduct as DotProduct,
+    _VectorAdd as VectorAdd, _VectorCopy as VectorCopy, _VectorMA as VectorMA,
+    _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
+};
 
 use crate::cm::c_leaf_t::cLeaf_t;
 use crate::cm::c_node_t::cNode_t;
@@ -36,9 +48,13 @@ use crate::cm::cmodel_s::cmodel_t;
 use crate::cm::leaf_list_s::leafList_t;
 use crate::cm::sphere_t::sphere_t;
 use crate::cm::trace_work_s::{traceWork_s, traceWork_t};
-use crate::cm_load::{CCMLandScape, RenderModels, RmManager};
+use crate::cm_load::{
+    CCMLandScape, RenderModels, RmManager, CM_ClipHandleToModel, CM_ModelBounds, CM_TempBoxModel,
+};
+use crate::cm_test::{CM_BoxLeafnums_r, CM_StoreLeafs};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
+use crate::common_fns::Com_Memset;
 use mp_host_interface::engine_host::EngineHost;
 
 // PORT-NOTE(rm-types): `RmManager`/`RenderModels` are the state-receiver types
@@ -91,9 +107,9 @@ pub fn CreateRotationMatrix(angles: vec3_t, matrix: *mut vec3_t) {
     unsafe {
         AngleVectors(
             angles,
-            &mut *matrix.add(0),
-            &mut *matrix.add(1),
-            &mut *matrix.add(2),
+            Some(&mut *matrix.add(0)),
+            Some(&mut *matrix.add(1)),
+            Some(&mut *matrix.add(2)),
         );
         VectorInverse(&mut *matrix.add(1));
     }
@@ -924,7 +940,7 @@ pub fn CM_PositionTest(
                 host,
                 tw,
                 trace,
-                &mut cm.cmg.leafs[leafs[i as usize] as usize],
+                &mut *cm.cmg.leafs.add(leafs[i as usize] as usize),
                 &mut cm.cmg,
             );
             if trace.allsolid != 0 {
@@ -954,7 +970,10 @@ pub fn CM_TestCapsuleInCapsule(
         let mut offset: vec3_t = [0.0; 3];
         let mut symetricSize: vec3pair_t = [[0.0; 3]; 2];
 
-        CM_ModelBounds(cm, model, &mut mins, &mut maxs);
+        // PORT-NOTE(shape-mismatch): `CM_ModelBounds`'s LAW signature (cm_load.rs)
+        // takes `mins`/`maxs` by value (documented out-param non-propagation);
+        // call bent to match — the fill does not write back here.
+        CM_ModelBounds(cm, model, mins, maxs);
 
         VectorAdd((*tw).start, (*tw).sphere.offset, &mut top);
         VectorSubtract((*tw).start, (*tw).sphere.offset, &mut bottom);
@@ -1036,7 +1055,10 @@ pub fn CM_TestBoundingBoxInCapsule(
         let mut size: vec3pair_t = [[0.0; 3]; 2];
 
         // mins maxs of the capsule
-        CM_ModelBounds(cm, model, &mut mins, &mut maxs);
+        // PORT-NOTE(shape-mismatch): `CM_ModelBounds`'s LAW signature (cm_load.rs)
+        // takes `mins`/`maxs` by value (documented out-param non-propagation);
+        // call bent to match — the fill does not write back here.
+        CM_ModelBounds(cm, model, mins, maxs);
 
         // offset for capsule center
         for i in 0..3 {
@@ -1117,7 +1139,10 @@ pub fn CM_TraceCapsuleThroughCapsule(
         let mut offset: vec3_t = [0.0; 3];
         let mut symetricSize: vec3pair_t = [[0.0; 3]; 2];
 
-        CM_ModelBounds(cm, model, &mut mins, &mut maxs);
+        // PORT-NOTE(shape-mismatch): `CM_ModelBounds`'s LAW signature (cm_load.rs)
+        // takes `mins`/`maxs` by value (documented out-param non-propagation);
+        // call bent to match — the fill does not write back here.
+        CM_ModelBounds(cm, model, mins, maxs);
         // test trace bounds vs. capsule bounds
         if (*tw).bounds[0][0] > maxs[0] + RADIUS_EPSILON
             || (*tw).bounds[0][1] > maxs[1] + RADIUS_EPSILON
@@ -1357,7 +1382,10 @@ pub fn CM_TraceBoundingBoxThroughCapsule(
         let mut size: vec3pair_t = [[0.0; 3]; 2];
 
         // mins maxs of the capsule
-        CM_ModelBounds(cm, model, &mut mins, &mut maxs);
+        // PORT-NOTE(shape-mismatch): `CM_ModelBounds`'s LAW signature (cm_load.rs)
+        // takes `mins`/`maxs` by value (documented out-param non-propagation);
+        // call bent to match — the fill does not write back here.
+        CM_ModelBounds(cm, model, mins, maxs);
 
         // offset for capsule center
         for i in 0..3 {
@@ -1435,7 +1463,7 @@ pub fn CM_TraceThroughTree(
                 tw,
                 trace,
                 local,
-                &mut (*local).leafs[(-1 - num) as usize],
+                &mut *(*local).leafs.add((-1 - num) as usize),
             );
             return;
         }
@@ -1616,7 +1644,7 @@ pub fn CM_Trace(
 
         // fill in a default trace
         Com_Memset(
-            &mut tw as *mut traceWork_t as *mut core::ffi::c_void,
+            &mut tw as *mut traceWork_t as *mut (),
             0,
             core::mem::size_of::<traceWork_t>(),
         );

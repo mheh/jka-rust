@@ -487,8 +487,8 @@ pub fn Com_AddStartupCommands(common: &mut Common) -> qboolean {
         if q_stricmpn(line, c"set".as_ptr() as *mut c_char, 3) != 0 {
             added = qtrue;
         }
-        crate::cmd::Cbuf_AddText(common, line);
-        crate::cmd::Cbuf_AddText(common, c"\n".as_ptr() as *mut c_char);
+        crate::cmd_common::Cbuf_AddText(common, line);
+        crate::cmd_common::Cbuf_AddText(common, c"\n".as_ptr() as *mut c_char);
     }
     added
 }
@@ -893,12 +893,12 @@ pub fn Com_EventLoop(
                 unsafe {
                     let s = ev.evPtr as *mut c_char;
                     if *s == b'\\' as c_char || *s == b'/' as c_char {
-                        crate::cmd::Cbuf_AddText(common, s.add(1));
+                        crate::cmd_common::Cbuf_AddText(common, s.add(1));
                     } else {
-                        crate::cmd::Cbuf_AddText(common, s);
+                        crate::cmd_common::Cbuf_AddText(common, s);
                     }
                 }
-                crate::cmd::Cbuf_AddText(common, c"\n".as_ptr() as *mut c_char);
+                crate::cmd_common::Cbuf_AddText(common, c"\n".as_ptr() as *mut c_char);
             }
             sysEventType_t::SE_PACKET => {
                 // this cvar allows simulation of connections that
@@ -1280,14 +1280,14 @@ pub fn Com_Init(
 
         Com_InitJournaling(common, cm, rm, host);
 
-        crate::cmd::Cbuf_AddText(common, c"exec mpdefault.cfg\n".as_ptr() as *mut c_char);
+        crate::cmd_common::Cbuf_AddText(common, c"exec mpdefault.cfg\n".as_ptr() as *mut c_char);
 
         // skip the jampconfig.cfg if "safe" is on the command line
         if Com_SafeMode(common) == qfalse {
-            crate::cmd::Cbuf_AddText(common, c"exec jampconfig.cfg\n".as_ptr() as *mut c_char);
+            crate::cmd_common::Cbuf_AddText(common, c"exec jampconfig.cfg\n".as_ptr() as *mut c_char);
         }
 
-        crate::cmd::Cbuf_AddText(common, c"exec autoexec.cfg\n".as_ptr() as *mut c_char);
+        crate::cmd_common::Cbuf_AddText(common, c"exec autoexec.cfg\n".as_ptr() as *mut c_char);
 
         crate::cmd_common::Cbuf_Execute(common, cm, sv, rm, host);
 
@@ -1672,7 +1672,7 @@ pub fn Com_Init(
             if Com_AddStartupCommands(common) == qfalse {
                 // if the user didn't give any commands, run default action
                 if (*common.com_dedicated).integer == 0 {
-                    crate::cmd::Cbuf_AddText(common, c"cinematic openinglogos.roq\n".as_ptr() as *mut c_char);
+                    crate::cmd_common::Cbuf_AddText(common, c"cinematic openinglogos.roq\n".as_ptr() as *mut c_char);
                 }
             }
         }

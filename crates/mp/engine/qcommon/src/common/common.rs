@@ -11,6 +11,9 @@ use mp_qshared::shared::limits::{
 };
 use mp_qshared::shared::qboolean;
 
+use crate::qcommon::net_chan_cpp_consts::MAX_LOOPBACK;
+use crate::z_memman::zone_header_s::zoneHeader_t;
+
 use super::error::ErrorState;
 use super::journal::Journal;
 use super::sys_event_queue::SysEventQueue;
@@ -37,6 +40,55 @@ pub struct cmd_t {
     pub data: *mut u8,
     pub maxsize: c_int,
     pub cursize: c_int,
+}
+
+/// Raven `zoneStats_t` (`z_memman_pc.cpp:56-65`) — the zone allocator's
+/// running byte/count totals, per-tag broken down over `memtag_t::TAG_COUNT`
+/// slots. No rosetta row; resolved verbatim here as the shape of
+/// `Common::TheZone.Stats` (`cmd_t` precedent above).
+///
+/// Type definition source: `oracle/codemp/qcommon/z_memman_pc.cpp:56-65`
+#[repr(C)]
+pub struct zoneStats_t {
+    pub iCount: c_int,
+    pub iCurrent: c_int,
+    pub iPeak: c_int,
+    pub iSizesPerTag: [c_int; memtag_t::TAG_COUNT as usize],
+    pub iCountsPerTag: [c_int; memtag_t::TAG_COUNT as usize],
+}
+
+/// Raven `zone_t` (`z_memman_pc.cpp:68-72`) — `TheZone`'s aggregate shape
+/// (stats + the allocation-list header). No rosetta row; resolved verbatim
+/// here as the shape of `Common::TheZone` (`cmd_t` precedent above).
+///
+/// Type definition source: `oracle/codemp/qcommon/z_memman_pc.cpp:68-72`
+#[repr(C)]
+pub struct zone_t {
+    pub Stats: zoneStats_t,
+    pub Header: zoneHeader_t,
+}
+
+/// Raven `loopmsg_t` (`net_chan.cpp:477-480`) — one buffered loopback packet.
+/// No rosetta row; resolved verbatim here as the shape of
+/// `Common::loopbacks` (`cmd_t` precedent above).
+///
+/// Type definition source: `oracle/codemp/qcommon/net_chan.cpp:477-480`
+#[repr(C)]
+pub struct loopmsg_t {
+    pub data: [u8; crate::qcommon::net_chan_cpp_consts::MAX_PACKETLEN as usize],
+    pub datalen: c_int,
+}
+
+/// Raven `loopback_t` (`net_chan.cpp:482-484`) — the localhost transport's
+/// per-direction message ring. No rosetta row; resolved verbatim here as the
+/// shape of `Common::loopbacks` (`cmd_t` precedent above).
+///
+/// Type definition source: `oracle/codemp/qcommon/net_chan.cpp:482-484`
+#[repr(C)]
+pub struct loopback_t {
+    pub msgs: [loopmsg_t; MAX_LOOPBACK as usize],
+    pub get: c_int,
+    pub send: c_int,
 }
 
 /// The `common.cpp` global state, a field of the aggregate `Engine`
@@ -349,6 +401,49 @@ pub struct Common {
     pub call_op_stack: *mut c_int,
     pub call_syscall_num: c_int,
     pub current_vm: *mut vm_t,
+
+    // ---- zone allocator (`z_memman_pc.cpp`) ----
+    /// Raven `TheZone` (the zone allocator's stats + allocation-list header).
+    ///
+    /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:77`
+    pub TheZone: zone_t,
+
+    // ---- filesystem (`files_common.cpp`) fn-static / init-state hoists ----
+    /// Raven `FS_BuildOSPath`'s `static char ospath[2][MAX_OSPATH]` /
+    /// `static int toggle` (fn-static hoists, three-kind rule).
+    ///
+    /// Source: `oracle/codemp/qcommon/files_common.cpp:296-297`
+    pub fs_build_os_path_buf: [[c_char; MAX_OSPATH]; 2],
+    pub fs_build_os_path_toggle: c_int,
+    /// Raven `FS_BuildOSPath` (`base`/`game`/`qpath` overload)'s
+    /// `static char ospath[4][MAX_OSPATH]` / `static int toggle` — a
+    /// SEPARATE fn-scope-static pair from the single-`qpath` overload above
+    /// (Raven gives each overload its own statics).
+    ///
+    /// Source: `oracle/codemp/qcommon/files_common.cpp:315-317`
+    pub fs_build_os_path4_buf: [[c_char; MAX_OSPATH]; 4],
+    pub fs_build_os_path4_toggle: c_int,
+    /// Raven `fs_loadStack` — total files currently loaded into memory.
+    ///
+    /// Source: `oracle/codemp/qcommon/files_common.cpp:196`
+    pub fs_loadStack: c_int,
+    /// Raven `initialized` — whether `FS_InitFilesystem` has completed.
+    ///
+    /// Source: `oracle/codemp/qcommon/files_common.cpp:224`
+    pub initialized: qboolean,
+    /// Raven `lastValidBase` / `lastValidGame` — the last known-good
+    /// basepath/gamedir, restored on a failed `FS_SetBaseDir`/pure check.
+    ///
+    /// Source: `oracle/codemp/qcommon/files_common.cpp:217-218`
+    pub lastValidBase: [c_char; MAX_OSPATH],
+    pub lastValidGame: [c_char; MAX_OSPATH],
+
+    // ---- networking (`net_chan.cpp`) ----
+    /// Raven `loopbacks[2]` — the localhost transport's per-direction
+    /// message rings.
+    ///
+    /// Source: `oracle/codemp/qcommon/net_chan.cpp:486`
+    pub loopbacks: [loopback_t; 2],
 }
 
 /// Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching the FS field sizes).
