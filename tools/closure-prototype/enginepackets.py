@@ -81,7 +81,21 @@ DOC = {
     "ghoul2": "docs/subsystems/ghoul2-server.md",
     "npcnav": "docs/subsystems/npcnav.md",
     "roff": "docs/subsystems/roff.md",
+    # Rulings 50/51 (2026-07-09): the sixth and seventh §F docs.
+    "stringed": "docs/subsystems/stringed.md",
+    "trmodel": "docs/subsystems/tr-model.md",
 }
+# Ruling 49: CDraw32 (all of cm_draw.cpp) is §20-dropped — sole caller
+# CTerrainMap is header-only in the link set; addendum in rmg-terrain.md.
+S20_FILES = {"cm_draw.cpp"}
+# Ruling 50/51 file scopes: whole-TU doc routing (free fns included — the
+# docs' Method-transcription tables are their work orders).
+STRINGED_FILES = {"stringed_ingame.cpp", "stringed_interface.cpp"}
+# tr-model.md owns tr_model.cpp + matcomp.c live surface AND the §20/§C10
+# classification of the DEDICATED-dead renderer TUs (ruling 54).
+TRMODEL_FILES = {"tr_model.cpp", "matcomp.c", "tr_shader.cpp", "tr_image.cpp",
+                 "tr_init.cpp", "tr_main.cpp", "tr_mesh.cpp",
+                 "null_renderer.cpp"}
 # RMG qcommon terrain twins folded into rmg-terrain.md (ruling 16/28); class set
 # confirmed present in rmg-terrain.md.
 RMG_FOLDED = {"CCMLandScape", "CRandomTerrain", "CTerrainMap", "CPathInfo",
@@ -114,6 +128,13 @@ def classify(f):
         return "cpp", DOC["rmg"]
     if file == "GenericParser2.cpp" or owner in GP2_CLASSES:
         return "cpp-done", GP2_DIR
+    if file in S20_FILES:
+        # ruling 49: §20-dropped, zero live callers; no packet, no doc row.
+        return "s20-dropped", "docs/subsystems/rmg-terrain.md (addendum, ruling 49)"
+    if file in STRINGED_FILES:
+        return "cpp", DOC["stringed"]
+    if file in TRMODEL_FILES:
+        return "cpp", DOC["trmodel"]
     if owner is not None:
         # a C++ class method with no frozen §F doc — a coverage GAP (referee item)
         return "cpp-undocumented", None
