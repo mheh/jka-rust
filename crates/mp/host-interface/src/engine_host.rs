@@ -20,7 +20,9 @@ use crate::vm_slot::VmSlot;
 ///
 /// The method set is fixed by ruling 24 (trace, FS read/free, print/error,
 /// `VM_Call`, shared-memory window, `flrand`/`irand`, gentity), extended by
-/// ruling 36 (cvar read, `svs.time`, FS write, loader model memory).
+/// ruling 36 (cvar read, `svs.time`, FS write, loader model memory),
+/// ruling 55 (cvar register/string/take-modified, VFS file listing), and
+/// ruling 59a (pak membership).
 pub trait EngineHost {
     /// Raven `SV_Trace` — sweep a box through the collision world, writing the
     /// result into `results` (kept as an out-param to transcribe the NPCNav
@@ -191,4 +193,18 @@ pub trait EngineHost {
     /// — today's call sites pass `false`).
     /// Source: `oracle/codemp/qcommon/files.cpp:2174`
     fn fs_list_files(&mut self, dir: &str, ext: &str, want_subs: bool) -> Vec<String>;
+
+    /// Raven `FS_FileIsInPAK( filename, &checksum )` collapsed per §C7
+    /// (ruling 59a). Raven's convention: returns `1` and writes
+    /// `*pChecksum = pak->pure_checksum` when the file is found in a
+    /// pure-allowed pak; returns `-1` (never `0`) in every other case — a
+    /// file found only on disk, not found at all, an illegal `..`/`::` path,
+    /// or a hit in a non-pure pak (skipped by `FS_PakIsPure`). So
+    /// `Some(pure_checksum)` = the `1` path, `None` = every `-1` path. Live
+    /// consumers: the `iPAKFileCheckSum` stamp in
+    /// `RE_RegisterServerModels_Malloc` (`tr_model.cpp:212`) and the purity
+    /// re-check in `RE_RegisterModels_DumpNonPure` (`tr_model.cpp:434-436`).
+    /// Source: `oracle/codemp/qcommon/files.cpp:1602-1659` (decl:
+    /// `qcommon.h:551`)
+    fn fs_file_is_in_pak(&mut self, qpath: &str) -> Option<i32>;
 }

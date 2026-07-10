@@ -139,6 +139,13 @@ fn c_atoi(s: &str) -> i32 {
 pub struct MockHost {
     /// FS fixtures served by [`EngineHost::fs_read_file`], keyed by qpath.
     pub files: BTreeMap<String, Vec<u8>>,
+    /// Pak-membership fixtures served by [`EngineHost::fs_file_is_in_pak`]:
+    /// qpath → the pak's `pure_checksum`. A file present in [`files`] but
+    /// absent here behaves as disk-only — `None`, Raven's `-1` path
+    /// (`files.cpp:1659`).
+    ///
+    /// [`files`]: MockHost::files
+    pub pak_files: BTreeMap<String, i32>,
     /// `Sys_ListFiles` fixtures, keyed by directory → sorted entry names.
     pub dir_entries: BTreeMap<String, Vec<String>>,
     /// Scripted inbound datagrams served by [`PlatformHost::get_packet`]
@@ -201,6 +208,7 @@ impl MockHost {
         let stride = core::mem::size_of::<sharedEntity_t>();
         Self {
             files: BTreeMap::new(),
+            pak_files: BTreeMap::new(),
             dir_entries: BTreeMap::new(),
             incoming_packets: VecDeque::new(),
             sent_packets: Vec::new(),
@@ -414,6 +422,12 @@ impl EngineHost for MockHost {
             }
         }
         out
+    }
+
+    fn fs_file_is_in_pak(&mut self, qpath: &str) -> Option<i32> {
+        // Some(pure_checksum) = Raven's `return 1` path; a qpath absent here
+        // (even if present in `files`) is disk-only/missing = the -1 path.
+        self.pak_files.get(qpath).copied()
     }
 }
 
@@ -663,6 +677,26 @@ mod tests {
         host.set_cvar("se_language", "deutsch");
         assert!(host.cvar_take_modified("se_language"));
         assert!(!host.cvar_take_modified("se_language"));
+    }
+
+    #[test]
+    fn fs_file_is_in_pak_serves_checksum_or_none() {
+        let mut host = MockHost::new()
+            .with_file("models/players/kyle/model.glm", b"glm".to_vec())
+            .with_file("models/local/tweak.glm", b"glm".to_vec());
+        host.pak_files
+            .insert("models/players/kyle/model.glm".to_string(), 0x1234_abcd_u32 as i32);
+
+        // In a pure pak: Some(pure_checksum) (files.cpp:1650-1653).
+        assert_eq!(
+            host.fs_file_is_in_pak("models/players/kyle/model.glm"),
+            Some(0x1234_abcd_u32 as i32)
+        );
+        // Present in the FS fixtures but not the pak map = disk-only: None
+        // (Raven's -1, files.cpp:1659).
+        assert_eq!(host.fs_file_is_in_pak("models/local/tweak.glm"), None);
+        // Not found at all: also None (same -1 path).
+        assert_eq!(host.fs_file_is_in_pak("models/missing.glm"), None);
     }
 
     #[test]
