@@ -16,6 +16,7 @@ use crate::z_memman::zone_header_s::zoneHeader_t;
 
 use super::error::ErrorState;
 use super::journal::Journal;
+use super::qrand::QRand;
 use super::sys_event_queue::SysEventQueue;
 use crate::cmd::cmd_consts::MAX_CMD_BUFFER;
 use crate::common::common_consts::{MAX_CONSOLE_LINES, MAX_PUSHED_EVENTS};
@@ -126,6 +127,13 @@ pub struct Common {
     /// `Common` sub-struct field per ruling 50; written through its `Default`
     /// (= Raven's `Clear(SE_FALSE)`) in `Engine::new()`'s write-list (ruling 55).
     pub stringed: crate::stringed::package::StringEdPackage,
+    /// Raven `q_math.c`'s file-static `holdrand` LCG — the engine island's OWN
+    /// generator instance (ruling 21), distinct from the game-tier
+    /// `BgState.rng`. Written through its `Default` (Raven's `0x89abcdef`
+    /// static initializer) in `Engine::new()`'s write-list, then reseeded by
+    /// `Com_Init`'s `Rand_Init(Sys_Milliseconds())`.
+    /// Source: `oracle/codemp/game/q_math.c:1432`
+    pub qrand: QRand,
     //TODO: Port Common cvars/cmd/cbuf/fs/net sub-structs + com_printf print state
     // Source: oracle/codemp/qcommon/common.cpp:32-72,128,137-171
     /// Raven `msg.cpp` file-scope statics/globals (ruling 2/3): `msgInit`,

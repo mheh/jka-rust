@@ -139,6 +139,10 @@ impl Engine {
             // through its Default (= Raven's Clear(SE_FALSE)) per the ruling-55
             // construction story.
             addr_of_mut!((*p).common.stringed).write(Default::default());
+            // Common.qrand (ruling 21): the engine island's own LCG, whose
+            // Raven static initializer is 0x89abcdef (non-zero), so it is
+            // written through its Default rather than left zeroed.
+            addr_of_mut!((*p).common.qrand).write(Default::default());
             Box::from_raw(p)
         }
     }

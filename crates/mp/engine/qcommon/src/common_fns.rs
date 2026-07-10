@@ -1419,14 +1419,11 @@ pub fn Com_Init(
         // override anything from the config files with command line args
         Com_StartupVariable(common, cm, rm, host, core::ptr::null());
 
-        // Seed the random number generator
-        //TODO: Port Rand_Init — the engine-side q_math LCG (ruling 21's
-        // `common.qrand` QRand field) has NOT landed: the generator currently
-        // lives only in game-tier `BgState` (q_math_rand.rs), unreachable from
-        // qcommon. Seed value computed faithfully; the seeding lands with the
-        // engine-LCG wave.
+        // Seed the random number generator — Raven `Rand_Init(Sys_Milliseconds(true))`
+        // seeds the engine island's own LCG (ruling 21's `common.qrand`).
         // Source: oracle/codemp/qcommon/common.cpp:1248
-        let _rand_seed = crate::timing::sys_milliseconds(common);
+        let rand_seed = crate::timing::sys_milliseconds(common);
+        common.qrand.Rand_Init(rand_seed);
 
         // get the developer cvar set as early as possible
         Com_StartupVariable(common, cm, rm, host, c"developer".as_ptr());
