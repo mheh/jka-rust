@@ -1,6 +1,6 @@
-# CNavigator (server/NPCNav) Design
+# CNavigator (server/NPCNav) — engine-side nav graph (§F idiomatic reimplementation) Design
 Status: DRAFT     Supersedes: none
-Decision prefix: NAV     Ledger deps: engine-fork-discovery rulings 11 (EngineHost seam), 12 (`Engine.nav` field), 14 (fixture pattern), 18 (faithful priority queue), 22 (shared const/vec3 home in `mp_qshared` — closes NAV-Q6), 24 (Stage-0 crate PINNED `crates/mp/host-interface` / `mp_host_interface`), 26 (nav tie-order pinned to the oracle-harness toolchain); forks 2/3 (state placement, fn-scope statics), 7 (§F doc list). Rulings 11–22 stand (NAV-D3 input).
+Decision prefix: NAV     Ledger deps: engine-fork-discovery rulings 11 (one `EngineHost` seam), 12 (`Engine.nav` field), 14 (fixtures), 18 (faithful priority queue), 22 (shared const/vec3 home in `mp_qshared`), 24 (Stage-0 crate PINNED `mp_host_interface` / `crates/mp/host-interface`), 26 (nav tie-order pinned to the oracle-harness libstdc++), 30 (the ent-taking arms carry `*mut sharedEntity_t`), 31/33 (`mp_host_interface` BUILT and green, commit `4b7f01b0`), 32 (MockHost-driven goldens, no test-only ctor); forks 2/3 (state placement, fn-scope statics), 7 (§F doc list). All rulings 11–26 stand (NAV-D5).
 
 C++-track subsystem (porting-rules §F). This doc carries the `files` roster and
 `divergences` list so it drops into `.claude/workflows/port-cpp-subsystem.js`
@@ -18,7 +18,7 @@ Links only — never restated here:
 - `docs/GOAL-engine.md` — no-stub / no-`todo!` port discipline; every fn verified.
 - `docs/doc-standards.md` — this template.
 - `docs/handoffs/engine-fork-discovery.md` — settled fork rulings (forks 2/3/7)
-  and the §F doc-session rulings 11–18 this revision renders.
+  and the §F doc-session rulings 11–33 this revision renders.
 - GP2 is the §F exemplar: `crates/mp/engine/qcommon/src/gp2/`, `tools/gp2-oracle/`.
 
 ## Scope & non-goals
@@ -37,19 +37,37 @@ engine→game out-calls. Header: `oracle/codemp/server/NPCNav/navigator.h`.
   wave 20 — see the build-out plan §0.4. This doc freezes only the `CNavigator`
   pub surface those arms call; NAV-D5 keeps that boundary byte-identical. The
   `SETCHECKEDNODE`/`FLAGALLNODES` switch fall-through is that port's obligation,
-  not this one — NAV-D3.
+  not this one — NAV-D5.
 - The game-module twin of this API (the `trap_Nav_*` wrappers and the
   `GAME_NAV_*` handlers `oracle/codemp/game/g_public.h:788-796`) is already
   ported in `mp_game` — see NAV-D5. This doc does not re-port it.
-- The `Sys_*`/FS/trace/cvar engine services `CNavigator` calls back into
-  (`SV_Trace`, `SV_inPVS`, `SV_GentityNum`, `FS_*`, `Cvar_Get`, `Com_Error`,
-  `Com_Printf`) are reached through the one shared `EngineHost` trait (NAV-D2,
-  RULING 11); that trait is designed once at Stage-0 in the pinned
-  `mp_host_interface` crate (`crates/mp/host-interface`, RULING 24), not here.
-  This doc only records that they are the nav seam's inbound dependencies.
-- The host seam mechanism and the golden fixture set are **settled** by NAV-D2
-  and NAV-D4 (they were open at the prior draft; the §F doc-session rulings
-  closed them).
+- The `Sys_*`/FS/trace engine services `CNavigator` calls back into
+  (`SV_Trace`, `SV_inPVS`, `SV_GentityNum`, `FS_*`, `Com_Error`, `Com_Printf`)
+  are reached through the one shared `EngineHost` trait (NAV-D4, RULING 11),
+  which is **already BUILT and green** in the pinned `mp_host_interface` crate
+  (`crates/mp/host-interface`, RULING 24; commit `4b7f01b0`, RULING 31/33). This
+  doc quotes that trait's frozen signatures verbatim (NAV-D4, Seam) but does not
+  define it. **Three services nav also needs are NOT on that frozen trait and
+  are open seam escalations, not settled here** (like `SV_inPVS`): the cvar reads
+  `d_altRoutes`/`d_patched`→`integer` (**NAV-Q9**), the `svs.time` server-frame
+  clock (**NAV-Q10**), and `Save`'s `FS_Write` path (**NAV-Q11**). Their
+  resolution is a seam/scope decision this doc does not make.
+
+**The Stage-0-covered seam points are settled:** the host seam is built (NAV-D4),
+the graph-construction/goldens mechanism is the fixture-backed `MockHost` (NAV-D2,
+closes the old NAV-Q7), the shared const/vec3 migration's destination / ownership /
+move-vs-re-export are pinned (NAV-D3, closes the old NAV-Q8), and the ent-taking
+arms carry `*mut sharedEntity_t` (NAV-D1). **But three services the nav code
+provably calls have no method on the frozen `EngineHost` and are covered by no
+ruling — cvar reads (NAV-Q9), `svs.time` (NAV-Q10), and `Save`'s FS-write
+(NAV-Q11) — and two NAV-D3 execution parameters its "deleted and re-imported in
+the same commit, no shims" wording leaves unspecified are, on a tree check, not
+mechanically self-resolvable: the cross-crate call-site footprint (NAV-Q12) and
+the moved vec3-fn names (NAV-Q13).** None can be self-resolved by an agent
+(extending the frozen Stage-0 trait, or threading the value another way, is a
+design decision — rulings 31/33 / NAV-D4; the NAV-D3 scope/naming likewise); per
+doc-standards Gate-2 they **escalate to an interactive session**, so `## Open
+questions` carries five live holes and the doc stays **DRAFT**.
 
 ## Raven ground truth
 
@@ -117,7 +135,7 @@ then repeatedly `Pop` the min-cost `CEdge`, assign the popped node
 `node->AddRank(testNode->GetID(), curRank++)` (:853), and `Push` each unchecked
 neighbour at cumulative cost. **The `curRank++` is assigned in pop order**, so
 the order in which equal-cost frontier entries pop is baked into every node's
-rank table — the tie-break is parity-visible (NAV-D1).
+rank table — the tie-break is parity-visible (NAV-D5, RULING 26).
 
 ### The failed-edge / checked-node bookkeeping
 
@@ -125,8 +143,10 @@ rank table — the tie-break is parity-visible (NAV-D1).
   (`oracle/codemp/game/g_public.h:706-712`: `waypoint`, `failedWaypoints[8]`
   (`MAX_FAILED_NODES = 8`, g_public.h:673), `failedWaypointCheckTime`), written
   by `AddFailedNode` (:1768-1799) / re-tested by `CheckFailedNodes`
-  (:1724-1766) / read by `NodeFailed` (:1801-1811). These fields are in the
-  **game-owned** entity array the engine sees through `SV_GentityNum`.
+  (:1724-1766) / read by `NodeFailed` (:1801-1811). The `CNavigator` methods
+  reach these fields by **dereferencing the `sharedEntity_t *ent` the trap
+  hands them** (`(sharedEntity_t *)VMA(1)`, sv_game.cpp:885/888/891), exactly as
+  Raven does — see NAV-D1.
 - Failed **edges** live in the engine's `failedEdges[]` + `m_edgeLookupMap`;
   `AddFailedEdge` (:1925-2055), `ClearFailedEdge` (:1835-1865),
   `ClearAllFailedEdges` (:1867-1874), `CheckFailedEdge` (:2057-2142),
@@ -167,58 +187,154 @@ cross-frame state → host field).
 
 | Raven global | oracle cite | Rust owner (crate::Type.field) | constructed by | threaded via |
 | --- | --- | --- | --- | --- |
-| `navigator` | navigator.cpp:32 | `mp_engine_core::Engine.nav: Navigator` (type in `mp_engine_server::npcnav`) | `Default`-init direct field; RULING 12 | `(&mut self, &mut impl EngineHost)`; NAV-D2 |
+| `navigator` | navigator.cpp:32 | `mp_engine_core::Engine.nav: Navigator` (type in `mp_engine_server::npcnav`) | `Default`-init direct field; RULING 12 | `(&mut self, &mut impl EngineHost)`; NAV-D4 |
 | `Navigator.m_nodes` | navigator.h:247 | `Navigator.nodes: Vec<Node>` | `AddRawPoint`/`Load` | owned arena, node id = index; NAV-D5 |
 | `Navigator.m_edgeLookupMap` | navigator.h:248 | `Navigator.edge_lookup: BTreeMap<i32, Vec<usize>>` | `AddFailedEdge`/`Load` | owned; NAV-D5 |
 | `Navigator.failedEdges[32]` | navigator.h:245 | `Navigator.failed_edges: [failedEdge_t; MAX_FAILED_EDGES]` | ctor/`ClearAllFailedEdges` | owned array |
 | `Navigator.pathsCalculated` | navigator.h:215 | `Navigator.paths_calculated: qboolean` | `CalculatePaths` | pub field (NAV-D5 seam get/set) |
-| `d_altRoutes`, `d_patched` | navigator.cpp:36-37 | engine cvar handles in `EngineCvars` (fork-2) | `NAV_CvarInit` | read via `EngineHost` at method entry; NAV-D2 |
+| `d_altRoutes`, `d_patched` | navigator.cpp:36-37 | engine cvar handles in `EngineCvars` (fork-2) | `NAV_CvarInit` | handle placement is fork-2; but the frozen `EngineHost` has **no cvar accessor**, so the `->integer` read path (navigator.cpp:480,1403,1418,1433,1498,1933,2278,2323,2346) is an **open seam gap — NAV-Q9**, not reachable via NAV-D4 as frozen |
 | `CheckedNodes` static | navigator.cpp:1687 | `Navigator.checked_nodes: BTreeMap<i32, u8>` | first `SetCheckedNode` | owned; fork-3 kind-3. **`BTreeMap` not `HashMap`** — iteration/lookup determinism (plan §3d), NAV-D5 |
-| `wpMaxs`/`wpMins` | navigator.cpp:50-51 | module `const WP_MAXS/WP_MINS: [f32;3]` | — | fork-3 kind-1; `WP_MINS`'s `-24+STEPSIZE` reads `STEPSIZE` from `mp_qshared` (NAV-D6) |
+| `wpMaxs`/`wpMins` | navigator.cpp:50-51 | module `const WP_MAXS/WP_MINS: [f32;3]` | — | fork-3 kind-1; `WP_MINS`'s `-24+STEPSIZE` reads `STEPSIZE` from `mp_qshared` (NAV-D3) |
 | `CHECKED_NO/FAILED/PASSED` | navigator.cpp:54-56 | module `const` (`u8`) | — | fork-3 kind-1 |
 | `GetTime` statics | navigator.cpp:63-64 | not ported (`AI_TIMERS` off) | — | §20 dead-surface note |
 
-`sharedEntity_t.{waypoint, failedWaypoints, failedWaypointCheckTime}`
-(g_public.h:706-712) are **not** engine-owned — they live in the game module's
-entity array reached through `SV_GentityNum` (an `EngineHost` service); the nav
-methods read/write them through that borrow, exactly as Raven does through the
-raw `sharedEntity_t*`.
+**Per-entity failed-node fields are NOT engine-owned, and are reached by
+dereferencing the trap-marshaled pointer, not by re-fetching through
+`SV_GentityNum`.** `sharedEntity_t.{waypoint, failedWaypoints,
+failedWaypointCheckTime}` (g_public.h:706-712) live in the game module's entity
+array. Under **NAV-D1 (RULING 30)** the five ent-taking arms receive the entity
+as a raw `*mut sharedEntity_t` produced by the trap's `(sharedEntity_t *)VMA(1)`
+marshal (sv_game.cpp:865/885/888/891/917), and the methods deref that pointer
+directly for `ent->s.number`, `ent->r.currentOrigin`, `ent->r.mins/maxs`,
+`ent->waypoint`, `ent->failedWaypoints` (navigator.cpp:1159,1202,1217,1223,
+1334,1347,1493 and the `AddFailedNode`/`NodeFailed`/`CheckFailedNodes` bodies
+:1724-1811) — writing back through the same borrow, exactly as Raven does. The
+`SV_GentityNum` service (the `gentity()` `EngineHost` method) is kept **only**
+for the genuinely index-based access the nav code still makes by slot number:
+`SV_GentityNum(0)` (the player entity) in `GetNearestNode`/`ShowNodes`/`ShowPath`
+(navigator.cpp:933,943,947,975,980,1006,1011).
 
-**Shared constants & vec3 helpers the nav code consumes (not nav-owned).**
-`Q3_INFINITE` (`oracle/codemp/game/g_public.h:9`, `16777216`), `WORLD_SIZE`
+**Shared constants & vec3 helpers the nav code consumes (not nav-owned) — home
+in `mp_qshared`, migrated in this doc's first slice.** `Q3_INFINITE`
+(`oracle/codemp/game/g_public.h:9`, `16777216`), `WORLD_SIZE`
 (`oracle/codemp/game/q_shared.h:20`), `STEPSIZE` (`oracle/codemp/game/bg_public.h:22`,
 `18` — used by `WP_MINS`'s `-24+STEPSIZE`, navigator.cpp:51), `WAYPOINT_NONE`
 (`oracle/codemp/game/g_nav.h:7`, `-1`), and the vec3 primitives
 `VectorNormalize`/`DotProduct`/`VectorSubtract`/`VectorCopy`
 (`q_shared.h`/`q_math.c`; used by `GetProjectedNode` and `CNode::GetPosition`)
-are **not nav-owned** and are **not** re-declared in npcnav. They are shared
-items imported from the engine-reachable shared tier — the same status as the
-`va`/`Q_irand` q_shared helpers (Seam, outbound) and `failedEdge_t` (repr
-section): imported, never a local copy (porting-rules §14/single-source). npcnav
-does **not** read them from `mp_game`/`mp_bg` — `mp_engine_server` has no game/bg
-source dependency (Cargo deps: `mp_qshared`, `mp_engine_qcommon`, `mp_abi`), so a
-`mp_game`-only copy is unreachable. **NAV-D6 (RULING 22) settles their canonical
-engine-reachable home as `mp_qshared`** — the single definition the referee
-compares, moved or re-exported out of the copies that today sit only in `mp_game`
-(`crates/mp/game/src/g_public_consts.rs:14`, `crates/mp/game/src/NPC_combat.rs:2736`,
-`crates/mp/game/src/bg_slidemove.rs:37`, `crates/mp/game/src/g_nav_consts.rs:13`,
-`crates/mp/game/src/q_math.rs:916`), with no duplication. This matches the
-precedent already in that crate: `Q_irand`
-(`crates/mp/qshared/src/shared/q_math_rand.rs`) and `failedEdge_t`
-(`crates/mp/qshared/src/common/mp/qcommon/failed_edge.rs`) already live in
-`mp_qshared`, the only shared tier the engine depends on. These four constants
-are therefore **absent from the nav-owned globals table above by design** (they
-are not nav globals); the nav-owned consts (`NF_*`, `EFLAG_*`, `NODE_NONE`,
-header IDs, `MAX_FAILED_EDGES`, `WP_MINS`/`WP_MAXS`, `CHECKED_*` — all from
-navigator.h) remain module consts per fork-3 kind-1, and `WP_MINS`/`WP_MAXS`
-build their `-24+STEPSIZE`/`24` bounds (navigator.cpp:50-51) from the
-`mp_qshared`-homed `STEPSIZE` (NAV-D6).
+are **not nav-owned** and are **not** re-declared in npcnav. They live today only
+in `mp_game` — the consts at `crates/mp/game/src/g_public_consts.rs:14`
+(`Q3_INFINITE`), `.../NPC_combat.rs:2736` (`WORLD_SIZE`), `.../bg_slidemove.rs:37`
+(`STEPSIZE`), `.../g_nav_consts.rs:13` (`WAYPOINT_NONE`); the vec3 fns in
+`.../q_math.rs`, where **only `VectorNormalize` is at :916** —
+`DotProduct`/`VectorSubtract`/`VectorCopy` are Raven **macros** over the
+`_`-prefixed C functions transcribed as `_DotProduct` (:961), `_VectorSubtract`
+(:968), `_VectorCopy` (:986), **not** bare names at :916 (the prior "`q_math.rs:916`
+for all four" cite was wrong; whether the `mp_qshared` copies keep those
+`_`-prefixed mp_game/Raven-fn names or adopt the bare macro names is unresolved —
+**NAV-Q13**) — none of which the engine can reach (`mp_engine_server` deps:
+`mp_qshared`, `mp_engine_qcommon`, `mp_abi` — never `mp_game`). **NAV-D3
+(RULING 22 + the round-4 mechanical resolution) MOVES all eight into
+`mp_qshared`** — the single definition the referee compares — the vec3 fns to a
+new `crates/mp/qshared/src/shared/q_math.rs`, each const to the folder mirroring
+its owning Raven header, with the `mp_game` copies **deleted and re-imported in
+the same commit** (no re-export shims). This matches the precedent already in
+that crate: `Q_irand` (`crates/mp/qshared/src/shared/q_math_rand.rs`) and
+`failedEdge_t` (`crates/mp/qshared/src/common/mp/qcommon/failed_edge.rs`) already
+live in `mp_qshared`. These four constants are therefore **absent from the
+nav-owned globals table above by design** (they are not nav globals); the
+nav-owned consts (`NF_*`, `EFLAG_*`, `NODE_NONE`, header IDs, `MAX_FAILED_EDGES`,
+`WP_MINS`/`WP_MAXS`, `CHECKED_*` — all from navigator.h) remain module consts per
+fork-3 kind-1, and `WP_MINS`/`WP_MAXS` build their `-24+STEPSIZE`/`24` bounds
+(navigator.cpp:50-51) from the `mp_qshared`-homed `STEPSIZE` (NAV-D3).
 
 ## Seam definition
 
 Two seam directions, both preserved exactly (NAV-D5). The host-taking receiver is
-frozen by NAV-D2 (RULING 11): every method that reaches a service takes
-`(&mut self, host: &mut impl EngineHost)`; the ~9 pure-graph queries take no host.
+frozen by NAV-D4 (RULING 11/24): every method that reaches a service takes
+`(&mut self, host: &mut impl EngineHost)`; the pure-graph queries take no host.
+
+### The `EngineHost` trait (already built — quoted verbatim, NAV-D4)
+
+Per NAV-D4 (RULINGS 31/33) `mp_host_interface` is BUILT and green (commit
+`4b7f01b0`); npcnav imports `EngineHost` from `crates/mp/host-interface`, no
+other path. The frozen signatures npcnav consumes, transcribed **verbatim** from
+`crates/mp/host-interface/src/engine_host.rs:23-106` so this doc is
+self-contained (doc-comments elided; `Source:` cites are on each method there):
+
+```rust
+pub trait EngineHost {
+    #[allow(clippy::too_many_arguments)]
+    fn trace(
+        &mut self,
+        results: &mut trace_t,
+        start: &vec3_t,
+        mins: &vec3_t,
+        maxs: &vec3_t,
+        end: &vec3_t,
+        pass_entity_num: i32,
+        contentmask: i32,
+        capsule: bool,
+        trace_flags: i32,
+        use_lod: i32,
+    );
+
+    fn fs_read_file(&mut self, qpath: &str) -> Option<Vec<u8>>;
+
+    fn fs_free_file(&mut self, _buffer: Vec<u8>) {}
+
+    fn print(&mut self, msg: &str);
+
+    fn error(&mut self, code: errorParm_t, msg: &str) -> !;
+
+    fn vm_call(&mut self, vm: VmSlot, callnum: i32, args: &[isize]) -> isize;
+
+    fn shared_memory(&mut self) -> *mut c_char;
+
+    fn flrand(&mut self, min: f32, max: f32) -> f32;
+
+    fn irand(&mut self, min: i32, max: i32) -> i32;
+
+    fn gentity(&mut self, ent_num: i32) -> *mut sharedEntity_t;
+}
+```
+
+Note: `gentity` returns the raw `*mut sharedEntity_t` exactly as the trap
+marshals it (engine_host.rs:100-105 cites rulings 19/23/30) — so the entity-taking
+nav arms and this index-based service carry the pointer in the same shape.
+`SV_inPVS` is not yet a method on the trait; the trace/PVS-dependent nav methods
+(Verification 3c) are added to the trait — or reached through `trace` — when the
+server spine lands, not by npcnav.
+
+**Three further services nav calls have no accessor on this frozen trait, and —
+unlike `SV_inPVS` — no ruling covers how to reach them; each is an open seam
+escalation this doc does not resolve:**
+
+- **NAV-Q9 (cvar reads).** `NAV_CvarInit` registers `d_altRoutes`/`d_patched`
+  via `Cvar_Get` (navigator.cpp:41-42, both `CVAR_CHEAT`) and the code reads
+  `->integer` at navigator.cpp:480,1403,1418,1433,1498,1933,2278,2323,2346
+  (`d_altRoutes` gates the entire alt-route pathing family — parity-visible on
+  the 3c surface; `d_patched` gates patched-nav in `AddFailedEdge`). The frozen
+  `EngineHost` exposes **no** `Cvar_Get`/cvar-read method, and a nav method
+  receives only `(&mut self, host: &mut impl EngineHost)` — neither `self` nor
+  the trait can reach the `EngineCvars`-placed handles (fork-2).
+- **NAV-Q10 (`svs.time`).** Read at navigator.cpp:1733,1763,1778,1797,1987,2010,
+  2065,2137 (failed-node/edge re-check timers; the resulting `checkTime`/
+  `failedWaypointCheckTime` values are parity-visible). `svs.time` is the server
+  frame time (`serverStatic_t`), not a `Navigator` field; the frozen `EngineHost`
+  has no time accessor. (`PlatformHost::milliseconds` is `Sys_Milliseconds`, a
+  different clock, and nav never receives `PlatformHost`.)
+- **NAV-Q11 (`Save` FS-write).** `Save` uses `FS_FOpenFileByMode(...,FS_WRITE)` +
+  `FS_Write` + `FS_FCloseFile` (navigator.cpp:670,678,681,686,697,699), and
+  `CNode::Save` writes likewise; the frozen `EngineHost` exposes only
+  `fs_read_file` (whole-file read → `Option<Vec<u8>>`) and `fs_free_file` — **no
+  write capability**. `Load` (FS_READ) *is* mappable onto `fs_read_file`; `Save`
+  is not writable through the frozen trait.
+
+Resolving each (extend the frozen Stage-0 `EngineHost`; or store resolved cvar
+values on `Navigator`; or thread `svs.time` another way; or rule `Save`
+§20-dead under DEDICATED) changes a settled artifact (rulings 31/33 / NAV-D4) or
+this doc's scope, so it is escalated, not decided here.
 
 ### Inbound: game → engine (the `G_NAV_*` arms)
 
@@ -229,8 +345,11 @@ calls (the plan's "39 direct callees" figure, §0.4; two arms are the same
 overloaded `GetBestNodeAltRoute`), and two (`G_NAV_GETPATHSCALCULATED`/
 `G_NAV_SETPATHSCALCULATED`) read/write the public `pathsCalculated` **field**.
 Args arrive as `intptr_t` slots; pointer args use `VMA(n)` (shared-memory base
-offset). The pub Rust surface these arms need (`EngineHost` is the one Stage-0
-services trait, NAV-D2 — trace/PVS/FS/print/`VM_Call`/shared-memory):
+offset). **Five arms marshal a `(sharedEntity_t *)VMA(1)` and one a second
+`(sharedEntity_t *)VMA(2)`** (`GETNEARESTNODE` :865, `CHECKFAILEDNODES` :885,
+`ADDFAILEDNODE` :888, `NODEFAILED` :891, `GETBESTPATHBETWEENENTS` :917) — the
+Rust seam carries those exactly, as `*mut sharedEntity_t` (NAV-D1). The pub Rust
+surface these arms need (`EngineHost` is the one Stage-0 services trait, NAV-D4):
 
 ```rust
 // Lifecycle / build
@@ -245,7 +364,7 @@ fn show_nodes(&mut self, host: &mut impl EngineHost);          // G_NAV_SHOWNODE
 fn show_edges(&mut self, host: &mut impl EngineHost);          // G_NAV_SHOWEDGES
 fn show_path(&mut self, host: &mut impl EngineHost, start: i32, end: i32);  // G_NAV_SHOWPATH (Com_Printf :1661,:1681)
 // Queries (host-free = pure graph; see NAV first-slice)
-fn get_nearest_node(&mut self, host: &mut impl EngineHost, ent: EntityId, last_id: i32, flags: i32, target_id: i32) -> i32; // G_NAV_GETNEARESTNODE
+fn get_nearest_node(&mut self, host: &mut impl EngineHost, ent: *mut sharedEntity_t, last_id: i32, flags: i32, target_id: i32) -> i32; // G_NAV_GETNEARESTNODE ((sharedEntity_t*)VMA(1), sv_game.cpp:865)
 fn get_best_node(&mut self, start_id: i32, end_id: i32, reject_id: i32) -> i32;        // G_NAV_GETBESTNODE
 fn get_node_position(&self, node_id: i32, out: &mut [f32;3]) -> i32;                   // G_NAV_GETNODEPOSITION
 fn get_node_num_edges(&self, node_id: i32) -> i32;            // G_NAV_GETNODENUMEDGES
@@ -256,22 +375,22 @@ fn get_path_cost(&self, start_id: i32, end_id: i32) -> u32; // G_NAV_GETPATHCOST
 fn get_edge_cost(&mut self, host: &mut impl EngineHost, start_id: i32, end_id: i32) -> u32; // G_NAV_GETEDGECOST
 fn get_projected_node(&self, origin: [f32;3], node_id: i32) -> i32;                    // G_NAV_GETPROJECTEDNODE
 fn get_node_radius(&self, node_id: i32) -> i32;             // G_NAV_GETNODERADIUS
-// Failed-node bookkeeping (writes into the game entity via host)
-fn check_failed_nodes(&mut self, host: &mut impl EngineHost, ent: EntityId);              // G_NAV_CHECKFAILEDNODES
-fn add_failed_node(&mut self, host: &mut impl EngineHost, ent: EntityId, node_id: i32);   // G_NAV_ADDFAILEDNODE
-fn node_failed(&self, host: &impl EngineHost, ent: EntityId, node_id: i32) -> qboolean;   // G_NAV_NODEFAILED
+// Failed-node bookkeeping (deref the *mut sharedEntity_t arg from VMA(1), NAV-D1)
+fn check_failed_nodes(&mut self, host: &mut impl EngineHost, ent: *mut sharedEntity_t);              // G_NAV_CHECKFAILEDNODES ((sharedEntity_t*)VMA(1), :885)
+fn add_failed_node(&mut self, host: &mut impl EngineHost, ent: *mut sharedEntity_t, node_id: i32);   // G_NAV_ADDFAILEDNODE ((sharedEntity_t*)VMA(1), :888)
+fn node_failed(&self, ent: *mut sharedEntity_t, node_id: i32) -> qboolean;                           // G_NAV_NODEFAILED ((sharedEntity_t*)VMA(1), :891)
 fn nodes_are_neighbors(&self, start_id: i32, end_id: i32) -> qboolean;                 // G_NAV_NODESARENEIGHBORS
 // Failed-edge bookkeeping (failedEdge_t crosses by pointer via VMA)
 fn clear_failed_edge(&mut self, host: &mut impl EngineHost, e: &mut failedEdge_t);        // G_NAV_CLEARFAILEDEDGE
 fn clear_all_failed_edges(&mut self);                        // G_NAV_CLEARALLFAILEDEDGES
 fn edge_failed(&self, start_id: i32, end_id: i32) -> i32;   // G_NAV_EDGEFAILED
-fn add_failed_edge(&mut self, host: &mut impl EngineHost, ent_id: i32, start_id: i32, end_id: i32); // G_NAV_ADDFAILEDEDGE (d_patched :1933, Com_Printf :1945-2053, svs.time :1987/2010)
+fn add_failed_edge(&mut self, host: &mut impl EngineHost, ent_id: i32, start_id: i32, end_id: i32); // G_NAV_ADDFAILEDEDGE (d_patched :1933 = NAV-Q9, Com_Printf :1945-2053, svs.time :1987/2010 = NAV-Q10 — neither on the frozen trait)
 fn check_failed_edge(&mut self, host: &mut impl EngineHost, e: &mut failedEdge_t) -> qboolean; // G_NAV_CHECKFAILEDEDGE
 fn check_all_failed_edges(&mut self, host: &mut impl EngineHost);                         // G_NAV_CHECKALLFAILEDEDGES
 fn route_blocked(&self, start_id: i32, test_edge_id: i32, end_id: i32, reject_rank: i32) -> qboolean; // G_NAV_ROUTEBLOCKED
 fn get_best_node_alt_route(&mut self, host: &mut impl EngineHost, start_id: i32, end_id: i32, path_cost: &mut i32, reject_id: i32) -> i32; // G_NAV_GETBESTNODEALTROUTE
 fn get_best_node_alt_route2(&mut self, host: &mut impl EngineHost, start_id: i32, end_id: i32, reject_id: i32) -> i32; // G_NAV_GETBESTNODEALT2 (overload)
-fn get_best_path_between_ents(&mut self, host: &mut impl EngineHost, ent: EntityId, goal: EntityId, flags: i32) -> i32; // G_NAV_GETBESTPATHBETWEENENTS
+fn get_best_path_between_ents(&mut self, host: &mut impl EngineHost, ent: *mut sharedEntity_t, goal: *mut sharedEntity_t, flags: i32) -> i32; // G_NAV_GETBESTPATHBETWEENENTS ((sharedEntity_t*)VMA(1)+VMA(2), :917)
 fn check_blocked_edges(&mut self, host: &mut impl EngineHost);  // G_NAV_CHECKBLOCKEDEDGES
 fn clear_checked_nodes(&mut self);                          // G_NAV_CLEARCHECKEDNODES
 fn checked_node(&self, waypoint: i32, ent: i32) -> u8;      // G_NAV_CHECKEDNODE
@@ -286,35 +405,46 @@ fn flag_all_nodes(&mut self, new_flag: i32);                // G_NAV_FLAGALLNODE
 (`SETCHECKEDNODE`→`FLAGALLNODES`→`GETPATHSCALCULATED`, which returns
 `pathsCalculated`; `oracle/codemp/server/sv_game.cpp:928-933`). This quirk is a
 property of the `SV_GameSystemCalls` switch, **not** of any `CNavigator` method;
-per NAV-D3 its §20 preservation obligation travels with the wave-20
+per NAV-D5 its §20 preservation obligation travels with the wave-20
 `SV_GameSystemCalls` port, and NAV-D5 holds this boundary byte-identical. This
 doc's `CNavigator` surface neither emits nor asserts the fall-through.
 
 ### Outbound: engine → game (`gameCallbacks.cpp`) and engine services
 
 `CNavigator` reaches back into the game module and the rest of the engine
-through the one shared `EngineHost` trait (NAV-D2, RULING 11 — designed once at
-Stage-0 in the pinned `mp_host_interface` crate / `crates/mp/host-interface`,
-RULING 24; not defined by this doc). The services it consumes:
+through the one shared `EngineHost` trait (NAV-D4 — designed once at Stage-0 in
+the pinned `mp_host_interface` crate / `crates/mp/host-interface`, RULING 24;
+BUILT and green, RULING 31/33; not defined by this doc). The services it consumes:
 
 - **Nine game out-calls** (`oracle/codemp/server/NPCNav/gameCallbacks.cpp:6-49`),
   each a thin `VM_Call(gvm, GAME_NAV_*, ...)` (`GAME_NAV_*` enum
   `g_public.h:788-796`; already handled in `mp_game`, NAV-D5) — reached via the
-  `EngineHost` `VM_Call` service:
+  `EngineHost::vm_call(VmSlot::Gvm, ...)` service:
   `NAV_ClearPathToPoint`, `NPC_ClearLOS`, `NAVNEW_ClearPathBetweenPoints`,
   `NAV_CheckNodeFailedForEnt`, `G_EntIsUnlockedDoor`, `G_EntIsDoor`,
   `G_EntIsBreakable`, `G_EntIsRemovableUsable`, `CP_FindCombatPointWaypoints`.
   The `intptr_t`-slot widening for pointer args is mandatory (plan §5.4 — the
   historical `GAME_NAV_CLEARPATHTOPOINT` truncation bug).
-- **Engine services** (all through `EngineHost`; each ported by its own
-  subsystem): `SV_Trace` (`server/server.h:416`), `SV_inPVS` (server.h:356),
-  `SV_GentityNum` (server.h:349), `FS_Read`/`FS_Write`/`FS_FOpenFileByMode`/
-  `FS_FCloseFile`, `Cvar_Get`, `Com_Error`(ERR_DROP), `Com_Printf`, and
-  `svs.time`. `va`/`Q_irand` are pure `q_shared` helpers (already ported in
-  `mp_qshared`), not host services; the vec3 primitives
+- **Engine services** (each ported by its own subsystem). Reached on the frozen
+  `EngineHost`: `SV_Trace` (`server/server.h:416` → `EngineHost::trace`),
+  `SV_GentityNum` (server.h:349 → `EngineHost::gentity`, index-based access only,
+  State-ownership), the **read** side of `FS_*` for `Load` —
+  `FS_FOpenFileByMode(...,FS_READ)`/`FS_Read`/`FS_FCloseFile` → one
+  `fs_read_file` whole-file read parsed from an in-memory cursor,
+  `Com_Error`(ERR_DROP) (→ `error`), and `Com_Printf` (→ `print`). **Not on the
+  frozen trait but deferred to the server-spine work, NOT an npcnav escalation:**
+  `SV_inPVS` (server.h:356 — a trace/PVS service added to the trait, or reached
+  through `trace`, when the server spine lands; the PVS-dependent nav methods are
+  3c-surface, Seam note above). **Not on the frozen trait AND covered by no ruling
+  — open seam escalations (Seam note above):** `Cvar_Get` + the
+  `d_altRoutes`/`d_patched`→`integer` reads
+  (**NAV-Q9**), `svs.time` (**NAV-Q10**), and `Save`'s **write** side —
+  `FS_FOpenFileByMode(...,FS_WRITE)`/`FS_Write`/`FS_FCloseFile`, which
+  `fs_read_file`/`fs_free_file` cannot express (**NAV-Q11**). `va`/`Q_irand` are pure `q_shared`
+  helpers (already ported in `mp_qshared`), not host services; the vec3 primitives
   (`VectorNormalize`/`DotProduct`/`VectorSubtract`/`VectorCopy`) and the shared
   constants `Q3_INFINITE`/`WORLD_SIZE`/`STEPSIZE`/`WAYPOINT_NONE` are the same
-  class of shared import (State-ownership "Shared constants" note, NAV-D6) —
+  class of shared import (State-ownership "Shared constants" note, NAV-D3) —
   imported from `mp_qshared`, never re-declared in npcnav, never host services.
 
 ### `#[repr(C)]` types touched
@@ -325,127 +455,142 @@ layout — imported from the ported type (`mp_qshared`,
 `crates/mp/qshared/src/common/mp/qcommon/failed_edge.rs`; the rosetta-registered
 Rust name is `failedEdge_t`, **not** `FailedEdge` — there is no `FailedEdge`
 alias in the tree), never re-declared (type-rosetta rule).
-`sharedEntity_t` (g_public.h:679-715) is reached through `SV_GentityNum`;
-`trace_t`, `vec3_t`, `cvar_t` likewise imported.
+`sharedEntity_t` (g_public.h:679-715) crosses by pointer as `*mut sharedEntity_t`
+on the five ent-taking arms (NAV-D1) and is returned by `EngineHost::gentity`
+for index access; `trace_t`, `vec3_t`, `cvar_t` likewise imported.
 
 ## Decisions
 
-**NAV-D1** — The priority queue is transcribed faithfully, **not** replaced with
-`std::BinaryHeap`, and its equal-cost tie order is pinned to **the established
-oracle-reference algorithm** — the libstdc++ `push_heap`/`pop_heap` shipped by
-the **oracle-harness toolchain (Homebrew g++-16 / libstdc++)**, the same
-reference every golden in the project already compares against (RULING 26,
-2026-07-09). `CPriorityQueue` (navigator.h:254-276, navigator.cpp:2705-2782) — a
-`vector<CEdge*>` driven by `std::push_heap`/`std::pop_heap` under
-`NodeTotalGreater` (`first->m_cost > second->m_cost`, min-heap on cost,
-:2693-2699) — ports as an owned `Vec<Edge>` with that toolchain's
-`push_heap`/`pop_heap` sift algorithm hand-transcribed, so equal-cost tie order
-reproduces it byte-for-byte. The procedures to transcribe are the ones behind
-`std::push_heap`/`std::pop_heap` in that libstdc++'s `<bits/stl_heap.h>`
-(`__push_heap` sift-up; `__adjust_heap` + `__pop_heap` sift-down) — this is the
-**one** source the port reads outside `oracle/`, authoritative **not** because it
-is Raven's own implementation (retail JA built under MSVC, whose heap can tie
-differently) but because it is the oracle-reference algorithm the goldens are
-dumped from: `tools/npcnav-oracle/` compiles the unmodified oracle TU against
-that same standard library, and the 3a rank-output goldens (NAV-D4) are the
-binding byte-for-byte check that catches any slip. The port does **not**
-reconstruct the algorithm from memory. Because `CalculatePath` assigns
-`curRank++` in pop order (navigator.cpp:853), the tie-break among equal-cost
-frontier nodes is baked into every node's rank table and is parity-visible.
-Retail-MSVC's `push_heap`/`pop_heap` may pop equal-cost entries in a different
-order and thus assign a different-but-equally-valid rank set; that divergence is
-**accepted exactly as FP parity is** — the oracle-harness toolchain is the single
-reference, not the retail binary. Rejected `std::BinaryHeap<Edge>` (the withdrawn
-prior claim, a settled doc defect): Rust's binary heap resolves equal keys in a
-different order than the oracle toolchain's heap, diverging the ranks.
-(RULING 18 + RULING 26, 2026-07-09.)
+**NAV-D1** — The five ent-taking nav arms carry `*mut sharedEntity_t` **exactly
+as the trap marshals it**, not `EntityId`. Per **RULING 30** (2026-07-09, closing
+the contested seam point) `G_NAV_GETNEARESTNODE` (sv_game.cpp:865),
+`G_NAV_CHECKFAILEDNODES` (:885), `G_NAV_ADDFAILEDNODE` (:888), `G_NAV_NODEFAILED`
+(:891), and `G_NAV_GETBESTPATHBETWEENENTS` (:917) pass `(sharedEntity_t *)VMA(1)`
+(the last a second `(sharedEntity_t *)VMA(2)` too), so the seam signatures take
+`ent: *mut sharedEntity_t` (`get_best_path_between_ents` takes `ent` **and**
+`goal`), and the methods deref the pointer like Raven — `ent->s.number`,
+`ent->r.currentOrigin`, `ent->waypoint`, `ent->failedWaypoints`
+(navigator.cpp:1159,1202,1217,1223,1334,1347,1493,:1724-1811). Because ruling
+23's precedent applies verbatim: an arm that the trap already marshals as a
+pointer keeps that pointer at the seam, transcription-first, rather than
+round-tripping through an `EntityId`+`SV_GentityNum` re-fetch that Raven never
+does. This **replaces every prior `ent: EntityId` seam signature** and the prior
+"reached through `SV_GentityNum`" State-ownership note (rewritten this pass), and
+**reconciles with NAV-D5's VMA-marshaling clause** — carrying the arm exactly as
+the switch presents it *is* "kept exactly as the syscall switch presents it".
+The `gentity()`/`SV_GentityNum` `EngineHost` service **stays** for the genuinely
+index-based access nav still makes (`SV_GentityNum(0)`, the player entity,
+navigator.cpp:933,943,947,975,980,1006,1011). Rejected `ent: EntityId` on these
+arms (the withdrawn prior draft): it invents a re-fetch the trap did not marshal
+and diverges the seam from ruling 23. (RULING 30, 2026-07-09.)
 
-**NAV-D2** — Services reach nav through the one shared `EngineHost` trait, and
-nav state is a direct field on `Engine`. Per RULING 11 the trace/PVS/FS/print/
-error/`VM_Call`/shared-memory services are the single Stage-0 `EngineHost` trait;
-per **RULING 24** that trait's home crate is **PINNED**: package
-**`mp_host_interface`** at **`crates/mp/host-interface`** — npcnav imports
-`EngineHost` from there, no other path. Every host-taking nav method takes
-`(&mut self, host: &mut impl EngineHost)`, and `Engine` supplies the impl through
-a **split-borrow view struct that excludes `nav`** — that is what lets
-`engine.nav.method(&mut view, …)` borrow `nav` and the rest of `Engine`
-disjointly. Per RULING 12 the state is a plain `Default`-initialized `nav:
-Navigator` field directly on `mp_engine_core::Engine` (no `Option`/`Box`/nesting);
-the ctor's lazy `NAV_CvarInit` (navigator.cpp:39-43,478-484) is modeled with
-Raven's own init flag. Resolves NAV-Q1/Q4/Q5. Because the engine-wide fork
-rulings put every §F subsystem on this one seam, and RULING 24 fixes its real
-path so docs cite it concretely. Rejected a nav-private `NavHost` trait and a
-`Server.navigator` sub-struct — RULING 11/12 supersede both. (RULING 11/12/24.)
+**NAV-D2** — The 3a goldens are driven by the fixture-backed **`MockHost`** that
+now exists at `crates/mp/host-interface/src/mock.rs`; there is **no** test-only
+`Navigator` constructor. Per **RULING 32** (2026-07-09, closing the old NAV-Q7)
+the golden harness implements `EngineHost` via `MockHost` — its `fs_read_file`
+serves the committed `.nav` fixture bytes, `print`/`error` are captured, and
+`flrand`/`irand` are deterministic off the faithful `holdrand` LCG replica
+(mock.rs:53-89). So **`Load` ports in the first slice with its real frozen
+signature** (`load(&mut self, host: &mut impl EngineHost, filename, checksum)`)
+and populates `Navigator{nodes, edges}` **through the front door** — the mock's
+`fs_read_file` returns the fixture map bytes exactly as `FS_ReadFile` would — and
+`CalculatePath` joins the first slice behind it. Because RULING 32 makes the mock
+the reusable goldens vehicle for every host-taking subsystem (mock.rs:5-9), so no
+subsystem grows a bespoke test seam. Rejected a test-only in-Rust constructor
+that sets `nodes`/`edges` directly (the old NAV-Q7 candidate): it bypasses the
+real `Load` path the goldens must exercise and adds a seam Raven has no analogue
+for. (RULING 32, 2026-07-09.)
 
-**NAV-D3** — The `G_NAV_SETCHECKEDNODE`→`FLAGALLNODES`→`GETPATHSCALCULATED`
-switch fall-through (a real Raven bug: no `return`/`break`, sv_game.cpp:928-933)
-is owned by the wave-20 `SV_GameSystemCalls` transcription, **not** this
-subsystem. Because the fall-through is a property of the dispatch switch, not of
-any `CNavigator` method; §20's preservation obligation travels with the switch
-(build-out plan §0.4 puts it at wave 20). Closes NAV-Q3: no `CNavigator` port
-artifact emits or asserts it. Rejected asserting it from a nav method — the
-methods never see the arm boundary. (EVIDENCE, engine-fork-discovery NAV-Q3.)
+**NAV-D3** — The four shared constants and four vec3 primitives the nav code
+consumes but does not own **MOVE** — never duplicate — into `mp_qshared`, and
+that migration is **in-scope for this doc's first slice**. Per the round-4
+mechanical resolution (closing the old NAV-D6/NAV-Q8 hole): the vec3 fns
+(`VectorNormalize`/`DotProduct`/`VectorSubtract`/`VectorCopy`) go to a **new**
+`crates/mp/qshared/src/shared/q_math.rs` (sibling of `q_math_rand.rs`, mirroring
+`oracle/codemp/game/q_math.c`); each const goes to the folder mirroring its
+owning Raven header per existing convention — `Q3_INFINITE` (g_public.h) and
+`WAYPOINT_NONE` (g_nav.h) under `crates/mp/qshared/src/common/mp/game/`,
+`STEPSIZE` (bg_public.h) under `crates/mp/qshared/src/common/mp/bg/`, `WORLD_SIZE`
+(q_shared.h) under `crates/mp/qshared/src/shared/`. The existing `mp_game` copies
+(`g_public_consts.rs:14`, `g_nav_consts.rs:13`, `bg_slidemove.rs:37`,
+`NPC_combat.rs:2736`; and in `q_math.rs`: `VectorNormalize` at :916, `_DotProduct`
+at :961, `_VectorSubtract` at :968, `_VectorCopy` at :986 — the last three are
+Raven macros wrapping `_`-prefixed C functions, **not** bare names at :916) are
+**deleted and re-imported from `mp_qshared` in the SAME commit** — **no re-export
+shims**. **Two execution parameters this "delete + re-import, no shims" instruction
+leaves open surfaced against the tree and escalate (both block the first slice,
+`GetProjectedNode`/`CNode::GetPosition`): the mass cross-crate call-site footprint
+the delete-with-no-shim entails — NAV-Q12 — and the `mp_qshared` function names,
+`_`-prefixed vs bare — NAV-Q13.** NAV-D3 settles destination, ownership, and
+move-vs-re-export; it does **not** settle these two, so a porter cannot
+self-resolve them without inventing the answer. Because RULING 22
+pinned the destination crate and the no-duplication constraint but left the
+owner/paths/move-vs-re-export unassigned; the mechanical resolution assigns them
+to this slice so the host-free code (`WP_MINS`/`WP_MAXS` need `STEPSIZE`,
+`node.rs`'s `GetPosition` needs `VectorCopy`) can actually be written. The
+migration files are listed in this doc's `files` roster. Rejected re-export shims
+(would leave two homes, tripping the referee's single-definition compare) and a
+separate later ticket (the first slice cannot compile without the moved items).
+(RULING 22 + round-4 mechanical resolution, 2026-07-09.)
 
-**NAV-D4** — Golden fixtures are path queries over two nav sources: the retail
-`.nav` data read locally from the `jka_server` assets (**uncommitted,
-ignored-by-default** — never in the public repo) **plus** committed
-hand-authored minimal nav graphs. Mirrors the ICARUS ruling-14 pattern
-(committed hand-authored goldens + an optional local retail corpus). Because
-retail blobs cannot ship in the repo yet the query surface must be exercised
-over both minimal and realistic graphs. Resolves NAV-Q2's fixture-source
-question. Rejected committing retail `.nav` blobs (licensing) and relying on a
-retail-only corpus (not reproducible in CI). (RULING 14 pattern.)
+**NAV-D4** — Services reach nav through the one shared `EngineHost` trait, which
+is **already BUILT and green**, and nav state is a direct field on `Engine`. Per
+RULING 11 the trace/PVS/FS/print/error/`VM_Call`/shared-memory services are the
+single Stage-0 `EngineHost` trait; per **RULING 24** its home crate is pinned to
+package **`mp_host_interface`** at **`crates/mp/host-interface`**; per **RULINGS
+31/33** that crate is built and green at commit **`4b7f01b0`**, so this doc
+**quotes its real frozen signatures verbatim** (Seam,
+`crates/mp/host-interface/src/engine_host.rs:23-106`) rather than sketching them.
+Every host-taking nav method takes `(&mut self, host: &mut impl EngineHost)`, and
+`Engine` supplies the impl through a **split-borrow view struct that excludes
+`nav`** — that is what lets `engine.nav.method(&mut view, …)` borrow `nav` and the
+rest of `Engine` disjointly. Per RULING 12 the state is a plain `Default`-init
+`nav: Navigator` field directly on `mp_engine_core::Engine` (no `Option`/`Box`/
+nesting); the ctor's lazy `NAV_CvarInit` (navigator.cpp:39-43,478-484) is modeled
+with Raven's own init flag. Because reading the built crate (permitted and
+required) makes the doc self-contained and pins the exact method set porters call.
+Rejected a nav-private `NavHost` trait and a `Server.navigator` sub-struct —
+RULING 11/12/24 supersede both. (RULINGS 11/12/24/31/33.)
 
-**NAV-D5** — All prior settled nav decisions stand. The node/edge graph is owned
-`Vec` arenas indexed by id (node id == index, `m_nodes.size()` assignment
-navigator.cpp:712), never a pointer graph (§B5): `CNode.m_edges` →
-`Vec<NodeEdge>`, `m_ranks` (heap `int*`) → `Vec<i32>` (`-1` fill),
-`m_edgeLookupMap` (`multimap<int,int>`) → `BTreeMap<i32, Vec<usize>>` (per-key
-insertion order preserved so `EdgeFailed`'s `equal_range` first-match,
+**NAV-D5** — All prior settled nav decisions and **rulings 11–26 stand**. The
+node/edge graph is owned `Vec` arenas indexed by id (node id == index,
+`m_nodes.size()` assignment navigator.cpp:712), never a pointer graph (§B5):
+`CNode.m_edges` → `Vec<NodeEdge>` (`NodeEdge` = Raven's CNode-nested `edge_t`
+`{ID,cost,flags}`, navigator.h:72-77, defined in `node.rs` alongside `Node` as
+CNode's private member type per porting-rules §21 colocation — **not** in
+`edge.rs`, which is `CEdge`/`Edge`, the priority-queue triple), `m_ranks` (heap
+`int*`) → `Vec<i32>` (`-1`
+fill), `m_edgeLookupMap` (`multimap<int,int>`) → `BTreeMap<i32, Vec<usize>>`
+(per-key insertion order preserved so `EdgeFailed`'s `equal_range` first-match,
 :1876-1898, is reproduced), `CheckedNodes`/`ShowEdges` maps → `BTreeMap`
-(iteration/lookup determinism). The `GAME_NAV_*`/`G_NAV_*` boundary is kept
-exactly as the syscall switch presents it — numbers, arg order, `VMA`
-marshaling, `intptr_t`-slot widening — and the `GAME_NAV_*` handlers already in
-`mp_game` are not re-ported. **All rulings 11–22 stand** (NAV-D3 input): the
-`mp_qshared` constant/vec3 home (RULING 22 / NAV-D6), the shared `EngineHost`
-seam (RULING 11 / NAV-D2), and the wave-20 ownership of the switch fall-through
-(NAV-D3) are unchanged; the later rulings 24 (host-interface crate PIN) and 26
-(nav tie-order PIN) refine — they do not overturn — the seam and heap decisions.
-Because these were settled before the §F doc session and rulings 11/12/14/18/22
-do not disturb them. Rejected `HashMap` (nondeterministic iteration) and
-collapsing the two `GetBestNodeAltRoute` overloads (the game module issues both
-arm numbers).
-
-**NAV-D6** — The shared constants and vec3 primitives the nav code consumes but
-does not own — `Q3_INFINITE` (g_public.h:9, `16777216`), `WORLD_SIZE`
-(q_shared.h:20), `STEPSIZE` (bg_public.h:22, `18`), `WAYPOINT_NONE` (g_nav.h:7,
-`-1`), and `VectorNormalize`/`DotProduct`/`VectorSubtract`/`VectorCopy`
-(q_shared.h / q_math.c) — get their **canonical engine-reachable home in
-`mp_qshared`**: one definition, the single one the referee compares, moved or
-re-exported out of the copies that today sit only in `mp_game`
-(`crates/mp/game/src/g_public_consts.rs:14`, `.../NPC_combat.rs:2736`,
-`.../bg_slidemove.rs:37`, `.../g_nav_consts.rs:13`, `.../q_math.rs:916`), with
-**no duplication** — npcnav re-declares none of them and consumes them from
-`mp_qshared`. `WP_MINS`/`WP_MAXS` (navigator.cpp:50-51) and the affected pure-graph
-queries (`GetBestNode`/`GetPathCost`/`GetProjectedNode`, `GetEdgeCost`'s id form,
-`CNode::GetPosition`) cite the `mp_qshared` source for those items. RULING 22
-settles only the destination crate and the no-duplication constraint; the
-relocation's own mechanics — owner/sequencing, exact per-item `mp_qshared` paths,
-and whether the `mp_game` copies are updated in place or kept as `pub use` shims —
-are **not** pinned by it and are tracked as **NAV-Q8** (a genuine first-slice
-prerequisite: the host-free code cannot reference these items until the migration
-lands them in `mp_qshared`). Because the
-engine depends only on `mp_qshared`/`mp_engine_qcommon`/`mp_abi` — never on
-`mp_game` (game and engine are separate ABI-boundary binaries) — and `mp_qshared`
-is the shared tier that precedent already homes these classes in (`Q_irand`,
-`crates/mp/qshared/src/shared/q_math_rand.rs`; `failedEdge_t`,
-`crates/mp/qshared/src/common/mp/qcommon/failed_edge.rs`). Closes NAV-Q6 and
-unblocks the first slice **once the migration named here actually lands** (its
-owner/paths/re-export mechanics are open — NAV-Q8). Rejected a local npcnav copy
-(porting-rules §14/single-source forbids it) and homing them in
-`native_math`/`mp_game` (the
-former splits the definition across crates the referee would have to reconcile,
-the latter is unreachable from the engine). (RULING 22, 2026-07-09.)
+(iteration/lookup determinism). **The priority queue is transcribed faithfully,
+not `std::BinaryHeap`, and its equal-cost tie order is pinned to the
+oracle-harness libstdc++** (Homebrew g++-16) `push_heap`/`pop_heap` under
+`NodeTotalGreater` (`first->m_cost > second->m_cost`, min-heap on cost,
+navigator.cpp:2693-2699) — RULING 26 (2026-07-09): the `<bits/stl_heap.h>`
+`__push_heap` sift-up and `__adjust_heap`+`__pop_heap` sift-down are
+hand-transcribed onto an owned `Vec<Edge>`, the **one** source read outside
+`oracle/`, authoritative because it is the reference `tools/npcnav-oracle/`
+compiles the unmodified oracle TU against and the 3a rank goldens are dumped from
+(retail-MSVC may tie differently — that divergence is accepted exactly as FP
+parity is; the port does not reconstruct the algorithm from memory). Because
+`CalculatePath` assigns `curRank++` in pop order (:853) the tie-break is baked
+into every rank table and is parity-visible (RULING 18 + 26). The `GAME_NAV_*`/
+`G_NAV_*` boundary is kept **exactly** as the syscall switch presents it —
+numbers, arg order, **`VMA` marshaling** (including the `sharedEntity_t*` arms,
+NAV-D1), `intptr_t`-slot widening — and the `GAME_NAV_*` handlers already in
+`mp_game` are not re-ported; the `SETCHECKEDNODE`→`FLAGALLNODES`→
+`GETPATHSCALCULATED` switch fall-through (a real Raven bug, no `return`/`break`,
+sv_game.cpp:928-933) is owned by the wave-20 `SV_GameSystemCalls` transcription,
+not any `CNavigator` method (build-out plan §0.4). Golden fixtures are path
+queries over committed hand-authored minimal nav graphs (public, CI-reproducible)
+**plus** an uncommitted, ignored-by-default local retail `.nav` corpus (RULING 14
+/ ICARUS pattern). Because these were settled before the §F doc session and the
+later rulings (24/26/30/31/32/33) refine — they do not overturn — the seam and
+heap decisions. Rejected `HashMap` (nondeterministic iteration), `std::BinaryHeap`
+(diverges tie order), collapsing the two `GetBestNodeAltRoute` overloads (the game
+module issues both arm numbers), and committing retail `.nav` blobs (licensing).
+(RULINGS 11–26.)
 
 ## Verification strategy
 
@@ -454,33 +599,34 @@ oracle TU, committed so `cargo test` needs no C++ toolchain. Harness home:
 `tools/npcnav-oracle/` (GP2 pattern — stub headers under it, oracle never
 edited).
 
-**Fixture sources (NAV-D4, ICARUS ruling-14 pattern):** committed hand-authored
+**Fixture sources (NAV-D5, ICARUS ruling-14 pattern):** committed hand-authored
 minimal nav graphs are the public, CI-reproducible corpus; the retail `.nav`
 data read from the local `jka_server` assets is an **uncommitted,
 ignored-by-default** extra corpus that may run locally. Goldens are dumped from
 the oracle over both and committed only for the hand-authored set.
 
-**Golden surface (3a, primary — path-query goldens):** after `Load` (or
-`CalculatePaths` regenerating ranks), the pure-graph query surface is fully
-deterministic with **no trace/PVS/callback** dependency — the ranks are baked
-into the file / recomputed in-process. Dump-and-compare `GetBestNode`,
-`GetBestNodeAltRoute`, `GetPathCost`,
-`Connected`, `NodesAreNeighbors`, `GetProjectedNode`,
+**Golden surface (3a, primary — path-query goldens, MockHost-driven):** the Rust
+side builds its graph **through the front door** (NAV-D2): the harness seeds a
+`MockHost` (`crates/mp/host-interface/src/mock.rs`) whose `fs_read_file` returns
+the fixture `.nav` bytes, calls the real `load(&mut self, host, filename,
+checksum)`, then `CalculatePaths`/per-node `CalculatePath` to (re)build the rank
+tables — no test-only constructor. After load, the pure-graph query surface is
+fully deterministic with **no trace/PVS/callback** dependency (the ranks are
+baked into the file / recomputed in-process). Dump-and-compare `GetBestNode`,
+`GetBestNodeAltRoute`, `GetPathCost`, `Connected`, `NodesAreNeighbors`,
+`GetProjectedNode`,
 `GetNodeNumEdges`/`GetNodeEdge`/`GetNodePosition`/`GetNodeRadius`/`GetNumNodes`,
-plus `GetPathCost` over a rank table populated **host-free** by `CNode::InitRanks`
-+ `CalculatePath` (navigator.cpp:351-363, :814-877) — **not** the `CalculatePaths`
-wrapper (:884-908): its trailing `GNavCallback_CP_FindCombatPointWaypoints`
+plus `GetPathCost` over a rank table populated by `CNode::InitRanks` +
+`CalculatePath` (navigator.cpp:351-363, :814-877). The trailing
+`GNavCallback_CP_FindCombatPointWaypoints` in the `CalculatePaths` wrapper
 (:904) runs after every rank is assigned and touches only combat waypoints, so it
-is host-taking and off the rank-golden path (deferred to the host slice). The
-priority-queue tie order (NAV-D1) is exercised transitively through
+is a `vm_call` the `MockHost` records but that does not perturb the ranks. The
+priority-queue tie order (NAV-D5) is exercised transitively through
 `CalculatePath`'s rank output — the primary reason the faithful heap is testable
 without a bespoke probe; these rank goldens are the binding check on the
-`<bits/stl_heap.h>` sift transcription named in NAV-D1. How the Rust side builds
-the `nodes`/`edges` these run over before `Load` is ported is **NAV-Q7** (open).
-The oracle side stubs
-`FS_Read` against the fixture bytes and stubs `Com_Printf`/`Cvar_Get`
-(`d_altRoutes`/`d_patched` forced to fixed values so both `d_altRoutes` branches
-are covered).
+`<bits/stl_heap.h>` sift transcription. The oracle side stubs `FS_Read` against
+the same fixture bytes and stubs `Com_Printf`/`Cvar_Get` (`d_altRoutes`/
+`d_patched` forced to fixed values so both `d_altRoutes` branches are covered).
 
 **Trace/callback-dependent surface (3c, referee swap-in):** `GetNearestNode`,
 `GetBestPathBetweenEnts`, `CheckBlockedEdges`, `HardConnect`, `GetEdgeCost`
@@ -489,10 +635,11 @@ trace form unconditionally, navigator.cpp:2634 — and the `CNode*,CNode*` trace
 form :734-755), `CheckFailedNodes`, `CheckFailedEdge`,
 `CheckAllFailedEdges` reach `SV_Trace`/`SV_inPVS`/`SV_GentityNum` and the nine
 game callbacks (all `EngineHost` services), so they need live engine + game
-state. They verify under the plan's §3c A/B referee (`crates/jampgame/tests/
-referee.rs` / the external `sv_referee` rig) once the server spine is real, or
-via captured-trace replay (§3b), the deterministic `EngineHost` impl injected
-per RULING 11.
+state — the ent-taking ones also a populated `*mut sharedEntity_t` (NAV-D1),
+which the `MockHost` supplies via `gentity_mut` (mock.rs:158-166). They verify
+under the plan's §3c A/B referee (`crates/jampgame/tests/referee.rs` / the
+external `sv_referee` rig) once the server spine is real, or via captured-trace
+replay (§3b), the deterministic `MockHost` injected per NAV-D2/D4.
 
 Governing clause: porting-rules §F (§18 differential goldens; §19 UB
 divergence; §20 emergent-quirk preservation; §21 one class per file).
@@ -501,70 +648,51 @@ divergence; §20 emergent-quirk preservation; §21 one class per file).
 
 - Build-out plan §0.4 / wave 20: `SV_GameSystemCalls` — must have this doc's
   pub surface (Seam definition) frozen before its `G_NAV_*` arms are filled; it
-  also owns the SETCHECKEDNODE/FLAGALLNODES fall-through (NAV-D3).
+  also owns the SETCHECKEDNODE/FLAGALLNODES fall-through (NAV-D5).
 - Build-out plan wave 25 (server complete) / M4: the full nav subsystem must be
   green under the 3c referee swap-in.
 - The `EngineHost` trait (Stage-0 `mp_host_interface` crate /
-  `crates/mp/host-interface`, RULING 11/24) and the `Engine` split-borrow view
-  struct must exist before the host-taking methods can be written — this is a shared Stage-0 dependency, not a nav-specific open point
-  (NAV-D2 froze the receiver `(&mut self, &mut impl EngineHost)`).
-- The **NAV-D6 shared-home migration** (the four consts + four vec3 primitives
-  into `mp_qshared`) must have actually landed before the first slice's host-free
-  code can reference them (`STEPSIZE` for `WP_MINS`/`WP_MAXS`, `VectorCopy` for
-  `GetPosition`, …); its owner, exact paths, and move-vs-re-export mechanics are
-  unsettled — **NAV-Q8** — and it is not in npcnav's own `files:` roster.
-- **First slice (host-independent — host-free *code*, blocked from being written
-  until the NAV-D6 shared-home migration lands, NAV-Q8, and from being *verified*
-  until the graph-construction mechanism lands, NAV-Q7).** The nine host-free
-  pure-graph queries (`GetBestNode`,
-  `GetNodePosition`, `GetNodeNumEdges`, `GetNodeEdge`, `GetNumNodes`,
-  `Connected`, `GetPathCost`, `GetProjectedNode`, `GetNodeRadius`), **plus
-  `CalculatePath`** (the host-free inner flood-fill, navigator.cpp:814-877, on
-  `navigator.rs`), plus the type skeletons — `mod.rs` consts (State-ownership
-  table), `edge.rs` `Edge` (D-1), `node.rs` `Node`'s host-free members (accessors
-  navigator.h:94-110, edge/rank queries incl. `InitRanks`/`AddRank`/`GetRank`,
-  `Create`, `AddEdge`; `Save`/`Load` are **deferred**, they take `FS_*` via host),
-  and `priority_queue.rs`'s faithful `Vec<Edge>` heap (NAV-D1/D-7) — form a
-  self-contained, **host-independent** slice that verifies against the 3a
-  path-query goldens: none needs an `EngineHost` service, so the Stage-0 host seam
-  is not their blocker. **`CalculatePath` is in this slice by reconciliation, not
-  new decision:** its Raven signature takes no host/trace/callback
-  (navigator.cpp:814-877, verified pure), so it satisfies the host-independent
-  criterion; and none of the nine queries returns a non-trivial result on an
-  unpopulated `ranks` array, while `priority_queue.rs` (already enumerated here)
-  is by NAV-D1 testable **only** transitively through `CalculatePath`'s pop-order
-  rank output (Verification Strategy 3a) — so the slice's own settled contents
-  already require it. The host-taking `CalculatePaths` wrapper (:884-908, its
-  `GNavCallback_CP_FindCombatPointWaypoints` at :904) stays deferred to the host
-  slice; the first slice drives `InitRanks` + `CalculatePath` per node directly
-  (the callback runs after all ranks and touches only combat waypoints, not
-  ranks). **What is _not_ resolved:** every production path that fills
-  `nodes`/`edges` for `CalculatePath` to flood over — `Load` (:602-657, host
-  `FS_Read` + the `Get*` byte readers :496-564), `AddRawPoint` (:710-726, host for
-  the D-3 `Com_Error`), `HardConnect` (:1113-1140, host trace + door/breakable
-  callbacks) — is host-taking, so none is available to build the fixture graph in
-  a host-free test. NAV-D4 fixes the fixture format/source but not the Rust-side
-  loading mechanism usable before `Load` lands; that mechanism is **NAV-Q7**
-  (open). Every host-taking method and the whole of `callbacks.rs`
-  land separately, once that Stage-0 `EngineHost` seam is present; under
-  GOAL-engine no-stub discipline a porter writes them against the frozen
-  `EngineHost` trait, never a stub. The slice consumes the shared
-  `Q3_INFINITE`/`WORLD_SIZE`/`WAYPOINT_NONE` consts
-  (`GetBestNode`/`GetPathCost`/`GetEdgeCost`, the latter delegating per
-  navigator.cpp:2634), the vec3 primitives (`GetProjectedNode` — pure,
-  navigator.cpp:2643-2686 — and `CNode::GetPosition`), and `mod.rs`'s
-  `WP_MINS`/`WP_MAXS`'s `STEPSIZE`; npcnav owns none of these and re-declares none
-  of them (porting-rules §14/single-source), importing them all from `mp_qshared`
-  per **NAV-D6** — the crate `mp_engine_server` already depends on
-  (`mp_qshared`/`mp_engine_qcommon`/`mp_abi`). NAV-D6 names that shared home, but
-  its migration mechanics (owner, exact `mp_qshared` paths, and the
-  move-vs-re-export treatment of the existing `mp_game` copies) are unassigned —
-  **NAV-Q8**; until that migration lands the eight items in `mp_qshared`, the
-  slice's host-free **code** cannot even be written (it consumes
-  `STEPSIZE`/`VectorCopy`/…). Its 3a golden **verification** additionally needs
-  the graph-construction mechanism (**NAV-Q7**) settled before the slice can be
-  proven end-to-end per porting-rules §16. Both are genuine first-slice
-  prerequisites that escalate to a design session, not agent-inventable.
+  `crates/mp/host-interface`, RULING 11/24) is **already built and green**
+  (commit `4b7f01b0`, NAV-D4); the `Engine` split-borrow view struct that
+  excludes `nav` must exist before the host-taking methods compile — a shared
+  Stage-0 dependency, not a nav-specific open point.
+- **First slice (Load-anchored, MockHost-verified).** Per NAV-D2 the slice ports
+  `Load` (`load`, navigator.cpp:602-657 + the `Get*` byte readers :512-564)
+  against its real frozen `EngineHost` signature and verifies it with a
+  `MockHost` serving the fixture `.nav` bytes — no test-only constructor. On top
+  of `Load` it ports **`CalculatePath`** (the host-free inner flood-fill,
+  navigator.cpp:814-877, on `navigator.rs`) and the pure-graph queries
+  (`GetBestNode`, `GetNodePosition`, `GetNodeNumEdges`, `GetNodeEdge`,
+  `GetNumNodes`, `Connected`, `GetPathCost`, `GetProjectedNode`, `GetNodeRadius`),
+  plus the type skeletons — `mod.rs` consts (State-ownership table), `edge.rs`
+  `Edge` (D-1), `node.rs` `Node` including its `Load` (host `fs_read_file`) and
+  `Save` (host `FS_Write` — **NAV-Q11**, no frozen-trait method, so as literally
+  scoped this slice **also** blocks on NAV-Q11; see Open questions) and
+  host-free members (accessors navigator.h:94-110, edge/rank queries incl.
+  `InitRanks`/`AddRank`/`GetRank`, `Create`, `AddEdge`), and `priority_queue.rs`'s
+  faithful `Vec<Edge>` heap (NAV-D5/D-7). Together these verify against the 3a
+  MockHost-driven Load + rank/query goldens: `Load` fills `nodes`/`edges` through
+  the front door, `CalculatePath` produces pop-order ranks, and the queries dump
+  against the oracle. The host-taking `CalculatePaths` wrapper (:884-908, its
+  `GNavCallback_CP_FindCombatPointWaypoints` at :904) is exercisable here too —
+  the `MockHost` records the `vm_call` and it does not perturb ranks.
+- **The NAV-D3 shared-home migration is part of this first slice** (RULING 22 +
+  round-4 resolution): the four consts and four vec3 primitives MOVE into
+  `mp_qshared` (new `crates/mp/qshared/src/shared/q_math.rs` for the vec3 fns;
+  each const to the folder mirroring its owning header), with the five `mp_game`
+  copies deleted and re-imported in the same commit (no shims). It is listed in
+  the `files` roster below and must land so the host-free code that consumes
+  `STEPSIZE` (`WP_MINS`/`WP_MAXS`) and `VectorCopy` (`GetPosition`) compiles.
+  **Its execution scope (NAV-Q12) and the moved vec3-fn names (NAV-Q13) are
+  unresolved and block this slice** — the migration cannot be transcribed until
+  they settle (a tree check shows "deleted in the same commit, no shims" touches
+  40+ `mp_game` files not in the roster, and only `VectorNormalize` is a bare fn;
+  see Open questions).
+- Every remaining host-taking method (`AddRawPoint`, `HardConnect`,
+  `GetNearestNode`, `GetBestPathBetweenEnts`, `CheckBlockedEdges`, the failed-edge
+  checks) and the whole of `callbacks.rs` land against the built `EngineHost`
+  trait — under GOAL-engine no-stub discipline a porter writes them against the
+  frozen trait, never a stub — and verify under the 3c referee.
 
 ## Method transcription table
 
@@ -574,42 +702,42 @@ impl. Grouped by Raven class; Rust shape per NAV-D1/D5.
 | Raven method | oracle cite | Rust shape |
 | --- | --- | --- |
 | `CEdge::CEdge()` / `(int,int,int)` / `~CEdge` | :82-96 | `Edge { first, second, cost }`; 0-arg ctor is a Raven no-op (divergence D-1) |
-| `CNode::CNode`/`~CNode`/`Create(...)`/`Create()` | :104-147 | `Node::new` / `Node::create(pos,flags,radius,id)`; `Vec`-owned (no `new`/`delete`); `GetPosition`'s vec3 helpers imported from `mp_qshared` (NAV-D6) |
+| `CNode::CNode`/`~CNode`/`Create(...)`/`Create()` | :104-147 | `Node::new` / `Node::create(pos,flags,radius,id)`; `Vec`-owned (no `new`/`delete`); `GetPosition`'s vec3 helpers imported from `mp_qshared` (NAV-D3) |
 | `CNode::AddEdge` | :155-183 | dedup-or-push into `edges: Vec<NodeEdge>`; `assert(<9)` → `debug_assert!` (D-6) |
 | `CNode::GetEdgeNumToNode`/`GetEdge`/`GetEdgeCost`/`GetEdgeFlags`/`SetEdgeFlags` | :191-344 | index/scan `edges`; keep `edgeNum > m_numEdges` bound verbatim (D-2) |
 | `CNode::AddRank`/`InitRanks`/`GetRank` | :214-376 | `ranks: Vec<i32>` (`-1` fill) |
 | `CNode::Draw` | :227-236 | empty (renderer stripped) — port as no-op with §20 note |
-| `CNode::Save`/`Load` | :385-470 | `FS_*` via `EngineHost`; `NODE_HEADER_ID` check |
+| `CNode::Save`/`Load` | :385-470 | `Load` reads via `EngineHost::fs_read_file`; `Save`'s `FS_Write` has **no frozen-trait method — NAV-Q11**; `NODE_HEADER_ID` check |
 | `CNode` inline accessors (`GetID`,`GetPosition`,`GetNumEdges`,`GetRadius`,`GetFlags`,`AddFlag`,`RemoveFlag`) | navigator.h:94-110 | trivial methods |
-| `CNavigator::CNavigator`/`~CNavigator` | :478-488 | `Navigator::default`; ctor's lazy `NAV_CvarInit` → cvar handles via host, Raven init flag |
+| `CNavigator::CNavigator`/`~CNavigator` | :478-488 | `Navigator::default`; ctor's lazy `NAV_CvarInit` registers the cvars (Raven init flag); the read-back accessor is **unresolved — NAV-Q9** (no cvar method on the frozen trait) |
 | `CNavigator::Init`/`Free` | :572-594 | clear `nodes`/`edge_lookup` |
-| `CNavigator::Load`/`Save` | :602-702 | `FS_*` via host; rebuild `edge_lookup` |
+| `CNavigator::Load`/`Save` | :602-702 | `Load` reads whole-file via `EngineHost::fs_read_file` (first slice, NAV-D2), rebuilds `edge_lookup`; `Save`'s `FS_Write`+`FS_FOpenFileByMode(FS_WRITE)` path (:670,678,681,686,697,699) has **no frozen-trait method — NAV-Q11**, unwritable as the trait is frozen |
 | `CNavigator::AddRawPoint` | :710-726 | push `Node`; `Com_Error` branch dead (D-3) |
 | `CNavigator::GetEdgeCost(int,int)` / `GetEdgeCost(CNode*,CNode*)` | :2621-2635,:734-755 | public `int,int` form validates ids then delegates to the trace form (:2634); `SV_Trace` via host — trace-dependent (3c), host-taking |
 | `CNavigator::SetEdgeCost`/`AddNodeEdges` | :757-806 | id-indexed; bidirectional add |
-| `CNavigator::CalculatePath`/`CalculatePaths` | :814-908 | faithful `Vec<Edge>` heap flood fill (D-7 raw-ptr ownership → owned values; pop-order ranks NAV-D1) |
-| `CNavigator::ShowNodes`/`ShowEdges`/`ShowPath` | :916-1027,:1632-1685 | draw calls stripped (renderer); keep PVS/`Com_Printf` control flow, §20 notes |
+| `CNavigator::CalculatePath`/`CalculatePaths` | :814-908 | faithful `Vec<Edge>` heap flood fill (D-7 raw-ptr ownership → owned values; pop-order ranks NAV-D5); `CalculatePath` in first slice |
+| `CNavigator::ShowNodes`/`ShowEdges`/`ShowPath` | :916-1027,:1632-1685 | draw calls stripped (renderer); keep PVS/`Com_Printf` control flow, §20 notes; `SV_GentityNum(0)` index access via `gentity()` (NAV-D1) |
 | `CNavigator::GetNodeRadius` | :1029-1034 | pure query — `m_nodes[id].radius` with the §19 range guard (D-8), host-free (golden surface) |
 | `CNavigator::CheckBlockedEdges`/`HardConnect` | :1036-1140 | host trace + door/breakable callbacks |
-| `CNavigator::TestNodePath`/`TestNodeLOS`/`TestBestFirst` | :1150-1237 | protected; host callbacks |
+| `CNavigator::TestNodePath`/`TestNodeLOS`/`TestBestFirst` | :1150-1237 | protected; host callbacks; deref the `*mut sharedEntity_t` ent (NAV-D1) |
 | `CNavigator::CollectNearestNodes` | :1249-1318 | `nodeChain_l` → `Vec`/`VecDeque` insert-sorted (NAV-D5) |
-| `CNavigator::GetBestPathBetweenEnts`/`GetNearestNode` | :1320-1624 | host trace/PVS; writes `ent->waypoint` via host |
+| `CNavigator::GetBestPathBetweenEnts`/`GetNearestNode` | :1320-1624 | host trace/PVS; `ent`/`goal` are `*mut sharedEntity_t` from VMA (NAV-D1), written back through the pointer (`ent->waypoint`); `SV_GentityNum(0)` via `gentity()` |
 | `CNavigator::ClearCheckedNodes`/`CheckedNode`/`SetCheckedNode` | :1687-1719 | `checked_nodes: BTreeMap<i32,u8>` |
-| `CNavigator::CheckFailedNodes`/`AddFailedNode`/`NodeFailed` | :1724-1811 | read/write `sharedEntity_t` via `SV_GentityNum` |
+| `CNavigator::CheckFailedNodes`/`AddFailedNode`/`NodeFailed` | :1724-1811 | deref the `*mut sharedEntity_t` arg (VMA(1), NAV-D1) — read/write `ent->waypoint`/`failedWaypoints` |
 | `CNavigator::NodesAreNeighbors` | :1813-1833 | scan node edges |
 | `CNavigator::ClearFailedEdge`/`ClearAllFailedEdges` | :1835-1874 | `failed_edges[..]`; `memset(WAYPOINT_NONE)` → explicit fill |
 | `CNavigator::EdgeFailed`/`AddFailedEdge` | :1876-2055 | `edge_lookup` `equal_range` first-match (NAV-D5) |
 | `CNavigator::CheckFailedEdge`/`CheckAllFailedEdges` | :2057-2168 | host trace/PVS; `#if 0` NAVNEW branch not taken (D-4) |
 | `CNavigator::RouteBlocked` | :2170-2253 | rank-guided walk; `while(1)` loop |
 | `CNavigator::GetBestNodeAltRoute` (both overloads) | :2261-2370 | 3-arg delegates to 4-arg |
-| `CNavigator::GetBestNode`/`GetNodePosition`/`GetNodeNumEdges`/`GetNodeEdge`/`Connected`/`GetPathCost`/`GetProjectedNode` | :2377-2686 | pure graph queries (golden surface); `Q3_INFINITE`/`WORLD_SIZE`/`WAYPOINT_NONE` + vec3 primitives imported from `mp_qshared` (NAV-D6) |
+| `CNavigator::GetBestNode`/`GetNodePosition`/`GetNodeNumEdges`/`GetNodeEdge`/`Connected`/`GetPathCost`/`GetProjectedNode` | :2377-2686 | pure graph queries (golden surface); `Q3_INFINITE`/`WORLD_SIZE`/`WAYPOINT_NONE` + vec3 primitives imported from `mp_qshared` (NAV-D3) |
 | `CNavigator::FlagAllNodes`/`GetChar`/`GetInt`/`GetFloat`/`GetLong`/`GetNumNodes` | :496-564,navigator.h:184 | helpers; `Get*` read via host `FS_Read` |
-| `NodeTotalGreater::operator()` | :2693-2699 | the `first.cost > second.cost` comparator for the faithful heap sift (NAV-D1) |
-| `CPriorityQueue::~/Find/Pop/Push/Update/Empty` | :2705-2782 | owned `Vec<Edge>` with hand-transcribed `push_heap`/`pop_heap` (NAV-D1/D-7); `Find`/`Update` have no live caller — §20 |
-| `NAV_CvarInit`/`NAV_Free` | :39-48 | host cvar registration / `Navigator::free` |
+| `NodeTotalGreater::operator()` | :2693-2699 | the `first.cost > second.cost` comparator for the faithful heap sift (NAV-D5) |
+| `CPriorityQueue::~/Find/Pop/Push/Update/Empty` | :2705-2782 | owned `Vec<Edge>` with hand-transcribed `push_heap`/`pop_heap` (NAV-D5/D-7); `Find`/`Update` have no live caller — §20 |
+| `NAV_CvarInit`/`NAV_Free` | :39-48 | registers `d_altRoutes`/`d_patched` via `Cvar_Get` (:41-42) — the frozen `EngineHost` has **no cvar method — NAV-Q9**; `NAV_Free`→`Navigator::free` |
 | `GetTime` (`#if AI_TIMERS`) | :59-74 | not ported (`AI_TIMERS` off) — §20 |
 | `CNavigator::GetNodeLeadDistance` | navigator.h:182 | declared-only, **no definition** in navigator.cpp and no caller/trap arm — dropped as dead surface (§20 zero-caller note), not stubbed |
-| `GNavCallback_*` ×9 | gameCallbacks.cpp:6-49 | `EngineHost` `VM_Call(GAME_NAV_*)` (NAV-D2/D5) |
+| `GNavCallback_*` ×9 | gameCallbacks.cpp:6-49 | `EngineHost::vm_call(VmSlot::Gvm, GAME_NAV_*)` (NAV-D4/D5); ent args pass the `*mut sharedEntity_t` widened to `isize` slots |
 
 ## Divergences
 
@@ -644,7 +772,7 @@ surface). `port-cpp-subsystem` consumes this list.
 - **D-7 (idiomatic ownership, faithful order):** `CPriorityQueue`'s raw `CEdge*`
   `new`/`delete` lifecycle (:818,838,865,869,2705-2758) becomes an owning
   `Vec<Edge>` of values with the C++ `push_heap`/`pop_heap` sift algorithm
-  hand-transcribed (NAV-D1). Ownership/layout is free (§F); pop order under
+  hand-transcribed (NAV-D5). Ownership/layout is free (§F); pop order under
   `NodeTotalGreater` — including equal-cost ties — is preserved to match
   libstdc++. **Not** `std::BinaryHeap` (would diverge tie order). `Find`/`Update`
   (:2716-2774) have no live caller — drop with §20 zero-caller notes.
@@ -666,7 +794,7 @@ files:
     crate: mp_engine_server
     mode: mp
     class: (module)
-    summary: Nav module root — NF_*/EFLAG_* flags, NODE_NONE, NAV/NODE header IDs, MAX_FAILED_EDGES, WP_MINS/WP_MAXS, CHECKED_* consts (all navigator.h, nav-owned); re-exports. Q3_INFINITE/WORLD_SIZE/STEPSIZE/WAYPOINT_NONE and the vec3 primitives are NOT defined here — imported from mp_qshared (NAV-D6/RULING 22), never local copies. Navigator becomes the Engine.nav field (RULING 12).
+    summary: Nav module root — NF_*/EFLAG_* flags, NODE_NONE, NAV/NODE header IDs, MAX_FAILED_EDGES, WP_MINS/WP_MAXS, CHECKED_* consts (all navigator.h, nav-owned); re-exports. Q3_INFINITE/WORLD_SIZE/STEPSIZE/WAYPOINT_NONE and the vec3 primitives are NOT defined here — imported from mp_qshared (NAV-D3/RULING 22), never local copies. Navigator becomes the Engine.nav field (RULING 12).
   - path: crates/mp/engine/server/src/npcnav/edge.rs
     crate: mp_engine_server
     mode: mp
@@ -676,119 +804,169 @@ files:
     crate: mp_engine_server
     mode: mp
     class: CNode
-    summary: Node — position/flags/radius/id, edges Vec<NodeEdge>, ranks Vec<i32>; Save/Load, accessors, edge queries.
+    summary: Node — position/flags/radius/id, edges Vec<NodeEdge>, ranks Vec<i32>; Save/Load (host FS_* via EngineHost), accessors, edge queries. NodeEdge (Raven CNode-nested edge_t {ID,cost,flags}, navigator.h:72-77) is defined HERE alongside Node as CNode's private member type (porting-rules §21 colocation) — NOT in edge.rs, which is CEdge/Edge (the priority-queue triple). GetPosition uses the mp_qshared vec3 primitives (NAV-D3).
   - path: crates/mp/engine/server/src/npcnav/navigator.rs
     crate: mp_engine_server
     mode: mp
     class: CNavigator
-    summary: CNavigator — node/edge arenas, failed-edge/checked-node bookkeeping, priority-queue pathfinding, Load/Save, the G_NAV_* pub surface; host-taking methods take (&mut self, &mut impl EngineHost) (NAV-D2).
+    summary: CNavigator — node/edge arenas, failed-edge/checked-node bookkeeping, priority-queue pathfinding, Load/Save (first slice, NAV-D2), the G_NAV_* pub surface; host-taking methods take (&mut self, &mut impl EngineHost) (NAV-D4); the five ent-taking arms take *mut sharedEntity_t (NAV-D1).
   - path: crates/mp/engine/server/src/npcnav/priority_queue.rs
     crate: mp_engine_server
     mode: mp
     class: CPriorityQueue
-    summary: Faithful Vec<Edge> min-heap on cost — hand-transcribed push_heap/pop_heap under NodeTotalGreater so equal-cost tie order matches libstdc++ (NAV-D1/D-7); NOT std::BinaryHeap; Find/Update dropped as zero-caller.
+    summary: Faithful Vec<Edge> min-heap on cost — hand-transcribed push_heap/pop_heap under NodeTotalGreater so equal-cost tie order matches the oracle-harness libstdc++ (NAV-D5/D-7); NOT std::BinaryHeap; Find/Update dropped as zero-caller.
   - path: crates/mp/engine/server/src/npcnav/callbacks.rs
     crate: mp_engine_server
     mode: mp
     class: (GNavCallback free fns)
-    summary: The nine GNavCallback_* outbound calls as EngineHost VM_Call(GAME_NAV_*) shims (gameCallbacks.cpp); NAV_CvarInit/NAV_Free.
+    summary: The nine GNavCallback_* outbound calls as EngineHost vm_call(VmSlot::Gvm, GAME_NAV_*) shims (gameCallbacks.cpp); NAV_CvarInit/NAV_Free.
+  - path: crates/mp/qshared/src/shared/q_math.rs
+    crate: mp_qshared
+    mode: mp
+    class: (q_math.c vec3 fns)
+    summary: NAV-D3 migration (NEW file, sibling of q_math_rand.rs, mirrors oracle/codemp/game/q_math.c) — the vec3 fns MOVED here from crates/mp/game/src/q_math.rs (VectorNormalize at :916; _DotProduct at :961, _VectorSubtract at :968, _VectorCopy at :986 — the last three are Raven macros over _-prefixed C fns, NOT bare names at :916), mp_game copies deleted and re-imported in the same commit, no shims. The single engine-reachable definition the referee compares. OPEN: the cross-crate call-site footprint (NAV-Q12) and the mp_qshared fn names, _-prefixed vs bare (NAV-Q13), are escalated — this file's exact contents and edit scope are not portable until they settle.
+  - path: crates/mp/qshared/src/common/mp/game/q3_infinite.rs
+    crate: mp_qshared
+    mode: mp
+    class: (g_public.h const)
+    summary: NAV-D3 migration — Q3_INFINITE (g_public.h:9) MOVED into the game-mirroring folder (one-const-per-file convention, snake_case leaf); the mp_game copy (g_public_consts.rs:14) deleted and re-imported in the same commit, no shims.
+  - path: crates/mp/qshared/src/common/mp/game/waypoint_none.rs
+    crate: mp_qshared
+    mode: mp
+    class: (g_nav.h const)
+    summary: NAV-D3 migration — WAYPOINT_NONE (g_nav.h:7) MOVED into the game-mirroring folder (one-const-per-file convention, snake_case leaf); the mp_game copy (g_nav_consts.rs:13) deleted and re-imported in the same commit, no shims.
+  - path: crates/mp/qshared/src/common/mp/bg/stepsize.rs
+    crate: mp_qshared
+    mode: mp
+    class: (bg_public.h const)
+    summary: NAV-D3 migration — STEPSIZE (bg_public.h:22, 18.0) MOVED into the bg-mirroring folder; the mp_game copy (bg_slidemove.rs:37) deleted and re-imported in the same commit, no shims. Consumed by WP_MINS/WP_MAXS.
+  - path: crates/mp/qshared/src/shared/world_size.rs
+    crate: mp_qshared
+    mode: mp
+    class: (q_shared.h const)
+    summary: NAV-D3 migration — WORLD_SIZE (q_shared.h:20, 131072.0) MOVED into the shared tier; the mp_game copy (NPC_combat.rs:2736) deleted and re-imported in the same commit, no shims.
 ```
 
 ## Open questions
 
-MUST be empty at FROZEN. **NAV-Q1–Q6 are resolved** — Q1–Q5 by the §F
-doc-session rulings, Q6 by RULING 22 (NAV-D6) at the interactive design session
-that followed the 2026-07-09 dry-run escalation; retained here as
-resolved-in-place notes for cross-doc ID stability (never re-litigate). **NAV-Q7
-and NAV-Q8 are OPEN** — both raised by the 2026-07-09 first-slice dry-run and
-escalating to a design session; the doc is not FROZEN-ready until they resolve.
-NAV-Q8 is new to this revision: the second dry-run confirmed that NAV-D6 names
-the destination crate but leaves the migration's owner, exact paths, and
-move-vs-re-export treatment unassigned — a genuine new-decision hole, not
-agent-resolvable.
+MUST be empty at FROZEN. **NAV-Q1–Q8 are all resolved** — Q1–Q5 by the §F
+doc-session rulings, Q6 by RULING 22, Q7 by RULING 32 (NAV-D2), Q8 by the round-4
+mechanical resolution (NAV-D3); retained here as resolved-in-place notes for
+cross-doc ID stability (never re-litigate). **NAV-Q9–Q13 are live holes.**
+NAV-Q9–Q11 are three frozen-`EngineHost` seam gaps a porter would hit that no
+ruling covers — each needs a service the frozen trait
+(`crates/mp/host-interface/src/engine_host.rs:23-106`) does not expose. **NAV-Q11
+additionally blocks the first slice**: its `Save` (host `FS_Write`) is
+first-slice-scoped (`node.rs`, Slice hooks), so under GOAL-engine no-stub
+discipline the first slice **as literally scoped** cannot complete until NAV-Q11
+resolves or `Save` is dropped from it — which of those two is itself part of the
+NAV-Q11 escalation, not settled here. NAV-Q12–Q13
+are two NAV-D3 execution parameters the settled "MOVE, delete the copies in the
+same commit, no shims" instruction leaves unspecified and that a tree check shows
+are not mechanically self-resolvable (both also block the first slice). Resolving any of
+the five extends a settled artifact (rulings 31/33 / NAV-D4, or NAV-D3 / RULING 22)
+or this doc's scope, so per doc-standards Gate-2 they **escalate to an interactive
+session and are not self-resolved here**. The doc stays **DRAFT** until they are
+settled.
 
-- **NAV-Q1** — *(Resolved: NAV-D2 / RULING 11.)* Host-threading mechanism for the
-  trace/FS/callback services = the one shared Stage-0 `EngineHost` trait; every
+- **NAV-Q1** — *(Resolved: NAV-D4 / RULING 11/24/31/33.)* Host-threading mechanism
+  for the trace/FS/callback services = the one shared Stage-0 `EngineHost` trait,
+  now BUILT and green (`crates/mp/host-interface`, commit `4b7f01b0`); every
   host-taking method takes `(&mut self, host: &mut impl EngineHost)`.
-- **NAV-Q2** — *(Resolved: NAV-D4 / RULING 14 pattern.)* Fixtures = committed
+- **NAV-Q2** — *(Resolved: NAV-D5 / RULING 14 pattern.)* Fixtures = committed
   hand-authored minimal nav graphs + an uncommitted local retail `.nav` corpus.
   The exact per-fixture probe list is a mechanical Verification-plan detail the
   harness enumerates, not a design point.
-- **NAV-Q3** — *(Resolved: NAV-D3 / EVIDENCE.)* The SETCHECKEDNODE/FLAGALLNODES
+- **NAV-Q3** — *(Resolved: NAV-D5 / EVIDENCE.)* The SETCHECKEDNODE/FLAGALLNODES
   switch fall-through is owned by the wave-20 `SV_GameSystemCalls` port; no
   `CNavigator` artifact is responsible for it.
-- **NAV-Q4** — *(Resolved: NAV-D2 / RULING 11.)* There is no nav-private host
+- **NAV-Q4** — *(Resolved: NAV-D4 / RULING 11.)* There is no nav-private host
   trait; the required services are methods on the shared `EngineHost` trait,
-  designed once at Stage-0. This doc names the Raven services it consumes
-  (Seam definition, outbound); their Rust signatures live with the `EngineHost`
-  design.
-- **NAV-Q5** — *(Resolved: NAV-D2 / RULING 11.)* The `Navigator`-vs-rest
+  quoted verbatim in the Seam from the built crate. Their Rust signatures live
+  with the `EngineHost` design.
+- **NAV-Q5** — *(Resolved: NAV-D4 / RULING 11.)* The `Navigator`-vs-rest
   self-borrow is resolved by `Engine`'s split-borrow view struct that excludes
   `nav`, so `engine.nav.method(&mut view, …)` borrows disjointly.
-- **NAV-Q6** — *(Resolved: NAV-D6 / RULING 22, 2026-07-09.)* Canonical
-  engine-reachable home for the shared constants/helpers the nav code **consumes
-  but does not own** (`Q3_INFINITE`, `WORLD_SIZE`, `STEPSIZE`, `WAYPOINT_NONE`,
-  and the vec3 primitives `VectorNormalize`/`DotProduct`/`VectorSubtract`/
-  `VectorCopy`) = **`mp_qshared`**: one definition the referee compares, moved or
-  re-exported out of the copies that today sit only in `mp_game`, with no
-  duplication. Authorizes promoting the `bg_public.h` `STEPSIZE` and the un-homed
-  `g_nav.h` `WAYPOINT_NONE` and relocating the vec3 math + `Q3_INFINITE` +
-  `WORLD_SIZE` copies into that tier. npcnav re-declares none of them locally and
-  imports them from `mp_qshared`. NAV-Q6 fixes the *home*; the migration's
-  owner/exact-paths/re-export mechanics (which the first slice's host-free code
-  waits on) are the newer **NAV-Q8**, and its golden verification is gated on
-  NAV-Q7.
-- **NAV-Q7** — *(OPEN — escalates to a design session; raised by the 2026-07-09
-  first-slice dry-run.)* How does the **host-independent** first slice populate a
-  `Navigator{nodes, edges}` for its 3a rank/query goldens **before `Load` is
-  ported**? The rank-producing method is settled to be in the slice
-  (`CalculatePath`, navigator.cpp:814-877, host-free), but every production path
-  that builds the graph it flood-fills is **host-taking**: `Load` (host `FS_Read`
-  + the `Get*` byte readers, navigator.cpp:602-657,:496-564), `AddRawPoint` (host
-  for the D-3 `Com_Error`, :710-726), and `HardConnect` (host trace +
-  door/breakable callbacks, :1113-1140). NAV-D4 fixes the fixture *format/source*
-  (committed hand-authored minimal nav graphs; the oracle harness reads the
-  matching `.nav` bytes through a stubbed `FS_Read`, Verification Strategy) but
-  **not** the Rust-side *loading mechanism* usable while `Load` is deferred:
-  whether a test-only in-Rust constructor that sets `nodes`/`edges` directly from
-  a Rust-native rendering of the fixture (dual-authored alongside the oracle's
-  `.nav` bytes), a host-free subset of the `.nav` parser, or another route. This
-  is a genuine open mechanism for the first slice's own verification — not a
-  later-wave concern and not covered by NAV-Q2 (which scopes only the per-fixture
-  *probe list*, not graph construction) — and it needs a decision, not agent
-  invention.
-- **NAV-Q8** — *(OPEN — escalates to a design session; raised by the 2026-07-09
-  second first-slice dry-run.)* **Who performs the NAV-D6 / RULING 22 shared-home
-  migration, to which exact paths, and how are the existing `mp_game` copies
-  treated?** RULING 22 (NAV-D6) settles the *destination* — the four consts
-  (`Q3_INFINITE`, `WORLD_SIZE`, `STEPSIZE`, `WAYPOINT_NONE`) and four vec3
-  primitives (`VectorNormalize`/`DotProduct`/`VectorSubtract`/`VectorCopy`) get
-  their canonical engine-reachable home in `mp_qshared` with **no duplication** —
-  but does **not** settle the migration's mechanics, three of which a first-slice
-  porter needs and cannot invent:
-  1. **Owner/sequencing.** The relocation is absent from this doc's own `files:`
-     roster (npcnav only *imports* these — it re-declares none) and from every
-     wave in `docs/plans/2026-07-08-mp-engine-build-out.md` (whose port order
-     covers oracle→engine *functions*, not relocation of already-ported `mp_game`
-     constants; Stage 0 owns only the interface crate). No ticket, wave, or agent
-     is assigned to it, yet the first slice's host-free code depends on it.
-  2. **Exact target paths.** RULING 22 pins only the crate; it names no
-     per-item file/module path — unlike every comparable relocation the doc cites
-     by contrast, which give exact paths (`failedEdge_t` →
-     `crates/mp/qshared/src/common/mp/qcommon/failed_edge.rs`; `Q_irand` →
-     `crates/mp/qshared/src/shared/q_math_rand.rs`).
-  3. **Move-vs-re-export of the `mp_game` copies.** The items live today only in
-     `mp_game` (`crates/mp/game/src/g_public_consts.rs:14`,
-     `.../g_nav_consts.rs:13`, `.../bg_slidemove.rs:37`, `.../NPC_combat.rs:2736`,
-     `.../q_math.rs:916`). RULING 22's "**moved or re-exported**" leaves unpinned
-     whether those five `mp_game` files are updated to import from `mp_qshared`
-     or keep thin `pub use` re-export shims — and the "no duplication" requirement
-     means one of the two *must* happen, i.e. the migration edits five files
-     outside npcnav's roster in the same change, with no guidance on which.
-  Confirmed by grep: none of the four consts or four vec3 fns exists in
-  `mp_qshared` today. Like NAV-Q7 this is a genuine **first-slice prerequisite** —
-  `mod.rs`'s `WP_MINS`/`WP_MAXS` (needs `STEPSIZE`) and `node.rs`'s `GetPosition`
-  (needs `VectorCopy`) cannot be written until the home actually exists — and it
-  needs a decision, not agent invention. (What *is* settled and answered in place:
-  the migration is **not** part of npcnav's own commits — the roster excludes
-  every `mp_qshared`/`mp_game` file, so npcnav only consumes the result.)
+- **NAV-Q6** — *(Resolved: NAV-D3 / RULING 22.)* Canonical engine-reachable home
+  for the shared constants/helpers the nav code consumes but does not own =
+  `mp_qshared`, one definition the referee compares, no duplication.
+- **NAV-Q7** — *(Resolved: NAV-D2 / RULING 32, 2026-07-09.)* How the first slice
+  populates `Navigator{nodes, edges}` for its 3a goldens: **through the front
+  door** — `Load` ports in the first slice with its real frozen signature and the
+  fixture-backed `MockHost` (`crates/mp/host-interface/src/mock.rs`) serves the
+  `.nav` bytes via `fs_read_file`; `CalculatePath` joins behind it. No test-only
+  constructor is added (RULING 32 makes the mock the reusable goldens vehicle).
+- **NAV-Q8** — *(Resolved: NAV-D3 / round-4 mechanical resolution, 2026-07-09.)*
+  The NAV-D6/RULING-22 migration mechanics: the four consts and four vec3
+  primitives **MOVE** into `mp_qshared` (vec3 fns → new
+  `crates/mp/qshared/src/shared/q_math.rs`; each const → the folder mirroring its
+  owning Raven header), the five `mp_game` copies **deleted and re-imported in the
+  same commit, no re-export shims**, and the migration is **in-scope for this
+  doc's first slice** and listed in the `files` roster. Owner (this slice), paths
+  (pinned above), and move-vs-re-export (move, no shims) are all settled.
+- **NAV-Q9** — *(LIVE — escalate; blocks execution.)* **How does a nav method
+  read `d_altRoutes`/`d_patched`?** `NAV_CvarInit` registers both (`Cvar_Get`,
+  navigator.cpp:41-42, `CVAR_CHEAT`) and `->integer` is read at
+  navigator.cpp:480,1403,1418,1433,1498,1933,2278,2323,2346 — `d_altRoutes` gates
+  the whole alt-route pathing family (parity-visible, 3c), `d_patched` gates
+  patched-nav in `AddFailedEdge`. The frozen `EngineHost`
+  (`engine_host.rs:23-106`) exposes **no** cvar accessor, the handles live in
+  `EngineCvars` (fork-2, not on `Navigator`), and a nav method receives only
+  `(&mut self, host: &mut impl EngineHost)` — so neither `self` nor the trait can
+  reach them. Candidate resolutions (a cvar-read method on the frozen Stage-0
+  trait, vs. resolved cvar values stored on `Navigator`) each change a settled
+  artifact (rulings 31/33 / NAV-D4); **decision owed at an interactive session,
+  not made here.**
+- **NAV-Q10** — *(LIVE — escalate; blocks execution.)* **How does a nav method
+  read `svs.time`?** Read at navigator.cpp:1733,1763,1778,1797,1987,2010,2065,2137
+  (failed-node/edge re-check timers; the stored `checkTime`/
+  `failedWaypointCheckTime` are parity-visible). `svs.time` is `serverStatic_t`
+  server frame time, not a `Navigator` field, and the frozen `EngineHost` has no
+  time accessor (`PlatformHost::milliseconds` = `Sys_Milliseconds` is a different
+  clock and nav never receives `PlatformHost`). Resolution (a `svs.time` accessor
+  on the frozen trait, vs. threading it another way) is a seam decision;
+  **escalate, not decided here.**
+- **NAV-Q11** — *(LIVE — escalate; blocks execution AND the first slice.)* **How is `Save` written?**
+  `CNavigator::Save` and `CNode::Save` use `FS_FOpenFileByMode(...,FS_WRITE)` +
+  `FS_Write` + `FS_FCloseFile` (navigator.cpp:670,678,681,686,697,699), but the
+  frozen `EngineHost` exposes only `fs_read_file` (whole-file read →
+  `Option<Vec<u8>>`) + `fs_free_file` — **no write**. `Save` stays in scope
+  (`G_NAV_SAVE`, sv_game.cpp:845-846) yet is unwritable against the trait as
+  frozen; under GOAL-engine no-stub discipline a porter cannot fill its body.
+  (`Load`, by contrast, IS mappable: `FS_READ`+`FS_Read` → one `fs_read_file`
+  read parsed from a cursor.) Because `node.rs`'s `Save` is scoped into the
+  **first slice** (Slice hooks), NAV-Q11 also blocks that slice: whether to **drop
+  `Save` from the first slice** or **resolve NAV-Q11 before it starts** is part of
+  this same escalation, not decided here. Resolution (add an FS-write method to the
+  frozen Stage-0 trait, vs. rule `Save` §20-dead under DEDICATED) changes a settled
+  artifact / this doc's scope; **decision owed at an interactive session.**
+- **NAV-Q12** — *(LIVE — escalate; blocks the first slice.)* **Does NAV-D3's
+  "delete the `mp_game` copies in the SAME commit, no re-export shims" intend the
+  full cross-crate call-site edit its wording entails, or a narrower scope?** The
+  four vec3 fns are not single-use copies: in `crates/mp/game` `_DotProduct` is
+  referenced in 17 files, `_VectorSubtract` in 34, `_VectorCopy` in 43, and
+  `VectorNormalize` in 45 (hundreds of call sites total); the four consts add
+  `Q3_INFINITE` (15 files), `WAYPOINT_NONE` (13), `STEPSIZE` (5), `WORLD_SIZE` (2).
+  Deleting each `mp_game` definition and re-importing from `mp_qshared` in the same
+  commit — with **no** re-export shim — therefore edits 40+ `mp_game` files that
+  appear in **no** `files:` roster entry, an order of magnitude beyond the
+  five-file migration the roster discloses. Whether that mass edit is the intended
+  first-slice scope, or NAV-D3 should read narrowly (add the eight items to
+  `mp_qshared` for nav's own import and leave `mp_game`'s existing local
+  definitions and their callers untouched — which the "no re-export shims / deleted
+  in the same commit" text explicitly forbids), is a scope decision a porter cannot
+  self-resolve without inventing the answer. **Blocks the first slice**
+  (`GetProjectedNode` and `CNode::GetPosition` need the vec3 fns). Escalate; not
+  decided here.
+- **NAV-Q13** — *(LIVE — escalate; blocks the first slice.)* **What are the moved
+  vec3 functions named in `mp_qshared`?** NAV-D3's prose and Seam-adjacent text use
+  the bare Raven macro names `VectorNormalize`/`DotProduct`/`VectorSubtract`/
+  `VectorCopy`, but only `VectorNormalize` is a bare function in the tree
+  (`crates/mp/game/src/q_math.rs:916`); `DotProduct`/`VectorSubtract`/`VectorCopy`
+  are Raven `#define` macros over the `_`-prefixed C functions transcribed as
+  `_DotProduct` (:961), `_VectorSubtract` (:968), `_VectorCopy` (:986), matching
+  Raven's own `q_math.c` function names and mp_game's existing convention (bare
+  names reserved for C-macro-style call-site inlining). Whether `mp_qshared` keeps
+  the `_`-prefixed names or adopts the bare macro names is a naming decision NAV-D3
+  never states; it changes the moved file's contents and every re-import, so a
+  porter cannot self-resolve it. Escalate; not decided here.
