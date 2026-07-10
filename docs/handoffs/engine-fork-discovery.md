@@ -627,3 +627,19 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     43/56b, exactness lands with the wave-20 packet — inside the
     campaign, not a deferral.
     **RULING: AlignedBytes, 16-byte layout (user, 2026-07-10)**
+
+59. **tr-model pass-3 closeout (DELEGATED DEFAULTS — user granted
+    default-decision authority ~00:30 2026-07-10 for one hour; each item
+    takes the recommended option):** (a) TRM-Q5: EngineHost gains a 20th
+    method `fs_file_is_in_pak(&mut self, qpath: &str) -> Option<i32>` —
+    Raven's `FS_FileIsInPAK(qboolean + checksum out-param)` collapsed per
+    §C7; live consumers: the `iPAKFileCheckSum` stamp in
+    RE_RegisterServerModels_Malloc (tr_model.cpp:212) and
+    RE_RegisterModels_DumpNonPure (:434). MockHost grows a pak-membership
+    fixture map. (b) `RE_RegisterMedia_LevelLoadEnd` is §20-DROPPED —
+    sole caller is client cl_cgame.cpp:1942, zero dedicated callers (the
+    doc's own live chain already omitted it); the live eviction path is
+    `models_level_load_end`. (c) MECHANICAL: the doc's "§A1" citations
+    become porting-rules §1 ("internals are free; the seam is not" —
+    section A rule 1; the rules are numbered globally).
+    **RULING (delegated): extend to 20 methods; §20 the wrapper; fix cites (2026-07-10)**
