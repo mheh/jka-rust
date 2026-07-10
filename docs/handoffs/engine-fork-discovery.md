@@ -583,3 +583,22 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     the existing `modules`/`time_base` precedent, because BTreeMap/Vec/
     String fields are NOT all-zero-valid.
     **RULING: extend — cvar trio + fs_list_files (user, 2026-07-09)**
+
+56. **tr-model closeout (TRM-Q1/Q2 + the systemic Cargo-edge omission):**
+    (a) matcomp lives in `mp_engine_ghoul2` beside its sole live consumer
+    (MC_UnCompressQuat ← UnCompressBone, tr_ghoul2.cpp:1158; the codec is
+    part of the mdxa format the bone subset decodes); MC_Compress/
+    MC_UnCompress get §20 notes if their callers prove dead at port. No
+    dependency inversion; the FROZEN ghoul2 boundary holds. (b) The
+    EngineHostView self-borrow (refines ruling 43):
+    `render_models: Option<&mut RenderModels>` on the view —
+    `ghoul2_call()` fills `Some`, `render_models_call()` sets `None`
+    (sound: RenderModels' own methods never call `host.model_*`; they own
+    the registry); a `model_*` call on `None` is a contract violation →
+    panic, fatal-bug class per fork 1. One view type, invariant recorded
+    in state-ownership.md. (c) MECHANICAL, systemic: every §F consumer
+    crate is AUTHORIZED to add the `mp_host_interface` path dependency to
+    its Cargo.toml as part of its first slice (acyclic — host-interface
+    depends only on mp_qshared); the §F docs cite this ruling instead of
+    each re-litigating the edge.
+    **RULING: ghoul2 home; Option view; blanket Cargo-edge authorization (user, 2026-07-09)**
