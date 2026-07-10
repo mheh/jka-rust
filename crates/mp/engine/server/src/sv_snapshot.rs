@@ -1,3 +1,5 @@
+/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/engine-cpass/crates/mp/engine/server/src/sv_snapshot.rs:
+
 //! `sv_snapshot.cpp` — server snapshot building/sending.
 
 use mp_engine_qcommon::collision_world::CollisionWorld;
