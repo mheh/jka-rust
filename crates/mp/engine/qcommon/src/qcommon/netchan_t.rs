@@ -4,10 +4,7 @@ use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::netsrc_t::netsrc_t;
 use mp_qshared::shared::qboolean;
 
-// Raven `MAX_MSGLEN` — max length of a message, which may be fragmented into
-// multiple packets.
-// Source: oracle/codemp/qcommon/qcommon.h:150
-const MAX_MSGLEN: usize = 49152;
+use super::net_limits::MAX_MSGLEN;
 
 /// Raven `netchan_t`.
 ///

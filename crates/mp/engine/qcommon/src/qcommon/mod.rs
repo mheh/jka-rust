@@ -1,11 +1,18 @@
 //! `qcommon` types.
 
 pub mod clc_ops_e;
+pub mod cpuid;
+pub mod filesystem_limits;
 pub mod huff_t;
+pub mod huffman_consts;
 pub mod huffman_t;
 pub mod joystick_axis_t;
+pub mod msg_consts;
+pub mod net_chan_cpp_consts;
+pub mod net_limits;
 pub mod netchan_t;
 pub mod nodetype;
+pub mod protocol;
 pub mod shared_traps_t;
 pub mod svc_ops_e;
 pub mod sys_event_t;

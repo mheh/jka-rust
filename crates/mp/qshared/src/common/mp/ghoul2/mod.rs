@@ -2,5 +2,7 @@
 //! engine's ghoul2 crate, mirroring `oracle/codemp/ghoul2/G2.h`.
 
 pub mod bone_flags;
+pub mod perf_flags;
 
 pub use bone_flags::*;
+pub use perf_flags::*;

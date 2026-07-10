@@ -139,19 +139,8 @@ pub const BASE_GUARD_DISTANCE: c_int = 256;
 /// Source: `oracle/codemp/game/ai_main.h:75`
 pub const BASE_GETENEMYFLAG_DISTANCE: c_int = 256;
 
-/// Raven botlib.h print-level `#define`s (not an enum), so §C8 makes them
-/// `const`s directly.
-///
-/// Source: `oracle/codemp/game/botlib.h:39-43`
-pub const PRT_MESSAGE: c_int = 1;
-/// Raven `PRT_WARNING`. Source: `oracle/codemp/game/botlib.h:40`
-pub const PRT_WARNING: c_int = 2;
-/// Raven `PRT_ERROR`. Source: `oracle/codemp/game/botlib.h:41`
-pub const PRT_ERROR: c_int = 3;
-/// Raven `PRT_FATAL`. Source: `oracle/codemp/game/botlib.h:42`
-pub const PRT_FATAL: c_int = 4;
-/// Raven `PRT_EXIT`. Source: `oracle/codemp/game/botlib.h:43`
-pub const PRT_EXIT: c_int = 5;
+// PRT_MESSAGE/PRT_WARNING/PRT_ERROR/PRT_FATAL/PRT_EXIT (`botlib.h:40-44`) live
+// in `mp_qshared::common::mp::botlib::print_type` — botlib.h's ABI seam home.
 
 /// Raven `STRAFEAROUND_RIGHT`/`STRAFEAROUND_LEFT` — file-local `#define`s in
 /// `ai_main.c` under `BOT_STRAFE_AVOIDANCE`, no ported home in a header.

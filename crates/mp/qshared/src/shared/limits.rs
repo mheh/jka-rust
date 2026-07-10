@@ -113,3 +113,16 @@ pub const VEH_WEAPON_BASE: c_int = 0;
 ///
 /// Source: `oracle/codemp/game/bg_vehicles.h:72`
 pub const VEH_WEAPON_NONE: c_int = -1;
+
+/// Raven `GENTITYNUM_BITS` — bits needed to send an entity number over the
+/// wire. Non-Xbox value (`#ifdef _XBOX` gives `9`; this project only builds
+/// the non-Xbox branch, matching [`MAX_CLIENTS`]'s existing precedent).
+///
+/// Source: `oracle/codemp/game/q_shared.h:1992-1994`
+pub const GENTITYNUM_BITS: c_int = 10;
+
+/// Raven `SNAPFLAG_SERVERCOUNT` — toggled every `map_restart` so transitions
+/// can be detected.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1977`
+pub const SNAPFLAG_SERVERCOUNT: c_int = 4;

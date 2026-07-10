@@ -2,6 +2,14 @@
 
 use mp_qshared::shared::vec3_t;
 
+/// Raven `CACHETYPE_PORTAL` — routing cache is for a portal.
+/// Source: `oracle/codemp/botlib/be_aas_def.h:129`
+pub const CACHETYPE_PORTAL: u8 = 0;
+
+/// Raven `CACHETYPE_AREA` — routing cache is for an area.
+/// Source: `oracle/codemp/botlib/be_aas_def.h:130`
+pub const CACHETYPE_AREA: u8 = 1;
+
 /// Raven `aas_routingcache_t` — a cached routing table for a portal or area.
 ///
 /// Raven: portal or area cache.

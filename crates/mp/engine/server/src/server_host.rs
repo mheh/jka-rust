@@ -62,6 +62,27 @@ pub struct WorldSectors {
 /// Type definition source: `oracle/codemp/server/server.h:236`
 pub const MAX_MASTER_SERVERS: usize = 5;
 
+/// Raven `NEW_RESOLVE_DURATION` — master-address re-resolve interval, 24 hours
+/// in milliseconds (`#ifndef _XBOX`).
+///
+/// Source: `oracle/codemp/server/sv_main.cpp:191`
+pub const NEW_RESOLVE_DURATION: c_int = 86400000;
+
+/// Raven `HEARTBEAT_MSEC` — interval between master-server heartbeats.
+///
+/// Source: `oracle/codemp/server/sv_main.cpp:220`
+pub const HEARTBEAT_MSEC: c_int = 300 * 1000;
+
+/// Raven `HEARTBEAT_GAME` — game identifier string sent in heartbeats.
+///
+/// Source: `oracle/codemp/server/sv_main.cpp:221`
+pub const HEARTBEAT_GAME: &str = "QuakeArena-1";
+
+/// Raven `SV_OUTPUTBUF_LENGTH` — `SVC_RemoteCommand` reply buffer size.
+///
+/// Source: `oracle/codemp/server/sv_main.cpp:494`
+pub const SV_OUTPUTBUF_LENGTH: usize = mp_engine_qcommon::qcommon::net_limits::MAX_MSGLEN - 16;
+
 /// The server-island state owned by `Engine.sv: Server` — always present, NOT
 /// an `Option` (LIFE-Q7 resolution, round-6): liveness is `sv.state == SS_DEAD`
 /// (`serverState_t`, `SS_DEAD` = "no map loaded", `codemp/server/server.h:46-54`),

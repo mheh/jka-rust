@@ -234,7 +234,16 @@ pub use mp_bg::weapons::ammo_t::ammo_t::*;
 pub use mp_bg::weapons::weapon_t::weapon_t;
 
 pub use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_t;
+pub use mp_qshared::common::mp::botlib::action::{
+    ACTION_ALT_ATTACK, ACTION_ATTACK, ACTION_CROUCH, ACTION_DELAYEDJUMP, ACTION_FORCEPOWER,
+    ACTION_GESTURE, ACTION_JUMP, ACTION_MOVEBACK, ACTION_MOVEDOWN, ACTION_MOVEFORWARD,
+    ACTION_MOVELEFT, ACTION_MOVERIGHT, ACTION_MOVEUP, ACTION_RESPAWN, ACTION_TALK, ACTION_USE,
+    ACTION_WALK,
+};
 pub use mp_qshared::common::mp::botlib::bot_input_s::bot_input_t;
+pub use mp_qshared::common::mp::botlib::print_type::{
+    PRT_ERROR, PRT_EXIT, PRT_FATAL, PRT_MESSAGE, PRT_WARNING,
+};
 pub use mp_qshared::common::mp::gentity::{
     gentity_t, material_t, moverState_t, MAT_CRATE1, MAT_CRATE2, MAT_DRK_STONE, MAT_ELECTRICAL,
     MAT_ELEC_METAL, MAT_GLASS, MAT_GLASS_METAL, MAT_GRATE1, MAT_GREY_STONE, MAT_LT_STONE,

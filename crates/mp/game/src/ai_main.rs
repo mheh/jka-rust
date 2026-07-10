@@ -25,23 +25,9 @@ use mp_bg::weapons::weapon_t::{
     WP_REPEATER, WP_ROCKET_LAUNCHER, WP_STUN_BATON, WP_THERMAL, WP_TRIP_MINE,
 };
 
-// Raven `ACTION_*` bot-command flags (`botlib.h:66-89`) — `bot_input_t::actionflags`
-// bitmask; not yet ported to a shared home, pinned here (this file's the sole consumer).
-// Source: `oracle/codemp/game/botlib.h:66-89`
-const ACTION_ATTACK: c_int = 0x0000001;
-const ACTION_USE: c_int = 0x0000002;
-const ACTION_RESPAWN: c_int = 0x0000008;
-const ACTION_JUMP: c_int = 0x0000010;
-const ACTION_CROUCH: c_int = 0x0000080;
-const ACTION_MOVEFORWARD: c_int = 0x0000200;
-const ACTION_MOVEBACK: c_int = 0x0000800;
-const ACTION_MOVELEFT: c_int = 0x0001000;
-const ACTION_MOVERIGHT: c_int = 0x0002000;
-const ACTION_DELAYEDJUMP: c_int = 0x0008000;
-const ACTION_GESTURE: c_int = 0x0020000;
-const ACTION_WALK: c_int = 0x0080000;
-const ACTION_FORCEPOWER: c_int = 0x0100000;
-const ACTION_ALT_ATTACK: c_int = 0x0200000;
+// ACTION_* bot-command flags (`botlib.h:66-82`) — `bot_input_t::actionflags`
+// bitmask — live in `mp_qshared::common::mp::botlib::action`, imported via
+// `crate::prelude::*`.
 
 // Pass-2 body imports: the outbound trap seam, the ai_main.h const families,
 // and the syscall `Args` builders each ported body constructs.

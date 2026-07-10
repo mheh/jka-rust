@@ -4,6 +4,8 @@ pub mod bot_chat_s;
 pub mod bot_chatmessage_s;
 pub mod bot_chatstate_s;
 pub mod bot_chattype_s;
+pub mod chat_consts;
+pub mod chat_cpp_consts;
 pub mod bot_matchpiece_s;
 pub mod bot_matchstring_s;
 pub mod bot_matchtemplate_s;

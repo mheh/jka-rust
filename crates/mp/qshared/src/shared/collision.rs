@@ -50,6 +50,23 @@ pub struct CollisionRecord_t {
     pub mBarycentricJ: c_float, // K = 1-I-J
 }
 
+// Plane types are used to speed some tests; 0-2 are axial planes and match
+// `cplane_t::r#type`'s `0,1,2 = axial` convention above.
+//
+// Source: `oracle/codemp/game/q_shared.h:1842-1846`
+
+/// Raven `PLANE_X`.
+/// Source: `oracle/codemp/game/q_shared.h:1844`
+pub const PLANE_X: c_int = 0;
+
+/// Raven `PLANE_Y`.
+/// Source: `oracle/codemp/game/q_shared.h:1845`
+pub const PLANE_Y: c_int = 1;
+
+/// Raven `PLANE_Z`.
+/// Source: `oracle/codemp/game/q_shared.h:1846`
+pub const PLANE_Z: c_int = 2;
+
 const _: () = assert!(core::mem::size_of::<cplane_t>() == 20);
 const _: () = assert!(core::mem::offset_of!(cplane_t, normal) == 0);
 const _: () = assert!(core::mem::offset_of!(cplane_t, dist) == 12);

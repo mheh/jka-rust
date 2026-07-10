@@ -6,6 +6,7 @@ pub mod add_electricity_arg;
 pub mod addbezier_arg;
 pub mod addpoly_arg;
 pub mod addsprite_arg;
+pub mod build_ident;
 pub mod cbuf_exec;
 pub mod collision;
 pub mod effect_trail_arg;
@@ -64,8 +65,9 @@ pub use add_electricity_arg::addElectricityArgStruct_t;
 pub use addbezier_arg::addbezierArgStruct_t;
 pub use addpoly_arg::addpolyArgStruct_t;
 pub use addsprite_arg::addspriteArgStruct_t;
+pub use build_ident::{CPUSTRING, MAC_STATIC, PATH_SEP, QDECL};
 pub use cbuf_exec::cbufExec_t;
-pub use collision::{cplane_t, CollisionRecord_t};
+pub use collision::{cplane_t, CollisionRecord_t, PLANE_X, PLANE_Y, PLANE_Z};
 pub use effect_trail_arg::effectTrailArgStruct_t;
 pub use effect_trail_vert::effectTrailVertStruct_t;
 pub use game_state::{gameState_t, MAX_CONFIGSTRINGS, MAX_GAMESTATE_CHARS};
@@ -92,8 +94,9 @@ pub use gen_cmds::genCmds_t;
 pub use hunk_pref::ha_pref;
 pub use item_use_fail::itemUseFail_t;
 pub use limits::{
-    BIG_INFO_STRING, ENTITYNUM_MAX_NORMAL, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS,
-    MAX_CLIENTS_I32, MAX_GENTITIES, MAX_INFO_STRING, MAX_STRING_CHARS,
+    BIG_INFO_STRING, ENTITYNUM_MAX_NORMAL, ENTITYNUM_NONE, ENTITYNUM_WORLD, GENTITYNUM_BITS,
+    MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_INFO_STRING, MAX_STRING_CHARS,
+    SNAPFLAG_SERVERCOUNT,
 };
 pub use mark_fragment::markFragment_t;
 pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};

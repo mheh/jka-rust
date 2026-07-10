@@ -4,6 +4,11 @@ use core::ffi::c_int;
 
 use super::sv_entity_s::svEntity_t;
 
+/// Raven `AREA_DEPTH` — max recursion depth of the world area bsp tree.
+///
+/// Type definition source: `oracle/codemp/server/sv_world.cpp:55`
+pub const AREA_DEPTH: c_int = 4;
+
 /// Raven `AREA_NODES`.
 ///
 /// Type definition source: `oracle/codemp/server/sv_world.cpp:56`
@@ -34,3 +39,9 @@ const _: () = assert!(core::mem::offset_of!(worldSector_t, entities) == 24);
 
 /// C tag `worldSector_s` is the same type as the `worldSector_t` typedef.
 pub type worldSector_s = worldSector_t;
+
+/// Raven `MAX_TOTAL_ENT_LEAFS` — max leafs an entity's bounding box can span
+/// in `SV_LinkEntity`.
+///
+/// Type definition source: `oracle/codemp/server/sv_world.cpp:188`
+pub const MAX_TOTAL_ENT_LEAFS: usize = 128;

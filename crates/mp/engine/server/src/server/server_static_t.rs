@@ -13,6 +13,12 @@ use super::client_s::client_s;
 /// Source: `oracle/codemp/server/server.h:190`
 pub const MAX_CHALLENGES: usize = 1024;
 
+/// Raven `AUTHORIZE_TIMEOUT` — milliseconds before a pending `challenge_t`
+/// authorize-server round-trip is dropped.
+///
+/// Source: `oracle/codemp/server/server.h:192`
+pub const AUTHORIZE_TIMEOUT: i32 = 5000;
+
 /// Raven `serverStatic_t`.
 ///
 /// Type definition source: `oracle/codemp/qcommon/../server/server.h:208-228`

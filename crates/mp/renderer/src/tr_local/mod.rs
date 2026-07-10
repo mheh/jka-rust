@@ -18,6 +18,7 @@ pub mod draw_buffer_command_t;
 pub mod draw_surf_s;
 pub mod draw_surfs_command_t;
 pub mod e_dlight_types;
+pub mod glext_consts;
 pub mod eglfog_override;
 pub mod end_frame_command_t;
 pub mod fog_parms_t;

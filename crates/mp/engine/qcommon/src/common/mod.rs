@@ -6,6 +6,7 @@
 
 pub mod boot_stubs;
 pub mod common;
+pub mod common_consts;
 pub mod error;
 pub mod journal;
 pub mod sys_event_queue;

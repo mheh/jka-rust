@@ -12,3 +12,4 @@ pub mod aas_settings_s;
 pub mod aas_stringindex_s;
 pub mod bsp_entdata_s;
 pub mod bsp_link_s;
+pub mod be_aas_def_consts;

@@ -25,8 +25,16 @@ pub const RANK_TIED_FLAG: c_int = 0x4000;
 
 // Config strings are a general means of communicating variable length
 // strings from the server to all connected clients.
-//
-// CS_SERVERINFO and CS_SYSTEMINFO are defined in q_shared.h.
+
+/// Raven `CS_SERVERINFO` — an info string with all the serverinfo cvars.
+///
+/// Source: `oracle/codemp/game/q_shared.h:2041`
+pub const CS_SERVERINFO: c_int = 0;
+/// Raven `CS_SYSTEMINFO` — an info string for server system to client system
+/// configuration (timescale, etc).
+///
+/// Source: `oracle/codemp/game/q_shared.h:2042`
+pub const CS_SYSTEMINFO: c_int = 1;
 
 /// Source: `oracle/codemp/game/bg_public.h:59`
 pub const CS_MUSIC: c_int = 2;

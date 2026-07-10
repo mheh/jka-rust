@@ -47,16 +47,85 @@ pub const SURF_NODLIGHT: c_int = 0x0080_0000; // don't dlight even if solid (sol
 pub const SURF_NOMISCENTS: c_int = 0x0100_0000; // no client models allowed on this surface
 
 // --- `surfaceflags.h` `MATERIAL_*` ground-material bits (surface type, packed
-// into `groundTrace.surfaceFlags` and masked out via `MATERIAL_MASK`). Only the
-// subset referenced by `bg_pmove.c`'s footstep/material handling is ported here;
-// add more `MATERIAL_*` values as they gain call sites.
+// into `groundTrace.surfaceFlags` and masked out via `MATERIAL_MASK`).
 // Source: `oracle/codemp/game/surfaceflags.h:51-86`
+pub const MATERIAL_BITS: c_int = 5;
 pub const MATERIAL_MASK: c_int = 0x1f;
-pub const MATERIAL_DIRT: c_int = 7;
-pub const MATERIAL_SAND: c_int = 8;
-pub const MATERIAL_GRAVEL: c_int = 9;
-pub const MATERIAL_SNOW: c_int = 14;
-pub const MATERIAL_MUD: c_int = 17;
+
+pub const MATERIAL_NONE: c_int = 0; // for when the artist hasn't set anything up =)
+pub const MATERIAL_SOLIDWOOD: c_int = 1; // freshly cut timber
+pub const MATERIAL_HOLLOWWOOD: c_int = 2; // termite infested creaky wood
+pub const MATERIAL_SOLIDMETAL: c_int = 3; // solid girders
+pub const MATERIAL_HOLLOWMETAL: c_int = 4; // hollow metal machines
+pub const MATERIAL_SHORTGRASS: c_int = 5; // manicured lawn
+pub const MATERIAL_LONGGRASS: c_int = 6; // long jungle grass
+pub const MATERIAL_DIRT: c_int = 7; // hard mud
+pub const MATERIAL_SAND: c_int = 8; // sandy beach
+pub const MATERIAL_GRAVEL: c_int = 9; // lots of small stones
+pub const MATERIAL_GLASS: c_int = 10;
+pub const MATERIAL_CONCRETE: c_int = 11; // hardened concrete pavement
+pub const MATERIAL_MARBLE: c_int = 12; // marble floors
+pub const MATERIAL_WATER: c_int = 13; // light covering of water on a surface
+pub const MATERIAL_SNOW: c_int = 14; // freshly laid snow
+pub const MATERIAL_ICE: c_int = 15; // packed snow/solid ice
+pub const MATERIAL_FLESH: c_int = 16; // hung meat, corpses in the world
+pub const MATERIAL_MUD: c_int = 17; // wet soil
+pub const MATERIAL_BPGLASS: c_int = 18; // bulletproof glass
+pub const MATERIAL_DRYLEAVES: c_int = 19; // dried up leaves on the floor
+pub const MATERIAL_GREENLEAVES: c_int = 20; // fresh leaves still on a tree
+pub const MATERIAL_FABRIC: c_int = 21; // Cotton sheets
+pub const MATERIAL_CANVAS: c_int = 22; // tent material
+pub const MATERIAL_ROCK: c_int = 23;
+pub const MATERIAL_RUBBER: c_int = 24; // hard tire like rubber
+pub const MATERIAL_PLASTIC: c_int = 25;
+pub const MATERIAL_TILES: c_int = 26; // tiled floor
+pub const MATERIAL_CARPET: c_int = 27; // lush carpet
+pub const MATERIAL_PLASTER: c_int = 28; // drywall style plaster
+pub const MATERIAL_SHATTERGLASS: c_int = 29; // glass with the Crisis Zone style shattering
+pub const MATERIAL_ARMOR: c_int = 30; // body armor
+pub const MATERIAL_COMPUTER: c_int = 31; // computers/electronic equipment
+pub const MATERIAL_LAST: c_int = 32; // number of materials
+
+/// Raven `MATERIALS` — parallel name table for the `MATERIAL_*` constants
+/// above, index-for-index (`"none"` = [`MATERIAL_NONE`], `"solidwood"` =
+/// [`MATERIAL_SOLIDWOOD`], ...). Defined as an X-macro in Raven "so one
+/// change will affect all the relevant files".
+///
+/// Source: `oracle/codemp/game/surfaceflags.h:90-123`
+pub const MATERIALS: [&str; 32] = [
+    "none",
+    "solidwood",
+    "hollowwood",
+    "solidmetal",
+    "hollowmetal",
+    "shortgrass",
+    "longgrass",
+    "dirt",
+    "sand",
+    "gravel",
+    "glass",
+    "concrete",
+    "marble",
+    "water",
+    "snow",
+    "ice",
+    "flesh",
+    "mud",
+    "bpglass",
+    "dryleaves",
+    "greenleaves",
+    "fabric",
+    "canvas",
+    "rock",
+    "rubber",
+    "plastic",
+    "tiles",
+    "carpet",
+    "plaster",
+    "shatterglass",
+    "armor",
+    "computer",
+];
 
 /// Raven `MASK_ALL`.
 ///

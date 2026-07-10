@@ -8,6 +8,22 @@ use core::ffi::c_int;
 
 use crate::shared::vec3_t;
 
+/// Raven `GFL_NONE` — no goal flags set.
+/// Source: `oracle/codemp/game/be_ai_goal.h:19`
+pub const GFL_NONE: c_int = 0;
+
+/// Raven `GFL_ITEM` — goal is an item.
+/// Source: `oracle/codemp/game/be_ai_goal.h:20`
+pub const GFL_ITEM: c_int = 1;
+
+/// Raven `GFL_ROAM` — goal is a roam goal.
+/// Source: `oracle/codemp/game/be_ai_goal.h:21`
+pub const GFL_ROAM: c_int = 2;
+
+/// Raven `GFL_DROPPED` — goal is a dropped item.
+/// Source: `oracle/codemp/game/be_ai_goal.h:22`
+pub const GFL_DROPPED: c_int = 4;
+
 /// Raven `bot_goal_t`.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]

@@ -2,6 +2,7 @@
 
 use core::ffi::c_char;
 
+use mp_engine_qcommon::qcommon::net_limits::{MAX_DOWNLOAD_WINDOW, MAX_RELIABLE_COMMANDS, PACKET_BACKUP};
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
@@ -13,22 +14,6 @@ use super::client_state_t::clientState_t;
 
 // `MAX_INFO_STRING` (`q_shared.h:384`) imported from its canonical home in
 // `mp_qshared::shared`.
-
-/// Raven `MAX_RELIABLE_COMMANDS` — max string commands buffered for retransmit.
-///
-/// Source: `oracle/codemp/qcommon/qcommon.h:106`
-const MAX_RELIABLE_COMMANDS: usize = 128;
-
-/// Raven `MAX_DOWNLOAD_WINDOW` — max of eight download frames.
-///
-/// Source: `oracle/codemp/qcommon/qcommon.h:155`
-const MAX_DOWNLOAD_WINDOW: usize = 8;
-
-/// Raven `PACKET_BACKUP` — number of old messages that must be kept on
-/// client and server for delta comparison and ping estimation.
-///
-/// Source: `oracle/codemp/qcommon/qcommon.h:98`
-const PACKET_BACKUP: usize = 32;
 
 /// Raven `client_t` — server-side per-client connection state.
 ///
