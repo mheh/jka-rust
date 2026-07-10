@@ -28,7 +28,7 @@ use mp_qshared::common::mp::qcommon::aas_areainfo::aas_areainfo_t;
 use mp_qshared::shared::surface_flags::{CONTENTS_PLAYERCLIP, CONTENTS_SOLID};
 use mp_qshared::shared::vec3_t;
 
-use native_types::{qboolean, qfalse, qtrue};
+use mp_qshared::shared::{qboolean, qfalse, qtrue};
 
 use crate::aasfile::aas_area_s::aas_area_t;
 use crate::aasfile::aas_edge_s::aas_edge_t;

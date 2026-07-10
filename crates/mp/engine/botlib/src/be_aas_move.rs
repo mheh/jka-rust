@@ -25,7 +25,7 @@
 use core::ffi::{c_char, c_int, c_void};
 
 use mp_engine_qcommon::common::Common;
-use mp_game::q_math::{
+use mp_qshared::shared::q_math::{
     vec3_origin, AngleVectors, VectorClear, VectorCompare, VectorLength, VectorNormalize, PITCH,
     ROLL, YAW,
 };

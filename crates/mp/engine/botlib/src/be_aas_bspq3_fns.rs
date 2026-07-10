@@ -49,7 +49,7 @@ use core::ffi::c_char;
 use core::ffi::c_int;
 use core::ffi::c_ulong;
 
-use native_types::{qboolean, qfalse, qtrue};
+use mp_qshared::shared::{qboolean, qfalse, qtrue};
 
 use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
 use mp_qshared::common::mp::botlib::print_type::PRT_MESSAGE;
@@ -66,36 +66,20 @@ use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
 use crate::BotLib;
 
 // ---------------------------------------------------------------------
-// Externally-ported callees this file reaches (signatures per their own
-// resolved-signature packets; ported in sibling packets outside this
-// shard — see `_PREAMBLE.md`'s stub-free / extern "Rust" forward-decl
-// convention already used by `l_script_fns.rs`/`be_aas_cluster_fns.rs`).
+// Externally-ported callees this file reaches: these already have real
+// (non-extern) definitions elsewhere in the crate (`l_script_fns.rs`/
+// `l_memory_fns.rs`) and `mp_engine_qcommon::common_fns` (`Com_Memcpy`/
+// `Com_Memset`), so they are imported rather than forward-declared via
+// `extern "Rust"` — `ScriptError` in particular is a real variadic Rust fn,
+// which `extern "Rust"` cannot express (E0045).
 // ---------------------------------------------------------------------
-extern "Rust" {
-    fn Com_Memcpy(dest: *mut (), src: *const (), count: usize);
-    fn Com_Memset(dest: *mut (), val: c_int, count: usize);
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut ());
-    fn ScriptError(bot: &mut BotLib, script: *mut script_t, str: *mut c_char, ...);
-    fn FreeScript(bot: &mut BotLib, script: *mut script_t);
-    fn GetClearedHunkMemory(bot: &mut BotLib, size: c_ulong) -> *mut ();
-    fn GetHunkMemory(bot: &mut BotLib, size: c_ulong) -> *mut ();
-    fn LoadScriptMemory(
-        bot: &mut BotLib,
-        ptr: *mut c_char,
-        length: c_int,
-        name: *mut c_char,
-    ) -> *mut script_t;
-    fn PS_ExpectTokenType(
-        bot: &mut BotLib,
-        script: *mut script_t,
-        r#type: c_int,
-        subtype: c_int,
-        token: *mut token_t,
-    ) -> c_int;
-    fn PS_ReadToken(bot: &mut BotLib, script: *mut script_t, token: *mut token_t) -> c_int;
-    fn SetScriptFlags(script: *mut script_t, flags: c_int);
-    fn StripDoubleQuotes(string: *mut c_char);
-}
+use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
+
+use crate::l_memory_fns::{FreeMemory, GetClearedHunkMemory, GetHunkMemory};
+use crate::l_script_fns::{
+    FreeScript, LoadScriptMemory, PS_ExpectTokenType, PS_ReadToken, ScriptError, SetScriptFlags,
+    StripDoubleQuotes,
+};
 
 /// Raven `AAS_Trace` — forward a bbox trace to the engine's `botimport`.
 ///

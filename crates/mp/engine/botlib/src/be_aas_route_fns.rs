@@ -17,8 +17,10 @@ use mp_qshared::common::mp::botlib::aas_route_stop_event::{
 use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE, PRT_WARNING};
 use mp_qshared::common::mp::botlib::travel_flags::{
-    TFL_AIR, TFL_BRIDGE, TFL_DEFAULT, TFL_DONOTENTER, TFL_INVALID, TFL_LAVA, TFL_NOTTEAM1,
-    TFL_NOTTEAM2, TFL_SLIME, TFL_WALK, TFL_WATER,
+    TFL_AIR, TFL_BARRIERJUMP, TFL_BFGJUMP, TFL_BRIDGE, TFL_CROUCH, TFL_DEFAULT, TFL_DONOTENTER,
+    TFL_DOUBLEJUMP, TFL_ELEVATOR, TFL_FUNCBOB, TFL_GRAPPLEHOOK, TFL_INVALID, TFL_JUMP, TFL_JUMPPAD,
+    TFL_LADDER, TFL_LAVA, TFL_NOTTEAM1, TFL_NOTTEAM2, TFL_RAMPJUMP, TFL_ROCKETJUMP, TFL_SLIME,
+    TFL_STRAFEJUMP, TFL_SWIM, TFL_TELEPORT, TFL_WALK, TFL_WALKOFFLEDGE, TFL_WATER, TFL_WATERJUMP,
 };
 use mp_qshared::shared::file_mode::{FS_READ, FS_WRITE};
 use mp_qshared::shared::{fileHandle_t, qboolean, qfalse, qtrue, vec3_t, MAX_QPATH};
@@ -35,32 +37,26 @@ use crate::aasfile::area_contents::{
 use crate::aasfile::area_flags::{AREA_BRIDGE, AREA_DISABLED};
 use crate::aasfile::presence_type::PRESENCE_CROUCH;
 use crate::aasfile::travel_type::{
-    MAX_TRAVELTYPES, TFL_BARRIERJUMP as TFL_BARRIERJUMP_IMPORT, TRAVELFLAG_NOTTEAM1,
-    TRAVELFLAG_NOTTEAM2, TRAVELTYPE_MASK, TRAVEL_BARRIERJUMP, TRAVEL_BFGJUMP, TRAVEL_CROUCH,
-    TRAVEL_DOUBLEJUMP, TRAVEL_ELEVATOR, TRAVEL_FUNCBOB, TRAVEL_GRAPPLEHOOK, TRAVEL_INVALID,
-    TRAVEL_JUMP, TRAVEL_JUMPPAD, TRAVEL_LADDER, TRAVEL_RAMPJUMP, TRAVEL_ROCKETJUMP,
-    TRAVEL_STRAFEJUMP, TRAVEL_SWIM, TRAVEL_TELEPORT, TRAVEL_WALK, TRAVEL_WALKOFFLEDGE,
-    TRAVEL_WATERJUMP,
+    MAX_TRAVELTYPES, TRAVELFLAG_NOTTEAM1, TRAVELFLAG_NOTTEAM2, TRAVELTYPE_MASK, TRAVEL_BARRIERJUMP,
+    TRAVEL_BFGJUMP, TRAVEL_CROUCH, TRAVEL_DOUBLEJUMP, TRAVEL_ELEVATOR, TRAVEL_FUNCBOB,
+    TRAVEL_GRAPPLEHOOK, TRAVEL_INVALID, TRAVEL_JUMP, TRAVEL_JUMPPAD, TRAVEL_LADDER,
+    TRAVEL_RAMPJUMP, TRAVEL_ROCKETJUMP, TRAVEL_STRAFEJUMP, TRAVEL_SWIM, TRAVEL_TELEPORT,
+    TRAVEL_WALK, TRAVEL_WALKOFFLEDGE, TRAVEL_WATERJUMP,
 };
 use crate::be_aas_def::aas_reachabilityareas_s::aas_reachabilityareas_t;
 use crate::be_aas_def::aas_reversedlink_s::aas_reversedlink_t;
 use crate::be_aas_def::aas_reversedreachability_s::aas_reversedreachability_t;
 use crate::be_aas_def::aas_routingcache_s::{aas_routingcache_t, CACHETYPE_AREA, CACHETYPE_PORTAL};
 use crate::be_aas_def::aas_routingupdate_s::aas_routingupdate_t;
+use crate::BotLib;
+use mp_engine_qcommon::common::Common;
 
-//TODO: Port BotLib
-// Source: oracle/codemp/botlib/be_interface.h (synthesized state aggregate, not yet landed)
-//TODO: Port Common
-// Source: oracle/codemp/qcommon/common.cpp (the `common: &mut Common` receiver, not yet landed)
-//
 // The `bot: &mut BotLib` / `common: &mut Common` receivers named in every
-// signature below are the campaign's threaded-state aggregates (ruling 2);
-// neither type exists in this worktree slice yet (`_PREAMBLE.md`'s "botlib
-// waves" note). Every reference to `aasworld`/`botimport`/`bot_developer`/
+// signature below are the campaign's threaded-state aggregates (ruling 2).
+// Every reference to `aasworld`/`botimport`/`bot_developer`/
 // `numareacacheupdates`/`numportalcacheupdates`/`routingcachesize`/
 // `max_routingcachesize` below is the exact Raven global name per house rule,
-// reached as a field on `bot` (or `common` where the packet says so) —
-// resolved when those aggregates land.
+// reached as a field on `bot` (or `common` where the packet says so).
 
 /// Raven `AAS_RoutingInfo` — prints routing cache statistics.
 ///
@@ -102,37 +98,23 @@ pub fn AAS_InitTravelFlagFromType(bot: &mut BotLib) {
     }
     bot.aasworld.travelflagfortype[TRAVEL_INVALID as usize] = TFL_INVALID;
     bot.aasworld.travelflagfortype[TRAVEL_WALK as usize] = TFL_WALK;
-    bot.aasworld.travelflagfortype[TRAVEL_CROUCH as usize] =
-        crate::aasfile::travel_type::TFL_CROUCH;
-    bot.aasworld.travelflagfortype[TRAVEL_BARRIERJUMP as usize] = TFL_BARRIERJUMP_IMPORT;
-    bot.aasworld.travelflagfortype[TRAVEL_JUMP as usize] = crate::aasfile::travel_type::TFL_JUMP;
-    bot.aasworld.travelflagfortype[TRAVEL_LADDER as usize] =
-        crate::aasfile::travel_type::TFL_LADDER;
-    bot.aasworld.travelflagfortype[TRAVEL_WALKOFFLEDGE as usize] =
-        crate::aasfile::travel_type::TFL_WALKOFFLEDGE;
-    bot.aasworld.travelflagfortype[TRAVEL_SWIM as usize] = crate::aasfile::travel_type::TFL_SWIM;
-    bot.aasworld.travelflagfortype[TRAVEL_WATERJUMP as usize] =
-        crate::aasfile::travel_type::TFL_WATERJUMP;
-    bot.aasworld.travelflagfortype[TRAVEL_TELEPORT as usize] =
-        crate::aasfile::travel_type::TFL_TELEPORT;
-    bot.aasworld.travelflagfortype[TRAVEL_ELEVATOR as usize] =
-        crate::aasfile::travel_type::TFL_ELEVATOR;
-    bot.aasworld.travelflagfortype[TRAVEL_ROCKETJUMP as usize] =
-        crate::aasfile::travel_type::TFL_ROCKETJUMP;
-    bot.aasworld.travelflagfortype[TRAVEL_BFGJUMP as usize] =
-        crate::aasfile::travel_type::TFL_BFGJUMP;
-    bot.aasworld.travelflagfortype[TRAVEL_GRAPPLEHOOK as usize] =
-        crate::aasfile::travel_type::TFL_GRAPPLEHOOK;
-    bot.aasworld.travelflagfortype[TRAVEL_DOUBLEJUMP as usize] =
-        crate::aasfile::travel_type::TFL_DOUBLEJUMP;
-    bot.aasworld.travelflagfortype[TRAVEL_RAMPJUMP as usize] =
-        crate::aasfile::travel_type::TFL_RAMPJUMP;
-    bot.aasworld.travelflagfortype[TRAVEL_STRAFEJUMP as usize] =
-        crate::aasfile::travel_type::TFL_STRAFEJUMP;
-    bot.aasworld.travelflagfortype[TRAVEL_JUMPPAD as usize] =
-        crate::aasfile::travel_type::TFL_JUMPPAD;
-    bot.aasworld.travelflagfortype[TRAVEL_FUNCBOB as usize] =
-        crate::aasfile::travel_type::TFL_FUNCBOB;
+    bot.aasworld.travelflagfortype[TRAVEL_CROUCH as usize] = TFL_CROUCH;
+    bot.aasworld.travelflagfortype[TRAVEL_BARRIERJUMP as usize] = TFL_BARRIERJUMP;
+    bot.aasworld.travelflagfortype[TRAVEL_JUMP as usize] = TFL_JUMP;
+    bot.aasworld.travelflagfortype[TRAVEL_LADDER as usize] = TFL_LADDER;
+    bot.aasworld.travelflagfortype[TRAVEL_WALKOFFLEDGE as usize] = TFL_WALKOFFLEDGE;
+    bot.aasworld.travelflagfortype[TRAVEL_SWIM as usize] = TFL_SWIM;
+    bot.aasworld.travelflagfortype[TRAVEL_WATERJUMP as usize] = TFL_WATERJUMP;
+    bot.aasworld.travelflagfortype[TRAVEL_TELEPORT as usize] = TFL_TELEPORT;
+    bot.aasworld.travelflagfortype[TRAVEL_ELEVATOR as usize] = TFL_ELEVATOR;
+    bot.aasworld.travelflagfortype[TRAVEL_ROCKETJUMP as usize] = TFL_ROCKETJUMP;
+    bot.aasworld.travelflagfortype[TRAVEL_BFGJUMP as usize] = TFL_BFGJUMP;
+    bot.aasworld.travelflagfortype[TRAVEL_GRAPPLEHOOK as usize] = TFL_GRAPPLEHOOK;
+    bot.aasworld.travelflagfortype[TRAVEL_DOUBLEJUMP as usize] = TFL_DOUBLEJUMP;
+    bot.aasworld.travelflagfortype[TRAVEL_RAMPJUMP as usize] = TFL_RAMPJUMP;
+    bot.aasworld.travelflagfortype[TRAVEL_STRAFEJUMP as usize] = TFL_STRAFEJUMP;
+    bot.aasworld.travelflagfortype[TRAVEL_JUMPPAD as usize] = TFL_JUMPPAD;
+    bot.aasworld.travelflagfortype[TRAVEL_FUNCBOB as usize] = TFL_FUNCBOB;
 }
 
 /// Raven `AAS_TravelFlagForType_inline`.
@@ -292,7 +274,7 @@ pub fn AAS_FreeRoutingCache(bot: &mut BotLib, cache: *mut aas_routingcache_t) {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:325-328`
 pub fn AAS_RoutingTime(bot: &mut BotLib) -> f32 {
-    crate::be_aas_route::AAS_Time(bot)
+    crate::be_aas_main::AAS_Time(bot)
 }
 
 /// Raven `AAS_AreaTravelTime`.
@@ -301,9 +283,9 @@ pub fn AAS_RoutingTime(bot: &mut BotLib) -> f32 {
 pub fn AAS_AreaTravelTime(bot: &mut BotLib, areanum: c_int, start: vec3_t, end: vec3_t) -> u16 {
     let dir = [start[0] - end[0], start[1] - end[1], start[2] - end[2]];
     let mut dist = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
-    if crate::be_aas_route::AAS_AreaCrouch(bot, areanum) != 0 {
+    if crate::be_aas_reach_fns::AAS_AreaCrouch(bot, areanum) != 0 {
         dist *= crate::be_aas_route::DISTANCEFACTOR_CROUCH;
-    } else if crate::be_aas_route::AAS_AreaSwim(bot, areanum) != 0 {
+    } else if crate::be_aas_reach_fns::AAS_AreaSwim(bot, areanum) != 0 {
         dist *= crate::be_aas_route::DISTANCEFACTOR_SWIM;
     } else {
         dist *= crate::be_aas_route::DISTANCEFACTOR_WALK;
@@ -499,9 +481,20 @@ pub fn AAS_ReachabilityFromNum(bot: &mut BotLib, num: c_int, reach: *mut aas_rea
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:2049-2056`
 pub fn DistancePointToLine(v1: vec3_t, v2: vec3_t, point: vec3_t) -> f32 {
-    let p2 = crate::be_aas_route::AAS_ProjectPointOntoVector(point, v1, v2);
+    // PORT-NOTE(vProj): `AAS_ProjectPointOntoVector`'s resolved signature takes
+    // `vProj` by value (see its own PORT-NOTE), so it cannot write back through
+    // this call; matches the documented shape mismatch there.
+    let p2: vec3_t = [0.0, 0.0, 0.0];
+    crate::be_aas_main::AAS_ProjectPointOntoVector(point, v1, v2, p2);
     let vec = [point[0] - p2[0], point[1] - p2[1], point[2] - p2[2]];
     (vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]).sqrt()
+}
+
+/// Raven `AAS_AreaVisible` — always false (stub; visarea data is never built).
+///
+/// Source: `oracle/codemp/botlib/be_aas_route.cpp:2039-2042`
+pub fn AAS_AreaVisible(_srcarea: c_int, _destarea: c_int) -> c_int {
+    qfalse
 }
 
 /// Raven `AAS_RemoveRoutingCacheInCluster` — frees all per-area cache in a cluster.
@@ -894,7 +887,9 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
         let mut fp: fileHandle_t = 0;
         bot.botimport.FS_FOpenFile(&filename, &mut fp, FS_WRITE);
         if fp == 0 {
-            crate::be_aas_route::AAS_Error(bot, &format!("Unable to open file: {}\n", filename));
+            let msg = std::ffi::CString::new(format!("Unable to open file: {}\n", filename))
+                .unwrap_or_default();
+            crate::be_aas_main::AAS_Error(bot, msg.as_ptr() as *mut core::ffi::c_char);
             return;
         }
 
@@ -976,18 +971,18 @@ pub fn AAS_ReadRouteCache(bot: &mut BotLib) -> c_int {
             fp,
         );
         if routecacheheader.ident != crate::be_aas_route::RCID {
-            crate::be_aas_route::AAS_Error(bot, "%s is not a route cache dump\n");
+            let msg = c"%s is not a route cache dump\n";
+            crate::be_aas_main::AAS_Error(bot, msg.as_ptr() as *mut core::ffi::c_char);
             return qfalse;
         }
         if routecacheheader.version != crate::be_aas_route::RCVERSION {
-            crate::be_aas_route::AAS_Error(
-                bot,
-                &format!(
-                    "route cache dump has wrong version {}, should be {}",
-                    routecacheheader.version,
-                    crate::be_aas_route::RCVERSION
-                ),
-            );
+            let msg = std::ffi::CString::new(format!(
+                "route cache dump has wrong version {}, should be {}",
+                routecacheheader.version,
+                crate::be_aas_route::RCVERSION
+            ))
+            .unwrap_or_default();
+            crate::be_aas_main::AAS_Error(bot, msg.as_ptr() as *mut core::ffi::c_char);
             return qfalse;
         }
         if routecacheheader.numareas != bot.aasworld.numareas {
@@ -1075,7 +1070,7 @@ pub fn AAS_InitReachabilityAreas(bot: &mut BotLib) {
     bot.aasworld.reachabilityareaindex = crate::l_memory::GetClearedMemory(
         bot,
         bot.aasworld.reachabilitysize
-            * crate::be_aas_route::MAX_REACHABILITYPASSAREAS
+            * crate::be_aas_route::MAX_REACHABILITYPASSAREAS as c_int
             * std::mem::size_of::<c_int>() as c_int,
     ) as *mut c_int;
 
@@ -1087,35 +1082,35 @@ pub fn AAS_InitReachabilityAreas(bot: &mut BotLib) {
             t if t == TRAVEL_BARRIERJUMP || t == TRAVEL_WATERJUMP => {
                 let mut end = reach.start;
                 end[2] = reach.end[2];
-                numareas = crate::be_aas_route::AAS_TraceAreas(
+                numareas = crate::be_aas_sample_fns::AAS_TraceAreas(
                     bot,
                     reach.start,
                     end,
-                    &mut areas,
-                    None,
-                    crate::be_aas_route::MAX_REACHABILITYPASSAREAS,
+                    areas.as_mut_ptr(),
+                    std::ptr::null_mut(),
+                    crate::be_aas_route::MAX_REACHABILITYPASSAREAS as c_int,
                 );
             }
             t if t == TRAVEL_WALKOFFLEDGE => {
                 let mut start = reach.end;
                 start[2] = reach.start[2];
-                numareas = crate::be_aas_route::AAS_TraceAreas(
+                numareas = crate::be_aas_sample_fns::AAS_TraceAreas(
                     bot,
                     start,
                     reach.end,
-                    &mut areas,
-                    None,
-                    crate::be_aas_route::MAX_REACHABILITYPASSAREAS,
+                    areas.as_mut_ptr(),
+                    std::ptr::null_mut(),
+                    crate::be_aas_route::MAX_REACHABILITYPASSAREAS as c_int,
                 );
             }
             t if t == TRAVEL_GRAPPLEHOOK => {
-                numareas = crate::be_aas_route::AAS_TraceAreas(
+                numareas = crate::be_aas_sample_fns::AAS_TraceAreas(
                     bot,
                     reach.start,
                     reach.end,
-                    &mut areas,
-                    None,
-                    crate::be_aas_route::MAX_REACHABILITYPASSAREAS,
+                    areas.as_mut_ptr(),
+                    std::ptr::null_mut(),
+                    crate::be_aas_route::MAX_REACHABILITYPASSAREAS as c_int,
                 );
             }
             t if t == TRAVEL_JUMP
@@ -1226,10 +1221,14 @@ pub fn AAS_NearestHideArea(
                         (*reach).start,
                     );
 
-                let p = crate::be_aas_route::AAS_ProjectPointOntoVector(
+                // PORT-NOTE(vProj): see `DistancePointToLine` above — the resolved
+                // signature cannot write back through this call.
+                let p: vec3_t = [0.0, 0.0, 0.0];
+                crate::be_aas_main::AAS_ProjectPointOntoVector(
                     enemyorigin,
                     (*curupdate).start,
                     (*reach).end,
+                    p,
                 );
                 let mut j = 0;
                 while j < 3 {
@@ -1267,9 +1266,7 @@ pub fn AAS_NearestHideArea(
                 if dist2 < dist1 {
                     t += ((dist1 - dist2) * 10.0) as u16;
                 }
-                if start_visible == qfalse
-                    && crate::be_aas_route::AAS_AreaVisible(bot, enemyareanum, nextareanum) != 0
-                {
+                if start_visible == qfalse && AAS_AreaVisible(enemyareanum, nextareanum) != 0 {
                     continue;
                 }
                 if besttraveltime != 0 && t >= besttraveltime {
@@ -1277,7 +1274,7 @@ pub fn AAS_NearestHideArea(
                 }
                 let existing = *bot.hidetraveltimes.add(nextareanum as usize);
                 if existing == 0 || existing > t {
-                    if crate::be_aas_route::AAS_AreaVisible(bot, enemyareanum, nextareanum) == 0 {
+                    if AAS_AreaVisible(enemyareanum, nextareanum) == 0 {
                         besttraveltime = t;
                         bestarea = nextareanum;
                     }
@@ -1671,8 +1668,8 @@ pub fn AAS_AreaRouteToGoalArea(
                 break;
             }
         }
-        if crate::be_aas_route::AAS_AreaDoNotEnter(bot, areanum) != 0
-            || crate::be_aas_route::AAS_AreaDoNotEnter(bot, goalareanum) != 0
+        if crate::be_aas_reach_fns::AAS_AreaDoNotEnter(bot, areanum) != 0
+            || crate::be_aas_reach_fns::AAS_AreaDoNotEnter(bot, goalareanum) != 0
         {
             travelflags |= TFL_DONOTENTER;
         }
@@ -1845,14 +1842,14 @@ pub fn AAS_CreateAllRoutingCache(bot: &mut BotLib) {
     bot.botimport
         .Print(PRT_MESSAGE, "AAS_CreateAllRoutingCache\n");
     for i in 1..bot.aasworld.numareas {
-        if crate::be_aas_route::AAS_AreaReachability(bot, i) == 0 {
+        if crate::be_aas_reach_fns::AAS_AreaReachability(bot, i) == 0 {
             continue;
         }
         for j in 1..bot.aasworld.numareas {
             if i == j {
                 continue;
             }
-            if crate::be_aas_route::AAS_AreaReachability(bot, j) == 0 {
+            if crate::be_aas_reach_fns::AAS_AreaReachability(bot, j) == 0 {
                 continue;
             }
             let _t = AAS_AreaTravelTimeToGoalArea(
@@ -2000,7 +1997,7 @@ pub fn AAS_RandomGoalArea(
     goalorigin: *mut vec3_t,
 ) -> c_int {
     unsafe {
-        if crate::be_aas_route::AAS_AreaReachability(bot, areanum) == 0 {
+        if crate::be_aas_reach_fns::AAS_AreaReachability(bot, areanum) == 0 {
             return qfalse;
         }
         // `random()` (libc, [0,1) via ruling 21's rand family): the engine LCG
@@ -2015,7 +2012,7 @@ pub fn AAS_RandomGoalArea(
             if n >= bot.aasworld.numareas {
                 n = 1;
             }
-            if crate::be_aas_route::AAS_AreaReachability(bot, n) != 0 {
+            if crate::be_aas_reach_fns::AAS_AreaReachability(bot, n) != 0 {
                 let t = AAS_AreaTravelTimeToGoalArea(
                     bot,
                     areanum,
@@ -2024,24 +2021,23 @@ pub fn AAS_RandomGoalArea(
                     travelflags,
                 );
                 if t > 0 {
-                    if crate::be_aas_route::AAS_AreaSwim(bot, n) != 0 {
+                    if crate::be_aas_reach_fns::AAS_AreaSwim(bot, n) != 0 {
                         *goalareanum = n;
                         *goalorigin = bot.aasworld.areas[n as usize].center;
                         return qtrue;
                     }
                     let mut start = bot.aasworld.areas[n as usize].center;
-                    if crate::be_aas_route::AAS_PointAreaNum(bot, start) == 0 {
-                        crate::be_aas_route::Log_Write(
-                            bot,
-                            &format!(
-                                "area {} center {} {} {} in solid?",
-                                n, start[0], start[1], start[2]
-                            ),
-                        );
+                    if crate::be_aas_sample_fns::AAS_PointAreaNum(bot, start) == 0 {
+                        let msg = std::ffi::CString::new(format!(
+                            "area {} center {} {} {} in solid?",
+                            n, start[0], start[1], start[2]
+                        ))
+                        .unwrap_or_default();
+                        crate::l_log_fns::Log_Write(bot, msg.as_ptr() as *mut std::os::raw::c_char);
                     }
                     let mut end = start;
                     end[2] -= 300.0;
-                    let trace = crate::be_aas_route::AAS_TraceClientBBox(
+                    let trace = crate::be_aas_sample_fns::AAS_TraceClientBBox(
                         bot,
                         start,
                         end,
@@ -2050,9 +2046,9 @@ pub fn AAS_RandomGoalArea(
                     );
                     if trace.startsolid == qfalse
                         && trace.fraction < 1.0
-                        && crate::be_aas_route::AAS_PointAreaNum(bot, trace.endpos) == n
+                        && crate::be_aas_sample_fns::AAS_PointAreaNum(bot, trace.endpos) == n
                     {
-                        if crate::be_aas_route::AAS_AreaGroundFaceArea(bot, n) > 300.0 {
+                        if crate::be_aas_reach_fns::AAS_AreaGroundFaceArea(bot, n) > 300.0 {
                             *goalareanum = n;
                             *goalorigin = trace.endpos;
                             return qtrue;

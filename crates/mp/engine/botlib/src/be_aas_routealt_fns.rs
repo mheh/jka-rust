@@ -48,7 +48,7 @@ use mp_qshared::common::mp::botlib::aas_altroutegoal_s::aas_altroutegoal_t;
 // convention already used by `l_script_fns.rs`/`be_ai_goal_fns.rs`/
 // `be_aas_cluster_fns.rs`).
 // ---------------------------------------------------------------------
-extern "Rust" {
+extern "C" {
     fn Log_Write(bot: &mut BotLib, fmt: *mut core::ffi::c_char, ...);
     fn GetMemory(bot: &mut BotLib, size: c_int) -> *mut c_void;
     fn FreeMemory(bot: &mut BotLib, ptr: *mut c_void);

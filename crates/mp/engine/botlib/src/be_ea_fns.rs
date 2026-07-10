@@ -1,5 +1,3 @@
-/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/engine-cpass/crates/mp/engine/botlib/src/be_ea_fns.rs:
-
 #![allow(non_camel_case_types, non_snake_case, unused_variables)]
 
 //! MP botlib `be_ea.cpp` — the elementary-action layer: bots write their

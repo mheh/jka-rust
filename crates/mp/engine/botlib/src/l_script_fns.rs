@@ -43,24 +43,27 @@ use crate::l_script::script_s::script_t;
 use crate::l_script::token_s::token_t;
 use crate::BotLib;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_WARNING};
-use mp_qshared::shared::fsMode_t::FS_READ;
-use mp_qshared::shared::{qfalse, qtrue};
-use native_types::{fileHandle_t, MAX_QPATH};
+use mp_qshared::shared::{fileHandle_t, qfalse, qtrue, FS_READ, MAX_QPATH};
 
 // ---------------------------------------------------------------------
 // Externally-ported callees this file reaches (signatures inferred from
 // the Raven call sites; ported in sibling packets outside this shard).
 // PORT-NOTE(callee-signatures): see module doc comment.
 // ---------------------------------------------------------------------
+use crate::l_memory_fns::{FreeMemory, GetClearedMemory, GetMemory};
+use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
+
 extern "Rust" {
-    fn GetMemory(bot: &mut BotLib, size: usize) -> *mut c_void;
-    fn GetClearedMemory(bot: &mut BotLib, size: usize) -> *mut c_void;
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut c_void);
-    fn Com_Memset(dest: *mut (), val: c_int, count: usize);
-    fn Com_Memcpy(dest: *mut (), src: *const (), count: usize);
     fn Com_sprintf(dest: *mut c_char, size: c_int, s: &str);
     fn COM_Compress(data_p: *mut c_char) -> c_int;
 }
+
+// Raven's `long double` has no Rust equivalent; `f64` matches every existing
+// use here (parsed/stored as a plain float, never relying on 80-bit extended
+// precision).
+// Source: `oracle/codemp/botlib/l_script.cpp` (multiple `long double` locals)
+#[allow(non_camel_case_types)]
+type long_double = f64;
 
 /// Raven `PunctuationFromNum` — look up a punctuation's text by its number.
 ///
@@ -438,9 +441,10 @@ pub fn PS_CreatePunctuationTable(
     unsafe {
         // get memory for the table
         if (*script).punctuationtable.is_null() {
-            (*script).punctuationtable =
-                GetMemory(bot, 256 * core::mem::size_of::<*mut punctuation_t>())
-                    as *mut *mut punctuation_t;
+            (*script).punctuationtable = GetMemory(
+                bot,
+                (256 * core::mem::size_of::<*mut punctuation_t>()) as c_ulong,
+            ) as *mut *mut punctuation_t;
         }
         Com_Memset(
             (*script).punctuationtable as *mut (),
@@ -858,7 +862,7 @@ pub fn ScriptSkipTo(script: *mut script_t, value: *mut c_char) -> c_int {
 /// per §C10.
 pub fn FreeScript(bot: &mut BotLib, script: *mut script_t) {
     unsafe {
-        FreeMemory(bot, script as *mut c_void);
+        FreeMemory(bot, script as *mut ());
     }
 }
 
@@ -1167,7 +1171,10 @@ pub fn LoadScriptFile(bot: &mut BotLib, filename: *const c_char) -> *mut script_
             return core::ptr::null_mut();
         }
 
-        let buffer = GetClearedMemory(bot, core::mem::size_of::<script_t>() + length as usize + 1);
+        let buffer = GetClearedMemory(
+            bot,
+            (core::mem::size_of::<script_t>() + length as usize + 1) as c_ulong,
+        );
         let script = buffer as *mut script_t;
         Com_Memset(script as *mut (), 0, core::mem::size_of::<script_t>());
         libc::strcpy((*script).filename.as_mut_ptr(), filename);
@@ -1205,7 +1212,10 @@ pub fn LoadScriptMemory(
     name: *mut c_char,
 ) -> *mut script_t {
     unsafe {
-        let buffer = GetClearedMemory(bot, core::mem::size_of::<script_t>() + length as usize + 1);
+        let buffer = GetClearedMemory(
+            bot,
+            (core::mem::size_of::<script_t>() + length as usize + 1) as c_ulong,
+        );
         let script = buffer as *mut script_t;
         Com_Memset(script as *mut (), 0, core::mem::size_of::<script_t>());
         libc::strcpy((*script).filename.as_mut_ptr(), name);

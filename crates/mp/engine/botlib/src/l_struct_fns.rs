@@ -32,6 +32,7 @@ use mp_qshared::shared::{qfalse, qtrue};
 use native_types::qboolean;
 
 use crate::l_precomp::source_s::source_t;
+use crate::BotLib;
 use crate::l_script::consts::{TT_LITERAL, TT_NUMBER, TT_PUNCTUATION};
 use crate::l_script::token_s::token_t;
 use crate::l_struct::fielddef_s::fielddef_t;

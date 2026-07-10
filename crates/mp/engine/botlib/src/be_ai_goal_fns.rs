@@ -37,7 +37,7 @@ use mp_qshared::common::mp::qcommon::bot_goal::{bot_goal_t, GFL_DROPPED, GFL_ITE
 use mp_qshared::shared::limits::MAX_CLIENTS;
 use mp_qshared::shared::surface_flags::{CONTENTS_PLAYERCLIP, CONTENTS_SOLID, CONTENTS_WATER};
 use mp_qshared::shared::vec3_t;
-use mp_qshared::{qfalse, qtrue};
+use mp_qshared::shared::{qfalse, qtrue};
 
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::gametype::{GT_SINGLE_PLAYER, GT_TEAM};
@@ -65,7 +65,7 @@ use crate::BotLib;
 // the Raven call sites; ported in sibling packets outside this shard).
 // PORT-NOTE(callee-signatures): see module doc comment.
 // ---------------------------------------------------------------------
-extern "Rust" {
+extern "C" {
     fn FreeMemory(bot: &mut BotLib, ptr: *mut ());
     fn GetClearedMemory(bot: &mut BotLib, size: c_ulong) -> *mut ();
     fn GetClearedHunkMemory(bot: &mut BotLib, size: c_ulong) -> *mut ();
@@ -497,12 +497,13 @@ pub fn BotDumpAvoidGoals(bot: &mut BotLib, goalstate: c_int) {
         unsafe {
             if (*gs).avoidgoaltimes[i] >= AAS_Time(bot) {
                 BotGoalName(bot, (*gs).avoidgoals[i], name.as_mut_ptr(), 32);
+                let remaining = (*gs).avoidgoaltimes[i] - AAS_Time(bot);
                 Log_Write(
                     bot,
                     c"avoid goal %s, number %d for %f seconds".as_ptr() as *mut c_char,
                     name.as_ptr(),
                     (*gs).avoidgoals[i],
-                    (*gs).avoidgoaltimes[i] - AAS_Time(bot),
+                    remaining as core::ffi::c_double,
                 );
             }
         }

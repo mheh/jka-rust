@@ -57,7 +57,7 @@ pub fn SV_ResetPureClient_f(cl: *mut client_t) {
 /// Raven `SV_UserinfoChanged`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:1452-1500`
-pub fn SV_UserinfoChanged(common: &mut Common, cl: *mut client_t) {
+pub fn SV_UserinfoChanged(common: &mut Common, host: &mut dyn EngineHost, cl: *mut client_t) {
     unsafe {
         let name = mp_qshared::shared::Info_ValueForKey(
             (*cl).userinfo.as_mut_ptr(),
@@ -67,7 +67,7 @@ pub fn SV_UserinfoChanged(common: &mut Common, cl: *mut client_t) {
 
         // if the client is on the same subnet as the server and we aren't running an
         // internet public server, assume they don't need a rate choke
-        if mp_qshared::shared::sys_shared::Sys_IsLANAddress((*cl).netchan.remoteAddress) == qtrue
+        if host.is_lan_address(&(*cl).netchan.remoteAddress)
             && mp_engine_qcommon::cvar::com_dedicated(common).integer != 2
         {
             // lans should not rate limit
@@ -127,7 +127,12 @@ pub fn SV_UserinfoChanged(common: &mut Common, cl: *mut client_t) {
 /// Raven `SV_GetChallenge`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:31-130`
-pub fn SV_GetChallenge(common: &mut Common, sv: &mut Server, from: netadr_t) {
+pub fn SV_GetChallenge(
+    common: &mut Common,
+    sv: &mut Server,
+    host: &mut dyn EngineHost,
+    from: netadr_t,
+) {
     if mp_engine_qcommon::cvar::Cvar_VariableValue(
         common,
         c"ui_singlePlayerActive".as_ptr() as *const c_char,
@@ -174,7 +179,7 @@ pub fn SV_GetChallenge(common: &mut Common, sv: &mut Server, from: netadr_t) {
     let challenge = &mut sv.svs.challenges[i];
 
     // if they are on a lan address, send the challengeResponse immediately
-    if mp_qshared::shared::sys_shared::Sys_IsLANAddress(from) == qtrue {
+    if host.is_lan_address(&from) {
         challenge.pingTime = sv.svs.time;
         mp_engine_qcommon::net::NET_OutOfBandPrint(
             common,
@@ -417,7 +422,12 @@ pub fn SV_Disconnect_f(common: &mut Common, sv: &mut Server, cl: *mut client_t) 
 /// Raven `SV_UpdateUserinfo_f`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:1510-1535`
-pub fn SV_UpdateUserinfo_f(common: &mut Common, sv: &mut Server, cl: *mut client_t) {
+pub fn SV_UpdateUserinfo_f(
+    common: &mut Common,
+    sv: &mut Server,
+    host: &mut dyn EngineHost,
+    cl: *mut client_t,
+) {
     unsafe {
         mp_qshared::shared::Q_strncpyz(
             (*cl).userinfo.as_mut_ptr(),
@@ -431,15 +441,14 @@ pub fn SV_UpdateUserinfo_f(common: &mut Common, sv: &mut Server, cl: *mut client
         (*cl).lastUserInfoChange =
             sv.svs.time + mp_engine_server::sv_client_userinfo::INFO_CHANGE_MIN_INTERVAL;
 
-        SV_UserinfoChanged(common, cl);
+        SV_UserinfoChanged(common, host, cl);
         // call prog code to allow overrides
         let client_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
-        mp_engine_qcommon::vm::VM_Call(
-            common,
-            sv.gvm,
+        host.vm_call(
+            mp_host_interface::VmSlot::Gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_USERINFO_CHANGED as c_int,
-            &[client_num],
+            &[client_num as isize],
         );
     }
 }
@@ -464,7 +473,11 @@ pub struct ucmd_t {
 /// (integration-time shape conflict, reported in `shape_mismatches`).
 pub fn SV_ExecuteClientCommand(
     common: &mut Common,
+    cm: &mut CollisionWorld,
     sv: &mut Server,
+    rm: &mut RenderModels,
+    rmg: &mut RmManager,
+    host: &mut dyn EngineHost,
     cl: *mut client_t,
     s: *const c_char,
     clientOK: qboolean,
@@ -518,11 +531,10 @@ pub fn SV_ExecuteClientCommand(
                 ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
                     / core::mem::size_of::<client_t>() as isize) as c_int
             };
-            mp_engine_qcommon::vm::VM_Call(
-                common,
-                sv.gvm,
+            host.vm_call(
+                mp_host_interface::VmSlot::Gvm,
                 mp_abi::game::exports::MpGameExport::GAME_CLIENT_COMMAND as c_int,
-                &[client_num],
+                &[client_num as isize],
             );
         }
     }
@@ -822,7 +834,7 @@ pub fn SV_DirectConnect(
             sv.svs.challenges[i].connected = qtrue;
 
             // never reject a LAN client based on ping
-            if mp_qshared::shared::sys_shared::Sys_IsLANAddress(from) == qfalse {
+            if !host.is_lan_address(&from) {
                 let min_ping = mp_engine_qcommon::cvar::sv_minPing(common).value;
                 if min_ping != 0.0 && (ping as f32) < min_ping {
                     // don't let them keep trying until they get a big delay
@@ -930,11 +942,10 @@ pub fn SV_DirectConnect(
                     let cl_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
                         / core::mem::size_of::<client_t>() as isize)
                         as c_int;
-                    mp_engine_qcommon::vm::VM_Call(
-                        common,
-                        sv.gvm,
+                    host.vm_call(
+                        mp_host_interface::VmSlot::Gvm,
                         mp_abi::game::exports::MpGameExport::GAME_CLIENT_DISCONNECT as c_int,
-                        &[cl_num],
+                        &[cl_num as isize],
                     );
                     found = true;
                     break;
@@ -1061,14 +1072,18 @@ pub fn SV_DirectConnect(
         );
 
         // get the game a chance to reject this connection or modify the userinfo
-        let mut denied = mp_engine_qcommon::vm::VM_Call(
-            common,
-            sv.gvm,
+        let denied = host.vm_call(
+            mp_host_interface::VmSlot::Gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_CONNECT as c_int,
-            &[client_num, qtrue, qfalse], // firstTime = qtrue
+            &[client_num as isize, qtrue as isize, qfalse as isize], // firstTime = qtrue
         );
         if denied != 0 {
             // we can't just use VM_ArgPtr, because that is only valid inside a VM_Call
+            //TODO: Port VM_ExplicitArgPtr
+            // Source: oracle/codemp/qcommon/vm.cpp — EngineHost has no VM
+            // shared-memory arg-ptr accessor yet (only vm_call's isize
+            // return); resolving the denied-connect reason string needs
+            // that seam, escalated rather than guessed.
             let denied_ptr =
                 mp_engine_qcommon::vm::VM_ExplicitArgPtr(common, sv.gvm, denied) as *const c_char;
             mp_engine_qcommon::net::NET_OutOfBandPrint(
@@ -1090,7 +1105,7 @@ pub fn SV_DirectConnect(
             return;
         }
 
-        SV_UserinfoChanged(common, cl_ptr);
+        SV_UserinfoChanged(common, host, cl_ptr);
 
         // send the connect packet to the client
         mp_engine_qcommon::net::NET_OutOfBandPrint(
@@ -1568,7 +1583,11 @@ pub fn SV_DoneDownload_f(
 /// Source: `oracle/codemp/server/sv_client.cpp:1590-1639`
 pub fn SV_ClientCommand(
     common: &mut Common,
+    cm: &mut CollisionWorld,
     sv: &mut Server,
+    rm: &mut RenderModels,
+    rmg: &mut RmManager,
+    host: &mut dyn EngineHost,
     cl: *mut client_t,
     msg: *mut msg_t,
 ) -> qboolean {
@@ -1634,7 +1653,7 @@ pub fn SV_ClientCommand(
         // don't allow another command for one second
         (*cl).nextReliableTime = sv.svs.time + 1000;
 
-        SV_ExecuteClientCommand(common, sv, cl, s, client_ok);
+        SV_ExecuteClientCommand(common, cm, sv, rm, rmg, host, cl, s, client_ok);
 
         (*cl).lastClientCommand = seq;
         let s_str = core::ffi::CStr::from_ptr(s).to_string_lossy();
@@ -1829,7 +1848,7 @@ pub fn SV_ExecuteClientMessage(
             if c != mp_engine_qcommon::qcommon::clc_ops_e::clc_ops_e::clc_clientCommand as c_int {
                 break;
             }
-            if SV_ClientCommand(common, sv, cl, msg) == qfalse {
+            if SV_ClientCommand(common, cm, sv, rm, rmg, host, cl, msg) == qfalse {
                 return; // we couldn't execute it because of the flood protection
             }
             if (*cl).state == clientState_t::CS_ZOMBIE {

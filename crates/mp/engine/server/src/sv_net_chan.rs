@@ -32,7 +32,7 @@ pub fn SV_Netchan_Decode(common: &mut Common, client: *mut client_t, msg: *mut m
         (*msg).readcount = srdc;
 
         let string: *mut u8 = (*client).reliableCommands
-            [(reliable_acknowledge & (MAX_RELIABLE_COMMANDS - 1)) as usize]
+            [(reliable_acknowledge as usize) & (MAX_RELIABLE_COMMANDS - 1)]
             .as_mut_ptr() as *mut u8;
         let mut index: i32 = 0;
 

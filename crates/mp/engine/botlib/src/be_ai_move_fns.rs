@@ -14,7 +14,7 @@
 //! Source-cited per fn. Vector macros expand to the ported q_math surface
 //! (`_VectorSubtract`/`_VectorCopy`/… mirror the mp_game names, NAV-D6 home).
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{c_char, c_int, c_ulong};
 
 use crate::aasfile::aas_reachability_s::aas_reachability_t;
 use crate::aasfile::presence_type::{PRESENCE_CROUCH, PRESENCE_NORMAL};
@@ -44,8 +44,10 @@ use crate::be_ai_move::move_consts::{
 use crate::BotLib;
 
 use mp_engine_qcommon::common::Common;
+use mp_engine_qcommon::common_fns::Com_Memset;
 use mp_qshared::shared::limits::MAX_MODELS;
-use mp_game::q_math::PITCH;
+use mp_qshared::shared::q_math::PITCH;
+use mp_qshared::shared::Q_stricmp;
 use mp_qshared::common::mp::botlib::aas_clientmove_s::aas_clientmove_t;
 use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_t;
 use mp_qshared::common::mp::botlib::aas_stop_event::{
@@ -72,11 +74,40 @@ use mp_qshared::shared::surface_flags::{
 };
 use mp_qshared::shared::{qboolean, qfalse, qtrue, vec2_t, vec3_t};
 
+use crate::be_aas_bspq3_fns::{
+    AAS_BSPModelMinsMaxsOrigin, AAS_NextBSPEntity, AAS_PointContents, AAS_Trace,
+    AAS_ValueForBSPEpairKey,
+};
+use crate::be_aas_entity::{
+    AAS_EntityInfo, AAS_EntityModelNum, AAS_EntityModelindex, AAS_EntityType, AAS_NextEntity,
+    AAS_OriginOfMoverWithModelNum,
+};
+use crate::be_aas_main::{AAS_ProjectPointOntoVector, AAS_Time};
+use crate::be_aas_move::{
+    AAS_AgainstLadder, AAS_HorizontalVelocityForJump, AAS_JumpReachRunStart, AAS_OnGround,
+    AAS_PredictClientMovement, AAS_Swimming,
+};
+use crate::be_aas_reach_fns::{AAS_AreaDoNotEnter, AAS_AreaJumpPad, AAS_AreaReachability};
+use crate::be_aas_route_fns::{
+    AAS_AreaContentsTravelFlags, AAS_AreaTravelTimeToGoalArea, AAS_NextAreaReachability,
+    AAS_NextModelReachability, AAS_ReachabilityFromNum, AAS_TravelFlagForType,
+};
+use crate::be_aas_sample_fns::{
+    AAS_AreaPresenceType, AAS_PointAreaNum, AAS_PresenceTypeBoundingBox, AAS_TraceAreas,
+    AAS_TraceClientBBox,
+};
+use crate::be_ea_fns::{
+    EA_Attack, EA_Command, EA_Crouch, EA_DelayedJump, EA_Jump, EA_Move, EA_MoveForward, EA_MoveUp,
+    EA_SelectWeapon, EA_View, EA_Walk,
+};
+use crate::l_libvar_fns::LibVar;
+use crate::l_memory_fns::{FreeMemory, GetClearedMemory};
+
 /// Raven `BotMoveStateFromHandle`.
 /// Source: `oracle/codemp/botlib/be_ai_move.cpp:151-164`
 pub fn BotMoveStateFromHandle(bot: &mut BotLib, handle: c_int) -> *mut bot_movestate_t {
     unsafe {
-        if handle <= 0 || handle > MAX_CLIENTS {
+        if handle <= 0 || handle > MAX_CLIENTS as c_int {
             (bot.botimport.Print.unwrap())(
                 PRT_FATAL,
                 c"move state handle %d out of range\n".as_ptr() as *mut c_char,
@@ -263,7 +294,7 @@ pub fn BotReachabilityTime(bot: &mut BotLib, reach: *mut aas_reachability_t) -> 
 /// Source: `oracle/codemp/botlib/be_ai_move.cpp:130-144`
 pub fn BotFreeMoveState(bot: &mut BotLib, handle: c_int) {
     unsafe {
-        if handle <= 0 || handle > MAX_CLIENTS {
+        if handle <= 0 || handle > MAX_CLIENTS as c_int {
             (bot.botimport.Print.unwrap())(
                 PRT_FATAL,
                 c"move state handle %d out of range\n".as_ptr() as *mut c_char,
@@ -280,7 +311,7 @@ pub fn BotFreeMoveState(bot: &mut BotLib, handle: c_int) {
             return;
         }
         let p = bot.botmovestates[handle as usize];
-        FreeMemory(bot, p as *mut c_void);
+        FreeMemory(bot, p as *mut ());
         bot.botmovestates[handle as usize] = core::ptr::null_mut();
     }
 }
@@ -350,16 +381,9 @@ pub fn BotOnMover(
 
         modelnum = (*reach).facenum & 0x0000FFFF;
         //get some bsp model info
-        AAS_BSPModelMinsMaxsOrigin(
-            bot,
-            modelnum,
-            angles,
-            &mut mins,
-            &mut maxs,
-            core::ptr::null_mut(),
-        );
+        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, [0.0; 3]);
         //
-        if AAS_OriginOfMoverWithModelNum(bot, modelnum, &mut modelorigin) == 0 {
+        if AAS_OriginOfMoverWithModelNum(bot, modelnum, modelorigin) == 0 {
             (bot.botimport.Print.unwrap())(
                 PRT_MESSAGE,
                 c"no entity with model %d\n".as_ptr() as *mut c_char,
@@ -415,9 +439,9 @@ pub fn MoverDown(bot: &mut BotLib, reach: *mut aas_reachability_t) -> c_int {
 
         modelnum = (*reach).facenum & 0x0000FFFF;
         //get some bsp model info
-        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, &mut mins, &mut maxs, &mut origin);
+        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, origin);
         //
-        if AAS_OriginOfMoverWithModelNum(bot, modelnum, &mut origin) == 0 {
+        if AAS_OriginOfMoverWithModelNum(bot, modelnum, origin) == 0 {
             (bot.botimport.Print.unwrap())(
                 PRT_MESSAGE,
                 c"no entity with model %d\n".as_ptr() as *mut c_char,
@@ -443,7 +467,7 @@ pub fn BotOnTopOfEntity(bot: &mut BotLib, ms: *mut bot_movestate_t) -> c_int {
         let up: vec3_t = [0.0, 0.0, 1.0];
         let trace: bsp_trace_t;
 
-        AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, &mut mins, &mut maxs);
+        AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, mins, maxs);
         _VectorMA((*ms).origin, -3.0, up, &mut end);
         trace = AAS_Trace(
             bot,
@@ -506,7 +530,7 @@ pub fn DistanceFromLineSquared(p: vec3_t, lp1: vec3_t, lp2: vec3_t) -> f32 {
     let mut dir: vec3_t = [0.0; 3];
     let mut j: usize;
 
-    AAS_ProjectPointOntoVector(p, lp1, lp2, &mut proj);
+    AAS_ProjectPointOntoVector(p, lp1, lp2, proj);
     j = 0;
     while j < 3 {
         if (proj[j] > lp1[j] && proj[j] > lp2[j]) || (proj[j] < lp1[j] && proj[j] < lp2[j]) {
@@ -569,8 +593,8 @@ pub fn BotVisible(bot: &mut BotLib, ent: c_int, eye: vec3_t, target: vec3_t) -> 
         trace = AAS_Trace(
             bot,
             eye,
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
+            [0.0; 3],
+            [0.0; 3],
             target,
             ent,
             CONTENTS_SOLID | CONTENTS_PLAYERCLIP,
@@ -599,9 +623,9 @@ pub fn MoverBottomCenter(
 
         modelnum = (*reach).facenum & 0x0000FFFF;
         //get some bsp model info
-        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, &mut mins, &mut maxs, &mut origin);
+        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, origin);
         //
-        if AAS_OriginOfMoverWithModelNum(bot, modelnum, &mut origin) == 0 {
+        if AAS_OriginOfMoverWithModelNum(bot, modelnum, origin) == 0 {
             (bot.botimport.Print.unwrap())(
                 PRT_MESSAGE,
                 c"no entity with model %d\n".as_ptr() as *mut c_char,
@@ -847,7 +871,7 @@ pub fn BotFuncBobStartEnd(
         let mut num1: c_int;
 
         modelnum = (*reach).facenum & 0x0000FFFF;
-        if AAS_OriginOfMoverWithModelNum(bot, modelnum, &mut origin) == 0 {
+        if AAS_OriginOfMoverWithModelNum(bot, modelnum, origin) == 0 {
             (bot.botimport.Print.unwrap())(
                 PRT_MESSAGE,
                 c"BotFuncBobStartEnd: no entity with model %d\n".as_ptr() as *mut c_char,
@@ -857,14 +881,7 @@ pub fn BotFuncBobStartEnd(
             VectorSet(&mut end, 0.0, 0.0, 0.0);
             return;
         }
-        AAS_BSPModelMinsMaxsOrigin(
-            bot,
-            modelnum,
-            angles,
-            &mut mins,
-            &mut maxs,
-            core::ptr::null_mut(),
-        );
+        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, [0.0; 3]);
         _VectorAdd(mins, maxs, &mut mid);
         _VectorScale(mid, 0.5, &mut mid);
         _VectorCopy(mid, &mut start);
@@ -1087,17 +1104,17 @@ pub fn BotResetAvoidReach(bot: &mut BotLib, movestate: c_int) {
             return;
         }
         Com_Memset(
-            (*ms).avoidreach.as_mut_ptr() as *mut c_void,
+            (*ms).avoidreach.as_mut_ptr() as *mut (),
             0,
             MAX_AVOIDREACH * core::mem::size_of::<c_int>(),
         );
         Com_Memset(
-            (*ms).avoidreachtimes.as_mut_ptr() as *mut c_void,
+            (*ms).avoidreachtimes.as_mut_ptr() as *mut (),
             0,
             MAX_AVOIDREACH * core::mem::size_of::<f32>(),
         );
         Com_Memset(
-            (*ms).avoidreachtries.as_mut_ptr() as *mut c_void,
+            (*ms).avoidreachtries.as_mut_ptr() as *mut (),
             0,
             MAX_AVOIDREACH * core::mem::size_of::<c_int>(),
         );
@@ -1150,7 +1167,7 @@ pub fn BotResetMoveState(bot: &mut BotLib, movestate: c_int) {
             return;
         }
         Com_Memset(
-            ms as *mut c_void,
+            ms as *mut (),
             0,
             core::mem::size_of::<bot_movestate_t>(),
         );
@@ -1164,10 +1181,10 @@ pub fn BotShutdownMoveAI(bot: &mut BotLib) {
         let mut i: c_int;
 
         i = 1;
-        while i <= MAX_CLIENTS {
+        while i <= MAX_CLIENTS as c_int {
             if !bot.botmovestates[i as usize].is_null() {
                 let p = bot.botmovestates[i as usize];
-                FreeMemory(bot, p as *mut c_void);
+                FreeMemory(bot, p as *mut ());
                 bot.botmovestates[i as usize] = core::ptr::null_mut();
             }
             i += 1;
@@ -1182,10 +1199,10 @@ pub fn BotAllocMoveState(bot: &mut BotLib) -> c_int {
         let mut i: c_int;
 
         i = 1;
-        while i <= MAX_CLIENTS {
+        while i <= MAX_CLIENTS as c_int {
             if bot.botmovestates[i as usize].is_null() {
                 bot.botmovestates[i as usize] =
-                    GetClearedMemory(bot, core::mem::size_of::<bot_movestate_t>())
+                    GetClearedMemory(bot, core::mem::size_of::<bot_movestate_t>() as c_ulong)
                         as *mut bot_movestate_s;
                 return i;
             }
@@ -1290,7 +1307,7 @@ pub fn BotSetBrushModelTypes(bot: &mut BotLib) {
         let mut model: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
 
         Com_Memset(
-            bot.modeltypes.as_mut_ptr() as *mut c_void,
+            bot.modeltypes.as_mut_ptr() as *mut (),
             0,
             MAX_MODELS as usize * core::mem::size_of::<c_int>(),
         );
@@ -1319,7 +1336,7 @@ pub fn BotSetBrushModelTypes(bot: &mut BotLib) {
                     break 'cont;
                 }
                 if model[0] != 0 {
-                    modelnum = atoi(model.as_ptr().add(1));
+                    modelnum = libc::atoi(model.as_ptr().add(1));
                 } else {
                     modelnum = 0;
                 }
@@ -1463,7 +1480,7 @@ pub fn BotCheckBlocked(
         let mut trace: bsp_trace_t;
 
         //test for entities obstructing the bot's path
-        AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, &mut mins, &mut maxs);
+        AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, mins, maxs);
         //
         if _DotProduct(dir, up).abs() < 0.7 {
             mins[2] += (*bot.sv_maxstep).value; //if the bot can step on
@@ -1487,7 +1504,7 @@ pub fn BotCheckBlocked(
         //if not in an area with reachability
         else if checkbottom != 0 && AAS_AreaReachability(bot, (*ms).areanum) == 0 {
             //check if the bot is standing on something
-            AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, &mut mins, &mut maxs);
+            AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, mins, maxs);
             _VectorMA((*ms).origin, -3.0, up, &mut end);
             trace = AAS_Trace(
                 bot,
@@ -2040,8 +2057,8 @@ pub fn BotTravel_Grapple(
                 trace = AAS_Trace(
                     bot,
                     org,
-                    core::ptr::null_mut(),
-                    core::ptr::null_mut(),
+                    [0.0; 3],
+                    [0.0; 3],
                     (*reach).end,
                     (*ms).entitynum,
                     CONTENTS_SOLID,
@@ -2264,7 +2281,7 @@ pub fn BotReachabilityArea(bot: &mut BotLib, origin: vec3_t, client: c_int) -> c
         let trace: aas_trace_t;
 
         //check if the bot is standing on something
-        AAS_PresenceTypeBoundingBox(bot, PRESENCE_CROUCH, &mut mins, &mut maxs);
+        AAS_PresenceTypeBoundingBox(bot, PRESENCE_CROUCH, mins, maxs);
         _VectorMA(origin, -3.0, up, &mut end);
         bsptrace = AAS_Trace(
             bot,
@@ -3093,7 +3110,7 @@ pub fn BotTravel_Jump(
 
         BotClearMoveResult(&mut result);
         //
-        AAS_JumpReachRunStart(common, bot, reach, &mut runstart);
+        AAS_JumpReachRunStart(common, bot, reach, runstart);
         //
         hordir[0] = runstart[0] - (*reach).start[0];
         hordir[1] = runstart[1] - (*reach).start[1];
@@ -3276,7 +3293,7 @@ pub fn BotPredictVisiblePosition(
         }
 
         Com_Memset(
-            avoidreach.as_mut_ptr() as *mut c_void,
+            avoidreach.as_mut_ptr() as *mut (),
             0,
             MAX_AVOIDREACH * core::mem::size_of::<c_int>(),
         );
@@ -3612,7 +3629,7 @@ pub fn BotMoveToGoal(
                 (*result).failure = qtrue;
                 (*result).flags |= resultflags;
                 Com_Memset(
-                    &mut reach as *mut aas_reachability_t as *mut c_void,
+                    &mut reach as *mut aas_reachability_t as *mut (),
                     0,
                     core::mem::size_of::<aas_reachability_t>(),
                 );

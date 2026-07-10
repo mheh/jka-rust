@@ -1,5 +1,3 @@
-/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/engine-cpass/crates/mp/engine/botlib/src/be_aas_optimize_fns.rs:
-
 #![allow(
     non_snake_case,
     non_camel_case_types,

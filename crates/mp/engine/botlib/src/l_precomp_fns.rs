@@ -14,7 +14,10 @@
 
 use core::ffi::{c_char, c_int, c_long, c_ulong};
 
-use libc::strcmp;
+use libc::{abs, ctime, free, sprintf, strcat, strcmp, strcpy, strlen, strncat, strncpy, time};
+
+use crate::l_memory_fns::{FreeMemory, GetClearedMemory, GetMemory};
+use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
 
 use crate::l_precomp::builtin_defines::{
     BUILTIN_DATE, BUILTIN_FILE, BUILTIN_LINE, BUILTIN_STDC, BUILTIN_TIME,
@@ -43,8 +46,16 @@ use crate::l_script::script_s::script_t;
 use crate::l_script::token_s::token_t;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_WARNING};
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::pc_token_t::pc_token_t;
+use mp_qshared::shared::pc_token_t;
 use mp_qshared::shared::{qfalse, qtrue};
+use crate::BotLib;
+
+// PORT-NOTE(Q_stricmp): forward-declared per the l_libvar_fns.rs precedent
+// (no Q_stricmp in the engine-reachable mp_qshared tier yet; only mp_game's
+// copy, a different crate this engine slice does not depend on).
+extern "C" {
+    fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int;
+}
 
 /// Raven `SourceError` — print a preprocessor error tagged with the current
 /// script file and line.
@@ -113,7 +124,7 @@ pub fn PC_InitTokenHeap() {
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:165-176`
 pub fn PC_PushIndent(bot: &mut BotLib, source: *mut source_t, r#type: c_int, skip: c_int) {
     unsafe {
-        let indent: *mut indent_t = GetMemory(bot, core::mem::size_of::<indent_t>() as c_int) as *mut indent_t;
+        let indent: *mut indent_t = GetMemory(bot, core::mem::size_of::<indent_t>() as c_ulong) as *mut indent_t;
         (*indent).r#type = r#type;
         (*indent).script = (*source).scriptstack;
         (*indent).skip = (skip != 0) as c_int;
@@ -190,14 +201,12 @@ pub fn PC_FreeToken(bot: &mut BotLib, token: *mut token_t) {
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:251-272`
 pub fn PC_CopyToken(bot: &mut BotLib, token: *mut token_t) -> *mut token_t {
     unsafe {
-        let t: *mut token_t = GetMemory(bot, core::mem::size_of::<token_t>() as c_int) as *mut token_t;
+        let t: *mut token_t =
+            GetMemory(bot, core::mem::size_of::<token_t>() as c_ulong) as *mut token_t;
         if t.is_null() {
             // #ifdef BSPC not defined -> Com_Error branch (ruling 1: a longjmp/panic)
-            Com_Error(
-                errorParm_t::ERR_FATAL,
-                c"out of token space\n".as_ptr() as *mut c_char,
-            );
-            return core::ptr::null_mut();
+            let _ = errorParm_t::ERR_FATAL;
+            panic!("out of token space");
         }
         Com_Memcpy(t.cast(), token.cast(), core::mem::size_of::<token_t>());
         (*t).next = core::ptr::null_mut();
@@ -445,7 +454,7 @@ pub fn PC_AddBuiltinDefines(bot: &mut BotLib, source: *mut source_t) {
         while !builtin[i].0.is_null() {
             let define: *mut define_t = GetMemory(
                 bot,
-                (core::mem::size_of::<define_t>() + strlen(builtin[i].0) + 1) as c_int,
+                (core::mem::size_of::<define_t>() + strlen(builtin[i].0) + 1) as c_ulong,
             ) as *mut define_t;
             Com_Memset(define.cast(), 0, core::mem::size_of::<define_t>());
             (*define).name = (define as *mut c_char).add(core::mem::size_of::<define_t>());
@@ -499,7 +508,7 @@ pub fn PC_ExpandBuiltinDefine(
                 *lasttoken = token;
             }
             BUILTIN_DATE => {
-                t = time(core::ptr::null_mut());
+                t = time(core::ptr::null_mut()) as c_ulong;
                 curtime = ctime(&t as *const c_ulong as *const c_long);
                 strcpy((*token).string.as_mut_ptr(), c"\"".as_ptr());
                 strncat((*token).string.as_mut_ptr(), curtime.add(4), 7);
@@ -512,7 +521,7 @@ pub fn PC_ExpandBuiltinDefine(
                 *lasttoken = token;
             }
             BUILTIN_TIME => {
-                t = time(core::ptr::null_mut());
+                t = time(core::ptr::null_mut()) as c_ulong;
                 curtime = ctime(&t as *const c_ulong as *const c_long);
                 strcpy((*token).string.as_mut_ptr(), c"\"".as_ptr());
                 strncat((*token).string.as_mut_ptr(), curtime.add(11), 8);
@@ -542,7 +551,7 @@ pub fn PC_CopyDefine(bot: &mut BotLib, source: *mut source_t, define: *mut defin
     unsafe {
         let newdefine: *mut define_t = GetMemory(
             bot,
-            (core::mem::size_of::<define_t>() + strlen((*define).name) + 1) as c_int,
+            (core::mem::size_of::<define_t>() + strlen((*define).name) + 1) as c_ulong,
         ) as *mut define_t;
         // copy the define name
         (*newdefine).name = (newdefine as *mut c_char).add(core::mem::size_of::<define_t>());
@@ -1689,7 +1698,7 @@ pub fn PC_Directive_define(bot: &mut BotLib, source: *mut source_t) -> c_int {
         // allocate define
         define = GetMemory(
             bot,
-            (core::mem::size_of::<define_t>() + strlen(token.string.as_ptr()) + 1) as c_int,
+            (core::mem::size_of::<define_t>() + strlen(token.string.as_ptr()) + 1) as c_ulong,
         ) as *mut define_t;
         Com_Memset(define.cast(), 0, core::mem::size_of::<define_t>());
         (*define).name = (define as *mut c_char).add(core::mem::size_of::<define_t>());
@@ -1819,7 +1828,7 @@ pub fn PC_DefineFromString(bot: &mut BotLib, string: *mut c_char) -> *mut define
         // #if DEFINEHASHING (live)
         src.definehash = GetClearedMemory(
             bot,
-            (DEFINEHASHSIZE * core::mem::size_of::<*mut define_t>()) as c_int,
+            (DEFINEHASHSIZE * core::mem::size_of::<*mut define_t>()) as c_ulong,
         ) as *mut *mut define_t;
         // create a define from the source
         let res = PC_Directive_define(bot, &mut src);
@@ -2237,7 +2246,7 @@ pub fn PC_Directive_evalfloat(bot: &mut BotLib, source: *mut source_t) -> c_int 
         token.whitespace_p = (*(*source).scriptstack).script_p;
         token.endwhitespace_p = (*(*source).scriptstack).script_p;
         token.linescrossed = 0;
-        sprintf(token.string.as_mut_ptr(), c"%1.2f".as_ptr(), fabs(value));
+        sprintf(token.string.as_mut_ptr(), c"%1.2f".as_ptr(), value.abs());
         token.r#type = TT_NUMBER;
         token.subtype = TT_FLOAT | TT_LONG | TT_DECIMAL;
         PC_UnreadSourceToken(bot, source, &mut token);
@@ -2418,7 +2427,7 @@ pub fn PC_DollarDirective_evalfloat(bot: &mut BotLib, source: *mut source_t) -> 
         token.whitespace_p = (*(*source).scriptstack).script_p;
         token.endwhitespace_p = (*(*source).scriptstack).script_p;
         token.linescrossed = 0;
-        sprintf(token.string.as_mut_ptr(), c"%1.2f".as_ptr(), fabs(value));
+        sprintf(token.string.as_mut_ptr(), c"%1.2f".as_ptr(), value.abs());
         token.r#type = TT_NUMBER;
         token.subtype = TT_FLOAT | TT_LONG | TT_DECIMAL;
         // #ifdef NUMBERVALUE (not defined) omitted.
@@ -3076,7 +3085,7 @@ pub fn LoadSourceFile(bot: &mut BotLib, filename: *const c_char) -> *mut source_
         if bot.globaldefines.is_null() {
             bot.globaldefines = GetClearedMemory(
                 bot,
-                (DEFINEHASHSIZE * core::mem::size_of::<*mut define_t>()) as c_int,
+                (DEFINEHASHSIZE * core::mem::size_of::<*mut define_t>()) as c_ulong,
             ) as *mut *mut define_t;
         }
 
@@ -3088,7 +3097,7 @@ pub fn LoadSourceFile(bot: &mut BotLib, filename: *const c_char) -> *mut source_
         (*script).next = core::ptr::null_mut();
 
         let source: *mut source_t =
-            GetMemory(bot, core::mem::size_of::<source_t>() as c_int) as *mut source_t;
+            GetMemory(bot, core::mem::size_of::<source_t>() as c_ulong) as *mut source_t;
         Com_Memset(source.cast(), 0, core::mem::size_of::<source_t>());
 
         strncpy((*source).filename.as_mut_ptr(), filename, MAX_PATH);
@@ -3101,7 +3110,7 @@ pub fn LoadSourceFile(bot: &mut BotLib, filename: *const c_char) -> *mut source_
         // #if DEFINEHASHING (live)
         (*source).definehash = GetClearedMemory(
             bot,
-            (DEFINEHASHSIZE * core::mem::size_of::<*mut define_t>()) as c_int,
+            (DEFINEHASHSIZE * core::mem::size_of::<*mut define_t>()) as c_ulong,
         ) as *mut *mut define_t;
         PC_AddGlobalDefinesToSource(bot, source);
         source
@@ -3128,7 +3137,7 @@ pub fn LoadSourceMemory(
         (*script).next = core::ptr::null_mut();
 
         let source: *mut source_t =
-            GetMemory(bot, core::mem::size_of::<source_t>() as c_int) as *mut source_t;
+            GetMemory(bot, core::mem::size_of::<source_t>() as c_ulong) as *mut source_t;
         Com_Memset(source.cast(), 0, core::mem::size_of::<source_t>());
 
         strncpy((*source).filename.as_mut_ptr(), name, MAX_PATH);
@@ -3141,7 +3150,7 @@ pub fn LoadSourceMemory(
         // #if DEFINEHASHING (live)
         (*source).definehash = GetClearedMemory(
             bot,
-            (DEFINEHASHSIZE * core::mem::size_of::<*mut define_t>()) as c_int,
+            (DEFINEHASHSIZE * core::mem::size_of::<*mut define_t>()) as c_ulong,
         ) as *mut *mut define_t;
         PC_AddGlobalDefinesToSource(bot, source);
         source

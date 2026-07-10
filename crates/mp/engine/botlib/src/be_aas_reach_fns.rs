@@ -66,9 +66,37 @@ use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE, PRT_WAR
 use mp_qshared::shared::surface_flags::{
     CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER, MASK_WATER, SURF_SKY,
 };
+use mp_qshared::shared::q_math::{
+    AngleVectors, CrossProduct, VectorInverse, VectorLength, VectorNormalize,
+};
 use mp_qshared::shared::{vec3_t, vec_t};
 
+use mp_engine_qcommon::common_fns::Com_Memset;
+
+use libc::{atoi, strcmp};
+
 use native_types::{qboolean, qfalse, qtrue};
+
+use crate::BotLib;
+
+use crate::be_aas_bspq3_fns::{
+    AAS_BSPModelMinsMaxsOrigin, AAS_FloatForBSPEpairKey, AAS_IntForBSPEpairKey, AAS_NextBSPEntity,
+    AAS_PointContents, AAS_Trace, AAS_ValueForBSPEpairKey, AAS_VectorForBSPEpairKey,
+};
+use crate::be_aas_debug_fns::AAS_PermanentLine;
+use crate::be_aas_main::AAS_Error;
+use crate::be_aas_move::{
+    AAS_BFGJumpZVelocity, AAS_ClientMovementHitBBox, AAS_DropToFloor, AAS_HorizontalVelocityForJump,
+    AAS_PredictClientMovement, AAS_RocketJumpZVelocity,
+};
+use crate::be_aas_sample_fns::{
+    AAS_AreaPresenceType, AAS_LinkEntityClientBBox, AAS_PointAreaNum, AAS_PointInsideFace,
+    AAS_TraceAreas, AAS_TraceClientBBox, AAS_UnlinkFromAreas,
+};
+use crate::be_interface_fns::Sys_MilliSeconds;
+use crate::l_libvar_fns::{LibVarGetValue, LibVarValue};
+use crate::l_log_fns::Log_Write;
+use crate::l_memory_fns::{FreeMemory, GetClearedMemory};
 
 /// Raven `AAS_FaceArea` — area of one AAS face.
 ///
@@ -4668,7 +4696,7 @@ pub fn AAS_Reachability_Teleport(bot: &mut BotLib) {
                     );
                     if angle != 0.0 {
                         angles = [0.0, angle, 0.0];
-                        AngleVectors(angles, &mut velocity, ptr::null_mut(), ptr::null_mut());
+                        AngleVectors(angles, Some(&mut velocity), None, None);
                         velocity = [
                             velocity[0] * 400.0,
                             velocity[1] * 400.0,

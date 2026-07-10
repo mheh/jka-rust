@@ -457,6 +457,13 @@ pub struct Common {
     ///
     /// Source: `oracle/codemp/qcommon/net_chan.cpp:486`
     pub loopbacks: [loopback_t; 2],
+
+    // ---- server bot glue (`sv_bot.cpp`) ----
+    /// Raven `bot_enable` — cached `bot_enable` cvar integer (mirrors the
+    /// `cl_shownet` PORT-NOTE collapse above pending the cvar-registry wave).
+    ///
+    /// Source: `oracle/codemp/server/sv_bot.cpp:20`
+    pub bot_enable: c_int,
 }
 
 /// Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching the FS field sizes).
