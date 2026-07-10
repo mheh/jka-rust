@@ -602,3 +602,14 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     depends only on mp_qshared); the §F docs cite this ruling instead of
     each re-litigating the edge.
     **RULING: ghoul2 home; Option view; blanket Cargo-edge authorization (user, 2026-07-09)**
+
+57. **StringEd overloaded lookups (SE-Q3):** the C++ arity-overloaded
+    SE_GetString/SE_GetFlags pairs exist ONLY as the seam's
+    `StringEdPackage` methods (`get_string`/`get_string2`,
+    `get_flags`/`get_flags2` — arity in the name, per the frozen Seam).
+    SE-D2 narrows to the genuinely externally-reached surface: the trap
+    arm (`trap_SP_GetStringTextString`, abi-traps row 52) and true link
+    targets keep exact Raven names; intra-binary callers (sv_client/
+    sv_ccmds — themselves ported Rust) call the methods. Consistent with
+    ruling 40 (internal = idiomatic) and seam-is-authoritative.
+    **RULING: seam methods govern; narrow SE-D2 (user, 2026-07-09)**
