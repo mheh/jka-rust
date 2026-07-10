@@ -27,7 +27,7 @@ use mp_qshared::shared::qboolean;
 use mp_qshared::shared::vec3_t;
 
 use mp_bg::public::configstring::CS_MODELS;
-use mp_engine_server::server::server_t::MAX_MODELS;
+use mp_qshared::shared::limits::MAX_MODELS;
 
 use crate::be_aas_def::be_aas_def_consts::MAX_PATH;
 use crate::l_libvar::libvar_s::libvar_t;

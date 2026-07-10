@@ -14,16 +14,21 @@
 
 use core::ffi::{c_char, c_int, c_long, c_ulong};
 
+use libc::strcmp;
+
 use crate::l_precomp::builtin_defines::{
     BUILTIN_DATE, BUILTIN_FILE, BUILTIN_LINE, BUILTIN_STDC, BUILTIN_TIME,
 };
 use crate::l_precomp::define_flags::{DEFINE_FIXED, DEFINE_GLOBAL};
 use crate::l_precomp::define_s::define_t;
+use crate::l_precomp::directive_s::directive_t;
+use crate::l_precomp::operator_s::operator_t;
+use crate::l_precomp::value_s::value_t;
 use crate::l_precomp::indent_s::indent_t;
 use crate::l_precomp::indent_type::{INDENT_ELSE, INDENT_IF, INDENT_IFDEF, INDENT_IFNDEF};
 use crate::l_precomp::path_seperator_consts::{PATHSEPERATOR_CHAR, PATHSEPERATOR_STR};
 use crate::l_precomp::precomp_consts::{
-    DEFINEHASHSIZE, MAX_DEFINEPARMS, MAX_OPERATORS, MAX_SOURCEFILES, MAX_VALUES,
+    DEFINEHASHSIZE, MAX_DEFINEPARMS, MAX_OPERATORS, MAX_PATH, MAX_SOURCEFILES, MAX_VALUES,
 };
 use crate::l_precomp::source_s::source_t;
 use crate::l_script::consts::{
@@ -2242,6 +2247,45 @@ pub fn PC_Directive_evalfloat(bot: &mut BotLib, source: *mut source_t) -> c_int 
         qtrue
     }
 }
+
+/// Sentinel handler for the `{NULL, NULL}` terminator row of the directive
+/// dispatch tables. Never invoked — the walk stops on the null `name` before
+/// `func` is read — but a Rust `fn` pointer cannot be null, so the terminator
+/// row carries this no-op in place of Raven's `NULL`.
+/// Source: `oracle/codemp/botlib/l_precomp.cpp:2550,2652` (`{NULL, NULL}`).
+fn PC_Directive_sentinel(_bot: &mut BotLib, _source: *mut source_t) -> c_int {
+    0
+}
+
+/// Raven `directives[]` — file-scope `#`-directive dispatch table (ruling 5:
+/// const `fn`-item table). `name` is compared with `strcmp`; the null-`name`
+/// terminator row ends the walk.
+/// Source: `oracle/codemp/botlib/l_precomp.cpp:2535-2551`.
+const directives: [directive_t; 15] = [
+    directive_t { name: c"if".as_ptr(), func: PC_Directive_if },
+    directive_t { name: c"ifdef".as_ptr(), func: PC_Directive_ifdef },
+    directive_t { name: c"ifndef".as_ptr(), func: PC_Directive_ifndef },
+    directive_t { name: c"elif".as_ptr(), func: PC_Directive_elif },
+    directive_t { name: c"else".as_ptr(), func: PC_Directive_else },
+    directive_t { name: c"endif".as_ptr(), func: PC_Directive_endif },
+    directive_t { name: c"include".as_ptr(), func: PC_Directive_include },
+    directive_t { name: c"define".as_ptr(), func: PC_Directive_define },
+    directive_t { name: c"undef".as_ptr(), func: PC_Directive_undef },
+    directive_t { name: c"line".as_ptr(), func: PC_Directive_line },
+    directive_t { name: c"error".as_ptr(), func: PC_Directive_error },
+    directive_t { name: c"pragma".as_ptr(), func: PC_Directive_pragma },
+    directive_t { name: c"eval".as_ptr(), func: PC_Directive_eval },
+    directive_t { name: c"evalfloat".as_ptr(), func: PC_Directive_evalfloat },
+    directive_t { name: core::ptr::null(), func: PC_Directive_sentinel },
+];
+
+/// Raven `dollardirectives[]` — file-scope `$`-directive dispatch table.
+/// Source: `oracle/codemp/botlib/l_precomp.cpp:2648-2653`.
+const dollardirectives: [directive_t; 3] = [
+    directive_t { name: c"evalint".as_ptr(), func: PC_DollarDirective_evalint },
+    directive_t { name: c"evalfloat".as_ptr(), func: PC_DollarDirective_evalfloat },
+    directive_t { name: core::ptr::null(), func: PC_Directive_sentinel },
+];
 
 /// Raven `PC_ReadDirective` — dispatch a `#`-directive to its handler.
 ///

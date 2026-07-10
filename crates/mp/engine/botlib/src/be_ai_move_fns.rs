@@ -44,7 +44,7 @@ use crate::be_ai_move::move_consts::{
 use crate::BotLib;
 
 use mp_engine_qcommon::common::Common;
-use mp_engine_server::server::server_t::MAX_MODELS;
+use mp_qshared::shared::limits::MAX_MODELS;
 use mp_game::q_math::PITCH;
 use mp_qshared::common::mp::botlib::aas_clientmove_s::aas_clientmove_t;
 use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_t;
