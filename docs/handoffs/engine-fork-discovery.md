@@ -418,3 +418,48 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     at its verified file counts; moved vec3 fns keep Raven's
     underscore-prefixed names (`_DotProduct` etc.).
     **RULING: bless all four (user, 2026-07-09)**
+
+## §F doc-session rulings, round 6 (user, 2026-07-09 — seventh session)
+
+40. **ICARUS corrections:** `CBlockStream::Init` is LIVE (corrects ruling
+    39a's drop-list — the live reader `Open()` calls `Init()` at
+    BlockStream.cpp:670; the pass-5 "zero callers" claim was wrong; the
+    other five writer/duplicator drops stand, independently verified).
+    NAMING RULE, project-wide for §F internal types: Raven's bare
+    hungarian `C` prefix DROPS (CSequence→Sequence, CTaskManager→
+    TaskManager, CBlock→Block, CNavigator→Navigator, …); subsystem
+    acronym prefixes stay in Pascal form (CCMLandScape→CmLandScape,
+    CRMArea→RmArea — the ruled precedents); ABI-frozen types keep exact
+    Raven names as always.
+    **RULING: Init lives; drop the bare C prefix (user, 2026-07-09)**
+41. **RMG-Q10 + wave-order principle:** `CM_GetShaderInfo` ports as a
+    `CollisionWorld` method (`&mut self` — it registers shader text on
+    miss), signature transcribed faithfully from its oracle decl,
+    returning `Option<&CCMShader>`; it lands with the cm C-track waves and
+    rmg-terrain.md cites it as a settled extern. GENERAL PRINCIPLE
+    (recorded once, applies campaign-wide): a §F/C++ struct DEFINITION
+    (all fields, cites, no method bodies) lands at the earliest wave any
+    of its methods or consumers occupies; bodies follow the tool order.
+    Types precede function waves — not a stub, the same relationship the
+    already-ported C-track types have.
+    **RULING: pin accessor now + struct-defs-early (user, 2026-07-09)**
+42. **NAV-Q14 (.nav golden fixtures):** build `tools/npcnav-oracle` —
+    compile the unmodified navigator.cpp TU standalone (§18), feed
+    hand-authored waypoint layouts through the real
+    AddRawPoint/HardConnect/Save path, commit the emitted `.nav` bytes
+    plus the query/rank goldens the same run produces. The C oracle
+    generates its own ground truth; Rust Load/queries reproduce it
+    byte-for-byte. No retail blobs (same logic as the IBI ruling).
+    **RULING: tools/npcnav-oracle, Save-generated (user, 2026-07-09)**
+43. **EngineHostView pinned (the split-borrow view, ruling 11's missing
+    concrete shape):** `pub struct EngineHostView<'a>` lives in
+    `mp_engine_core` (the one crate seeing all `Engine` fields), holding
+    `&mut` borrows of the Common/Server/CollisionWorld/loader fields
+    EngineHost needs; `Engine` gains per-subsystem split constructors
+    (`fn nav_call(&mut self) -> (EngineHostView<'_>, &mut Navigator)`
+    pattern) that split-borrow disjoint fields — plain field-level
+    reborrowing, no unsafe. The trait impl itself is wave-20 work,
+    landing with the SV_GameSystemCalls arms that need it; docs cite the
+    pinned shape. Recorded in state-ownership.md alongside STATE-Q2's
+    ruling-12 closure.
+    **RULING: pin the shape now, impl at wave 20 (user, 2026-07-09)**

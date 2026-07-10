@@ -32,8 +32,10 @@ pub struct Engine {
     pub cm: CollisionWorld,
     /// Client only; `None` on dedicated (`mp_engine_client`).
     pub snd: Option<SoundSystem>,
-    // botlib/ghoul2/icarus/rmg engine-side state is NOT yet a field here — those
-    // four §F subcrates were outside the A2 survey; attachment point is STATE-Q2.
+    // botlib/ghoul2/icarus/rmg/roff engine-side state becomes direct fields here
+    // (STATE-Q2 CLOSED — engine-fork-discovery rulings 12/13/43); each field
+    // lands with its subsystem's port waves, reached via the EngineHostView
+    // split-borrow constructors (ruling 43).
 }
 
 //TODO: Port ZeroValid for Engine

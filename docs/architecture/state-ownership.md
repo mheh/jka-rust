@@ -473,7 +473,7 @@ These four engine subcrates exist in the crate graph (`mp/engine/{botlib,ghoul2,
 
 | Raven global | oracle cite | Rust owner | constructed by | threaded via |
 |---|---|---|---|---|
-| botlib / ghoul2 / icarus / rmg engine-side globals | dossier §1 (not censused; readers only, e.g. `icarus/GameInterface.cpp:129`) | **pending §F subsystem docs** (`docs/subsystems/{botlib,ghoul2,icarus,rmg}.md`); `Engine`-field attachment is STATE-Q2 | their `*_Init` (per §F doc) | n/a here |
+| botlib / ghoul2 / icarus / rmg engine-side globals | dossier §1 (not censused; readers only, e.g. `icarus/GameInterface.cpp:129`) | direct `Engine` fields (`engine.icarus`/`nav`/`g2`/`rmg`/`roff` — STATE-Q2 CLOSED per rulings 12/13/43; internal shapes per the §F docs `docs/subsystems/{icarus,rmg-terrain,ghoul2-server,npcnav,roff}.md`) | their `*_Init` (per §F doc), fields land with each subsystem's waves | `EngineHostView` split-borrow (ruling 43) |
 
 **Module island — MP game (`mp/game::GameWorld`)**
 
@@ -1857,16 +1857,23 @@ round-7 gate's two Slice-0 stamping blockers are **CLOSED** (user, 2026-07-03, i
 - **Tracked note (finding 15)** (below STATE-Q9) — SP *engine-side* signatures
   (`sv_init_game_progs`, the `ge` handle placement) have no doc home yet.
 
-- **STATE-Q2 — `Engine`-island attachment for the four §F subcrates.**
-  *Owner: the per-subsystem C++-track design docs
-  (`docs/subsystems/{botlib,ghoul2,icarus,rmg}.md`).* botlib, ghoul2, icarus, and
-  rmg have real engine-side Raven globals but were outside the A2 survey (dossier
-  §1 censused only qcommon/server/client/sound/renderer; these appear there as
-  readers, not owners). Their internal ownership is designed in their own §F
-  subsystem docs (porting-rules §F, GP2 precedent), but whether/how their
-  engine-side state becomes fields of `Engine` — especially ghoul2, shared
-  engine↔cgame — is undecided. Placeholdered in the master table; resolve
-  alongside those §F docs.
+- **STATE-Q2 — `Engine`-island attachment for the four §F subcrates —
+  CLOSED 2026-07-09 (engine-fork-discovery rulings 12/13 + 43).** The
+  placement half is ruled: each §F subsystem's engine-side state becomes a
+  **direct `Engine` field** (`engine.icarus`, `engine.nav`, `engine.g2`,
+  `engine.rmg`, `engine.roff` — no `Option`/`Box` wrapping, ruling 12);
+  internal shapes stay owned by their §F docs
+  (`docs/subsystems/{icarus,rmg-terrain,ghoul2-server,npcnav,roff}.md`).
+  The fields land with each subsystem's port waves (the struct types do
+  not exist before their §F work). `Engine` implements `EngineHost` for
+  subsystem calls through the pinned split-borrow view (ruling 43):
+  `pub struct EngineHostView<'a>` in `mp_engine_core`, holding `&mut`
+  borrows of the Common/Server/CollisionWorld/loader fields `EngineHost`
+  needs; `Engine` gains per-subsystem split constructors
+  (`fn nav_call(&mut self) -> (EngineHostView<'_>, &mut Navigator)`
+  pattern) that split-borrow disjoint fields — plain field-level
+  reborrowing, no unsafe. The trait impl lands at wave 20 with the
+  `SV_GameSystemCalls` arms that consume it.
 
 - **STATE-Q7 — Freeze-ordering — CLOSED 2026-07-03 (whole-set freeze, user
   sign-off).** All four architecture docs advanced REVIEWED → FROZEN together,
