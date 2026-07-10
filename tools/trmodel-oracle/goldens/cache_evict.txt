@@ -1,0 +1,10 @@
+=== after level 1 register (GetLevel=1) ===
+0/2: "models/test.glm" (360 bytes)1/2: "skeletons/test.gla" (100 bytes)460 bytes total (0.00MB)
+
+=== after level 2 register (GetLevel=2) ===
+0/4: "models/modelb.glm" (360 bytes)1/4: "models/test.glm" (360 bytes)2/4: "skeletons/test.gla" (100 bytes)3/4: "skeletons/test2.gla" (100 bytes)920 bytes total (0.00MB)
+
+=== LevelLoadEnd(qfalse), r_modelpoolmegs=0 -> evict stale ===
+freed at least one=1
+survivors (sorted):
+0/2: "models/modelb.glm" (360 bytes)1/2: "skeletons/test2.gla" (100 bytes)460 bytes total (0.00MB)
