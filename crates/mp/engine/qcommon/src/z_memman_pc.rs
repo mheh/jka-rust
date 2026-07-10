@@ -16,11 +16,16 @@ use core::ffi::c_int;
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::ha_pref::ha_pref;
+use mp_qshared::shared::ha_pref;
 use native_types::qboolean;
+
+/// Raven `ZONE_MAGIC` — zone-block header/tail guard value.
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:28`
+const ZONE_MAGIC: i32 = 0x21436587;
 
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
+use crate::vm_fns::VM_Clear;
 use crate::z_memman::zone_header_s::zoneHeader_t;
 use crate::z_memman::zone_tail_s::zoneTail_t;
 
@@ -71,7 +76,7 @@ pub fn Zone_FreeBlock(common: &mut Common, pMemory: *mut zoneHeader_t) {
             if !(*pMemory).pNext.is_null() {
                 (*(*pMemory).pNext).pPrev = (*pMemory).pPrev;
             }
-            free(pMemory as *mut ());
+            libc::free(pMemory as *mut libc::c_void);
 
             // DETAILED_ZONE_DEBUG_CODE is not defined in this build; the
             // debug-only double-free counter block is dropped per the
@@ -174,9 +179,9 @@ pub fn Z_MorphMallocTag(common: &mut Common, pvAddress: *mut (), eDesiredTag: me
         let pMemory: *mut zoneHeader_t = (pvAddress as *mut zoneHeader_t).wrapping_sub(1);
 
         if (*pMemory).iMagic != ZONE_MAGIC {
-            Com_Error(
+            crate::common::error::com_error(
                 errorParm_t::ERR_FATAL,
-                "Z_MorphMallocTag(): Not a valid zone header!",
+                "Z_MorphMallocTag(): Not a valid zone header!".to_string(),
             );
             return; // won't get here
         }
@@ -213,7 +218,10 @@ pub fn Z_Size(pvAddress: *mut ()) -> c_int {
         }
 
         if (*pMemory).iMagic != ZONE_MAGIC {
-            Com_Error(errorParm_t::ERR_FATAL, "Z_Size(): Not a valid zone header!");
+            crate::common::error::com_error(
+                errorParm_t::ERR_FATAL,
+                "Z_Size(): Not a valid zone header!".to_string(),
+            );
             return 0; // won't get here
         }
 

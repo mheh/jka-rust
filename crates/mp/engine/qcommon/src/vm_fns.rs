@@ -11,9 +11,11 @@
 use core::ffi::{c_char, c_int};
 
 use mp_host_interface::engine_host::EngineHost;
+use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
-use native_types::MAX_QPATH;
+use native_types::{qboolean, qfalse, qtrue, MAX_QPATH};
 
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
@@ -36,6 +38,65 @@ struct RenderModels;
 struct RmManager;
 #[allow(dead_code)]
 struct Server;
+
+// PORT-NOTE(unlanded-callees): `Z_Malloc`/`Z_Free` (z_memman_pc.cpp) have no
+// ported body reachable from this file (this file's own `RenderModels`
+// placeholder is a distinct type from z_memman_pc.rs's, so even the sibling
+// fns there can't be called directly — vm_x86.rs precedent for the same
+// gap). `Sys_LoadDll`/`Sys_UnloadDll` (win_main.cpp/unix_main.c) have no
+// ported body in this crate at all. `Cmd_AddCommand`/`Cvar_VariableValue`
+// (qcommon.h) are the dispatch-table/cvar waves, not landed here either.
+// `COM_StripExtension`/`COM_Parse`/`LittleLong` (q_shared.h/q_platform.h)
+// are ported only in `mp_game`, a tier above this crate — unreachable
+// (cmd_common.rs/files_common.rs precedent for the same reachability gap).
+// All forward-declared here in the established `extern "Rust"` shape,
+// narrowed to each call site's own shape; escalated as missing symbols for
+// the finisher.
+extern "Rust" {
+    fn Z_Malloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        iSize: c_int,
+        eTag: memtag_t,
+        bZeroit: qboolean,
+        iUnusedAlign: c_int,
+    ) -> *mut ();
+    fn Z_Free(common: &mut Common, pvAddress: *mut ());
+    fn Sys_LoadDll(
+        name: *const c_char,
+        entryPoint: *mut Option<unsafe extern "C" fn(callNum: c_int, ...) -> c_int>,
+        systemcalls: Option<extern "C" fn(*mut c_int) -> c_int>,
+    ) -> *mut core::ffi::c_void;
+    fn Sys_UnloadDll(dllHandle: *mut core::ffi::c_void);
+    fn Cmd_AddCommand(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        cmd_name: *const c_char,
+        function: *const (),
+    );
+    fn Cvar_VariableValue(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        var_name: *const c_char,
+    ) -> f32;
+    fn COM_StripExtension(path: &str) -> String;
+    fn COM_Parse(data: &str) -> (String, &str);
+    fn LittleLong(l: c_int) -> c_int;
+    fn Hunk_Alloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        size: c_int,
+        preference: ha_pref,
+    ) -> *mut ();
+}
 
 /// `VM_VM2C`.
 ///
@@ -330,7 +391,7 @@ pub fn VM_Free(common: &mut Common, vm: *mut vm_t) {
             // PORT-NOTE(sys-dll): `Sys_UnloadDll` is the platform dylib-unload
             // external; not yet exposed on a receiver in this shard —
             // reported as a missing symbol.
-            crate::qcommon::sys_dll::Sys_UnloadDll((*vm).dllHandle);
+            Sys_UnloadDll((*vm).dllHandle);
             *vm = core::mem::zeroed();
         }
 
@@ -348,7 +409,7 @@ pub fn VM_Clear(common: &mut Common) {
     for i in 0..MAX_VM {
         unsafe {
             if !common.vmTable[i].dllHandle.is_null() {
-                crate::qcommon::sys_dll::Sys_UnloadDll(common.vmTable[i].dllHandle);
+                Sys_UnloadDll(common.vmTable[i].dllHandle);
             }
             common.vmTable[i] = core::mem::zeroed();
         }
@@ -376,14 +437,15 @@ pub fn VM_Shifted_Alloc(
         }
 
         // first allocate our desired memory, up front
-        let mem = crate::z_memman_pc::Z_Malloc(
+        let mem = Z_Malloc(
             common,
             cm,
             rm,
             host,
             size + 1,
-            mp_qshared::common::mp::qcommon::tags::memtag_t::TAG_VM_ALLOCATED,
-            false,
+            memtag_t::TAG_VM_ALLOCATED,
+            qfalse,
+            0,
         );
 
         if mem.is_null() {
@@ -421,7 +483,7 @@ pub fn VM_Shifted_Free(common: &mut Common, ptr: *mut *mut ()) {
             return;
         }
 
-        crate::z_memman_pc::Z_Free(common, mem);
+        Z_Free(common, mem);
         *ptr = core::ptr::null_mut(); // go ahead and clear the pointer for the game.
     }
 }
@@ -446,14 +508,15 @@ pub fn VM_VmProfile_f(
             return;
         }
 
-        let sorted = crate::z_memman_pc::Z_Malloc(
+        let sorted = Z_Malloc(
             common,
             cm,
             rm,
             host,
-            (*vm).numSymbols as usize * core::mem::size_of::<*mut vmSymbol_t>(),
-            mp_qshared::common::mp::qcommon::tags::memtag_t::TAG_VM,
-            true,
+            ((*vm).numSymbols as usize * core::mem::size_of::<*mut vmSymbol_t>()) as c_int,
+            memtag_t::TAG_VM,
+            qtrue,
+            0,
         ) as *mut *mut vmSymbol_t;
 
         *sorted.offset(0) = (*vm).symbols;
@@ -483,7 +546,7 @@ pub fn VM_VmProfile_f(
 
         host.print(&format!("    {total:9.0} total\n"));
 
-        crate::z_memman_pc::Z_Free(common, sorted as *mut ());
+        Z_Free(common, sorted as *mut ());
     }
 }
 
@@ -508,7 +571,7 @@ pub fn VM_VmInfo_f(common: &mut Common) {
                 crate::common::com_printf(common, "native\n");
                 continue;
             }
-            if (*vm).compiled != mp_qshared::shared::qboolean::qfalse {
+            if (*vm).compiled != qfalse {
                 crate::common::com_printf(common, "compiled on load\n");
             } else {
                 crate::common::com_printf(common, "interpreted\n");
@@ -542,19 +605,19 @@ pub fn VM_Init(
     host.cvar_register(
         "vm_cgame",
         "0",
-        (mp_game::q_shared_cvar_flags::CVAR_SYSTEMINFO | mp_game::q_shared_cvar_flags::CVAR_ARCHIVE)
+        (mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE)
             as c_int,
     );
     host.cvar_register(
         "vm_game",
         "0",
-        (mp_game::q_shared_cvar_flags::CVAR_SYSTEMINFO | mp_game::q_shared_cvar_flags::CVAR_ARCHIVE)
+        (mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE)
             as c_int,
     );
     host.cvar_register(
         "vm_ui",
         "0",
-        (mp_game::q_shared_cvar_flags::CVAR_SYSTEMINFO | mp_game::q_shared_cvar_flags::CVAR_ARCHIVE)
+        (mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE)
             as c_int,
     );
     // client wants to know if the server is using vm's for certain modules,
@@ -564,7 +627,7 @@ pub fn VM_Init(
     // signature isn't landed in this shard (dispatch-table wave, ruling 5);
     // referenced by its exact resolved name/receivers per the no-stub rule,
     // reported as a missing symbol.
-    crate::cmd_pc::Cmd_AddCommand(
+    Cmd_AddCommand(
         common,
         cm,
         rm,
@@ -572,7 +635,7 @@ pub fn VM_Init(
         c"vmprofile".as_ptr(),
         VM_VmProfile_f as _,
     );
-    crate::cmd_pc::Cmd_AddCommand(common, cm, rm, host, c"vminfo".as_ptr(), VM_VmInfo_f as _);
+    Cmd_AddCommand(common, cm, rm, host, c"vminfo".as_ptr(), VM_VmInfo_f as _);
 
     common.vmTable = unsafe { core::mem::zeroed() };
 }
@@ -589,14 +652,7 @@ pub fn VM_Alloc(
     host: &mut dyn EngineHost,
     size: c_int,
 ) -> *mut () {
-    crate::miniheap::cmini_heap::Hunk_Alloc(
-        common,
-        cm,
-        rm,
-        host,
-        size,
-        mp_qshared::shared::ha_pref::ha_pref::h_high,
-    )
+    Hunk_Alloc(common, cm, rm, host, size, ha_pref::h_high)
 }
 
 /// `VM_LoadSymbols`.
@@ -619,7 +675,7 @@ pub fn VM_LoadSymbols(
     unsafe {
         let mut name = [0u8; MAX_QPATH as usize];
         let vm_name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
-        let stripped = crate::qcommon::com_string::COM_StripExtension(&vm_name);
+        let stripped = COM_StripExtension(&vm_name);
         let n = stripped.len().min(name.len() - 1);
         name[..n].copy_from_slice(&stripped.as_bytes()[..n]);
 
@@ -642,7 +698,7 @@ pub fn VM_LoadSymbols(
         let mut count: c_int = 0;
 
         loop {
-            let (token, rest) = crate::qcommon::com_string::COM_Parse(cursor);
+            let (token, rest) = COM_Parse(cursor);
             cursor = rest;
             if token.is_empty() {
                 break;
@@ -650,14 +706,14 @@ pub fn VM_LoadSymbols(
             let token_c = std::ffi::CString::new(token.clone()).unwrap();
             let segment = ParseHex(token_c.as_ptr());
             if segment != 0 {
-                let (_, rest) = crate::qcommon::com_string::COM_Parse(cursor);
+                let (_, rest) = COM_Parse(cursor);
                 cursor = rest;
-                let (_, rest) = crate::qcommon::com_string::COM_Parse(cursor);
+                let (_, rest) = COM_Parse(cursor);
                 cursor = rest;
                 continue; // only load code segment values
             }
 
-            let (token, rest) = crate::qcommon::com_string::COM_Parse(cursor);
+            let (token, rest) = COM_Parse(cursor);
             cursor = rest;
             if token.is_empty() {
                 host.print("WARNING: incomplete line at end of file\n");
@@ -666,7 +722,7 @@ pub fn VM_LoadSymbols(
             let token_c = std::ffi::CString::new(token).unwrap();
             let mut value = ParseHex(token_c.as_ptr());
 
-            let (token, rest) = crate::qcommon::com_string::COM_Parse(cursor);
+            let (token, rest) = COM_Parse(cursor);
             cursor = rest;
             if token.is_empty() {
                 host.print("WARNING: incomplete line at end of file\n");
@@ -760,9 +816,7 @@ pub fn VM_Create(
 
         // never allow dll loading with a demo
         if interpret == vmInterpret_t::VMI_NATIVE {
-            if crate::cvar_fns::Cvar_VariableValue(common, cm, rm, host, c"fs_restrict".as_ptr())
-                != 0.0
-            {
+            if Cvar_VariableValue(common, cm, rm, host, c"fs_restrict".as_ptr()) != 0.0 {
                 interpret = vmInterpret_t::VMI_COMPILED;
             }
         }
@@ -771,11 +825,7 @@ pub fn VM_Create(
             // try to load as a system dll
             let vm_name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
             host.print(&format!("Loading dll file {vm_name}.\n"));
-            (*vm).dllHandle = crate::qcommon::sys_dll::Sys_LoadDll(
-                module,
-                &mut (*vm).entryPoint,
-                VM_DllSyscall as _,
-            );
+            (*vm).dllHandle = Sys_LoadDll(module, &mut (*vm).entryPoint, VM_DllSyscall as _);
             if !(*vm).dllHandle.is_null() {
                 return vm;
             }
@@ -806,7 +856,7 @@ pub fn VM_Create(
         // byte swap the header
         for j in 0..(core::mem::size_of::<vmHeader_t>() / 4) {
             let p = (header as *mut c_int).add(j);
-            *p = crate::qcommon::byteswap::LittleLong(*p);
+            *p = LittleLong(*p);
         }
 
         // validate
@@ -847,7 +897,7 @@ pub fn VM_Create(
         let mut k = 0;
         while k < (*header).dataLength {
             let p = (*vm).dataBase.add(k as usize) as *mut c_int;
-            *p = crate::qcommon::byteswap::LittleLong(*p);
+            *p = LittleLong(*p);
             k += 4;
         }
 
@@ -861,10 +911,10 @@ pub fn VM_Create(
         (*vm).codeLength = (*header).codeLength;
 
         if interpret as c_int >= vmInterpret_t::VMI_COMPILED as c_int {
-            (*vm).compiled = mp_qshared::shared::qboolean::qtrue;
+            (*vm).compiled = qtrue;
             crate::vm_x86::VM_Compile(common, cm, rm, host, vm, header);
         } else {
-            (*vm).compiled = mp_qshared::shared::qboolean::qfalse;
+            (*vm).compiled = qfalse;
             crate::vm_interpreted::VM_PrepareInterpreter(common, cm, rm, host, vm, header);
         }
 
@@ -927,7 +977,7 @@ pub fn VM_Restart(
         // byte swap the header
         for j in 0..(core::mem::size_of::<vmHeader_t>() / 4) {
             let p = (header as *mut c_int).add(j);
-            *p = crate::qcommon::byteswap::LittleLong(*p);
+            *p = LittleLong(*p);
         }
 
         // validate
@@ -967,7 +1017,7 @@ pub fn VM_Restart(
         let mut k = 0;
         while k < (*header).dataLength {
             let p = (*vm).dataBase.add(k as usize) as *mut c_int;
-            *p = crate::qcommon::byteswap::LittleLong(*p);
+            *p = LittleLong(*p);
             k += 4;
         }
 

@@ -21,17 +21,42 @@ struct RmManager;
 
 use core::ffi::{c_char, c_int};
 
-use mp_engine_icarus::q3_interface::S_COLOR_YELLOW;
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::surface_flags::{CONTENTS_OPAQUE, CONTENTS_SOLID, MATERIAL_LAST, SURF_SKY};
-use mp_qshared::shared::{qboolean, vec3_t, MAX_QPATH};
+use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t, MAX_QPATH};
 
 use crate::cm::ccmshader::CCMShader;
 use crate::cm::cm_shader_consts::MAX_SHADER_FILES;
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
+
+// Raven `S_COLOR_YELLOW` — not reachable from this crate (icarus/game keep
+// their own private copies of this same literal; qshared has no public
+// home for it yet), so this file keeps its own copy per that precedent.
+// Source: `oracle/codemp/game/q_shared.h:1163`
+const S_COLOR_YELLOW: &str = "^3";
+
+// PORT-NOTE(q_math-reach): `COM_ParseExt`/`SkipWhitespace`/`SkipBracedSection`/
+// `SkipRestOfLine`/`Q_stricmp`/`Q_strncpyz`/`Com_sprintf` (q_shared/q_math
+// primitives) are ported in `mp_game`, a tier above this crate's dependency
+// graph (cm_load.rs/files_common.rs precedent) — not reachable here.
+// Referenced by their exact Raven names; `Com_sprintf` narrowed to a
+// pre-formatted `&str` (Rust has no safe C-variadic fn definitions) matching
+// the net_chan.rs/files_common.rs `Com_sprintf` call precedent; `Com_Error`
+// narrowed to `(common, code, msg)` matching the files_common.rs precedent
+// (ruling 1: receiverless panic).
+extern "Rust" {
+    fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *mut c_char;
+    fn SkipWhitespace(data: *const c_char, hasNewLines: *mut qboolean) -> *const c_char;
+    fn SkipBracedSection(program: *mut *const c_char);
+    fn SkipRestOfLine(data: *mut *const c_char);
+    fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int;
+    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
+    fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: &str);
+    fn Com_Error(common: &mut Common, code: c_int, msg: &str);
+}
 
 /// Raven `SV_ParseSurfaceParm` — match the next token against `svInfoParms`,
 /// OR/AND-ing the shader's surface/content flags from the matching row.
@@ -46,10 +71,10 @@ pub fn SV_ParseSurfaceParm(
     // Source: oracle/codemp/qcommon/cm_shader.cpp:226-259
     let numsvInfoParms: c_int = cm.svInfoParms.len() as c_int;
 
-    let token = crate::qcommon::com_parse::COM_ParseExt(text, false);
+    let token = unsafe { COM_ParseExt(text, qfalse) };
     for i in 0..numsvInfoParms {
         let row = &cm.svInfoParms[i as usize];
-        if crate::qcommon::q_shared::Q_stricmp(token, row.name) == 0 {
+        if unsafe { Q_stricmp(token, row.name) } == 0 {
             unsafe {
                 (*shader).surfaceFlags |= row.surfaceFlags;
                 (*shader).contentFlags |= row.contents;
@@ -104,9 +129,9 @@ pub fn CM_CreateShaderTextHash(
     let mut p: *const c_char = cm.shaderText;
     // look for label
     while !p.is_null() {
-        let mut hasNewLines: bool = false;
-        p = crate::qcommon::com_parse::SkipWhitespace(p, &mut hasNewLines);
-        let token = crate::qcommon::com_parse::COM_ParseExt(&mut p, true);
+        let mut hasNewLines: qboolean = qfalse;
+        p = unsafe { SkipWhitespace(p, &mut hasNewLines) };
+        let token = unsafe { COM_ParseExt(&mut p, qtrue) };
         if unsafe { *token } == 0 {
             break;
         }
@@ -117,7 +142,7 @@ pub fn CM_CreateShaderTextHash(
         // Source: oracle/codemp/qcommon/cm_shader.cpp:29
         cm.shaderTextTable.insert(shader);
 
-        crate::qcommon::com_parse::SkipBracedSection(&mut p);
+        unsafe { SkipBracedSection(&mut p) };
     }
 }
 
@@ -189,47 +214,49 @@ pub fn CM_LoadShaderFiles(
     // load and parse shader files
     while i < numShaders1 {
         let mut filename: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-        crate::qcommon::q_shared::Com_sprintf(
-            filename.as_mut_ptr(),
-            core::mem::size_of_val(&filename),
-            &format!("shaders/{}", unsafe { *shaderFiles1.add(i as usize) }),
-        );
+        unsafe {
+            Com_sprintf(
+                filename.as_mut_ptr(),
+                core::mem::size_of_val(&filename) as c_int,
+                &format!("shaders/{}", *shaderFiles1.add(i as usize)),
+            )
+        };
         crate::common::com_printf::Com_DPrintf(common, &format!("...loading '{}'\n", "filename"));
         sum += crate::files::FS_ReadFile(common, cm, rm, host, "filename", unsafe {
             buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void
         });
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
-            crate::common::com_error::Com_Error(
-                common,
-                cm,
-                rm,
-                host,
-                errorParm_t::ERR_FATAL,
-                &format!("Couldn't load {}", "filename"),
-            );
+            unsafe {
+                Com_Error(
+                    common,
+                    errorParm_t::ERR_FATAL as c_int,
+                    &format!("Couldn't load {}", "filename"),
+                )
+            };
         }
         i += 1;
     }
     while i < numShaders {
         let mut filename: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-        crate::qcommon::q_shared::Com_sprintf(
-            filename.as_mut_ptr(),
-            core::mem::size_of_val(&filename),
-            &format!("shaders/test/{}", "shaderFiles2[i - numShaders1]"),
-        );
+        unsafe {
+            Com_sprintf(
+                filename.as_mut_ptr(),
+                core::mem::size_of_val(&filename) as c_int,
+                &format!("shaders/test/{}", "shaderFiles2[i - numShaders1]"),
+            )
+        };
         crate::common::com_printf::Com_DPrintf(common, &format!("...loading '{}'\n", "filename"));
         sum += crate::files::FS_ReadFile(common, cm, rm, host, "filename", unsafe {
             buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void
         });
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
-            crate::common::com_error::Com_Error(
-                common,
-                cm,
-                rm,
-                host,
-                errorParm_t::ERR_DROP,
-                &format!("Couldn't load {}", "filename"),
-            );
+            unsafe {
+                Com_Error(
+                    common,
+                    errorParm_t::ERR_DROP as c_int,
+                    &format!("Couldn't load {}", "filename"),
+                )
+            };
         }
         i += 1;
     }
@@ -251,8 +278,8 @@ pub fn CM_LoadShaderFiles(
     let mut j = numShaders - 1;
     while j >= 0 {
         unsafe {
-            crate::qcommon::q_shared::strcat(cm.shaderText, c"\n".as_ptr());
-            crate::qcommon::q_shared::strcat(cm.shaderText, buffers[j as usize]);
+            libc::strcat(cm.shaderText, c"\n".as_ptr());
+            libc::strcat(cm.shaderText, buffers[j as usize]);
         }
         crate::files::FS_FreeFile(common, buffers[j as usize]);
         j -= 1;
@@ -289,7 +316,7 @@ pub fn SV_ParseMaterial(
     shader: *mut CCMShader,
     text: *mut *const c_char,
 ) {
-    let token = crate::qcommon::com_parse::COM_ParseExt(text, false);
+    let token = unsafe { COM_ParseExt(text, qfalse) };
     if unsafe { *token } == 0 {
         crate::common::com_printf::Com_Printf(
             common,
@@ -304,7 +331,7 @@ pub fn SV_ParseMaterial(
     for i in 0..MATERIAL_LAST {
         //TODO: Port svMaterialNames
         // Source: oracle/codemp/qcommon/cm_shader.cpp:285-288
-        if crate::qcommon::q_shared::Q_stricmp(token, cm.svMaterialNames[i as usize]) == 0 {
+        if unsafe { Q_stricmp(token, cm.svMaterialNames[i as usize]) } == 0 {
             unsafe {
                 (*shader).surfaceFlags |= i;
             }
@@ -324,8 +351,8 @@ pub fn CM_ParseVector(
     count: c_int,
     v: *mut f32,
 ) -> qboolean {
-    let mut token = crate::qcommon::com_parse::COM_ParseExt(text, false);
-    if unsafe { crate::qcommon::q_shared::strcmp(token, c"(".as_ptr()) } != 0 {
+    let mut token = unsafe { COM_ParseExt(text, qfalse) };
+    if unsafe { libc::strcmp(token, c"(".as_ptr()) } != 0 {
         crate::common::com_printf::Com_Printf(
             common,
             &format!(
@@ -334,11 +361,11 @@ pub fn CM_ParseVector(
                 unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
             ),
         );
-        return qboolean::qfalse as qboolean;
+        return qfalse;
     }
 
     for i in 0..count {
-        token = crate::qcommon::com_parse::COM_ParseExt(text, false);
+        token = unsafe { COM_ParseExt(text, qfalse) };
         if unsafe { *token } == 0 {
             crate::common::com_printf::Com_Printf(
                 common,
@@ -350,15 +377,15 @@ pub fn CM_ParseVector(
                     }
                 ),
             );
-            return qboolean::qfalse as qboolean;
+            return qfalse;
         }
         unsafe {
-            *v.add(i as usize) = crate::qcommon::q_shared::atof(token);
+            *v.add(i as usize) = libc::atof(token) as f32;
         }
     }
 
-    token = crate::qcommon::com_parse::COM_ParseExt(text, false);
-    if unsafe { crate::qcommon::q_shared::strcmp(token, c")".as_ptr()) } != 0 {
+    token = unsafe { COM_ParseExt(text, qfalse) };
+    if unsafe { libc::strcmp(token, c")".as_ptr()) } != 0 {
         crate::common::com_printf::Com_Printf(
             common,
             &format!(
@@ -367,9 +394,9 @@ pub fn CM_ParseVector(
                 unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
             ),
         );
-        return qboolean::qfalse as qboolean;
+        return qfalse;
     }
-    qboolean::qtrue as qboolean
+    qtrue
 }
 
 /// Raven `CM_LoadShaderText` — (re)build the cached shader-text buffer if
@@ -410,7 +437,7 @@ pub fn CM_ParseShader(
     shader: *mut CCMShader,
     text: *mut *const c_char,
 ) {
-    let mut token = crate::qcommon::com_parse::COM_ParseExt(text, true);
+    let mut token = unsafe { COM_ParseExt(text, qtrue) };
     if unsafe { *token } != b'{' as c_char {
         crate::common::com_printf::Com_Printf(
             common,
@@ -425,7 +452,7 @@ pub fn CM_ParseShader(
     }
 
     loop {
-        token = crate::qcommon::com_parse::COM_ParseExt(text, true);
+        token = unsafe { COM_ParseExt(text, qtrue) };
         if unsafe { *token } == 0 {
             crate::common::com_printf::Com_Printf(
                 common,
@@ -447,59 +474,57 @@ pub fn CM_ParseShader(
         }
         // stage definition
         else if c0 == b'{' as c_char {
-            crate::qcommon::com_parse::SkipBracedSection(text);
+            unsafe { SkipBracedSection(text) };
             continue;
         }
         // material deprecated as of 11 Jan 01
         // material undeprecated as of 7 May 01 - q3map_material deprecated
         else if unsafe {
-            crate::qcommon::q_shared::Q_stricmp(token, c"material".as_ptr()) == 0
-                || crate::qcommon::q_shared::Q_stricmp(token, c"q3map_material".as_ptr()) == 0
+            (Q_stricmp(token, c"material".as_ptr()) == 0)
+                || (Q_stricmp(token, c"q3map_material".as_ptr()) == 0)
         } {
             SV_ParseMaterial(common, cm, shader, text);
         }
         // sun parms
         // q3map_sun deprecated as of 11 Jan 01
         else if unsafe {
-            crate::qcommon::q_shared::Q_stricmp(token, c"sun".as_ptr()) == 0
-                || crate::qcommon::q_shared::Q_stricmp(token, c"q3map_sun".as_ptr()) == 0
+            (Q_stricmp(token, c"sun".as_ptr()) == 0)
+                || (Q_stricmp(token, c"q3map_sun".as_ptr()) == 0)
         } {
             //			float	a, b;
 
-            token = crate::qcommon::com_parse::COM_ParseExt(text, false);
+            token = unsafe { COM_ParseExt(text, qfalse) };
             //			shader->sunLight[0] = atof( token );
-            token = crate::qcommon::com_parse::COM_ParseExt(text, false);
+            token = unsafe { COM_ParseExt(text, qfalse) };
             //			shader->sunLight[1] = atof( token );
-            token = crate::qcommon::com_parse::COM_ParseExt(text, false);
+            token = unsafe { COM_ParseExt(text, qfalse) };
             //			shader->sunLight[2] = atof( token );
 
             //			VectorNormalize( shader->sunLight );
 
-            token = crate::qcommon::com_parse::COM_ParseExt(text, false);
+            token = unsafe { COM_ParseExt(text, qfalse) };
             //			a = atof( token );
             //			VectorScale( shader->sunLight, a, shader->sunLight);
 
-            token = crate::qcommon::com_parse::COM_ParseExt(text, false);
+            token = unsafe { COM_ParseExt(text, qfalse) };
             //			a = DEG2RAD(atof( token ));
 
-            token = crate::qcommon::com_parse::COM_ParseExt(text, false);
+            token = unsafe { COM_ParseExt(text, qfalse) };
             //			b = DEG2RAD(atof( token ));
 
             //			shader->sunDirection[0] = cos( a ) * cos( b );
             //			shader->sunDirection[1] = sin( a ) * cos( b );
             //			shader->sunDirection[2] = sin( b );
-        } else if unsafe {
-            crate::qcommon::q_shared::Q_stricmp(token, c"surfaceParm".as_ptr()) == 0
-        } {
+        } else if unsafe { Q_stricmp(token, c"surfaceParm".as_ptr()) == 0 } {
             SV_ParseSurfaceParm(cm, shader, text);
             continue;
-        } else if unsafe { crate::qcommon::q_shared::Q_stricmp(token, c"fogParms".as_ptr()) == 0 } {
+        } else if unsafe { Q_stricmp(token, c"fogParms".as_ptr()) } == 0 {
             let mut fogColor: vec3_t = vec3_t::default();
             if CM_ParseVector(common, shader, text, 3, fogColor.as_mut_ptr()) == 0 {
                 return;
             }
 
-            token = crate::qcommon::com_parse::COM_ParseExt(text, false);
+            token = unsafe { COM_ParseExt(text, qfalse) };
             if unsafe { *token } == 0 {
                 crate::common::com_printf::Com_Printf(
                     common,
@@ -516,7 +541,7 @@ pub fn CM_ParseShader(
             //			shader->depthForOpaque = atof( token );
 
             // skip any old gradient directions
-            crate::qcommon::com_parse::SkipRestOfLine(text);
+            unsafe { SkipRestOfLine(text) };
             continue;
         }
     }
@@ -588,7 +613,7 @@ pub fn CM_GetShaderInfo_ByName(
     ) as *mut CCMShader;
     // Set defaults
     unsafe {
-        crate::qcommon::q_shared::Q_strncpyz((*out).shader.as_mut_ptr(), name, MAX_QPATH);
+        Q_strncpyz((*out).shader.as_mut_ptr(), name, MAX_QPATH as c_int);
         (*out).contentFlags = CONTENTS_SOLID | CONTENTS_OPAQUE;
     }
 

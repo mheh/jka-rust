@@ -12,9 +12,13 @@ use mp_host_interface::engine_host::EngineHost;
 
 use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 
+use mp_qshared::shared::error_parm::errorParm_t;
+
 use crate::cmd::cmd_consts::{MAX_CMD_BUFFER, MAX_CMD_LINE};
+use crate::cmd_pc::{Cmd_ExecuteString, Cmd_List_f};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
+use crate::common_fns::Com_Memcpy;
 
 extern "C" {
     fn strcat(dest: *mut c_char, src: *const c_char) -> *mut c_char;
@@ -25,6 +29,39 @@ extern "C" {
         src: *const core::ffi::c_void,
         n: usize,
     ) -> *mut core::ffi::c_void;
+}
+
+// PORT-NOTE(q_math-reach): `Q_strncpyz`/`COM_DefaultExtension`/`va` (q_shared
+// primitives) and `Cvar_VariableString` are ported only in `mp_game`, a tier
+// above this crate's dependency graph (cm_load.rs/files_common.rs precedent)
+// — not reachable here. `Com_Printf`/`Com_Error`/`FS_ReadFile`/`FS_FreeFile`
+// are not yet landed in this crate under any importable path. Referenced by
+// their exact Raven names, narrowed to this file's call-site shapes (no
+// variadic `...` in safe Rust); each escalated as a missing symbol.
+extern "Rust" {
+    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
+    fn Com_Printf(common: &mut Common, msg: *const c_char);
+    fn Com_Error(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        sv: &mut Server,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        code: errorParm_t,
+        msg: *const c_char,
+    );
+    fn COM_DefaultExtension(path: *mut c_char, maxSize: c_int, extension: *const c_char);
+    fn FS_ReadFile(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        qpath: *const c_char,
+        buffer: *mut *mut (),
+    ) -> c_int;
+    fn FS_FreeFile(common: &mut Common, f: *mut ());
+    fn Cvar_VariableString(common: &mut Common, name: *mut c_char) -> *const c_char;
+    fn va(fmt: *const c_char, arg: *const c_char) -> *mut c_char;
 }
 
 // PORT-NOTE(rm-types): `RenderModels`/`Server` are state-receiver types pinned
@@ -260,6 +297,31 @@ pub fn Cmd_ArgvBuffer(common: &mut Common, arg: c_int, buffer: *mut c_char, buff
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:383-385`
 pub fn Cmd_ArgsBuffer(common: &mut Common, buffer: *mut c_char, bufferLength: c_int) {
     Q_strncpyz(buffer, Cmd_Args(common), bufferLength);
+}
+
+/// `Cbuf_AddText`.
+///
+/// Adds command text at the end of the buffer, does NOT add a final \n.
+///
+/// Source: `oracle/codemp/qcommon/cmd_common.cpp:68-78`
+pub fn Cbuf_AddText(common: &mut Common, text: *const c_char) {
+    unsafe {
+        let l = strlen(text) as c_int;
+
+        if common.cmd_text.cursize + l >= common.cmd_text.maxsize {
+            Com_Printf(
+                common,
+                b"Cbuf_AddText: overflow\n\0".as_ptr() as *const c_char,
+            );
+            return;
+        }
+        Com_Memcpy(
+            common.cmd_text.data.add(common.cmd_text.cursize as usize) as *mut (),
+            text as *const (),
+            l as usize,
+        );
+        common.cmd_text.cursize += l;
+    }
 }
 
 /// `Cbuf_InsertText`.

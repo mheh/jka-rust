@@ -12,6 +12,7 @@ mp_qshared = { path = "../../qshared" }
 abi_transport = { path = "../../../abi-transport" }
 native_platform = { path = "../../../native/platform" }
 native_math = { path = "../../../native/math" }
+native_types = { path = "../../../native/types" }
 # The RMG terrain seams (`register_terrain`, `rmg_create_seed`, the ctor's
 # empty-heightMap `Com_Error`) and cm_trace.rs's §F callees thread
 # `&mut impl EngineHost` — the one Stage-0 host-services trait (RMG-D3,

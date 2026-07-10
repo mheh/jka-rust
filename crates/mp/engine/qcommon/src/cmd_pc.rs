@@ -21,6 +21,16 @@ use crate::common_fns::Com_Filter;
 struct RenderModels;
 struct Server;
 
+// PORT-NOTE(q_math-reach): `Q_stricmp` (q_shared primitive) is ported only in
+// `mp_game`, a tier above this crate's dependency graph (cm_shader.rs
+// precedent) — not reachable here. `Com_Printf` is not yet landed in this
+// crate under any importable path. Both narrowed to this file's call-site
+// shapes; escalated as missing symbols.
+extern "Rust" {
+    fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int;
+    fn Com_Printf(common: &mut Common, msg: *const c_char);
+}
+
 // PORT-NOTE(cmd_function_t): `cmd_function_t` (linked-list node: `next`,
 // `name`, `function`) has no rosetta row — `Common`'s command-registry field
 // (`cmd_functions`) isn't landed yet either. Referenced verbatim per the
@@ -72,13 +82,19 @@ pub fn Cmd_List_f(common: &mut Common) {
             // PORT-NOTE(Com_Printf): the qcommon-side `Com_Printf` (routes
             // through the engine print sink / console) has no landed symbol
             // in this crate yet (escalated as missing, resolution packet
-            // `qcommon__1592_CM_DeleteCachedMap.md`).
-            Com_Printf(common, c"%s\n".as_ptr(), (*cmd).name);
+            // `qcommon__1592_CM_DeleteCachedMap.md`); narrowed to a single
+            // `*const c_char` (no safe C-variadic fn defs) — pre-format the
+            // name here, matching the `cmd_common.rs` `Cmd_Echo_f` precedent.
+            let name = core::ffi::CStr::from_ptr((*cmd).name).to_string_lossy();
+            Com_Printf(common, format!("{}\n", name).as_ptr() as *const c_char);
             i += 1;
             cmd = (*cmd).next;
         }
     }
-    Com_Printf(common, c"%i commands\n".as_ptr(), i);
+    Com_Printf(
+        common,
+        format!("{} commands\n", i).as_ptr() as *const c_char,
+    );
 }
 
 /// `Cmd_ExecuteString`.
@@ -106,9 +122,7 @@ pub fn Cmd_ExecuteString(
         let mut prev: *mut *mut cmd_function_t = &mut common.cmd_functions as *mut _;
         while !(*prev).is_null() {
             let cmd = *prev;
-            if crate::q_shared::Q_stricmp(crate::cmd_common::Cmd_Argv(common, 0), (*cmd).name)
-                == 0
-            {
+            if Q_stricmp(crate::cmd_common::Cmd_Argv(common, 0), (*cmd).name) == 0 {
                 // rearrange the links so that the command will be
                 // near the head of the list next time it is used
                 *prev = (*cmd).next;

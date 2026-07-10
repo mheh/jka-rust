@@ -36,6 +36,7 @@ use crate::cm::cmodel_s::cmodel_t;
 use crate::cm::leaf_list_s::leafList_t;
 use crate::cm::sphere_t::sphere_t;
 use crate::cm::trace_work_s::{traceWork_s, traceWork_t};
+use crate::cm_load::{CCMLandScape, RenderModels, RmManager};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use mp_host_interface::engine_host::EngineHost;

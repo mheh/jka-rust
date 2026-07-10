@@ -14,7 +14,7 @@ use core::ffi::{c_char, c_int, c_long, c_uint};
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::fsMode_t::{self, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
+use mp_qshared::shared::fsMode_t::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
 use mp_qshared::shared::fs_origin::fsOrigin_t;
 use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_STRING_TOKENS};
 use mp_qshared::shared::qboolean;
@@ -32,7 +32,7 @@ use crate::qcommon::filesystem_limits::{
 // PORT-NOTE(render-models): `RenderModels` is the tr-model state-home receiver
 // pinned by the preamble's state-receiver order (ruling 53); not yet landed
 // in the tree. Reported in missing_symbols.
-use crate::render_models::RenderModels;
+use crate::cm_load::RenderModels;
 
 /// Raven `FS_PakIsPure`.
 ///

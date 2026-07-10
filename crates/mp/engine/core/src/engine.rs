@@ -127,6 +127,14 @@ impl Engine {
             addr_of_mut!((*p).render_models).write(Default::default());
             addr_of_mut!((*p).nav).write(Default::default());
             addr_of_mut!((*p).roff).write(Default::default());
+            // cm.shaderTextTable: Vec-backed CmHashTable placeholder, not zero-valid.
+            addr_of_mut!((*p).cm.shaderTextTable).write(Default::default());
+            // cm.cmShaderTable: Vec-backed CmHashTable, not zero-valid.
+            addr_of_mut!((*p).cm.cmShaderTable).write(Default::default());
+            // cm.svInfoParms: real name-pointer/flag lookup table, not zero.
+            addr_of_mut!((*p).cm.svInfoParms).write(CollisionWorld::init_svInfoParms());
+            // cm.svMaterialNames: real C-string pointer table, not zero.
+            addr_of_mut!((*p).cm.svMaterialNames).write(CollisionWorld::init_svMaterialNames());
             // Common.stringed (ruling 50/55): BTreeMap-backed store, written
             // through its Default (= Raven's Clear(SE_FALSE)) per the ruling-55
             // construction story.

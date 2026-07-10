@@ -1,4 +1,3 @@
-/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/engine-cpass/crates/mp/engine/qcommon/src/files_common.rs:
 
 #![allow(
     non_snake_case,

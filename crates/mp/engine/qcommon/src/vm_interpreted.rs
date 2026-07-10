@@ -6,7 +6,7 @@ use std::os::raw::{c_char, c_int};
 
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::ha_pref::ha_pref;
+use mp_qshared::shared::ha_pref;
 
 use crate::collision_world::CollisionWorld;
 use crate::common::com_error;
@@ -16,7 +16,6 @@ use crate::qfiles::vm_header_t::vmHeader_t;
 use crate::vm::opcode_t::opcode_t;
 use crate::vm::vm_s::vm_t;
 use crate::vm_fns::VM_ValueToSymbol;
-use crate::z_memman_pc::Hunk_Alloc;
 
 // PORT-NOTE(rm-types): `RenderModels` is the state-receiver type pinned by
 // the engine-fork-discovery preamble's receiver order (rmg-terrain.md /
@@ -25,6 +24,23 @@ use crate::z_memman_pc::Hunk_Alloc;
 // precedent); reported as a missing symbol for the finisher.
 #[allow(dead_code)]
 struct RenderModels;
+
+// PORT-NOTE(unlanded-callee): `Hunk_Alloc` (z_memman_pc.cpp) has a real body
+// in `z_memman_pc.rs`, but that file's own `RenderModels` placeholder is a
+// distinct type from this file's — the real fn isn't callable here (same gap
+// as vm_x86.rs/vm_fns.rs). Forward-declared in the established `extern
+// "Rust"` shape, narrowed to this file's own `RenderModels`.
+// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:791-793`
+extern "Rust" {
+    fn Hunk_Alloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        size: c_int,
+        preference: ha_pref,
+    ) -> *mut ();
+}
 
 /// Raven `loadWord` — file-static helper, non-`_BIG_ENDIAN_PPC_` macro arm
 /// (`*((int *)addr)`; oracle's PPC `__lwbrx` arm doesn't apply to our target).

@@ -14,6 +14,14 @@ use mp_qshared::shared::{errorParm_t, qboolean, qfalse, qtrue};
 
 use crate::common::Common;
 
+// PORT-NOTE(q_math-reach): `Q_strncpyz` (q_shared primitive) is ported in
+// `mp_game`, a tier above this crate's dependency graph (cm_load.rs/
+// files_common.rs precedent) — not reachable here. Referenced by its exact
+// Raven name.
+extern "Rust" {
+    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
+}
+
 // PORT-NOTE(cross-crate): `Server`/`SV_GentityNum` (oracle/codemp/qcommon/../
 // server/server.h:233; server/sv_game.cpp:58) live in `mp_engine_server`,
 // which itself depends on THIS crate (`mp_engine_qcommon`) — importing them
@@ -158,11 +166,7 @@ pub fn MSG_WriteBigString(common: &mut Common, sb: *mut msg_t, s: *const c_char)
                 return;
             }
             let mut string = [0u8; mp_qshared::shared::limits::BIG_INFO_STRING];
-            crate::q_shared::Q_strncpyz(
-                string.as_mut_ptr() as *mut c_char,
-                s,
-                string.len() as c_int,
-            );
+            Q_strncpyz(string.as_mut_ptr() as *mut c_char, s, string.len() as c_int);
 
             // eurofix: remove this so we can chat in european languages...	-ste
             // (0xff-strip loop left commented in the oracle; not ported)

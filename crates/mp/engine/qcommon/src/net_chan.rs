@@ -21,15 +21,29 @@ use crate::qcommon::net_limits::MAX_MSGLEN;
 use crate::qcommon::netchan_t::netchan_t;
 use crate::qcommon::protocol::PORT_SERVER;
 
-// PORT-NOTE(engine-host-state): `RenderModels` does not exist anywhere in the
-// tree yet (grepped, no hits) — same situation as sv_init.rs/sv_ccmds.rs.
-// Imported by its preamble-table decl-home crate; escalated in
-// missing_symbols rather than stubbed (ZERO-PARK), following the sibling
-// files' precedent exactly. `mp_engine_qcommon`'s Cargo.toml does not yet
-// depend on `mp_engine_renderer`/`mp_game` — escalated alongside.
-use mp_engine_renderer::RenderModels;
-use mp_game::q_shared_cvar_flags::{CVAR_INIT, CVAR_TEMP};
 use mp_host_interface::engine_host::EngineHost;
+
+// PORT-NOTE(engine-host-state): `RenderModels`'s real definition
+// (`mp_renderer::tr_model::render_models::RenderModels`) is unreachable —
+// `mp_renderer` depends on `mp_engine_qcommon`, so importing it here would
+// cycle. Local placeholder struct matching the cm_load.rs/vm_fns.rs/
+// cmd_common.rs precedent throughout this crate.
+#[allow(dead_code)]
+struct RenderModels;
+
+// PORT-NOTE(cvar-flags-reach): `CVAR_INIT`/`CVAR_TEMP` (q_shared.h) live in
+// `mp_game::q_shared_cvar_flags`, a tier above this crate (`mp_game` depends
+// on `mp_engine_qcommon`, so depending back would cycle) — same reachability
+// gap as common_fns.rs/vm_fns.rs's identical `mp_game::q_shared_cvar_flags::*`
+// references. Escalated in missing_symbols; local consts transcribed here
+// pending the canonical q_shared.h flags home landing somewhere both crates
+// can reach (e.g. mp_qshared).
+/// Raven `CVAR_INIT`.
+/// Source: `oracle/codemp/game/q_shared.h:1788`
+const CVAR_INIT: c_int = 0x0000_0010;
+/// Raven `CVAR_TEMP`.
+/// Source: `oracle/codemp/game/q_shared.h:1799`
+const CVAR_TEMP: c_int = 0x0000_0100;
 
 // PORT-NOTE(cvar-globals): `showpackets`/`showdrop`/`qport`/
 // `net_killdroppedfragments` are file-scope `cvar_t*` globals
@@ -61,6 +75,15 @@ use mp_host_interface::engine_host::EngineHost;
 /// Source: `oracle/codemp/qcommon/net_chan.cpp:45-48`
 const NETSRC_STRING: [&str; 2] = ["client", "server"];
 
+// PORT-NOTE(q_math-reach): `Com_sprintf` (q_shared/q_math primitive) is
+// ported in `mp_game`, a tier above this crate's dependency graph — not
+// reachable here. Narrowed to a pre-formatted `&str` (Rust has no safe
+// C-variadic fn definitions), matching the cm_shader.rs/files_common.rs
+// `Com_sprintf` precedent exactly.
+extern "Rust" {
+    fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: &str);
+}
+
 /// Raven `NET_AdrToString`.
 ///
 /// Source: `oracle/codemp/qcommon/net_chan.cpp:406-426`
@@ -68,47 +91,49 @@ pub fn NET_AdrToString(common: &mut Common, a: netadr_t) -> *const c_char {
     let s_ptr = common.net_adr_to_string_buf.as_mut_ptr() as *mut c_char;
     let size = common.net_adr_to_string_buf.len() as c_int;
 
-    match a.r#type {
-        netadrtype_t::NA_LOOPBACK => {
-            mp_qshared::shared::Com_sprintf(s_ptr, size, "loopback");
-        }
-        netadrtype_t::NA_BOT => {
-            mp_qshared::shared::Com_sprintf(s_ptr, size, "bot");
-        }
-        netadrtype_t::NA_IP => {
-            // BigShort(a.port): host is little-endian (matches the referee
-            // platform), so BigShort is a byte-swap; %i vararg promotion
-            // sign-extends the `short` return, reproduced via the i16 hop.
-            let port = (a.port.swap_bytes() as i16) as i32;
-            mp_qshared::shared::Com_sprintf(
-                s_ptr,
-                size,
-                &format!("{}.{}.{}.{}:{}", a.ip[0], a.ip[1], a.ip[2], a.ip[3], port),
-            );
-        }
-        netadrtype_t::NA_BAD => {
-            mp_qshared::shared::Com_sprintf(s_ptr, size, "BAD");
-        }
-        _ => {
-            let port = (a.port.swap_bytes() as i16) as i32;
-            mp_qshared::shared::Com_sprintf(
-                s_ptr,
-                size,
-                &format!(
-                    "{:02x}{:02x}{:02x}{:02x}.{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}:{}",
-                    a.ipx[0],
-                    a.ipx[1],
-                    a.ipx[2],
-                    a.ipx[3],
-                    a.ipx[4],
-                    a.ipx[5],
-                    a.ipx[6],
-                    a.ipx[7],
-                    a.ipx[8],
-                    a.ipx[9],
-                    port
-                ),
-            );
+    unsafe {
+        match a.r#type {
+            netadrtype_t::NA_LOOPBACK => {
+                Com_sprintf(s_ptr, size, "loopback");
+            }
+            netadrtype_t::NA_BOT => {
+                Com_sprintf(s_ptr, size, "bot");
+            }
+            netadrtype_t::NA_IP => {
+                // BigShort(a.port): host is little-endian (matches the referee
+                // platform), so BigShort is a byte-swap; %i vararg promotion
+                // sign-extends the `short` return, reproduced via the i16 hop.
+                let port = (a.port.swap_bytes() as i16) as i32;
+                Com_sprintf(
+                    s_ptr,
+                    size,
+                    &format!("{}.{}.{}.{}:{}", a.ip[0], a.ip[1], a.ip[2], a.ip[3], port),
+                );
+            }
+            netadrtype_t::NA_BAD => {
+                Com_sprintf(s_ptr, size, "BAD");
+            }
+            _ => {
+                let port = (a.port.swap_bytes() as i16) as i32;
+                Com_sprintf(
+                    s_ptr,
+                    size,
+                    &format!(
+                        "{:02x}{:02x}{:02x}{:02x}.{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}:{}",
+                        a.ipx[0],
+                        a.ipx[1],
+                        a.ipx[2],
+                        a.ipx[3],
+                        a.ipx[4],
+                        a.ipx[5],
+                        a.ipx[6],
+                        a.ipx[7],
+                        a.ipx[8],
+                        a.ipx[9],
+                        port
+                    ),
+                );
+            }
         }
     }
 
@@ -369,7 +394,7 @@ pub fn NET_OutOfBandData(
     common: &mut Common,
     sock: netsrc_t,
     adr: netadr_t,
-    format: *mut mp_game::prelude::byte,
+    format: *mut native_types::byte,
     len: c_int,
 ) {
     // §19: Raven's `byte string[MAX_MSGLEN*2]` local is written header-first

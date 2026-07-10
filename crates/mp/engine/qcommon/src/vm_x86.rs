@@ -9,13 +9,17 @@
 //! Source: `oracle/codemp/qcommon/vm_x86.cpp`
 
 use core::ffi::{c_char, c_int};
+use std::ffi::CStr;
 
 use mp_host_interface::engine_host::EngineHost;
+use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::ha_pref::ha_pref;
 use native_types::{byte, qboolean, qfalse, qtrue};
 
 use crate::collision_world::CollisionWorld;
-use crate::common::Common;
+use crate::common::{com_error, com_printf, Common};
+use crate::common_fns::{Com_Memcpy, Com_Memset};
 use crate::qfiles::vm_header_t::vmHeader_t;
 use crate::vm::elastcommand::ELastCommand;
 use crate::vm::opcode_t::opcode_t;
@@ -31,6 +35,36 @@ use crate::vm::vm_s::vm_t;
 struct RenderModels;
 #[allow(dead_code)]
 struct RmManager;
+
+// PORT-NOTE(unlanded-callees): the `z_memman_pc.cpp` zone allocator
+// (`Z_Malloc`/`Z_Free`) has no ported body in this crate yet, and the pub
+// `Hunk_Alloc` threads the sibling file's own `RenderModels` placeholder (a
+// distinct type from this file's). Forward-declared here in the established
+// `extern "Rust"` shape (cm_load.rs precedent) so the emitter compiles against
+// this file's placeholders; the finisher swaps these for the real imports once
+// the shared `RenderModels`/`RmManager` state lands (rmg-terrain.md/tr-model.md).
+// Source: `oracle/codemp/qcommon/z_memman_pc.cpp` (Z_Malloc/Z_Free/Hunk_Alloc)
+extern "Rust" {
+    fn Z_Malloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        iSize: c_int,
+        eTag: memtag_t,
+        bZeroit: qboolean,
+        iUnusedAlign: c_int,
+    ) -> *mut ();
+    fn Z_Free(common: &mut Common, pvAddress: *mut ());
+    fn Hunk_Alloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        size: c_int,
+        preference: ha_pref,
+    ) -> *mut ();
+}
 
 /// `callAsmCall`.
 ///
@@ -173,21 +207,12 @@ pub fn Hex(
         return c - b'0' as c_int;
     }
 
-    // PORT-NOTE(missing-callee): `Com_Error` is part of the still-unlanded
-    // cm_load.cpp cyclic unit (qcommon__1592_CM_DeleteCachedMap.md); called
-    // with the exact resolved receivers and reported as a missing symbol.
-    Com_Error(
-        common,
-        cm,
-        rm,
-        rmg,
-        host,
-        errorParm_t::ERR_DROP as c_int,
-        c"Hex: bad char '%c'".as_ptr(),
-        c,
-    );
-
-    0
+    // Raven `Com_Error( ERR_DROP, "Hex: bad char '%c'", c )` — the engine's
+    // longjmp error path is the diverging `com_error` panic (ruling 1).
+    com_error(
+        errorParm_t::ERR_DROP,
+        format!("Hex: bad char '{}'", c as u8 as char),
+    )
 }
 
 /// `EmitString`.
@@ -455,14 +480,9 @@ pub fn VM_Compile(
 
             while common.instruction < (*header).instructionCount {
                 if common.compiled_ofs > max_length - 16 {
-                    Com_Error(
-                        common,
-                        cm,
-                        rm,
-                        &mut rmg,
-                        host,
-                        errorParm_t::ERR_FATAL as c_int,
-                        c"VM_CompileX86: maxLength exceeded".as_ptr(),
+                    com_error(
+                        errorParm_t::ERR_FATAL,
+                        "VM_CompileX86: maxLength exceeded".into(),
                     );
                 }
 
@@ -472,14 +492,9 @@ pub fn VM_Compile(
                 common.instruction += 1;
 
                 if common.pc > (*header).codeLength {
-                    Com_Error(
-                        common,
-                        cm,
-                        rm,
-                        &mut rmg,
-                        host,
-                        errorParm_t::ERR_FATAL as c_int,
-                        c"VM_CompileX86: pc > header->codeLength".as_ptr(),
+                    com_error(
+                        errorParm_t::ERR_FATAL,
+                        "VM_CompileX86: pc > header->codeLength".into(),
                     );
                 }
 
@@ -1596,16 +1611,12 @@ pub fn VM_Compile(
                         Emit4(common, (*vm).instructionPointers as c_int);
                     }
                     _ => {
-                        Com_Error(
-                            common,
-                            cm,
-                            rm,
-                            &mut rmg,
-                            host,
-                            errorParm_t::ERR_DROP as c_int,
-                            c"VM_CompileX86: bad opcode %i at offset %i".as_ptr(),
-                            op,
-                            common.pc,
+                        com_error(
+                            errorParm_t::ERR_DROP,
+                            format!(
+                                "VM_CompileX86: bad opcode {} at offset {}",
+                                op, common.pc
+                            ),
                         );
                     }
                 }
@@ -1616,7 +1627,8 @@ pub fn VM_Compile(
 
         // copy to an exact size buffer on the hunk
         (*vm).codeLength = common.compiled_ofs;
-        (*vm).codeBase = Hunk_Alloc(common, cm, rm, host, common.compiled_ofs, h_low) as *mut byte;
+        (*vm).codeBase =
+            Hunk_Alloc(common, cm, rm, host, common.compiled_ofs, ha_pref::h_low) as *mut byte;
         Com_Memcpy(
             (*vm).codeBase as *mut (),
             common.buf as *const (),
@@ -1624,12 +1636,12 @@ pub fn VM_Compile(
         );
         Z_Free(common, common.buf as *mut ());
         Z_Free(common, common.jused as *mut ());
-        Com_Printf(
-            common,
-            c"VM file %s compiled to %i bytes of code\n".as_ptr(),
-            (*vm).name.as_ptr(),
-            common.compiled_ofs,
+        let vm_name = CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
+        let msg = format!(
+            "VM file {} compiled to {} bytes of code\n",
+            vm_name, common.compiled_ofs
         );
+        com_printf(common, &msg);
 
         // offset all the instruction pointers for the new location
         for i in 0..(*header).instructionCount {
