@@ -38,7 +38,7 @@ use mp_host_interface::engine_host::EngineHost;
 
 // PORT-NOTE(rm-types): see module doc.
 #[allow(dead_code)]
-struct RenderModels;
+use crate::cm_load::RenderModels;
 #[allow(dead_code)]
 struct RmManager;
 

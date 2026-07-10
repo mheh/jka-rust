@@ -2,19 +2,28 @@
 //!
 //! Source: `oracle/codemp/qcommon/unzip.cpp`
 
-use core::ffi::{c_char, c_int, c_long, c_uint};
+use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong};
+
+use libc::{SEEK_CUR, SEEK_SET};
 
 use crate::files::unz_file::unzFile;
+use crate::files::unz_types::{
+    tm_unz, uInt, uLong, unz_file_info, unz_file_info_internal, unz_global_info, unz_s, z_stream,
+    FILE, ZF_DEFLATED, Z_OK, Z_STREAM_END,
+};
 use crate::files::unzip_consts::{
     CASESENSITIVITYDEFAULTVALUE, SIZECENTRALDIRITEM, SIZEZIPLOCALHEADER, UNZ_BADZIPFILE,
     UNZ_BUFSIZE, UNZ_END_OF_LIST_OF_FILE, UNZ_EOF, UNZ_ERRNO, UNZ_MAXFILENAMEINZIP, UNZ_OK,
     UNZ_PARAMERROR,
 };
 
-// PORT-NOTE(unzip-types): `FILE`/`ZIP_FILE`, `uLong`/`uInt`, `unz_s`, `unz_file_info`,
-// `unz_file_info_internal`, `tm_unz` are not in the type rosetta and have no crate in this
-// worktree yet (missing_symbols reports each). Referenced verbatim by the packets' resolved
-// names below, per the no-stub/escalation rule.
+extern "C" {
+    // Vendored zlib32 `inflate` (external C library the oracle links via
+    // `#include "../zlib32/zip.h"`, `oracle/codemp/zlib32/zip.h:187`). The
+    // DEFLATE decompressor is the one genuine zlib dependency the minizip
+    // reader pulls in; declared here as the external symbol, not ported.
+    fn inflate(z: *mut z_stream) -> c_int;
+}
 
 /// Raven `unzlocal_getShort` — reads a little-endian 16-bit value from `fin` into `*pX`.
 ///
@@ -23,12 +32,12 @@ pub fn unzlocal_getShort(fin: *mut FILE, pX: *mut uLong) -> c_int {
     let mut v: i16 = 0;
     unsafe {
         libc::fread(
-            &mut v as *mut i16 as *mut (),
-            core::mem::size_of::<i16>() as c_uint,
+            &mut v as *mut i16 as *mut libc::c_void,
+            core::mem::size_of::<i16>(),
             1,
             fin,
         );
-        *pX = LittleShort(v) as uLong;
+        *pX = i16::from_le(v) as uLong;
     }
     UNZ_OK
 }
@@ -40,12 +49,12 @@ pub fn unzlocal_getLong(fin: *mut FILE, pX: *mut uLong) -> c_int {
     let mut v: i32 = 0;
     unsafe {
         libc::fread(
-            &mut v as *mut i32 as *mut (),
-            core::mem::size_of::<i32>() as c_uint,
+            &mut v as *mut i32 as *mut libc::c_void,
+            core::mem::size_of::<i32>(),
             1,
             fin,
         );
-        *pX = LittleLong(v) as uLong;
+        *pX = i32::from_le(v) as uLong;
     }
     UNZ_OK
 }
@@ -188,8 +197,8 @@ pub fn unzReadCurrentFile(file: unzFile, buf: *mut (), len: c_uint) -> c_int {
                     }
                 }
                 if libc::fread(
-                    (*pfile_in_zip_read_info).read_buffer as *mut (),
-                    uReadThis,
+                    (*pfile_in_zip_read_info).read_buffer as *mut libc::c_void,
+                    uReadThis as usize,
                     1,
                     (*pfile_in_zip_read_info).file,
                 ) != 1
@@ -316,7 +325,7 @@ pub fn unzGetLocalExtrafield(file: unzFile, buf: *mut (), len: c_uint) -> c_int 
             return UNZ_PARAMERROR;
         }
 
-        let size_to_read: uLong = (*pfile_in_zip_read_info).size_local_extrafield
+        let size_to_read: uLong = (*pfile_in_zip_read_info).size_local_extrafield as uLong
             - (*pfile_in_zip_read_info).pos_local_extrafield;
 
         if buf.is_null() {
@@ -343,7 +352,7 @@ pub fn unzGetLocalExtrafield(file: unzFile, buf: *mut (), len: c_uint) -> c_int 
             return UNZ_ERRNO;
         }
 
-        if libc::fread(buf, size_to_read as uInt, 1, (*pfile_in_zip_read_info).file) != 1 {
+        if libc::fread(buf as *mut libc::c_void, size_to_read as usize, 1, (*pfile_in_zip_read_info).file) != 1 {
             return UNZ_ERRNO;
         }
 
@@ -372,7 +381,7 @@ pub fn unzGetGlobalComment(file: unzFile, szComment: *mut c_char, uSizeBuf: uLon
 
         if uReadThis > 0 {
             *szComment = 0;
-            if libc::fread(szComment as *mut (), uReadThis as uInt, 1, (*s).file) != 1 {
+            if libc::fread(szComment as *mut libc::c_void, uReadThis as usize, 1, (*s).file) != 1 {
                 return UNZ_ERRNO;
             }
         }
@@ -527,7 +536,7 @@ pub fn unzlocal_GetCurrentFileInfoInternal(
             }
 
             if file_info.size_filename > 0 && fileNameBufferSize > 0 {
-                if libc::fread(szFileName as *mut (), uSizeRead as uInt, 1, (*s).file) != 1 {
+                if libc::fread(szFileName as *mut libc::c_void, uSizeRead as usize, 1, (*s).file) != 1 {
                     err = UNZ_ERRNO;
                 }
             }
@@ -549,7 +558,7 @@ pub fn unzlocal_GetCurrentFileInfoInternal(
                 }
             }
             if file_info.size_file_extra > 0 && extraFieldBufferSize > 0 {
-                if libc::fread(extraField, uSizeRead as uInt, 1, (*s).file) != 1 {
+                if libc::fread(extraField as *mut libc::c_void, uSizeRead as usize, 1, (*s).file) != 1 {
                     err = UNZ_ERRNO;
                 }
             }
@@ -575,7 +584,7 @@ pub fn unzlocal_GetCurrentFileInfoInternal(
                 }
             }
             if file_info.size_file_comment > 0 && commentBufferSize > 0 {
-                if libc::fread(szComment as *mut (), uSizeRead as uInt, 1, (*s).file) != 1 {
+                if libc::fread(szComment as *mut libc::c_void, uSizeRead as usize, 1, (*s).file) != 1 {
                     err = UNZ_ERRNO;
                 }
             }
@@ -760,7 +769,7 @@ pub fn unzGoToFirstFile(file: unzFile) -> c_int {
             core::ptr::null_mut(),
             0,
         );
-        (*s).current_file_ok = err == UNZ_OK;
+        (*s).current_file_ok = (err == UNZ_OK) as uLong;
         err
     }
 }
@@ -774,7 +783,7 @@ pub fn unzGoToNextFile(file: unzFile) -> c_int {
     }
     unsafe {
         let s = file as *mut unz_s;
-        if !(*s).current_file_ok {
+        if (*s).current_file_ok == 0 {
             return UNZ_END_OF_LIST_OF_FILE;
         }
         if (*s).num_file + 1 == (*s).gi.number_entry {
@@ -797,7 +806,7 @@ pub fn unzGoToNextFile(file: unzFile) -> c_int {
             core::ptr::null_mut(),
             0,
         );
-        (*s).current_file_ok = err == UNZ_OK;
+        (*s).current_file_ok = (err == UNZ_OK) as uLong;
         err
     }
 }
@@ -825,7 +834,7 @@ pub fn unzSetCurrentFileInfoPosition(file: unzFile, pos: c_ulong) -> c_int {
             core::ptr::null_mut(),
             0,
         );
-        (*s).current_file_ok = err == UNZ_OK;
+        (*s).current_file_ok = (err == UNZ_OK) as uLong;
     }
     UNZ_OK
 }
@@ -845,7 +854,7 @@ pub fn unzLocateFile(file: unzFile, szFileName: *const c_char, iCaseSensitivity:
         }
 
         let s = file as *mut unz_s;
-        if !(*s).current_file_ok {
+        if (*s).current_file_ok == 0 {
             return UNZ_END_OF_LIST_OF_FILE;
         }
 

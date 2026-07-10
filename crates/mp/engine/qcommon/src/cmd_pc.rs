@@ -18,7 +18,7 @@ use crate::common_fns::Com_Filter;
 // depends on this crate — importing it here would cycle). Referenced by their
 // exact resolved-signature names per the no-stub rule; reported as missing
 // symbols (`cmd_common.rs` precedent).
-pub(crate) struct RenderModels;
+pub(crate) use crate::cm_load::RenderModels;
 pub(crate) struct Server;
 
 // PORT-NOTE(q_math-reach): `Q_stricmp` (q_shared primitive) is ported only in
@@ -56,7 +56,7 @@ extern "Rust" {
 // `name`, `function`) has no rosetta row — `Common`'s command-registry field
 // (`cmd_functions`) isn't landed yet either. Referenced verbatim per the
 // no-stub rule; both escalated as missing symbols.
-struct cmd_function_t {
+pub(crate) struct cmd_function_t {
     next: *mut cmd_function_t,
     name: *const c_char,
     function: Option<extern "C" fn()>,

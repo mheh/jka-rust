@@ -23,7 +23,7 @@ use crate::vm_fns::VM_ValueToSymbol;
 // its exact resolved-signature name per the no-stub rule (z_memman_pc.rs
 // precedent); reported as a missing symbol for the finisher.
 #[allow(dead_code)]
-struct RenderModels;
+use crate::cm_load::RenderModels;
 
 // PORT-NOTE(unlanded-callee): `Hunk_Alloc` (z_memman_pc.cpp) has a real body
 // in `z_memman_pc.rs`, but that file's own `RenderModels` placeholder is a

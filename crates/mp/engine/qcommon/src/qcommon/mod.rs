@@ -3,12 +3,14 @@
 pub mod clc_ops_e;
 pub mod cpuid;
 pub mod filesystem_limits;
+pub mod huff;
 pub mod huff_t;
 pub mod huffman_consts;
 pub mod huffman_t;
 pub mod joystick_axis_t;
 pub mod msg_consts;
 pub mod net_chan_cpp_consts;
+pub mod net_field_t;
 pub mod net_limits;
 pub mod netchan_t;
 pub mod nodetype;

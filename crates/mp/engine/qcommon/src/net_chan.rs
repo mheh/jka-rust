@@ -30,7 +30,7 @@ use mp_qshared::shared::cvar::cvar_t;
 // cycle. Local placeholder struct matching the cm_load.rs/vm_fns.rs/
 // cmd_common.rs precedent throughout this crate.
 #[allow(dead_code)]
-struct RenderModels;
+use crate::cm_load::RenderModels;
 
 // PORT-NOTE(cvar-flags-reach): `CVAR_INIT`/`CVAR_TEMP` (q_shared.h) live in
 // `mp_game::q_shared_cvar_flags`, a tier above this crate (`mp_game` depends
@@ -110,6 +110,15 @@ extern "Rust" {
 // shape mismatch for the finisher to wire a `PlatformHost` receiver through.
 extern "Rust" {
     fn Sys_StringToAdr(s: &str, a: &mut netadr_t) -> bool;
+}
+
+// PORT-NOTE(sys-send-packet-reach): `Sys_SendPacket` is `PlatformHost::
+// send_packet` (host-interface/src/platform_host.rs), but `NET_SendPacket`'s
+// pinned signature threads no `PlatformHost` receiver — forward-declared here
+// by its exact Raven call-site shape (no-stub rule), mirroring the
+// `Sys_StringToAdr` precedent above; escalated for a `PlatformHost` wiring.
+extern "Rust" {
+    fn Sys_SendPacket(length: c_int, data: *const (), to: netadr_t);
 }
 
 /// Raven `NET_AdrToString`.
@@ -252,6 +261,37 @@ pub fn NET_SendLoopPacket(
             length as usize,
         );
         loop_.msgs[i].datalen = length;
+    }
+}
+
+/// Raven `NET_SendPacket`.
+///
+/// Source: `oracle/codemp/qcommon/net_chan.cpp:531-549`
+pub fn NET_SendPacket(
+    common: &mut Common,
+    sock: netsrc_t,
+    length: c_int,
+    data: *const (),
+    to: netadr_t,
+) {
+    unsafe {
+        // sequenced packets are shown in netchan, so just show oob
+        if common.showpackets != 0 && *(data as *const c_int) == -1 {
+            crate::common::common::com_printf(common, &format!("send packet {length:4}\n"));
+        }
+
+        if to.r#type == netadrtype_t::NA_LOOPBACK {
+            NET_SendLoopPacket(common, sock, length, data, to);
+            return;
+        }
+        if to.r#type == netadrtype_t::NA_BOT {
+            return;
+        }
+        if to.r#type == netadrtype_t::NA_BAD {
+            return;
+        }
+
+        Sys_SendPacket(length, data, to);
     }
 }
 
@@ -450,7 +490,7 @@ pub fn NET_OutOfBandData(
         };
 
         // set the header
-        crate::msg::Huff_Compress(common, &mut mbuf, 12);
+        crate::qcommon::huff::Huff_Compress(&mut mbuf, 12);
         // send the datagram
         NET_SendPacket(common, sock, mbuf.cursize, mbuf.data as *const (), adr);
     }

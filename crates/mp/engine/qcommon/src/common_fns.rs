@@ -35,15 +35,15 @@ use crate::qcommon::sys_event_type_t::sysEventType_t;
 // the no-stub rule; reported as missing symbols/shape mismatches for the
 // finisher (cm_trace.rs precedent).
 #[allow(dead_code)]
-struct RenderModels;
+use crate::cm_load::RenderModels;
 #[allow(dead_code)]
 struct RmManager;
 #[allow(dead_code)]
-struct Ghoul2System;
+use crate::z_memman_pc::Ghoul2System;
 #[allow(dead_code)]
 struct BotLib;
 #[allow(dead_code)]
-struct Server;
+use crate::cmd_pc::Server;
 #[allow(dead_code)]
 struct Client;
 
@@ -605,7 +605,8 @@ pub fn Com_StartupVariable(
         }
         let s = crate::cmd_common::Cmd_Argv(common, 1);
         if r#match.is_null() || q_strcmp(s, r#match as *mut c_char) == 0 {
-            unsafe { Cvar_Set(common, cm, rm, host, s, crate::cmd_common::Cmd_Argv(common, 2)) };
+            let arg2 = crate::cmd_common::Cmd_Argv(common, 2);
+            unsafe { Cvar_Set(common, cm, rm, host, s, arg2) };
             let cv: *mut cvar_t =
                 unsafe { Cvar_Get(common, cm, rm, host, s, c"".as_ptr() as *mut c_char, 0) };
             unsafe {
@@ -735,7 +736,7 @@ pub fn Com_Freeze_f(
         crate::common::com_printf(common, "freeze <seconds>\n");
         return;
     }
-    let s: f32 = c_str_to_string(crate::cmd_common::Cmd_Argv(common, 1))
+    let s: f32 = unsafe { c_str_to_string(crate::cmd_common::Cmd_Argv(common, 1)) }
         .trim()
         .parse()
         .unwrap_or(0.0);

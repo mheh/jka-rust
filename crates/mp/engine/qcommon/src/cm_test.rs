@@ -211,7 +211,8 @@ pub fn CM_PointLeafnum(cm: &mut CollisionWorld, p: vec3_t) -> c_int {
         // map not loaded
         return 0;
     }
-    CM_PointLeafnum_r(cm, p, 0, &mut cm.cmg)
+    let cmg = core::ptr::addr_of_mut!(cm.cmg);
+    CM_PointLeafnum_r(cm, p, 0, cmg)
 }
 
 /// Raven `CM_BoxLeafnums`.
@@ -356,8 +357,8 @@ pub fn CM_PointContents(cm: &mut CollisionWorld, p: vec3_t, model: clipHandle_t)
                 leaf = &mut (*clipm).leaf;
             }
         } else {
-            local = &mut cm.cmg;
-            let leafnum = CM_PointLeafnum_r(cm, p, 0, &mut cm.cmg);
+            local = core::ptr::addr_of_mut!(cm.cmg);
+            let leafnum = CM_PointLeafnum_r(cm, p, 0, local);
             leaf = (*local).leafs.add(leafnum as usize);
         }
 

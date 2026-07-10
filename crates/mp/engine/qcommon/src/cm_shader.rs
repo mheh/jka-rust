@@ -15,7 +15,7 @@
 //! (`common_fns.rs` precedent); reported as missing symbols/shape mismatches
 //! for the finisher.
 #[allow(dead_code)]
-struct RenderModels;
+use crate::cm_load::RenderModels;
 #[allow(dead_code)]
 struct RmManager;
 

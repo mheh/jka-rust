@@ -483,7 +483,7 @@ pub fn CM_HandlePatchCollision(
     trace: &mut trace_t,
     _tStart: vec3_t,
     _tEnd: vec3_t,
-    patch: *mut CCMPatch,
+    patch: *mut crate::cm_patch::CmPatch,
     checkcount: c_int,
 ) {
     unsafe {
@@ -1089,7 +1089,9 @@ pub fn CM_TestBoundingBoxInCapsule(
         let h = CM_TempBoxModel(cm, (*tw).size[0], (*tw).size[1], qfalse);
         // calculate collision
         let cmod: *mut cmodel_t = CM_ClipHandleToModel(cm, h, core::ptr::null_mut());
-        CM_TestInLeaf(cm, rmg, host, tw, trace, &mut (*cmod).leaf, &mut cm.cmg);
+        let cmg = core::ptr::addr_of_mut!(cm.cmg);
+        let leaf = core::ptr::addr_of_mut!((*cmod).leaf);
+        CM_TestInLeaf(cm, rmg, host, tw, trace, leaf, cmg);
     }
 }
 
@@ -1416,17 +1418,9 @@ pub fn CM_TraceBoundingBoxThroughCapsule(
         let h = CM_TempBoxModel(cm, (*tw).size[0], (*tw).size[1], qfalse);
         // calculate collision
         let cmod: *mut cmodel_t = CM_ClipHandleToModel(cm, h, core::ptr::null_mut());
-        CM_TraceThroughLeaf(
-            common,
-            cm,
-            rm,
-            rmg,
-            host,
-            tw,
-            trace,
-            &mut cm.cmg,
-            &mut (*cmod).leaf,
-        );
+        let cmg = core::ptr::addr_of_mut!(cm.cmg);
+        let leaf = core::ptr::addr_of_mut!((*cmod).leaf);
+        CM_TraceThroughLeaf(common, cm, rm, rmg, host, tw, trace, cmg, leaf);
     }
 }
 
@@ -1679,7 +1673,7 @@ pub fn CM_Trace(
 
         // if a sphere is already specified
         if !sphere.is_null() {
-            tw.sphere = *sphere;
+            tw.sphere = core::ptr::read(sphere);
         } else {
             tw.sphere.r#use = capsule;
             tw.sphere.radius = if tw.size[1][0] > tw.size[1][2] {

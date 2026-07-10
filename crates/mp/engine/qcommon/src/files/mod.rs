@@ -9,4 +9,5 @@ pub mod qfile_gus;
 pub mod qfile_us;
 pub mod searchpath_s;
 pub mod unz_file;
+pub mod unz_types;
 pub mod unzip_consts;

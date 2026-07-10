@@ -1074,7 +1074,7 @@ pub fn FS_Seek(
 
     if common.fsh[f as usize].streamed != mp_qshared::shared::qfalse {
         common.fsh[f as usize].streamed = mp_qshared::shared::qfalse;
-        Sys_StreamSeek(f, offset, origin);
+        unsafe { Sys_StreamSeek(f, offset, origin) };
         common.fsh[f as usize].streamed = mp_qshared::shared::qtrue;
     }
 
@@ -1087,13 +1087,15 @@ pub fn FS_Seek(
                     common.fsh[f as usize].zipFilePos as c_ulong,
                 );
             }
-            unzOpenCurrentFile(
-                common,
-                cm,
-                rm,
-                host,
-                common.fsh[f as usize].handleFiles.file.z,
-            )
+            unsafe {
+                unzOpenCurrentFile(
+                    common,
+                    cm,
+                    rm,
+                    host,
+                    common.fsh[f as usize].handleFiles.file.z,
+                )
+            }
         } else if offset < 65536 {
             // set the file position in the zip file (also sets the current file info)
             unsafe {
@@ -1102,14 +1104,16 @@ pub fn FS_Seek(
                     common.fsh[f as usize].zipFilePos as c_ulong,
                 );
             }
-            unzOpenCurrentFile(
-                common,
-                cm,
-                rm,
-                host,
-                common.fsh[f as usize].handleFiles.file.z,
-            );
-            FS_Read(common, foo.as_mut_ptr() as *mut (), offset as c_int, f)
+            unsafe {
+                unzOpenCurrentFile(
+                    common,
+                    cm,
+                    rm,
+                    host,
+                    common.fsh[f as usize].handleFiles.file.z,
+                );
+            }
+            unsafe { FS_Read(common, foo.as_mut_ptr() as *mut (), offset as c_int, f) }
         } else {
             crate::common::com_error(
                 errorParm_t::ERR_FATAL,
@@ -1118,7 +1122,7 @@ pub fn FS_Seek(
             -1
         }
     } else {
-        let file = FS_FileForHandle(common, f);
+        let file = unsafe { FS_FileForHandle(common, f) };
         let _origin = match origin {
             x if x == fsOrigin_t::FS_SEEK_CUR as c_int => libc::SEEK_CUR,
             x if x == fsOrigin_t::FS_SEEK_END as c_int => libc::SEEK_END,
@@ -1232,15 +1236,17 @@ pub fn Sys_ConcatenateFileLists(
     total_length += Sys_CountFileList(list2) as usize;
 
     // Create new list.
-    let cat = Z_Malloc(
-        common,
-        cm,
-        rm,
-        host,
-        (total_length + 1) * core::mem::size_of::<*mut c_char>(),
-        memtag_t::TAG_FILESYS,
-        mp_qshared::shared::qtrue,
-    ) as *mut *mut c_char;
+    let cat = unsafe {
+        Z_Malloc(
+            common,
+            cm,
+            rm,
+            host,
+            (total_length + 1) * core::mem::size_of::<*mut c_char>(),
+            memtag_t::TAG_FILESYS,
+            mp_qshared::shared::qtrue,
+        )
+    } as *mut *mut c_char;
     let mut dst = cat;
 
     unsafe {
@@ -1389,7 +1395,7 @@ pub fn FS_PureServerSetReferencedPaks(
         for i in 0..d as usize {
             let arg = crate::cmd_common::Cmd_Argv(common, i as c_int);
             common.fs_serverReferencedPakNames[i] =
-                CopyString(common, cm, rm, host, arg);
+                unsafe { CopyString(common, cm, rm, host, arg) };
         }
     }
 }

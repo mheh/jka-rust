@@ -36,11 +36,11 @@ use crate::z_memman::zone_tail_s::zoneTail_t;
 // exact resolved-signature names per the no-stub rule (common_fns.rs/
 // vm_fns.rs precedent); reported as missing symbols for the finisher.
 #[allow(dead_code)]
-struct RenderModels;
+use crate::cm_load::RenderModels;
 #[allow(dead_code)]
-struct Ghoul2System;
+pub(crate) struct Ghoul2System;
 #[allow(dead_code)]
-struct Server;
+use crate::cmd_pc::Server;
 
 // PORT-NOTE(unlanded-callees): `Com_Printf` (com_common.cpp), `Cvar_Get`
 // (cvar.cpp), `Cmd_AddCommand`/`Cmd_RemoveCommand` (cmd_pc.cpp),
@@ -335,13 +335,6 @@ pub fn Com_InitZoneMemory(
     }
     //#endif
 
-    // PORT-NOTE(z-stats-details-body-gap): `Z_Stats_f`/`Z_Details_f`
-    // (z_memman_pc.cpp:510-524) have no transcribed body anywhere in the
-    // tree — genuine logic port, not a mechanical call-site fix; escalated
-    // as missing symbols for the finisher.
-    // Source: `oracle/codemp/qcommon/z_memman_pc.cpp:588-589`
-    //TODO: Port Z_Stats_f
-    //TODO: Port Z_Details_f
     unsafe {
         Cmd_AddCommand(common, cm, rm, host, "zone_stats", Z_Stats_f as *const ());
         Cmd_AddCommand(
@@ -356,6 +349,132 @@ pub fn Com_InitZoneMemory(
 
     // #ifdef _DEBUG: zone_memrecovertest is a debug-only command; this is a
     // release build, so the block is dropped per its own guard.
+}
+
+/// Raven `psTagStrings` — memory-tag display names (`TAG_` prefix stripped),
+/// indexed by `memtag_t`; the trailing entry is `TAG_COUNT` becoming a string.
+/// Source: `oracle/codemp/qcommon/tags.h` (via `z_memman_pc.cpp:14-17`)
+const psTagStrings: [&str; memtag_t::TAG_COUNT as usize + 1] = [
+    "ALL",
+    "BOTLIB",
+    "CLIENTS",
+    "BOTGAME",
+    "DOWNLOAD",
+    "GENERAL",
+    "CLIPBOARD",
+    "SND_MP3STREAMHDR",
+    "SND_DYNAMICMUSIC",
+    "BSP_DISKIMAGE",
+    "VM",
+    "SPECIAL_MEM_TEST",
+    "HUNK_MARK1",
+    "HUNK_MARK2",
+    "EVENT",
+    "FILESYS",
+    "GHOUL2",
+    "GHOUL2_GORE",
+    "LISTFILES",
+    "AMBIENTSET",
+    "STATIC",
+    "SMALL",
+    "MODEL_MD3",
+    "MODEL_GLM",
+    "MODEL_GLA",
+    "ICARUS",
+    "ICARUS2",
+    "ICARUS3",
+    "ICARUS4",
+    "ICARUS5",
+    "SHADERTEXT",
+    "SND_RAWDATA",
+    "TEMP_WORKSPACE",
+    "TEMP_PNG",
+    "TEXTPOOL",
+    "IMAGE_T",
+    "INFLATE",
+    "DEFLATE",
+    "BSP",
+    "GRIDMESH",
+    "POINTCACHE",
+    "TERRAIN",
+    "R_TERRAIN",
+    "RESAMPLE",
+    "CM_TERRAIN",
+    "CM_TERRAIN_TEMP",
+    "TEMP_IMAGE",
+    "VM_ALLOCATED",
+    "TEMP_HUNKALLOC",
+    "COUNT",
+];
+
+/// Raven `Z_Stats_f` — the `zone_stats` console command; prints the zone's
+/// current and peak usage.
+///
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:510-524`
+fn Z_Stats_f(common: &mut Common) {
+    let iCurrent = common.TheZone.Stats.iCurrent;
+    let iCount = common.TheZone.Stats.iCount;
+    let iPeak = common.TheZone.Stats.iPeak;
+
+    crate::common::com_printf(
+        common,
+        &format!(
+            "\nThe zone is using {} bytes ({:.2}MB) in {} memory blocks\n",
+            iCurrent,
+            iCurrent as f32 / 1024.0 / 1024.0,
+            iCount
+        ),
+    );
+
+    crate::common::com_printf(
+        common,
+        &format!(
+            "The zone peaked at {} bytes ({:.2}MB)\n",
+            iPeak,
+            iPeak as f32 / 1024.0 / 1024.0
+        ),
+    );
+}
+
+/// Raven `Z_Details_f` — the `zone_details` console command; prints per-tag
+/// byte/block totals, then the summary (`Z_Stats_f`).
+///
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:526-553`
+fn Z_Details_f(common: &mut Common) {
+    crate::common::com_printf(
+        common,
+        "---------------------------------------------------------------------------\n",
+    );
+    crate::common::com_printf(common, &format!("{:>20} {:>9}\n", "Zone Tag", "Bytes"));
+    crate::common::com_printf(common, &format!("{:>20} {:>9}\n", "--------", "-----"));
+    for i in 0..memtag_t::TAG_COUNT as usize {
+        let iThisCount = common.TheZone.Stats.iCountsPerTag[i];
+        let iThisSize = common.TheZone.Stats.iSizesPerTag[i];
+
+        if iThisCount != 0 {
+            let fSize = iThisSize as f32 / 1024.0 / 1024.0;
+            let iSize = fSize as c_int;
+            let iRemainder = (100.0 * (fSize - fSize.floor())) as c_int;
+            crate::common::com_printf(
+                common,
+                &format!(
+                    "{:>20} {:>9} ({:>2}.{:02}MB) in {:>6} blocks ({:>9} average)\n",
+                    psTagStrings[i],
+                    iThisSize,
+                    iSize,
+                    iRemainder,
+                    iThisCount,
+                    iThisSize / iThisCount
+                ),
+            );
+        }
+    }
+    crate::common::com_printf(
+        common,
+        "---------------------------------------------------------------------------\n",
+    );
+
+    Z_Stats_f(common);
 }
 
 /// Raven `Com_TouchMemory`.

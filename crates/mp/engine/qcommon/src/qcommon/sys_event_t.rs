@@ -6,6 +6,7 @@ use super::sys_event_type_t::sysEventType_t;
 /// event queue (key, mouse, console, packet, etc.).
 ///
 /// Type definition source: `oracle/codemp/qcommon/qcommon.h:934-940`
+#[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct sysEvent_t {
 	pub evTime: i32,

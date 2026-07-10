@@ -32,7 +32,7 @@ use crate::vm::vm_s::vm_t;
 // no-stub rule (common_fns.rs precedent); reported as missing symbols for the
 // finisher to replace with the real imports once they land.
 #[allow(dead_code)]
-struct RenderModels;
+use crate::cm_load::RenderModels;
 #[allow(dead_code)]
 struct RmManager;
 

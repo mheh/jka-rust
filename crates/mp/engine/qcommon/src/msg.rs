@@ -128,18 +128,196 @@ pub fn MSG_initHuffman(common: &mut Common) {
     // PORT-NOTE(_NEWHUFFTABLE_): `fp=fopen(...)` debug-log open is compiled
     // out (no `_NEWHUFFTABLE_` define).
     common.msg_init = qtrue;
-    //TODO: Port Huff_Init
-    // Source: oracle/codemp/qcommon/msg.cpp:3227
-    crate::qcommon::huff::Huff_Init(&mut common.msg_huff);
-    for i in 0..256usize {
-        for _j in 0..MSG_H_DATA[i] {
-            //TODO: Port Huff_addRef
-            // Source: oracle/codemp/qcommon/msg.cpp:3230-3231
-            crate::qcommon::huff::Huff_addRef(&mut common.msg_huff.compressor, i as u8); // Do update
-            crate::qcommon::huff::Huff_addRef(&mut common.msg_huff.decompressor, i as u8);
-            // Do update
+    unsafe {
+        crate::qcommon::huff::Huff_Init(&mut common.msg_huff);
+        for i in 0..256usize {
+            for _j in 0..MSG_H_DATA[i] {
+                crate::qcommon::huff::Huff_addRef(&mut common.msg_huff.compressor, i as u8); // Do update
+                crate::qcommon::huff::Huff_addRef(&mut common.msg_huff.decompressor, i as u8);
+                // Do update
+            }
         }
     }
+}
+
+/// Raven `MSG_WriteBits`. The module-static write-only `overflows` diagnostic
+/// counter (its `Com_Printf` is compiled out and the counter is never read
+/// anywhere in the tree) is dropped as dead surface.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:129-207`
+pub fn MSG_WriteBits(common: &mut Common, msg: *mut msg_t, mut value: c_int, mut bits: c_int) {
+    common.oldsize += bits;
+    unsafe {
+        // this isn't an exact overflow check, but close enough
+        if (*msg).maxsize - (*msg).cursize < 4 {
+            (*msg).overflowed = qtrue;
+            return;
+        }
+        if bits == 0 || bits < -31 || bits > 32 {
+            Com_Error(
+                common,
+                errorParm_t::ERR_DROP,
+                &format!("MSG_WriteBits: bad bits {bits}"),
+            );
+        }
+        // check for overflows: the oracle only bumps the dead `overflows` counter.
+        if bits < 0 {
+            bits = -bits;
+        }
+        if (*msg).oob != qfalse {
+            if bits == 8 {
+                *(*msg).data.add((*msg).cursize as usize) = value as u8;
+                (*msg).cursize += 1;
+                (*msg).bit += 8;
+            } else if bits == 16 {
+                let sp = (*msg).data.add((*msg).cursize as usize) as *mut u16;
+                *sp = (value as u16).to_le();
+                (*msg).cursize += 2;
+                (*msg).bit += 16;
+            } else if bits == 32 {
+                let ip = (*msg).data.add((*msg).cursize as usize) as *mut u32;
+                *ip = (value as u32).to_le();
+                (*msg).cursize += 4;
+                (*msg).bit += 8;
+            } else {
+                Com_Error(
+                    common,
+                    errorParm_t::ERR_DROP,
+                    &format!("can't read {bits} bits\n"),
+                );
+            }
+        } else {
+            value &= (0xffffffffu32 >> (32 - bits)) as c_int;
+            if bits & 7 != 0 {
+                let nbits = bits & 7;
+                for _ in 0..nbits {
+                    crate::qcommon::huff::Huff_putBit(value & 1, (*msg).data, &mut (*msg).bit);
+                    value >>= 1;
+                }
+                bits -= nbits;
+            }
+            if bits != 0 {
+                let mut i = 0;
+                while i < bits {
+                    crate::qcommon::huff::Huff_offsetTransmit(
+                        &mut common.msg_huff.compressor,
+                        value & 0xff,
+                        (*msg).data,
+                        &mut (*msg).bit,
+                    );
+                    value = ((value as u32) >> 8) as c_int;
+                    i += 8;
+                }
+            }
+            (*msg).cursize = ((*msg).bit >> 3) + 1;
+        }
+    }
+}
+
+/// Raven `MSG_ReadBits`.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:211-283`
+pub fn MSG_ReadBits(common: &mut Common, msg: *mut msg_t, mut bits: c_int) -> c_int {
+    let mut value: c_int = 0;
+    let sgn;
+    unsafe {
+        if bits < 0 {
+            bits = -bits;
+            sgn = true;
+        } else {
+            sgn = false;
+        }
+
+        if (*msg).oob != qfalse {
+            if bits == 8 {
+                value = *(*msg).data.add((*msg).readcount as usize) as c_int;
+                (*msg).readcount += 1;
+                (*msg).bit += 8;
+            } else if bits == 16 {
+                let sp = (*msg).data.add((*msg).readcount as usize) as *const u16;
+                value = u16::from_le(*sp) as c_int;
+                (*msg).readcount += 2;
+                (*msg).bit += 16;
+            } else if bits == 32 {
+                let ip = (*msg).data.add((*msg).readcount as usize) as *const u32;
+                value = u32::from_le(*ip) as c_int;
+                (*msg).readcount += 4;
+                (*msg).bit += 32;
+            } else {
+                Com_Error(
+                    common,
+                    errorParm_t::ERR_DROP,
+                    &format!("can't read {bits} bits\n"),
+                );
+            }
+        } else {
+            let mut nbits = 0;
+            if bits & 7 != 0 {
+                nbits = bits & 7;
+                for i in 0..nbits {
+                    value |= crate::qcommon::huff::Huff_getBit((*msg).data, &mut (*msg).bit) << i;
+                }
+                bits -= nbits;
+            }
+            if bits != 0 {
+                let mut get: c_int = 0;
+                let mut i = 0;
+                while i < bits {
+                    crate::qcommon::huff::Huff_offsetReceive(
+                        common.msg_huff.decompressor.tree,
+                        &mut get,
+                        (*msg).data,
+                        &mut (*msg).bit,
+                    );
+                    value |= get << (i + nbits);
+                    i += 8;
+                }
+            }
+            (*msg).readcount = ((*msg).bit >> 3) + 1;
+        }
+        if sgn && value & (1 << (bits - 1)) != 0 {
+            value |= -1 ^ ((1 << bits) - 1);
+        }
+    }
+    value
+}
+
+/// Raven `MSG_WriteByte`. `PARANOID` range-check guard compiles out.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:289-296`
+pub fn MSG_WriteByte(common: &mut Common, sb: *mut msg_t, c: c_int) {
+    MSG_WriteBits(common, sb, c, 8);
+}
+
+/// Raven `MSG_WriteData`.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:298-303`
+pub fn MSG_WriteData(common: &mut Common, buf: *mut msg_t, data: *const (), length: c_int) {
+    unsafe {
+        for i in 0..length {
+            MSG_WriteByte(common, buf, *(data as *const u8).add(i as usize) as c_int);
+        }
+    }
+}
+
+/// Raven `MSG_WriteShort`. `PARANOID` range-check guard compiles out.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:305-312`
+pub fn MSG_WriteShort(common: &mut Common, sb: *mut msg_t, c: c_int) {
+    MSG_WriteBits(common, sb, c, 16);
+}
+
+/// Raven `MSG_ReadLong`.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:433-441`
+pub fn MSG_ReadLong(common: &mut Common, msg: *mut msg_t) -> c_int {
+    let mut c = MSG_ReadBits(common, msg, 32);
+    unsafe {
+        if (*msg).readcount > (*msg).cursize {
+            c = -1;
+        }
+    }
+    c
 }
 
 /// Raven `MSG_WriteChar`. `PARANOID` range-check guard compiles out (no
@@ -381,18 +559,22 @@ pub fn MSG_ReportChangeVectors_f(common: &mut Common) {
     // Source: oracle/codemp/qcommon/msg.cpp:859-1051
     let num_entity_fields = common.entity_state_fields.len();
     crate::common::com_printf(common, "Entity State Fields:\n");
-    for field in common.entity_state_fields.iter_mut() {
-        crate::common::com_printf(common, &format!("{}\t\t{}\n", field.name, field.mCount));
-        field.mCount = 0;
+    for i in 0..common.entity_state_fields.len() {
+        let name = common.entity_state_fields[i].name;
+        let mCount = common.entity_state_fields[i].mCount;
+        crate::common::com_printf(common, &format!("{}\t\t{}\n", name, mCount));
+        common.entity_state_fields[i].mCount = 0;
     }
     let _ = num_entity_fields;
 
     //TODO: Port playerStateFields
     // Source: oracle/codemp/qcommon/msg.cpp:1410-1568
     crate::common::com_printf(common, "\nPlayer State Fields:\n");
-    for field in common.player_state_fields.iter_mut() {
-        crate::common::com_printf(common, &format!("{}\t\t{}\n", field.name, field.mCount));
-        field.mCount = 0;
+    for i in 0..common.player_state_fields.len() {
+        let name = common.player_state_fields[i].name;
+        let mCount = common.player_state_fields[i].mCount;
+        crate::common::com_printf(common, &format!("{}\t\t{}\n", name, mCount));
+        common.player_state_fields[i].mCount = 0;
     }
 }
 
@@ -947,14 +1129,16 @@ pub fn MSG_ReadDeltaPlayerstate(
         let lc = MSG_ReadByte(common, msg);
 
         for i in 0..lc {
-            let field = &mut common.player_state_fields[i as usize];
-            let fromF = (from as *const u8).add(field.offset as usize) as *const c_int;
-            let toF = (to as *mut u8).add(field.offset as usize) as *mut c_int;
+            let offset = common.player_state_fields[i as usize].offset;
+            let bits = common.player_state_fields[i as usize].bits;
+            let name = common.player_state_fields[i as usize].name;
+            let fromF = (from as *const u8).add(offset as usize) as *const c_int;
+            let toF = (to as *mut u8).add(offset as usize) as *mut c_int;
 
             if MSG_ReadBits(common, msg, 1) == 0 {
                 // no change
                 *toF = *fromF;
-            } else if field.bits == 0 {
+            } else if bits == 0 {
                 // float
                 if MSG_ReadBits(common, msg, 1) == 0 {
                     // integral float
@@ -964,7 +1148,7 @@ pub fn MSG_ReadDeltaPlayerstate(
                     trunc -= crate::qcommon::msg_consts::FLOAT_INT_BIAS;
                     *(toF as *mut f32) = trunc as f32;
                     if print {
-                        crate::common::com_printf(common, &format!("{}:{} ", field.name, trunc));
+                        crate::common::com_printf(common, &format!("{}:{} ", name, trunc));
                     }
                 } else {
                     // full floating point value
@@ -972,15 +1156,15 @@ pub fn MSG_ReadDeltaPlayerstate(
                     if print {
                         crate::common::com_printf(
                             common,
-                            &format!("{}:{} ", field.name, *(toF as *mut f32)),
+                            &format!("{}:{} ", name, *(toF as *mut f32)),
                         );
                     }
                 }
             } else {
                 // integer
-                *toF = MSG_ReadBits(common, msg, field.bits);
+                *toF = MSG_ReadBits(common, msg, bits);
                 if print {
-                    crate::common::com_printf(common, &format!("{}:{} ", field.name, *toF));
+                    crate::common::com_printf(common, &format!("{}:{} ", name, *toF));
                 }
             }
         }
@@ -1010,9 +1194,9 @@ pub fn MSG_ReadDeltaPlayerstate(
                                 common,
                                 msg,
                                 mp_qshared::common::mp::qcommon::player_state::MAX_WEAPONS as c_int,
-                            ) as i16;
+                            );
                         } else {
-                            (*to).stats[i as usize] = MSG_ReadShort(common, msg) as i16;
+                            (*to).stats[i as usize] = MSG_ReadShort(common, msg);
                         }
                     }
                 }
@@ -1025,7 +1209,7 @@ pub fn MSG_ReadDeltaPlayerstate(
                 let bits = MSG_ReadShort(common, msg);
                 for i in 0..16 {
                     if bits & (1 << i) != 0 {
-                        (*to).persistant[i as usize] = MSG_ReadShort(common, msg) as i16;
+                        (*to).persistant[i as usize] = MSG_ReadShort(common, msg);
                     }
                 }
             }
@@ -1037,7 +1221,7 @@ pub fn MSG_ReadDeltaPlayerstate(
                 let bits = MSG_ReadShort(common, msg);
                 for i in 0..16 {
                     if bits & (1 << i) != 0 {
-                        (*to).ammo[i as usize] = MSG_ReadShort(common, msg) as i16;
+                        (*to).ammo[i as usize] = MSG_ReadShort(common, msg);
                     }
                 }
             }

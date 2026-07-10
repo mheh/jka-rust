@@ -33,11 +33,11 @@ use crate::vm::vmptr_t::vmptr_t;
 // (`common_fns.rs`/`vm_x86.rs` precedent); reported as missing symbols for
 // the finisher to replace with the real imports once they land.
 #[allow(dead_code)]
-struct RenderModels;
+use crate::cm_load::RenderModels;
 #[allow(dead_code)]
 struct RmManager;
 #[allow(dead_code)]
-struct Server;
+use crate::cmd_pc::Server;
 
 // PORT-NOTE(unlanded-callees): `Z_Malloc`/`Z_Free` (z_memman_pc.cpp) have no
 // ported body reachable from this file (this file's own `RenderModels`
