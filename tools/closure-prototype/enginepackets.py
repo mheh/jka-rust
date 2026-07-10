@@ -51,6 +51,7 @@ Usage:
 """
 import argparse
 import json
+import os
 import pickle
 import re
 import sys
@@ -106,6 +107,236 @@ GHOUL2_CLASSES = {"CBoneCache", "CTransformBone"}
 # doc; its work order is the landed reimplementation.
 GP2_DIR = "crates/mp/engine/qcommon/src/gp2/"
 GP2_CLASSES = {"CGPGroup", "CGPValue", "CGPObject", "CGenericParser2", "CTextPool"}
+
+
+# ------------------------------------------------------- state receivers
+# STATE-D1 / STATE-D11 / ruling 2/3 rendered into signatures: Raven's ~680
+# file-scope globals become fields on owning sub-structs under the one `Engine`
+# aggregate, and are THREADED as explicit `&mut` receiver params (never reached).
+# This is the engine sibling of the jampgame BgState/GameCallbacks pre-pass
+# signature retrofit — every C-track resolved signature carries the receivers its
+# body (and its callees) need, computed mechanically from the STATE-THREADED table.
+#
+# RECEIVER MAP — a global/static's DECLARING file (the `decl` column, `..`-relative
+# oracle paths normalized) → a receiver kind. Convention pinned per
+# docs/architecture/state-ownership.md (master table) + engine-fork-discovery.md
+# rulings 2/3 (global placement, fn-scope statics), 21 (engine LCG on Common), 43
+# (EngineHostView split-borrow), 50/51 (stringed→Common.stringed, tr-model→
+# RenderModels). The kind → its leading `&mut` param spelling:
+RECEIVER_PARAM = {
+    "common": "common: &mut Common",          # qcommon/* (common/cvar/cmd/files/
+                                              #   msg/huffman/net_chan/vm*/z_memman/
+                                              #   md4/stringed/q_shared holdrand …)
+    "cm": "cm: &mut CollisionWorld",          # qcommon/cm_* (cmg, SubBSP, cm cvars)
+    "sv": "sv: &mut Server",                  # server/* (sv/svs/world sectors)
+    "cl": "cl: &mut Client",                  # client/* + the null/ dedicated stubs
+    "bot": "bot: &mut BotLib",                # botlib/* — synthesized aggregate,
+                                              #   same pattern as Icarus; lands with
+                                              #   the botlib waves (name pinned here)
+    "rm": "rm: &mut RenderModels",            # renderer/* — tr-model.md state home
+    "rmg": "rmg: &mut RmManager",             # RMG/* — rmg-terrain.md aggregate
+    "icarus": "icarus: &mut Icarus",          # icarus/* + game/g_public.h's
+                                              #   gSequencers/gTaskManagers
+                                              #   (ICARUS-D3 per-entity arrays)
+    "nav": "nav: &mut Navigator",             # server/NPCNav/* — npcnav.md (ruling 40)
+    "g2": "g2: &mut Ghoul2System",            # ghoul2/* — ghoul2-server.md
+    "roff": "roff: &mut RoffSystem",          # qcommon/RoffSystem* — roff.md
+    "host": "host: &mut dyn EngineHost",      # §F seam host (rulings 11/24/43)
+}
+# Pinned emission order — receivers are the LEADING params of every resolved
+# signature in exactly this sequence (host always last; it is the §F seam trailer).
+RECEIVER_ORDER = ["common", "cm", "sv", "cl", "bot", "rm", "rmg",
+                  "icarus", "nav", "g2", "roff", "host"]
+# A §F doc pointer → the receiver kind of the state it owns. A C-track fn that
+# CALLS a doc-routed fn gains that kind PLUS `host` (rulings 11/24: §F seam fns
+# take `(&mut <Subsystem>, &mut dyn EngineHost, …)`). GP2-routed callees (cpp-done)
+# need no receiver (the GP2 reimpl threads none). stringed folds into `common`
+# (ruling 50), trmodel into `rm` (ruling 51).
+DOC_KIND = {
+    DOC["icarus"]: "icarus",
+    DOC["rmg"]: "rmg",
+    DOC["ghoul2"]: "g2",
+    DOC["npcnav"]: "nav",
+    DOC["roff"]: "roff",
+    DOC["stringed"]: "common",
+    DOC["trmodel"]: "rm",
+}
+
+
+def decl_kind(cite, unmapped):
+    """A `decl`-column cite ('oracle/..:NN' | bare path) → receiver kind, per the
+    RECEIVER MAP. `..`-relative oracle paths are normalized first. A decl file
+    matching NO rule is counted in `unmapped` and returns None (never silently
+    defaulted — it is a referee item, surfaced in the report)."""
+    path = cite.rsplit(":", 1)[0]
+    p = os.path.normpath(path)
+    if "/codemp/" not in p:
+        unmapped[p] += 1
+        return None
+    rel = p.split("/codemp/", 1)[1]
+    parts = rel.split("/")
+    sub, base = parts[0], parts[-1]
+    if sub == "qcommon":
+        if base.startswith("cm_"):
+            return "cm"                        # cm_load/cm_local.h/cm_patch/…
+        if base.startswith("RoffSystem"):
+            return "roff"                      # RoffSystem.{h,cpp}
+        return "common"
+    if sub == "server":
+        return "nav" if "NPCNav" in parts else "sv"
+    if sub == "botlib":
+        return "bot"
+    if sub == "renderer":
+        return "rm"
+    if sub == "RMG":
+        return "rmg"
+    if sub == "icarus":
+        return "icarus"
+    if sub == "ghoul2":
+        return "g2"
+    if sub in ("client", "null"):
+        return "cl"
+    if sub == "game" and base == "q_shared.h":
+        return "common"                        # engine-side q_shared globals
+                                               #   (holdrand, vec3_origin, g_G2*Alloc)
+    if sub == "game" and base == "g_public.h":
+        return "icarus"                        # gSequencers/gTaskManagers — the
+                                               #   ICARUS per-entity sequencer/task-
+                                               #   manager arrays; Icarus-owned state
+                                               #   (icarus.md ICARUS-D3), declared in
+                                               #   game/g_public.h only for game-tier
+                                               #   visibility
+    unmapped[p] += 1
+    return None
+
+
+# RAND-FAMILY ROUTING (ruling 21). The engine has its OWN q_math LCG — a qshared
+# `QRand`-type field on `Engine.common` (exposed to §F seam fns via
+# `EngineHost::flrand`/`irand`). It is a DIFFERENT instance from the game tier's
+# `bg_channel::rng::Rng` (mp_game); engine code must NEVER route to that, nor to
+# libc `rand`. A C-track body calling any of these therefore reaches the `common`
+# receiver's `QRand` field — so calling one IMPLIES the `common` receiver.
+# Method surface (verified against the ported LCG `crates/mp/game/src/bg_channel/
+# rng.rs`; the engine `QRand` mirrors it): Rand_Init/flrand/Q_flrand/irand/Q_irand
+# /srand/rand (holdrand is platform-width `c_ulong`, already encoded there).
+RAND_FAMILY = {"rand", "srand", "Rand_Init", "irand", "flrand",
+               "Q_irand", "Q_flrand"}
+
+
+# DESTINATION PATHS — one Rust module per oracle source file, at the owning
+# crate's src root, named by the oracle stem (`cm_load.cpp` → `<root>/cm_load.rs`).
+# COLLISION ESCAPE: if a stem equals an existing directory-module name in that
+# crate's src/ (e.g. `vm.cpp` vs `vm/`, `common.cpp` vs `common/`), the file
+# becomes `<stem>_fns.rs` — computed from the real on-disk dir listing at
+# generation time (see crate_src_dirs), applied escapes reported.
+CRATE_SRC = {
+    "qcommon": "crates/mp/engine/qcommon/src",
+    "botlib": "crates/mp/engine/botlib/src",
+    "server": "crates/mp/engine/server/src",
+    "renderer": "crates/mp/renderer/src",
+    "null": "crates/mp/engine/client/src/null",
+}
+
+
+def crate_src_dirs():
+    """subsystem -> set of existing sub-directory (module) names under its crate
+    src root — the collision set for the DESTINATION stem-vs-dir escape."""
+    dirs = {}
+    for sub, root in CRATE_SRC.items():
+        p = REPO / root
+        dirs[sub] = ({c.name for c in p.iterdir() if c.is_dir()}
+                     if p.exists() else set())
+    return dirs
+
+
+def destination(subsystem, file, src_dirs):
+    """(rust_path, escaped) for one oracle source file's ported module."""
+    root = CRATE_SRC.get(subsystem)
+    if root is None:
+        return None, False
+    stem = re.sub(r"\.(cpp|c)$", "", file)
+    escaped = stem in src_dirs.get(subsystem, set())
+    name = f"{stem}_fns.rs" if escaped else f"{stem}.rs"
+    return f"{root}/{name}", escaped
+
+
+def own_kinds(f, name2path, unmapped):
+    """The receiver kinds a fn's OWN state table (globals + fn-scope statics)
+    demands. A static's decl file is the fn's own source file (fork-3 kind-3
+    cross-frame statics live on the owning sub-struct; a kind-2 scratch that ends
+    up a local costs one extra param at worst — acceptable, ruling 3)."""
+    ks = set()
+    for g in f["globals_read"] + f["globals_write"]:
+        k = decl_kind(g["cite"], unmapped)
+        if k:
+            ks.add(k)
+    if f["statics"]:
+        path = name2path.get(f["file"])
+        try:
+            rel = str(Path(path).relative_to(REPO)) if path else None
+        except ValueError:
+            rel = str(path)
+        if rel is None:
+            rel = f"oracle/codemp/{f['subsystem']}/{f['file']}"
+        k = decl_kind(rel, unmapped)
+        if k:
+            ks.add(k)
+    return ks
+
+
+def compute_receivers(funcs, track_of, ptr_of, calls_of, usr2fn, name2path):
+    """receivers(fn) for every C-track fn, to fixpoint (ruling-2/3 state threading):
+
+      receivers(fn) = own_kinds(fn)                       # its own globals/statics
+                    ∪ {§F-callee kind, host}              # ruling 2: doc-routed CALL
+                    ∪ ⋃ receivers(c) for C-track callee c # transitive closure
+
+    over the manifest call graph (calls only — an address-taken dispatch-table ref
+    does not pass state at the take site). Cycles exist → iterate to a stable
+    fixpoint. EXCEPTION (ruling 1): edges TO `Com_Error` do NOT propagate — a
+    Com_Error call site is a `panic!`/unwind, receiverless; Com_Error's own body
+    keeps its receivers for its wave-5 port. Com_Printf propagates normally
+    (STATE-D11: `&mut Common`). Returns (receivers usr->set, iterations, unmapped)."""
+    from collections import Counter
+    unmapped = Counter()
+    ctrack = [f for f in funcs if track_of[f["usr"]] == "c"]
+    ctrack_usrs = {f["usr"] for f in ctrack}
+    rand_fns = set()
+    recv = {}
+    for f in ctrack:
+        s = own_kinds(f, name2path, unmapped)
+        if RAND_FAMILY.intersection(f["externals"]):  # ruling 21 engine LCG
+            s.add("common")
+            rand_fns.add(f["usr"])
+        for cu in calls_of.get(f["usr"], ()):        # §F CALLEE RULE (ruling 2)
+            if track_of.get(cu) == "cpp":
+                k = DOC_KIND.get(ptr_of.get(cu))
+                if k:
+                    s.add(k)
+                    s.add("host")
+            # cpp-done (GP2) / cpp-undocumented: no receiver contributed
+        recv[f["usr"]] = s
+    iters, converged = 0, False
+    while not converged:
+        converged, iters = True, iters + 1
+        for f in ctrack:
+            s = recv[f["usr"]]
+            before = len(s)
+            for cu in calls_of.get(f["usr"], ()):
+                if cu not in ctrack_usrs:
+                    continue
+                if usr2fn[cu]["name"] == "Com_Error":  # ruling 1 — no propagation
+                    continue
+                s |= recv[cu]
+            if len(s) != before:
+                converged = False
+    return recv, iters, unmapped, rand_fns
+
+
+def receiver_list(usr, receivers):
+    """Ordered leading-param kinds for a fn, in the pinned RECEIVER_ORDER."""
+    have = receivers.get(usr, ())
+    return [k for k in RECEIVER_ORDER if k in have]
 
 
 def classify(f):
@@ -185,6 +416,54 @@ _ARRAY = re.compile(r"\[[^\]]*\]")
 # default is to flag, so only names with an unambiguous Rust twin go here).
 CPP_MAP = {"string": "String", "std::string": "String", "basic_string": "String"}
 
+# CONST resolution: screaming-snake identifiers in a packet's oracle source slice
+# resolve against the const rosetta so porters import the named size/count, never
+# a magic number. `_MACROCALL_TOK` (a name followed by `(`) is a function-like
+# macro (VMA, LL, …), reported separately, not treated as an unresolved const.
+_CONST_TOK = re.compile(r"\b([A-Z][A-Z0-9_]{2,})\b")
+_MACROCALL_TOK = re.compile(r"\b([A-Z][A-Z0-9_]{2,})\s*\(")
+# Obvious non-consts (screaming-snake literals / booleans, not size consts).
+_CONST_STOP = {"NULL", "TRUE", "FALSE", "NULL_HANDLE"}
+# Rosetta kinds the CONSTS table resolves against (typemap.py harvests all
+# three): `const`/`static` items (identity-named fallback included) and enum
+# `variant` rows, whose rust column is the qualified `Enum::VARIANT` form so a
+# porter writes the right syntax straight from the table.
+CONST_KINDS = ("const", "static", "variant")
+
+# SEAM-SUPPLIED consts (plan §1 vendored seams): zlib32/ and png/ are Rust-crate
+# seams, never byte-ported, so their constant names (Z_OK, ZF_DEFLATED, inflate's
+# START/END/TYPE mode enum, …) have no rosetta row BY DESIGN — porters obtain
+# them from the seam wrapper module at port time (escalate if the seam lacks
+# one). Harvested mechanically from the vendored sources at generation time,
+# plus the libc whence names (SEEK_SET family — host stdio seam, same stance as
+# `FILE` in EXTERNAL below). They render on their own packet line and leave the
+# unresolved count.
+VENDORED_DIRS = ("oracle/codemp/zlib32", "oracle/codemp/png")
+LIBC_SEAM_CONSTS = {"SEEK_SET", "SEEK_CUR", "SEEK_END"}
+# `#define ZIP_FILE FILE` (qcommon/unzip.h:3) — a stdio-FILE alias, host stdio
+# seam like `FILE` itself; explicit because unzip.cpp is otherwise C-track (its
+# UNZ_* consts stay real backfill items, NOT seam).
+SEAM_EXTRA_CONSTS = {"ZIP_FILE"}
+_VEND_DEF = re.compile(r"^\s*#\s*define\s+([A-Z][A-Z0-9_]{1,})(?![A-Za-z0-9_(])",
+                       re.M)
+_VEND_ENUM = re.compile(r"enum[^{;]*\{([^}]*)\}", re.S)
+_VEND_ENUM_NAME = re.compile(r"\b([A-Z][A-Z0-9_]{1,})\b\s*(?=[,=}]|/[/*])")
+
+
+def seam_supplied_consts():
+    """Screaming-snake constant names declared in the vendored zlib32/png
+    sources (object-like #defines + enum constants) ∪ the libc whence names."""
+    names = set(LIBC_SEAM_CONSTS) | set(SEAM_EXTRA_CONSTS)
+    for d in VENDORED_DIRS:
+        for p in sorted((REPO / d).glob("*")):
+            if p.suffix not in (".h", ".cpp", ".c"):
+                continue
+            txt = p.read_text(errors="replace")
+            names |= set(_VEND_DEF.findall(txt))
+            for em in _VEND_ENUM.finditer(txt):
+                names |= set(_VEND_ENUM_NAME.findall(em.group(1)))
+    return names - _CONST_STOP
+
 # Externals NOT owned by the Rust port — they cross a seam the Rust host fills
 # with its own substrate, so they resolve as non-rosetta types and are
 # whitelisted out of the "missing rosetta type" referee check rather than ported:
@@ -256,12 +535,15 @@ def sig_type_names(f):
     return names
 
 
-def resolved_signature(f, rosetta, miss, cpp_types=frozenset()):
-    """`pub fn name(p: T, ...) -> R` under §C mechanical defaults."""
-    ps = []
+def resolved_signature(f, rosetta, miss, cpp_types=frozenset(), receivers=None):
+    """`pub fn name(recv…, p: T, ...) -> R` under §C mechanical defaults, with the
+    threaded state receivers (ruling 2/3) as LEADING params in the pinned order."""
+    lead = ([RECEIVER_PARAM[k] for k in receiver_list(f["usr"], receivers)]
+            if receivers is not None else [])
+    ps = list(lead)
     for p in f["params"]:
         rt = resolve_type(p["type"], rosetta, miss, cpp_types)
-        nm = p["name"] or f"a{len(ps)}"
+        nm = p["name"] or f"a{len(ps) - len(lead)}"
         if rt == "...":
             ps.append("...")
         else:
@@ -354,8 +636,8 @@ def render_preamble(rulings):
              "`char`→`c_char`, `unsigned long`→`c_ulong`, …); **named types** "
              "resolve to their rosetta Rust name (listed per packet).")
     o.append("- **C++ refs** (`T&`/`const T&`) become `&mut T`/`&T`. The "
-             "signature is the faithful shape; STATE THREADING (which globals "
-             "become which owner-struct field) is separate — see below.")
+             "printed signature is the faithful shape PLUS the threaded state "
+             "receivers (leading params — see 'State receivers' below).")
     o.append("")
     o.append("## State threading — globals & statics")
     o.append("")
@@ -375,6 +657,100 @@ def render_preamble(rulings):
              "(`Vec`/`String`/array), never a hidden cell;")
     o.append("  3. **genuine cross-frame state** → a field on the owning host "
              "struct (ruling 2), threaded in.")
+    o.append("")
+    o.append("## State receivers — the LEADING params (ruling 2/3, STATE-D1)")
+    o.append("")
+    o.append("Every C-track resolved signature carries its threaded state as "
+             "**leading `&mut` params**, computed mechanically from the "
+             "STATE-THREADED table (own globals/statics) unioned transitively "
+             "over the fn's callees. They appear in this **pinned order** (host "
+             "always last — it is the §F seam trailer):")
+    o.append("")
+    o.append("`" + " , ".join(RECEIVER_PARAM[k] for k in RECEIVER_ORDER) + "`")
+    o.append("")
+    o.append("| receiver | owns (decl home) |")
+    o.append("| --- | --- |")
+    o.append("| `common: &mut Common` | `qcommon/*` (common/cvar/cmd/cbuf/files/"
+             "msg/huffman/net_chan/vm*/z_memman/md4; stringed pkg ruling 50; the "
+             "engine `QRand` LCG ruling 21; `q_shared.h` `holdrand`/`vec3_origin`) |")
+    o.append("| `cm: &mut CollisionWorld` | `qcommon/cm_*` (cmg, SubBSP, cm cvars) |")
+    o.append("| `sv: &mut Server` | `server/*` (sv/svs, world sectors) |")
+    o.append("| `cl: &mut Client` | `client/*` + the `null/` dedicated stubs |")
+    o.append("| `bot: &mut BotLib` | `botlib/*` (synthesized aggregate — lands "
+             "with the botlib waves) |")
+    o.append("| `rm: &mut RenderModels` | `renderer/*` (tr-model.md state home) |")
+    o.append("| `rmg: &mut RmManager` | `RMG/*` (rmg-terrain.md aggregate) |")
+    o.append("| `icarus: &mut Icarus` | `icarus/*`; `game/g_public.h`'s "
+             "`gSequencers`/`gTaskManagers` (ICARUS-D3 per-entity arrays) |")
+    o.append("| `nav: &mut Navigator` | `server/NPCNav/*` (npcnav.md, ruling 40) |")
+    o.append("| `g2: &mut Ghoul2System` | `ghoul2/*` (ghoul2-server.md) |")
+    o.append("| `roff: &mut RoffSystem` | `qcommon/RoffSystem*` (roff.md) |")
+    o.append("| `host: &mut dyn EngineHost` | the §F seam host — added whenever a "
+             "body CALLS a doc-routed §F fn (rulings 11/24) |")
+    o.append("")
+    o.append("- **Pass your own params through.** When you call an in-engine "
+             "callee, the RESOLVED CALL SURFACE lists ITS receiver kinds — pass "
+             "your matching params straight through (`CM_ClearMap(common, cm, "
+             "rmg)` from inside a fn that already has `common`/`cm`/`rmg`). By the "
+             "stub-free order + transitive closure, every callee's receivers are a "
+             "SUBSET of yours, so you always have what to pass.")
+    o.append("- **A receiver the body never reads still STAYS in the signature.** "
+             "It is inherited transitively (a callee needs it) — it is LAW for "
+             "this pass. Do NOT drop it to satisfy an unused-variable lint; "
+             "integration owns receiver-cleanup rulings (e.g. NAV-D4), not the "
+             "transcriber.")
+    o.append("- **§F callees** take `(&mut <Subsystem>, &mut dyn EngineHost, …)`; "
+             "calling one gives you that subsystem receiver **and** `host`. **GP2** "
+             "callees (done pilot) take no receiver. **`Com_Error`** is receiverless "
+             "(ruling 1, below) — its edge does not add receivers to you.")
+    o.append("")
+    o.append("## Rand family → the engine LCG (ruling 21)")
+    o.append("")
+    o.append("`rand`/`srand`/`Rand_Init`/`irand`/`flrand`/`Q_irand`/`Q_flrand` are "
+             "**NOT** the shared qshared free-function surface here. The engine "
+             "owns its own q_math LCG — a qshared **`QRand`** field on the "
+             "`common: &mut Common` receiver (type + methods mirror the ported "
+             "`mp_qshared` `Rng`: `Rand_Init`/`irand`/`flrand`/`Q_irand`/`Q_flrand`"
+             "/`srand`/`rand`; `holdrand` is platform-width `c_ulong`). So:")
+    o.append("- direct C-track engine code: `irand(a, b)` → "
+             "`common.<qrand>.irand(a, b)` (the `QRand` field on `Common`; the "
+             "field name is pinned when the `QRand` type lands — ruling 21 fixes "
+             "the **type** + `Engine.common` home, not the field name);")
+    o.append("- §F seam fns reach it via **`host.flrand(...)` / `host.irand(...)`** "
+             "(ruling 21 — the exposed `EngineHost` methods).")
+    o.append("- **NEVER** the game tier's `bg_channel::rng::Rng` (mp_game — a "
+             "different LCG instance), and **never** libc `rand`. Calling any of "
+             "these implies the `common` receiver (already added for you).")
+    o.append("")
+    o.append("## Arrays & consts — exact sizes, imported names (ruling 3 / §19)")
+    o.append("")
+    o.append("- **Fixed-size arrays keep Raven's EXACT size via the named const** "
+             "— never a magic number. The const is in the rosetta (per-packet "
+             "'CONSTS' table); import it, do not re-`const` it.")
+    o.append("- **Raven file-scope arrays are loader-zeroed** → zeroed / `Default` "
+             "fields on the owning struct (the whole-`Engine` zeroed allocation, "
+             "STATE-D13).")
+    o.append("- **An uninitialized C LOCAL array Raven reads before writing is UB** "
+             "(porting-rules §19) → zero-init it and drop a ≤2-line `// §19:` note "
+             "at the site. Otherwise transcribe Raven's own init (`memset`/loop) "
+             "faithfully.")
+    o.append("- **Seam-supplied consts (plan §1):** names declared in the vendored "
+             "`zlib32/`/`png/` sources (`Z_OK`, `ZF_DEFLATED`, inflate's "
+             "`START`/`END`/`TYPE`, …) and the libc `SEEK_*` whence names have no "
+             "rosetta row BY DESIGN — those layers are Rust-crate seams, never "
+             "byte-ported; obtain them from the seam wrapper module at port time "
+             "(escalate if the seam lacks one). Packets list them on their own "
+             "'Seam-supplied' line, outside the unresolved escalations.")
+    o.append("")
+    o.append("## Destination module (one per oracle source file)")
+    o.append("")
+    o.append("Each packet prints a **DESTINATION** line: the fns land in **one "
+             "Rust module per oracle source file**, at the owning crate's `src` "
+             "root, named by the oracle stem (`cm_load.cpp` → "
+             "`crates/mp/engine/qcommon/src/cm_load.rs`). If the stem collides "
+             "with an existing directory-module in that crate's `src/` (`vm.cpp` "
+             "vs `vm/`), the destination is `<stem>_fns.rs` — the packet's "
+             "DESTINATION line already reflects the escape.")
     o.append("")
     o.append("## Error recovery (ruling 1)")
     o.append("")
@@ -414,8 +790,11 @@ def render_preamble(rulings):
 
 # ------------------------------------------------------------------ packet
 def render_packet(unit_members, dest, rosetta, name2path, usr2dest, usr2name,
-                  calls_of, refs_of, miss, cpp_class_doc, rosetta_keys):
-    """One packet for a C-track unit (>1 member = a cyclic SCC, ported together)."""
+                  calls_of, refs_of, miss, cpp_class_doc, rosetta_keys,
+                  receivers, track_of, ptr_of, const_rosetta, src_dirs,
+                  seam_names):
+    """One packet for a C-track unit (>1 member = a cyclic SCC, ported together).
+    Returns (markdown, pkt_stats)."""
     cpp_types = frozenset(cpp_class_doc)
     cyclic = len(unit_members) > 1
     first = unit_members[0]
@@ -429,9 +808,20 @@ def render_packet(unit_members, dest, rosetta, name2path, usr2dest, usr2name,
              f"**{first['unit']}**  ·  subsystem **{first['subsystem']}**  ·  "
              f"file `{first['file']}`  ·  oracle LOC "
              f"**{sum(m['loc'] for m in unit_members)}**")
+    # DESTINATION — one Rust module per oracle source file (collision-escaped).
+    dests = {}
+    for m in unit_members:
+        dp, esc = destination(m["subsystem"], m["file"], src_dirs)
+        if dp:
+            dests[dp] = esc
+    if dests:
+        o.append("- DESTINATION: " + ", ".join(
+            f"`{dp}`" + ("  _(stem↔dir collision → `_fns` escape)_" if esc else "")
+            for dp, esc in sorted(dests.items())))
     o.append(f"- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` "
              "first — it holds the §C contract, the three-kind static rule, the "
-             "no-stub discipline, and doc routing.")
+             "state-receiver order, the rand/const rules, the no-stub discipline, "
+             "and doc routing.")
     if cyclic:
         o.append(f"- **CYCLIC UNIT ({len(unit_members)} fns): mutual recursion — "
                  "port these bodies TOGETHER; every peer signature below is fixed "
@@ -439,12 +829,15 @@ def render_packet(unit_members, dest, rosetta, name2path, usr2dest, usr2name,
     o.append("")
 
     # ---- resolved signatures (all members up front, so a cyclic unit compiles)
-    o.append("## RESOLVED SIGNATURES (§C mechanical — transcribe the body into these)")
+    o.append("## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)")
+    o.append("")
+    o.append("Leading `&mut` params are the threaded state receivers (ruling 2/3, "
+             "pinned order); transcribe the body into what follows them:")
     o.append("")
     o.append("```rust")
     for m in unit_members:
-        o.append(resolved_signature(m, rosetta, miss, cpp_types) + " { /* "
-                 "PORT-NOTE if needed; port here */ }")
+        o.append(resolved_signature(m, rosetta, miss, cpp_types, receivers)
+                 + " { /* PORT-NOTE if needed; port here */ }")
     o.append("```")
     o.append("")
     if any(m["variadic"] for m in unit_members):
@@ -543,32 +936,52 @@ def render_packet(unit_members, dest, rosetta, name2path, usr2dest, usr2name,
     o.append("")
     if callee_usrs:
         o.append("Each in-engine callee is ALREADY PORTED at this point in the "
-                 "order (stub-free) — call it; find its work order here:")
+                 "order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER "
+                 "PARAMS THROUGH (its receivers are a subset of yours). §F callees "
+                 "additionally take `host`; GP2 callees take none:")
         o.append("")
-        o.append("| callee | resolution |")
-        o.append("| --- | --- |")
+        o.append("| callee | receivers to pass | resolution |")
+        o.append("| --- | --- | --- |")
         for u in sorted(callee_usrs, key=lambda u: usr2name.get(u, u)):
             nm = usr2name.get(u, u)
             d = usr2dest.get(u)
+            tr = track_of.get(u)
             if d is None:
-                res = "**DANGLING — referee item**"
+                res, kinds = "**DANGLING — referee item**", []
             elif d[0] == "c":
                 res = f"packet `{d[1]}`"
+                kinds = receiver_list(u, receivers)
             elif d[0] == "cpp":
                 res = f"§F doc `{d[1]}`"
+                k = DOC_KIND.get(ptr_of.get(u))
+                kinds = ([k, "host"] if k else ["host"])  # §F seam: subsystem+host
             elif d[0] == "cpp-done":
-                res = f"done (GP2) `{d[1]}`"
+                res, kinds = f"done (GP2) `{d[1]}`", []   # GP2 threads no receiver
             else:
-                res = "undocumented C++ class — referee item"
-            o.append(f"| `{nm}` | {res} |")
+                res, kinds = "undocumented C++ class — referee item", []
+            rc = ", ".join(f"`{k}`" for k in kinds) if kinds else "—"
+            o.append(f"| `{nm}` | {rc} | {res} |")
         o.append("")
     if externals:
-        o.append("**Externals** (supplied by Rust std/libc or the already-ported "
-                 "qshared `q_shared`/`q_math` surface — do NOT port here, call "
-                 "through the existing crate):")
-        o.append("")
-        o.append(", ".join(f"`{e}`" for e in externals))
-        o.append("")
+        rand_ext = [e for e in externals if e in RAND_FAMILY]
+        plain_ext = [e for e in externals if e not in RAND_FAMILY]
+        if plain_ext:
+            o.append("**Externals** (supplied by Rust std/libc or the already-"
+                     "ported qshared `q_shared`/`q_math` surface — do NOT port "
+                     "here, call through the existing crate):")
+            o.append("")
+            o.append(", ".join(f"`{e}`" for e in plain_ext))
+            o.append("")
+        if rand_ext:
+            o.append("**Rand family → the engine LCG (ruling 21, NOT the qshared "
+                     "free-fn surface):** "
+                     + ", ".join(f"`{e}`" for e in rand_ext)
+                     + " — route through the `common` receiver's `QRand` field "
+                     "(`common.<qrand>.irand(…)`), or `host.irand(…)`/"
+                     "`host.flrand(…)` in §F seam fns. NEVER the game tier's "
+                     "`bg_channel::rng::Rng`, never libc `rand`. See `_PREAMBLE.md` "
+                     "§ 'Rand family'.")
+            o.append("")
 
     # ---- rosetta rows for every type the signature/body names
     named = set()
@@ -582,7 +995,10 @@ def render_packet(unit_members, dest, rosetta, name2path, usr2dest, usr2name,
             named |= (set(re.findall(r"[A-Za-z_]\w{3,}", b)) & rosetta_keys)
     o.append("## TYPE ROSETTA — import these, never redeclare")
     o.append("")
-    hit = sorted(n for n in named if n in rosetta)
+    # const-kind rows (const/static/enum-variant) are handled by the CONSTS
+    # section below, not here.
+    hit = sorted(n for n in named
+                 if n in rosetta and rosetta[n]["kind"] not in CONST_KINDS)
     cpp_named = sorted(n for n in named if n not in rosetta and n in cpp_class_doc)
     missing = sorted(n for n in named if n not in rosetta and n not in SCALAR
                      and n not in cpp_class_doc)
@@ -605,7 +1021,63 @@ def render_packet(unit_members, dest, rosetta, name2path, usr2dest, usr2name,
                  "needs these landed/renamed first; the finisher triages):** "
                  + ", ".join(f"`{n}`" for n in missing))
         o.append("")
-    return "\n".join(o)
+
+    # ---- CONSTS — resolve every screaming-snake identifier in the source slice
+    # (bodies + global decls) against the const rosetta. Array sizes / counts were
+    # the #1 jampgame porter failure; import the named const, never a magic number.
+    const_text = ""
+    if path is not None:
+        const_text = "\n".join(body_text(path, m["line"], m["end_line"])
+                               for m in unit_members)
+    for cite, (relp, a, b) in sorted(decl_cites.items()):
+        gp = REPO / relp
+        if gp.exists():
+            const_text += "\n" + body_text(str(gp), a, min(b, a + 3))
+    caps = set(_CONST_TOK.findall(const_text))
+    macro_like = {m for m in _MACROCALL_TOK.findall(const_text)
+                  if m not in _CONST_STOP}
+    caps -= _CONST_STOP
+    cand = caps - macro_like                       # not a function-like macro call
+    resolved = sorted(n for n in cand if n in const_rosetta)
+    # a real rosetta row wins over seam classification (a deliberately ported
+    # twin resolves normally); only rosetta-less vendored names go seam-supplied.
+    seam = sorted(n for n in cand
+                  if n not in const_rosetta and n in seam_names)
+    unresolved = sorted(n for n in cand
+                        if n not in const_rosetta and n not in seam_names)
+    if resolved:
+        o.append("## CONSTS — import these, never redefine (exact array sizes)")
+        o.append("")
+        o.append("| const | Rust | crate | path |")
+        o.append("| --- | --- | --- | --- |")
+        for n in resolved:
+            r = const_rosetta[n]
+            o.append(f"| `{n}` | `{r['rust']}` | {r['crate']} | `{r['path']}` |")
+        o.append("")
+    if seam:
+        o.append("**Seam-supplied (vendored zlib/png → Rust crate seam, plan "
+                 "§1):** " + ", ".join(f"`{n}`" for n in seam)
+                 + " — no rosetta row by design; obtain from the seam wrapper "
+                 "module at port time (escalate if the seam lacks one).")
+        o.append("")
+    if unresolved:
+        o.append("**UNRESOLVED CONSTS (escalation, not a guess — surfaced for the "
+                 "referee; may be an enum variant / flag / macro pending its "
+                 "rosetta row):** " + ", ".join(f"`{n}`" for n in unresolved))
+        o.append("")
+    if macro_like:
+        o.append("**Function-like macros (reported, NOT consts — `NAME(...)` in "
+                 "the source; port the macro's expansion, not a const):** "
+                 + ", ".join(f"`{n}`" for n in sorted(macro_like)))
+        o.append("")
+    pkt_stats = {
+        "consts_resolved": set(resolved),
+        "consts_seam": set(seam),
+        "consts_unresolved": set(unresolved),
+        "macro_like": set(macro_like),
+        "dest_escaped": [dp for dp, esc in dests.items() if esc],
+    }
+    return "\n".join(o), pkt_stats
 
 
 # ------------------------------------------------------------------ shards
@@ -684,6 +1156,15 @@ def main():
                                                  "cpp-undocumented"):
             cpp_class_doc.setdefault(f["owner"], ptr_of[f["usr"]])
     rosetta_keys = set(rosetta)
+    const_rosetta = {k: v for k, v in rosetta.items()
+                     if v["kind"] in CONST_KINDS}
+    src_dirs = crate_src_dirs()
+
+    # ---- state receivers: threaded &mut params for every C-track fn (ruling 2/3),
+    # to fixpoint over the call graph (rand-family + §F callee seeds; Com_Error
+    # edge excluded — ruling 1). Computed once, emitted as leading signature params.
+    receivers, recv_iters, unmapped_decls, rand_fns = compute_receivers(
+        funcs, track_of, ptr_of, calls_of, usr2fn, name2path)
 
     # ---- units: group members; a C-track unit becomes one packet
     miss = {}          # missing rosetta base name -> None (populated during render)
@@ -718,11 +1199,21 @@ def main():
             usr2dest[u] = (tr, ptr_of[u])
 
     # ---- render packets
+    seam_names = seam_supplied_consts()
+    consts_resolved, consts_unresolved, macro_like = set(), set(), set()
+    consts_seam = set()
+    dest_escapes = set()
     for u, cmembers, fname, rel in ctrack_units:
-        text = render_packet(cmembers, rel, rosetta, name2path, usr2dest,
-                             usr2name, calls_of, refs_of, miss, cpp_class_doc,
-                             rosetta_keys)
+        text, pkt = render_packet(cmembers, rel, rosetta, name2path, usr2dest,
+                                  usr2name, calls_of, refs_of, miss, cpp_class_doc,
+                                  rosetta_keys, receivers, track_of, ptr_of,
+                                  const_rosetta, src_dirs, seam_names)
         (outdir / fname).write_text(text)
+        consts_resolved |= pkt["consts_resolved"]
+        consts_seam |= pkt["consts_seam"]
+        consts_unresolved |= pkt["consts_unresolved"]
+        macro_like |= pkt["macro_like"]
+        dest_escapes.update(pkt["dest_escaped"])
         packets_meta.append({
             "packet": rel,
             "seq": cmembers[0]["seq"],
@@ -735,6 +1226,17 @@ def main():
             "loc": sum(m["loc"] for m in cmembers),
         })
     packets_meta.sort(key=lambda p: p["seq"])
+
+    # ---- prune stale packets: a prior generator version (before some fns were
+    # reclassified to §F cpp-track) left orphan *.md files. Keep the output dir
+    # exactly the current C-track set + the meta files, so packets/ ≡ manifest.
+    keep = {fname for _, _, fname, _ in ctrack_units} | {
+        "_PREAMBLE.md", "manifest.json", "generation-report.md"}
+    pruned = 0
+    for existing in outdir.glob("*.md"):
+        if existing.name not in keep:
+            existing.unlink()
+            pruned += 1
 
     # ---- preamble
     (outdir / "_PREAMBLE.md").write_text(render_preamble(rulings))
@@ -757,6 +1259,57 @@ def main():
                 continue  # seam-external or anonymous fn-pointer param type
             if n not in rosetta and n not in SCALAR and n not in cpp_class_doc:
                 sig_miss[n].append(f["qualname"])
+
+    # ---- MACHINE CHECK 3: state receivers (ruling 2/3 threading)
+    #   * fixpoint converged (compute_receivers iterates to stability);
+    #   * every C-track fn with a non-empty state table got ≥1 receiver;
+    #   * receiver-count histogram + max + §F/host-carrying count.
+    ctrack_fns = [f for f in funcs if track_of[f["usr"]] == "c"]
+    state_fns_no_receiver = [
+        f["qualname"] for f in ctrack_fns
+        if (f["globals_read"] or f["globals_write"] or f["statics"])
+        and not receivers.get(f["usr"])]
+    recv_hist = defaultdict(int)
+    for f in ctrack_fns:
+        recv_hist[len(receivers.get(f["usr"], ()))] += 1
+    max_fn = max(ctrack_fns, key=lambda f: len(receivers.get(f["usr"], ())))
+    max_recv = len(receivers.get(max_fn["usr"], ()))
+    host_fns = sum(1 for f in ctrack_fns if "host" in receivers.get(f["usr"], ()))
+    state_receivers = {
+        "fixpoint_iterations": recv_iters,
+        "converged": True,   # compute_receivers only returns at fixpoint
+        "state_fns_without_receiver": len(state_fns_no_receiver),
+        "state_fns_without_receiver_examples": state_fns_no_receiver[:10],
+        "receiver_count_histogram": {str(k): recv_hist[k]
+                                     for k in sorted(recv_hist)},
+        "max_receivers": max_recv,
+        "max_receivers_fn": max_fn["qualname"],
+        "max_receivers_kinds": receiver_list(max_fn["usr"], receivers),
+        "fns_with_host_receiver": host_fns,
+        "rand_family_fns": len(rand_fns),
+        "unmapped_decl_files": {p: n for p, n in
+                                sorted(unmapped_decls.items(), key=lambda kv: -kv[1])},
+    }
+    consts_stats = {
+        "distinct_resolved": len(consts_resolved),
+        "distinct_unresolved": len(consts_unresolved),
+        "distinct_macro_like": len(macro_like),
+        "distinct_seam_supplied": len(consts_seam),
+        "seam_supplied_all": sorted(consts_seam),
+        "unresolved_top": sorted(consts_unresolved)[:40],
+        # full list — input to the const-backfill census (constbackfill.py)
+        "unresolved_all": sorted(consts_unresolved),
+        "resolved_all": sorted(consts_resolved),
+        "macro_like_all": sorted(macro_like),
+        "macro_like_top": sorted(macro_like)[:40],
+    }
+    destinations_stats = {
+        "rule": "one Rust module per oracle source file at the owning crate src "
+                "root, named by the oracle stem; <stem>_fns.rs on a stem↔dir "
+                "collision",
+        "crate_roots": CRATE_SRC,
+        "collision_escapes": sorted(dest_escapes),
+    }
 
     # ---- manifest: EVERY fn -> resolution
     manifest_fns = []
@@ -817,7 +1370,13 @@ def main():
             "dangling_examples": dangling[:10],
             "missing_rosetta_types": len(sig_miss),
             "no_stub_order_verified": order_stats.get("no_stub_verified", True),
+            "receivers_converged": state_receivers["converged"],
+            "receiver_fixpoint_iterations": recv_iters,
+            "state_fns_without_receiver": len(state_fns_no_receiver),
         },
+        "state_receivers": state_receivers,
+        "consts": consts_stats,
+        "destinations": destinations_stats,
         "missing_rosetta_types": {
             n: {"count": len(v), "example_fns": sorted(set(v))[:5]}
             for n, v in sorted(sig_miss.items(), key=lambda kv: -len(kv[1]))},
@@ -838,7 +1397,15 @@ def main():
           f"{track_hist['cpp']+track_hist['cpp-done']} cpp-track fns, "
           f"{track_hist['cpp-undocumented']} undocumented-cpp fns, "
           f"{len(sig_miss)} missing sig types, {len(dangling)} dangling callees, "
-          f"{len(shards)} shards, {runtime:.1f}s")
+          f"{len(shards)} shards, {pruned} stale pruned, {runtime:.1f}s")
+    print(f"[enginepackets] receivers: fixpoint {recv_iters} iters, max "
+          f"{max_recv} ({max_fn['qualname']}), {host_fns} host-carrying, "
+          f"{len(rand_fns)} rand-family, {len(state_fns_no_receiver)} state-fns-"
+          f"without-receiver, {len(unmapped_decls)} unmapped decl files; "
+          f"consts: {len(consts_resolved)} resolved / {len(consts_seam)} "
+          f"seam-supplied / {len(consts_unresolved)} unresolved / "
+          f"{len(macro_like)} macro-like; "
+          f"{len(dest_escapes)} dest collision-escapes")
 
 
 def render_report(outdir, manifest, packets, sig_miss, undoc, dangling,
@@ -885,6 +1452,95 @@ def render_report(outdir, manifest, packets, sig_miss, undoc, dangling,
              "(inherited from engineorder).")
     o.append(f"- **Missing rosetta types (C-track signatures):** "
              f"{mc['missing_rosetta_types']} distinct.")
+    sr = manifest["state_receivers"]
+    o.append(f"- **State-receiver fixpoint:** "
+             f"{'converged' if mc['receivers_converged'] else 'NOT converged'} in "
+             f"{mc['receiver_fixpoint_iterations']} iterations.")
+    o.append(f"- **Every state-touching fn got a receiver:** "
+             f"{sr['state_fns_without_receiver']} C-track fn(s) with a non-empty "
+             "state table but zero receivers "
+             + ("(0 — check green)." if sr['state_fns_without_receiver'] == 0
+                else "— **referee items**: "
+                     + ", ".join('`'+x+'`' for x in
+                                 sr['state_fns_without_receiver_examples']) + "."))
+    o.append("")
+    o.append("## State receivers (ruling 2/3 — threaded &mut params)")
+    o.append("")
+    o.append(f"- Fixpoint over the call graph (rand-family + §F-callee seeds; "
+             f"`Com_Error` edge excluded per ruling 1) — {sr['fixpoint_iterations']}"
+             " iterations to stability.")
+    o.append(f"- **Max receivers on one fn:** {sr['max_receivers']} — "
+             f"`{sr['max_receivers_fn']}` "
+             f"({', '.join('`'+k+'`' for k in sr['max_receivers_kinds'])}).")
+    o.append(f"- **§F/host-carrying fns:** {sr['fns_with_host_receiver']}.  "
+             f"**Rand-family fns (→ `common` LCG, ruling 21):** "
+             f"{sr['rand_family_fns']}.")
+    o.append("")
+    o.append("Receiver-count histogram (C-track fns):")
+    o.append("")
+    o.append("| receivers | fns |")
+    o.append("| ---: | ---: |")
+    for k, v in sr["receiver_count_histogram"].items():
+        o.append(f"| {k} | {v} |")
+    o.append("")
+    o.append("### Unmapped decl files (no RECEIVER-MAP rule — NOT silently "
+             "defaulted)")
+    o.append("")
+    if not sr["unmapped_decl_files"]:
+        o.append("_None — every global/static decl file matched a receiver-map "
+                 "rule._")
+    else:
+        o.append("These declaring files match no path rule; their globals "
+                 "contribute no receiver (referee items — a fn touching one still "
+                 "gets its other state's receivers, so the check above stays "
+                 "green). Listed with global-touch counts:")
+        o.append("")
+        o.append("| decl file | touches |")
+        o.append("| --- | ---: |")
+        for p, n in sr["unmapped_decl_files"].items():
+            o.append(f"| `{p}` | {n} |")
+    o.append("")
+    o.append("## Consts (array-size / count imports — jampgame's #1 porter fail)")
+    o.append("")
+    cs = manifest["consts"]
+    o.append(f"- **Resolved** (import from the const rosetta, never redefine): "
+             f"{cs['distinct_resolved']} distinct.")
+    o.append(f"- **Seam-supplied** (vendored zlib/png → Rust crate seam, plan §1; "
+             f"+ libc SEEK_* — obtained from the seam wrapper at port time, "
+             f"never rosetta rows): {cs['distinct_seam_supplied']} distinct: "
+             + ", ".join('`'+n+'`' for n in cs["seam_supplied_all"]) + ".")
+    o.append(f"- **Unresolved** (escalation, not a guess — may be an enum variant "
+             f"/ flag / macro pending its rosetta row): {cs['distinct_unresolved']} "
+             "distinct.")
+    o.append(f"- **Function-like macros** (reported separately, not consts): "
+             f"{cs['distinct_macro_like']} distinct.")
+    if cs["unresolved_top"]:
+        o.append("")
+        o.append("Top unresolved consts: "
+                 + ", ".join('`'+n+'`' for n in cs["unresolved_top"]))
+    if cs["macro_like_top"]:
+        o.append("")
+        o.append("Sample function-like macros: "
+                 + ", ".join('`'+n+'`' for n in cs["macro_like_top"]))
+    o.append("")
+    o.append("## Destination modules")
+    o.append("")
+    ds = manifest["destinations"]
+    o.append(f"Rule: {ds['rule']}.")
+    o.append("")
+    o.append("| subsystem | crate src root |")
+    o.append("| --- | --- |")
+    for sub, root in ds["crate_roots"].items():
+        o.append(f"| {sub} | `{root}` |")
+    o.append("")
+    if ds["collision_escapes"]:
+        o.append("**Applied `_fns.rs` collision escapes** (stem equals an existing "
+                 "`src/` directory-module):")
+        o.append("")
+        for dp in ds["collision_escapes"]:
+            o.append(f"- `{dp}`")
+    else:
+        o.append("_No stem↔dir collisions — every destination is `<stem>.rs`._")
     o.append("")
     if dangling:
         o.append("### Dangling callees (referee items)")

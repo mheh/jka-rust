@@ -18,8 +18,30 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 
+# `const`/`static` harvested alongside the type kinds: engine packets resolve
+# array-size / count identifiers (MAX_*, and any screaming-snake const) against
+# the rosetta so porters import them instead of re-defining a magic number (the
+# #1 jampgame pass-3 porter failure class). Identity-named fallback — no
+# doc-comment gate — so non-doc-commented consts (the census's 38
+# "ported-elsewhere": ACTION_*, S_COLOR_WHITE, …) resolve too.
 ITEM_RE = re.compile(
-    r'^\s*pub\s+(struct|enum|union|type|trait)\s+([A-Za-z_][A-Za-z0-9_]*)')
+    r'^\s*pub\s+(struct|enum|union|type|trait|const|static)\s+(?:mut\s+)?'
+    r'([A-Za-z_][A-Za-z0-9_]*)')
+# ENUM VARIANTS of ported enums (kind "variant", rust = `EnumName::VARIANT`):
+# Raven spells its C enum constants bare (`FS_SEEK_SET`), so the packet CONSTS
+# resolution needs the bare name → qualified Rust form. Screaming-snake only —
+# CamelCase variants can't be named by a C source slice and would only add
+# collision noise.
+VARIANT_RE = re.compile(r"^\s*([A-Z][A-Z0-9_]{2,})\s*(?:=[^,]*)?,?\s*(?://.*)?$")
+# Non-pub (or pub(crate)) const/static fallback — screaming-snake only. Several
+# census "ported-elsewhere" names are PRIVATE consts (mp_game's ACTION_* flags,
+# botlib.h:66-89); a rosetta row still resolves the name for porters (the row's
+# path says where the value lives — visibility/tier is the porter's/finisher's
+# call, better than an unresolved escalation). Gated to [A-Z_]+ so local helper
+# consts inside fn bodies don't flood the rosetta.
+PRIV_CONST_RE = re.compile(
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?(const|static)\s+(?:mut\s+)?"
+    r"([A-Z][A-Z0-9_]{2,})\s*:")
 RAVEN_RE = re.compile(r'Raven(?:\'s)?\s+`([A-Za-z_][A-Za-z0-9_]*)`')
 CITE_RE = re.compile(r'(?:Source|source):\s*`?(oracle/[^\s`]+)`?')
 
@@ -48,8 +70,28 @@ def scan(crates_dir):
         header = "\n".join(l for l in lines[:30] if l.strip().startswith("//!"))
         f_raven, f_cite = RAVEN_RE.search(header), CITE_RE.search(header)
         doc = []  # trailing comment block (/// or //) above the current line
+        # enum-body tracker: (enum rust name, opening-brace seen, brace depth)
+        in_enum, enum_seen, enum_depth = None, False, 0
         for ln in lines:
             s = ln.strip()
+            # ---- inside a pub enum body: harvest screaming-snake variants
+            if in_enum is not None and not s.startswith("//"):
+                if enum_seen and enum_depth > 0:
+                    vm = VARIANT_RE.match(ln)
+                    if vm:
+                        rows.append({
+                            "raven": vm.group(1),
+                            "rust": f"{in_enum}::{vm.group(1)}",
+                            "kind": "variant",
+                            "crate": crate_of(rs),
+                            "path": str(rs.relative_to(REPO)),
+                            "cite": "",
+                        })
+                enum_depth += ln.count("{") - ln.count("}")
+                if enum_depth > 0:
+                    enum_seen = True
+                elif enum_seen:
+                    in_enum = None
             if s.startswith("///") or s.startswith("//") or s.startswith("#["):
                 doc.append(s)
                 continue
@@ -77,11 +119,37 @@ def scan(crates_dir):
                     names.append(rust)
                 if kind == "type":
                     names.append(rust)
+                # A const/static's Rust name IS the import spelling and is
+                # usually identical to the Raven `#define`/enum name
+                # (MAX_QPATH etc.); ALWAYS register it (identity fallback, no
+                # doc-comment gate — the census's "ported-elsewhere" fix).
+                if kind in ("const", "static") and rust not in names:
+                    names.append(rust)
+                # a pub enum: harvest its screaming-snake variants (kind
+                # "variant") — start the body tracker on this very line.
+                if kind == "enum":
+                    in_enum = rust
+                    enum_depth = ln.count("{") - ln.count("}")
+                    enum_seen = enum_depth > 0
                 for nm in dict.fromkeys(names):
                     rows.append({
                         "raven": nm,
                         "rust": rust,
                         "kind": kind,
+                        "crate": crate_of(rs),
+                        "path": str(rs.relative_to(REPO)),
+                        "cite": cite.group(1) if cite else "",
+                    })
+            else:
+                # non-pub const/static fallback (identity row only) — picks up
+                # the doc-block Source cite when present.
+                pm = PRIV_CONST_RE.match(ln)
+                if pm:
+                    cite = CITE_RE.search("\n".join(doc)) or f_cite
+                    rows.append({
+                        "raven": pm.group(2),
+                        "rust": pm.group(2),
+                        "kind": pm.group(1),
                         "crate": crate_of(rs),
                         "path": str(rs.relative_to(REPO)),
                         "cite": cite.group(1) if cite else "",
