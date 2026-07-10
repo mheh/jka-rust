@@ -508,3 +508,30 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     1835-1865) uses no engine service; the signature becomes host-free,
     matching its body and its sibling `clear_all_failed_edges`.
     **RULING: drop the host param (user, 2026-07-09)**
+
+## Undocumented-C++ referee rulings, round 8 (user, 2026-07-09 — ninth session)
+
+49. **CDraw32 §20-dropped (22 methods, cm_draw.cpp):** provably dead under
+    DEDICATED — sole caller `CTerrainMap` is header-only in WinDed.vcproj
+    and already §20-dropped (rmg-terrain.md, ruling 17/RMG-D4c); the only
+    instantiation site is `#ifndef DEDICATED` + `!com_dedicated->integer`
+    double-guarded (RM_Mission.cpp:1501-1504). One-line addendum lands in
+    FROZEN rmg-terrain.md's divergences (this ruling IS the amendment
+    sign-off); the manifest reclassifies the 22 methods §20.
+    **RULING: §20-drop (user, 2026-07-09)**
+50. **StringEd (CStringEdPackage + SE_Entry_s — LIVE, game-module trap at
+    sv_game.cpp:699): new §F doc, seeded with the faithful set** —
+    (1) the package is an `Engine.common` sub-struct field, threaded, no
+    singleton; (2) the store owns Strings, lookups borrow `&str`, the
+    syscall arm copies bytes out exactly as Raven's trap does;
+    (3) `Filename_*` scratch statics follow ruling 3's three-kind rule;
+    (4) `BTreeMap` — Raven's sorted `std::map` iteration order kept.
+    docs/subsystems/stringed.md authored via the established workflow.
+    **RULING: faithful set (user, 2026-07-09)**
+51. **tr_model doc queued NOW (no-deferrals):** the tr_model subsystem doc
+    ghoul2-server.md anticipates (loader TUs + the
+    `CachedEndianedModelBinary_s` cache — pModelDiskImage ownership and
+    cache home settle inside it) enters the §F pipeline immediately:
+    fork-discovery → rulings → author-design-doc → FROZEN. It gates the
+    M3 renderer waves.
+    **RULING: queue it now (user, 2026-07-09)**

@@ -1,5 +1,6 @@
 # RMG + qcommon terrain classes (§F idiomatic reimplementation) Design
 Status: FROZEN (user sign-off 2026-07-09)     Supersedes: none
+Amended: ruling 49 (2026-07-09) — CDraw32 §20-drop addendum (see Divergences)
 Decision prefix: RMG     Ledger deps: DEC-01, DEC-04, DEC-09
 
 ## Standing context
@@ -1584,3 +1585,12 @@ divergences:
   - { class: CTerrainMap, kind: drop, rule: "§20/RMG-D4c", note: "whole automap-image builder dead under DEDICATED: its only ctor CM_TM_Create is #ifndef DEDICATED (RM_Mission.cpp:1503-1504); Upload/SaveImageToDisk named by ruling 17. Recorded, not ported (returns to scope if the renderer is un-deferred, DEC-01)" }
   - { class: CRMLandScape, kind: drop, rule: "§20/RMG-D4c", note: "RM_Terrain.cpp client-model chain (CRMLandScape/CCGHeightDetails/CRandomModel/CCGPatch, RM_CreateRandomModels, SpawnPatchModelsWrapper) — graph-confirmed zero engine callers under DEDICATED (ruling 17); reached only from the client (RM_CreateRandomModels ← cl_cgame.cpp:1707). Not ported" }
 ```
+
+## Addendum (ruling 49, 2026-07-09 — amendment signed off in the ruling)
+
+- **`CDraw32` (cm_draw.cpp, 22 methods) is §20-dropped**, transitively on the
+  already-dropped `CTerrainMap` (its sole caller; header-only in
+  WinDed.vcproj). The only instantiation chain (`CM_TM_Create`,
+  RM_Mission.cpp:1501-1504) is `#ifndef DEDICATED` + `!com_dedicated->integer`
+  double-guarded. Zero-caller note per porting-rules §20; no roster rows.
+  Source: `docs/handoffs/engine-fork-discovery.md` ruling 49.
