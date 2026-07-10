@@ -463,3 +463,42 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     pinned shape. Recorded in state-ownership.md alongside STATE-Q2's
     ruling-12 closure.
     **RULING: pin the shape now, impl at wave 20 (user, 2026-07-09)**
+
+## §F doc-session rulings, round 7 (user, 2026-07-09 — eighth session)
+
+44. **`.nav` binary long width — 4 bytes, pinned.** Raven's on-disk truth
+    is Win32: every `long`/`unsigned long` in the `.nav` format
+    (header/ids/GetLong reads, navigator.cpp:388,428,557-564,614,676)
+    reads/writes as exactly 4 bytes (`i32`/`u32`) in Rust.
+    `tools/npcnav-oracle` builds the unmodified TU with a 4-byte-long shim
+    via compile flags/stub-header typedef (flags are not source edits —
+    LittleShort= precedent), so its fixtures are retail-shaped; goldens,
+    retail pk3 `.nav` files, and the OpenJK referee agree. GENERAL RULE:
+    Win32 `long` inside any BINARY FILE FORMAT = 4 bytes; `c_long` in
+    compiled-ABI structs is the separate, correct case.
+    **RULING: pin 4 bytes; shim the harness TU (user, 2026-07-09)**
+45. **Heap-algorithm ground truth (completes ruling 26):** the npcnav doc
+    states libstdc++'s push_heap/pop_heap behaviorally (two-phase Floyd:
+    pop swaps root/last, __adjust_heap percolates the hole down with
+    libstdc++'s child-comparison order, then sifts up from the leaf) with
+    a reference-only cite to the Homebrew g++-16 stl_heap.h path — no GPL
+    text enters the repo. The committed rank-order goldens are the
+    enforcing gate for any sift-order mistake.
+    **RULING: behavioral spec + goldens gate (user, 2026-07-09)**
+46. **CmLandScape brush arena:** one shared Vec-backed arena owned by
+    `CmLandScape` mirroring Raven's single
+    `Z_Malloc(size × GetBlockCount())` buffer (cm_terrain.cpp:215);
+    each `CmPatch` stores offset/length RANGES into it (no raw pointers);
+    `UpdatePatches`' carving transcribes as range arithmetic. Faithful
+    single-allocation topology per ruling 4.
+    **RULING: one shared arena + range indices (user, 2026-07-09)**
+47. **RMG closeout bundle:** (1) golden #4 exercises the REAL `.terrain`
+    parse with a hand-authored fixture; the standalone oracle TU stubs the
+    `CM_GetShaderInfo` extern (closes RMG-Q12). (2) `load_mission` KEEPS
+    the faithful full signature (cm/is_server dead-on-live-path params
+    included) — ruling 38 collapsed a dead call; this is a live call, and
+    the wave-20 arm transcribes 1:1. (3) Mechanical blessings: RMG-D5/D6
+    append numbering stands (no renumber); automap symbols hardcode
+    0/None with no backing array; `GetAutomapSymbol`'s unchecked C index
+    becomes `.get()` → `Option` per §19.
+    **RULING: real parse fixture; keep full signature; bless (user, 2026-07-09)**
