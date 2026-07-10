@@ -47,7 +47,7 @@ divergences:
 ---
 
 # StringEd localization (CStringEdPackage) — MP engine (§F idiomatic reimplementation)
-Status: REVIEWED     Supersedes: none
+Status: FROZEN (delegated sign-off 2026-07-10, user default-decision grant)     Supersedes: none
 Decision prefix: SE     Ledger deps: DEC-09 (oracle-differential parity), DEC-04 (per-mode)
 
 ## Standing context
