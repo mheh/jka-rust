@@ -120,8 +120,11 @@ name = "mp_engine_botlib"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "mp_bg",
  "mp_engine_qcommon",
+ "mp_game",
  "mp_qshared",
+ "native_types",
 ]
 
 [[package]]
@@ -199,9 +202,15 @@ name = "mp_engine_server"
 version = "0.1.0"
 dependencies = [
  "mp_abi",
+ "mp_engine_ghoul2",
+ "mp_engine_icarus",
  "mp_engine_qcommon",
+ "mp_engine_rmg",
  "mp_host_interface",
  "mp_qshared",
+ "mp_renderer",
+ "native_math",
+ "native_types",
 ]
 
 [[package]]

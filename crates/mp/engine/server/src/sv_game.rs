@@ -16,7 +16,7 @@ use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::qboolean;
+use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use mp_qshared::shared::surface_flags::CONTENTS_LIGHTSABER;
 use native_math::vector::vec3_t;
 use native_types::clipHandle_t;
@@ -31,15 +31,16 @@ use crate::Server;
 // packets were generated ahead of those state structs landing. Imported below
 // by their preamble-table decl-home crate; genuinely missing, escalated in
 // missing_symbols rather than stubbed (ZERO-PARK).
-use mp_engine_ghoul2::Ghoul2System;
+use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_icarus::Icarus;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
-use mp_engine_qcommon::RoffSystem;
-use mp_engine_renderer::RenderModels;
-use mp_engine_rmg::RmManager;
-use mp_engine_server::Navigator;
+use mp_engine_qcommon::roff::RoffSystem;
+use mp_engine_renderer::tr_model::render_models::RenderModels;
+use mp_engine_rmg::rm_manager::RmManager;
 use mp_host_interface::engine_host::EngineHost;
+
+use crate::npcnav::Navigator;
 
 /// Raven `SV_NumForGentity`.
 ///
@@ -105,9 +106,9 @@ pub fn SV_GetEntityToken(sv: &mut Server, buffer: *mut c_char, bufferSize: c_int
             );
             mp_qshared::shared::q_shared::Q_strncpyz(buffer, s, bufferSize);
             if sv.sv.entityParsePoint.is_null() && *s == 0 {
-                qboolean::qfalse
+                qfalse
             } else {
-                qboolean::qtrue
+                qtrue
             }
         } else {
             let s = mp_qshared::shared::com_parse::COM_Parse(
@@ -115,9 +116,9 @@ pub fn SV_GetEntityToken(sv: &mut Server, buffer: *mut c_char, bufferSize: c_int
             );
             mp_qshared::shared::q_shared::Q_strncpyz(buffer, s, bufferSize);
             if sv.sv.mLocalSubBSPEntityParsePoint.is_null() && *s == 0 {
-                qboolean::qfalse
+                qfalse
             } else {
-                qboolean::qtrue
+                qtrue
             }
         }
     }
@@ -135,7 +136,7 @@ pub fn FloatAsInt(f: f32) -> c_int {
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:77-82`
 pub fn SV_GEntityForSvEntity(sv: &mut Server, svEnt: *mut svEntity_t) -> *mut sharedEntity_t {
-    let num = unsafe { svEnt.offset_from(sv.sv.svEntities as *mut svEntity_t) } as c_int;
+    let num = unsafe { svEnt.offset_from(sv.sv.svEntities.as_mut_ptr()) } as c_int;
     SV_GentityNum(sv, num)
 }
 
@@ -144,10 +145,10 @@ pub fn SV_GEntityForSvEntity(sv: &mut Server, svEnt: *mut svEntity_t) -> *mut sh
 /// Source: `oracle/codemp/server/sv_game.cpp:185-200`
 pub fn SV_SetActiveSubBSP(cm: &mut CollisionWorld, sv: &mut Server, index: c_int) -> *const c_char {
     if index >= 0 {
-        sv.sv.mLocalSubBSPIndex = mp_engine_qcommon::cm::CM_FindSubBSP(cm, index);
+        sv.sv.mLocalSubBSPIndex = mp_engine_qcommon::cm_load::CM_FindSubBSP(cm, index);
         sv.sv.mLocalSubBSPModelOffset = index;
         sv.sv.mLocalSubBSPEntityParsePoint =
-            mp_engine_qcommon::cm::CM_SubBSPEntityString(cm, sv.sv.mLocalSubBSPIndex);
+            mp_engine_qcommon::cm_load::CM_SubBSPEntityString(cm, sv.sv.mLocalSubBSPIndex);
         sv.sv.mLocalSubBSPEntityParsePoint as *const c_char
     } else {
         sv.sv.mLocalSubBSPIndex = -1;
@@ -180,22 +181,22 @@ pub fn ConvertedEntity(
             sv.g_local_modifier.taskID[i] = (*ent).taskID[i];
         }
         sv.g_local_modifier.parms =
-            mp_engine_qcommon::vm::VM_ArgPtr(common, (*ent).parms as c_int) as *mut parms_t;
+            mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).parms as c_int) as *mut parms_t;
         for i in 0..NUM_BSETS as usize {
             sv.g_local_modifier.behaviorSet[i] =
-                mp_engine_qcommon::vm::VM_ArgPtr(common, (*ent).behaviorSet[i] as c_int)
+                mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).behaviorSet[i] as c_int)
                     as *mut c_char;
         }
         sv.g_local_modifier.script_targetname =
-            mp_engine_qcommon::vm::VM_ArgPtr(common, (*ent).script_targetname as c_int)
+            mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).script_targetname as c_int)
                 as *mut c_char;
         sv.g_local_modifier.delayScriptTime = (*ent).delayScriptTime;
         sv.g_local_modifier.fullName =
-            mp_engine_qcommon::vm::VM_ArgPtr(common, (*ent).fullName as c_int) as *mut c_char;
+            mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).fullName as c_int) as *mut c_char;
         sv.g_local_modifier.targetname =
-            mp_engine_qcommon::vm::VM_ArgPtr(common, (*ent).targetname as c_int) as *mut c_char;
+            mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).targetname as c_int) as *mut c_char;
         sv.g_local_modifier.classname =
-            mp_engine_qcommon::vm::VM_ArgPtr(common, (*ent).classname as c_int) as *mut c_char;
+            mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).classname as c_int) as *mut c_char;
 
         sv.g_local_modifier.ghoul2 = (*ent).ghoul2;
 
@@ -211,7 +212,7 @@ pub fn SV_GameError(string: *const c_char) {
     let msg = unsafe { core::ffi::CStr::from_ptr(string) }
         .to_string_lossy()
         .into_owned();
-    mp_engine_qcommon::common::com_error(errorParm_t::ERR_DROP, &msg);
+    mp_engine_qcommon::common::com_error(errorParm_t::ERR_DROP, msg);
 }
 
 /// Raven `SV_GamePrint`.
@@ -263,48 +264,48 @@ pub fn SV_GameDropClient(
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:209-233`
 pub fn SV_inPVS(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t) -> qboolean {
-    let mut leafnum = mp_engine_qcommon::cm::CM_PointLeafnum(cm, p1);
+    let mut leafnum = mp_engine_qcommon::cm_test::CM_PointLeafnum(cm, p1);
     let mut cluster = mp_engine_qcommon::cm::CM_LeafCluster(cm, leafnum);
     let area1 = mp_engine_qcommon::cm::CM_LeafArea(cm, leafnum);
-    let mask = mp_engine_qcommon::cm::CM_ClusterPVS(cm, cluster);
+    let mask = mp_engine_qcommon::cm_test::CM_ClusterPVS(cm, cluster);
 
-    leafnum = mp_engine_qcommon::cm::CM_PointLeafnum(cm, p2);
+    leafnum = mp_engine_qcommon::cm_test::CM_PointLeafnum(cm, p2);
     cluster = mp_engine_qcommon::cm::CM_LeafCluster(cm, leafnum);
     let area2 = mp_engine_qcommon::cm::CM_LeafArea(cm, leafnum);
     if !mask.is_null() {
         let byte = unsafe { *mask.offset((cluster >> 3) as isize) };
         if byte & (1 << (cluster & 7)) == 0 {
-            return qboolean::qfalse;
+            return qfalse;
         }
     }
-    if mp_engine_qcommon::cm::CM_AreasConnected(cm, area1, area2) == qboolean::qfalse {
+    if mp_engine_qcommon::cm::CM_AreasConnected(cm, area1, area2) == qfalse {
         // a door blocks sight
-        return qboolean::qfalse;
+        return qfalse;
     }
-    qboolean::qtrue
+    qtrue
 }
 
 /// Raven `SV_inPVSIgnorePortals`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:243-267`
 pub fn SV_inPVSIgnorePortals(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t) -> qboolean {
-    let mut leafnum = mp_engine_qcommon::cm::CM_PointLeafnum(cm, p1);
+    let mut leafnum = mp_engine_qcommon::cm_test::CM_PointLeafnum(cm, p1);
     let mut cluster = mp_engine_qcommon::cm::CM_LeafCluster(cm, leafnum);
     let _area1 = mp_engine_qcommon::cm::CM_LeafArea(cm, leafnum);
-    let mask = mp_engine_qcommon::cm::CM_ClusterPVS(cm, cluster);
+    let mask = mp_engine_qcommon::cm_test::CM_ClusterPVS(cm, cluster);
 
-    leafnum = mp_engine_qcommon::cm::CM_PointLeafnum(cm, p2);
+    leafnum = mp_engine_qcommon::cm_test::CM_PointLeafnum(cm, p2);
     cluster = mp_engine_qcommon::cm::CM_LeafCluster(cm, leafnum);
     let _area2 = mp_engine_qcommon::cm::CM_LeafArea(cm, leafnum);
 
     if !mask.is_null() {
         let byte = unsafe { *mask.offset((cluster >> 3) as isize) };
         if byte & (1 << (cluster & 7)) == 0 {
-            return qboolean::qfalse;
+            return qfalse;
         }
     }
 
-    qboolean::qtrue
+    qtrue
 }
 
 /// Raven `SV_GetServerinfo`.
@@ -314,12 +315,12 @@ pub fn SV_GetServerinfo(common: &mut Common, buffer: *mut c_char, bufferSize: c_
     if bufferSize < 1 {
         mp_engine_qcommon::common::com_error(
             errorParm_t::ERR_DROP,
-            &format!("SV_GetServerinfo: bufferSize == {bufferSize}"),
+            format!("SV_GetServerinfo: bufferSize == {bufferSize}"),
         );
     }
     let info = mp_engine_qcommon::cvar::Cvar_InfoString(
         common,
-        mp_game::q_shared_cvar_flags::CVAR_SERVERINFO,
+        mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
     unsafe {
         mp_qshared::shared::q_shared::Q_strncpyz(
@@ -358,7 +359,7 @@ pub fn SV_InitGameVM(
     host: &mut dyn EngineHost,
     restart: qboolean,
 ) {
-    sv.sv.entityParsePoint = mp_engine_qcommon::cm::CM_EntityString(cm);
+    sv.sv.entityParsePoint = mp_engine_qcommon::cm_load::CM_EntityString(cm);
 
     let ms = mp_engine_qcommon::common::Com_Milliseconds(common, cm, rm, host);
     mp_engine_qcommon::vm::VM_Call(
@@ -381,8 +382,8 @@ pub fn SV_InitGameVM(
 /// Source: `oracle/codemp/server/sv_game.cpp:1766-1772`
 pub fn SV_GameCommand(common: &mut Common, sv: &mut Server) -> qboolean {
     use crate::server::server_state_t::serverState_t;
-    if sv.sv.state != serverState_t::SS_GAME {
-        return qboolean::qfalse;
+    if sv.sv.state as c_int != serverState_t::SS_GAME as c_int {
+        return qfalse;
     }
     let r = mp_engine_qcommon::vm::VM_Call(
         common,
@@ -407,7 +408,7 @@ pub fn SV_AdjustAreaPortalState(
         if (*svEnt).areanum2 == -1 {
             return;
         }
-        mp_engine_qcommon::cm::CM_AdjustAreaPortalState(
+        mp_engine_qcommon::cm_test::CM_AdjustAreaPortalState(
             cm,
             (*svEnt).areanum,
             (*svEnt).areanum2,
@@ -433,17 +434,20 @@ pub fn SV_RestartGameProgs(
         common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_SHUTDOWN as c_int,
-        &[qboolean::qtrue as c_int],
+        &[qtrue as c_int],
     );
 
     // do a restart instead of a free
-    sv.gvm = mp_engine_qcommon::vm::VM_Restart(common, cm, rm, host, sv.gvm);
+    sv.gvm = mp_engine_qcommon::vm_fns::VM_Restart(common, cm, rm, host, sv.gvm);
     if sv.gvm.is_null() {
         // bk001212 - as done below
-        mp_engine_qcommon::common::com_error(errorParm_t::ERR_FATAL, "VM_Restart on game failed");
+        mp_engine_qcommon::common::com_error(
+            errorParm_t::ERR_FATAL,
+            "VM_Restart on game failed".to_string(),
+        );
     }
 
-    SV_InitGameVM(common, cm, sv, rm, host, qboolean::qtrue);
+    SV_InitGameVM(common, cm, sv, rm, host, qtrue);
 }
 
 /// Raven `SV_EntityContact`.
@@ -466,7 +470,7 @@ pub fn SV_EntityContact(
 
         let ch: clipHandle_t = mp_engine_server::SV_ClipHandleForEntity(cm, gEnt);
         let mut trace = core::mem::zeroed();
-        mp_engine_qcommon::cm::CM_TransformedBoxTrace(
+        mp_engine_qcommon::cm_trace::CM_TransformedBoxTrace(
             common,
             cm,
             rm,
@@ -503,7 +507,10 @@ pub fn SV_SetBrushModel(
 ) {
     unsafe {
         if name.is_null() {
-            mp_engine_qcommon::common::com_error(errorParm_t::ERR_DROP, "SV_SetBrushModel: NULL");
+            mp_engine_qcommon::common::com_error(
+                errorParm_t::ERR_DROP,
+                "SV_SetBrushModel: NULL".to_string(),
+            );
         }
 
         let name_str = core::ffi::CStr::from_ptr(name).to_string_lossy();
@@ -517,52 +524,52 @@ pub fn SV_SetBrushModel(
                 (*ent).s.modelindex += sv.sv.mLocalSubBSPModelOffset;
             }
 
-            let h = mp_engine_qcommon::cm::CM_InlineModel(cm, (*ent).s.modelindex);
+            let h = mp_engine_qcommon::cm_load::CM_InlineModel(cm, (*ent).s.modelindex);
 
-            mp_engine_qcommon::cm::CM_ModelBounds(cm, h, &mut mins, &mut maxs);
+            mp_engine_qcommon::cm_load::CM_ModelBounds(cm, h, &mut mins, &mut maxs);
 
             (*ent).r.mins = mins;
             (*ent).r.maxs = maxs;
-            (*ent).r.bmodel = qboolean::qtrue;
+            (*ent).r.bmodel = qtrue;
 
             let com_rmg = mp_engine_qcommon::cvar::com_RMG(common);
             if !com_rmg.is_null() && (*com_rmg).integer != 0 {
                 (*ent).r.contents =
-                    mp_engine_qcommon::cm::CM_ModelContents(cm, h, sv.sv.mLocalSubBSPIndex);
+                    mp_engine_qcommon::cm_load::CM_ModelContents(cm, h, sv.sv.mLocalSubBSPIndex);
             } else {
-                (*ent).r.contents = mp_engine_qcommon::cm::CM_ModelContents(cm, h, -1);
+                (*ent).r.contents = mp_engine_qcommon::cm_load::CM_ModelContents(cm, h, -1);
             }
         } else if *name == b'#' as c_char {
             let bsp_name = format!("maps/{}.bsp", &name_str[1..]);
-            (*ent).s.modelindex = mp_engine_qcommon::cm::CM_LoadSubBSP(
+            (*ent).s.modelindex = mp_engine_qcommon::cm_load::CM_LoadSubBSP(
                 common,
                 cm,
                 rm,
                 rmg,
                 host,
                 &bsp_name,
-                qboolean::qfalse,
+                qfalse,
             );
-            mp_engine_qcommon::cm::CM_ModelBounds(cm, (*ent).s.modelindex, &mut mins, &mut maxs);
+            mp_engine_qcommon::cm_load::CM_ModelBounds(cm, (*ent).s.modelindex, &mut mins, &mut maxs);
 
             (*ent).r.mins = mins;
             (*ent).r.maxs = maxs;
-            (*ent).r.bmodel = qboolean::qtrue;
+            (*ent).r.bmodel = qtrue;
 
             //rwwNOTE: We don't ever want to set contents -1, it includes CONTENTS_LIGHTSABER.
             //Lots of stuff will explode if there's a brush with CONTENTS_LIGHTSABER that isn't attached to a client owner.
             //ent->contents = -1;		// we don't know exactly what is in the brushes
             let _ = CONTENTS_LIGHTSABER;
-            let h = mp_engine_qcommon::cm::CM_InlineModel(cm, (*ent).s.modelindex);
-            (*ent).r.contents = mp_engine_qcommon::cm::CM_ModelContents(
+            let h = mp_engine_qcommon::cm_load::CM_InlineModel(cm, (*ent).s.modelindex);
+            (*ent).r.contents = mp_engine_qcommon::cm_load::CM_ModelContents(
                 cm,
                 h,
-                mp_engine_qcommon::cm::CM_FindSubBSP(cm, (*ent).s.modelindex),
+                mp_engine_qcommon::cm_load::CM_FindSubBSP(cm, (*ent).s.modelindex),
             );
         } else {
             mp_engine_qcommon::common::com_error(
                 errorParm_t::ERR_DROP,
-                &format!("SV_SetBrushModel: {name_str} isn't a brush model"),
+                format!("SV_SetBrushModel: {name_str} isn't a brush model"),
             );
         }
     }
@@ -575,7 +582,7 @@ pub fn SV_SetBrushModel(
 /// Source: `oracle/codemp/qcommon/vm_local.h` (`VMA`/`VMF` macros)
 #[inline]
 unsafe fn vma(common: &mut Common, args: *mut c_int, n: isize) -> *mut c_void {
-    mp_engine_qcommon::vm::VM_ArgPtr(common, *args.offset(n)) as *mut c_void
+    mp_engine_qcommon::vm_fns::VM_ArgPtr(common, *args.offset(n)) as *mut c_void
 }
 
 /// Raven's `VMF(n)` macro — reinterpret `args[n]`'s bits as `float`.
@@ -692,11 +699,11 @@ pub fn SV_GameSystemCalls(
             let s = core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
                 .to_string_lossy()
                 .into_owned();
-            mp_engine_qcommon::common::com_error(errorParm_t::ERR_DROP, &s);
+            mp_engine_qcommon::common::com_error(errorParm_t::ERR_DROP, s);
             return 0;
         } else if trap == G::G_MILLISECONDS as c_int {
             return mp_qshared::shared::sys_shared::Sys_Milliseconds();
-        } else if trap == G::CG_PRECISIONTIMER_START as c_int {
+        } else if trap == G::G_PRECISIONTIMER_START as c_int {
             // rww - precision timer funcs. -ALWAYS- call end after start with
             // supplied ptr, or you'll get a nasty memory leak. Not that you
             // should be using these outside of debug anyway.
@@ -705,7 +712,7 @@ pub fn SV_GameSystemCalls(
             *supplied_ptr = Box::into_raw(new_timer) as *mut c_void;
             (**(supplied_ptr as *mut *mut mp_engine_qcommon::timing::timing_c::timing_c)).Start();
             return 0;
-        } else if trap == G::CG_PRECISIONTIMER_END as c_int {
+        } else if trap == G::G_PRECISIONTIMER_END as c_int {
             let timer = *args.offset(1) as *mut mp_engine_qcommon::timing::timing_c::timing_c;
             let r = (*timer).End();
             drop(Box::from_raw(timer));
@@ -764,9 +771,9 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_ARGC as c_int {
-            return mp_engine_qcommon::cmd::Cmd_Argc(common);
+            return mp_engine_qcommon::cmd_common::Cmd_Argc(common);
         } else if trap == G::G_ARGV as c_int {
-            mp_engine_qcommon::cmd::Cmd_ArgvBuffer(
+            mp_engine_qcommon::cmd_common::Cmd_ArgvBuffer(
                 common,
                 *args.offset(1),
                 vma(common, args, 2) as *mut c_char,
@@ -774,7 +781,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_SEND_CONSOLE_COMMAND as c_int {
-            mp_engine_qcommon::cbuf::Cbuf_ExecuteText(
+            mp_engine_qcommon::cmd_common::Cbuf_ExecuteText(
                 common,
                 cm,
                 sv,
@@ -787,7 +794,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_FS_FOPEN_FILE as c_int {
-            return mp_engine_qcommon::files::FS_FOpenFileByMode(
+            return mp_engine_qcommon::files_pc::FS_FOpenFileByMode(
                 common,
                 cm,
                 rm,
@@ -799,7 +806,7 @@ pub fn SV_GameSystemCalls(
                 core::mem::transmute(*args.offset(3)),
             );
         } else if trap == G::G_FS_READ as c_int {
-            mp_engine_qcommon::files::FS_Read2(
+            mp_engine_qcommon::files_pc::FS_Read2(
                 common,
                 vma(common, args, 1),
                 *args.offset(2),
@@ -818,7 +825,7 @@ pub fn SV_GameSystemCalls(
             mp_engine_qcommon::files::FS_FCloseFile(common, *args.offset(1));
             return 0;
         } else if trap == G::G_FS_GETFILELIST as c_int {
-            return mp_engine_qcommon::files::FS_GetFileList(
+            return mp_engine_qcommon::files_pc::FS_GetFileList(
                 common,
                 cm,
                 rm,
@@ -892,7 +899,7 @@ pub fn SV_GameSystemCalls(
                 *(vma(common, args, 1) as *const vec3_t),
                 *(vma(common, args, 2) as *const vec3_t),
                 vma(common, args, 3) as *const sharedEntity_t,
-                qboolean::qfalse as c_int,
+                qfalse as c_int,
             ) as c_int;
         } else if trap == G::G_ENTITY_CONTACTCAPSULE as c_int {
             return SV_EntityContact(
@@ -904,7 +911,7 @@ pub fn SV_GameSystemCalls(
                 *(vma(common, args, 1) as *const vec3_t),
                 *(vma(common, args, 2) as *const vec3_t),
                 vma(common, args, 3) as *const sharedEntity_t,
-                qboolean::qtrue as c_int,
+                qtrue as c_int,
             ) as c_int;
         } else if trap == G::G_TRACE as c_int {
             mp_engine_server::SV_Trace(
@@ -922,7 +929,7 @@ pub fn SV_GameSystemCalls(
                 vma(common, args, 5) as *const f32,
                 *args.offset(6),
                 *args.offset(7),
-                qboolean::qfalse as c_int,
+                qfalse as c_int,
                 0,
                 *args.offset(9),
             );
@@ -943,7 +950,7 @@ pub fn SV_GameSystemCalls(
                 vma(common, args, 5) as *const f32,
                 *args.offset(6),
                 *args.offset(7),
-                qboolean::qfalse as c_int,
+                qfalse as c_int,
                 *args.offset(8),
                 *args.offset(9),
             );
@@ -964,7 +971,7 @@ pub fn SV_GameSystemCalls(
                 vma(common, args, 5) as *const f32,
                 *args.offset(6),
                 *args.offset(7),
-                qboolean::qtrue as c_int,
+                qtrue as c_int,
                 *args.offset(8),
                 *args.offset(9),
             );
@@ -1088,7 +1095,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_REAL_TIME as c_int {
             return mp_qshared::shared::sys_shared::Com_RealTime(
-                vma(common, args, 1) as *mut mp_qshared::shared::qtime_t::qtime_t
+                vma(common, args, 1) as *mut mp_qshared::common::mp::qcommon::qtime::qtime_t
             );
         } else if trap == G::G_SNAPVECTOR as c_int {
             mp_qshared::shared::sys_shared::Sys_SnapVector(vma(common, args, 1) as *mut f32);
@@ -1109,34 +1116,34 @@ pub fn SV_GameSystemCalls(
                     text.as_ptr() as *const c_char,
                     *args.offset(3),
                 );
-                return qboolean::qtrue as c_int;
+                return qtrue as c_int;
             } else {
                 mp_qshared::shared::q_shared::Q_strncpyz(
                     vma(common, args, 2) as *mut c_char,
                     c"??".as_ptr(),
                     *args.offset(3),
                 );
-                return qboolean::qfalse as c_int;
+                return qfalse as c_int;
             }
         } else if trap == G::G_ROFF_CLEAN as c_int {
-            return roff.Clean(host, qboolean::qfalse) as c_int;
+            return roff.Clean(host, qfalse) as c_int;
         } else if trap == G::G_ROFF_UPDATE_ENTITIES as c_int {
-            roff.UpdateEntities(host, qboolean::qfalse);
+            roff.UpdateEntities(host, qfalse);
             return 0;
         } else if trap == G::G_ROFF_CACHE as c_int {
-            return roff.Cache(host, vma(common, args, 1) as *mut c_char, qboolean::qfalse);
+            return roff.Cache(host, vma(common, args, 1) as *mut c_char, qfalse);
         } else if trap == G::G_ROFF_PLAY as c_int {
             return roff.Play(
                 host,
                 *args.offset(1),
                 *args.offset(2),
                 core::mem::transmute(*args.offset(3)),
-                qboolean::qfalse,
+                qfalse,
             );
         } else if trap == G::G_ROFF_PURGE_ENT as c_int {
-            return roff.PurgeEnt(host, *args.offset(1), qboolean::qfalse);
+            return roff.PurgeEnt(host, *args.offset(1), qfalse);
         } else if trap == G::G_TRUEMALLOC as c_int {
-            mp_engine_qcommon::vm::VM_Shifted_Alloc(
+            mp_engine_qcommon::vm_fns::VM_Shifted_Alloc(
                 common,
                 cm,
                 rm,
@@ -1146,7 +1153,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_TRUEFREE as c_int {
-            mp_engine_qcommon::vm::VM_Shifted_Free(
+            mp_engine_qcommon::vm_fns::VM_Shifted_Free(
                 common,
                 vma(common, args, 1) as *mut *mut c_void,
             );
@@ -1542,7 +1549,7 @@ pub fn SV_GameSystemCalls(
         } else {
             mp_engine_qcommon::common::com_error(
                 errorParm_t::ERR_DROP,
-                &format!("Bad game system trap: {trap}"),
+                format!("Bad game system trap: {trap}"),
             );
         }
     }
@@ -1566,7 +1573,7 @@ pub fn SV_InitGameProgs(
         host,
         "bot_enable",
         "1",
-        mp_game::q_shared_cvar_flags::CVAR_LATCH,
+        mp_qshared::shared::cvar::CVAR_LATCH,
     );
     // PORT-NOTE(bot_enable): the file-scope `extern int bot_enable` threads
     // as a `Common` field per ruling 3; the field doesn't exist yet, escalated.
@@ -1581,12 +1588,12 @@ pub fn SV_InitGameProgs(
         && !mp_qshared::shared::sys_shared::Sys_CheckCD()
     {
         let need_cd = mp_engine_qcommon::stringed::SE_GetString(common, host, "CON_TEXT_NEED_CD");
-        mp_engine_qcommon::common::com_error(errorParm_t::ERR_NEED_CD, &need_cd);
+        mp_engine_qcommon::common::com_error(errorParm_t::ERR_NEED_CD, need_cd);
         //"Game CD not in drive" );
     }
 
     // load the dll or bytecode
-    sv.gvm = mp_engine_qcommon::vm::VM_Create(
+    sv.gvm = mp_engine_qcommon::vm_fns::VM_Create(
         common,
         cm,
         rm,
@@ -1600,8 +1607,11 @@ pub fn SV_InitGameProgs(
         },
     );
     if sv.gvm.is_null() {
-        mp_engine_qcommon::common::com_error(errorParm_t::ERR_FATAL, "VM_Create on game failed");
+        mp_engine_qcommon::common::com_error(
+            errorParm_t::ERR_FATAL,
+            "VM_Create on game failed".to_string(),
+        );
     }
 
-    SV_InitGameVM(common, cm, sv, rm, host, qboolean::qfalse);
+    SV_InitGameVM(common, cm, sv, rm, host, qfalse);
 }

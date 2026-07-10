@@ -2,7 +2,7 @@
 
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
-use mp_engine_renderer::RenderModels;
+use mp_engine_renderer::tr_model::render_models::RenderModels;
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 
@@ -52,7 +52,7 @@ pub fn SV_SendClientMessages(
     for i in 0..max_clients {
         let c = unsafe { sv.svs.clients.offset(i as isize) };
         unsafe {
-            if (*c).state == 0 {
+            if (*c).state as i32 == 0 {
                 continue; // not connected
             }
 

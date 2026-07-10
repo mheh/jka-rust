@@ -27,8 +27,8 @@ use mp_host_interface::engine_host::EngineHost;
 // homes under `mp_engine_rmg`/type-only `mp_renderer`) — imported by their
 // rosetta decl-home crate/path per ZERO-PARK; escalated in `missing_symbols`
 // rather than stubbed.
-use mp_engine_renderer::RenderModels;
-use mp_engine_rmg::RmManager;
+use mp_engine_renderer::tr_model::render_models::RenderModels;
+use mp_engine_rmg::rm_manager::RmManager;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
@@ -149,7 +149,7 @@ pub fn SV_GetChallenge(
     while i < MAX_CHALLENGES {
         let challenge = &mut sv.svs.challenges[i];
         if challenge.connected == qfalse
-            && mp_engine_qcommon::net::NET_CompareAdr(common, from, challenge.adr) == qtrue
+            && mp_engine_qcommon::net_chan::NET_CompareAdr(common, from, challenge.adr) == qtrue
         {
             break;
         }
@@ -181,7 +181,7 @@ pub fn SV_GetChallenge(
     // if they are on a lan address, send the challengeResponse immediately
     if host.is_lan_address(&from) {
         challenge.pingTime = sv.svs.time;
-        mp_engine_qcommon::net::NET_OutOfBandPrint(
+        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
             common,
             netsrc_t::NS_SERVER,
             from,
@@ -194,7 +194,7 @@ pub fn SV_GetChallenge(
     // porting-rules FINAL_BUILD precedent) — the `#else` branch is the live
     // path.
     challenge.pingTime = sv.svs.time;
-    mp_engine_qcommon::net::NET_OutOfBandPrint(
+    mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
         common,
         netsrc_t::NS_SERVER,
         challenge.adr,
@@ -341,7 +341,7 @@ pub fn SV_StopDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
 /// Source: `oracle/codemp/server/sv_client.cpp:1043-1065`
 pub fn SV_NextDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t) {
     unsafe {
-        let block = mp_qshared::shared::atoi(mp_engine_qcommon::cmd::Cmd_Argv(common, 1));
+        let block = mp_qshared::shared::atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1));
 
         let client_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
@@ -400,7 +400,7 @@ pub fn SV_BeginDownload_f(common: &mut Common, cl: *mut client_t) {
     unsafe {
         mp_qshared::shared::Q_strncpyz(
             (*cl).downloadName.as_mut_ptr(),
-            mp_engine_qcommon::cmd::Cmd_Argv(common, 1),
+            mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
             (*cl).downloadName.len() as c_int,
         );
     }
@@ -431,7 +431,7 @@ pub fn SV_UpdateUserinfo_f(
     unsafe {
         mp_qshared::shared::Q_strncpyz(
             (*cl).userinfo.as_mut_ptr(),
-            mp_engine_qcommon::cmd::Cmd_Argv(common, 1),
+            mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
             (*cl).userinfo.len() as c_int,
         );
 
@@ -482,10 +482,10 @@ pub fn SV_ExecuteClientCommand(
     s: *const c_char,
     clientOK: qboolean,
 ) {
-    mp_engine_qcommon::cmd::Cmd_TokenizeString(common, s);
+    mp_engine_qcommon::cmd_common::Cmd_TokenizeString(common, s);
 
     // see if it is a server level command
-    let name = unsafe { core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd::Cmd_Argv(common, 0)) }
+    let name = unsafe { core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 0)) }
         .to_string_lossy();
     let mut matched = false;
     match name.as_ref() {
@@ -572,7 +572,7 @@ pub fn SV_ClientThink(
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:142-211`
 pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t) {
-    if mp_engine_qcommon::net::NET_CompareBaseAdr(common, from, sv.svs.authorizeAddress) == qfalse {
+    if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(common, from, sv.svs.authorizeAddress) == qfalse {
         mp_engine_qcommon::common::common::com_printf(
             common,
             "SV_AuthorizeIpPacket: not from authorize server\n",
@@ -580,7 +580,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
         return;
     }
 
-    let challenge = mp_qshared::shared::atoi(mp_engine_qcommon::cmd::Cmd_Argv(common, 1));
+    let challenge = mp_qshared::shared::atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1));
 
     let mut i: usize = 0;
     while i < MAX_CHALLENGES {
@@ -599,10 +599,10 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
 
     // send a packet back to the original client
     sv.svs.challenges[i].pingTime = sv.svs.time;
-    let s = unsafe { core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd::Cmd_Argv(common, 2)) }
+    let s = unsafe { core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 2)) }
         .to_string_lossy()
         .into_owned();
-    let r = mp_engine_qcommon::cmd::Cmd_Argv(common, 3); // reason
+    let r = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 3); // reason
 
     if mp_qshared::shared::Q_stricmp(
         s.as_ptr() as *const c_char,
@@ -615,7 +615,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
         ) != 0.0
         {
             // a demo client connecting to a demo server
-            mp_engine_qcommon::net::NET_OutOfBandPrint(
+            mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                 common,
                 netsrc_t::NS_SERVER,
                 sv.svs.challenges[i].adr,
@@ -624,7 +624,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
             return;
         }
         // they are a demo client trying to connect to a real server
-        mp_engine_qcommon::net::NET_OutOfBandPrint(
+        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
             common,
             netsrc_t::NS_SERVER,
             sv.svs.challenges[i].adr,
@@ -639,7 +639,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
         c"accept".as_ptr() as *const c_char,
     ) == 0
     {
-        mp_engine_qcommon::net::NET_OutOfBandPrint(
+        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
             common,
             netsrc_t::NS_SERVER,
             sv.svs.challenges[i].adr,
@@ -653,7 +653,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
     ) == 0
     {
         if r.is_null() {
-            mp_engine_qcommon::net::NET_OutOfBandPrint(
+            mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                 common,
                 netsrc_t::NS_SERVER,
                 sv.svs.challenges[i].adr,
@@ -661,7 +661,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
             );
         } else {
             let r_str = unsafe { core::ffi::CStr::from_ptr(r) }.to_string_lossy();
-            mp_engine_qcommon::net::NET_OutOfBandPrint(
+            mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                 common,
                 netsrc_t::NS_SERVER,
                 sv.svs.challenges[i].adr,
@@ -675,7 +675,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
 
     // authorization failed
     if r.is_null() {
-        mp_engine_qcommon::net::NET_OutOfBandPrint(
+        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
             common,
             netsrc_t::NS_SERVER,
             sv.svs.challenges[i].adr,
@@ -683,7 +683,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
         );
     } else {
         let r_str = unsafe { core::ffi::CStr::from_ptr(r) }.to_string_lossy();
-        mp_engine_qcommon::net::NET_OutOfBandPrint(
+        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
             common,
             netsrc_t::NS_SERVER,
             sv.svs.challenges[i].adr,
@@ -712,7 +712,7 @@ pub fn SV_DirectConnect(
     unsafe {
         mp_engine_qcommon::common::common::com_printf(common, "SVC_DirectConnect ()\n");
 
-        let userinfo_ptr = mp_engine_qcommon::cmd::Cmd_Argv(common, 1);
+        let userinfo_ptr = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1);
         let mut userinfo = [0 as c_char; mp_qshared::shared::MAX_INFO_STRING as usize];
         mp_qshared::shared::Q_strncpyz(
             userinfo.as_mut_ptr(),
@@ -725,7 +725,7 @@ pub fn SV_DirectConnect(
             c"protocol".as_ptr() as *mut c_char,
         ));
         if version != mp_engine_qcommon::qcommon::protocol::PROTOCOL_VERSION {
-            mp_engine_qcommon::net::NET_OutOfBandPrint(
+            mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                 common,
                 netsrc_t::NS_SERVER,
                 from,
@@ -758,7 +758,7 @@ pub fn SV_DirectConnect(
             let mut i: c_int = 0;
             while i < max_clients {
                 let cl = sv.svs.clients.offset(i as isize);
-                if mp_engine_qcommon::net::NET_CompareBaseAdr(
+                if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(
                     common,
                     from,
                     (*cl).netchan.remoteAddress,
@@ -769,7 +769,7 @@ pub fn SV_DirectConnect(
                     if (sv.svs.time - (*cl).lastConnectTime)
                         < (mp_engine_qcommon::cvar::sv_reconnectlimit(common).integer * 1000)
                     {
-                        mp_engine_qcommon::net::NET_OutOfBandPrint(
+                        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                             common,
                             netsrc_t::NS_SERVER,
                             from,
@@ -779,7 +779,7 @@ pub fn SV_DirectConnect(
                             common,
                             &format!(
                                 "{}:reconnect rejected : too soon\n",
-                                mp_engine_qcommon::net::NET_AdrToString(common, from)
+                                mp_engine_qcommon::net_chan::NET_AdrToString(common, from)
                             ),
                         );
                         return;
@@ -791,10 +791,10 @@ pub fn SV_DirectConnect(
         }
 
         // see if the challenge is valid (LAN clients don't need to challenge)
-        if mp_engine_qcommon::net::NET_IsLocalAddress(from) == qfalse {
+        if mp_engine_qcommon::net_chan::NET_IsLocalAddress(from) == qfalse {
             let mut i: usize = 0;
             while i < MAX_CHALLENGES {
-                if mp_engine_qcommon::net::NET_CompareAdr(common, from, sv.svs.challenges[i].adr)
+                if mp_engine_qcommon::net_chan::NET_CompareAdr(common, from, sv.svs.challenges[i].adr)
                     == qtrue
                 {
                     if challenge == sv.svs.challenges[i].challenge {
@@ -804,7 +804,7 @@ pub fn SV_DirectConnect(
                 i += 1;
             }
             if i == MAX_CHALLENGES {
-                mp_engine_qcommon::net::NET_OutOfBandPrint(
+                mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                     common,
                     netsrc_t::NS_SERVER,
                     from,
@@ -816,7 +816,7 @@ pub fn SV_DirectConnect(
             mp_qshared::shared::Info_SetValueForKey(
                 userinfo.as_mut_ptr(),
                 c"ip".as_ptr() as *mut c_char,
-                mp_engine_qcommon::net::NET_AdrToString(common, from) as *mut c_char,
+                mp_engine_qcommon::net_chan::NET_AdrToString(common, from) as *mut c_char,
             );
 
             let ping = sv.svs.time - sv.svs.challenges[i].pingTime;
@@ -838,7 +838,7 @@ pub fn SV_DirectConnect(
                 let min_ping = mp_engine_qcommon::cvar::sv_minPing(common).value;
                 if min_ping != 0.0 && (ping as f32) < min_ping {
                     // don't let them keep trying until they get a big delay
-                    mp_engine_qcommon::net::NET_OutOfBandPrint(
+                    mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                         common,
                         netsrc_t::NS_SERVER,
                         from,
@@ -869,7 +869,7 @@ pub fn SV_DirectConnect(
                 }
                 let max_ping = mp_engine_qcommon::cvar::sv_maxPing(common).value;
                 if max_ping != 0.0 && (ping as f32) > max_ping {
-                    mp_engine_qcommon::net::NET_OutOfBandPrint(
+                    mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                         common,
                         netsrc_t::NS_SERVER,
                         from,
@@ -919,7 +919,7 @@ pub fn SV_DirectConnect(
                     i += 1;
                     continue;
                 }
-                if mp_engine_qcommon::net::NET_CompareBaseAdr(
+                if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(
                     common,
                     from,
                     (*cl).netchan.remoteAddress,
@@ -931,7 +931,7 @@ pub fn SV_DirectConnect(
                         common,
                         &format!(
                             "{}:reconnect\n",
-                            mp_engine_qcommon::net::NET_AdrToString(common, from)
+                            mp_engine_qcommon::net_chan::NET_AdrToString(common, from)
                         ),
                     );
                     reconnect_cl = cl;
@@ -989,7 +989,7 @@ pub fn SV_DirectConnect(
                 }
 
                 if new_slot.is_null() {
-                    if mp_engine_qcommon::net::NET_IsLocalAddress(from) == qtrue {
+                    if mp_engine_qcommon::net_chan::NET_IsLocalAddress(from) == qtrue {
                         let mut count = 0;
                         let mut j = start_index;
                         while j < max_clients {
@@ -1016,7 +1016,7 @@ pub fn SV_DirectConnect(
                             );
                         }
                     } else {
-                        mp_engine_qcommon::net::NET_OutOfBandPrint(
+                        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                             common,
                             netsrc_t::NS_SERVER,
                             from,
@@ -1085,8 +1085,8 @@ pub fn SV_DirectConnect(
             // return); resolving the denied-connect reason string needs
             // that seam, escalated rather than guessed.
             let denied_ptr =
-                mp_engine_qcommon::vm::VM_ExplicitArgPtr(common, sv.gvm, denied) as *const c_char;
-            mp_engine_qcommon::net::NET_OutOfBandPrint(
+                mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr(common, sv.gvm, denied) as *const c_char;
+            mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                 common,
                 netsrc_t::NS_SERVER,
                 from,
@@ -1108,7 +1108,7 @@ pub fn SV_DirectConnect(
         SV_UserinfoChanged(common, host, cl_ptr);
 
         // send the connect packet to the client
-        mp_engine_qcommon::net::NET_OutOfBandPrint(
+        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
             common,
             netsrc_t::NS_SERVER,
             from,
@@ -1369,7 +1369,7 @@ pub fn SV_VerifyPaks_f(
         != 0.0
     {
         let mut cs1 = 0;
-        b_good = mp_engine_qcommon::files::FS_FileIsInPAK(
+        b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
             common,
             c"vm/cgame.qvm".as_ptr() as *const c_char,
             &mut cs1,
@@ -1377,7 +1377,7 @@ pub fn SV_VerifyPaks_f(
         n_chk_sum1 = cs1;
     } else {
         let mut cs1 = 0;
-        b_good = mp_engine_qcommon::files::FS_FileIsInPAK(
+        b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
             common,
             c"cgamex86.dll".as_ptr() as *const c_char,
             &mut cs1,
@@ -1390,7 +1390,7 @@ pub fn SV_VerifyPaks_f(
             != 0.0
         {
             let mut cs2 = 0;
-            b_good = mp_engine_qcommon::files::FS_FileIsInPAK(
+            b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
                 common,
                 c"vm/ui.qvm".as_ptr() as *const c_char,
                 &mut cs2,
@@ -1398,7 +1398,7 @@ pub fn SV_VerifyPaks_f(
             n_chk_sum2 = cs2;
         } else {
             let mut cs2 = 0;
-            b_good = mp_engine_qcommon::files::FS_FileIsInPAK(
+            b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
                 common,
                 c"uix86.dll".as_ptr() as *const c_char,
                 &mut cs2,
@@ -1407,7 +1407,7 @@ pub fn SV_VerifyPaks_f(
         }
     }
 
-    let mut n_client_paks = mp_engine_qcommon::cmd::Cmd_Argc(common);
+    let mut n_client_paks = mp_engine_qcommon::cmd_common::Cmd_Argc(common);
     // start at arg 1 (skip cl_paks)
     let mut n_cur_arg: c_int = 1;
 
@@ -1422,7 +1422,7 @@ pub fn SV_VerifyPaks_f(
             break;
         }
         // verify first to be the cgame checksum
-        let p_arg = mp_engine_qcommon::cmd::Cmd_Argv(common, n_cur_arg);
+        let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(common, n_cur_arg);
         n_cur_arg += 1;
         if p_arg.is_null()
             || unsafe { *p_arg } == b'@' as c_char
@@ -1432,7 +1432,7 @@ pub fn SV_VerifyPaks_f(
             break;
         }
         // verify the second to be the ui checksum
-        let p_arg = mp_engine_qcommon::cmd::Cmd_Argv(common, n_cur_arg);
+        let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(common, n_cur_arg);
         n_cur_arg += 1;
         if p_arg.is_null()
             || unsafe { *p_arg } == b'@' as c_char
@@ -1442,7 +1442,7 @@ pub fn SV_VerifyPaks_f(
             break;
         }
         // should be sitting at the delimeter now
-        let p_arg = mp_engine_qcommon::cmd::Cmd_Argv(common, n_cur_arg);
+        let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(common, n_cur_arg);
         n_cur_arg += 1;
         if unsafe { *p_arg } != b'@' as c_char {
             b_good = false;
@@ -1452,7 +1452,7 @@ pub fn SV_VerifyPaks_f(
         let mut i: usize = 0;
         while n_cur_arg < n_client_paks {
             n_client_chk_sum[i] =
-                mp_qshared::shared::atoi(mp_engine_qcommon::cmd::Cmd_Argv(common, n_cur_arg));
+                mp_qshared::shared::atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(common, n_cur_arg));
             n_cur_arg += 1;
             i += 1;
         }
@@ -1483,9 +1483,9 @@ pub fn SV_VerifyPaks_f(
         }
 
         // get the pure checksums of the pk3 files loaded by the server
-        let p_paks = mp_engine_qcommon::files::FS_LoadedPakPureChecksums(common);
-        mp_engine_qcommon::cmd::Cmd_TokenizeString(common, p_paks);
-        let mut n_server_paks = mp_engine_qcommon::cmd::Cmd_Argc(common);
+        let p_paks = mp_engine_qcommon::files_pc::FS_LoadedPakPureChecksums(common);
+        mp_engine_qcommon::cmd_common::Cmd_TokenizeString(common, p_paks);
+        let mut n_server_paks = mp_engine_qcommon::cmd_common::Cmd_Argc(common);
         if n_server_paks > 1024 {
             n_server_paks = 1024;
         }
@@ -1493,7 +1493,7 @@ pub fn SV_VerifyPaks_f(
         let mut i: c_int = 0;
         while i < n_server_paks {
             n_server_chk_sum[i as usize] =
-                mp_qshared::shared::atoi(mp_engine_qcommon::cmd::Cmd_Argv(common, i));
+                mp_qshared::shared::atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(common, i));
             i += 1;
         }
 
