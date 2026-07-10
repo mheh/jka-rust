@@ -65,7 +65,9 @@ pub trait PlatformHost {
     /// Raven `Sys_ListFiles` — enumerate `directory` for entries matching
     /// `extension` (or `filter`), returning their names. `Sys_FreeFileList`
     /// collapses into the returned `Vec`'s drop. Enumeration order is pinned
-    /// sorted (ruling 9). `want_subs` is Raven's `qboolean wantsubs`.
+    /// sorted (ruling 9). `want_subs` is Raven's `qboolean wantsubs`. This is
+    /// the RAW OS directory scan — DISTINCT from `EngineHost::fs_list_files`
+    /// (`FS_ListFiles`), the VFS/pk3-aware listing over the FS search paths.
     /// Source: `oracle/codemp/qcommon/qcommon.h:1025`
     fn list_files(
         &mut self,

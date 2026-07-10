@@ -5,10 +5,10 @@
 //!
 //! * [`EngineHost`] — the in-engine service surface the §F C++-track subsystems
 //!   (icarus, RMG, ghoul2, server NPCNav, ROFF) call on the host: trace, FS
-//!   read/free/write, print/error, `VM_Call`, the shared-memory window,
-//!   `flrand`/`irand`, `gentity`, integer cvar reads, `svs.time`, and the
-//!   loader model-memory accessors (rulings 24 + 36). Per
-//!   `engine-fork-discovery.md` ruling 11 the §F
+//!   read/free/write/list, print/error, `VM_Call`, the shared-memory window,
+//!   `flrand`/`irand`, `gentity`, the cvar services (register/integer/string/
+//!   take-modified), `svs.time`, and the loader model-memory accessors
+//!   (rulings 24 + 36 + 55). Per `engine-fork-discovery.md` ruling 11 the §F
 //!   methods take `(&mut SubsystemState, &mut impl EngineHost)`; the aggregate
 //!   `Engine` implements it through a split-borrow view struct, and dispatch
 //!   tables store `&mut dyn EngineHost` (ruling 24), so the trait is

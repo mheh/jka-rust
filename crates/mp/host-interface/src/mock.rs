@@ -32,11 +32,14 @@
 //!   `send_packet` captures into `sent_packets`; `string_to_adr` resolves
 //!   `localhost`/dotted quads deterministically (no real DNS); LAN = loopback
 //!   or `127.x`.
-//! * Ruling-36 fixtures: `cvar_integer` reads a name→i32 map (missing = 0,
-//!   `Cvar_VariableIntegerValue` semantics); `sv_time` serves the settable
-//!   `sv_time` field; `fs_write_file` captures into `written_files`;
-//!   `model_mdxm`/`model_mdxa` hand back pointers into caller-provided byte
-//!   blocks (missing handle = NULL, Raven's NULL `model_t` pointer).
+//! * Ruling-36/55 fixtures: the cvar registry (`cvars`, name → [`MockCvar`])
+//!   serves register/string/integer/take-modified coherently — the string is
+//!   authoritative, `cvar_integer` derives via C `atoi` per read, missing
+//!   names read `0`/`""`/`false`; `sv_time` serves the settable `sv_time`
+//!   field; `fs_write_file` captures into `written_files`; `fs_list_files`
+//!   filters the FS fixture map's keys by dir/ext (the `"/"` extension lists
+//!   subdirectory names); `model_mdxm`/`model_mdxa` hand back pointers into
+//!   caller-provided byte blocks (missing handle = NULL).
 
 use core::ffi::{c_char, c_ulong, c_void};
 
@@ -93,6 +96,45 @@ impl HoldrandLcg {
     }
 }
 
+/// One registered cvar in [`MockHost::cvars`] — the fixture mirror of Raven's
+/// `cvar_t` slots the ruled services read (`string`/`modified`) plus the
+/// registration record (`default`/`flags`). `integer` is NOT stored: it is
+/// derived from `string` per read (see the registry field doc).
+/// Source: `oracle/codemp/game/q_shared.h` (`cvar_t`); creation semantics
+/// `oracle/codemp/qcommon/cvar.cpp:261-273`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MockCvar {
+    /// Raven `cvar_t->string` — the authoritative value.
+    pub string: String,
+    /// Raven `cvar_t->modified` — set on create and on every set; taken (and
+    /// cleared) by [`EngineHost::cvar_take_modified`].
+    pub modified: bool,
+    /// Raven `cvar_t->resetString` — the registration default.
+    pub default: String,
+    /// Raven `cvar_t->flags` — ORed on re-registration (`cvar.cpp:223`).
+    pub flags: i32,
+}
+
+/// C `atoi` over a Rust string: skip leading whitespace, optional sign, then
+/// the digit prefix; empty/non-numeric prefix = 0. (C overflow is UB; here it
+/// wraps via `i64 as i32` — a defined stand-in, per porting-rules §19.)
+fn c_atoi(s: &str) -> i32 {
+    let t = s.trim_start();
+    let (neg, t) = match t.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, t.strip_prefix('+').unwrap_or(t)),
+    };
+    let digits: String = t.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let mut v: i64 = 0;
+    for c in digits.chars() {
+        v = v.wrapping_mul(10).wrapping_add((c as u8 - b'0') as i64);
+    }
+    if neg {
+        v = v.wrapping_neg();
+    }
+    v as i32
+}
+
 /// Fixture-backed [`EngineHost`] + [`PlatformHost`] for goldens and the referee.
 pub struct MockHost {
     /// FS fixtures served by [`EngineHost::fs_read_file`], keyed by qpath.
@@ -114,11 +156,19 @@ pub struct MockHost {
     pub vm_calls: Vec<(VmSlot, i32, Vec<isize>)>,
     /// The value [`EngineHost::vm_call`] returns (default `0`).
     pub vm_call_return: isize,
-    /// Integer cvar fixtures served by [`EngineHost::cvar_integer`]. A missing
-    /// name reads 0 — matching `Cvar_VariableIntegerValue`'s unregistered-cvar
-    /// return (`cvar.cpp:118-124`) and the pattern sites' `Cvar_Get(name, "0",
-    /// …)` defaults.
-    pub cvars: BTreeMap<String, i32>,
+    /// The cvar registry serving all four cvar services coherently
+    /// ([`EngineHost::cvar_register`]/[`cvar_string`]/[`cvar_integer`]/
+    /// [`cvar_take_modified`]). The STRING is the single source of truth —
+    /// `cvar_integer` derives via C `atoi` semantics per read, exactly how
+    /// Raven keeps `var->integer = atoi(var->string)` in sync
+    /// (`cvar.cpp:266,404`). A missing name reads `0`/`""`/`false`
+    /// (`Cvar_VariableIntegerValue`: `cvar.cpp:118-124`;
+    /// `Cvar_VariableString`: `cvar.cpp:133-140`).
+    ///
+    /// [`cvar_string`]: EngineHost::cvar_string
+    /// [`cvar_integer`]: EngineHost::cvar_integer
+    /// [`cvar_take_modified`]: EngineHost::cvar_take_modified
+    pub cvars: BTreeMap<String, MockCvar>,
     /// The `svs.time` value [`EngineHost::sv_time`] serves — set it per frame
     /// (it never auto-advances; the driver owns the frame clock).
     pub sv_time: i32,
@@ -175,6 +225,21 @@ impl MockHost {
     pub fn with_file(mut self, qpath: impl Into<String>, bytes: impl Into<Vec<u8>>) -> Self {
         self.files.insert(qpath.into(), bytes.into());
         self
+    }
+
+    /// Set a cvar value like Raven's `Cvar_Set2` — writes the string and sets
+    /// `modified = qtrue` (`cvar.cpp` Cvar_Set2); creates the cvar (empty
+    /// default, no flags) if the name is new, so tests can seed values before
+    /// or after the subsystem registers them.
+    pub fn set_cvar(&mut self, name: &str, value: &str) {
+        let e = self.cvars.entry(name.to_string()).or_insert(MockCvar {
+            string: String::new(),
+            modified: false,
+            default: String::new(),
+            flags: 0,
+        });
+        e.string = value.to_string();
+        e.modified = true;
     }
 
     /// Borrow the entity at `ent_num` to populate it before a run (the same
@@ -258,8 +323,10 @@ impl EngineHost for MockHost {
     }
 
     fn cvar_integer(&mut self, name: &str) -> i32 {
-        // Missing name reads 0 (Cvar_VariableIntegerValue, cvar.cpp:118-124).
-        self.cvars.get(name).copied().unwrap_or(0)
+        // Derived from the string per read — Raven's `var->integer =
+        // atoi(var->string)` invariant. Missing name reads 0
+        // (Cvar_VariableIntegerValue, cvar.cpp:118-124).
+        self.cvars.get(name).map(|c| c_atoi(&c.string)).unwrap_or(0)
     }
 
     fn sv_time(&mut self) -> i32 {
@@ -287,6 +354,66 @@ impl EngineHost for MockHost {
             .get_mut(&model)
             .map(|b| b.as_mut_ptr() as *mut c_void)
             .unwrap_or(core::ptr::null_mut())
+    }
+
+    fn cvar_register(&mut self, name: &str, default: &str, flags: i32) {
+        match self.cvars.get_mut(name) {
+            // Existing cvar: keep the value, OR the flags in (cvar.cpp:209-232).
+            Some(c) => {
+                c.flags |= flags;
+                if c.default.is_empty() {
+                    c.default = default.to_string();
+                }
+            }
+            // Creation: string=default, modified=qtrue (cvar.cpp:261-273).
+            None => {
+                self.cvars.insert(
+                    name.to_string(),
+                    MockCvar {
+                        string: default.to_string(),
+                        modified: true,
+                        default: default.to_string(),
+                        flags,
+                    },
+                );
+            }
+        }
+    }
+
+    fn cvar_string(&mut self, name: &str) -> String {
+        // Missing name reads "" (Cvar_VariableString, cvar.cpp:133-140).
+        self.cvars.get(name).map(|c| c.string.clone()).unwrap_or_default()
+    }
+
+    fn cvar_take_modified(&mut self, name: &str) -> bool {
+        match self.cvars.get_mut(name) {
+            Some(c) => core::mem::replace(&mut c.modified, false),
+            None => false,
+        }
+    }
+
+    fn fs_list_files(&mut self, dir: &str, ext: &str, want_subs: bool) -> Vec<String> {
+        // Served from the FS fixture map's keys under `dir/`. `ext = "/"`
+        // lists distinct subdirectory names (the SE_R_ListFiles convention);
+        // otherwise direct children (or, with `want_subs`, sub-path entries)
+        // whose names end with `ext`. BTreeMap keys keep the output sorted.
+        let prefix = format!("{dir}/");
+        let mut out: Vec<String> = Vec::new();
+        for key in self.files.keys() {
+            let Some(rest) = key.strip_prefix(&prefix) else {
+                continue;
+            };
+            if ext == "/" {
+                if let Some((sub, _)) = rest.split_once('/') {
+                    if !out.iter().any(|s| s == sub) {
+                        out.push(sub.to_string());
+                    }
+                }
+            } else if (want_subs || !rest.contains('/')) && rest.ends_with(ext) {
+                out.push(rest.to_string());
+            }
+        }
+        out
     }
 }
 
@@ -487,12 +614,78 @@ mod tests {
     }
 
     #[test]
-    fn cvar_integer_serves_map_and_defaults_to_zero() {
+    fn cvar_integer_serves_registry_and_defaults_to_zero() {
         let mut host = MockHost::new();
-        host.cvars.insert("developer".to_string(), 1);
+        host.set_cvar("developer", "1");
         assert_eq!(host.cvar_integer("developer"), 1);
         // Unregistered name reads 0 (Cvar_VariableIntegerValue, cvar.cpp:118-124).
         assert_eq!(host.cvar_integer("cg_g2MarksAllModels"), 0);
+        // atoi semantics: digit prefix wins, non-numeric reads 0.
+        host.set_cvar("weird", "12abc");
+        assert_eq!(host.cvar_integer("weird"), 12);
+        host.set_cvar("word", "english");
+        assert_eq!(host.cvar_integer("word"), 0);
+    }
+
+    #[test]
+    fn cvar_register_defaults_once_and_ors_flags() {
+        let mut host = MockHost::new();
+        // Creation: string = default, modified = qtrue (cvar.cpp:261-273).
+        host.cvar_register("se_language", "english", 1 | 8);
+        assert_eq!(host.cvar_string("se_language"), "english");
+        assert!(host.cvars["se_language"].modified);
+        assert_eq!(host.cvars["se_language"].flags, 1 | 8);
+        // Re-registration keeps the (user-set) value, ORs flags (cvar.cpp:209-232).
+        host.set_cvar("se_language", "deutsch");
+        host.cvar_register("se_language", "english", 4);
+        assert_eq!(host.cvar_string("se_language"), "deutsch");
+        assert_eq!(host.cvars["se_language"].flags, 1 | 8 | 4);
+    }
+
+    #[test]
+    fn cvar_string_reads_value_or_empty() {
+        let mut host = MockHost::new();
+        assert_eq!(host.cvar_string("se_language"), "");
+        host.cvar_register("se_language", "english", 0);
+        assert_eq!(host.cvar_string("se_language"), "english");
+    }
+
+    #[test]
+    fn cvar_take_modified_reads_and_clears() {
+        let mut host = MockHost::new();
+        // Missing name reads false.
+        assert!(!host.cvar_take_modified("se_language"));
+        // Creation sets modified; the take returns it once, then clears.
+        host.cvar_register("se_language", "english", 0);
+        assert!(host.cvar_take_modified("se_language"));
+        assert!(!host.cvar_take_modified("se_language"));
+        // A set re-raises it (SE_CheckForLanguageUpdates cycle).
+        host.set_cvar("se_language", "deutsch");
+        assert!(host.cvar_take_modified("se_language"));
+        assert!(!host.cvar_take_modified("se_language"));
+    }
+
+    #[test]
+    fn fs_list_files_filters_fixture_keys() {
+        let mut host = MockHost::new()
+            .with_file("strings/english/menus.str", b"a".to_vec())
+            .with_file("strings/english/mp.str", b"b".to_vec())
+            .with_file("strings/deutsch/menus.str", b"c".to_vec())
+            .with_file("strings/readme.txt", b"d".to_vec());
+
+        // ext "/" lists distinct subdirectory names (SE_R_ListFiles convention).
+        assert_eq!(host.fs_list_files("strings", "/", false), vec!["deutsch", "english"]);
+        // Direct children by extension.
+        assert_eq!(
+            host.fs_list_files("strings/english", ".str", false),
+            vec!["menus.str", "mp.str"]
+        );
+        assert_eq!(host.fs_list_files("strings", ".str", false), Vec::<String>::new());
+        // want_subs extends into subdirectories (ruled surface).
+        assert_eq!(
+            host.fs_list_files("strings", ".str", true),
+            vec!["deutsch/menus.str", "english/menus.str", "english/mp.str"]
+        );
     }
 
     #[test]

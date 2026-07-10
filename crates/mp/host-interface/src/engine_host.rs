@@ -152,4 +152,43 @@ pub trait EngineHost {
     /// Source: `oracle/codemp/renderer/tr_local.h:1129` (`model_t.mdxa`);
     /// chain: `oracle/codemp/ghoul2/G2_API.cpp:2735-2739`
     fn model_mdxa(&mut self, model: qhandle_t) -> *mut c_void;
+
+    /// Raven `Cvar_Get`'s registration side (ruling 55) — establish the cvar
+    /// with `default` exactly once (creation sets string=default, integer=
+    /// atoi, `modified = qtrue`, cvar.cpp:261-273); an already-existing cvar
+    /// keeps its value and only ORs `flags` in (cvar.cpp:209-232). The
+    /// returned `cvar_t*` collapses away — reads go through the by-name
+    /// services. StringEd registers `se_language`/`se_debug`/`sp_leet` this
+    /// way in SE_Init.
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:188` (SE_Init sites:
+    /// `oracle/codemp/qcommon/stringed_ingame.cpp:1169-1171`)
+    fn cvar_register(&mut self, name: &str, default: &str, flags: i32);
+
+    /// Per-call string cvar read (ruling 55) — collapses Raven's cached
+    /// `cvar_t->string` reads (SE_Load's `se_language->string` path build,
+    /// `stringed_ingame.cpp:921-925`). A missing name reads `""`, as
+    /// `Cvar_VariableString` returns.
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:133-140`
+    fn cvar_string(&mut self, name: &str) -> String;
+
+    /// Read-and-clear of Raven's `cvar_t->modified` flag (ruling 55): returns
+    /// the flag and clears it in the same call — Raven's two-step update-check
+    /// idiom (`if (se_language->modified) { ...; se_language->modified =
+    /// SE_FALSE; }`, SE_CheckForLanguageUpdates) collapsed so no host
+    /// round-trip can observe the in-between state. A missing name reads
+    /// `false`.
+    /// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:1252-1259`
+    fn cvar_take_modified(&mut self, name: &str) -> bool;
+
+    /// Raven `FS_ListFiles` + `FS_FreeFileList` collapsed (ruling 55) — the
+    /// VFS/pk3-aware listing over the FS search paths, DISTINCT from
+    /// `PlatformHost::list_files` (`Sys_ListFiles`, a raw OS directory scan):
+    /// this one sees pak contents. Subdirectories are requested with
+    /// `ext = "/"` (`SE_R_ListFiles`, `stringed_interface.cpp:139`), files by
+    /// extension (`:158`); the free collapses into the `Vec` drop
+    /// (`:182-183`). `want_subs` extends the match into subdirectories (the
+    /// ruled surface; Raven's own `FS_ListFiles` is 3-param, `files.cpp:2174`
+    /// — today's call sites pass `false`).
+    /// Source: `oracle/codemp/qcommon/files.cpp:2174`
+    fn fs_list_files(&mut self, dir: &str, ext: &str, want_subs: bool) -> Vec<String>;
 }
