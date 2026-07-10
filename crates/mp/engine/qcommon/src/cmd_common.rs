@@ -15,7 +15,7 @@ use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 use mp_qshared::shared::error_parm::errorParm_t;
 
 use crate::cmd::cmd_consts::{MAX_CMD_BUFFER, MAX_CMD_LINE};
-use crate::cmd_pc::{Cmd_ExecuteString, Cmd_List_f};
+use crate::cmd_pc::{Cmd_ExecuteString, Cmd_List_f, RenderModels, Server};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use crate::common_fns::Com_Memcpy;
@@ -79,13 +79,9 @@ extern "Rust" {
 // PORT-NOTE(rm-types): `RenderModels`/`Server` are state-receiver types pinned
 // by the engine-fork-discovery preamble's receiver order; neither has landed
 // in this crate yet (`Server` lives in `mp_engine_server`, which already
-// depends on this crate — importing it here would cycle). Referenced by their
-// exact resolved-signature names per the no-stub rule; reported as missing
-// symbols (common_fns.rs precedent).
-#[allow(dead_code)]
-struct RenderModels;
-#[allow(dead_code)]
-struct Server;
+// depends on this crate — importing it here would cycle). Imported from
+// `cmd_pc` (which declares the same placeholders) so both files' call sites
+// share one type and unify at `Cmd_ExecuteString`'s call boundary.
 
 /// `Cbuf_Init`.
 ///

@@ -223,19 +223,21 @@ pub fn CM_LoadShaderFiles(
     let mut numShaders1: c_int = 0;
     // scan for shader files
     let shaderFiles1 =
-        FS_ListFiles(common, cm, rm, host, "shaders", ".shader", &mut numShaders1);
+        unsafe { FS_ListFiles(common, cm, rm, host, "shaders", ".shader", &mut numShaders1) };
     //TODO: Port FINAL_BUILD
     // Source: oracle/codemp/qcommon/cm_shader.cpp:75
     let mut numShaders2: c_int = 0;
-    let shaderFiles2 = FS_ListFiles(
-        common,
-        cm,
-        rm,
-        host,
-        "shaders/test",
-        ".shader",
-        &mut numShaders2,
-    );
+    let shaderFiles2 = unsafe {
+        FS_ListFiles(
+            common,
+            cm,
+            rm,
+            host,
+            "shaders/test",
+            ".shader",
+            &mut numShaders2,
+        )
+    };
 
     if shaderFiles1.is_null() || numShaders1 == 0 {
         //TODO: Port WARNING
@@ -270,9 +272,16 @@ pub fn CM_LoadShaderFiles(
             )
         };
         crate::common::com_printf(common, &format!("...loading '{}'\n", "filename"));
-        sum += FS_ReadFile(common, cm, rm, host, "filename", unsafe {
-            buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void
-        });
+        sum += unsafe {
+            FS_ReadFile(
+                common,
+                cm,
+                rm,
+                host,
+                "filename",
+                buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void,
+            )
+        };
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
             unsafe {
                 Com_Error(
@@ -294,9 +303,16 @@ pub fn CM_LoadShaderFiles(
             )
         };
         crate::common::com_printf(common, &format!("...loading '{}'\n", "filename"));
-        sum += FS_ReadFile(common, cm, rm, host, "filename", unsafe {
-            buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void
-        });
+        sum += unsafe {
+            FS_ReadFile(
+                common,
+                cm,
+                rm,
+                host,
+                "filename",
+                buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void,
+            )
+        };
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
             unsafe {
                 Com_Error(
@@ -312,15 +328,17 @@ pub fn CM_LoadShaderFiles(
     // build single large buffer
     //TODO: Port shaderText
     // Source: oracle/codemp/qcommon/cm_shader.cpp:28
-    cm.shaderText = Z_Malloc(
-        common,
-        cm,
-        rm,
-        host,
-        (sum + numShaders * 2) as usize,
-        memtag_t::TAG_SHADERTEXT,
-        true,
-    ) as *mut c_char;
+    cm.shaderText = unsafe {
+        Z_Malloc(
+            common,
+            cm,
+            rm,
+            host,
+            (sum + numShaders * 2) as usize,
+            memtag_t::TAG_SHADERTEXT,
+            true,
+        )
+    } as *mut c_char;
 
     // free in reverse order, so the temp files are all dumped
     let mut j = numShaders - 1;
@@ -329,13 +347,15 @@ pub fn CM_LoadShaderFiles(
             libc::strcat(cm.shaderText, c"\n".as_ptr());
             libc::strcat(cm.shaderText, buffers[j as usize]);
         }
-        FS_FreeFile(common, buffers[j as usize]);
+        unsafe { FS_FreeFile(common, buffers[j as usize]) };
         j -= 1;
     }
 
     // free up memory
-    FS_FreeFileList(common, shaderFiles1);
-    FS_FreeFileList(common, shaderFiles2);
+    unsafe {
+        FS_FreeFileList(common, shaderFiles1);
+        FS_FreeFileList(common, shaderFiles2);
+    }
 }
 
 /// Raven `CM_FreeShaderText` — release the cached shader-text buffer and
@@ -651,14 +671,16 @@ pub fn CM_GetShaderInfo_ByName(
     // Create a new CCMShader class
     //TODO: Port h_high
     // Source: oracle/codemp/qcommon/cm_shader.cpp:510
-    out = Hunk_Alloc(
-        common,
-        cm,
-        rm,
-        host,
-        core::mem::size_of::<CCMShader>(),
-        "h_high",
-    ) as *mut CCMShader;
+    out = unsafe {
+        Hunk_Alloc(
+            common,
+            cm,
+            rm,
+            host,
+            core::mem::size_of::<CCMShader>(),
+            "h_high",
+        )
+    } as *mut CCMShader;
     // Set defaults
     unsafe {
         Q_strncpyz((*out).shader.as_mut_ptr(), name, MAX_QPATH as c_int);

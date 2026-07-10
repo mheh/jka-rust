@@ -3,6 +3,7 @@
 /// Raven `netadrtype_t` — network address types.
 ///
 /// Type definition source: `oracle/codemp/qcommon/qcommon.h:108-116`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum netadrtype_t {
     NA_BOT = 0,

@@ -627,15 +627,17 @@ pub fn VM_Init(
     // signature isn't landed in this shard (dispatch-table wave, ruling 5);
     // referenced by its exact resolved name/receivers per the no-stub rule,
     // reported as a missing symbol.
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        c"vmprofile".as_ptr(),
-        VM_VmProfile_f as _,
-    );
-    Cmd_AddCommand(common, cm, rm, host, c"vminfo".as_ptr(), VM_VmInfo_f as _);
+    unsafe {
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            c"vmprofile".as_ptr(),
+            VM_VmProfile_f as _,
+        );
+        Cmd_AddCommand(common, cm, rm, host, c"vminfo".as_ptr(), VM_VmInfo_f as _);
+    }
 
     common.vmTable = unsafe { core::mem::zeroed() };
 }

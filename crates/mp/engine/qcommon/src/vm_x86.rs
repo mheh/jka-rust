@@ -93,6 +93,10 @@ pub extern "C" fn callAsmCall(common: &mut Common) {
 /// `callAsmCall`. Transcribed as an inline-asm block matching the oracle's
 /// clobbers/operands 1:1 (data-faithful emitter, ruling 6).
 /// Source: `oracle/codemp/qcommon/vm_x86.cpp:167-199`
+// Ruling 6: vm_x86 executes only on x86 hosts, same as Raven; the inline asm
+// below is 32-bit-only (`movl`/`%eax`-family mnemonics), so it is gated to
+// `target_arch = "x86"` and stubbed elsewhere rather than compiled unconditionally.
+#[cfg(target_arch = "x86")]
 pub extern "C" fn AsmCall(common: &mut Common) {
     // PORT-NOTE(vm-x86-asm): GNU inline asm syntax differs from Rust's; the
     // operand/clobber list is transcribed 1:1 from the oracle block. `callMask`
@@ -131,10 +135,18 @@ pub extern "C" fn AsmCall(common: &mut Common) {
             syscall_out = out(reg) common.call_syscall_num,
             prog_stack_out = out(reg) common.call_program_stack,
             op_stack_out = out(reg) common.call_op_stack,
-            out("ax") _, out("di") _, out("si") _, out("cx") _,
+            out("eax") _, out("edi") _, out("esi") _, out("ecx") _,
             options(att_syntax),
         );
     }
+}
+
+/// Non-x86 stub: Raven's `AsmCall` never runs on non-x86 hosts either (the
+/// vm_x86 JIT emitter is x86-only); calling it off-target is a build/config
+/// error, not a runtime path any target actually exercises.
+#[cfg(not(target_arch = "x86"))]
+pub extern "C" fn AsmCall(_common: &mut Common) {
+    unreachable!("vm_x86::AsmCall is x86-only (ruling 6)");
 }
 
 /// `Constant4`.

@@ -47,6 +47,150 @@ struct Server;
 #[allow(dead_code)]
 struct Client;
 
+// PORT-NOTE(unlanded-callees): the callees below have no ported body reachable
+// from this crate yet — cvar.cpp (`Cvar_Get`/`Cvar_Set`/`Cvar_Init`/
+// `Cvar_WriteVariables`), cmd.cpp (`Cmd_AddCommand`), the low-level `FS_*`
+// bodies, `MSG_Init`, `SE_Init`, `Z_Free`, and this file's own
+// `Com_Milliseconds`/`Com_GetRealEvent`/`Com_Shutdown`. The `SV_*`/`CL_*`/
+// `Key_WriteBindings` set lives in `mp_engine_server`/the client build, which
+// already depend on this crate — a `use` would cycle. Following the
+// crate-wide escalation convention (`net_chan.rs`/`cmd_common.rs`/
+// `z_memman_pc.rs`/`vm_fns.rs` each forward-declare their own unlanded
+// callees), they are declared here by their exact call-site shape and left
+// for the finisher to link to the real bodies.
+extern "Rust" {
+    fn Cvar_Get(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        var_name: *mut c_char,
+        var_value: *mut c_char,
+        flags: c_int,
+    ) -> *mut cvar_t;
+    fn Cvar_Set(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        var_name: *mut c_char,
+        value: *mut c_char,
+    );
+    fn Cvar_Init(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+    );
+    fn Cvar_WriteVariables(common: &mut Common, f: mp_qshared::shared::fileHandle_t);
+    fn Cmd_AddCommand(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        cmd_name: &str,
+        function: *const (),
+    );
+    fn Com_Milliseconds(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+    ) -> c_int;
+    fn Com_GetRealEvent(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+    ) -> sysEvent_t;
+    fn Com_Shutdown(common: &mut Common, cm: &mut CollisionWorld, rmg: &mut RmManager);
+    fn FS_Shutdown(common: &mut Common, closemfp: qboolean);
+    fn SE_Init(common: &mut Common, host: &mut dyn EngineHost);
+    fn MSG_Init(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        buf: *mut msg_t,
+        data: *mut u8,
+        length: c_int,
+    );
+    fn FS_FOpenFileWrite(common: &mut Common, filename: &str) -> mp_qshared::shared::fileHandle_t;
+    fn FS_FCloseFile(common: &mut Common, f: mp_qshared::shared::fileHandle_t);
+    fn FS_Read(
+        common: &mut Common,
+        buffer: *mut (),
+        len: c_int,
+        f: mp_qshared::shared::fileHandle_t,
+    ) -> c_int;
+    fn FS_FOpenFileRead(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        filename: &str,
+        f: *mut mp_qshared::shared::fileHandle_t,
+        unique_file: qboolean,
+    ) -> c_int;
+    fn Z_Free(common: &mut Common, pv_address: *mut c_void);
+    // server (mp_engine_server — importing would cycle)
+    fn SV_Init(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        sv: &mut Server,
+        bot: &mut BotLib,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+    );
+    fn SV_Shutdown(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        sv: &mut Server,
+        rm: &mut RenderModels,
+        rmg: &mut RmManager,
+        host: &mut dyn EngineHost,
+        finalmsg: &str,
+    );
+    fn SV_Frame(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        sv: &mut Server,
+        rm: &mut RenderModels,
+        rmg: &mut RmManager,
+        g2: &mut Ghoul2System,
+        host: &mut dyn EngineHost,
+        msec: c_int,
+    );
+    fn SV_PacketEvent(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        sv: &mut Server,
+        rm: &mut RenderModels,
+        rmg: &mut RmManager,
+        host: &mut dyn EngineHost,
+        from: netadr_t,
+        buf: *mut msg_t,
+    );
+    // client (mp_engine_client / null build)
+    fn CL_Init(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        cl: &mut Client,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+    );
+    fn CL_Shutdown();
+    fn CL_StartHunkUsers();
+    fn CL_Frame(msec: c_int);
+    fn CL_PacketEvent(from: netadr_t, msg: *mut msg_t);
+    fn CL_KeyEvent(key: c_int, down: bool, time: c_int);
+    fn CL_CharEvent(key: c_int);
+    fn CL_MouseEvent(dx: c_int, dy: c_int, time: c_int);
+    fn CL_JoystickEvent(axis: c_int, value: c_int, time: c_int);
+    fn CL_InitKeyCommands();
+    fn Key_WriteBindings(f: mp_qshared::shared::fileHandle_t);
+}
+
 /// `Com_BeginRedirect`.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:96-105`
@@ -435,10 +579,10 @@ pub fn Com_Quit_f(
 ) {
     // don't try to shutdown if we are in a recursive error
     if common.com_errorEntered == qfalse {
-        crate::server::sv_init::SV_Shutdown(common, cm, sv, rm, rmg, host, "Server quit\n");
-        crate::null::cl_main::CL_Shutdown();
-        crate::common::com_shutdown::Com_Shutdown(common, cm, rmg);
-        crate::files::fs_shutdown::FS_Shutdown(common, qtrue);
+        unsafe { SV_Shutdown(common, cm, sv, rm, rmg, host, "Server quit\n") };
+        unsafe { CL_Shutdown() };
+        unsafe { Com_Shutdown(common, cm, rmg) };
+        unsafe { FS_Shutdown(common, qtrue) };
     }
     host.sys_quit();
 }
@@ -461,9 +605,9 @@ pub fn Com_StartupVariable(
         }
         let s = crate::cmd_common::Cmd_Argv(common, 1);
         if r#match.is_null() || q_strcmp(s, r#match as *mut c_char) == 0 {
-            crate::cvar::Cvar_Set(common, cm, rm, host, s, crate::cmd_common::Cmd_Argv(common, 2));
+            unsafe { Cvar_Set(common, cm, rm, host, s, crate::cmd_common::Cmd_Argv(common, 2)) };
             let cv: *mut cvar_t =
-                crate::cvar::Cvar_Get(common, cm, rm, host, s, c"".as_ptr() as *mut c_char, 0);
+                unsafe { Cvar_Get(common, cm, rm, host, s, c"".as_ptr() as *mut c_char, 0) };
             unsafe {
                 (*cv).flags |= mp_qshared::shared::cvar::CVAR_USER_CREATED;
             }
@@ -564,7 +708,7 @@ pub fn Com_GetEvent(
         return common.com_pushedEvents
             [((common.com_pushedEventsTail - 1) & (MAX_PUSHED_EVENTS as i32 - 1)) as usize];
     }
-    crate::common::com_get_real_event::Com_GetRealEvent(common, cm, rm, host)
+    unsafe { Com_GetRealEvent(common, cm, rm, host) }
 }
 
 /// `Com_Error_f`.
@@ -596,10 +740,10 @@ pub fn Com_Freeze_f(
         .parse()
         .unwrap_or(0.0);
 
-    let start = crate::common::com_milliseconds::Com_Milliseconds(common, cm, rm, host);
+    let start = unsafe { Com_Milliseconds(common, cm, rm, host) };
 
     loop {
-        let now = crate::common::com_milliseconds::Com_Milliseconds(common, cm, rm, host);
+        let now = unsafe { Com_Milliseconds(common, cm, rm, host) };
         if (now - start) as f32 * 0.001 > s {
             break;
         }
@@ -666,7 +810,7 @@ pub fn Com_InitJournaling(
     host: &mut dyn EngineHost,
 ) {
     Com_StartupVariable(common, cm, rm, host, c"journal".as_ptr());
-    common.com_journal = crate::cvar::Cvar_Get(
+    common.com_journal = unsafe { Cvar_Get(
         common,
         cm,
         rm,
@@ -674,7 +818,7 @@ pub fn Com_InitJournaling(
         c"journal".as_ptr() as *mut c_char,
         c"0".as_ptr() as *mut c_char,
         mp_qshared::shared::cvar::CVAR_INIT,
-    );
+    ) };
     unsafe {
         if (*common.com_journal).integer == 0 {
             return;
@@ -683,33 +827,37 @@ pub fn Com_InitJournaling(
         if (*common.com_journal).integer == 1 {
             crate::common::com_printf(common, "Journaling events\n");
             common.com_journalFile =
-                crate::files::fs_fopen_file_write::FS_FOpenFileWrite(common, "journal.dat");
+                FS_FOpenFileWrite(common, "journal.dat");
             common.com_journalDataFile =
-                crate::files::fs_fopen_file_write::FS_FOpenFileWrite(common, "journaldata.dat");
+                FS_FOpenFileWrite(common, "journaldata.dat");
         } else if (*common.com_journal).integer == 2 {
             crate::common::com_printf(common, "Replaying journaled events\n");
-            crate::files::fs_fopen_file_read::FS_FOpenFileRead(
+            let mut jf = common.com_journalFile;
+            FS_FOpenFileRead(
                 common,
                 cm,
                 rm,
                 host,
                 "journal.dat",
-                &mut common.com_journalFile,
+                &mut jf,
                 qtrue,
             );
-            crate::files::fs_fopen_file_read::FS_FOpenFileRead(
+            common.com_journalFile = jf;
+            let mut jdf = common.com_journalDataFile;
+            FS_FOpenFileRead(
                 common,
                 cm,
                 rm,
                 host,
                 "journaldata.dat",
-                &mut common.com_journalDataFile,
+                &mut jdf,
                 qtrue,
             );
+            common.com_journalDataFile = jdf;
         }
 
         if common.com_journalFile == 0 || common.com_journalDataFile == 0 {
-            crate::cvar::Cvar_Set(
+            Cvar_Set(
                 common,
                 cm,
                 rm,
@@ -728,9 +876,9 @@ pub fn Com_InitJournaling(
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1446-1461`
 pub fn Com_WriteConfigToFile(common: &mut Common, filename: *const c_char) {
-    let f = crate::files::fs_fopen_file_write::FS_FOpenFileWrite(common, unsafe {
+    let f = unsafe { FS_FOpenFileWrite(common, unsafe {
         &c_str_to_string(filename)
-    });
+    }) };
     if f == 0 {
         crate::common::com_printf(
             common,
@@ -744,9 +892,9 @@ pub fn Com_WriteConfigToFile(common: &mut Common, filename: *const c_char) {
         f,
         "// generated by Star Wars Jedi Academy MP, do not modify\n",
     );
-    crate::null::key_write_bindings::Key_WriteBindings(f);
-    crate::cvar::cvar_write_variables::Cvar_WriteVariables(common, f);
-    crate::files::fs_fclose_file::FS_FCloseFile(common, f);
+    unsafe { Key_WriteBindings(f) };
+    unsafe { Cvar_WriteVariables(common, f) };
+    unsafe { FS_FCloseFile(common, f) };
 }
 
 /// `Com_WriteConfiguration`.
@@ -817,7 +965,7 @@ pub fn Com_RunAndTimeServerPacket(
             t1 = host.milliseconds_sys();
         }
 
-        crate::server::sv_main::SV_PacketEvent(common, cm, sv, rm, rmg, host, *evFrom, buf);
+        SV_PacketEvent(common, cm, sv, rm, rmg, host, *evFrom, buf);
 
         if (*common.com_speeds).integer != 0 {
             let t2 = host.milliseconds_sys();
@@ -842,7 +990,7 @@ pub fn Com_EventLoop(
 ) -> c_int {
     let mut buf_data = [0u8; MAX_MSGLEN];
     let mut buf: msg_t = unsafe { core::mem::zeroed() };
-    crate::qcommon::msg::MSG_Init(common, cm, rm, host, &mut buf, buf_data.as_mut_ptr(), MAX_MSGLEN as c_int);
+    unsafe { MSG_Init(common, cm, rm, host, &mut buf, buf_data.as_mut_ptr(), MAX_MSGLEN as c_int) };
 
     loop {
         let ev = Com_GetEvent(common, cm, rm, host);
@@ -856,8 +1004,8 @@ pub fn Com_EventLoop(
                 mp_qshared::common::mp::qcommon::netsrc_t::netsrc_t::NS_CLIENT,
                 &mut ev_from,
                 &mut buf,
-            ) {
-                crate::null::cl_main::CL_PacketEvent(ev_from, &mut buf);
+            ) != qfalse {
+                unsafe { CL_PacketEvent(ev_from, &mut buf) };
             }
 
             while crate::net_chan::NET_GetLoopPacket(
@@ -865,7 +1013,7 @@ pub fn Com_EventLoop(
                 mp_qshared::common::mp::qcommon::netsrc_t::netsrc_t::NS_SERVER,
                 &mut ev_from,
                 &mut buf,
-            ) {
+            ) != qfalse {
                 // if the server just shut down, flush the events
                 if unsafe { (*common.com_sv_running).integer != 0 } {
                     Com_RunAndTimeServerPacket(common, cm, sv, rm, rmg, host, &mut ev_from, &mut buf);
@@ -878,16 +1026,16 @@ pub fn Com_EventLoop(
         match ev.evType {
             sysEventType_t::SE_NONE => {}
             sysEventType_t::SE_KEY => {
-                crate::null::cl_input::CL_KeyEvent(ev.evValue, ev.evValue2 != 0, ev.evTime);
+                unsafe { CL_KeyEvent(ev.evValue, ev.evValue2 != 0, ev.evTime) };
             }
             sysEventType_t::SE_CHAR => {
-                crate::null::cl_input::CL_CharEvent(ev.evValue);
+                unsafe { CL_CharEvent(ev.evValue) };
             }
             sysEventType_t::SE_MOUSE => {
-                crate::null::cl_input::CL_MouseEvent(ev.evValue, ev.evValue2, ev.evTime);
+                unsafe { CL_MouseEvent(ev.evValue, ev.evValue2, ev.evTime) };
             }
             sysEventType_t::SE_JOYSTICK_AXIS => {
-                crate::null::cl_input::CL_JoystickEvent(ev.evValue, ev.evValue2, ev.evTime);
+                unsafe { CL_JoystickEvent(ev.evValue, ev.evValue2, ev.evTime) };
             }
             sysEventType_t::SE_CONSOLE => {
                 unsafe {
@@ -932,7 +1080,7 @@ pub fn Com_EventLoop(
                     if (*common.com_sv_running).integer != 0 {
                         Com_RunAndTimeServerPacket(common, cm, sv, rm, rmg, host, &mut ev_from, &mut buf);
                     } else {
-                        crate::null::cl_main::CL_PacketEvent(ev_from, &mut buf);
+                        CL_PacketEvent(ev_from, &mut buf);
                     }
                 }
             }
@@ -946,7 +1094,7 @@ pub fn Com_EventLoop(
 
         // free any block data
         if !ev.evPtr.is_null() {
-            crate::z_memman::z_free::Z_Free(common, ev.evPtr);
+            unsafe { Z_Free(common, ev.evPtr) };
         }
     }
 }
@@ -1029,7 +1177,7 @@ pub fn Com_Frame(
             }
         }
 
-        crate::server::sv_main::SV_Frame(common, cm, sv, rm, rmg, g2, host, msec);
+        unsafe { SV_Frame(common, cm, sv, rm, rmg, g2, host, msec) };
 
         // if "dedicated" has been modified, start up
         // or shut down the client system.
@@ -1038,7 +1186,7 @@ pub fn Com_Frame(
         unsafe {
             if (*common.com_dedicated).modified != 0 {
                 // get the latched value
-                crate::cvar::Cvar_Get(
+                Cvar_Get(
                     common,
                     cm,
                     rm,
@@ -1049,11 +1197,11 @@ pub fn Com_Frame(
                 );
                 (*common.com_dedicated).modified = qfalse;
                 if (*common.com_dedicated).integer == 0 {
-                    crate::null::cl_main::CL_Init(common, cm, cl, rm, host);
+                    CL_Init(common, cm, cl, rm, host);
                     host.sys_show_console((*common.com_viewlog).integer, qfalse);
-                    crate::null::cl_main::CL_StartHunkUsers();
+                    CL_StartHunkUsers();
                 } else {
-                    crate::null::cl_main::CL_Shutdown();
+                    CL_Shutdown();
                     host.sys_show_console(1, qtrue);
                 }
             }
@@ -1081,7 +1229,7 @@ pub fn Com_Frame(
                     let _time_before_client = host.milliseconds_sys();
                 }
 
-                crate::null::cl_main::CL_Frame(msec);
+                CL_Frame(msec);
 
                 if (*common.com_speeds).integer != 0 {
                     let _time_after = host.milliseconds_sys();
@@ -1152,7 +1300,7 @@ pub fn Com_ParseTextFile(
         cm,
         rm,
         host,
-        unsafe { &c_str_to_string(file) },
+        file,
         &mut f,
         FS_READ,
     );
@@ -1161,13 +1309,13 @@ pub fn Com_ParseTextFile(
     }
 
     let mut buf = vec![0u8; (length + 1) as usize];
-    crate::files::fs_read::FS_Read(common, buf.as_mut_ptr() as *mut (), length, f);
+    unsafe { FS_Read(common, buf.as_mut_ptr() as *mut (), length, f) };
     buf[length as usize] = 0;
 
     let text = String::from_utf8_lossy(&buf[..length as usize]).into_owned();
     let _ = parser.parse(&text, cleanFirst);
 
-    crate::files::fs_fclose_file::FS_FCloseFile(common, f);
+    unsafe { FS_FCloseFile(common, f) };
 
     true
 }
@@ -1201,7 +1349,7 @@ pub fn Com_ParseTextFile2(
         cm,
         rm,
         host,
-        unsafe { &c_str_to_string(file) },
+        file,
         &mut f,
         FS_READ,
     );
@@ -1210,8 +1358,8 @@ pub fn Com_ParseTextFile2(
     }
 
     let mut buf = vec![0u8; (length + 1) as usize];
-    crate::files::fs_read::FS_Read(common, buf.as_mut_ptr() as *mut (), length, f);
-    crate::files::fs_fclose_file::FS_FCloseFile(common, f);
+    unsafe { FS_Read(common, buf.as_mut_ptr() as *mut (), length, f) };
+    unsafe { FS_FCloseFile(common, f) };
     buf[length as usize] = 0;
 
     let text = String::from_utf8_lossy(&buf[..length as usize]).into_owned();
@@ -1252,7 +1400,7 @@ pub fn Com_Init(
         // bk001129 - do this before anything else decides to push events
         Com_InitPushEvent(common);
 
-        crate::cvar::cvar_init::Cvar_Init(common, cm, rm, host);
+        unsafe { Cvar_Init(common, cm, rm, host) };
 
         // prepare enough of the subsystems to handle
         // cvar and command buffer management
@@ -1274,7 +1422,7 @@ pub fn Com_Init(
         Com_StartupVariable(common, cm, rm, host, c"developer".as_ptr());
 
         // done early so bind command exists
-        crate::null::cl_input::CL_InitKeyCommands();
+        unsafe { CL_InitKeyCommands() };
 
         crate::files_common::FS_InitFilesystem(common, cm, rm, host);
 
@@ -1295,7 +1443,7 @@ pub fn Com_Init(
         Com_StartupVariable(common, cm, rm, host, core::ptr::null());
 
         // get dedicated here for proper hunk megs initialization
-        common.com_dedicated = crate::cvar::Cvar_Get(
+        common.com_dedicated = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1303,7 +1451,7 @@ pub fn Com_Init(
             c"dedicated".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_LATCH,
-        );
+        ) };
         // allocate the stack based hunk allocator
         crate::z_memman_pc::Com_InitHunkMemory(common, sv, rm, g2, host);
 
@@ -1314,7 +1462,7 @@ pub fn Com_Init(
         //
         // init commands and vars
         //
-        common.com_maxfps = crate::cvar::Cvar_Get(
+        common.com_maxfps = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1322,8 +1470,8 @@ pub fn Com_Init(
             c"com_maxfps".as_ptr() as *mut c_char,
             c"85".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
-        common.com_blood = crate::cvar::Cvar_Get(
+        ) };
+        common.com_blood = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1331,9 +1479,9 @@ pub fn Com_Init(
             c"com_blood".as_ptr() as *mut c_char,
             c"1".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
+        ) };
 
-        common.com_developer = crate::cvar::Cvar_Get(
+        common.com_developer = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1341,8 +1489,8 @@ pub fn Com_Init(
             c"developer".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_TEMP,
-        );
-        common.com_vmdebug = crate::cvar::Cvar_Get(
+        ) };
+        common.com_vmdebug = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1350,8 +1498,8 @@ pub fn Com_Init(
             c"vmdebug".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_TEMP,
-        );
-        common.com_logfile = crate::cvar::Cvar_Get(
+        ) };
+        common.com_logfile = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1359,9 +1507,9 @@ pub fn Com_Init(
             c"logfile".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_TEMP,
-        );
+        ) };
 
-        common.com_timescale = crate::cvar::Cvar_Get(
+        common.com_timescale = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1369,8 +1517,8 @@ pub fn Com_Init(
             c"timescale".as_ptr() as *mut c_char,
             c"1".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_CHEAT | mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        common.com_fixedtime = crate::cvar::Cvar_Get(
+        ) };
+        common.com_fixedtime = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1378,8 +1526,8 @@ pub fn Com_Init(
             c"fixedtime".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
-        common.com_showtrace = crate::cvar::Cvar_Get(
+        ) };
+        common.com_showtrace = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1387,9 +1535,9 @@ pub fn Com_Init(
             c"com_showtrace".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
+        ) };
 
-        common.com_terrainPhysics = crate::cvar::Cvar_Get(
+        common.com_terrainPhysics = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1397,9 +1545,9 @@ pub fn Com_Init(
             c"com_terrainPhysics".as_ptr() as *mut c_char,
             c"1".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
+        ) };
 
-        common.com_dropsim = crate::cvar::Cvar_Get(
+        common.com_dropsim = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1407,8 +1555,8 @@ pub fn Com_Init(
             c"com_dropsim".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
-        common.com_viewlog = crate::cvar::Cvar_Get(
+        ) };
+        common.com_viewlog = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1416,8 +1564,8 @@ pub fn Com_Init(
             c"viewlog".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
-        common.com_speeds = crate::cvar::Cvar_Get(
+        ) };
+        common.com_speeds = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1425,8 +1573,8 @@ pub fn Com_Init(
             c"com_speeds".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             0,
-        );
-        common.com_timedemo = crate::cvar::Cvar_Get(
+        ) };
+        common.com_timedemo = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1434,8 +1582,8 @@ pub fn Com_Init(
             c"timedemo".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             0,
-        );
-        common.com_cameraMode = crate::cvar::Cvar_Get(
+        ) };
+        common.com_cameraMode = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1443,9 +1591,9 @@ pub fn Com_Init(
             c"com_cameraMode".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
+        ) };
 
-        common.com_optvehtrace = crate::cvar::Cvar_Get(
+        common.com_optvehtrace = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1453,9 +1601,9 @@ pub fn Com_Init(
             c"com_optvehtrace".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             0,
-        );
+        ) };
 
-        common.cl_paused = crate::cvar::Cvar_Get(
+        common.cl_paused = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1463,8 +1611,8 @@ pub fn Com_Init(
             c"cl_paused".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ROM,
-        );
-        common.sv_paused = crate::cvar::Cvar_Get(
+        ) };
+        common.sv_paused = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1472,8 +1620,8 @@ pub fn Com_Init(
             c"sv_paused".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ROM,
-        );
-        common.com_sv_running = crate::cvar::Cvar_Get(
+        ) };
+        common.com_sv_running = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1481,8 +1629,8 @@ pub fn Com_Init(
             c"sv_running".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ROM,
-        );
-        common.com_cl_running = crate::cvar::Cvar_Get(
+        ) };
+        common.com_cl_running = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1490,8 +1638,8 @@ pub fn Com_Init(
             c"cl_running".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ROM,
-        );
-        common.com_buildScript = crate::cvar::Cvar_Get(
+        ) };
+        common.com_buildScript = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1499,12 +1647,12 @@ pub fn Com_Init(
             c"com_buildScript".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             0,
-        );
+        ) };
 
         // G2_PERFORMANCE_ANALYSIS gated in retail (unresolved const,
         // escalated) — com_G2Report registers unconditionally here since the
         // engine ships that build config.
-        common.com_G2Report = crate::cvar::Cvar_Get(
+        common.com_G2Report = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1512,9 +1660,9 @@ pub fn Com_Init(
             c"com_G2Report".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             0,
-        );
+        ) };
 
-        common.com_RMG = crate::cvar::Cvar_Get(
+        common.com_RMG = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1522,74 +1670,74 @@ pub fn Com_Init(
             c"RMG".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             0,
-        );
+        ) };
 
-        crate::cvar::Cvar_Get(common, cm, rm, host, c"RMG_seed".as_ptr() as *mut c_char, c"0".as_ptr() as *mut c_char, 0);
-        crate::cvar::Cvar_Get(common, cm, rm, host, c"RMG_time".as_ptr() as *mut c_char, c"day".as_ptr() as *mut c_char, 0);
-        crate::cvar::Cvar_Get(common, cm, rm, host, c"RMG_soundset".as_ptr() as *mut c_char, c"".as_ptr() as *mut c_char, 0);
+        unsafe { Cvar_Get(common, cm, rm, host, c"RMG_seed".as_ptr() as *mut c_char, c"0".as_ptr() as *mut c_char, 0) };
+        unsafe { Cvar_Get(common, cm, rm, host, c"RMG_time".as_ptr() as *mut c_char, c"day".as_ptr() as *mut c_char, 0) };
+        unsafe { Cvar_Get(common, cm, rm, host, c"RMG_soundset".as_ptr() as *mut c_char, c"".as_ptr() as *mut c_char, 0) };
 
-        crate::cvar::Cvar_Get(
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_textseed".as_ptr() as *mut c_char, c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
-        crate::cvar::Cvar_Get(
+        ) };
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_map".as_ptr() as *mut c_char, c"small".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ARCHIVE | mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        crate::cvar::Cvar_Get(
+        ) };
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_timefile".as_ptr() as *mut c_char, c"day".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
-        crate::cvar::Cvar_Get(
+        ) };
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_terrain".as_ptr() as *mut c_char, c"grassyhills".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
+        ) };
 
-        crate::cvar::Cvar_Get(
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_sky".as_ptr() as *mut c_char, c"".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        crate::cvar::Cvar_Get(
+        ) };
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_fog".as_ptr() as *mut c_char, c"".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        crate::cvar::Cvar_Get(
+        ) };
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_weather".as_ptr() as *mut c_char, c"".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_SYSTEMINFO
                 | mp_qshared::shared::cvar::CVAR_SERVERINFO
                 | mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
-        crate::cvar::Cvar_Get(
+        ) };
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_instances".as_ptr() as *mut c_char, c"colombia".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        crate::cvar::Cvar_Get(common, cm, rm, host, c"RMG_miscents".as_ptr() as *mut c_char, c"deciduous".as_ptr() as *mut c_char, 0);
-        crate::cvar::Cvar_Get(common, cm, rm, host, c"RMG_music".as_ptr() as *mut c_char, c"music/dm_kam1".as_ptr() as *mut c_char, 0);
-        crate::cvar::Cvar_Get(
+        ) };
+        unsafe { Cvar_Get(common, cm, rm, host, c"RMG_miscents".as_ptr() as *mut c_char, c"deciduous".as_ptr() as *mut c_char, 0) };
+        unsafe { Cvar_Get(common, cm, rm, host, c"RMG_music".as_ptr() as *mut c_char, c"music/dm_kam1".as_ptr() as *mut c_char, 0) };
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_mission".as_ptr() as *mut c_char, c"ctf".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        crate::cvar::Cvar_Get(
+        ) };
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_course".as_ptr() as *mut c_char, c"standard".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        crate::cvar::Cvar_Get(
+        ) };
+        unsafe { Cvar_Get(
             common, cm, rm, host,
             c"RMG_distancecull".as_ptr() as *mut c_char, c"5000".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
+        ) };
 
-        common.com_introPlayed = crate::cvar::Cvar_Get(
+        common.com_introPlayed = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1597,11 +1745,11 @@ pub fn Com_Init(
             c"com_introplayed".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
+        ) };
 
         unsafe {
             if (*common.com_dedicated).integer != 0 && (*common.com_viewlog).integer == 0 {
-                crate::cvar::Cvar_Set(
+                Cvar_Set(
                     common,
                     cm,
                     rm,
@@ -1612,21 +1760,21 @@ pub fn Com_Init(
             }
 
             if !common.com_developer.is_null() && (*common.com_developer).integer != 0 {
-                crate::cmd::Cmd_AddCommand(common, cm, rm, host, "error", Com_Error_f_cmd);
-                crate::cmd::Cmd_AddCommand(common, cm, rm, host, "crash", Com_Crash_f_cmd);
-                crate::cmd::Cmd_AddCommand(common, cm, rm, host, "freeze", Com_Freeze_f_cmd);
+                Cmd_AddCommand(common, cm, rm, host, "error", Com_Error_f_cmd as *const ());
+                Cmd_AddCommand(common, cm, rm, host, "crash", Com_Crash_f_cmd as *const ());
+                Cmd_AddCommand(common, cm, rm, host, "freeze", Com_Freeze_f_cmd as *const ());
             }
         }
-        crate::cmd::Cmd_AddCommand(common, cm, rm, host, "quit", Com_Quit_f_cmd);
-        crate::cmd::Cmd_AddCommand(
+        unsafe { Cmd_AddCommand(common, cm, rm, host, "quit", Com_Quit_f_cmd as *const ()) };
+        unsafe { Cmd_AddCommand(
             common,
             cm,
             rm,
             host,
             "changeVectors",
-            crate::msg::MSG_ReportChangeVectors_f,
-        );
-        crate::cmd::Cmd_AddCommand(common, cm, rm, host, "writeconfig", Com_WriteConfig_f_cmd);
+            crate::msg::MSG_ReportChangeVectors_f as *const (),
+        ) };
+        unsafe { Cmd_AddCommand(common, cm, rm, host, "writeconfig", Com_WriteConfig_f_cmd as *const ()) };
 
         let s = format!(
             "{} {} {}",
@@ -1634,7 +1782,7 @@ pub fn Com_Init(
             mp_qshared::shared::cpustring::CPUSTRING,
             option_env!("BUILD_DATE").unwrap_or("unknown"),
         );
-        common.com_version = crate::cvar::Cvar_Get(
+        common.com_version = unsafe { Cvar_Get(
             common,
             cm,
             rm,
@@ -1642,22 +1790,21 @@ pub fn Com_Init(
             c"version".as_ptr() as *mut c_char,
             s.as_ptr() as *mut c_char,
             mp_qshared::shared::cvar::CVAR_ROM | mp_qshared::shared::cvar::CVAR_SERVERINFO,
-        );
+        ) };
 
-        crate::common::stringed::SE_Init(common, host);
+        unsafe { SE_Init(common, host) };
 
         host.sys_init();
-        crate::net_chan::Netchan_Init(
-            common,
-            (crate::common::com_milliseconds::Com_Milliseconds(common, cm, rm, host) & 0xffff) as c_int,
-        );
+        let netchan_port =
+            (unsafe { Com_Milliseconds(common, cm, rm, host) } & 0xffff) as c_int;
+        crate::net_chan::Netchan_Init(common, cm, rm, host, netchan_port);
         crate::vm_fns::VM_Init(common, cm, rm, host);
-        crate::server::sv_init::SV_Init(common, cm, sv, bot, rm, host);
+        unsafe { SV_Init(common, cm, sv, bot, rm, host) };
 
         unsafe {
             (*common.com_dedicated).modified = qfalse;
             if (*common.com_dedicated).integer == 0 {
-                crate::null::cl_main::CL_Init(common, cm, cl, rm, host);
+                CL_Init(common, cm, cl, rm, host);
                 host.sys_show_console((*common.com_viewlog).integer, qfalse);
             }
         }
@@ -1665,7 +1812,7 @@ pub fn Com_Init(
         // set com_frameTime so that if a map is started on the
         // command line it will still be able to count on com_frameTime
         // being random enough for a serverid
-        common.com_frameTime = crate::common::com_milliseconds::Com_Milliseconds(common, cm, rm, host);
+        common.com_frameTime = unsafe { Com_Milliseconds(common, cm, rm, host) };
 
         // add + commands from command line
         unsafe {
@@ -1678,26 +1825,26 @@ pub fn Com_Init(
         }
 
         // start in full screen ui mode
-        crate::cvar::Cvar_Set(
+        unsafe { Cvar_Set(
             common,
             cm,
             rm,
             host,
             c"r_uiFullScreen".as_ptr() as *mut c_char,
             c"1".as_ptr() as *mut c_char,
-        );
+        ) };
 
-        crate::null::cl_main::CL_StartHunkUsers();
+        unsafe { CL_StartHunkUsers() };
 
         // make sure single player is off by default
-        crate::cvar::Cvar_Set(
+        unsafe { Cvar_Set(
             common,
             cm,
             rm,
             host,
             c"ui_singlePlayerActive".as_ptr() as *mut c_char,
             c"0".as_ptr() as *mut c_char,
-        );
+        ) };
 
         common.com_fullyInitialized = true;
         crate::common::com_printf(common, "--- Common Initialization Complete ---\n");

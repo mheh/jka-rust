@@ -18,8 +18,8 @@ use crate::common_fns::Com_Filter;
 // depends on this crate — importing it here would cycle). Referenced by their
 // exact resolved-signature names per the no-stub rule; reported as missing
 // symbols (`cmd_common.rs` precedent).
-struct RenderModels;
-struct Server;
+pub(crate) struct RenderModels;
+pub(crate) struct Server;
 
 // PORT-NOTE(q_math-reach): `Q_stricmp` (q_shared primitive) is ported only in
 // `mp_game`, a tier above this crate's dependency graph (cm_shader.rs
@@ -112,10 +112,12 @@ pub fn Cmd_List_f(common: &mut Common) {
             cmd = (*cmd).next;
         }
     }
-    Com_Printf(
-        common,
-        format!("{} commands\n", i).as_ptr() as *const c_char,
-    );
+    unsafe {
+        Com_Printf(
+            common,
+            format!("{} commands\n", i).as_ptr() as *const c_char,
+        );
+    }
 }
 
 /// `Cmd_ExecuteString`.
