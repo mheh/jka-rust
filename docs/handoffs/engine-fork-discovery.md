@@ -502,3 +502,9 @@ Evidence resolutions (mechanical, no ruling needed — recorded for the docs):
     0/None with no backing array; `GetAutomapSymbol`'s unchecked C index
     becomes `.get()` → `Option` per §19.
     **RULING: real parse fixture; keep full signature; bless (user, 2026-07-09)**
+
+48. **Nav seam accuracy (the last open item):** `clear_failed_edge` DROPS
+    its unused host param — Raven's ClearFailedEdge (navigator.cpp:
+    1835-1865) uses no engine service; the signature becomes host-free,
+    matching its body and its sibling `clear_all_failed_edges`.
+    **RULING: drop the host param (user, 2026-07-09)**
