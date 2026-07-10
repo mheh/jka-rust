@@ -78,8 +78,11 @@ def main():
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "out" / "engine"))
     args = ap.parse_args()
     rows = scan(Path(args.crates))
-    # prefer rows with an oracle cite when a raven name maps to several items
-    rows.sort(key=lambda r: (r["raven"].lower(), r["cite"] == "", r["path"]))
+    # On raven-name collisions prefer the identity-named port (rust == raven) —
+    # doc-comment mentions of OTHER types (e.g. `Raven \`qboolean\`` inside
+    # gtimer_t's block) otherwise shadow the real port. Then prefer cited rows.
+    rows.sort(key=lambda r: (r["raven"].lower(), r["rust"] != r["raven"],
+                             r["cite"] == "", r["path"]))
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     tsv = ["raven_name\trust_name\tkind\tcrate\tpath\toracle_cite"]
