@@ -1,3 +1,4 @@
-//! MP ICARUS `sequencer.h` byte-stream types.
+//! MP ICARUS `sequencer.h` per-entity driver (§F idiomatic reimplementation).
 
 pub mod bstream_s;
+pub mod csequencer;

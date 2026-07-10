@@ -1,20 +1,21 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! Raven `bstream_t` — an ICARUS block-stream stack node.
 
-use crate::blockstream::cblock_stream::CBlockStream;
+use crate::blockstream::cblock_stream::BlockStream;
 
-/// Raven `bstream_t` — a node in the block-stream linked list used by the
-/// Icarus sequencer.
+/// Raven `bstream_t` → `Bstream` (§F idiomatic, ICARUS-D1 naming).
 ///
-/// Raven: none.
-/// Type definition source: `oracle/codemp/game/../icarus/sequencer.h:42-46`
-#[repr(C)]
-pub struct bstream_t {
-    pub stream: *mut CBlockStream,
-    pub last: *mut bstream_t,
+/// A stream-stack node. `stream` owns Raven's `CBlockStream *stream`; Raven's
+/// intrusive `bstream_s *last` back-pointer folds to an **index** (`last`) into
+/// the sequencer's owned `Vec<Bstream>` (`m_streamsCreated`) — `None` mirrors
+/// Raven's top-level `last == NULL` (the fold the frozen shape called for; the
+/// stream stack cannot be reconstructed from Vec order alone once `DeleteStream`
+/// removes an interior node).
+/// Type definition source: `oracle/codemp/icarus/sequencer.h:42-46`
+#[derive(Default)]
+pub struct Bstream {
+    /// Raven `CBlockStream *stream` — owned here.
+    pub stream: BlockStream,
+    /// Raven `bstream_s *last` — index of the previous stream node in
+    /// `m_streamsCreated`, or `None` at the top level (`last == NULL`).
+    pub last: Option<usize>,
 }
-
-pub type bstream_s = bstream_t;
-
-const _: () = assert!(core::mem::size_of::<bstream_t>() == 16);
-const _: () = assert!(core::mem::offset_of!(bstream_t, stream) == 0);
-const _: () = assert!(core::mem::offset_of!(bstream_t, last) == 8);

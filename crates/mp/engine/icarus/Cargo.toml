@@ -8,3 +8,5 @@ name = "mp_engine_icarus"
 
 [dependencies]
 mp_qshared = { path = "../../qshared" }
+# ruling 56c blanket authorization: §F subsystems depend on the Stage-0 host seam.
+mp_host_interface = { path = "../../host-interface" }

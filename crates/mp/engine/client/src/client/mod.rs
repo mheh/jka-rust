@@ -1,5 +1,6 @@
 //! `client` types.
 
+pub mod cl_main_consts;
 pub mod cl_snapshot_t;
 pub mod client_active_t;
 pub mod client_connection_t;

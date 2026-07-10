@@ -130,6 +130,7 @@ name = "mp_engine_core"
 version = "0.1.0"
 dependencies = [
  "mp_engine_client",
+ "mp_engine_icarus",
  "mp_engine_qcommon",
  "mp_engine_server",
  "mp_qshared",
@@ -147,6 +148,7 @@ dependencies = [
 name = "mp_engine_icarus"
 version = "0.1.0"
 dependencies = [
+ "mp_host_interface",
  "mp_qshared",
 ]
 

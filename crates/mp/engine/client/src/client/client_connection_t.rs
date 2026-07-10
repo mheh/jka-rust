@@ -5,14 +5,10 @@ use std::os::raw::c_char;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_qshared::shared::limits::MAX_STRING_TOKENS;
+use mp_engine_qcommon::qcommon::net_limits::MAX_RELIABLE_COMMANDS;
 use mp_qshared::shared::{fileHandle_t, qboolean, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS};
 
 use super::rm_automap_symbol_t::rmAutomapSymbol_t;
-
-/// Raven `MAX_RELIABLE_COMMANDS` — max string commands buffered for retransmit.
-///
-/// Source: `oracle/codemp/qcommon/qcommon.h:106`
-const MAX_RELIABLE_COMMANDS: usize = 128;
 
 // Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching other ports of this const).
 // Source: oracle/codemp/game/q_shared.h:395

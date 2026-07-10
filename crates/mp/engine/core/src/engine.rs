@@ -32,7 +32,15 @@ pub struct Engine {
     pub cm: CollisionWorld,
     /// Client only; `None` on dedicated (`mp_engine_client`).
     pub snd: Option<SoundSystem>,
-    // botlib/ghoul2/icarus/rmg/roff engine-side state becomes direct fields here
+    /// ICARUS scripting subsystem — a plain, `Default`-initialized field per
+    /// ICARUS-D3 (rulings 12/27; STATE-Q2 CLOSED,
+    /// `docs/architecture/state-ownership.md:1860-1876`): the fork-2 owner of
+    /// every ICARUS file-scope global, reached through the ICARUS-D2
+    /// `EngineHostView`/`icarus_call` split-borrow. Not `Option`/`Box`-wrapped;
+    /// "is ICARUS initialized?" is Raven's own `iICARUS != NULL` NULL-flag
+    /// (`icarus.instance.is_some()`).
+    pub icarus: mp_engine_icarus::Icarus,
+    // botlib/ghoul2/rmg/roff engine-side state becomes direct fields here
     // (STATE-Q2 CLOSED — engine-fork-discovery rulings 12/13/43); each field
     // lands with its subsystem's port waves, reached via the EngineHostView
     // split-borrow constructors (ruling 43).
@@ -91,6 +99,11 @@ impl Engine {
             // Option<Client>/Option<SoundSystem>: same niche non-guarantee.
             addr_of_mut!((*p).cl).write(None);
             addr_of_mut!((*p).snd).write(None);
+            // Icarus holds Box slot-arrays, HashMaps, and a fn-item table — NONE
+            // all-zero-valid — so it is written in place through its hand-written
+            // Default before the Box is exposed (rulings 12/27; the modules /
+            // time_base non-ZeroValid precedent).
+            addr_of_mut!((*p).icarus).write(Default::default());
             Box::from_raw(p)
         }
     }
