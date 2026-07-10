@@ -32,8 +32,13 @@
 //!   `send_packet` captures into `sent_packets`; `string_to_adr` resolves
 //!   `localhost`/dotted quads deterministically (no real DNS); LAN = loopback
 //!   or `127.x`.
+//! * Ruling-36 fixtures: `cvar_integer` reads a name→i32 map (missing = 0,
+//!   `Cvar_VariableIntegerValue` semantics); `sv_time` serves the settable
+//!   `sv_time` field; `fs_write_file` captures into `written_files`;
+//!   `model_mdxm`/`model_mdxa` hand back pointers into caller-provided byte
+//!   blocks (missing handle = NULL, Raven's NULL `model_t` pointer).
 
-use core::ffi::{c_char, c_ulong};
+use core::ffi::{c_char, c_ulong, c_void};
 
 use std::collections::{BTreeMap, VecDeque};
 
@@ -44,7 +49,7 @@ use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, MAX_GENTITIES};
-use mp_qshared::shared::vec3_t;
+use mp_qshared::shared::{qhandle_t, vec3_t};
 
 use crate::engine_host::EngineHost;
 use crate::platform_host::PlatformHost;
@@ -109,6 +114,23 @@ pub struct MockHost {
     pub vm_calls: Vec<(VmSlot, i32, Vec<isize>)>,
     /// The value [`EngineHost::vm_call`] returns (default `0`).
     pub vm_call_return: isize,
+    /// Integer cvar fixtures served by [`EngineHost::cvar_integer`]. A missing
+    /// name reads 0 — matching `Cvar_VariableIntegerValue`'s unregistered-cvar
+    /// return (`cvar.cpp:118-124`) and the pattern sites' `Cvar_Get(name, "0",
+    /// …)` defaults.
+    pub cvars: BTreeMap<String, i32>,
+    /// The `svs.time` value [`EngineHost::sv_time`] serves — set it per frame
+    /// (it never auto-advances; the driver owns the frame clock).
+    pub sv_time: i32,
+    /// [`EngineHost::fs_write_file`] capture: qpath → written bytes (last
+    /// write wins, like an FS_WRITE reopen truncating).
+    pub written_files: BTreeMap<String, Vec<u8>>,
+    /// Loader model-memory fixtures, mesh half: model handle → `.glm` block
+    /// bytes served by [`EngineHost::model_mdxm`].
+    pub mdxm_blocks: BTreeMap<qhandle_t, Vec<u8>>,
+    /// Loader model-memory fixtures, animation half: model handle → `.gla`
+    /// block bytes served by [`EngineHost::model_mdxa`].
+    pub mdxa_blocks: BTreeMap<qhandle_t, Vec<u8>>,
     /// Byte arena strided by `size_of::<sharedEntity_t>()` behind `gentity`.
     gentities: Vec<u8>,
     /// The `sv.mSharedMemory` window.
@@ -137,6 +159,11 @@ impl MockHost {
             errors: Vec::new(),
             vm_calls: Vec::new(),
             vm_call_return: 0,
+            cvars: BTreeMap::new(),
+            sv_time: 0,
+            written_files: BTreeMap::new(),
+            mdxm_blocks: BTreeMap::new(),
+            mdxa_blocks: BTreeMap::new(),
             gentities: vec![0u8; MAX_GENTITIES * stride],
             shared_mem: vec![0u8; Self::SHARED_MEM_BYTES],
             rng: HoldrandLcg::new(),
@@ -228,6 +255,38 @@ impl EngineHost for MockHost {
         let stride = core::mem::size_of::<sharedEntity_t>();
         // Faithful `SV_GentityNum` arithmetic: byte base + stride*num.
         unsafe { self.gentities.as_mut_ptr().add(ent_num as usize * stride) as *mut sharedEntity_t }
+    }
+
+    fn cvar_integer(&mut self, name: &str) -> i32 {
+        // Missing name reads 0 (Cvar_VariableIntegerValue, cvar.cpp:118-124).
+        self.cvars.get(name).copied().unwrap_or(0)
+    }
+
+    fn sv_time(&mut self) -> i32 {
+        self.sv_time
+    }
+
+    fn fs_write_file(&mut self, qpath: &str, data: &[u8]) -> bool {
+        self.written_files.insert(qpath.to_string(), data.to_vec());
+        true
+    }
+
+    fn model_mdxm(&mut self, model: qhandle_t) -> *mut c_void {
+        // NULL where Raven's model_t.mdxm is NULL (no fixture). The pointer is
+        // into the fixture Vec: stable until `mdxm_blocks` is next mutated.
+        self.mdxm_blocks
+            .get_mut(&model)
+            .map(|b| b.as_mut_ptr() as *mut c_void)
+            .unwrap_or(core::ptr::null_mut())
+    }
+
+    fn model_mdxa(&mut self, model: qhandle_t) -> *mut c_void {
+        // NULL where Raven's model_t.mdxa is NULL (no fixture). Same pointer
+        // stability contract as `model_mdxm`.
+        self.mdxa_blocks
+            .get_mut(&model)
+            .map(|b| b.as_mut_ptr() as *mut c_void)
+            .unwrap_or(core::ptr::null_mut())
     }
 }
 
@@ -425,6 +484,54 @@ mod tests {
         assert_eq!(host.vm_call(VmSlot::Cgvm, 9, &[]), 7);
         assert_eq!(host.vm_calls[0], (VmSlot::Gvm, 3, vec![1, 2]));
         assert_eq!(host.vm_calls[1], (VmSlot::Cgvm, 9, vec![]));
+    }
+
+    #[test]
+    fn cvar_integer_serves_map_and_defaults_to_zero() {
+        let mut host = MockHost::new();
+        host.cvars.insert("developer".to_string(), 1);
+        assert_eq!(host.cvar_integer("developer"), 1);
+        // Unregistered name reads 0 (Cvar_VariableIntegerValue, cvar.cpp:118-124).
+        assert_eq!(host.cvar_integer("cg_g2MarksAllModels"), 0);
+    }
+
+    #[test]
+    fn sv_time_is_settable_and_distinct_from_milliseconds() {
+        let mut host = MockHost::new();
+        assert_eq!(EngineHost::sv_time(&mut host), 0);
+        host.sv_time = 12345;
+        assert_eq!(EngineHost::sv_time(&mut host), 12345);
+        // The PlatformHost clock advances independently.
+        let _ = host.milliseconds(false);
+        assert_eq!(EngineHost::sv_time(&mut host), 12345);
+    }
+
+    #[test]
+    fn fs_write_file_captures_and_reports_success() {
+        let mut host = MockHost::new();
+        assert!(host.fs_write_file("maps/duel1.nav", &[9, 8, 7]));
+        assert_eq!(host.written_files["maps/duel1.nav"], vec![9, 8, 7]);
+        // Rewrite truncates (last write wins).
+        assert!(host.fs_write_file("maps/duel1.nav", &[1]));
+        assert_eq!(host.written_files["maps/duel1.nav"], vec![1]);
+    }
+
+    #[test]
+    fn model_memory_serves_fixture_blocks_or_null() {
+        let mut host = MockHost::new();
+        host.mdxm_blocks.insert(3, vec![0xAA, 0xBB]);
+        host.mdxa_blocks.insert(7, vec![0xCC]);
+
+        let m = host.model_mdxm(3);
+        assert!(!m.is_null());
+        assert_eq!(unsafe { *(m as *const u8) }, 0xAA);
+        let a = host.model_mdxa(7);
+        assert!(!a.is_null());
+        assert_eq!(unsafe { *(a as *const u8) }, 0xCC);
+
+        // Missing handle = NULL, and the two halves are independent.
+        assert!(host.model_mdxm(7).is_null());
+        assert!(host.model_mdxa(3).is_null());
     }
 
     #[test]
