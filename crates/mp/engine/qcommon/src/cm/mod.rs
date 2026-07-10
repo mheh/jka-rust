@@ -17,6 +17,7 @@ pub mod cm_polylib_consts;
 pub mod cm_randomterrain_cpp_consts;
 pub mod cm_local_consts;
 pub mod cm_shader_consts;
+pub mod cm_trace;
 pub mod cm_trace_consts;
 pub mod cmodel_s;
 pub mod ecptype;

@@ -1,6 +1,10 @@
 //! `mp_engine_qcommon` crate. //TODO: Port module mp_engine_qcommon
 
 pub mod cm;
+pub mod cm_height_details;
+pub mod cm_patch;
+pub mod cm_randomterrain;
+pub mod cm_terrain;
 pub mod cmd;
 pub mod collision_world;
 pub mod common;
@@ -11,6 +15,9 @@ pub mod md4;
 pub mod miniheap;
 pub mod qcommon;
 pub mod qfiles;
+pub mod roff;
+pub mod stringed;
+pub mod terrain_handle;
 pub mod timing;
 pub mod vm;
 pub mod z_memman;

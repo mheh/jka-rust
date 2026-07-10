@@ -1,0 +1,95 @@
+=== scenario 1: non-translated v1 playback ===
+### non-translated v1: file=v1_basic.rof id=1 ent=1 translate=0 startAngles=(0,0,0) frameTime=100
+- frame 0 @ svs.time=1000 entList=1
+  pos  type=2 time=1000 base=0x00000000,0x00000000,0x00000000 delta=0x42c80000,0x00000000,0x00000000
+  apos type=2 time=1000 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  r.mIsRoffing=1 next_roff_time=1100 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=1
+- frame 1 @ svs.time=1100 entList=1
+  pos  type=2 time=1100 base=0x00000000,0x00000000,0x00000000 delta=0x43480000,0x42480000,0x00000000
+  apos type=2 time=1100 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x43e10000,0x00000000
+  r.mIsRoffing=1 next_roff_time=1200 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=1
+- frame 2 @ svs.time=1200 entList=1
+  pos  type=2 time=1200 base=0x00000000,0x00000000,0x00000000 delta=0x43960000,0x42480000,0x43160000
+  apos type=2 time=1200 base=0x00000000,0x00000000,0x00000000 delta=0x42c80000,0x44610000,0x43480000
+  r.mIsRoffing=1 next_roff_time=1300 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=1
+- frame 3 @ svs.time=1300 entList=1
+  pos  type=0 time=1300 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  apos type=0 time=1300 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  r.mIsRoffing=0 next_roff_time=1300 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=0
+- frame 4 @ svs.time=1400 entList=0
+  pos  type=0 time=1300 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  apos type=0 time=1300 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  r.mIsRoffing=0 next_roff_time=1300 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=0
+
+=== scenario 2: translated v1 playback (yaw 90) ===
+### translated v1: file=v1_basic.rof id=1 ent=2 translate=1 startAngles=(0,90,0) frameTime=100
+- frame 0 @ svs.time=1000 entList=1
+  pos  type=2 time=1000 base=0x00000000,0x00000000,0x00000000 delta=0xb692abcc,0x42c80000,0x00000000
+  apos type=2 time=1000 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  r.mIsRoffing=1 next_roff_time=1100 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=1
+- frame 1 @ svs.time=1100 entList=1
+  pos  type=2 time=1100 base=0x00000000,0x00000000,0x00000000 delta=0xc2480002,0x43480000,0x00000000
+  apos type=2 time=1100 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x43e10000,0x00000000
+  r.mIsRoffing=1 next_roff_time=1200 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=1
+- frame 2 @ svs.time=1200 entList=1
+  pos  type=2 time=1200 base=0x00000000,0x00000000,0x00000000 delta=0xc2480004,0x43960000,0x43160000
+  apos type=2 time=1200 base=0x00000000,0x00000000,0x00000000 delta=0x42c80000,0x44610000,0x43480000
+  r.mIsRoffing=1 next_roff_time=1300 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=1
+- frame 3 @ svs.time=1300 entList=1
+  pos  type=0 time=1300 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  apos type=0 time=1300 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  r.mIsRoffing=0 next_roff_time=1300 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=0
+- frame 4 @ svs.time=1400 entList=0
+  pos  type=0 time=1300 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  apos type=0 time=1300 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  r.mIsRoffing=0 next_roff_time=1300 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=0
+
+=== scenario 3: v2 note firing ===
+### v2 notes: file=v2_notes.rof id=1 ent=3 translate=0 startAngles=(0,0,0) frameTime=50
+- frame 0 @ svs.time=2000 entList=1
+  pos  type=2 time=2000 base=0x00000000,0x00000000,0x00000000 delta=0x42c80000,0x00000000,0x00000000
+  apos type=2 time=2000 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x43480000,0x00000000
+  r.mIsRoffing=1 next_roff_time=2050 curOrigin=0x00000000,0x00000000,0x00000000
+  NOTE callNum=12 entnum=3 text="hello"
+  entList after=1
+- frame 1 @ svs.time=2050 entList=1
+  pos  type=2 time=2050 base=0x00000000,0x00000000,0x00000000 delta=0x42f00000,0x00000000,0x00000000
+  apos type=2 time=2050 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x43c80000,0x00000000
+  r.mIsRoffing=1 next_roff_time=2100 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=1
+- frame 2 @ svs.time=2100 entList=1
+  pos  type=0 time=2100 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  apos type=0 time=2100 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  r.mIsRoffing=0 next_roff_time=2100 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=0
+- frame 3 @ svs.time=2150 entList=0
+  pos  type=0 time=2100 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  apos type=0 time=2100 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  r.mIsRoffing=0 next_roff_time=2100 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=0
+
+=== scenario 4: roff-not-found error path ===
+### roff-not-found: cached id=1 then Unload before UpdateEntities
+- UpdateEntities (roff gone) entList=1
+^1ROFF System Error:
+  pos  type=0 time=1000 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  apos type=0 time=1000 base=0x00000000,0x00000000,0x00000000 delta=0x00000000,0x00000000,0x00000000
+  r.mIsRoffing=1 next_roff_time=0 curOrigin=0x00000000,0x00000000,0x00000000
+  entList after=0
+
+=== scenario 5: purge_ent ===
+### purge_ent: two ents playing, entList=2
+purge_ent(5) = 1 entList=1
+^1Purge failed:  Entity <99> not found
+purge_ent(99 missing) = 0 entList=1
+

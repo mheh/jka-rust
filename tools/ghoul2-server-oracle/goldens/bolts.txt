@@ -1,0 +1,30 @@
+== add generated-surface bolts ==
+add surf 2 -> 0
+add surf 0 -> 1
+after 2 adds               size=2 | [0] bone=-1 surf=2 type=512 used=1 | [1] bone=-1 surf=0 type=512 used=1
+
+== duplicate add bumps boltUsed ==
+re-add surf 2 -> 0
+after re-add               size=2 | [0] bone=-1 surf=2 type=512 used=2 | [1] bone=-1 surf=0 type=512 used=1
+
+== add out-of-range surface (>= slist.size) ==
+add surf 9 -> -1
+
+== finders ==
+find surf 2 (flags=G2SURFACEFLAG_GENERATED) -> 0
+find surf 0 (flags=0) -> 1
+find surf 3 (absent) -> -1
+find bone -1 (none set) -> -1
+
+== remove (boltUsed decrement + tail resize) ==
+remove idx 0 (used 2->1) -> 1
+after 1st remove           size=2 | [0] bone=-1 surf=2 type=512 used=1 | [1] bone=-1 surf=0 type=512 used=1
+remove idx 0 again (used 1->0, frees slot) -> 1
+after 2nd remove           size=2 | [0] bone=-1 surf=-1 type=512 used=0 | [1] bone=-1 surf=0 type=512 used=1
+
+== RemoveRedundantBolts (drop bolts to inactive surfaces) ==
+before prune               size=2 | [0] bone=-1 surf=1 type=512 used=1 | [1] bone=-1 surf=0 type=512 used=2
+after prune (surf0 gone)   size=0
+
+== Init clears the list ==
+after init                 size=0

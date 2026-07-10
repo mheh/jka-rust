@@ -4,6 +4,10 @@
 ///
 /// Raven: (none).
 /// Type definition source: `oracle/codemp/ghoul2/ghoul2_shared.h:38-56`
+///
+/// `Clone` matches Raven's trivial copy (POD in a `vector` copied by
+/// `CGhoul2Info::mSlist`'s copy during `DeepCopy`).
+#[derive(Clone)]
 #[repr(C)]
 pub struct surfaceInfo_t {
     /// what the flags are for this model

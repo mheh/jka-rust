@@ -40,10 +40,25 @@ pub struct Engine {
     /// "is ICARUS initialized?" is Raven's own `iICARUS != NULL` NULL-flag
     /// (`icarus.instance.is_some()`).
     pub icarus: mp_engine_icarus::Icarus,
-    // botlib/ghoul2/rmg/roff engine-side state becomes direct fields here
-    // (STATE-Q2 CLOSED — engine-fork-discovery rulings 12/13/43); each field
-    // lands with its subsystem's port waves, reached via the EngineHostView
-    // split-borrow constructors (ruling 43).
+    /// Server-side Ghoul2 (bones/bolts/ragdoll/gore + the Ghoul2InfoArray
+    /// arena) — plain `Default` field per rulings 12/29 (`mp_engine_ghoul2`).
+    pub g2: mp_engine_ghoul2::ghoul2_system::Ghoul2System,
+    /// RMG mission manager — `land: Option<TerrainHandle>` mirrors Raven's
+    /// null-initialized `mLandScape` (rulings 12/28; `mp_engine_rmg`).
+    pub rmg: mp_engine_rmg::rm_manager::RmManager,
+    /// Headless model registry/cache (`tr.models` + CachedModels) — reached by
+    /// ghoul2 only through `EngineHost::model_*` (rulings 52/53; `mp_renderer`).
+    pub render_models: mp_renderer::tr_model::render_models::RenderModels,
+    /// Engine-side nav graph (`CNavigator` twin) — plain `Default` field per
+    /// rulings 12/30 (`mp_engine_server::npcnav`).
+    pub nav: mp_engine_server::npcnav::navigator::Navigator,
+    /// ROFF cache + per-entity playback list — plain `Default` field per
+    /// rulings 12 (`mp_engine_qcommon::roff`).
+    pub roff: mp_engine_qcommon::roff::RoffSystem,
+    // botlib engine-side state becomes a direct field here (STATE-Q2 CLOSED —
+    // engine-fork-discovery rulings 12/13/43); it lands with the botlib
+    // integration waves, reached via the EngineHostView split-borrow
+    // constructors (ruling 43).
 }
 
 //TODO: Port ZeroValid for Engine
@@ -104,6 +119,18 @@ impl Engine {
             // Default before the Box is exposed (rulings 12/27; the modules /
             // time_base non-ZeroValid precedent).
             addr_of_mut!((*p).icarus).write(Default::default());
+            // The five §F aggregates hold Vecs/BTreeMaps/Strings — none
+            // all-zero-valid — so each is written in place through its Default
+            // (rulings 12/28/29/30/53; same precedent as `icarus` above).
+            addr_of_mut!((*p).g2).write(Default::default());
+            addr_of_mut!((*p).rmg).write(Default::default());
+            addr_of_mut!((*p).render_models).write(Default::default());
+            addr_of_mut!((*p).nav).write(Default::default());
+            addr_of_mut!((*p).roff).write(Default::default());
+            // Common.stringed (ruling 50/55): BTreeMap-backed store, written
+            // through its Default (= Raven's Clear(SE_FALSE)) per the ruling-55
+            // construction story.
+            addr_of_mut!((*p).common.stringed).write(Default::default());
             Box::from_raw(p)
         }
     }

@@ -8,7 +8,7 @@ use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 use mp_engine_qcommon::qcommon::net_limits::MAX_RELIABLE_COMMANDS;
 use mp_qshared::shared::{fileHandle_t, qboolean, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS};
 
-use super::rm_automap_symbol_t::rmAutomapSymbol_t;
+use mp_qshared::RmAutomapSymbol;
 
 // Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching other ports of this const).
 // Source: oracle/codemp/game/q_shared.h:395
@@ -96,7 +96,7 @@ pub struct clientConnection_t {
 	pub rmgHeightMapSize: i32,
 	pub rmgHeightMap: [u8; MAX_HEIGHTMAP_SIZE],
 	pub rmgFlattenMap: [u8; MAX_HEIGHTMAP_SIZE],
-	pub rmgAutomapSymbols: [rmAutomapSymbol_t; MAX_AUTOMAP_SYMBOLS],
+	pub rmgAutomapSymbols: [RmAutomapSymbol; MAX_AUTOMAP_SYMBOLS],
 	pub rmgAutomapSymbolCount: i32,
 }
 

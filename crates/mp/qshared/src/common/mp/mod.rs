@@ -10,6 +10,7 @@ pub mod gentity;
 pub mod ghoul2;
 pub mod playerstate;
 pub mod qcommon;
+pub mod rmg;
 pub mod trace_t;
 pub mod ui;
 

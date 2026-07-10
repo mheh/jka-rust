@@ -130,10 +130,13 @@ name = "mp_engine_core"
 version = "0.1.0"
 dependencies = [
  "mp_engine_client",
+ "mp_engine_ghoul2",
  "mp_engine_icarus",
  "mp_engine_qcommon",
+ "mp_engine_rmg",
  "mp_engine_server",
  "mp_qshared",
+ "mp_renderer",
  "native_platform",
 ]
 
@@ -141,6 +144,7 @@ dependencies = [
 name = "mp_engine_ghoul2"
 version = "0.1.0"
 dependencies = [
+ "mp_host_interface",
  "mp_qshared",
 ]
 
@@ -158,6 +162,7 @@ version = "0.1.0"
 dependencies = [
  "abi_transport",
  "cc",
+ "mp_host_interface",
  "mp_qshared",
  "native_platform",
 ]
@@ -166,6 +171,8 @@ dependencies = [
 name = "mp_engine_rmg"
 version = "0.1.0"
 dependencies = [
+ "mp_engine_qcommon",
+ "mp_host_interface",
  "mp_qshared",
 ]
 
@@ -182,6 +189,7 @@ version = "0.1.0"
 dependencies = [
  "mp_abi",
  "mp_engine_qcommon",
+ "mp_host_interface",
  "mp_qshared",
 ]
 
@@ -218,6 +226,7 @@ name = "mp_renderer"
 version = "0.1.0"
 dependencies = [
  "mp_engine_qcommon",
+ "mp_host_interface",
  "mp_qshared",
  "native_platform",
 ]

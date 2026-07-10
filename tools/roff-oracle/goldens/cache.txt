@@ -1,0 +1,81 @@
+=== cache calls ===
+cache("v1_basic.rof") = 1  GetID=1
+cache("v1_badangle.rof") = 2  GetID=2
+cache("v2_notes.rof") = 3  GetID=3
+cache("fallbackcase.rof") = 4  GetID=4
+^1cache failed: roff <bad_version.rof> does not exist or is not a valid roff
+cache("bad_version.rof") = 0  GetID=0
+^1cache failed: roff <bad_count.rof> does not exist or is not a valid roff
+cache("bad_count.rof") = 0  GetID=0
+
+=== re-cache idempotency ===
+recache("v1_basic.rof") = 1
+
+=== mROFFList (ascending id order) ===
+id 1 -> "v1_basic.rof"
+id 2 -> "v1_badangle.rof"
+id 3 -> "v2_notes.rof"
+id 4 -> "fallbackcase.rof"
+
+=== per-roff contents (post-FixBadAngles) ===
+--- id 1: v1_basic.rof ---
+  entries=3 frameTime=100 lerp=10 numNoteTracks=0
+  [0] o=0x41200000,0x00000000,0x00000000 r=0x00000000,0x00000000,0x00000000 startNote=-1 numNotes=0
+  [1] o=0x41a00000,0x40a00000,0x00000000 r=0x00000000,0x42340000,0x00000000 startNote=-1 numNotes=0
+  [2] o=0x41f00000,0x40a00000,0x41700000 r=0x41200000,0x42b40000,0x41a00000 startNote=-1 numNotes=0
+--- id 2: v1_badangle.rof ---
+  entries=2 frameTime=100 lerp=10 numNoteTracks=0
+  [0] o=0x00000000,0x00000000,0x00000000 r=0xc2b40000,0x43200000,0x42340000 startNote=-1 numNotes=0
+  [1] o=0x3f800000,0x40000000,0x40400000 r=0xc3330000,0x43330000,0x43330000 startNote=-1 numNotes=0
+--- id 3: v2_notes.rof ---
+  entries=2 frameTime=50 lerp=20 numNoteTracks=1
+  [0] o=0x40a00000,0x00000000,0x00000000 r=0x00000000,0x41200000,0x00000000 startNote=0 numNotes=1
+  [1] o=0x40c00000,0x00000000,0x00000000 r=0x00000000,0x41a00000,0x00000000 startNote=-1 numNotes=0
+  note[0]="hello"
+--- id 4: fallbackcase.rof ---
+  entries=1 frameTime=100 lerp=10 numNoteTracks=0
+  [0] o=0x40e00000,0x41000000,0x41100000 r=0x3f800000,0x40000000,0x40400000 startNote=-1 numNotes=0
+
+=== List() ===
+^2
+--Cached ROFF files--
+^2ID   FILE
+^2 1 - v1_basic.rof
+^2 2 - v1_badangle.rof
+^2 3 - v2_notes.rof
+^2 4 - fallbackcase.rof
+^2
+Files: 4
+
+=== List(id) per roff ===
+^2File: v1_basic.rof
+^2ID: 1
+^2Entries: 3
+
+^2MOVE                 ROTATE
+^2 10.00   0.00   0.00     0.00   0.00   0.00
+^2 20.00   5.00   0.00     0.00  45.00   0.00
+^2 30.00   5.00  15.00    10.00  90.00  20.00
+^2File: v1_badangle.rof
+^2ID: 2
+^2Entries: 2
+
+^2MOVE                 ROTATE
+^2  0.00   0.00   0.00   -90.00 160.00  45.00
+^2  1.00   2.00   3.00   -179.00 179.00 179.00
+^2File: v2_notes.rof
+^2ID: 3
+^2Entries: 2
+
+^2MOVE                 ROTATE
+^2  5.00   0.00   0.00     0.00  10.00   0.00
+^2  6.00   0.00   0.00     0.00  20.00   0.00
+^2File: fallbackcase.rof
+^2ID: 4
+^2Entries: 1
+
+^2MOVE                 ROTATE
+^2  7.00   8.00   9.00     1.00   2.00   3.00
+
+=== List(missing id 999) ===
+^3ROFF not found: id <999>

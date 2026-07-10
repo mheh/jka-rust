@@ -38,6 +38,10 @@ pub struct Common {
     /// `sys_timeBase` (`win_shared.cpp:22-34`): the `std::time::Instant` base,
     /// captured in `Engine::new()` (LIFE-D4b), read-only afterward.
     pub time_base: Instant,
+    /// `TheStringPackage` (`stringed_ingame.cpp:71`) — the StringEd store, a
+    /// `Common` sub-struct field per ruling 50; written through its `Default`
+    /// (= Raven's `Clear(SE_FALSE)`) in `Engine::new()`'s write-list (ruling 55).
+    pub stringed: crate::stringed::package::StringEdPackage,
     //TODO: Port Common cvars/cmd/cbuf/fs/net sub-structs + com_printf print state
     // Source: oracle/codemp/qcommon/common.cpp:32-72,128,137-171
 }

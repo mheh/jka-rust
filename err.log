@@ -1,0 +1,264 @@
+    Checking mp_engine_qcommon v0.1.0 (/Users/milohehmsoth/Developer/Milo/jka-rust/crates/mp/engine/qcommon)
+error[E0432]: unresolved import `mp_qshared::vec3_t`
+ --> crates/mp/engine/qcommon/src/roff/sroff_entity.rs:3:5
+  |
+3 | use mp_qshared::vec3_t;
+  |     ^^^^^^^^^^^^^^^^^^ no `vec3_t` in the root
+
+warning: unused variable: `is_client`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:42:29
+   |
+42 |     pub fn clean(&mut self, is_client: bool) -> bool {
+   |                             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_is_client`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `is_client`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:53:39
+   |
+53 |     pub fn update_entities(&mut self, is_client: bool, host: &mut impl EngineHost) {
+   |                                       ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_is_client`
+
+warning: unused variable: `host`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:53:56
+   |
+53 |     pub fn update_entities(&mut self, is_client: bool, host: &mut impl EngineHost) {
+   |                                                        ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+warning: unused variable: `file`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:69:29
+   |
+69 |     pub fn cache(&mut self, file: &str, is_client: bool, host: &mut impl EngineHost) -> i32 {
+   |                             ^^^^ help: if this is intentional, prefix it with an underscore: `_file`
+
+warning: unused variable: `is_client`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:69:41
+   |
+69 |     pub fn cache(&mut self, file: &str, is_client: bool, host: &mut impl EngineHost) -> i32 {
+   |                                         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_is_client`
+
+warning: unused variable: `host`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:69:58
+   |
+69 |     pub fn cache(&mut self, file: &str, is_client: bool, host: &mut impl EngineHost) -> i32 {
+   |                                                          ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+warning: unused variable: `ent_id`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:84:9
+   |
+84 |         ent_id: i32,
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_ent_id`
+
+warning: unused variable: `roff_id`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:85:9
+   |
+85 |         roff_id: i32,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_roff_id`
+
+warning: unused variable: `do_translation`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:86:9
+   |
+86 |         do_translation: bool,
+   |         ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_do_translation`
+
+warning: unused variable: `is_client`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:87:9
+   |
+87 |         is_client: bool,
+   |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_is_client`
+
+warning: unused variable: `host`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:88:9
+   |
+88 |         host: &mut impl EngineHost,
+   |         ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+warning: unused variable: `ent_id`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:99:33
+   |
+99 |     pub fn purge_ent(&mut self, ent_id: i32, is_client: bool, host: &mut impl EngineHost) -> bool {
+   |                                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_ent_id`
+
+warning: unused variable: `is_client`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:99:46
+   |
+99 |     pub fn purge_ent(&mut self, ent_id: i32, is_client: bool, host: &mut impl EngineHost) -> bool {
+   |                                              ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_is_client`
+
+warning: unused variable: `host`
+  --> crates/mp/engine/qcommon/src/roff/roff_system.rs:99:63
+   |
+99 |     pub fn purge_ent(&mut self, ent_id: i32, is_client: bool, host: &mut impl EngineHost) -> bool {
+   |                                                               ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+warning: unused variable: `data`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:117:23
+    |
+117 |     fn is_roff(&self, data: &[u8]) -> bool {
+    |                       ^^^^ help: if this is intentional, prefix it with an underscore: `_data`
+
+warning: unused variable: `data`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:128:25
+    |
+128 |     fn init_roff(&self, data: &[u8], obj: &mut Croff) -> bool {
+    |                         ^^^^ help: if this is intentional, prefix it with an underscore: `_data`
+
+warning: unused variable: `obj`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:128:38
+    |
+128 |     fn init_roff(&self, data: &[u8], obj: &mut Croff) -> bool {
+    |                                      ^^^ help: if this is intentional, prefix it with an underscore: `_obj`
+
+warning: unused variable: `data`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:141:26
+    |
+141 |     fn init_roff2(&self, data: &[u8], obj: &mut Croff) -> bool {
+    |                          ^^^^ help: if this is intentional, prefix it with an underscore: `_data`
+
+warning: unused variable: `obj`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:141:39
+    |
+141 |     fn init_roff2(&self, data: &[u8], obj: &mut Croff) -> bool {
+    |                                       ^^^ help: if this is intentional, prefix it with an underscore: `_obj`
+
+warning: unused variable: `obj`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:152:30
+    |
+152 |     fn fix_bad_angles(&self, obj: &mut Croff) {
+    |                              ^^^ help: if this is intentional, prefix it with an underscore: `_obj`
+
+warning: unused variable: `file`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:174:22
+    |
+174 |     fn get_id(&self, file: &str) -> i32 {
+    |                      ^^^^ help: if this is intentional, prefix it with an underscore: `_file`
+
+warning: unused variable: `id`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:183:26
+    |
+183 |     fn unload(&mut self, id: i32) -> bool {
+    |                          ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: unused variable: `host`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:203:24
+    |
+203 |     fn list_all(&self, host: &mut impl EngineHost) {
+    |                        ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+warning: unused variable: `id`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:212:24
+    |
+212 |     fn list_one(&self, id: i32, host: &mut impl EngineHost) -> bool {
+    |                        ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: unused variable: `host`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:212:33
+    |
+212 |     fn list_one(&self, id: i32, host: &mut impl EngineHost) -> bool {
+    |                                 ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+warning: unused variable: `host`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:221:25
+    |
+221 |     fn list_ents(&self, host: &mut impl EngineHost) {
+    |                         ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+warning: unused variable: `name`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:232:37
+    |
+232 |     fn purge_ent_by_name(&mut self, name: &str, host: &mut impl EngineHost) -> bool {
+    |                                     ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: unused variable: `host`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:232:49
+    |
+232 |     fn purge_ent_by_name(&mut self, name: &str, host: &mut impl EngineHost) -> bool {
+    |                                                 ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+warning: unused variable: `ent_index`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:260:30
+    |
+260 |     fn apply_roff(&mut self, ent_index: usize, roff_id: i32, host: &mut impl EngineHost) -> bool {
+    |                              ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_ent_index`
+
+warning: unused variable: `roff_id`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:260:48
+    |
+260 |     fn apply_roff(&mut self, ent_index: usize, roff_id: i32, host: &mut impl EngineHost) -> bool {
+    |                                                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_roff_id`
+
+warning: unused variable: `host`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:260:62
+    |
+260 |     fn apply_roff(&mut self, ent_index: usize, roff_id: i32, host: &mut impl EngineHost) -> bool {
+    |                                                              ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+warning: unused variable: `ent_index`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:275:32
+    |
+275 |     fn process_note(&mut self, ent_index: usize, note: &str, host: &mut impl EngineHost) {
+    |                                ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_ent_index`
+
+warning: unused variable: `note`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:275:50
+    |
+275 |     fn process_note(&mut self, ent_index: usize, note: &str, host: &mut impl EngineHost) {
+    |                                                  ^^^^ help: if this is intentional, prefix it with an underscore: `_note`
+
+warning: unused variable: `host`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:275:62
+    |
+275 |     fn process_note(&mut self, ent_index: usize, note: &str, host: &mut impl EngineHost) {
+    |                                                              ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+warning: unused variable: `tr`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:288:9
+    |
+288 |         tr: &mut trajectory_t,
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_tr`
+
+warning: unused variable: `tr_type`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:289:9
+    |
+289 |         tr_type: trType_t,
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_tr_type`
+
+warning: unused variable: `origin`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:290:9
+    |
+290 |         origin: vec3_t,
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_origin`
+
+warning: unused variable: `delta`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:291:9
+    |
+291 |         delta: Option<vec3_t>,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_delta`
+
+warning: unused variable: `time`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:292:9
+    |
+292 |         time: i32,
+    |         ^^^^ help: if this is intentional, prefix it with an underscore: `_time`
+
+warning: unused variable: `rate`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:293:9
+    |
+293 |         rate: i32,
+    |         ^^^^ help: if this is intentional, prefix it with an underscore: `_rate`
+
+warning: unused variable: `ent_index`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:307:30
+    |
+307 |     fn clear_lerp(&mut self, ent_index: usize, host: &mut impl EngineHost) -> bool {
+    |                              ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_ent_index`
+
+warning: unused variable: `host`
+   --> crates/mp/engine/qcommon/src/roff/roff_system.rs:307:48
+    |
+307 |     fn clear_lerp(&mut self, ent_index: usize, host: &mut impl EngineHost) -> bool {
+    |                                                ^^^^ help: if this is intentional, prefix it with an underscore: `_host`
+
+For more information about this error, try `rustc --explain E0432`.
+warning: `mp_engine_qcommon` (lib) generated 42 warnings
+error: could not compile `mp_engine_qcommon` (lib) due to 1 previous error; 42 warnings emitted
