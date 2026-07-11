@@ -14,6 +14,7 @@ use mp_qshared::common::mp::gentity::{NUM_BSETS, NUM_TIDS};
 use mp_qshared::common::mp::qcommon::parms::parms_t;
 use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
+use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::shared::error_parm::errorParm_t;
@@ -45,6 +46,17 @@ use mp_engine_qcommon::vm::{arm_game_slot, VM_Call};
 use mp_engine_botlib::BotLib;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_icarus::Icarus;
+use mp_engine_icarus::game_interface::{
+    icarus_associate_ent, icarus_free_ent, icarus_init, icarus_init_ent, icarus_is_initialized,
+    icarus_is_running, icarus_maintain_task_manager, icarus_register_script, icarus_run_script,
+    icarus_shutdown, icarus_valid_ent,
+};
+use mp_engine_icarus::q3_interface::{
+    q3_set_var, q3_task_id_complete, q3_task_id_pending, q3_task_id_set,
+};
+use mp_engine_icarus::q3_registers::{
+    q3_get_float_variable, q3_get_string_variable, q3_get_vector_variable, q3_variable_declared,
+};
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::roff::RoffSystem;
@@ -626,6 +638,23 @@ unsafe fn vmf(args: *mut c_int, n: isize) -> f32 {
     f32::from_bits(*args.offset(n) as u32)
 }
 
+/// Checked `(taskID_t)args[2]` conversion for the three `G_ICARUS_TASKID*` arms.
+///
+/// Raven casts the arg word to `taskID_t` unchecked (`sv_game.cpp:786`/`:808`/
+/// `:813`) — UB for an out-of-range word; ported as a porting-rules §19 checked
+/// conversion. The ICARUS callees guard `< TID_CHAN_VOICE || >= NUM_TIDS` and
+/// no-op / return `qfalse` (`Q3_Interface.cpp:116-118`/`:169-171`), so `None`
+/// here reproduces that guarded outcome.
+/// Source: `oracle/codemp/server/sv_game.cpp:786`
+#[inline]
+fn task_id_from_word(word: c_int) -> Option<taskID_t> {
+    if word < taskID_t::TID_CHAN_VOICE as c_int || word >= taskID_t::NUM_TIDS as c_int {
+        return None;
+    }
+    // SAFETY: `word` is now in `0..NUM_TIDS` — a valid `#[repr(i32)]` discriminant.
+    Some(unsafe { core::mem::transmute::<c_int, taskID_t>(word) })
+}
+
 /// Raven `SV_GameSystemCalls` — the inbound syscall dispatcher the game VM
 /// calls through `VMA`/`VMF`.
 ///
@@ -1170,96 +1199,101 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_ICARUS_RUNSCRIPT as c_int {
-            return icarus.RunScript(
+            return icarus_run_script(
+                icarus,
                 host,
                 ConvertedEntity(common, sv, vma(common, args, 1) as *mut sharedEntity_t),
                 core::ffi::CStr::from_ptr(vma(common, args, 2) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
-            );
+            ) as c_int;
         } else if trap == G::G_ICARUS_REGISTERSCRIPT as c_int {
-            return icarus.RegisterScript(
+            return icarus_register_script(
+                icarus,
                 host,
                 core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
-                core::mem::transmute(*args.offset(2)),
-            );
+                *args.offset(2) != 0,
+            ) as c_int;
         } else if trap == G::G_ICARUS_INIT as c_int {
-            icarus.Init(host);
+            icarus_init(icarus, host);
             return 0;
         } else if trap == G::G_ICARUS_VALIDENT as c_int {
-            return icarus.ValidEnt(
+            return icarus_valid_ent(
+                icarus,
+                host,
+                ConvertedEntity(common, sv, vma(common, args, 1) as *mut sharedEntity_t),
+            ) as c_int;
+        } else if trap == G::G_ICARUS_ISINITIALIZED as c_int {
+            return icarus_is_initialized(icarus, host, *args.offset(1)) as c_int;
+        } else if trap == G::G_ICARUS_MAINTAINTASKMANAGER as c_int {
+            return icarus_maintain_task_manager(icarus, host, *args.offset(1)) as c_int;
+        } else if trap == G::G_ICARUS_ISRUNNING as c_int {
+            return icarus_is_running(icarus, host, *args.offset(1)) as c_int;
+        } else if trap == G::G_ICARUS_TASKIDPENDING as c_int {
+            return match task_id_from_word(*args.offset(2)) {
+                Some(task_type) => q3_task_id_pending(
+                    icarus,
+                    host,
+                    vma(common, args, 1) as *mut sharedEntity_t,
+                    task_type,
+                ) as c_int,
+                None => 0,
+            };
+        } else if trap == G::G_ICARUS_INITENT as c_int {
+            icarus_init_ent(
+                icarus,
                 host,
                 ConvertedEntity(common, sv, vma(common, args, 1) as *mut sharedEntity_t),
             );
-        } else if trap == G::G_ICARUS_ISINITIALIZED as c_int {
-            let ent_id = *args.offset(1) as usize;
-            if icarus.sequencers[ent_id].is_none() || icarus.task_managers[ent_id].is_none() {
-                return 0;
-            }
-            return 1;
-        } else if trap == G::G_ICARUS_MAINTAINTASKMANAGER as c_int {
-            let ent_id = *args.offset(1) as usize;
-            if let Some(tm) = icarus.task_managers[ent_id] {
-                icarus.update_task_manager(host, tm);
-                return 1;
-            }
-            return 0;
-        } else if trap == G::G_ICARUS_ISRUNNING as c_int {
-            let ent_id = *args.offset(1) as usize;
-            match icarus.task_managers[ent_id] {
-                Some(tm) if icarus.is_running(tm) => return 1,
-                _ => return 0,
-            }
-        } else if trap == G::G_ICARUS_TASKIDPENDING as c_int {
-            return icarus.Q3_TaskIDPending(
-                vma(common, args, 1) as *mut sharedEntity_t,
-                core::mem::transmute(*args.offset(2)),
-            );
-        } else if trap == G::G_ICARUS_INITENT as c_int {
-            icarus.InitEnt(ConvertedEntity(
-                common,
-                sv,
-                vma(common, args, 1) as *mut sharedEntity_t,
-            ));
             return 0;
         } else if trap == G::G_ICARUS_FREEENT as c_int {
-            icarus.FreeEnt(ConvertedEntity(
-                common,
-                sv,
-                vma(common, args, 1) as *mut sharedEntity_t,
-            ));
+            icarus_free_ent(
+                icarus,
+                host,
+                ConvertedEntity(common, sv, vma(common, args, 1) as *mut sharedEntity_t),
+            );
             return 0;
         } else if trap == G::G_ICARUS_ASSOCIATEENT as c_int {
-            icarus.AssociateEnt(ConvertedEntity(
-                common,
-                sv,
-                vma(common, args, 1) as *mut sharedEntity_t,
-            ));
+            icarus_associate_ent(
+                icarus,
+                host,
+                ConvertedEntity(common, sv, vma(common, args, 1) as *mut sharedEntity_t),
+            );
             return 0;
         } else if trap == G::G_ICARUS_SHUTDOWN as c_int {
-            icarus.Shutdown(host);
+            icarus_shutdown(icarus, host);
             return 0;
         } else if trap == G::G_ICARUS_TASKIDSET as c_int {
             // rww - note that we are passing in the true entity here. This is
             // because we allow modification of certain non-pointer values,
             // which is valid.
-            icarus.Q3_TaskIDSet(
-                vma(common, args, 1) as *mut sharedEntity_t,
-                core::mem::transmute(*args.offset(2)),
-                *args.offset(3),
-            );
+            if let Some(task_type) = task_id_from_word(*args.offset(2)) {
+                q3_task_id_set(
+                    icarus,
+                    host,
+                    vma(common, args, 1) as *mut sharedEntity_t,
+                    task_type,
+                    *args.offset(3),
+                );
+            }
             return 0;
         } else if trap == G::G_ICARUS_TASKIDCOMPLETE as c_int {
             // same as above.
-            icarus.Q3_TaskIDComplete(
-                vma(common, args, 1) as *mut sharedEntity_t,
-                core::mem::transmute(*args.offset(2)),
-            );
+            if let Some(task_type) = task_id_from_word(*args.offset(2)) {
+                q3_task_id_complete(
+                    icarus,
+                    host,
+                    vma(common, args, 1) as *mut sharedEntity_t,
+                    task_type,
+                );
+            }
             return 0;
         } else if trap == G::G_ICARUS_SETVAR as c_int {
-            icarus.Q3_SetVar(
+            q3_set_var(
+                icarus,
+                host,
                 *args.offset(1),
                 *args.offset(2),
                 core::ffi::CStr::from_ptr(vma(common, args, 3) as *const c_char)
@@ -1271,33 +1305,46 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_ICARUS_VARIABLEDECLARED as c_int {
-            return icarus.Q3_VariableDeclared(
+            return q3_variable_declared(
+                icarus,
+                host,
                 core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
             );
         } else if trap == G::G_ICARUS_GETFLOATVARIABLE as c_int {
-            return icarus.Q3_GetFloatVariable(
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
-                vma(common, args, 2) as *mut f32,
-            );
+            let name = core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+                .to_str()
+                .unwrap_or("");
+            match q3_get_float_variable(icarus, host, name) {
+                Some(value) => {
+                    *(vma(common, args, 2) as *mut f32) = value;
+                    return 1;
+                }
+                None => return 0,
+            }
         } else if trap == G::G_ICARUS_GETSTRINGVARIABLE as c_int {
-            let mut rec = vma(common, args, 2) as *const c_char;
-            return icarus.Q3_GetStringVariable(
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
-                &mut rec,
-            );
+            // Raven writes the found `c_str()` pointer into a discarded local
+            // `rec` (`sv_game.cpp:826-829`) — the string never reaches the game
+            // module, so only the found/not-found int is observable.
+            let name = core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+                .to_str()
+                .unwrap_or("");
+            return q3_get_string_variable(icarus, host, name).is_some() as c_int;
         } else if trap == G::G_ICARUS_GETVECTORVARIABLE as c_int {
-            return icarus.Q3_GetVectorVariable(
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
-                vma(common, args, 2) as *mut f32,
-            );
+            let name = core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+                .to_str()
+                .unwrap_or("");
+            match q3_get_vector_variable(icarus, host, name) {
+                Some(value) => {
+                    let out = vma(common, args, 2) as *mut f32;
+                    *out = value[0];
+                    *out.add(1) = value[1];
+                    *out.add(2) = value[2];
+                    return 1;
+                }
+                None => return 0,
+            }
         }
         // rww - BEGIN NPC NAV TRAPS
         else if trap == G::G_NAV_INIT as c_int {
