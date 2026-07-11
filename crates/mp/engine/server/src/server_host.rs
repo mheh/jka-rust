@@ -1,6 +1,7 @@
 //! `Server` (the `Engine.sv` island host) + `ServerGame` (the game dispatcher's
 //! reborrowed host state) + `sv_game_system_calls` (the MP game dispatcher).
 
+use std::io::Write;
 use mp_abi::game::imports::MpGameImport;
 use core::ffi::{c_char, c_int};
 
@@ -200,7 +201,7 @@ pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize {
         // `&mut Common` lands with the ServerGame reborrow wiring.
         let msg = unsafe { core::ffi::CStr::from_ptr(args[1] as *const core::ffi::c_char) };
         print!("{}", msg.to_string_lossy());
-        let _ = std::io::Write::flush(&mut std::io::stdout());
+        let _ = std::io::stdout().flush();
         return 0;
     }
     todo!("Port SV_GameSystemCalls trap {trap} — oracle/codemp/server/sv_game.cpp:458")
@@ -252,7 +253,7 @@ pub extern "C-unwind" fn game_system_calls_shim(
         // `&mut Common` lands with the ctx injection wiring.
         let msg = unsafe { core::ffi::CStr::from_ptr(frame[1] as *const core::ffi::c_char) };
         print!("{}", msg.to_string_lossy());
-        let _ = std::io::Write::flush(&mut std::io::stdout());
+        let _ = std::io::stdout().flush();
         return 0;
     }
     todo!(

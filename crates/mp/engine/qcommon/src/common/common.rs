@@ -9,8 +9,12 @@ use mp_qshared::shared::fileHandle_t;
 use mp_qshared::shared::limits::{
     BIG_INFO_STRING, MAX_INFO_STRING, MAX_STRING_CHARS, MAX_STRING_TOKENS, MAX_TOKEN_CHARS,
 };
+use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::{qboolean, qtrue};
 
+use std::io::Write;
+
+use crate::common::error::com_error as com_error_fn;
 use crate::files_common::{FS_FOpenFileWrite, FS_ForceFlush, FS_Initialized, FS_Write};
 use mp_qshared::shared::q_string::Q_strncpyz;
 
@@ -641,8 +645,8 @@ pub fn com_printf(common: &mut Common, msg: &str) {
             // Q_strcat(rd_buffer, rd_buffersize, msg): append bounded by size.
             let l1 = libc::strlen(common.rd_buffer) as c_int;
             if l1 >= common.rd_buffersize {
-                crate::common::com_error(
-                    mp_qshared::shared::error_parm::errorParm_t::ERR_FATAL,
+                com_error_fn(
+                    errorParm_t::ERR_FATAL,
                     "Q_strcat: already overflowed".to_string(),
                 );
             }
@@ -669,7 +673,7 @@ pub fn com_printf(common: &mut Common, msg: &str) {
 
     // echo to dedicated console and early console (Sys_Print → stdout).
     print!("{msg}");
-    let _ = std::io::Write::flush(&mut std::io::stdout());
+    let _ = std::io::stdout().flush();
 
     // logfile
     unsafe {
