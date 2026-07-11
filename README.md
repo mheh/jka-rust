@@ -22,7 +22,7 @@ the exact symbols the engines load. See
 crate graph and [`docs/porting-rules.md`](docs/porting-rules.md) for how code
 is ported.
 
-## Status (2026-07-08)
+## Status (2026-07-11)
 
 - **Type port: complete** (Waves 0–7, both trees). Every ABI-crossing struct
   carries `size_of`/`offset_of!` static-asserts — a green build is the layout
@@ -31,27 +31,38 @@ is ported.
   compiles green with zero `todo!()` stubs and zero open `TODO: Port` markers;
   all `vmMain` dispatch arms are wired. The built cdylib exports
   `dllEntry`/`vmMain`/`GetModuleAPI`.
-- **CI**: every push to `master` runs a full-workspace compile gate, then
-  builds `jampgame` for Windows/Linux × release/debug and publishes the zips to
-  the rolling [`latest` release](../../releases/tag/latest) under the exact
-  filenames the engine loads (`jampgamex86_64.dll`, `jampgamex86_64.so`, …).
-  32-bit lanes are allowed failures pending an ILP32 layout-assert pass.
-- **Not yet verified**: compiling green is not parity. The next phase is the
-  referee swap — oracle differential tests (single-threaded, replay-based)
-  become the ground truth, followed by the safe-state migration that retires
-  the transcription's raw-pointer scaffolding.
-- Remaining port surface is tracked in
-  [`docs/audits/marker-inventory-2026-07-08.md`](docs/audits/marker-inventory-2026-07-08.md),
-  [`docs/audits/2026-07-07-marker-triage.md`](docs/audits/2026-07-07-marker-triage.md) (open-work
-  enumeration), [`docs/audits/const-sweep-2026-07-08.md`](docs/audits/const-sweep-2026-07-08.md),
-  [`docs/audits/gatesweep-2026-07-08.md`](docs/audits/gatesweep-2026-07-08.md), and
-  [`docs/audits/per-file-oracle-audit.md`](docs/audits/per-file-oracle-audit.md); architectural
-  decisions live in [`docs/decisions.md`](docs/decisions.md).
+- **MP dedicated-server engine: transcription complete, closure in flight.**
+  The full `jampDed` link set (2,481 functions) is ported or being closed:
+  seven C++ subsystems (ICARUS, ghoul2-server, RMG/terrain, NPC nav, StringEd,
+  ROFF, headless model registry) are golden-verified against unmodified oracle
+  TUs; the C track (qcommon/server/botlib) is transcribed and integrated, with
+  `botlib` fully closed (compiles green, zero stubs, zero forward-declarations)
+  and `qcommon`/`server` carrying an honest, machine-audited list of remaining
+  unported functions being ported in dependency order. The platform layer
+  (`Sys_*`/console/sockets) is implemented natively in Rust behind the
+  `EngineHost` seam rather than transcribed, and the client draw surface is
+  out of the dedicated scope by ruling.
+- **CI**: pushes to `skeleton` and `master` run a compile+test gate
+  (temporarily scoped to the `jampgame` lane while the engine closure is in
+  flight); `master` pushes additionally build `jampgame` for Windows/Linux ×
+  release/debug and publish the zips to the rolling
+  [`latest` release](../../releases/tag/latest) under the exact filenames the
+  engine loads (`jampgamex86_64.dll`, `jampgamex86_64.so`, …). 32-bit lanes
+  are allowed failures pending the queued ILP32 layout-assert pass.
+- **Not yet verified**: compiling green is not parity. After the engine
+  closure lands workspace-green: the referee swap — oracle differential tests
+  (single-threaded, replay-based) become the ground truth — followed by the
+  safe-state migration that retires the transcription's raw-pointer
+  scaffolding.
+- Remaining port surface is machine-audited against the link-set manifest
+  (`tools/closure-prototype/out/engine/engine-port-order.tsv`); older audits
+  live under [`docs/audits/`](docs/audits/); architectural decisions live in
+  [`docs/decisions.md`](docs/decisions.md).
 
 ## Ship targets
 
 - **MP** (`jamp` engine): 3 loadable modules — `jampgame`, `cgame`, `ui`.
 - **SP** (`jasp` engine): `jagame` only (SP cgame/ui are statically linked into
   the engine).
-- Eventually the engines themselves; the renderer is deferred by decision
-  (DEC ledger).
+- **The MP dedicated server engine (`jampDed` equivalent) — in progress** (see
+  Status); client engine and renderer are deferred by decision (DEC ledger).
