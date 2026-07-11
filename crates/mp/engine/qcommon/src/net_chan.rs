@@ -347,19 +347,20 @@ pub fn Netchan_Init(
         // PORT-NOTE(cvar-globals): see the file-level note — `->integer`
         // reads collapse the not-yet-landed cvar registry to plain `i32`
         // fields, following `common.rs`'s existing `cl_shownet` precedent.
-        let showpackets_cvar = Cvar_Get(common, cm, rm, host, "showpackets", "0", CVAR_TEMP);
+        let showpackets_cvar = Cvar_Get(common, cm, rm, host, c"showpackets".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
         common.showpackets = (*showpackets_cvar).integer;
 
-        let showdrop_cvar = Cvar_Get(common, cm, rm, host, "showdrop", "0", CVAR_TEMP);
+        let showdrop_cvar = Cvar_Get(common, cm, rm, host, c"showdrop".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
         common.showdrop = (*showdrop_cvar).integer;
 
+        let qport_val = std::ffi::CString::new(format!("{port}")).unwrap();
         let qport_cvar = Cvar_Get(
             common,
             cm,
             rm,
             host,
-            "net_qport",
-            &format!("{port}"),
+            c"net_qport".as_ptr(),
+            qport_val.as_ptr(),
             CVAR_INIT,
         );
         common.net_qport = (*qport_cvar).integer;
@@ -369,8 +370,8 @@ pub fn Netchan_Init(
             cm,
             rm,
             host,
-            "net_killdroppedfragments",
-            "0",
+            c"net_killdroppedfragments".as_ptr(),
+            c"0".as_ptr(),
             CVAR_TEMP,
         );
         common.net_killdroppedfragments = (*killdropped_cvar).integer;

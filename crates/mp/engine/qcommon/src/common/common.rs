@@ -7,7 +7,7 @@ use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::cvar::cvar_t;
 use mp_qshared::shared::fileHandle_t;
 use mp_qshared::shared::limits::{
-    BIG_INFO_STRING, MAX_STRING_CHARS, MAX_STRING_TOKENS, MAX_TOKEN_CHARS,
+    BIG_INFO_STRING, MAX_INFO_STRING, MAX_STRING_CHARS, MAX_STRING_TOKENS, MAX_TOKEN_CHARS,
 };
 use mp_qshared::shared::qboolean;
 
@@ -19,6 +19,7 @@ use super::journal::Journal;
 use super::qrand::QRand;
 use super::sys_event_queue::SysEventQueue;
 use crate::cmd::cmd_consts::MAX_CMD_BUFFER;
+use crate::cvar::cvar_consts::{FILE_HASH_SIZE, MAX_CVARS};
 use crate::common::common_consts::{MAX_CONSOLE_LINES, MAX_PUSHED_EVENTS};
 use crate::files::file_handle_data_t::fileHandleData_t;
 use crate::files::files_consts::MAX_SEARCH_PATHS;
@@ -281,17 +282,44 @@ pub struct Common {
     /// registered-command linked list.
     ///
     /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:11`
-    pub cmd_functions: *mut crate::cmd_pc::cmd_function_t,
+    pub cmd_functions: *mut crate::cmd::cmd_function_t::cmd_function_t,
 
     // ---- `cvar.cpp` ----
     /// Raven `cvar_vars` — head of the registered-cvar linked list.
     ///
     /// Source: `oracle/codemp/qcommon/cvar.cpp:6`
     pub cvar_vars: *mut cvar_t,
+    /// Raven `cvar_cheats` — cached `sv_cheats` cvar (set by `Cvar_Init`).
+    ///
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:7`
+    pub cvar_cheats: *mut cvar_t,
     /// Raven `cvar_modifiedFlags`.
     ///
     /// Source: `oracle/codemp/qcommon/cvar.cpp:8`
     pub cvar_modifiedFlags: c_int,
+    /// Raven `cvar_indexes[MAX_CVARS]` — the static cvar storage pool.
+    ///
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:11`
+    pub cvar_indexes: [cvar_t; MAX_CVARS],
+    /// Raven `cvar_numIndexes` — count of used `cvar_indexes` slots.
+    ///
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:12`
+    pub cvar_numIndexes: c_int,
+    /// Raven `static cvar_t *hashTable[FILE_HASH_SIZE]` — cvar-name hash chains.
+    ///
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:15`
+    pub cvar_hashTable: [*mut cvar_t; FILE_HASH_SIZE],
+    /// Raven `Cvar_FreeString`'s file-static `lastMemPool`/`memPoolSize` — the
+    /// last `Cvar_Defrag` pool; strings inside it are not individually freed.
+    ///
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:20-21`
+    pub cvar_lastMemPool: *mut c_char,
+    pub cvar_memPoolSize: c_int,
+    /// Raven `Cvar_InfoString`'s `static char info[MAX_INFO_STRING]` return
+    /// buffer (fork-3 return-buffer static → owning host field).
+    ///
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:812`
+    pub cvar_info_string: [c_char; MAX_INFO_STRING],
     /// Raven `Cvar_InfoString_Big`'s `static char info[BIG_INFO_STRING]`
     /// return buffer (fork-3 return-buffer static → owning host field).
     ///

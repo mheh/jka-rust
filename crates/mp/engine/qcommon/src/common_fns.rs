@@ -1810,26 +1810,26 @@ pub fn Com_Init(
             }
 
             if !common.com_developer.is_null() && (*common.com_developer).integer != 0 {
-                Cmd_AddCommand(common, cm, rm, host, "error", Com_Error_f_cmd as *const ());
-                Cmd_AddCommand(common, cm, rm, host, "crash", Com_Crash_f_cmd as *const ());
+                Cmd_AddCommand(common, cm, rm, host, c"error".as_ptr(), Com_Error_f_cmd as *const ());
+                Cmd_AddCommand(common, cm, rm, host, c"crash".as_ptr(), Com_Crash_f_cmd as *const ());
                 Cmd_AddCommand(
                     common,
                     cm,
                     rm,
                     host,
-                    "freeze",
+                    c"freeze".as_ptr(),
                     Com_Freeze_f_cmd as *const (),
                 );
             }
         }
-        unsafe { Cmd_AddCommand(common, cm, rm, host, "quit", Com_Quit_f_cmd as *const ()) };
+        unsafe { Cmd_AddCommand(common, cm, rm, host, c"quit".as_ptr(), Com_Quit_f_cmd as *const ()) };
         unsafe {
             Cmd_AddCommand(
                 common,
                 cm,
                 rm,
                 host,
-                "changeVectors",
+                c"changeVectors".as_ptr(),
                 crate::msg::MSG_ReportChangeVectors_f as *const (),
             )
         };
@@ -1839,7 +1839,7 @@ pub fn Com_Init(
                 cm,
                 rm,
                 host,
-                "writeconfig",
+                c"writeconfig".as_ptr(),
                 Com_WriteConfig_f_cmd as *const (),
             )
         };

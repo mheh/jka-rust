@@ -4,13 +4,16 @@
 //!
 //! Source: `oracle/codemp/qcommon/cmd_pc.cpp`
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, CStr};
 
 use mp_host_interface::engine_host::EngineHost;
 
+use crate::cmd::cmd_function_t::cmd_function_t;
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use crate::common_fns::Com_Filter;
+use crate::qcommon::xcommand_t::xcommand_t;
+use crate::z_memman_pc::{CopyString, S_Malloc, Z_Free};
 
 // PORT-NOTE(rm-types): `RenderModels`/`Server` are state-receiver types pinned
 // by the engine-fork-discovery preamble's receiver order; neither has landed
@@ -30,14 +33,73 @@ use crate::common::com_printf;
 use crate::cvar_fns::Cvar_Command;
 use mp_qshared::shared::q_string::Q_stricmp;
 
-// PORT-NOTE(cmd_function_t): `cmd_function_t` (linked-list node: `next`,
-// `name`, `function`) has no rosetta row — `Common`'s command-registry field
-// (`cmd_functions`) isn't landed yet either. Referenced verbatim per the
-// no-stub rule; both escalated as missing symbols.
-pub(crate) struct cmd_function_t {
-    next: *mut cmd_function_t,
-    name: *const c_char,
-    function: Option<extern "C" fn()>,
+/// `Cmd_AddCommand`.
+///
+/// Source: `oracle/codemp/qcommon/cmd_pc.cpp:18-39`
+pub fn Cmd_AddCommand(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    cmd_name: *const c_char,
+    function: *const (),
+) {
+    unsafe {
+        // fail if the command already exists
+        let mut cmd: *mut cmd_function_t = common.cmd_functions;
+        while !cmd.is_null() {
+            if libc::strcmp(cmd_name, (*cmd).name) == 0 {
+                // allow completion-only commands to be silently doubled
+                if !function.is_null() {
+                    let name = CStr::from_ptr(cmd_name).to_string_lossy();
+                    com_printf(common, &format!("Cmd_AddCommand: {name} already defined\n"));
+                }
+                return;
+            }
+            cmd = (*cmd).next;
+        }
+
+        // use a small malloc to avoid zone fragmentation
+        let cmd = S_Malloc(
+            common,
+            cm,
+            rm,
+            host,
+            core::mem::size_of::<cmd_function_t>() as c_int,
+        ) as *mut cmd_function_t;
+        (*cmd).name = CopyString(common, cm, rm, host, cmd_name);
+        (*cmd).function = core::mem::transmute::<*const (), Option<xcommand_t>>(function);
+        (*cmd).next = common.cmd_functions;
+        common.cmd_functions = cmd;
+    }
+}
+
+/// `Cmd_RemoveCommand`.
+///
+/// Source: `oracle/codemp/qcommon/cmd_pc.cpp:46-67`
+pub fn Cmd_RemoveCommand(common: &mut Common, cmd_name: *const c_char) {
+    // Raw double-pointer walk (as `Cmd_ExecuteString`): `&mut …` is cast to a
+    // raw `*mut *mut` immediately so no borrow of `common` outlives the
+    // `Z_Free(common, …)` calls in the removal branch.
+    let mut back: *mut *mut cmd_function_t = &mut common.cmd_functions as *mut _;
+    loop {
+        unsafe {
+            let cmd = *back;
+            if cmd.is_null() {
+                // command wasn't active
+                return;
+            }
+            if libc::strcmp(cmd_name, (*cmd).name) == 0 {
+                *back = (*cmd).next;
+                if !(*cmd).name.is_null() {
+                    Z_Free(common, (*cmd).name as *mut ());
+                }
+                Z_Free(common, cmd as *mut ());
+                return;
+            }
+            back = &mut (*cmd).next as *mut _;
+        }
+    }
 }
 
 /// `Cmd_CommandCompletion`.

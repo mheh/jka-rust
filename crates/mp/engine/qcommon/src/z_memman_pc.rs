@@ -588,8 +588,8 @@ pub fn Com_ShutdownZoneMemory(common: &mut Common) {
     //	Com_Printf("Shutting down zone memory .....\n");
 
     unsafe {
-        Cmd_RemoveCommand(common, "zone_stats");
-        Cmd_RemoveCommand(common, "zone_details");
+        Cmd_RemoveCommand(common, c"zone_stats".as_ptr());
+        Cmd_RemoveCommand(common, c"zone_details".as_ptr());
     }
 
     if common.TheZone.Stats.iCount != 0 {
@@ -630,18 +630,18 @@ pub fn Com_InitZoneMemory(
     //	com_validateZone = Cvar_Get("com_validateZone", "1", 0);
     //#else
     unsafe {
-        common.com_validateZone = Cvar_Get(common, cm, rm, host, "com_validateZone", "0", 0);
+        common.com_validateZone = Cvar_Get(common, cm, rm, host, c"com_validateZone".as_ptr(), c"0".as_ptr(), 0);
     }
     //#endif
 
     unsafe {
-        Cmd_AddCommand(common, cm, rm, host, "zone_stats", Z_Stats_f as *const ());
+        Cmd_AddCommand(common, cm, rm, host, c"zone_stats".as_ptr(), Z_Stats_f as *const ());
         Cmd_AddCommand(
             common,
             cm,
             rm,
             host,
-            "zone_details",
+            c"zone_details".as_ptr(),
             Z_Details_f as *const (),
         );
     }
