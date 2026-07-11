@@ -362,6 +362,10 @@ impl EngineHost for MockHost {
 
     fn sys_show_console(&mut self, _level: i32, _quit_on_close: qboolean) {}
 
+    fn is_lan_address(&mut self, adr: &netadr_t) -> bool {
+        PlatformHost::is_lan_address(self, adr)
+    }
+
     fn vm_call(&mut self, vm: VmSlot, callnum: i32, args: &[isize]) -> isize {
         self.vm_calls.push((vm, callnum, args.to_vec()));
         self.vm_call_return
@@ -668,13 +672,16 @@ mod tests {
         assert_eq!(msg.cursize, 3);
         assert_eq!(&buf[..3], &[1, 2, 3]);
 
-        // is_lan_address: loopback rule.
-        assert!(host.is_lan_address(&netadr_t {
-            r#type: netadrtype_t::NA_LOOPBACK,
-            ip: [0; 4],
-            ipx: [0; 10],
-            port: 0,
-        }));
+        // is_lan_address: loopback rule (qualified — both host traits carry it).
+        assert!(PlatformHost::is_lan_address(
+            &mut host,
+            &netadr_t {
+                r#type: netadrtype_t::NA_LOOPBACK,
+                ip: [0; 4],
+                ipx: [0; 10],
+                port: 0,
+            }
+        ));
     }
 
     #[test]

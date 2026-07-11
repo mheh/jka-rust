@@ -356,7 +356,7 @@ pub fn SV_Status_f(common: &mut Common, sv: &mut Server, host: &mut dyn EngineHo
     mp_engine_qcommon::common::common::com_printf(
         common,
         &format!("map: {}\n", unsafe {
-            core::ffi::CStr::from_ptr((*common.sv_mapname).string.as_ptr()).to_string_lossy()
+            core::ffi::CStr::from_ptr((*common.sv_mapname).string).to_string_lossy()
         }),
     );
 

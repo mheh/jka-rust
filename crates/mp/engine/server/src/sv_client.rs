@@ -799,14 +799,12 @@ pub fn SV_DirectConnect(
                             from,
                             "print\nReconnect rejected : too soon\n".to_string(),
                         );
+                        let adr = mp_engine_qcommon::net_chan::NET_AdrToString(common, from);
                         mp_engine_qcommon::common::common::com_printf(
                             common,
                             &format!(
                                 "{}:reconnect rejected : too soon\n",
-                                core::ffi::CStr::from_ptr(
-                                    mp_engine_qcommon::net_chan::NET_AdrToString(common, from)
-                                )
-                                .to_string_lossy()
+                                core::ffi::CStr::from_ptr(adr).to_string_lossy()
                             ),
                         );
                         return;
@@ -850,17 +848,15 @@ pub fn SV_DirectConnect(
             );
 
             let ping = sv.svs.time - sv.svs.challenges[i].pingTime;
-            mp_engine_qcommon::common::common::com_printf(
+            let conn_msg = mp_engine_qcommon::stringed::SE_GetString2(
                 common,
-                &mp_engine_qcommon::stringed::SE_GetString2(
-                    common,
-                    host,
-                    "MP_SVGAME",
-                    "CLIENT_CONN_WITH_PING",
-                )
-                .replace("%i", &i.to_string())
-                .replacen("%i", &ping.to_string(), 1),
-            );
+                host,
+                "MP_SVGAME",
+                "CLIENT_CONN_WITH_PING",
+            )
+            .replace("%i", &i.to_string())
+            .replacen("%i", &ping.to_string(), 1);
+            mp_engine_qcommon::common::common::com_printf(common, &conn_msg);
             sv.svs.challenges[i].connected = qtrue;
 
             // never reject a LAN client based on ping
@@ -868,30 +864,26 @@ pub fn SV_DirectConnect(
                 let min_ping = (*common.sv_minPing).value;
                 if min_ping != 0.0 && (ping as f32) < min_ping {
                     // don't let them keep trying until they get a big delay
+                    let high_ping_msg = mp_engine_qcommon::stringed::SE_GetString2(
+                        common,
+                        host,
+                        "MP_SVGAME",
+                        "SERVER_FOR_HIGH_PING",
+                    );
                     mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                         common,
                         netsrc_t::NS_SERVER,
                         from,
-                        format!(
-                            "print\n{}\n",
-                            mp_engine_qcommon::stringed::SE_GetString2(
-                                common,
-                                host,
-                                "MP_SVGAME",
-                                "SERVER_FOR_HIGH_PING"
-                            )
-                        ),
+                        format!("print\n{}\n", high_ping_msg),
                     );
-                    mp_engine_qcommon::common::common::com_printf(
+                    let rejected_msg = mp_engine_qcommon::stringed::SE_GetString2(
                         common,
-                        &mp_engine_qcommon::stringed::SE_GetString2(
-                            common,
-                            host,
-                            "MP_SVGAME",
-                            "CLIENT_REJECTED_LOW_PING",
-                        )
-                        .replace("%i", &i.to_string()),
-                    );
+                        host,
+                        "MP_SVGAME",
+                        "CLIENT_REJECTED_LOW_PING",
+                    )
+                    .replace("%i", &i.to_string());
+                    mp_engine_qcommon::common::common::com_printf(common, &rejected_msg);
                     // reset the address otherwise their ping will keep increasing
                     // with each connect message and they'd eventually be able to connect
                     sv.svs.challenges[i].adr.port = 0;
@@ -899,30 +891,26 @@ pub fn SV_DirectConnect(
                 }
                 let max_ping = (*common.sv_maxPing).value;
                 if max_ping != 0.0 && (ping as f32) > max_ping {
+                    let low_ping_msg = mp_engine_qcommon::stringed::SE_GetString2(
+                        common,
+                        host,
+                        "MP_SVGAME",
+                        "SERVER_FOR_LOW_PING",
+                    );
                     mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                         common,
                         netsrc_t::NS_SERVER,
                         from,
-                        format!(
-                            "print\n{}\n",
-                            mp_engine_qcommon::stringed::SE_GetString2(
-                                common,
-                                host,
-                                "MP_SVGAME",
-                                "SERVER_FOR_LOW_PING"
-                            )
-                        ),
+                        format!("print\n{}\n", low_ping_msg),
                     );
-                    mp_engine_qcommon::common::common::com_printf(
+                    let rejected_msg = mp_engine_qcommon::stringed::SE_GetString2(
                         common,
-                        &mp_engine_qcommon::stringed::SE_GetString2(
-                            common,
-                            host,
-                            "MP_SVGAME",
-                            "CLIENT_REJECTED_HIGH_PING",
-                        )
-                        .replace("%i", &i.to_string()),
-                    );
+                        host,
+                        "MP_SVGAME",
+                        "CLIENT_REJECTED_HIGH_PING",
+                    )
+                    .replace("%i", &i.to_string());
+                    mp_engine_qcommon::common::common::com_printf(common, &rejected_msg);
                     return;
                 }
             }
@@ -957,14 +945,12 @@ pub fn SV_DirectConnect(
                     && ((*cl).netchan.qport == qport
                         || from.port == (*cl).netchan.remoteAddress.port)
                 {
+                    let adr = mp_engine_qcommon::net_chan::NET_AdrToString(common, from);
                     mp_engine_qcommon::common::common::com_printf(
                         common,
                         &format!(
                             "{}:reconnect\n",
-                            core::ffi::CStr::from_ptr(
-                                mp_engine_qcommon::net_chan::NET_AdrToString(common, from)
-                            )
-                            .to_string_lossy()
+                            core::ffi::CStr::from_ptr(adr).to_string_lossy()
                         ),
                     );
                     reconnect_cl = cl;
@@ -996,9 +982,7 @@ pub fn SV_DirectConnect(
                     Info_ValueForKey(userinfo.as_mut_ptr(), c"password".as_ptr() as *mut c_char);
                 let start_index: c_int = if strcmp(
                     password,
-                    (*common.sv_privatePassword)
-                        .string
-                        .as_ptr(),
+                    (*common.sv_privatePassword).string,
                 ) == 0
                 {
                     0
@@ -1321,16 +1305,13 @@ pub fn SV_SendClientGameState(
         mp_engine_qcommon::msg::MSG_WriteLong(common, &mut msg, sv.sv.checksumFeed);
 
         // rwwRMG - send info for the terrain
-        // PORT-NOTE(rmg-presence-check, ruling 12): Raven tests the raw
-        // `TheRandomMissionManager` pointer; the ported `RmManager` is a
-        // direct `Engine` field (ruling 12) rather than an optional pointer,
-        // so its own `Option`-shaped land-scape presence stands in for the
-        // null check (escalated: `RmManager`'s exact shape is not yet
-        // landed).
-        if rmg.has_mission() {
+        // Raven's `if (TheRandomMissionManager)` NULL test → the `cm.land_scape`
+        // Option presence (RmManager is a non-optional Engine field per ruling
+        // 12; the landscape lives on the CollisionWorld per rmg-terrain RMG-D1).
+        if let Some(land) = cm.land_scape.as_ref() {
             let mut heightmap = [0u8; 15000];
-            let height_src = rmg.GetLandScape().GetHeightMap();
-            let real_area = rmg.GetLandScape().GetRealArea();
+            let height_src = land.height_map().as_ptr();
+            let real_area = land.real_area();
             let total_out_h = mp_engine_qcommon::zlib_seam::deflate_sync_flush(
                 height_src,
                 real_area,
@@ -1345,7 +1326,7 @@ pub fn SV_SendClientGameState(
                 total_out_h as c_int,
             );
 
-            let flatten_src = rmg.GetLandScape().GetFlattenMap();
+            let flatten_src = land.flatten_map().as_ptr();
             let total_out_f = mp_engine_qcommon::zlib_seam::deflate_sync_flush(
                 flatten_src,
                 real_area,
@@ -1364,7 +1345,7 @@ pub fn SV_SendClientGameState(
             mp_engine_qcommon::msg::MSG_WriteLong(
                 common,
                 &mut msg,
-                rmg.GetLandScape().get_rand_seed(),
+                land.get_rand_seed() as c_int,
             );
 
             SV_WriteRMGAutomapSymbols(common, rmg, host, &mut msg);

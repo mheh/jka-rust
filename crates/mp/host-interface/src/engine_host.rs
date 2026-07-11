@@ -9,6 +9,7 @@
 
 use core::ffi::{c_char, c_void};
 
+use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::error_parm::errorParm_t;
@@ -236,6 +237,14 @@ pub trait EngineHost {
     /// the `Com_Init`/`Com_Frame` call sites 1:1).
     /// Source: `oracle/codemp/win32/win_syscon.cpp:396`
     fn sys_show_console(&mut self, level: i32, quit_on_close: qboolean);
+
+    /// Raven `Sys_IsLANAddress( netadr_t adr )` — whether `adr` is loopback,
+    /// IPX, or on a local LAN interface (LAN clients bypass the rate limiter).
+    /// The server net path (`SV_DirectConnect`, `SV_RateMsec`) reaches this
+    /// Sys_* platform test through the host seam; `adr` is borrowed (the callee
+    /// only reads the struct). Same surface as `PlatformHost::is_lan_address`.
+    /// Source: `oracle/codemp/unix/unix_net.c:240`
+    fn is_lan_address(&mut self, adr: &netadr_t) -> bool;
 }
 
 /// Forwarding impl so a `&mut dyn EngineHost` (the consumer-stored form, ruling
@@ -364,5 +373,9 @@ impl<T: EngineHost + ?Sized> EngineHost for &mut T {
 
     fn sys_show_console(&mut self, level: i32, quit_on_close: qboolean) {
         (**self).sys_show_console(level, quit_on_close)
+    }
+
+    fn is_lan_address(&mut self, adr: &netadr_t) -> bool {
+        (**self).is_lan_address(adr)
     }
 }

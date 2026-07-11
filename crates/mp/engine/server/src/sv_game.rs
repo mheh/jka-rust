@@ -11,6 +11,7 @@
 use core::ffi::{c_char, c_int, c_void};
 
 use mp_qshared::common::mp::gentity::{NUM_BSETS, NUM_TIDS};
+use mp_qshared::common::mp::qcommon::failedEdge_t;
 use mp_qshared::common::mp::qcommon::parms::parms_t;
 use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
@@ -681,7 +682,7 @@ pub fn SV_GameSystemCalls(
     nav: &mut Navigator,
     g2: &mut Ghoul2System,
     roff: &mut RoffSystem,
-    host: &mut dyn EngineHost,
+    mut host: &mut dyn EngineHost,
     args: *mut c_int,
 ) -> c_int {
 
@@ -1166,22 +1167,28 @@ pub fn SV_GameSystemCalls(
                 return qfalse as c_int;
             }
         } else if trap == G::G_ROFF_CLEAN as c_int {
-            return roff.Clean(host, qfalse) as c_int;
+            return roff.clean(false) as c_int;
         } else if trap == G::G_ROFF_UPDATE_ENTITIES as c_int {
-            roff.UpdateEntities(host, qfalse);
+            roff.update_entities(false, &mut host);
             return 0;
         } else if trap == G::G_ROFF_CACHE as c_int {
-            return roff.Cache(host, vma(common, args, 1) as *mut c_char, qfalse);
+            return roff.cache(
+                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+                    .to_str()
+                    .unwrap_or(""),
+                false,
+                &mut host,
+            );
         } else if trap == G::G_ROFF_PLAY as c_int {
-            return roff.Play(
-                host,
+            return roff.play(
                 *args.offset(1),
                 *args.offset(2),
-                core::mem::transmute(*args.offset(3)),
-                qfalse,
-            );
+                *args.offset(3) != 0,
+                false,
+                &mut host,
+            ) as c_int;
         } else if trap == G::G_ROFF_PURGE_ENT as c_int {
-            return roff.PurgeEnt(host, *args.offset(1), qfalse);
+            return roff.purge_ent(*args.offset(1), false, &mut host) as c_int;
         } else if trap == G::G_TRUEMALLOC as c_int {
             mp_engine_qcommon::vm_fns::VM_Shifted_Alloc(
                 common,
@@ -1348,161 +1355,163 @@ pub fn SV_GameSystemCalls(
         }
         // rww - BEGIN NPC NAV TRAPS
         else if trap == G::G_NAV_INIT as c_int {
-            nav.Init(host);
+            nav.init();
             return 0;
         } else if trap == G::G_NAV_FREE as c_int {
-            nav.Free(host);
+            nav.free();
             return 0;
         } else if trap == G::G_NAV_LOAD as c_int {
-            return nav.Load(
-                host,
+            return nav.load(
+                &mut host,
                 core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
                 *args.offset(2),
-            );
+            ) as c_int;
         } else if trap == G::G_NAV_SAVE as c_int {
-            return nav.Save(
-                host,
+            return nav.save(
+                &mut host,
                 core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
                 *args.offset(2),
-            );
+            ) as c_int;
         } else if trap == G::G_NAV_ADDRAWPOINT as c_int {
-            return nav.AddRawPoint(
-                host,
-                vma(common, args, 1) as *mut f32,
+            return nav.add_raw_point(
+                &mut host,
+                *(vma(common, args, 1) as *const vec3_t),
                 *args.offset(2),
                 *args.offset(3),
             );
         } else if trap == G::G_NAV_CALCULATEPATHS as c_int {
-            nav.CalculatePaths(host, core::mem::transmute(*args.offset(1)));
+            nav.calculate_paths(&mut host, core::mem::transmute(*args.offset(1)));
             return 0;
         } else if trap == G::G_NAV_HARDCONNECT as c_int {
-            nav.HardConnect(host, *args.offset(1), *args.offset(2));
+            nav.hard_connect(&mut host, *args.offset(1), *args.offset(2));
             return 0;
         } else if trap == G::G_NAV_SHOWNODES as c_int {
-            nav.ShowNodes(host);
+            nav.show_nodes(&mut host);
             return 0;
         } else if trap == G::G_NAV_SHOWEDGES as c_int {
-            nav.ShowEdges(host);
+            nav.show_edges(&mut host);
             return 0;
         } else if trap == G::G_NAV_SHOWPATH as c_int {
-            nav.ShowPath(host, *args.offset(1), *args.offset(2));
+            nav.show_path(&mut host, *args.offset(1), *args.offset(2));
             return 0;
         } else if trap == G::G_NAV_GETNEARESTNODE as c_int {
-            return nav.GetNearestNode(
-                host,
+            return nav.get_nearest_node(
+                &mut host,
                 vma(common, args, 1) as *mut sharedEntity_t,
                 *args.offset(2),
                 *args.offset(3),
                 *args.offset(4),
             );
         } else if trap == G::G_NAV_GETBESTNODE as c_int {
-            return nav.GetBestNode(host, *args.offset(1), *args.offset(2), *args.offset(3));
+            return nav.get_best_node(*args.offset(1), *args.offset(2), *args.offset(3));
         } else if trap == G::G_NAV_GETNODEPOSITION as c_int {
-            return nav.GetNodePosition(host, *args.offset(1), vma(common, args, 2) as *mut f32);
+            return nav.get_node_position(
+                *args.offset(1),
+                &mut *(vma(common, args, 2) as *mut vec3_t),
+            );
         } else if trap == G::G_NAV_GETNODENUMEDGES as c_int {
-            return nav.GetNodeNumEdges(host, *args.offset(1));
+            return nav.get_node_num_edges(*args.offset(1));
         } else if trap == G::G_NAV_GETNODEEDGE as c_int {
-            return nav.GetNodeEdge(host, *args.offset(1), *args.offset(2));
+            return nav.get_node_edge(*args.offset(1), *args.offset(2));
         } else if trap == G::G_NAV_GETNUMNODES as c_int {
-            return nav.GetNumNodes();
+            return nav.get_num_nodes();
         } else if trap == G::G_NAV_CONNECTED as c_int {
-            return nav.Connected(host, *args.offset(1), *args.offset(2));
+            return nav.connected(*args.offset(1), *args.offset(2)) as c_int;
         } else if trap == G::G_NAV_GETPATHCOST as c_int {
-            return nav.GetPathCost(host, *args.offset(1), *args.offset(2));
+            return nav.get_path_cost(*args.offset(1), *args.offset(2)) as c_int;
         } else if trap == G::G_NAV_GETEDGECOST as c_int {
-            return nav.GetEdgeCost(host, *args.offset(1), *args.offset(2));
+            return nav.get_edge_cost(&mut host, *args.offset(1), *args.offset(2)) as c_int;
         } else if trap == G::G_NAV_GETPROJECTEDNODE as c_int {
-            return nav.GetProjectedNode(host, vma(common, args, 1) as *mut f32, *args.offset(2));
+            return nav.get_projected_node(
+                *(vma(common, args, 1) as *const vec3_t),
+                *args.offset(2),
+            );
         } else if trap == G::G_NAV_CHECKFAILEDNODES as c_int {
-            nav.CheckFailedNodes(host, vma(common, args, 1) as *mut sharedEntity_t);
+            nav.check_failed_nodes(&mut host, vma(common, args, 1) as *mut sharedEntity_t);
             return 0;
         } else if trap == G::G_NAV_ADDFAILEDNODE as c_int {
-            nav.AddFailedNode(
-                host,
+            nav.add_failed_node(
+                &mut host,
                 vma(common, args, 1) as *mut sharedEntity_t,
                 *args.offset(2),
             );
             return 0;
         } else if trap == G::G_NAV_NODEFAILED as c_int {
-            return nav.NodeFailed(
-                host,
+            return nav.node_failed(
                 vma(common, args, 1) as *mut sharedEntity_t,
                 *args.offset(2),
             );
         } else if trap == G::G_NAV_NODESARENEIGHBORS as c_int {
-            return nav.NodesAreNeighbors(host, *args.offset(1), *args.offset(2));
+            return nav.nodes_are_neighbors(*args.offset(1), *args.offset(2));
         } else if trap == G::G_NAV_CLEARFAILEDEDGE as c_int {
-            nav.ClearFailedEdge(vma(common, args, 1)
-                as *mut mp_qshared::common::mp::qcommon::failed_edge::failedEdge_t);
+            nav.clear_failed_edge(&mut *(vma(common, args, 1) as *mut failedEdge_t));
             return 0;
         } else if trap == G::G_NAV_CLEARALLFAILEDEDGES as c_int {
-            nav.ClearAllFailedEdges(host);
+            nav.clear_all_failed_edges();
             return 0;
         } else if trap == G::G_NAV_EDGEFAILED as c_int {
-            return nav.EdgeFailed(host, *args.offset(1), *args.offset(2));
+            return nav.edge_failed(*args.offset(1), *args.offset(2));
         } else if trap == G::G_NAV_ADDFAILEDEDGE as c_int {
-            nav.AddFailedEdge(host, *args.offset(1), *args.offset(2), *args.offset(3));
+            nav.add_failed_edge(&mut host, *args.offset(1), *args.offset(2), *args.offset(3));
             return 0;
         } else if trap == G::G_NAV_CHECKFAILEDEDGE as c_int {
-            return nav.CheckFailedEdge(
-                host,
-                vma(common, args, 1)
-                    as *mut mp_qshared::common::mp::qcommon::failed_edge::failedEdge_t,
+            return nav.check_failed_edge(
+                &mut host,
+                &mut *(vma(common, args, 1) as *mut failedEdge_t),
             );
         } else if trap == G::G_NAV_CHECKALLFAILEDEDGES as c_int {
-            nav.CheckAllFailedEdges(host);
+            nav.check_all_failed_edges(&mut host);
             return 0;
         } else if trap == G::G_NAV_ROUTEBLOCKED as c_int {
-            return nav.RouteBlocked(
-                host,
+            return nav.route_blocked(
                 *args.offset(1),
                 *args.offset(2),
                 *args.offset(3),
                 *args.offset(4),
             );
         } else if trap == G::G_NAV_GETBESTNODEALTROUTE as c_int {
-            return nav.GetBestNodeAltRoute(
-                host,
+            return nav.get_best_node_alt_route(
+                &mut host,
                 *args.offset(1),
                 *args.offset(2),
-                vma(common, args, 3) as *mut c_int,
+                &mut *(vma(common, args, 3) as *mut c_int),
                 *args.offset(4),
             );
         } else if trap == G::G_NAV_GETBESTNODEALT2 as c_int {
-            return nav.GetBestNodeAltRoute2(
-                host,
+            return nav.get_best_node_alt_route2(
+                &mut host,
                 *args.offset(1),
                 *args.offset(2),
                 *args.offset(3),
             );
         } else if trap == G::G_NAV_GETBESTPATHBETWEENENTS as c_int {
-            return nav.GetBestPathBetweenEnts(
-                host,
+            return nav.get_best_path_between_ents(
+                &mut host,
                 vma(common, args, 1) as *mut sharedEntity_t,
                 vma(common, args, 2) as *mut sharedEntity_t,
                 *args.offset(3),
             );
         } else if trap == G::G_NAV_GETNODERADIUS as c_int {
-            return nav.GetNodeRadius(host, *args.offset(1));
+            return nav.get_node_radius(*args.offset(1));
         } else if trap == G::G_NAV_CHECKBLOCKEDEDGES as c_int {
-            nav.CheckBlockedEdges(host);
+            nav.check_blocked_edges(&mut host);
             return 0;
         } else if trap == G::G_NAV_CLEARCHECKEDNODES as c_int {
-            nav.ClearCheckedNodes(host);
+            nav.clear_checked_nodes();
             return 0;
         } else if trap == G::G_NAV_CHECKEDNODE as c_int {
-            return nav.CheckedNode(host, *args.offset(1), *args.offset(2));
+            return nav.checked_node(*args.offset(1), *args.offset(2)) as c_int;
         } else if trap == G::G_NAV_SETCHECKEDNODE as c_int {
-            nav.SetCheckedNode(host, *args.offset(1), *args.offset(2), *args.offset(3));
+            nav.set_checked_node(*args.offset(1), *args.offset(2), *args.offset(3) as u8);
             // Raven bug (sv_game.cpp:928-933, nav-D3/ruling NAV-Q3): falls
             // through into FLAGALLNODES/GETPATHSCALCULATED without a return —
             // transcribed faithfully, not fixed.
         } else if trap == G::G_NAV_FLAGALLNODES as c_int {
-            nav.FlagAllNodes(host, *args.offset(1));
+            nav.flag_all_nodes(*args.offset(1));
         } else if trap == G::G_NAV_GETPATHSCALCULATED as c_int {
             return nav.pathsCalculated as c_int;
         } else if trap == G::G_NAV_SETPATHSCALCULATED as c_int {
