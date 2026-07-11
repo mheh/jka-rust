@@ -53,74 +53,14 @@ use crate::cm_load::RenderModels;
 // Source: `mp_engine_client::client::client_connection_t::MAX_OSPATH` (value 1024)
 const MAX_OSPATH: usize = 1024;
 
-// Callees not yet landed in this crate (stub-free order violated by
-// concurrent parallel porting — referenced by exact Raven name per the
-// cm_load.rs `extern "Rust"` precedent); every one is reported in
-// missing_symbols.
-extern "Rust" {
-    /// `Com_Error` — ruling 1's `longjmp`-as-panic landing pad. The packet
-    /// at `qcommon__1592_CM_DeleteCachedMap.md` resolves its full signature
-    /// as `(common, cm, sv, rm, rmg, host, code, fmt, ...)`; none of this
-    /// file's callers carry `sv`/`rmg`/`cm`/`rm`/`host`, so this narrower
-    /// `(common, code, msg)` shape is called instead (shape_mismatches).
-    fn Com_Error(common: &mut Common, code: c_int, msg: &str);
-    /// `Com_Printf` — narrowed to `(common, msg)` for the same reason as
-    /// `Com_Error` above (its full resolved shape also carries `cm`/`rm`/
-    /// `host`).
-    fn Com_Printf(common: &mut Common, msg: &str);
-    /// `Com_StartupVariable` — resolved signature per
-    /// `qcommon__1763_Com_StartupVariable.md`.
-    fn Com_StartupVariable(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        r#match: *const c_char,
-    );
-    /// `FS_Write` — resolved signature per `qcommon__1592_CM_DeleteCachedMap.md`.
-    fn FS_Write(common: &mut Common, buffer: *const (), len: c_int, h: fileHandle_t) -> c_int;
-    /// `FS_FOpenFileWrite` — resolved signature per
-    /// `qcommon__1592_CM_DeleteCachedMap.md`.
-    fn FS_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fileHandle_t;
-    /// `FS_FCloseFile` — resolved signature per
-    /// `qcommon__1592_CM_DeleteCachedMap.md`.
-    fn FS_FCloseFile(common: &mut Common, f: fileHandle_t);
-    /// `FS_ReadFile` — resolved signature per
-    /// `qcommon__1592_CM_DeleteCachedMap.md`.
-    fn FS_ReadFile(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        qpath: *const c_char,
-        buffer: *mut *mut (),
-    ) -> c_int;
-    /// `FS_SetRestrictions` — resolved signature per
-    /// `qcommon__1592_CM_DeleteCachedMap.md`.
-    fn FS_SetRestrictions(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-    );
-    /// `FS_Startup` — resolved signature per
-    /// `qcommon__1592_CM_DeleteCachedMap.md`.
-    fn FS_Startup(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        gameName: *const c_char,
-    );
-    // PORT-NOTE(q_math-reach): `Com_sprintf`/`Q_strncpyz` (q_shared/q_math
-    // primitives) are ported in `mp_game`, a tier above this crate's
-    // dependency graph (cm_load.rs precedent) — not reachable here.
-    // Referenced by their exact Raven names; reported as missing symbols.
-    // Narrowed to a pre-formatted `&str` (Rust has no safe C-variadic fn
-    // definitions) matching the net_chan.rs `Com_sprintf` call precedent.
-    fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: &str);
-    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
-}
+// Sweep: extern forward-declares eliminated. Real in-crate callees imported
+// (`com_error`, `com_printf`, `Com_StartupVariable`); q_shared helpers
+// (`Com_sprintf`, `Q_strncpyz`) and this file's own not-yet-ported `FS_*`
+// (files_common.cpp subject) referenced at their canonical homes — the `FS_*`
+// left bare at their home; reported.
+use crate::common::{com_error, com_printf};
+use crate::common_fns::Com_StartupVariable;
+use mp_qshared::shared::q_string::{Com_sprintf, Q_strncpyz};
 
 /// Raven `FS_Initialized`.
 ///
@@ -296,11 +236,7 @@ pub fn FS_CheckInit(common: &mut Common) {
     // PORT-NOTE(state): `initialized` referenced verbatim (see module doc).
     if common.initialized == qfalse {
         unsafe {
-            Com_Error(
-                common,
-                errorParm_t::ERR_FATAL as c_int,
-                "Filesystem call made without initialization\n",
-            );
+            com_error(errorParm_t::ERR_FATAL, "Filesystem call made without initialization\n".to_string());
         }
     }
 }
@@ -327,25 +263,17 @@ pub fn FS_WriteFile(common: &mut Common, qpath: *const c_char, buffer: *const ()
     unsafe {
         // PORT-NOTE(state): `fs_searchpaths` referenced verbatim (see module doc).
         if common.fs_searchpaths.is_null() {
-            Com_Error(
-                common,
-                errorParm_t::ERR_FATAL as c_int,
-                "Filesystem call made without initialization\n",
-            );
+            com_error(errorParm_t::ERR_FATAL, "Filesystem call made without initialization\n".to_string());
         }
 
         if qpath.is_null() || buffer.is_null() {
-            Com_Error(
-                common,
-                errorParm_t::ERR_FATAL as c_int,
-                "FS_WriteFile: NULL parameter",
-            );
+            com_error(errorParm_t::ERR_FATAL, "FS_WriteFile: NULL parameter".to_string());
         }
 
         let f = FS_FOpenFileWrite(common, qpath);
         if f == 0 {
             let qpath_str = core::ffi::CStr::from_ptr(qpath).to_string_lossy();
-            Com_Printf(common, &format!("Failed to open {}\n", qpath_str));
+            com_printf(common, &format!("Failed to open {}\n", qpath_str));
             return;
         }
 
@@ -402,11 +330,7 @@ pub fn FS_InitFilesystem(
             // PORT-NOTE(shape): Com_Error's full resolved signature
             // (qcommon__1592_CM_DeleteCachedMap.md) also carries `sv`/`rmg`;
             // not available here (shape_mismatches).
-            Com_Error(
-                common,
-                errorParm_t::ERR_FATAL as c_int,
-                "Couldn't load mpdefault.cfg",
-            );
+            com_error(errorParm_t::ERR_FATAL, "Couldn't load mpdefault.cfg".to_string());
         }
 
         // PORT-NOTE(state): `lastValidBase`/`lastValidGame`/`fs_basepath`/

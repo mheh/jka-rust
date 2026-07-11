@@ -100,6 +100,13 @@ pub struct CollisionWorld {
     /// Source: `oracle/codemp/qcommon/cm_local.h:221`
     pub c_pointcontents: c_int,
 
+    /// Raven `cm_polylib.cpp` winding debug counters reached through the
+    /// clipmap receiver (`c_removed` free-side, `c_active_windings`).
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:12-15`
+    pub c_removed: c_int,
+    pub c_active_windings: c_int,
+
     /// Raven `byte *cmod_base` — the current lump's read cursor into the
     /// loaded BSP file image.
     ///

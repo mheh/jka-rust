@@ -47,149 +47,18 @@ use crate::cmd_pc::Server;
 #[allow(dead_code)]
 struct Client;
 
-// PORT-NOTE(unlanded-callees): the callees below have no ported body reachable
-// from this crate yet — cvar.cpp (`Cvar_Get`/`Cvar_Set`/`Cvar_Init`/
-// `Cvar_WriteVariables`), cmd.cpp (`Cmd_AddCommand`), the low-level `FS_*`
-// bodies, `MSG_Init`, `SE_Init`, `Z_Free`, and this file's own
-// `Com_Milliseconds`/`Com_GetRealEvent`/`Com_Shutdown`. The `SV_*`/`CL_*`/
-// `Key_WriteBindings` set lives in `mp_engine_server`/the client build, which
-// already depend on this crate — a `use` would cycle. Following the
-// crate-wide escalation convention (`net_chan.rs`/`cmd_common.rs`/
-// `z_memman_pc.rs`/`vm_fns.rs` each forward-declare their own unlanded
-// callees), they are declared here by their exact call-site shape and left
-// for the finisher to link to the real bodies.
-extern "Rust" {
-    fn Cvar_Get(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        var_name: *mut c_char,
-        var_value: *mut c_char,
-        flags: c_int,
-    ) -> *mut cvar_t;
-    fn Cvar_Set(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        var_name: *mut c_char,
-        value: *mut c_char,
-    );
-    fn Cvar_Init(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-    );
-    fn Cvar_WriteVariables(common: &mut Common, f: mp_qshared::shared::fileHandle_t);
-    fn Cmd_AddCommand(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        cmd_name: &str,
-        function: *const (),
-    );
-    fn Com_Milliseconds(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-    ) -> c_int;
-    fn Com_GetRealEvent(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-    ) -> sysEvent_t;
-    fn Com_Shutdown(common: &mut Common, cm: &mut CollisionWorld, rmg: &mut RmManager);
-    fn FS_Shutdown(common: &mut Common, closemfp: qboolean);
-    fn SE_Init(common: &mut Common, host: &mut dyn EngineHost);
-    fn MSG_Init(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        buf: *mut msg_t,
-        data: *mut u8,
-        length: c_int,
-    );
-    fn FS_FOpenFileWrite(common: &mut Common, filename: &str) -> mp_qshared::shared::fileHandle_t;
-    fn FS_FCloseFile(common: &mut Common, f: mp_qshared::shared::fileHandle_t);
-    fn FS_Read(
-        common: &mut Common,
-        buffer: *mut (),
-        len: c_int,
-        f: mp_qshared::shared::fileHandle_t,
-    ) -> c_int;
-    fn FS_FOpenFileRead(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        filename: &str,
-        f: *mut mp_qshared::shared::fileHandle_t,
-        unique_file: qboolean,
-    ) -> c_int;
-    fn Z_Free(common: &mut Common, pv_address: *mut c_void);
-    // server (mp_engine_server — importing would cycle)
-    fn SV_Init(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        sv: &mut Server,
-        bot: &mut BotLib,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-    );
-    fn SV_Shutdown(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        sv: &mut Server,
-        rm: &mut RenderModels,
-        rmg: &mut RmManager,
-        host: &mut dyn EngineHost,
-        finalmsg: &str,
-    );
-    fn SV_Frame(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        sv: &mut Server,
-        rm: &mut RenderModels,
-        rmg: &mut RmManager,
-        g2: &mut Ghoul2System,
-        host: &mut dyn EngineHost,
-        msec: c_int,
-    );
-    fn SV_PacketEvent(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        sv: &mut Server,
-        rm: &mut RenderModels,
-        rmg: &mut RmManager,
-        host: &mut dyn EngineHost,
-        from: netadr_t,
-        buf: *mut msg_t,
-    );
-    // client (mp_engine_client / null build)
-    fn CL_Init(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        cl: &mut Client,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-    );
-    fn CL_Shutdown();
-    fn CL_StartHunkUsers();
-    fn CL_Frame(msec: c_int);
-    fn CL_PacketEvent(from: netadr_t, msg: *mut msg_t);
-    fn CL_KeyEvent(key: c_int, down: bool, time: c_int);
-    fn CL_CharEvent(key: c_int);
-    fn CL_MouseEvent(dx: c_int, dy: c_int, time: c_int);
-    fn CL_JoystickEvent(axis: c_int, value: c_int, time: c_int);
-    fn CL_InitKeyCommands();
-    fn Key_WriteBindings(f: mp_qshared::shared::fileHandle_t);
-}
+// Sweep: extern forward-declares eliminated. Genuinely-unported callees
+// referenced at their canonical future homes (cvar.cpp/cmd/files/zone/stringed
+// /msg). This file's own not-yet-ported `Com_*` (common.cpp subject) collapse
+// to their home; the `SV_*`/`CL_*`/`Key_*` engine entrypoints sit across the
+// server/client cycle seam with no importable home — left bare; reported.
+use crate::cmd::Cmd_AddCommand;
+use crate::common_fns::{Com_GetRealEvent, Com_Milliseconds, Com_Shutdown};
+use crate::cvar_fns::{Cvar_Get, Cvar_Init, Cvar_Set, Cvar_WriteVariables};
+use crate::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_FOpenFileWrite, FS_Read, FS_Shutdown};
+use crate::msg::MSG_Init;
+use crate::stringed::api::SE_Init;
+use crate::z_memman_pc::Z_Free;
 
 /// `Com_BeginRedirect`.
 ///

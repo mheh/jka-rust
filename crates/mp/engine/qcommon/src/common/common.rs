@@ -307,6 +307,16 @@ pub struct Common {
     pub c_brush_traces: c_int,
     pub c_patch_traces: c_int,
 
+    // ---- winding (`cm_polylib.cpp`) debug counters ----
+    /// Raven `c_active_windings` / `c_peak_windings` / `c_winding_allocs` /
+    /// `c_winding_points` — file-static winding accounting.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:12-15`
+    pub c_active_windings: c_int,
+    pub c_peak_windings: c_int,
+    pub c_winding_allocs: c_int,
+    pub c_winding_points: c_int,
+
     // ---- filesystem (`files_common.cpp` / `files_pc.cpp`) ----
     /// Raven `fs_searchpaths` / `fsh[MAX_FILE_HANDLES]`.
     ///

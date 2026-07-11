@@ -25,22 +25,8 @@ use crate::vm_fns::VM_ValueToSymbol;
 #[allow(dead_code)]
 use crate::cm_load::RenderModels;
 
-// PORT-NOTE(unlanded-callee): `Hunk_Alloc` (z_memman_pc.cpp) has a real body
-// in `z_memman_pc.rs`, but that file's own `RenderModels` placeholder is a
-// distinct type from this file's — the real fn isn't callable here (same gap
-// as vm_x86.rs/vm_fns.rs). Forward-declared in the established `extern
-// "Rust"` shape, narrowed to this file's own `RenderModels`.
-// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:791-793`
-extern "Rust" {
-    fn Hunk_Alloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        size: c_int,
-        preference: ha_pref,
-    ) -> *mut ();
-}
+// Real in-crate callee imported (sweep: extern forward-declares eliminated).
+use crate::z_memman_pc::Hunk_Alloc;
 
 /// Raven `loadWord` — file-static helper, non-`_BIG_ENDIAN_PPC_` macro arm
 /// (`*((int *)addr)`; oracle's PPC `__lwbrx` arm doesn't apply to our target).

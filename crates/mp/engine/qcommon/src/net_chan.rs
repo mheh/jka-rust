@@ -76,50 +76,14 @@ const CVAR_TEMP: c_int = 0x0000_0100;
 /// Source: `oracle/codemp/qcommon/net_chan.cpp:45-48`
 const NETSRC_STRING: [&str; 2] = ["client", "server"];
 
-// PORT-NOTE(q_math-reach): `Com_sprintf` (q_shared/q_math primitive) is
-// ported in `mp_game`, a tier above this crate's dependency graph — not
-// reachable here. Narrowed to a pre-formatted `&str` (Rust has no safe
-// C-variadic fn definitions), matching the cm_shader.rs/files_common.rs
-// `Com_sprintf` precedent exactly.
-extern "Rust" {
-    fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: &str);
-}
-
-// PORT-NOTE(cvar-get-reach): `Cvar_Get` (cvar.cpp) has no ported body reachable
-// from this file (`crate::cvar` is still an empty stub module) — same
-// unlanded-callee gap as `vm_fns.rs`/`cm_load.rs`'s own local `Cvar_Get`
-// forward-declares. Narrowed to this file's own call-site shape (`&str`
-// name/value); escalated as a missing symbol for the finisher.
-extern "Rust" {
-    fn Cvar_Get(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        var_name: &str,
-        var_value: &str,
-        flags: c_int,
-    ) -> *mut cvar_t;
-}
-
-// PORT-NOTE(sys-string-to-adr-reach): `Sys_StringToAdr` is `PlatformHost::
-// string_to_adr` (host-interface/src/platform_host.rs), a distinct trait from
-// this file's `&mut dyn EngineHost` receiver — no `PlatformHost` receiver is
-// threaded through `NET_StringToAdr`'s pinned signature. Forward-declared
-// here by its exact Raven name/call-site shape (no-stub rule); escalated as a
-// shape mismatch for the finisher to wire a `PlatformHost` receiver through.
-extern "Rust" {
-    fn Sys_StringToAdr(s: &str, a: &mut netadr_t) -> bool;
-}
-
-// PORT-NOTE(sys-send-packet-reach): `Sys_SendPacket` is `PlatformHost::
-// send_packet` (host-interface/src/platform_host.rs), but `NET_SendPacket`'s
-// pinned signature threads no `PlatformHost` receiver — forward-declared here
-// by its exact Raven call-site shape (no-stub rule), mirroring the
-// `Sys_StringToAdr` precedent above; escalated for a `PlatformHost` wiring.
-extern "Rust" {
-    fn Sys_SendPacket(length: c_int, data: *const (), to: netadr_t);
-}
+// Genuinely-unported callees referenced at their canonical future homes
+// (sweep: extern forward-declares eliminated). `Com_sprintf` is a q_shared.c
+// helper whose qshared home is not yet landed; `Cvar_Get` awaits cvar.cpp.
+// `Sys_StringToAdr`/`Sys_SendPacket` are `PlatformHost` methods with no
+// free-fn home threaded through `NET_*`'s pinned signatures — left bare and
+// reported (cycle/shape seam).
+use crate::cvar_fns::Cvar_Get;
+use mp_qshared::shared::q_string::Com_sprintf;
 
 /// Raven `NET_AdrToString`.
 ///

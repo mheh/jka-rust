@@ -42,58 +42,15 @@ pub(crate) struct Ghoul2System;
 #[allow(dead_code)]
 use crate::cmd_pc::Server;
 
-// PORT-NOTE(unlanded-callees): `Com_Printf` (com_common.cpp), `Cvar_Get`
-// (cvar.cpp), `Cmd_AddCommand`/`Cmd_RemoveCommand` (cmd_pc.cpp),
-// `SV_ShutdownGameProgs` (sv_game.cpp), `R_HunkClearCrap` (tr_init.cpp) have
-// no ported body reachable from this file — same unlanded-callee gap as
-// `vm_fns.rs`'s own local forward-declares for the same symbols. Narrowed to
-// this file's own call-site shapes; escalated as missing symbols for the
-// finisher.
-extern "Rust" {
-    fn Com_Printf(common: &mut Common, msg: &str);
-    fn Cvar_Get(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        var_name: &str,
-        var_value: &str,
-        flags: c_int,
-    ) -> *mut mp_qshared::shared::cvar::cvar_t;
-    fn Cmd_AddCommand(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        cmd_name: &str,
-        function: *const (),
-    );
-    fn Cmd_RemoveCommand(common: &mut Common, cmd_name: &str);
-    fn SV_ShutdownGameProgs(common: &mut Common, sv: &mut Server);
-    fn R_HunkClearCrap(rm: &mut RenderModels, host: &mut dyn EngineHost);
-}
-
-// PORT-NOTE(zmemman-body-gap): `Z_Malloc`/`Z_Free`/`Z_Validate` are
-// `z_memman_pc.cpp`-native functions (this file's own subject) with no
-// transcribed body anywhere in the tree yet — only forward-declared as
-// unlanded callees by other files (`vm_fns.rs`/`vm_x86.rs`/`cm_load.rs`
-// precedent for `Z_Malloc`/`Z_Free`). Declared here in the same shape;
-// escalated as missing symbols (genuine logic port, not mechanical) for the
-// finisher.
-extern "Rust" {
-    fn Z_Malloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        iSize: c_int,
-        eTag: memtag_t,
-        bZeroit: qboolean,
-        iUnusedAlign: c_int,
-    ) -> *mut ();
-    fn Z_Free(common: &mut Common, pvAddress: *mut ());
-    fn Z_Validate(common: &mut Common);
-}
+// Real `Com_Printf` imported (sweep: extern forward-declares eliminated).
+use crate::common::com_printf as Com_Printf;
+// Genuinely-unported callees referenced at their canonical future homes.
+// `Z_Malloc`/`Z_Free`/`Z_Validate` are this file's own subject (z_memman_pc.cpp)
+// with no transcribed body yet — left bare at their home; reported.
+// `SV_ShutdownGameProgs` (sv_game) and `R_HunkClearCrap` (tr_init) live across
+// the server/renderer cycle seam — left bare; reported.
+use crate::cmd::{Cmd_AddCommand, Cmd_RemoveCommand};
+use crate::cvar_fns::Cvar_Get;
 
 /// Raven `ZoneTailFromHeader`.
 ///

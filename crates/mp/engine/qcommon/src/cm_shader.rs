@@ -15,9 +15,7 @@
 //! (`common_fns.rs` precedent); reported as missing symbols/shape mismatches
 //! for the finisher.
 #[allow(dead_code)]
-use crate::cm_load::RenderModels;
-#[allow(dead_code)]
-struct RmManager;
+use crate::cm_load::{RenderModels, RmManager};
 
 use core::ffi::{c_char, c_int};
 
@@ -38,70 +36,18 @@ use crate::common::Common;
 // Source: `oracle/codemp/game/q_shared.h:1163`
 const S_COLOR_YELLOW: &str = "^3";
 
-// PORT-NOTE(q_math-reach): `COM_ParseExt`/`SkipWhitespace`/`SkipBracedSection`/
-// `SkipRestOfLine`/`Q_stricmp`/`Q_strncpyz`/`Com_sprintf` (q_shared/q_math
-// primitives) are ported in `mp_game`, a tier above this crate's dependency
-// graph (cm_load.rs/files_common.rs precedent) — not reachable here.
-// Referenced by their exact Raven names; `Com_sprintf` narrowed to a
-// pre-formatted `&str` (Rust has no safe C-variadic fn definitions) matching
-// the net_chan.rs/files_common.rs `Com_sprintf` call precedent; `Com_Error`
-// narrowed to `(common, code, msg)` matching the files_common.rs precedent
-// (ruling 1: receiverless panic).
-extern "Rust" {
-    fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *mut c_char;
-    fn SkipWhitespace(data: *const c_char, hasNewLines: *mut qboolean) -> *const c_char;
-    fn SkipBracedSection(program: *mut *const c_char);
-    fn SkipRestOfLine(data: *mut *const c_char);
-    fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int;
-    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
-    fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: &str);
-    fn Com_Error(common: &mut Common, code: c_int, msg: &str);
-
-    // `FS_ListFiles`/`FS_ReadFile`/`FS_FreeFile`/`FS_FreeFileList` (files.cpp)
-    // and `Z_Malloc`/`Z_Free`/`Hunk_Alloc` (z_memman_pc.cpp) have no ported
-    // body reachable from this file yet (`crate::files`/`crate::z_memman`
-    // modules exist but don't export these under this crate's current
-    // landing state — vm_fns.rs precedent for the same reachability gap).
-    // Narrowed to each call site's own shape; escalated as missing symbols
-    // for the finisher.
-    fn FS_ListFiles(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        path: &str,
-        extension: &str,
-        numfiles: *mut c_int,
-    ) -> *mut *const c_char;
-    fn FS_ReadFile(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        qpath: &str,
-        buffer: *mut *mut core::ffi::c_void,
-    ) -> c_int;
-    fn FS_FreeFile(common: &mut Common, f: *mut c_char);
-    fn FS_FreeFileList(common: &mut Common, filelist: *mut *const c_char);
-    fn Z_Malloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        iSize: usize,
-        eTag: memtag_t,
-        bZeroit: bool,
-    ) -> *mut ();
-    fn Z_Free(common: &mut Common, pvAddress: *mut c_char);
-    fn Hunk_Alloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        size: usize,
-        preference: &str,
-    ) -> *mut ();
-}
+// Sweep: extern forward-declares eliminated. Real qshared/in-crate callees
+// imported (`Q_stricmp`/`Q_strncpyz`/`Hunk_Alloc`/`com_error`). q_shared
+// parse helpers (`COM_ParseExt`/`Skip*`/`Com_sprintf`), this crate's own
+// unported `FS_*` (files.cpp subject) and `Z_Malloc`/`Z_Free` (z_memman_pc.cpp
+// subject) referenced at their canonical homes; reported.
+use mp_qshared::shared::ha_pref;
+use mp_qshared::shared::q_string::{Q_stricmp, Q_strncpyz};
+use crate::common::com_error;
+use crate::z_memman_pc::Hunk_Alloc;
+use crate::files_common::{FS_FreeFile, FS_FreeFileList, FS_ListFiles, FS_ReadFile};
+use crate::z_memman_pc::{Z_Free, Z_Malloc};
+use mp_qshared::shared::q_string::{Com_sprintf, COM_ParseExt, SkipBracedSection, SkipRestOfLine, SkipWhitespace};
 
 /// Raven `SV_ParseSurfaceParm` — match the next token against `svInfoParms`,
 /// OR/AND-ing the shader's surface/content flags from the matching row.
@@ -289,11 +235,7 @@ pub fn CM_LoadShaderFiles(
         };
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
             unsafe {
-                Com_Error(
-                    common,
-                    errorParm_t::ERR_FATAL as c_int,
-                    &format!("Couldn't load {}", "filename"),
-                )
+                com_error(errorParm_t::ERR_FATAL, format!("Couldn't load {}", "filename"))
             };
         }
         i += 1;
@@ -320,11 +262,7 @@ pub fn CM_LoadShaderFiles(
         };
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
             unsafe {
-                Com_Error(
-                    common,
-                    errorParm_t::ERR_DROP as c_int,
-                    &format!("Couldn't load {}", "filename"),
-                )
+                com_error(errorParm_t::ERR_DROP, format!("Couldn't load {}", "filename"))
             };
         }
         i += 1;
@@ -680,9 +618,7 @@ pub fn CM_GetShaderInfo_ByName(
             cm,
             rm,
             host,
-            core::mem::size_of::<CCMShader>(),
-            "h_high",
-        )
+            core::mem::size_of::<CCMShader>() as c_int, ha_pref::h_high)
     } as *mut CCMShader;
     // Set defaults
     unsafe {

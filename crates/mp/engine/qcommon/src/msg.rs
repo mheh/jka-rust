@@ -16,21 +16,11 @@ use mp_host_interface::engine_host::EngineHost;
 
 use crate::common::Common;
 
-// PORT-NOTE(q_math-reach): `Q_strncpyz` (q_shared primitive) is ported in
-// `mp_game`, a tier above this crate's dependency graph (cm_load.rs/
-// files_common.rs precedent) — not reachable here. Referenced by its exact
-// Raven name.
-extern "Rust" {
-    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
-    // `Com_Error` — ruling 1's `longjmp`-as-panic landing pad, narrowed to
-    // `(common, code, msg)` matching the files_common.rs/cm_shader.rs
-    // precedent (its full resolved shape also carries cm/sv/rm/host).
-    fn Com_Error(common: &mut Common, code: errorParm_t, msg: &str);
-}
-
-extern "C" {
-    fn strlen(s: *const c_char) -> usize;
-}
+// Sweep: extern forward-declares eliminated. Real qshared/in-crate callees
+// imported; `strlen` from libc (rule 3).
+use crate::common::com_error;
+use libc::strlen;
+use mp_qshared::shared::q_string::Q_strncpyz;
 
 // The `sv`/`SV_GentityNum` cross-crate reach (server depends on qcommon) is
 // resolved through the sanctioned host edge `EngineHost::
@@ -152,11 +142,7 @@ pub fn MSG_WriteBits(common: &mut Common, msg: *mut msg_t, mut value: c_int, mut
             return;
         }
         if bits == 0 || bits < -31 || bits > 32 {
-            Com_Error(
-                common,
-                errorParm_t::ERR_DROP,
-                &format!("MSG_WriteBits: bad bits {bits}"),
-            );
+            com_error(errorParm_t::ERR_DROP, format!("MSG_WriteBits: bad bits {bits}"));
         }
         // check for overflows: the oracle only bumps the dead `overflows` counter.
         if bits < 0 {
@@ -178,11 +164,7 @@ pub fn MSG_WriteBits(common: &mut Common, msg: *mut msg_t, mut value: c_int, mut
                 (*msg).cursize += 4;
                 (*msg).bit += 8;
             } else {
-                Com_Error(
-                    common,
-                    errorParm_t::ERR_DROP,
-                    &format!("can't read {bits} bits\n"),
-                );
+                com_error(errorParm_t::ERR_DROP, format!("can't read {bits} bits\n"));
             }
         } else {
             value &= (0xffffffffu32 >> (32 - bits)) as c_int;
@@ -242,11 +224,7 @@ pub fn MSG_ReadBits(common: &mut Common, msg: *mut msg_t, mut bits: c_int) -> c_
                 (*msg).readcount += 4;
                 (*msg).bit += 32;
             } else {
-                Com_Error(
-                    common,
-                    errorParm_t::ERR_DROP,
-                    &format!("can't read {bits} bits\n"),
-                );
+                com_error(errorParm_t::ERR_DROP, format!("can't read {bits} bits\n"));
             }
         } else {
             let mut nbits = 0;
@@ -960,11 +938,7 @@ pub fn MSG_ReadDeltaEntity(
         if !(0..mp_qshared::shared::limits::MAX_GENTITIES as c_int).contains(&number) {
             //TODO: Port Com_Error
             // Source: oracle/codemp/qcommon/msg.cpp:1239 (ruling 1: receiverless panic)
-            Com_Error(
-                common,
-                errorParm_t::ERR_DROP,
-                &format!("Bad delta entity number: {number}"),
-            );
+            com_error(errorParm_t::ERR_DROP, format!("Bad delta entity number: {number}"));
         }
 
         let startBit = (*msg).bit;

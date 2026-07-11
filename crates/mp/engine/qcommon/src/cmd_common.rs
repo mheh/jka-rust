@@ -20,61 +20,18 @@ use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use crate::common_fns::Com_Memcpy;
 
-extern "C" {
-    fn strcat(dest: *mut c_char, src: *const c_char) -> *mut c_char;
-    fn strlen(s: *const c_char) -> usize;
-    fn atoi(s: *const c_char) -> c_int;
-    fn memmove(
-        dest: *mut core::ffi::c_void,
-        src: *const core::ffi::c_void,
-        n: usize,
-    ) -> *mut core::ffi::c_void;
-}
+// Sweep: extern forward-declares eliminated. libc byte helpers (rule 3),
+// real in-crate `Com_Printf`/`Com_Error`, and genuinely-unported callees
+// referenced at their canonical future homes (q_string / cvar_fns / files /
+// cmd). `Com_Printf`'s C-format `%s` sites were already lossy (the decl was
+// non-variadic), so &str parity is preserved.
+use libc::{atoi, memmove, strcat, strlen};
 
-// PORT-NOTE(q_math-reach): `Q_strncpyz`/`COM_DefaultExtension`/`va` (q_shared
-// primitives) and `Cvar_VariableString` are ported only in `mp_game`, a tier
-// above this crate's dependency graph (cm_load.rs/files_common.rs precedent)
-// — not reachable here. `Com_Printf`/`Com_Error`/`FS_ReadFile`/`FS_FreeFile`
-// are not yet landed in this crate under any importable path. Referenced by
-// their exact Raven names, narrowed to this file's call-site shapes (no
-// variadic `...` in safe Rust); each escalated as a missing symbol.
-extern "Rust" {
-    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
-    fn Com_Printf(common: &mut Common, msg: *const c_char);
-    fn Com_Error(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        sv: &mut Server,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        code: errorParm_t,
-        msg: *const c_char,
-    );
-    fn COM_DefaultExtension(path: *mut c_char, maxSize: c_int, extension: *const c_char);
-    fn FS_ReadFile(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        qpath: *const c_char,
-        buffer: *mut *mut (),
-    ) -> c_int;
-    fn FS_FreeFile(common: &mut Common, f: *mut ());
-    fn Cvar_VariableString(common: &mut Common, name: *mut c_char) -> *const c_char;
-    fn va(fmt: *const c_char, arg: *const c_char) -> *mut c_char;
-    // PORT-NOTE(Cmd_AddCommand): not yet landed as a callable body in this
-    // crate (`z_memman_pc.rs`/`vm_fns.rs` precedent — same signature declared
-    // there too); declared here to satisfy `Cmd_Init`'s call sites and
-    // escalated as a missing symbol.
-    fn Cmd_AddCommand(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        cmd_name: *const c_char,
-        function: *const (),
-    );
-}
+use crate::cmd::Cmd_AddCommand;
+use crate::common::{com_error, com_printf};
+use crate::cvar_fns::Cvar_VariableString;
+use crate::files_common::{FS_FreeFile, FS_ReadFile};
+use mp_qshared::shared::q_string::{va, COM_DefaultExtension, Q_strncpyz};
 
 // PORT-NOTE(rm-types): `RenderModels`/`Server` are state-receiver types pinned
 // by the engine-fork-discovery preamble's receiver order; neither has landed
@@ -321,10 +278,7 @@ pub fn Cbuf_AddText(common: &mut Common, text: *const c_char) {
         let l = strlen(text) as c_int;
 
         if common.cmd_text.cursize + l >= common.cmd_text.maxsize {
-            Com_Printf(
-                common,
-                b"Cbuf_AddText: overflow\n\0".as_ptr() as *const c_char,
-            );
+            com_printf(common, "Cbuf_AddText: overflow\n");
             return;
         }
         Com_Memcpy(
@@ -345,10 +299,7 @@ pub fn Cbuf_InsertText(common: &mut Common, text: *const c_char) {
         if len + common.cmd_text.cursize > common.cmd_text.maxsize {
             // PORT-NOTE(Com_Printf): `Com_Printf` is not yet ported in this
             // crate (missing-symbol escalation) — referenced verbatim.
-            Com_Printf(
-                common,
-                b"Cbuf_InsertText overflowed\n\0".as_ptr() as *const c_char,
-            );
+            com_printf(common, "Cbuf_InsertText overflowed\n");
             return;
         }
 
@@ -378,11 +329,11 @@ pub fn Cmd_Echo_f(common: &mut Common) {
         unsafe {
             let arg = core::ffi::CStr::from_ptr(Cmd_Argv(common, i)).to_string_lossy();
             let msg = format!("{} ", arg);
-            Com_Printf(common, msg.as_ptr() as *const c_char);
+            com_printf(common, &msg);
         }
     }
     unsafe {
-        Com_Printf(common, b"\n\0".as_ptr() as *const c_char);
+        com_printf(common, "\n");
     }
 }
 
@@ -400,10 +351,7 @@ pub fn Cmd_Exec_f(
 
     if Cmd_Argc(common) != 2 {
         unsafe {
-            Com_Printf(
-                common,
-                b"exec <filename> : execute a script file\n\0".as_ptr() as *const c_char,
-            );
+            com_printf(common, "exec <filename> : execute a script file\n");
         }
         return;
     }
@@ -434,12 +382,12 @@ pub fn Cmd_Exec_f(
     };
     if f.is_null() {
         unsafe {
-            Com_Printf(common, b"couldn't exec %s\n\0".as_ptr() as *const c_char);
+            com_printf(common, "couldn't exec %s\n");
         }
         return;
     }
     unsafe {
-        Com_Printf(common, b"execing %s\n\0".as_ptr() as *const c_char);
+        com_printf(common, "execing %s\n");
     }
 
     Cbuf_InsertText(common, f as *const c_char);
@@ -455,10 +403,7 @@ pub fn Cmd_Exec_f(
 pub fn Cmd_Vstr_f(common: &mut Common) {
     if Cmd_Argc(common) != 2 {
         unsafe {
-            Com_Printf(
-                common,
-                b"vstr <variablename> : execute a variable command\n\0".as_ptr() as *const c_char,
-            );
+            com_printf(common, "vstr <variablename> : execute a variable command\n");
         }
         return;
     }
@@ -624,15 +569,7 @@ pub fn Cbuf_ExecuteText(
             Cbuf_AddText(common, text);
         }
         _ => unsafe {
-            Com_Error(
-                common,
-                cm,
-                sv,
-                rm,
-                host,
-                errorParm_t::ERR_FATAL,
-                b"Cbuf_ExecuteText: bad exec_when\0".as_ptr() as *const c_char,
-            );
+            com_error(errorParm_t::ERR_FATAL, "Cbuf_ExecuteText: bad exec_when".to_string());
         },
     }
 }

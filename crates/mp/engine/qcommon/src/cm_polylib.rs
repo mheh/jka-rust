@@ -24,6 +24,11 @@
 use core::ffi::{c_char, c_int};
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
+use mp_qshared::shared::q_math::{
+    vec3_origin, CrossProduct, VectorLength, VectorNormalize2, _DotProduct as DotProduct,
+    _VectorAdd as VectorAdd, _VectorCopy as VectorCopy, _VectorMA as VectorMA,
+    _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
+};
 use mp_qshared::shared::{errorParm_t, vec3_t, vec_t};
 
 use crate::cm::cm_polylib_consts::{
@@ -51,9 +56,14 @@ struct RmManager;
 // mismatch for the finisher/rosetta to reconcile.
 use crate::cm::cm_polylib_consts::ON_EPSILON;
 
-extern "C" {
-    fn printf(fmt: *const c_char, ...) -> c_int;
-}
+// Sweep: extern forward-declare eliminated — libc provides `printf` (rule 3,
+// this crate already links libc for fopen-family I/O).
+use libc::printf;
+
+// First-compile wiring (sweep): real in-crate `Com_Memcpy`; `Z_Malloc`/`Z_Free`
+// referenced at their canonical `z_memman_pc` home (genuinely unported; reported).
+use crate::common_fns::Com_Memcpy;
+use crate::z_memman_pc::{Z_Free, Z_Malloc};
 
 /// Raven `pw` — debug-print a winding's points.
 ///
@@ -150,10 +160,7 @@ pub fn WindingBounds(w: *mut winding_t, mut mins: vec3_t, mut maxs: vec3_t) {
 /// PORT-NOTE(signature-shape): `center` is a BY-VALUE `vec3_t` out-param per
 /// the same shape mismatch as `WindingPlane`; flagged for the finisher.
 pub fn WindingCenter(common: &mut Common, w: *mut winding_t, mut center: vec3_t) {
-    // PORT-NOTE(missing-field): `vec3_origin` (`q_shared.h:1179`) has no home
-    // field on `Common` yet; referenced as `common.vec3_origin` per the
-    // preamble's Common-owns-vec3_origin note, reported as a missing symbol.
-    VectorCopy(common.vec3_origin, &mut center);
+    VectorCopy(vec3_origin, &mut center);
     unsafe {
         for i in 0..(*w).numpoints {
             let p = (*w).p[i as usize];
@@ -412,7 +419,7 @@ pub fn BaseWindingForPlane(
 
     // PORT-NOTE(missing-field): `vec3_origin` — see `WindingCenter`'s note.
     let mut vup: vec3_t = [0.0; 3];
-    VectorCopy(common.vec3_origin, &mut vup);
+    VectorCopy(vec3_origin, &mut vup);
     match x {
         0 | 1 => vup[2] = 1.0,
         2 => vup[0] = 1.0,

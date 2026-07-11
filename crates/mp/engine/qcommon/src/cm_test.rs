@@ -33,24 +33,10 @@ use crate::common::Common;
 use crate::common_fns::Com_Memset;
 use mp_qshared::shared::q_math::{_DotProduct, _VectorCopy, _VectorSubtract};
 
-// PORT-NOTE(q_math-reach continued): `BoxOnPlaneSide`/`AngleVectors` have no
-// home reachable from this crate (only ported in `mp_game`, a tier above);
-// forward-declared here in the established `extern "Rust"` shape (vm_fns.rs/
-// cm_load.rs precedent), narrowed to their `mp_game::q_math` signatures;
-// escalated as missing symbols for the finisher.
-extern "Rust" {
-    fn BoxOnPlaneSide(
-        emins: vec3_t,
-        emaxs: vec3_t,
-        p: *mut mp_qshared::shared::collision::cplane_t,
-    ) -> c_int;
-    fn AngleVectors(
-        angles: vec3_t,
-        forward: Option<&mut vec3_t>,
-        right: Option<&mut vec3_t>,
-        up: Option<&mut vec3_t>,
-    );
-}
+// Real q_shared math helper imported (sweep: extern forward-declares
+// eliminated). `BoxOnPlaneSide` is not yet in qshared — referenced at its
+// canonical q_math home; reported.
+use mp_qshared::shared::q_math::{AngleVectors, BoxOnPlaneSide};
 
 /// Raven `byte`.
 type byte = u8;

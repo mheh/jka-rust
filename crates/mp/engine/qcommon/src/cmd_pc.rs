@@ -21,36 +21,14 @@ use crate::common_fns::Com_Filter;
 pub(crate) use crate::cm_load::RenderModels;
 pub(crate) struct Server;
 
-// PORT-NOTE(q_math-reach): `Q_stricmp` (q_shared primitive) is ported only in
-// `mp_game`, a tier above this crate's dependency graph (cm_shader.rs
-// precedent) — not reachable here. `Com_Printf` is not yet landed in this
-// crate under any importable path. Both narrowed to this file's call-site
-// shapes; escalated as missing symbols.
-extern "Rust" {
-    fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int;
-    fn Com_Printf(common: &mut Common, msg: *const c_char);
-    // PORT-NOTE(Cvar_Command): missing symbol — `qcommon::cvar` doesn't expose
-    // this yet under this name/shape; resolution packet
-    // `qcommon__1774_Cvar_Command.md`. Referenced verbatim; escalated as a
-    // missing symbol.
-    fn Cvar_Command(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-    ) -> c_int;
-    // PORT-NOTE(CL_GameCommand/UI_GameCommand/CL_ForwardCommandToServer): live
-    // in `mp_engine_client`'s `null/` stubs (`null_client.rs`), which this
-    // crate cannot depend on without cycling. Referenced verbatim per the
-    // no-stub rule; escalated as missing symbols.
-    fn CL_GameCommand() -> c_int;
-    fn UI_GameCommand() -> c_int;
-    fn CL_ForwardCommandToServer(text: *const c_char);
-    // PORT-NOTE(SV_GameCommand): lives in `mp_engine_server::sv_game`, which
-    // this crate cannot depend on without cycling. Referenced verbatim per
-    // the no-stub rule; escalated as missing symbol.
-    fn SV_GameCommand(common: &mut Common, sv: &mut Server) -> c_int;
-}
+// Sweep: extern forward-declares eliminated. Real qshared/in-crate callees
+// imported; `Cvar_Command` at its canonical cvar_fns home; the client/server
+// dispatch entrypoints (`CL_GameCommand`/`UI_GameCommand`/
+// `CL_ForwardCommandToServer`/`SV_GameCommand`) sit across the engine cycle
+// seam with no importable home — left bare; reported.
+use crate::common::com_printf;
+use crate::cvar_fns::Cvar_Command;
+use mp_qshared::shared::q_string::Q_stricmp;
 
 // PORT-NOTE(cmd_function_t): `cmd_function_t` (linked-list node: `next`,
 // `name`, `function`) has no rosetta row — `Common`'s command-registry field
@@ -107,16 +85,13 @@ pub fn Cmd_List_f(common: &mut Common) {
             // `*const c_char` (no safe C-variadic fn defs) — pre-format the
             // name here, matching the `cmd_common.rs` `Cmd_Echo_f` precedent.
             let name = core::ffi::CStr::from_ptr((*cmd).name).to_string_lossy();
-            Com_Printf(common, format!("{}\n", name).as_ptr() as *const c_char);
+            com_printf(common, &format!("{}\n", name));
             i += 1;
             cmd = (*cmd).next;
         }
     }
     unsafe {
-        Com_Printf(
-            common,
-            format!("{} commands\n", i).as_ptr() as *const c_char,
-        );
+        com_printf(common, &format!("{} commands\n", i));
     }
 }
 

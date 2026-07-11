@@ -17,13 +17,9 @@ use crate::files::unzip_consts::{
     UNZ_PARAMERROR,
 };
 
-extern "C" {
-    // Vendored zlib32 `inflate` (external C library the oracle links via
-    // `#include "../zlib32/zip.h"`, `oracle/codemp/zlib32/zip.h:187`). The
-    // DEFLATE decompressor is the one genuine zlib dependency the minizip
-    // reader pulls in; declared here as the external symbol, not ported.
-    fn inflate(z: *mut z_stream) -> c_int;
-}
+// Sweep: extern forward-declare eliminated. `inflate` is the vendored zlib32
+// DEFLATE decompressor (`oracle/codemp/zlib32`), an unported external C
+// library with no Rust home — referenced by its bare Raven name; reported.
 
 /// Raven `unzlocal_getShort` — reads a little-endian 16-bit value from `fin` into `*pX`.
 ///

@@ -36,35 +36,10 @@ use crate::cm_load::RenderModels;
 #[allow(dead_code)]
 struct RmManager;
 
-// PORT-NOTE(unlanded-callees): the `z_memman_pc.cpp` zone allocator
-// (`Z_Malloc`/`Z_Free`) has no ported body in this crate yet, and the pub
-// `Hunk_Alloc` threads the sibling file's own `RenderModels` placeholder (a
-// distinct type from this file's). Forward-declared here in the established
-// `extern "Rust"` shape (cm_load.rs precedent) so the emitter compiles against
-// this file's placeholders; the finisher swaps these for the real imports once
-// the shared `RenderModels`/`RmManager` state lands (rmg-terrain.md/tr-model.md).
-// Source: `oracle/codemp/qcommon/z_memman_pc.cpp` (Z_Malloc/Z_Free/Hunk_Alloc)
-extern "Rust" {
-    fn Z_Malloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        iSize: c_int,
-        eTag: memtag_t,
-        bZeroit: qboolean,
-        iUnusedAlign: c_int,
-    ) -> *mut ();
-    fn Z_Free(common: &mut Common, pvAddress: *mut ());
-    fn Hunk_Alloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        size: c_int,
-        preference: ha_pref,
-    ) -> *mut ();
-}
+// Real in-crate callee imported (sweep: extern forward-declares eliminated).
+use crate::z_memman_pc::Hunk_Alloc;
+// Genuinely-unported callees referenced at their canonical future homes.
+use crate::z_memman_pc::{Z_Free, Z_Malloc};
 
 /// `callAsmCall`.
 ///

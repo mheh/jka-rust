@@ -100,110 +100,26 @@ pub struct CCMLandScape;
 #[allow(dead_code)]
 pub struct CRMManager;
 
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches whose bodies are not linked
-// into this crate yet — forward-declared with the faithful shape inferred
-// from the Raven call sites (receivers per the packets' RESOLVED CALL
-// SURFACE tables), matching the established `extern "Rust"` forward-declare
-// convention used elsewhere in this crate (`be_aas_move.rs`, `cm_polylib.rs`).
-// PORT-NOTE(callee-signatures): reported in missing_symbols.
-// ---------------------------------------------------------------------
-extern "Rust" {
-    fn CM_ClearLevelPatches(cm: &mut CollisionWorld);
-    fn CM_ShutdownShaderProperties(cm: &mut CollisionWorld);
-    fn Com_BlockChecksum(common: &mut Common, buffer: *const (), length: c_int) -> c_uint;
-    fn CM_GeneratePatchCollide(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        width: c_int,
-        height: c_int,
-        points: *mut vec3_t,
-    ) -> *mut crate::cm::patch_collide_s::patchCollide_s;
-    fn CM_LoadShaderText(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        rmg: &mut RmManager,
-        host: &mut dyn EngineHost,
-        server: qboolean,
-    );
-    fn CM_SetupShaderProperties(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rmg: &mut RmManager,
-        host: &mut dyn EngineHost,
-    );
-    fn CM_FloodAreaConnections(cm: &mut clipMap_t);
-    fn CM_InitTerrain(
-        rmg: &mut RmManager,
-        host: &mut dyn EngineHost,
-        config: *const c_char,
-        checksum: c_int,
-        server: bool,
-    ) -> *mut CCMLandScape;
-    fn Hunk_Alloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        size: usize,
-        h_high: c_int,
-    ) -> *mut ();
-    fn Cvar_Get(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        var_name: *const c_char,
-        var_value: *const c_char,
-        flags: c_int,
-    ) -> *mut cvar_t;
-    fn Com_DPrintf(common: &mut Common, msg: &str);
-    fn FS_FOpenFileRead(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        filename: *const c_char,
-        file: *mut fileHandle_t,
-        uniqueFILE: qboolean,
-    ) -> c_int;
-    fn FS_Read(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_t) -> c_int;
-    fn FS_FCloseFile(common: &mut Common, f: fileHandle_t);
-    fn Z_Malloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        iSize: c_int,
-        eTag: memtag_t,
-        bZeroit: qboolean,
-        iUnusedAlign: c_int,
-    ) -> *mut ();
-    fn Z_Free(common: &mut Common, pvAddress: *mut ());
-    fn Sys_LowPhysicalMemory() -> c_int;
-    // PORT-NOTE(q_math-reach): `Q_strncpyz`/`SetPlaneSignbits` (q_shared/q_math
-    // primitives) are ported in `mp_game`, a tier above this crate's
-    // dependency graph (cm_polylib.rs precedent) — not reachable here.
-    // Referenced by their exact Raven names; reported as missing symbols.
-    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
-    fn SetPlaneSignbits(out: *mut cplane_t);
-    fn PlaneTypeForNormal(normal: vec3_t) -> c_int;
+// Sweep: extern forward-declares eliminated. Real in-crate/qshared callees
+// imported. Genuinely-unported callees (this crate's own not-yet-ported
+// cm/files/zone functions, cvar/platform/q_math gaps, the §F rmg-terrain
+// C++ shims) referenced at their canonical homes or left bare; reported.
+use crate::cm_shader::{CM_LoadShaderText, CM_SetupShaderProperties, CM_ShutdownShaderProperties};
+use crate::cm_test::CM_FloodAreaConnections;
+use crate::md4_fns::Com_BlockChecksum;
+use crate::z_memman_pc::Hunk_Alloc;
+use mp_qshared::shared::ha_pref;
+use mp_qshared::shared::q_string::Q_strncpyz;
 
-    // PORT-NOTE(rmg-terrain): `CCMLandScape`/`CRMManager` methods (the
-    // rmg-terrain.md §F class, porting-rules §F) referenced opaquely by their
-    // exact Raven member names via C-style free-fn shims (`Class_Method`)
-    // pending that crate landing; reported as missing symbols.
-    fn CCMLandScape_DecreaseRefCount(ls: *mut CCMLandScape);
-    fn CCMLandScape_GetRefCount(ls: *mut CCMLandScape) -> c_int;
-    fn CCMLandScape_delete(ls: *mut CCMLandScape);
-    fn CCMLandScape_IncreaseRefCount(ls: *mut CCMLandScape);
-    fn CRMManager_delete(mgr: *mut CRMManager);
-}
+use crate::cm_patch_fns::{CM_ClearLevelPatches, CM_GeneratePatchCollide};
+use crate::cm_terrain::CM_InitTerrain;
+use crate::common_fns::Com_DPrintf;
+use crate::cvar_fns::Cvar_Get;
+use crate::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Read};
+use crate::z_memman_pc::{Z_Free, Z_Malloc};
+use mp_qshared::shared::q_math::{PlaneTypeForNormal, SetPlaneSignbits};
+use native_platform::Sys_LowPhysicalMemory;
 
-const H_HIGH: c_int = 1;
 
 /// Raven `CM_BoundBrush`.
 ///
@@ -607,8 +523,7 @@ pub fn CMod_LoadShaders(
             cm,
             rm,
             host,
-            (1 + count) * core::mem::size_of::<CCMShader>(),
-            H_HIGH,
+            ((1 + count) * core::mem::size_of::<CCMShader>()) as c_int, ha_pref::h_high
         ) as *mut CCMShader;
         cmap.numShaders = count as c_int;
 
@@ -656,8 +571,7 @@ pub fn CMod_LoadSubmodels(
             cm,
             rm,
             host,
-            count * core::mem::size_of::<cmodel_s>(),
-            H_HIGH,
+            (count * core::mem::size_of::<cmodel_s>()) as c_int, ha_pref::h_high
         ) as *mut cmodel_s;
         cmap.numSubModels = count as c_int;
 
@@ -693,8 +607,7 @@ pub fn CMod_LoadSubmodels(
                 cm,
                 rm,
                 host,
-                (*out).leaf.numLeafBrushes as usize * 4,
-                H_HIGH,
+                ((*out).leaf.numLeafBrushes as usize * 4) as c_int, ha_pref::h_high
             ) as *mut c_int;
             (*out).leaf.firstLeafBrush = (indexes.offset_from(cmap.leafbrushes)) as c_int;
             for j in 0..(*out).leaf.numLeafBrushes {
@@ -707,8 +620,7 @@ pub fn CMod_LoadSubmodels(
                 cm,
                 rm,
                 host,
-                (*out).leaf.numLeafSurfaces as usize * 4,
-                H_HIGH,
+                ((*out).leaf.numLeafSurfaces as usize * 4) as c_int, ha_pref::h_high
             ) as *mut c_int;
             (*out).leaf.firstLeafSurface = (indexes.offset_from(cmap.leafsurfaces)) as c_int;
             for j in 0..(*out).leaf.numLeafSurfaces {
@@ -749,8 +661,7 @@ pub fn CMod_LoadNodes(
             cm,
             rm,
             host,
-            count * core::mem::size_of::<cNode_t>(),
-            H_HIGH,
+            (count * core::mem::size_of::<cNode_t>()) as c_int, ha_pref::h_high
         ) as *mut cNode_t;
         cmap.numNodes = count as c_int;
 
@@ -793,8 +704,7 @@ pub fn CMod_LoadBrushes(
             cm,
             rm,
             host,
-            (BOX_BRUSHES + count) * core::mem::size_of::<cbrush_t>(),
-            H_HIGH,
+            ((BOX_BRUSHES + count) * core::mem::size_of::<cbrush_t>()) as c_int, ha_pref::h_high
         ) as *mut cbrush_t;
         cmap.numBrushes = count as c_int;
 
@@ -854,8 +764,7 @@ pub fn CMod_LoadLeafs(
             cm,
             rm,
             host,
-            (BOX_LEAFS + count) * core::mem::size_of::<cLeaf_t>(),
-            H_HIGH,
+            ((BOX_LEAFS + count) * core::mem::size_of::<cLeaf_t>()) as c_int, ha_pref::h_high
         ) as *mut cLeaf_t;
         cmap.numLeafs = count as c_int;
 
@@ -884,16 +793,14 @@ pub fn CMod_LoadLeafs(
             cm,
             rm,
             host,
-            cmap.numAreas as usize * core::mem::size_of::<cArea_t>(),
-            H_HIGH,
+            (cmap.numAreas as usize * core::mem::size_of::<cArea_t>()) as c_int, ha_pref::h_high
         ) as *mut cArea_t;
         cmap.areaPortals = Hunk_Alloc(
             common,
             cm,
             rm,
             host,
-            cmap.numAreas as usize * cmap.numAreas as usize * core::mem::size_of::<c_int>(),
-            H_HIGH,
+            (cmap.numAreas as usize * cmap.numAreas as usize * core::mem::size_of::<c_int>()) as c_int, ha_pref::h_high
         ) as *mut c_int;
     }
 }
@@ -927,8 +834,7 @@ pub fn CMod_LoadPlanes(
             cm,
             rm,
             host,
-            (BOX_PLANES + count) * core::mem::size_of::<cplane_t>(),
-            H_HIGH,
+            ((BOX_PLANES + count) * core::mem::size_of::<cplane_t>()) as c_int, ha_pref::h_high
         ) as *mut cplane_t;
         cmap.numPlanes = count as c_int;
 
@@ -978,8 +884,7 @@ pub fn CMod_LoadLeafBrushes(
             cm,
             rm,
             host,
-            (count + BOX_BRUSHES) * core::mem::size_of::<c_int>(),
-            H_HIGH,
+            ((count + BOX_BRUSHES) * core::mem::size_of::<c_int>()) as c_int, ha_pref::h_high
         ) as *mut c_int;
         cmap.numLeafBrushes = count as c_int;
 
@@ -1018,8 +923,7 @@ pub fn CMod_LoadLeafSurfaces(
             cm,
             rm,
             host,
-            count * core::mem::size_of::<c_int>(),
-            H_HIGH,
+            (count * core::mem::size_of::<c_int>()) as c_int, ha_pref::h_high
         ) as *mut c_int;
         cmap.numLeafSurfaces = count as c_int;
 
@@ -1058,8 +962,7 @@ pub fn CMod_LoadBrushSides(
             cm,
             rm,
             host,
-            (BOX_SIDES + count) * core::mem::size_of::<cbrushside_t>(),
-            H_HIGH,
+            ((BOX_SIDES + count) * core::mem::size_of::<cbrushside_t>()) as c_int, ha_pref::h_high
         ) as *mut cbrushside_t;
         cmap.numBrushSides = count as c_int;
 
@@ -1094,7 +997,7 @@ pub fn CMod_LoadEntityString(
 ) {
     unsafe {
         cmap.entityString =
-            Hunk_Alloc(common, cm, rm, host, (*l).filelen as usize, H_HIGH) as *mut c_char;
+            Hunk_Alloc(common, cm, rm, host, ((*l).filelen as usize) as c_int, ha_pref::h_high) as *mut c_char;
         cmap.numEntityChars = (*l).filelen;
         Com_Memcpy(
             cmap.entityString as *mut (),
@@ -1120,14 +1023,14 @@ pub fn CMod_LoadVisibility(
         if len == 0 {
             cmap.clusterBytes = (cmap.numClusters + 31) & !31;
             cmap.visibility =
-                Hunk_Alloc(common, cm, rm, host, cmap.clusterBytes as usize, H_HIGH) as *mut u8;
+                Hunk_Alloc(common, cm, rm, host, (cmap.clusterBytes as usize) as c_int, ha_pref::h_high) as *mut u8;
             Com_Memset(cmap.visibility as *mut (), 255, cmap.clusterBytes as usize);
             return;
         }
         let buf = cm.cmod_base.offset((*l).fileofs as isize);
 
         cmap.vised = mp_qshared::shared::qtrue;
-        cmap.visibility = Hunk_Alloc(common, cm, rm, host, len as usize, H_HIGH) as *mut u8;
+        cmap.visibility = Hunk_Alloc(common, cm, rm, host, (len as usize) as c_int, ha_pref::h_high) as *mut u8;
         cmap.numClusters = i32::from_le(*(buf as *const c_int));
         cmap.clusterBytes = i32::from_le(*(buf.offset(4) as *const c_int));
         Com_Memcpy(
@@ -1238,8 +1141,7 @@ pub fn CMod_LoadPatches(
             cm,
             rm,
             host,
-            cmap.numSurfaces as usize * core::mem::size_of::<*mut cPatch_t>(),
-            H_HIGH,
+            (cmap.numSurfaces as usize * core::mem::size_of::<*mut cPatch_t>()) as c_int, ha_pref::h_high
         ) as *mut *mut cPatch_t;
 
         let dv = cm.cmod_base.offset((*verts).fileofs as isize) as *mut drawVert_t;
@@ -1263,8 +1165,7 @@ pub fn CMod_LoadPatches(
                 cm,
                 rm,
                 host,
-                core::mem::size_of::<cPatch_t>(),
-                H_HIGH,
+                (core::mem::size_of::<cPatch_t>()) as c_int, ha_pref::h_high
             ) as *mut cPatch_t;
             *cmap.surfaces.add(i) = patch;
 
@@ -1383,8 +1284,7 @@ pub fn CM_LoadMap_Actual(
                 cm,
                 rm,
                 host,
-                core::mem::size_of::<cmodel_s>(),
-                H_HIGH,
+                (core::mem::size_of::<cmodel_s>()) as c_int, ha_pref::h_high
             ) as *mut cmodel_s;
             *checksum = 0;
             return;

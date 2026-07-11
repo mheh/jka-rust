@@ -39,66 +39,14 @@ struct RmManager;
 #[allow(dead_code)]
 use crate::cmd_pc::Server;
 
-// PORT-NOTE(unlanded-callees): `Z_Malloc`/`Z_Free` (z_memman_pc.cpp) have no
-// ported body reachable from this file (this file's own `RenderModels`
-// placeholder is a distinct type from z_memman_pc.rs's, so even the sibling
-// fns there can't be called directly — vm_x86.rs precedent for the same
-// gap). `Sys_LoadDll`/`Sys_UnloadDll` (win_main.cpp/unix_main.c) have no
-// ported body in this crate at all. `Cmd_AddCommand`/`Cvar_VariableValue`
-// (qcommon.h) are the dispatch-table/cvar waves, not landed here either.
-// `COM_StripExtension`/`COM_Parse`/`LittleLong` (q_shared.h/q_platform.h)
-// are ported only in `mp_game`, a tier above this crate — unreachable
-// (cmd_common.rs/files_common.rs precedent for the same reachability gap).
-// All forward-declared here in the established `extern "Rust"` shape,
-// narrowed to each call site's own shape; escalated as missing symbols for
-// the finisher.
-extern "Rust" {
-    fn Z_Malloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        iSize: c_int,
-        eTag: memtag_t,
-        bZeroit: qboolean,
-        iUnusedAlign: c_int,
-    ) -> *mut ();
-    fn Z_Free(common: &mut Common, pvAddress: *mut ());
-    fn Sys_LoadDll(
-        name: *const c_char,
-        entryPoint: *mut Option<unsafe extern "C" fn(callNum: c_int, ...) -> c_int>,
-        // Raven's `systemcalls` is the C-variadic `int (QDECL *)(int, ...)`
-        // (vm.cpp) — the SEAM-D11 trampoline type, not a `(*mut c_int)` fn.
-        systemcalls: Option<unsafe extern "C-unwind" fn(isize, ...) -> isize>,
-    ) -> *mut core::ffi::c_void;
-    fn Sys_UnloadDll(dllHandle: *mut core::ffi::c_void);
-    fn Cmd_AddCommand(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        cmd_name: *const c_char,
-        function: *const (),
-    );
-    fn Cvar_VariableValue(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        var_name: *const c_char,
-    ) -> f32;
-    fn COM_StripExtension(path: &str) -> String;
-    fn COM_Parse(data: &str) -> (String, &str);
-    fn LittleLong(l: c_int) -> c_int;
-    fn Hunk_Alloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        size: c_int,
-        preference: ha_pref,
-    ) -> *mut ();
-}
+// Real in-crate callee imported (sweep: extern forward-declares eliminated).
+use crate::z_memman_pc::Hunk_Alloc;
+// Genuinely-unported callees referenced at their canonical future homes.
+use crate::cmd::Cmd_AddCommand;
+use crate::cvar_fns::Cvar_VariableValue;
+use crate::z_memman_pc::{Z_Free, Z_Malloc};
+use mp_qshared::shared::q_string::{COM_Parse, COM_StripExtension};
+use native_platform::{Sys_LoadDll, Sys_UnloadDll};
 
 /// `VM_VM2C`.
 ///

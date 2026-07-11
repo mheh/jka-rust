@@ -9,6 +9,7 @@ pub mod cm_height_details;
 pub mod cm_load;
 pub mod cm_patch;
 pub mod cm_patch_fns;
+pub mod cm_polylib;
 pub mod cm_randomterrain;
 pub mod cm_shader;
 pub mod cm_terrain;

@@ -44,102 +44,21 @@ mod null {
     pub fn S_ClearSoundBuffer() {}
 }
 
-// Callees from `files.cpp` / `z_memman.cpp` not yet landed in this crate —
-// forward-declared by their exact Raven names per the crate's established
-// `extern "Rust"` forward-declare convention (`cm_load.rs`/`files_common.rs`
-// precedent), with the faithful shape inferred from the Raven call sites
-// (receivers per the packets' resolved call surface). Each is reported in
-// missing_symbols for the finisher to reconcile once the real defs land.
-// PORT-NOTE(callee-signatures): the transcriber pathed these as
-// `crate::files::<fn>`, but `crate::files` is a types-only module; re-pathed
-// to bare forward-declares here.
-extern "Rust" {
-    fn FS_HandleForFile(common: &mut Common) -> fileHandle_t;
-    fn FS_CreatePath(common: &mut Common, OSPath: *mut c_char) -> qboolean;
-    fn FS_CopyFile(common: &mut Common, fromOSPath: *mut c_char, toOSPath: *mut c_char);
-    fn FS_Read(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_t) -> c_int;
-    fn Sys_StreamedRead(buffer: *mut (), size: c_int, count: c_int, f: fileHandle_t) -> c_int;
-    fn Sys_StreamSeek(f: fileHandle_t, offset: c_long, origin: c_int);
-    fn unzOpenCurrentFile(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        file: *mut c_void,
-    ) -> c_int;
-    fn FS_FileForHandle(common: &mut Common, f: fileHandle_t) -> *mut libc::FILE;
-    fn Z_Malloc(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        iSize: usize,
-        eTag: memtag_t,
-        bZeroit: qboolean,
-    ) -> *mut ();
-    fn Z_Free(common: &mut Common, pvAddress: *mut ());
-    fn FS_AddGameDirectory(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        path: *const c_char,
-        dir: *const c_char,
-    );
-    fn CopyString(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        in_: *const c_char,
-    ) -> *mut c_char;
-    fn FS_Restart(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        checksumFeed: c_int,
-    );
-    fn Sys_ListFiles(
-        common: &mut Common,
-        directory: *const c_char,
-        extension: *const c_char,
-        filter: *mut c_char,
-        numfiles: *mut c_int,
-        wantSubs: qboolean,
-    ) -> *mut *mut c_char;
-    fn Sys_FreeFileList(common: &mut Common, list: *mut *mut c_char);
-    fn FS_SV_FOpenFileRead(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        filename: *const c_char,
-        fp: *mut fileHandle_t,
-    ) -> c_int;
-    fn FS_FCloseFile(common: &mut Common, f: fileHandle_t);
-    fn FS_FOpenFileRead(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        filename: *const c_char,
-        file: *mut fileHandle_t,
-        uniqueFILE: qboolean,
-    ) -> c_int;
-    fn FS_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fileHandle_t;
-    fn Sys_BeginStreamedFile(common: &mut Common, f: fileHandle_t, readAhead: c_int);
-    fn FS_ListFiles(
-        common: &mut Common,
-        cm: &mut CollisionWorld,
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        directory: *const c_char,
-        extension: *const c_char,
-        numfiles: *mut c_int,
-    ) -> *mut *mut c_char;
-    fn FS_FreeFileList(common: &mut Common, list: *mut *mut c_char);
-}
+// Sweep: extern forward-declares eliminated. This crate's own not-yet-ported
+// filesystem callees (files.cpp/files_pc.cpp subject) referenced at their
+// canonical `files_common` home; `Sys_*` platform I/O at `native_platform`;
+// `unzOpenCurrentFile` at the unzip reader; `Z_Malloc`/`Z_Free` at
+// `z_memman_pc`. All genuinely unported; reported.
+use crate::files::unz_file::unzOpenCurrentFile;
+use crate::files_common::{
+    CopyString, FS_AddGameDirectory, FS_CopyFile, FS_CreatePath, FS_FCloseFile, FS_FileForHandle,
+    FS_FOpenFileRead, FS_FOpenFileWrite, FS_FreeFileList, FS_HandleForFile, FS_ListFiles, FS_Read,
+    FS_Restart, FS_SV_FOpenFileRead,
+};
+use crate::z_memman_pc::{Z_Free, Z_Malloc};
+use native_platform::{
+    Sys_BeginStreamedFile, Sys_FreeFileList, Sys_ListFiles, Sys_StreamedRead, Sys_StreamSeek,
+};
 
 /// Raven `FS_PakIsPure`.
 ///
