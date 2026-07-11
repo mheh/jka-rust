@@ -10,7 +10,8 @@ use libc::{SEEK_CUR, SEEK_END, SEEK_SET};
 use crate::files::unz_file::unzFile;
 use crate::files::unz_types::{
     file_in_zip_read_info_s, tm_unz, uInt, uLong, unz_file_info, unz_file_info_internal,
-    unz_global_info, unz_s, z_stream, Z_DATA_ERROR, Z_OK, Z_STREAM_END, ZF_DEFLATED, FILE,
+    unz_global_info, unz_s, z_stream, Z_BUF_ERROR, Z_DATA_ERROR, Z_OK, Z_STREAM_END, ZF_DEFLATED,
+    FILE,
 };
 use crate::files::unzip_consts::{
     BUFREADCOMMENT, CASESENSITIVITYDEFAULTVALUE, SIZECENTRALDIRITEM, SIZEZIPLOCALHEADER,

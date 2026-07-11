@@ -6,7 +6,6 @@
 use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void};
 
 use mp_host_interface::engine_host::EngineHost;
-use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fs_origin::fsOrigin_t;
 use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_STRING_TOKENS};
@@ -46,7 +45,7 @@ use crate::files_common::{
     FS_FOpenFileRead, FS_FOpenFileWrite, FS_FreeFileList, FS_HandleForFile, FS_ListFiles, FS_Read,
     FS_Restart, FS_SV_FOpenFileRead,
 };
-use crate::z_memman_pc::{CopyString, Z_Free, Z_Malloc};
+use crate::z_memman_pc::{CopyString, Z_Free};
 use native_platform::{
     Sys_BeginStreamedFile, Sys_FreeFileList, Sys_ListFiles, Sys_StreamedRead, Sys_StreamSeek,
 };
@@ -1110,17 +1109,10 @@ pub fn Sys_ConcatenateFileLists(
     total_length += Sys_CountFileList(list2) as usize;
 
     // Create new list.
+    // Raven's chain is Z_Malloc/Z_Free end-to-end; the lists come from the
+    // libc-malloc'd native Sys_ListFiles here, so the whole chain uses libc.
     let cat = unsafe {
-        Z_Malloc(
-            common,
-            cm,
-            rm,
-            host,
-            ((total_length + 1) * core::mem::size_of::<*mut c_char>()) as c_int,
-            memtag_t::TAG_FILESYS,
-            mp_qshared::shared::qtrue,
-            4,
-        )
+        libc::calloc(total_length + 1, core::mem::size_of::<*mut c_char>())
     } as *mut *mut c_char;
     let mut dst = cat;
 
@@ -1157,13 +1149,13 @@ pub fn Sys_ConcatenateFileLists(
         // Free our old lists.
         // NOTE: not freeing their content, it's been merged in dst and still being used
         if !list0.is_null() {
-            Z_Free(common, list0 as *mut ());
+            libc::free(list0 as *mut libc::c_void);
         }
         if !list1.is_null() {
-            Z_Free(common, list1 as *mut ());
+            libc::free(list1 as *mut libc::c_void);
         }
         if !list2.is_null() {
-            Z_Free(common, list2 as *mut ());
+            libc::free(list2 as *mut libc::c_void);
         }
     }
 
@@ -1311,7 +1303,6 @@ pub fn FS_GetModList(
 
         let mut dummy: c_int = 0;
         let p_files0 = Sys_ListFiles(
-            common,
             (*common.fs_homepath).string,
             core::ptr::null(),
             core::ptr::null_mut(),
@@ -1319,7 +1310,6 @@ pub fn FS_GetModList(
             mp_qshared::shared::qtrue,
         );
         let p_files1 = Sys_ListFiles(
-            common,
             (*common.fs_basepath).string,
             core::ptr::null(),
             core::ptr::null_mut(),
@@ -1327,7 +1317,6 @@ pub fn FS_GetModList(
             mp_qshared::shared::qtrue,
         );
         let p_files2 = Sys_ListFiles(
-            common,
             (*common.fs_cdpath).string,
             core::ptr::null(),
             core::ptr::null_mut(),
@@ -1368,14 +1357,13 @@ pub fn FS_GetModList(
                 );
                 let mut n_paks: c_int = 0;
                 let mut p_paks = Sys_ListFiles(
-                    common,
                     path,
                     c".pk3".as_ptr(),
                     core::ptr::null_mut(),
                     &mut n_paks,
                     mp_qshared::shared::qfalse,
                 );
-                Sys_FreeFileList(common, p_paks); // we only use Sys_ListFiles to check wether .pk3 files are present
+                Sys_FreeFileList(p_paks); // we only use Sys_ListFiles to check wether .pk3 files are present
 
                 // Try on cd path
                 if n_paks <= 0 {
@@ -1387,14 +1375,13 @@ pub fn FS_GetModList(
                     );
                     n_paks = 0;
                     p_paks = Sys_ListFiles(
-                        common,
                         path,
                         c".pk3".as_ptr(),
                         core::ptr::null_mut(),
                         &mut n_paks,
                         mp_qshared::shared::qfalse,
                     );
-                    Sys_FreeFileList(common, p_paks);
+                    Sys_FreeFileList(p_paks);
                 }
 
                 // try on home path
@@ -1407,14 +1394,13 @@ pub fn FS_GetModList(
                     );
                     n_paks = 0;
                     p_paks = Sys_ListFiles(
-                        common,
                         path,
                         c".pk3".as_ptr(),
                         core::ptr::null_mut(),
                         &mut n_paks,
                         mp_qshared::shared::qfalse,
                     );
-                    Sys_FreeFileList(common, p_paks);
+                    Sys_FreeFileList(p_paks);
                 }
 
                 if n_paks > 0 {
@@ -1454,7 +1440,7 @@ pub fn FS_GetModList(
                 }
             }
         }
-        Sys_FreeFileList(common, p_files);
+        Sys_FreeFileList(p_files);
     }
 
     n_mods
@@ -1518,7 +1504,7 @@ pub fn FS_FOpenFileByMode(
             common.fsh[*f as usize].streamed = mp_qshared::shared::qfalse;
 
             if mode == FS_READ {
-                Sys_BeginStreamedFile(common, *f, 0x4000);
+                Sys_BeginStreamedFile(*f, 0x4000);
                 common.fsh[*f as usize].streamed = mp_qshared::shared::qtrue;
             }
         }

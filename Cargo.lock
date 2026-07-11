@@ -319,7 +319,9 @@ version = "0.1.0"
 name = "native_platform"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "libloading",
+ "native_types",
 ]
 
 [[package]]
