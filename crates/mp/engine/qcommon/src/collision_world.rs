@@ -12,6 +12,8 @@ use mp_qshared::shared::MAX_QPATH;
 use crate::cm::cbrush_s::cbrush_t;
 use crate::cm::ccmshader::CCMShader;
 use crate::cm::clip_map_t::clipMap_t;
+use crate::cm::cm_patch_h_consts::MAX_PATCH_PLANES;
+use crate::cm::patch_plane_t::patchPlane_t;
 use crate::cm::cmodel_s::cmodel_t;
 use crate::cm_load::CRMManager;
 use crate::cm_terrain::CmLandScape;
@@ -106,6 +108,24 @@ pub struct CollisionWorld {
     /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:12-15`
     pub c_removed: c_int,
     pub c_active_windings: c_int,
+
+    /// Raven `int c_totalPatchBlocks` — running total of grid blocks across every
+    /// generated patch collide (a load-time statistic accumulated by
+    /// `CM_GeneratePatchCollide`).
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_patch.cpp:85`
+    pub c_totalPatchBlocks: c_int,
+
+    /// Raven `static int numPlanes` / `static patchPlane_t planes[MAX_PATCH_PLANES]`
+    /// — the `cm_patch.cpp` plane-dedup scratch built while a patch collide is
+    /// generated (`CM_FindPlane`/`CM_FindPlane2`), then copied out into the
+    /// per-patch `patchCollide_s`. Threaded on the clipmap receiver (ruling 2)
+    /// rather than kept as file statics; zero-valid, so the `alloc_zeroed`
+    /// `Engine` mass initializes them (no boot writelist entry needed).
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_patch.cpp:430-431`
+    pub numPlanes: c_int,
+    pub planes: [patchPlane_t; MAX_PATCH_PLANES],
 
     /// Raven `byte *cmod_base` — the current lump's read cursor into the
     /// loaded BSP file image.
