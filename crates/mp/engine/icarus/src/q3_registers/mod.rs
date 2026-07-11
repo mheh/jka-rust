@@ -10,6 +10,8 @@
 
 #![allow(non_snake_case)]
 
+use std::collections::HashMap;
+
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::wl_e::WL_e;
 
@@ -257,6 +259,58 @@ pub fn Q3_SetVectorVariable(icarus: &mut Icarus, name: &str, value: &str) -> i32
         }
         None => 0,
     }
+}
+
+/// Raven `Q3_VariableSaveFloats` — inert in MP: the oracle body is an
+/// unconditional `return;`, so the save-game append tail is dead and untranscribed.
+/// Source: `oracle/codemp/icarus/Q3_Registers.cpp:267-288`
+pub fn Q3_VariableSaveFloats(fmap: &HashMap<String, f32>) {
+    let _ = fmap;
+}
+
+/// Raven `Q3_VariableSaveStrings` — inert in MP: the oracle body is an
+/// unconditional `return;`, so the save-game append tail is dead and untranscribed.
+/// Source: `oracle/codemp/icarus/Q3_Registers.cpp:296-320`
+pub fn Q3_VariableSaveStrings(smap: &HashMap<String, String>) {
+    let _ = smap;
+}
+
+/// Raven `Q3_VariableSave` — drives the (inert) per-map save helpers, returns qtrue.
+/// Source: `oracle/codemp/icarus/Q3_Registers.cpp:328-335`
+pub fn Q3_VariableSave(icarus: &Icarus) -> i32 {
+    Q3_VariableSaveFloats(&icarus.var_floats);
+    Q3_VariableSaveStrings(&icarus.var_strings);
+    Q3_VariableSaveStrings(&icarus.var_vectors);
+
+    1 // qtrue
+}
+
+/// Raven `Q3_VariableLoadFloats` — inert in MP: the oracle body is an
+/// unconditional `return;`, so the save-game read tail is dead and untranscribed.
+/// Source: `oracle/codemp/icarus/Q3_Registers.cpp:343-368`
+pub fn Q3_VariableLoadFloats(fmap: &mut HashMap<String, f32>) {
+    let _ = fmap;
+}
+
+/// Raven `Q3_VariableLoadStrings` — inert in MP: the oracle body is an
+/// unconditional `return;`, so the save-game read tail is dead and untranscribed.
+/// Source: `oracle/codemp/icarus/Q3_Registers.cpp:376-412`
+pub fn Q3_VariableLoadStrings(var_type: i32, fmap: &mut HashMap<String, String>) {
+    let _ = var_type;
+    let _ = fmap;
+}
+
+/// Raven `Q3_VariableLoad` — resets the store then drives the (inert) per-map
+/// load helpers, returns qfalse.
+/// Source: `oracle/codemp/icarus/Q3_Registers.cpp:420-428`
+pub fn Q3_VariableLoad(icarus: &mut Icarus, host: &mut dyn EngineHost) -> i32 {
+    Q3_InitVariables(icarus, host);
+
+    Q3_VariableLoadFloats(&mut icarus.var_floats);
+    Q3_VariableLoadStrings(TK_STRING, &mut icarus.var_strings);
+    Q3_VariableLoadStrings(TK_VECTOR, &mut icarus.var_vectors);
+
+    0 // qfalse
 }
 
 #[cfg(test)]
