@@ -46,9 +46,8 @@ use crate::files_common::{
     FS_Restart, FS_SV_FOpenFileRead,
 };
 use crate::z_memman_pc::{CopyString, Z_Free};
-use native_platform::{
-    Sys_BeginStreamedFile, Sys_FreeFileList, Sys_ListFiles, Sys_StreamedRead, Sys_StreamSeek,
-};
+use crate::sys_engine::{Sys_StreamedRead, Sys_StreamSeek};
+use native_platform::{Sys_BeginStreamedFile, Sys_FreeFileList, Sys_ListFiles};
 
 /// Raven `FS_PakIsPure`.
 ///
@@ -924,7 +923,7 @@ pub fn FS_Read2(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_
     }
     if common.fsh[f as usize].streamed != mp_qshared::shared::qfalse {
         common.fsh[f as usize].streamed = mp_qshared::shared::qfalse;
-        let r = unsafe { Sys_StreamedRead(buffer, len, 1, f) };
+        let r = Sys_StreamedRead(common, buffer, len, 1, f);
         common.fsh[f as usize].streamed = mp_qshared::shared::qtrue;
         r
     } else {
@@ -958,7 +957,7 @@ pub fn FS_Seek(
 
     if common.fsh[f as usize].streamed != mp_qshared::shared::qfalse {
         common.fsh[f as usize].streamed = mp_qshared::shared::qfalse;
-        unsafe { Sys_StreamSeek(f, offset, origin) };
+        Sys_StreamSeek(common, cm, rm, host, f, offset, origin);
         common.fsh[f as usize].streamed = mp_qshared::shared::qtrue;
     }
 

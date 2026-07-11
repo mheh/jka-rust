@@ -47,7 +47,8 @@ use crate::cvar_fns::Cvar_VariableValue;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::shared::q_string::{COM_Parse, COM_StripExtension};
 use mp_qshared::shared::swap::LittleLong;
-use native_platform::{Sys_LoadDll, Sys_UnloadDll};
+use crate::sys_engine::Sys_LoadDll;
+use native_platform::Sys_UnloadDll;
 
 /// `VM_VM2C`.
 ///
@@ -784,9 +785,8 @@ pub fn VM_Create(
             // SEAM-D11: `game_syscall_trampoline` is the C-variadic entry that
             // unpacks the va_list and dispatches to the armed engine slot; the
             // Rust `VM_DllSyscall` is reached through slot arming, not directly.
-            // Slot arming for the engine-side VM path lands with the sys/dll wave
-            // (`Sys_LoadDll` itself is still an unported extern).
             (*vm).dllHandle = Sys_LoadDll(
+                common,
                 module,
                 &mut (*vm).entryPoint,
                 Some(crate::vm::trampoline::game_syscall_trampoline),
