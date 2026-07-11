@@ -112,7 +112,6 @@ use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::q_string::Q_strncpyz;
 
 use crate::cm_patch_fns::{CM_ClearLevelPatches, CM_GeneratePatchCollide};
-use crate::cm_terrain::CM_InitTerrain;
 use crate::common_fns::Com_DPrintf;
 use crate::cvar_fns::Cvar_Get;
 use crate::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Read};
@@ -260,20 +259,15 @@ pub fn CM_TempBoxModel(
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:1065-1080`
 pub fn CM_ShutdownTerrain(cm: &mut CollisionWorld, terrainId: thandle_t) {
-    unsafe {
-        let landscape = cm.cmg.landScape as *mut CCMLandScape;
-
-        if !landscape.is_null() {
-            // PORT-NOTE(cpp-methods): `CCMLandScape::DecreaseRefCount`/
-            // `GetRefCount`/`delete` are the rmg-terrain.md §F class's methods
-            // (porting-rules §F, not the type rosetta); called opaquely per
-            // their doc-stated shape, reported as missing symbols.
-            CCMLandScape_DecreaseRefCount(landscape);
-            if CCMLandScape_GetRefCount(landscape) <= 0 {
-                CCMLandScape_delete(landscape);
-                cm.cmg.landScape = core::ptr::null_mut();
-            }
-        }
+    // Raven ignores `terrainId` (the landscape is the singleton `cmg.landScape`).
+    let _ = terrainId;
+    // Raven `DecreaseRefCount()` then free at `GetRefCount() <= 0`. `mRefCount` is
+    // §20-dropped (renderer-only reader, its sole caller is DEC-01-deferred —
+    // rmg-terrain.md RMG-D4c), so the single owner drops unconditionally. The owner
+    // is `cm.land_scape: Option<CmLandScape>` (rmg-terrain.md state table), not the
+    // raw `cmg.landScape` pointer.
+    if cm.land_scape.is_some() {
+        cm.land_scape = None;
     }
 }
 
@@ -321,16 +315,19 @@ pub fn CM_ClearMap(cm: &mut CollisionWorld, rmg: &mut RmManager) {
         CM_ShutdownShaderProperties(cm);
 
         if !cm.TheRandomMissionManager.is_null() {
-            // PORT-NOTE(rmg-terrain): `CRMManager` delete is the rmg-terrain.md
-            // §F class's destructor (porting-rules §F) — called opaquely,
-            // reported as a missing symbol.
-            CRMManager_delete(cm.TheRandomMissionManager);
+            // Raven `delete TheRandomMissionManager; = 0`. The RMG manager's owned
+            // Rust home is `Engine.rmg: RmManager` (wave-20 — rmg-terrain.md state
+            // table); this raw `CollisionWorld` slot is never allocated, so the drop
+            // is a plain null.
             cm.TheRandomMissionManager = core::ptr::null_mut();
         }
 
-        if !cm.cmg.landScape.is_null() {
-            CCMLandScape_delete(cm.cmg.landScape as *mut CCMLandScape);
-            cm.cmg.landScape = core::ptr::null_mut();
+        if cm.land_scape.is_some() {
+            // Raven `delete cmg.landScape; = NULL` — the unconditional teardown free
+            // (RMG-D4c). Owner is `cm.land_scape: Option<CmLandScape>` (rmg-terrain.md
+            // state table); the raw `cmg.landScape` pointer is zeroed by the memset
+            // below.
+            cm.land_scape = None;
         }
 
         Com_Memset(
@@ -1535,34 +1532,10 @@ pub fn CM_LoadSubBSP(
     }
 }
 
-/// Raven `CM_RegisterTerrain`.
-///
-/// Source: `oracle/codemp/qcommon/cm_load.cpp:1036-1057`
-pub fn CM_RegisterTerrain(
-    cm: &mut CollisionWorld,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
-    config: *const c_char,
-    server: bool,
-) -> *mut CCMLandScape {
-    unsafe {
-        if !cm.cmg.landScape.is_null() {
-            // Already spawned so just return
-            let ls = cm.cmg.landScape as *mut CCMLandScape;
-            CCMLandScape_IncreaseRefCount(ls);
-            return ls;
-        }
-        // Doesn't exist so create and link in
-        let ls = CM_InitTerrain(rmg, host, config, 0, server);
-
-        // Increment for the next instance
-        if !cm.cmg.landScape.is_null() {
-            com_error(
-                errorParm_t::ERR_DROP,
-                "You cannot have more than one terrain brush.\n".into(),
-            );
-        }
-        cm.cmg.landScape = ls as *mut c_void;
-        ls
-    }
-}
+// Raven `CM_RegisterTerrain` (`cm_load.cpp:1036-1057`) + `CM_InitTerrain`
+// (`cm_terrain.cpp:1618-1626`) are the §F design's `register_terrain` — the
+// get-or-create over `cm.land_scape: Option<CmLandScape>` that folds the
+// `CCMLandScape` construction and `SetTerrainId(0)` and returns a `TerrainHandle`
+// (`crate::cm_terrain::register_terrain`, rmg-terrain.md Seam-B / RMG-D4c). The
+// wave-20 `G_CM_REGISTER_TERRAIN` syscall arm calls that one; this C-track
+// duplicate is dropped (porting-rules §20 — zero engine callers, superseded).
