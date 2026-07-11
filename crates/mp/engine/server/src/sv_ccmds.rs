@@ -369,7 +369,7 @@ pub fn SV_Status_f(common: &mut Common, sv: &mut Server, host: &mut dyn EngineHo
             format!("{:4}", ping)
         };
 
-        let ps = mp_engine_server::SV_GameClientNum(sv, i);
+        let ps = crate::sv_game::SV_GameClientNum(sv, i);
         let s = unsafe {
             core::ffi::CStr::from_ptr(mp_engine_qcommon::net::NET_AdrToString(
                 common,
@@ -954,7 +954,7 @@ pub fn SV_Map_f(
     }
 
     // start up the map
-    mp_engine_server::SV_SpawnServer(
+    crate::sv_init::SV_SpawnServer(
         common,
         cm,
         sv,
@@ -1026,7 +1026,7 @@ pub fn SV_MapRestart_f(
     };
     if delay != 0 {
         sv.sv.restartTime = sv.svs.time + delay * 1000;
-        mp_engine_server::SV_SetConfigstring(
+        crate::sv_init::SV_SetConfigstring(
             common,
             cm,
             sv,
@@ -1053,7 +1053,7 @@ pub fn SV_MapRestart_f(
 
         mp_engine_qcommon::common::common::com_printf(common, "variable change -- restarting.\n");
 
-        mp_engine_server::SV_SpawnServer(
+        crate::sv_init::SV_SpawnServer(
             common,
             cm,
             sv,
@@ -1090,7 +1090,7 @@ pub fn SV_MapRestart_f(
     sv.sv.state = serverState_t::SS_LOADING;
     sv.sv.restarting = qboolean::qtrue;
 
-    mp_engine_server::SV_RestartGameProgs(common, cm, sv, rm, host);
+    crate::sv_game::SV_RestartGameProgs(common, cm, sv, rm, host);
 
     // run a few frames to allow everything to settle
     for _ in 0..3 {
@@ -1153,7 +1153,7 @@ pub fn SV_MapRestart_f(
             (*client).state = clientState_t::CS_ACTIVE;
         }
 
-        mp_engine_server::SV_ClientEnterWorld(common, sv, client, unsafe {
+        crate::sv_client::SV_ClientEnterWorld(common, sv, client, unsafe {
             &mut (*client).lastUsercmd
         });
     }

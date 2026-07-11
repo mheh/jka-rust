@@ -569,7 +569,7 @@ pub fn SV_EntityContact(
         let origin = (*gEnt).r.currentOrigin;
         let angles = (*gEnt).r.currentAngles;
 
-        let ch: clipHandle_t = mp_engine_server::SV_ClipHandleForEntity(cm, gEnt);
+        let ch: clipHandle_t = crate::sv_world::SV_ClipHandleForEntity(cm, gEnt);
         let mut trace = core::mem::zeroed();
         mp_engine_qcommon::cm_trace::CM_TransformedBoxTrace(
             common,
@@ -967,7 +967,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_LINKENTITY as c_int {
-            mp_engine_server::SV_LinkEntity(
+            crate::sv_world::SV_LinkEntity(
                 common,
                 cm,
                 sv,
@@ -975,14 +975,14 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_UNLINKENTITY as c_int {
-            mp_engine_server::SV_UnlinkEntity(
+            crate::sv_world::SV_UnlinkEntity(
                 common,
                 sv,
                 vma(common, args, 1) as *mut sharedEntity_t,
             );
             return 0;
         } else if trap == G::G_ENTITIES_IN_BOX as c_int {
-            return mp_engine_server::SV_AreaEntities(
+            return crate::sv_world::SV_AreaEntities(
                 common,
                 sv,
                 vma(common, args, 1) as *const f32,
@@ -1015,7 +1015,7 @@ pub fn SV_GameSystemCalls(
                 qtrue as c_int,
             ) as c_int;
         } else if trap == G::G_TRACE as c_int {
-            mp_engine_server::SV_Trace(
+            crate::sv_world::SV_Trace(
                 common,
                 cm,
                 sv,
@@ -1036,7 +1036,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_G2TRACE as c_int {
-            mp_engine_server::SV_Trace(
+            crate::sv_world::SV_Trace(
                 common,
                 cm,
                 sv,
@@ -1057,7 +1057,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_TRACECAPSULE as c_int {
-            mp_engine_server::SV_Trace(
+            crate::sv_world::SV_Trace(
                 common,
                 cm,
                 sv,
@@ -1078,7 +1078,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_POINT_CONTENTS as c_int {
-            return mp_engine_server::SV_PointContents(
+            return crate::sv_world::SV_PointContents(
                 common,
                 cm,
                 sv,
@@ -1113,7 +1113,7 @@ pub fn SV_GameSystemCalls(
                 *(vma(common, args, 2) as *const vec3_t),
             ) as c_int;
         } else if trap == G::G_SET_CONFIGSTRING as c_int {
-            mp_engine_server::SV_SetConfigstring(
+            crate::sv_init::SV_SetConfigstring(
                 common,
                 cm,
                 sv,
@@ -1126,7 +1126,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_GET_CONFIGSTRING as c_int {
-            mp_engine_server::SV_GetConfigstring(
+            crate::sv_init::SV_GetConfigstring(
                 sv,
                 *args.offset(1),
                 vma(common, args, 2) as *mut c_char,
@@ -1143,7 +1143,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_GET_USERINFO as c_int {
-            mp_engine_server::SV_GetUserinfo(
+            crate::sv_init::SV_GetUserinfo(
                 sv,
                 *args.offset(1),
                 vma(common, args, 2) as *mut c_char,
@@ -1615,7 +1615,7 @@ pub fn SV_GameSystemCalls(
                 *args.offset(3),
             );
         } else if trap == G::BOTLIB_USER_COMMAND as c_int {
-            mp_engine_server::SV_ClientThink(
+            crate::sv_client::SV_ClientThink(
                 common,
                 sv,
                 sv.svs.clients.offset(*args.offset(1) as isize),

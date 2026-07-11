@@ -93,7 +93,16 @@ use crate::be_aas_sample_fns::{
     AAS_AreaPresenceType, AAS_LinkEntityClientBBox, AAS_PointAreaNum, AAS_PointInsideFace,
     AAS_TraceAreas, AAS_TraceClientBBox, AAS_UnlinkFromAreas,
 };
-use crate::be_interface_fns::Sys_MilliSeconds;
+// `Sys_MilliSeconds` lives in `be_interface_fns` (the botlib export seam),
+// which is not yet integrated (its C export fn-ptr table cannot bind the
+// `&mut BotLib`-threaded fns without an ABI-bridge ruling, and it pulls the
+// unported `be_ai_weap` subsystem + the escalated `CLOCKS_PER_SEC` libc macro).
+// Forward-declared here per the crate's not-yet-integrated-callee convention
+// (mirrors the `extern "Rust"` decls in `be_ai_char_fns.rs`, `be_ea_fns.rs`, …).
+// Source: `oracle/codemp/botlib/be_interface.cpp` (`Sys_MilliSeconds`)
+extern "Rust" {
+    fn Sys_MilliSeconds() -> c_int;
+}
 use crate::l_libvar_fns::{LibVarGetValue, LibVarValue};
 use crate::l_log_fns::Log_Write;
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory};
@@ -441,11 +450,12 @@ pub fn AAS_FreeReachability(bot: &mut BotLib, lreach: *mut aas_lreachability_t) 
 pub fn AAS_AreaReachability(bot: &mut BotLib, areanum: c_int) -> c_int {
     unsafe {
         if areanum < 0 || areanum >= bot.aasworld.numareas {
-            AAS_Error(
-                bot,
-                c"AAS_AreaReachability: areanum %d out of range".as_ptr() as *mut c_char,
-                areanum,
-            );
+            let __ae = std::ffi::CString::new(format!(
+                "AAS_AreaReachability: areanum {} out of range",
+                areanum
+            ))
+            .unwrap_or_default();
+            AAS_Error(bot, __ae.as_ptr() as *mut c_char);
             return 0;
         }
         (*bot.aasworld.areasettings.add(areanum as usize)).numreachableareas
@@ -2719,7 +2729,7 @@ pub fn AAS_Reachability_Elevator(bot: &mut BotLib) {
     unsafe {
         let mut area1num: c_int;
         let mut area2num: c_int;
-        let modelnum: c_int;
+        let mut modelnum: c_int;
         let mut lip: f32 = 0.0;
         let mut height: f32 = 0.0;
         let mut speed: f32 = 0.0;
@@ -3382,9 +3392,9 @@ pub fn AAS_Reachability_Grapple(bot: &mut BotLib, area1num: c_int, area2num: c_i
         let mut areanum: c_int;
         let mut numareas: c_int;
         let mut areas: [c_int; 20] = [0; 20];
-        let mingrappleangle: f32;
-        let z: f32;
-        let hordist: f32;
+        let mut mingrappleangle: f32;
+        let mut z: f32;
+        let mut hordist: f32;
         let mut bsptrace: bsp_trace_t;
         let mut trace: aas_trace_t;
         let mut areastart: vec3_t = [0.0; 3];
@@ -3518,8 +3528,8 @@ pub fn AAS_Reachability_Grapple(bot: &mut BotLib, area1num: c_int, area2num: c_i
             bsptrace = AAS_Trace(
                 bot,
                 start,
-                ptr::null_mut(),
-                ptr::null_mut(),
+                [0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
                 end,
                 0,
                 CONTENTS_SOLID,
@@ -3659,7 +3669,7 @@ pub fn AAS_Reachability_WalkOffLedge(bot: &mut BotLib, areanum: c_int) {
         let mut otherareanum: c_int;
         let mut gap: c_int;
         let mut reachareanum: c_int;
-        let side: usize;
+        let mut side: usize;
         let mut sharededgevec: vec3_t;
         let mut mid: vec3_t;
         let mut dir: vec3_t = [0.0; 3];
@@ -4479,7 +4489,7 @@ pub fn AAS_Reachability_Teleport(bot: &mut BotLib) {
         let mut velocity: vec3_t = [0.0; 3];
         let mut cmdmove: vec3_t;
         let mut r#move: aas_clientmove_t = core::mem::zeroed();
-        let trace: aas_trace_t;
+        let mut trace: aas_trace_t;
 
         let mut ent = AAS_NextBSPEntity(bot, 0);
         while ent != 0 {
@@ -4975,7 +4985,7 @@ pub fn AAS_Reachability_JumpPad(bot: &mut BotLib) {
         let mut face2num: c_int;
         let mut ret: c_int;
         let mut area2num: c_int;
-        let visualize: c_int;
+        let mut visualize: c_int;
         let bot_visualizejumppads: c_int;
         let mut speed: f32 = 0.0;
         let mut zvel: f32;

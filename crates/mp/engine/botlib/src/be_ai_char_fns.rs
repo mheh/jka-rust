@@ -53,8 +53,10 @@ use crate::BotLib;
 // resolved-signature packets; forward-decl convention already used by
 // `be_aas_cluster_fns.rs`/`be_ai_goal_fns.rs`).
 // ---------------------------------------------------------------------
-extern "Rust" {
+extern "C" {
     fn Log_Write(bot: &mut BotLib, fmt: *mut c_char, ...);
+}
+extern "Rust" {
     fn LibVarGetValue(bot: &mut BotLib, var_name: *mut c_char) -> f32;
     fn GetMemory(bot: &mut BotLib, size: c_ulong) -> *mut ();
     fn GetClearedMemory(bot: &mut BotLib, size: c_ulong) -> *mut ();

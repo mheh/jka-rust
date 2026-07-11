@@ -432,7 +432,7 @@ pub fn SV_BeginDownload_f(common: &mut Common, cl: *mut client_t) {
 /// Source: `oracle/codemp/server/sv_client.cpp:1265-1268`
 pub fn SV_Disconnect_f(common: &mut Common, sv: &mut Server, cl: *mut client_t) {
     // SV_DropClient( cl, "disconnected" );
-    let msg = mp_engine_server::SV_GetStringEdString(
+    let msg = crate::sv_ccmds::SV_GetStringEdString(
         sv,
         c"MP_SVGAME".as_ptr() as *mut c_char,
         c"DISCONNECTED".as_ptr() as *mut c_char,
@@ -1182,7 +1182,7 @@ pub fn SV_DirectConnect(
             i += 1;
         }
         if count == 1 || count == max_clients {
-            mp_engine_server::SV_Heartbeat_f(sv);
+            crate::sv_ccmds::SV_Heartbeat_f(sv);
         }
 
         let _ = reconnect;

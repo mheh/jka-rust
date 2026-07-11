@@ -178,13 +178,15 @@ pub fn AAS_IndexFromString(
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:105-108`
 pub fn AAS_ModelFromIndex(bot: &mut BotLib, index: c_int) -> *mut c_char {
     unsafe {
+        let cs = bot
+            .aasworld
+            .configstrings
+            .as_mut_ptr()
+            .offset(CS_MODELS as isize);
         AAS_StringFromIndex(
             bot,
             c"ModelFromIndex".as_ptr() as *mut c_char,
-            bot.aasworld
-                .configstrings
-                .as_mut_ptr()
-                .offset(CS_MODELS as isize),
+            cs,
             MAX_MODELS as c_int,
             index,
         )
@@ -196,13 +198,15 @@ pub fn AAS_ModelFromIndex(bot: &mut BotLib, index: c_int) -> *mut c_char {
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:115-118`
 pub fn AAS_IndexFromModel(bot: &mut BotLib, modelname: *mut c_char) -> c_int {
     unsafe {
+        let cs = bot
+            .aasworld
+            .configstrings
+            .as_mut_ptr()
+            .offset(CS_MODELS as isize);
         AAS_IndexFromString(
             bot,
             c"IndexFromModel".as_ptr() as *mut c_char,
-            bot.aasworld
-                .configstrings
-                .as_mut_ptr()
-                .offset(CS_MODELS as isize),
+            cs,
             MAX_MODELS as c_int,
             modelname,
         )

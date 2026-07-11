@@ -30,6 +30,16 @@ use crate::l_script::consts::{TT_INTEGER, TT_NUMBER, TT_STRING};
 use crate::l_script::token_s::token_t;
 use crate::BotLib;
 
+// `Q_strncpyz` lands in `mp_qshared`'s q_shared TU, not wired into this crate;
+// forward-declared here per the engine-crate convention (mirrors the same
+// `extern "Rust"` decl in `server/sv_client.rs`, `qcommon/cm_load.rs`, …).
+// Source: `oracle/codemp/qcommon/q_shared.c` (`Q_strncpyz`)
+extern "Rust" {
+    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
+}
+use crate::l_libvar_fns::{LibVarGetValue};
+use crate::l_memory_fns::{FreeMemory, GetClearedMemory};
+
 /// Raven `FindFuzzyWeight` — index of the named weight in `wc`, or `-1`.
 ///
 /// Source: `oracle/codemp/botlib/be_ai_weight.cpp:540-552`

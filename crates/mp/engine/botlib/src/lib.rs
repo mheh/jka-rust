@@ -10,6 +10,7 @@ pub mod be_aas_bspq3;
 pub mod be_aas_bspq3_fns;
 pub mod be_aas_cluster;
 pub mod be_aas_debug;
+pub mod be_aas_debug_fns;
 pub mod be_aas_def;
 pub mod be_aas_entity;
 pub mod be_aas_main;
@@ -322,6 +323,48 @@ pub struct BotLib {
     /// Raven `source_t *sourceFiles[MAX_SOURCEFILES]`.
     /// Source: `oracle/codemp/botlib/l_precomp.cpp:3187`
     pub sourceFiles: [*mut source_t; MAX_SOURCEFILES],
+
+    // --- be_interface / be_aas_debug / be_ai_char / be_ai_weight globals ---
+    /// Raven `botlib_export_t be_botlib_export` — the botlib export fn-ptr table.
+    /// Source: `oracle/codemp/botlib/be_interface.cpp:41`
+    pub be_botlib_export: mp_qshared::common::mp::botlib::botlib_export_s::botlib_export_t,
+    /// Raven `bot_character_t *botcharacters[MAX_CLIENTS + 1]`.
+    /// Source: `oracle/codemp/botlib/be_ai_char.cpp:60`
+    pub botcharacters: [*mut crate::be_ai_char::bot_character_s::bot_character_t; MAX_CLIENTS + 1],
+    /// Raven `int botlibsetup` — true when the bot library has been set up.
+    /// Source: `oracle/codemp/botlib/be_interface.h:21`
+    pub botlibsetup: c_int,
+    /// Raven `int debuglines[MAX_DEBUGLINES]`.
+    /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:31`
+    pub debuglines: [c_int; crate::be_aas_debug::be_aas_debug_cpp_consts::MAX_DEBUGLINES as usize],
+    /// Raven `int debuglinevisible[MAX_DEBUGLINES]`.
+    /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:32`
+    pub debuglinevisible:
+        [c_int; crate::be_aas_debug::be_aas_debug_cpp_consts::MAX_DEBUGLINES as usize],
+    /// Raven `static int debugpolygons[MAX_DEBUGPOLYGONS]`.
+    /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:35`
+    pub debugpolygons:
+        [c_int; crate::be_aas_debug::be_aas_debug_cpp_consts::MAX_DEBUGPOLYGONS as usize],
+    /// Raven `static int index` (function-local static in `AAS_ShowReachableAreas`).
+    /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:671`
+    pub index: c_int,
+    /// Raven `static int lastareanum` (function-local static in `AAS_ShowReachableAreas`).
+    /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:671`
+    pub lastareanum: c_int,
+    /// Raven `static float lasttime` (function-local static in `AAS_ShowReachableAreas`).
+    /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:672`
+    pub lasttime: f32,
+    /// Raven `int numdebuglines`.
+    /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:33`
+    pub numdebuglines: c_int,
+    /// Raven `static aas_reachability_t reach` (function-local static in
+    /// `AAS_ShowReachableAreas`).
+    /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:670`
+    pub reach: crate::aasfile::aas_reachability_s::aas_reachability_t,
+    /// Raven `weightconfig_t *weightFileList[MAX_WEIGHT_FILES]`.
+    /// Source: `oracle/codemp/botlib/be_ai_weight.cpp:34`
+    pub weightFileList: [*mut crate::be_ai_weight::weightconfig_s::weightconfig_t;
+        crate::be_ai_weight::weightconfig_s::MAX_WEIGHT_FILES],
 }
 
 impl Default for BotLib {

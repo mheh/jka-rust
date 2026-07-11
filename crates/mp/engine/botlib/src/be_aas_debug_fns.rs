@@ -801,7 +801,7 @@ pub fn AAS_ShowReachability(common: &mut Common, bot: &mut BotLib, reach: *mut a
             let mut cmdmove: vec3_t = [0.0; 3];
             cmdmove[2] = bot.aassettings.phys_jumpvel;
             //
-            let mut r#move = aas_clientmove_t::default();
+            let mut r#move: aas_clientmove_t = core::mem::zeroed();
             crate::be_aas_move::AAS_PredictClientMovement(
                 bot,
                 &mut r#move as *mut aas_clientmove_t,
@@ -849,7 +849,7 @@ pub fn AAS_ShowReachability(common: &mut Common, bot: &mut BotLib, reach: *mut a
             let cmdmove: vec3_t = [dir[0] * speed, dir[1] * speed, dir[2] * speed];
             let velocity: vec3_t = [0.0, 0.0, zvel];
             //
-            let mut r#move = aas_clientmove_t::default();
+            let mut r#move: aas_clientmove_t = core::mem::zeroed();
             crate::be_aas_move::AAS_PredictClientMovement(
                 bot,
                 &mut r#move as *mut aas_clientmove_t,
@@ -891,7 +891,7 @@ pub fn AAS_ShowReachability(common: &mut Common, bot: &mut BotLib, reach: *mut a
             // NOTE: the facenum is the Z velocity
             velocity[2] = (*reach).facenum as f32;
             //
-            let mut r#move = aas_clientmove_t::default();
+            let mut r#move: aas_clientmove_t = core::mem::zeroed();
             crate::be_aas_move::AAS_PredictClientMovement(
                 bot,
                 &mut r#move as *mut aas_clientmove_t,
@@ -953,6 +953,7 @@ pub fn AAS_ShowReachableAreas(common: &mut Common, bot: &mut BotLib, areanum: c_
             AAS_PrintTravelType(bot.reach.traveltype & TRAVELTYPE_MASK);
             bot.botimport.Print.unwrap()(PRT_MESSAGE, c"\n".as_ptr() as *mut core::ffi::c_char);
         }
-        AAS_ShowReachability(common, bot, &mut bot.reach as *mut aas_reachability_t);
+        let __reach_ptr = core::ptr::addr_of_mut!(bot.reach);
+        AAS_ShowReachability(common, bot, __reach_ptr);
     }
 }

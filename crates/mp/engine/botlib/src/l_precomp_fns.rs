@@ -18,7 +18,10 @@ use libc::{abs, ctime, free, sprintf, strcat, strcmp, strcpy, strlen, strncat, s
 
 use crate::l_log_fns::Log_Write;
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory, GetMemory};
-use crate::l_script_fns::FreeScript;
+use crate::l_script_fns::{
+    EndOfScript, FreeScript, LoadScriptFile, LoadScriptMemory, PS_ReadToken, PS_SetBaseFolder,
+    StripDoubleQuotes,
+};
 use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
 
 use crate::l_precomp::builtin_defines::{
@@ -30,7 +33,9 @@ use crate::l_precomp::directive_s::directive_t;
 use crate::l_precomp::operator_s::operator_t;
 use crate::l_precomp::value_s::value_t;
 use crate::l_precomp::indent_s::indent_t;
-use crate::l_precomp::indent_type::{INDENT_ELSE, INDENT_IF, INDENT_IFDEF, INDENT_IFNDEF};
+use crate::l_precomp::indent_type::{
+    INDENT_ELIF, INDENT_ELSE, INDENT_IF, INDENT_IFDEF, INDENT_IFNDEF,
+};
 use crate::l_precomp::path_seperator_consts::{PATHSEPERATOR_CHAR, PATHSEPERATOR_STR};
 use crate::l_precomp::precomp_consts::{
     DEFINEHASHSIZE, MAX_DEFINEPARMS, MAX_OPERATORS, MAX_PATH, MAX_SOURCEFILES, MAX_VALUES,
@@ -106,20 +111,20 @@ pub fn SourceWarning(bot: &mut BotLib, source: *mut source_t, text: *const c_cha
 // above), then forwards the rendered buffer.
 macro_rules! source_error {
     ($bot:expr, $source:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
-        let mut __se_text = [0 as c_char; 1024];
+        let mut __se_text = [0 as ::core::ffi::c_char; 1024];
         unsafe {
-            sprintf(__se_text.as_mut_ptr(), $fmt $(, $arg)*);
+            ::libc::sprintf(__se_text.as_mut_ptr(), $fmt $(, $arg)*);
         }
-        SourceError($bot, $source, __se_text.as_ptr())
+        $crate::l_precomp_fns::SourceError($bot, $source, __se_text.as_ptr())
     }};
 }
 macro_rules! source_warning {
     ($bot:expr, $source:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
-        let mut __sw_text = [0 as c_char; 1024];
+        let mut __sw_text = [0 as ::core::ffi::c_char; 1024];
         unsafe {
-            sprintf(__sw_text.as_mut_ptr(), $fmt $(, $arg)*);
+            ::libc::sprintf(__sw_text.as_mut_ptr(), $fmt $(, $arg)*);
         }
-        SourceWarning($bot, $source, __sw_text.as_ptr())
+        $crate::l_precomp_fns::SourceWarning($bot, $source, __sw_text.as_ptr())
     }};
 }
 pub(crate) use source_error;
@@ -3319,11 +3324,11 @@ pub fn PC_ReadTokenHandle(bot: &mut BotLib, handle: c_int, pc_token: *mut pc_tok
 
         let ret = PC_ReadToken(bot, bot.sourceFiles[handle as usize], &mut token);
         strcpy((*pc_token).string.as_mut_ptr(), token.string.as_ptr());
-        (*pc_token).r#type = token.r#type;
+        (*pc_token).type_ = token.r#type;
         (*pc_token).subtype = token.subtype;
-        (*pc_token).intvalue = token.intvalue;
-        (*pc_token).floatvalue = token.floatvalue;
-        if (*pc_token).r#type == TT_STRING && (*pc_token).string[0] != b'@' as c_char {
+        (*pc_token).intvalue = token.intvalue as c_int;
+        (*pc_token).floatvalue = token.floatvalue as f32;
+        if (*pc_token).type_ == TT_STRING && (*pc_token).string[0] != b'@' as c_char {
             StripDoubleQuotes((*pc_token).string.as_mut_ptr());
         }
 

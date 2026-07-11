@@ -55,10 +55,14 @@ pub struct Engine {
     /// ROFF cache + per-entity playback list — plain `Default` field per
     /// rulings 12 (`mp_engine_qcommon::roff`).
     pub roff: mp_engine_qcommon::roff::RoffSystem,
-    // botlib engine-side state becomes a direct field here (STATE-Q2 CLOSED —
-    // engine-fork-discovery rulings 12/13/43); it lands with the botlib
-    // integration waves, reached via the EngineHostView split-borrow
-    // constructors (ruling 43).
+    /// botlib engine-side state (Raven's scattered `aasworld`/`botimport`/…
+    /// file-scope globals) — a direct, `Default`-initialized field per
+    /// STATE-Q2 CLOSED (engine-fork-discovery rulings 12/13/43), reached via
+    /// the `EngineHostView` split-borrow constructors (ruling 43). All-zero-
+    /// valid (`BotLib::default()` is `mem::zeroed()`, matching Raven's
+    /// zero-initialized BSS globals), so the `alloc_zeroed` mass covers it —
+    /// no explicit `Engine::new` write is required.
+    pub bot: mp_engine_botlib::BotLib,
 }
 
 //TODO: Port ZeroValid for Engine

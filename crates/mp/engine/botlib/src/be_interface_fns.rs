@@ -38,6 +38,25 @@ use mp_qshared::common::mp::botlib::botlib_misc::BOTLIB_API_VERSION;
 use mp_qshared::common::mp::botlib::ea_export_s::ea_export_t;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE};
 use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t};
+use libc::{CLOCKS_PER_SEC, clock};
+use crate::be_aas_bspq3_fns::{AAS_FloatForBSPEpairKey, AAS_IntForBSPEpairKey, AAS_NextBSPEntity, AAS_PointContents, AAS_ValueForBSPEpairKey, AAS_VectorForBSPEpairKey};
+use crate::be_aas_entity::{AAS_EntityInfo, AAS_UpdateEntity};
+use crate::be_aas_main::{AAS_Initialized, AAS_LoadMap, AAS_Setup, AAS_Shutdown, AAS_StartFrame, AAS_Time};
+use crate::be_aas_move::{AAS_PredictClientMovement, AAS_Swimming};
+use crate::be_aas_reach_fns::{AAS_AreaReachability};
+use crate::be_aas_route_fns::{AAS_AreaTravelTimeToGoalArea, AAS_EnableRoutingArea, AAS_PredictRoute};
+use crate::be_aas_routealt_fns::{AAS_AlternativeRouteGoals};
+use crate::be_aas_sample_fns::{AAS_AreaInfo, AAS_BBoxAreas, AAS_PointAreaNum, AAS_PointReachabilityAreaIndex, AAS_PresenceTypeBoundingBox, AAS_TraceAreas};
+use crate::be_ai_char_fns::{BotFreeCharacter, BotLoadCharacter, BotShutdownCharacters, Characteristic_BFloat, Characteristic_BInteger, Characteristic_Float, Characteristic_Integer, Characteristic_String};
+use crate::be_ai_chat_fns::{BotAllocChatState, BotChatLength, BotEnterChat, BotFindMatch, BotFreeChatState, BotGetChatMessage, BotInitialChat, BotLoadChatFile, BotMatchVariable, BotNextConsoleMessage, BotNumConsoleMessages, BotNumInitialChats, BotQueueConsoleMessage, BotRemoveConsoleMessage, BotReplaceSynonyms, BotReplyChat, BotSetChatGender, BotSetChatName, BotShutdownChatAI, StringContains, UnifyWhiteSpaces};
+use crate::be_ai_gen::{GeneticParentsAndChildSelection};
+use crate::be_ai_goal_fns::{BotAllocGoalState, BotAvoidGoalTime, BotChooseLTGItem, BotChooseNBGItem, BotDumpAvoidGoals, BotDumpGoalStack, BotEmptyGoalStack, BotFreeGoalState, BotFreeItemWeights, BotGetLevelItemGoal, BotGetMapLocationGoal, BotGetNextCampSpotGoal, BotGetSecondGoal, BotGetTopGoal, BotGoalName, BotInitLevelItems, BotInterbreedGoalFuzzyLogic, BotItemGoalInVisButNotVisible, BotLoadItemWeights, BotMutateGoalFuzzyLogic, BotPopGoal, BotPushGoal, BotRemoveFromAvoidGoals, BotResetAvoidGoals, BotResetGoalState, BotSaveGoalFuzzyLogic, BotSetAvoidGoalTime, BotShutdownGoalAI, BotTouchingGoal, BotUpdateEntityItems};
+use crate::be_ai_move_fns::{BotAddAvoidSpot, BotAllocMoveState, BotFreeMoveState, BotInitMoveState, BotMoveInDirection, BotMoveToGoal, BotMovementViewTarget, BotPredictVisiblePosition, BotReachabilityArea, BotResetAvoidReach, BotResetLastAvoidReach, BotResetMoveState, BotSetBrushModelTypes, BotShutdownMoveAI};
+use crate::be_ai_weight_fns::{BotShutdownWeights};
+use crate::be_ea_fns::{EA_Action, EA_Alt_Attack, EA_Attack, EA_Command, EA_Crouch, EA_DelayedJump, EA_EndRegular, EA_ForcePower, EA_Gesture, EA_GetInput, EA_Jump, EA_Move, EA_MoveBack, EA_MoveDown, EA_MoveForward, EA_MoveLeft, EA_MoveRight, EA_MoveUp, EA_ResetInput, EA_Respawn, EA_Say, EA_SayTeam, EA_SelectWeapon, EA_Setup, EA_Shutdown, EA_Talk, EA_Use, EA_View};
+use crate::l_libvar_fns::{LibVarDeAllocAll, LibVarGetString, LibVarGetValue, LibVarSet, LibVarValue};
+use crate::l_log_fns::{Log_Open, Log_Shutdown};
+use crate::l_precomp_fns::{PC_AddGlobalDefine, PC_CheckOpenSourceHandles, PC_FreeSourceHandle, PC_LoadGlobalDefines, PC_LoadSourceHandle, PC_ReadTokenHandle, PC_RemoveAllGlobalDefines, PC_SourceFileAndLine};
 
 /// Raven `Sys_MilliSeconds`.
 ///

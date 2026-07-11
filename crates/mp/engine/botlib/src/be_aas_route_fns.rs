@@ -84,15 +84,15 @@ pub fn AAS_RoutingInfo(bot: &mut BotLib) {
 /// Raven `AAS_ClusterAreaNum` — the area's number within its cluster.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:92-111`
-pub fn AAS_ClusterAreaNum(bot: &mut BotLib, cluster: c_int, areanum: c_int) -> c_int {
-    let areacluster = bot.aasworld.areasettings[areanum as usize].cluster;
+pub fn AAS_ClusterAreaNum(bot: &mut BotLib, cluster: c_int, areanum: c_int) -> c_int { unsafe {
+    let areacluster = (*bot.aasworld.areasettings.add(areanum as usize)).cluster;
     if areacluster > 0 {
-        bot.aasworld.areasettings[areanum as usize].clusterareanum
+        (*bot.aasworld.areasettings.add(areanum as usize)).clusterareanum
     } else {
-        let side = (bot.aasworld.portals[(-areacluster) as usize].frontcluster != cluster) as c_int;
-        bot.aasworld.portals[(-areacluster) as usize].clusterareanum[side as usize]
+        let side = ((*bot.aasworld.portals.add((-areacluster) as usize)).frontcluster != cluster) as c_int;
+        (*bot.aasworld.portals.add((-areacluster) as usize)).clusterareanum[side as usize]
     }
-}
+ }}
 
 /// Raven `AAS_InitTravelFlagFromType` — builds the travel-type -> travel-flag table.
 ///
@@ -181,8 +181,8 @@ pub fn AAS_LinkCache(bot: &mut BotLib, cache: *mut aas_routingcache_t) {
 /// Raven `AAS_GetAreaContentsTravelFlags`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:335-358`
-pub fn AAS_GetAreaContentsTravelFlags(bot: &mut BotLib, areanum: c_int) -> c_int {
-    let contents = bot.aasworld.areasettings[areanum as usize].contents;
+pub fn AAS_GetAreaContentsTravelFlags(bot: &mut BotLib, areanum: c_int) -> c_int { unsafe {
+    let contents = (*bot.aasworld.areasettings.add(areanum as usize)).contents;
     let mut tfl: c_int = 0;
     if contents & AREACONTENTS_WATER != 0 {
         tfl |= TFL_WATER;
@@ -202,42 +202,42 @@ pub fn AAS_GetAreaContentsTravelFlags(bot: &mut BotLib, areanum: c_int) -> c_int
     if contents & AREACONTENTS_NOTTEAM2 != 0 {
         tfl |= TFL_NOTTEAM2;
     }
-    if bot.aasworld.areasettings[areanum as usize].areaflags & AREA_BRIDGE != 0 {
+    if (*bot.aasworld.areasettings.add(areanum as usize)).areaflags & AREA_BRIDGE != 0 {
         tfl |= TFL_BRIDGE;
     }
     tfl
-}
+ }}
 
 /// Raven `AAS_AreaContentsTravelFlags_inline`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:365-368`
-pub fn AAS_AreaContentsTravelFlags_inline(bot: &mut BotLib, areanum: c_int) -> c_int {
-    bot.aasworld.areacontentstravelflags[areanum as usize]
-}
+pub fn AAS_AreaContentsTravelFlags_inline(bot: &mut BotLib, areanum: c_int) -> c_int { unsafe {
+    (*bot.aasworld.areacontentstravelflags.add(areanum as usize))
+ }}
 
 /// Raven `AAS_AreaContentsTravelFlags`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:375-378`
-pub fn AAS_AreaContentsTravelFlags(bot: &mut BotLib, areanum: c_int) -> c_int {
-    bot.aasworld.areacontentstravelflags[areanum as usize]
-}
+pub fn AAS_AreaContentsTravelFlags(bot: &mut BotLib, areanum: c_int) -> c_int { unsafe {
+    (*bot.aasworld.areacontentstravelflags.add(areanum as usize))
+ }}
 
 /// Raven `AAS_PortalMaxTravelTime`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:549-576`
-pub fn AAS_PortalMaxTravelTime(bot: &mut BotLib, portalnum: c_int) -> c_int {
-    let portal: *const aas_portal_t = &bot.aasworld.portals[portalnum as usize];
+pub fn AAS_PortalMaxTravelTime(bot: &mut BotLib, portalnum: c_int) -> c_int { unsafe {
+    let portal: *const aas_portal_t = bot.aasworld.portals.add(portalnum as usize);
     unsafe {
         let revreach: *const aas_reversedreachability_t =
-            &bot.aasworld.reversedreachability[(*portal).areanum as usize];
+            bot.aasworld.reversedreachability.add((*portal).areanum as usize);
         let settings: *const aas_areasettings_t =
-            &bot.aasworld.areasettings[(*portal).areanum as usize];
+            bot.aasworld.areasettings.add((*portal).areanum as usize);
         let mut maxt: c_int = 0;
         for _l in 0..(*settings).numreachableareas {
             let mut n = 0usize;
             let mut revlink = (*revreach).first;
             while !revlink.is_null() {
-                let t = bot.aasworld.areatraveltimes[(*portal).areanum as usize][_l as usize][n]
+                let t = (*(*(*bot.aasworld.areatraveltimes.add((*portal).areanum as usize)).add(_l as usize)).add(n))
                     as c_int;
                 if t > maxt {
                     maxt = t;
@@ -248,7 +248,7 @@ pub fn AAS_PortalMaxTravelTime(bot: &mut BotLib, portalnum: c_int) -> c_int {
         }
         maxt
     }
-}
+ }}
 
 /// Raven `AAS_BridgeWalkable` — always false; bridges are not (yet) walkable.
 ///
@@ -308,7 +308,7 @@ pub fn AAS_AreaTravelTime(bot: &mut BotLib, areanum: c_int, start: vec3_t, end: 
 pub fn AAS_ReadCache(bot: &mut BotLib, fp: fileHandle_t) -> *mut aas_routingcache_t {
     unsafe {
         let mut size: c_int = 0;
-        bot.botimport.FS_Read(
+        (bot.botimport.FS_Read.unwrap())(
             &mut size as *mut c_int as *mut std::ffi::c_void,
             std::mem::size_of::<c_int>() as c_int,
             fp,
@@ -316,7 +316,7 @@ pub fn AAS_ReadCache(bot: &mut BotLib, fp: fileHandle_t) -> *mut aas_routingcach
         let cache = crate::l_memory_fns::GetMemory(bot, size as c_ulong) as *mut aas_routingcache_t;
         (*cache).size = size;
         let size_field = std::mem::size_of::<c_int>() as c_int;
-        bot.botimport.FS_Read(
+        (bot.botimport.FS_Read.unwrap())(
             (cache as *mut u8).add(size_field as usize) as *mut std::ffi::c_void,
             size - size_field,
             fp,
@@ -335,7 +335,7 @@ pub fn AAS_ReadCache(bot: &mut BotLib, fp: fileHandle_t) -> *mut aas_routingcach
 /// Raven `AAS_UpdateAreaRoutingCache` — Dijkstra-like area routing-cache fill.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:1271-1375`
-pub fn AAS_UpdateAreaRoutingCache(bot: &mut BotLib, areacache: *mut aas_routingcache_t) {
+pub fn AAS_UpdateAreaRoutingCache(bot: &mut BotLib, areacache: *mut aas_routingcache_t) { unsafe {
     unsafe {
         // §19: `startareatraveltimes` is a local array Raven reads via the
         // `curupdate->areatraveltimes` pointer before any of it is written by
@@ -343,7 +343,7 @@ pub fn AAS_UpdateAreaRoutingCache(bot: &mut BotLib, areacache: *mut aas_routingc
         let mut startareatraveltimes: [u16; 128] = [0; 128];
 
         let numreachabilityareas =
-            bot.aasworld.clusters[(*areacache).cluster as usize].numreachabilityareas;
+            (*bot.aasworld.clusters.add((*areacache).cluster as usize)).numreachabilityareas;
         bot.aasworld.frameroutingupdates += 1;
 
         let badtravelflags = !(*areacache).travelflags;
@@ -355,15 +355,15 @@ pub fn AAS_UpdateAreaRoutingCache(bot: &mut BotLib, areacache: *mut aas_routingc
         }
 
         let curupdate: *mut aas_routingupdate_t =
-            &mut bot.aasworld.areaupdate[clusterareanum as usize];
+            bot.aasworld.areaupdate.add(clusterareanum as usize);
         (*curupdate).areanum = (*areacache).areanum;
         (*curupdate).areatraveltimes = startareatraveltimes.as_mut_ptr();
-        (*curupdate).tmptraveltime = (*areacache).starttraveltime;
+        (*curupdate).tmptraveltime = (*areacache).starttraveltime as u16;
 
         *(*areacache)
             .traveltimes
             .as_mut_ptr()
-            .add(clusterareanum as usize) = (*areacache).starttraveltime;
+            .add(clusterareanum as usize) = (*areacache).starttraveltime as u16;
 
         (*curupdate).next = std::ptr::null_mut();
         (*curupdate).prev = std::ptr::null_mut();
@@ -383,19 +383,19 @@ pub fn AAS_UpdateAreaRoutingCache(bot: &mut BotLib, areacache: *mut aas_routingc
             (*curupdate).inlist = qfalse;
 
             let revreach: *const aas_reversedreachability_t =
-                &bot.aasworld.reversedreachability[(*curupdate).areanum as usize];
+                bot.aasworld.reversedreachability.add((*curupdate).areanum as usize);
             let mut i = 0usize;
             let mut revlink = (*revreach).first;
             while !revlink.is_null() {
                 let linknum = (*revlink).linknum;
-                let reach: *const aas_reachability_t = &bot.aasworld.reachability[linknum as usize];
+                let reach: *const aas_reachability_t = bot.aasworld.reachability.add(linknum as usize);
 
                 if AAS_TravelFlagForType_inline(bot, (*reach).traveltype) & badtravelflags != 0 {
                     revlink = (*revlink).next;
                     i += 1;
                     continue;
                 }
-                if bot.aasworld.areasettings[(*reach).areanum as usize].areaflags & AREA_DISABLED
+                if (*bot.aasworld.areasettings.add((*reach).areanum as usize)).areaflags & AREA_DISABLED
                     != 0
                 {
                     revlink = (*revlink).next;
@@ -408,7 +408,7 @@ pub fn AAS_UpdateAreaRoutingCache(bot: &mut BotLib, areacache: *mut aas_routingc
                     continue;
                 }
                 let nextareanum = (*revlink).areanum;
-                let cluster = bot.aasworld.areasettings[nextareanum as usize].cluster;
+                let cluster = (*bot.aasworld.areasettings.add(nextareanum as usize)).cluster;
                 if cluster > 0 && cluster != (*areacache).cluster {
                     revlink = (*revlink).next;
                     i += 1;
@@ -435,17 +435,16 @@ pub fn AAS_UpdateAreaRoutingCache(bot: &mut BotLib, areacache: *mut aas_routingc
                         .as_mut_ptr()
                         .add(clusterareanum as usize) = t;
                     *(*areacache).reachabilities.add(clusterareanum as usize) = (linknum
-                        - bot.aasworld.areasettings[nextareanum as usize].firstreachablearea)
+                        - (*bot.aasworld.areasettings.add(nextareanum as usize)).firstreachablearea)
                         as u8;
                     let nextupdate: *mut aas_routingupdate_t =
-                        &mut bot.aasworld.areaupdate[clusterareanum as usize];
+                        bot.aasworld.areaupdate.add(clusterareanum as usize);
                     (*nextupdate).areanum = nextareanum;
                     (*nextupdate).tmptraveltime = t;
-                    (*nextupdate).areatraveltimes = bot.aasworld.areatraveltimes
-                        [nextareanum as usize][(linknum
-                        - bot.aasworld.areasettings[nextareanum as usize].firstreachablearea)
-                        as usize]
-                        .as_mut_ptr();
+                    (*nextupdate).areatraveltimes = *(*bot.aasworld.areatraveltimes.add(nextareanum as usize))
+                        .add((linknum
+                            - (*bot.aasworld.areasettings.add(nextareanum as usize))
+                                .firstreachablearea) as usize);
                     if (*nextupdate).inlist == qfalse {
                         (*nextupdate).next = std::ptr::null_mut();
                         (*nextupdate).prev = updatelistend;
@@ -463,12 +462,12 @@ pub fn AAS_UpdateAreaRoutingCache(bot: &mut BotLib, areacache: *mut aas_routingc
             }
         }
     }
-}
+ }}
 
 /// Raven `AAS_ReachabilityFromNum` — copies out one reachability by index.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:1902-1915`
-pub fn AAS_ReachabilityFromNum(bot: &mut BotLib, num: c_int, reach: *mut aas_reachability_s) {
+pub fn AAS_ReachabilityFromNum(bot: &mut BotLib, num: c_int, reach: *mut aas_reachability_s) { unsafe {
     unsafe {
         if bot.aasworld.initialized == qfalse {
             std::ptr::write_bytes(reach, 0, 1);
@@ -478,14 +477,14 @@ pub fn AAS_ReachabilityFromNum(bot: &mut BotLib, num: c_int, reach: *mut aas_rea
             std::ptr::write_bytes(reach, 0, 1);
             return;
         }
-        *reach = bot.aasworld.reachability[num as usize];
+        *reach = (*bot.aasworld.reachability.add(num as usize));
     }
-}
+ }}
 
 /// Raven `AAS_NextAreaReachability`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:1922-1950`
-pub fn AAS_NextAreaReachability(bot: &mut BotLib, areanum: c_int, reachnum: c_int) -> c_int {
+pub fn AAS_NextAreaReachability(bot: &mut BotLib, areanum: c_int, reachnum: c_int) -> c_int { unsafe {
     if bot.aasworld.initialized == qfalse {
         return 0;
     }
@@ -499,7 +498,7 @@ pub fn AAS_NextAreaReachability(bot: &mut BotLib, areanum: c_int, reachnum: c_in
         }
         return 0;
     }
-    let settings = bot.aasworld.areasettings[areanum as usize];
+    let settings = (*bot.aasworld.areasettings.add(areanum as usize));
     if reachnum == 0 {
         return settings.firstreachablearea;
     }
@@ -518,12 +517,12 @@ pub fn AAS_NextAreaReachability(bot: &mut BotLib, areanum: c_int, reachnum: c_in
         return 0;
     }
     reachnum
-}
+ }}
 
 /// Raven `AAS_NextModelReachability`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:1957-1977`
-pub fn AAS_NextModelReachability(bot: &mut BotLib, num: c_int, modelnum: c_int) -> c_int {
+pub fn AAS_NextModelReachability(bot: &mut BotLib, num: c_int, modelnum: c_int) -> c_int { unsafe {
     let mut num = num;
     if num <= 0 {
         num = 1;
@@ -533,7 +532,7 @@ pub fn AAS_NextModelReachability(bot: &mut BotLib, num: c_int, modelnum: c_int) 
         num += 1;
     }
     for i in num..bot.aasworld.reachabilitysize {
-        let reach = &bot.aasworld.reachability[i as usize];
+        let reach = &*bot.aasworld.reachability.add(i as usize);
         if (reach.traveltype & TRAVELTYPE_MASK) == TRAVEL_ELEVATOR {
             if reach.facenum == modelnum {
                 return i;
@@ -545,7 +544,7 @@ pub fn AAS_NextModelReachability(bot: &mut BotLib, num: c_int, modelnum: c_int) 
         }
     }
     0
-}
+ }}
 
 /// Raven `DistancePointToLine`.
 ///
@@ -570,12 +569,12 @@ pub fn AAS_AreaVisible(_srcarea: c_int, _destarea: c_int) -> c_int {
 /// Raven `AAS_RemoveRoutingCacheInCluster` — frees all per-area cache in a cluster.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:231-249`
-pub fn AAS_RemoveRoutingCacheInCluster(bot: &mut BotLib, clusternum: c_int) {
+pub fn AAS_RemoveRoutingCacheInCluster(bot: &mut BotLib, clusternum: c_int) { unsafe {
     unsafe {
         if bot.aasworld.clusterareacache.is_null() {
             return;
         }
-        let cluster: *const aas_cluster_t = &bot.aasworld.clusters[clusternum as usize];
+        let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(clusternum as usize);
         for i in 0..(*cluster).numareas {
             let mut cache =
                 *(*bot.aasworld.clusterareacache.add(clusternum as usize)).add(i as usize);
@@ -588,7 +587,7 @@ pub fn AAS_RemoveRoutingCacheInCluster(bot: &mut BotLib, clusternum: c_int) {
                 std::ptr::null_mut();
         }
     }
-}
+ }}
 
 /// Raven `AAS_InitAreaContentsTravelFlags` — rebuilds the per-area content
 /// travel-flag lookup table.
@@ -613,7 +612,7 @@ pub fn AAS_InitAreaContentsTravelFlags(bot: &mut BotLib) {
 /// Raven `AAS_CreateReversedReachability` — builds reversed reachability links.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:402-450`
-pub fn AAS_CreateReversedReachability(bot: &mut BotLib) {
+pub fn AAS_CreateReversedReachability(bot: &mut BotLib) { unsafe {
     unsafe {
         if !bot.aasworld.reversedreachability.is_null() {
             crate::l_memory_fns::FreeMemory(bot, bot.aasworld.reversedreachability as *mut ());
@@ -629,7 +628,7 @@ pub fn AAS_CreateReversedReachability(bot: &mut BotLib) {
         );
 
         for i in 1..bot.aasworld.numareas {
-            let settings: *const aas_areasettings_t = &bot.aasworld.areasettings[i as usize];
+            let settings: *const aas_areasettings_t = bot.aasworld.areasettings.add(i as usize);
             if (*settings).numreachableareas >= 128 {
                 bot.botimport.Print.unwrap()(
                     PRT_WARNING,
@@ -640,7 +639,7 @@ pub fn AAS_CreateReversedReachability(bot: &mut BotLib) {
             let mut n = 0;
             while n < (*settings).numreachableareas && n < 128 {
                 let reach: *const aas_reachability_t =
-                    &bot.aasworld.reachability[((*settings).firstreachablearea + n) as usize];
+                    bot.aasworld.reachability.add(((*settings).firstreachablearea + n) as usize);
 
                 let revlink = ptr as *mut aas_reversedlink_t;
                 ptr = ptr.add(std::mem::size_of::<aas_reversedlink_t>());
@@ -667,12 +666,12 @@ pub fn AAS_CreateReversedReachability(bot: &mut BotLib) {
             }
         }
     }
-}
+ }}
 
 /// Raven `AAS_CalculateAreaTravelTimes` — precomputes per-reachability travel times.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:483-542`
-pub fn AAS_CalculateAreaTravelTimes(bot: &mut BotLib) {
+pub fn AAS_CalculateAreaTravelTimes(bot: &mut BotLib) { unsafe {
     unsafe {
         if !bot.aasworld.areatraveltimes.is_null() {
             crate::l_memory_fns::FreeMemory(bot, bot.aasworld.areatraveltimes as *mut ());
@@ -680,8 +679,8 @@ pub fn AAS_CalculateAreaTravelTimes(bot: &mut BotLib) {
         let mut size = bot.aasworld.numareas as usize * std::mem::size_of::<*mut *mut u16>();
         for i in 0..bot.aasworld.numareas {
             let revreach: *const aas_reversedreachability_t =
-                &bot.aasworld.reversedreachability[i as usize];
-            let settings: *const aas_areasettings_t = &bot.aasworld.areasettings[i as usize];
+                bot.aasworld.reversedreachability.add(i as usize);
+            let settings: *const aas_areasettings_t = bot.aasworld.areasettings.add(i as usize);
             size += (*settings).numreachableareas as usize * std::mem::size_of::<*mut u16>();
             size += (*settings).numreachableareas as usize
                 * (*revreach).numlinks as usize
@@ -693,8 +692,8 @@ pub fn AAS_CalculateAreaTravelTimes(bot: &mut BotLib) {
 
         for i in 0..bot.aasworld.numareas {
             let revreach: *const aas_reversedreachability_t =
-                &bot.aasworld.reversedreachability[i as usize];
-            let settings: *const aas_areasettings_t = &bot.aasworld.areasettings[i as usize];
+                bot.aasworld.reversedreachability.add(i as usize);
+            let settings: *const aas_areasettings_t = bot.aasworld.areasettings.add(i as usize);
 
             *bot.aasworld.areatraveltimes.add(i as usize) = ptr as *mut *mut u16;
             ptr = ptr.add((*settings).numreachableareas as usize * std::mem::size_of::<*mut u16>());
@@ -704,12 +703,12 @@ pub fn AAS_CalculateAreaTravelTimes(bot: &mut BotLib) {
                 ptr = ptr.add((*revreach).numlinks as usize * std::mem::size_of::<u16>());
 
                 let reach: *const aas_reachability_t =
-                    &bot.aasworld.reachability[((*settings).firstreachablearea + l) as usize];
+                    bot.aasworld.reachability.add(((*settings).firstreachablearea + l) as usize);
 
                 let mut n = 0usize;
                 let mut revlink = (*revreach).first;
                 while !revlink.is_null() {
-                    let end = bot.aasworld.reachability[(*revlink).linknum as usize].end;
+                    let end = (*bot.aasworld.reachability.add((*revlink).linknum as usize)).end;
                     let tt = AAS_AreaTravelTime(bot, i, end, (*reach).start);
                     *(*(*bot.aasworld.areatraveltimes.add(i as usize)).add(l as usize)).add(n) = tt;
                     revlink = (*revlink).next;
@@ -718,7 +717,7 @@ pub fn AAS_CalculateAreaTravelTimes(bot: &mut BotLib) {
             }
         }
     }
-}
+ }}
 
 /// Raven `AAS_InitPortalMaxTravelTimes`.
 ///
@@ -743,12 +742,12 @@ pub fn AAS_InitPortalMaxTravelTimes(bot: &mut BotLib) {
 /// leading toward a portal), returns whether one was freed.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:678-710`
-pub fn AAS_FreeOldestCache(bot: &mut BotLib) -> c_int {
+pub fn AAS_FreeOldestCache(bot: &mut BotLib) -> c_int { unsafe {
     unsafe {
         let mut cache = bot.aasworld.oldestcache;
         while !cache.is_null() {
             if (*cache).r#type == CACHETYPE_AREA
-                && bot.aasworld.areasettings[(*cache).areanum as usize].cluster < 0
+                && (*bot.aasworld.areasettings.add((*cache).areanum as usize)).cluster < 0
             {
                 cache = (*cache).time_next;
                 continue;
@@ -783,7 +782,7 @@ pub fn AAS_FreeOldestCache(bot: &mut BotLib) -> c_int {
             qfalse
         }
     }
-}
+ }}
 
 /// Raven `AAS_AllocRoutingCache` — allocates a routing-cache block sized for
 /// `numtraveltimes` entries.
@@ -809,13 +808,13 @@ pub fn AAS_AllocRoutingCache(bot: &mut BotLib, numtraveltimes: c_int) -> *mut aa
 /// Raven `AAS_FreeAllClusterAreaCache`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:741-766`
-pub fn AAS_FreeAllClusterAreaCache(bot: &mut BotLib) {
+pub fn AAS_FreeAllClusterAreaCache(bot: &mut BotLib) { unsafe {
     unsafe {
         if bot.aasworld.clusterareacache.is_null() {
             return;
         }
         for i in 0..bot.aasworld.numclusters {
-            let cluster: *const aas_cluster_t = &bot.aasworld.clusters[i as usize];
+            let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(i as usize);
             for j in 0..(*cluster).numareas {
                 let mut cache = *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize);
                 while !cache.is_null() {
@@ -830,16 +829,16 @@ pub fn AAS_FreeAllClusterAreaCache(bot: &mut BotLib) {
         crate::l_memory_fns::FreeMemory(bot, bot.aasworld.clusterareacache as *mut ());
         bot.aasworld.clusterareacache = std::ptr::null_mut();
     }
-}
+ }}
 
 /// Raven `AAS_InitClusterAreaCache` — allocates the per-cluster/per-area
 /// routing-cache pointer table.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:773-795`
-pub fn AAS_InitClusterAreaCache(bot: &mut BotLib) {
+pub fn AAS_InitClusterAreaCache(bot: &mut BotLib) { unsafe {
     let mut size = 0i32;
     for i in 0..bot.aasworld.numclusters {
-        size += bot.aasworld.clusters[i as usize].numareas;
+        size += (*bot.aasworld.clusters.add(i as usize)).numareas;
     }
     unsafe {
         let mut ptr = crate::l_memory_fns::GetClearedMemory(
@@ -856,12 +855,12 @@ pub fn AAS_InitClusterAreaCache(bot: &mut BotLib) {
         for i in 0..bot.aasworld.numclusters {
             *bot.aasworld.clusterareacache.add(i as usize) = ptr as *mut *mut aas_routingcache_t;
             ptr = ptr.add(
-                bot.aasworld.clusters[i as usize].numareas as usize
+                (*bot.aasworld.clusters.add(i as usize)).numareas as usize
                     * std::mem::size_of::<*mut aas_routingcache_t>(),
             );
         }
     }
-}
+ }}
 
 /// Raven `AAS_FreeAllPortalCache`.
 ///
@@ -900,14 +899,14 @@ pub fn AAS_InitPortalCache(bot: &mut BotLib) {
 /// scratch arrays sized to the widest cluster/portal set.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:840-863`
-pub fn AAS_InitRoutingUpdate(bot: &mut BotLib) {
+pub fn AAS_InitRoutingUpdate(bot: &mut BotLib) { unsafe {
     if !bot.aasworld.areaupdate.is_null() {
         crate::l_memory_fns::FreeMemory(bot, bot.aasworld.areaupdate as *mut ());
     }
     let mut maxreachabilityareas = 0;
     for i in 0..bot.aasworld.numclusters {
-        if bot.aasworld.clusters[i as usize].numreachabilityareas > maxreachabilityareas {
-            maxreachabilityareas = bot.aasworld.clusters[i as usize].numreachabilityareas;
+        if (*bot.aasworld.clusters.add(i as usize)).numreachabilityareas > maxreachabilityareas {
+            maxreachabilityareas = (*bot.aasworld.clusters.add(i as usize)).numreachabilityareas;
         }
     }
     bot.aasworld.areaupdate = crate::l_memory_fns::GetClearedMemory(
@@ -923,12 +922,12 @@ pub fn AAS_InitRoutingUpdate(bot: &mut BotLib) {
         ((bot.aasworld.numportals + 1) * std::mem::size_of::<aas_routingupdate_t>() as c_int)
             as c_ulong,
     ) as *mut aas_routingupdate_t;
-}
+ }}
 
 /// Raven `AAS_WriteRouteCache` — writes the `.rcd` route-cache dump.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:917-1007`
-pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
+pub fn AAS_WriteRouteCache(bot: &mut BotLib) { unsafe {
     unsafe {
         let mut numportalcache = 0;
         for i in 0..bot.aasworld.numareas {
@@ -940,7 +939,7 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
         }
         let mut numareacache = 0;
         for i in 0..bot.aasworld.numclusters {
-            let cluster: *const aas_cluster_t = &bot.aasworld.clusters[i as usize];
+            let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(i as usize);
             for j in 0..(*cluster).numareas {
                 let mut cache = *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize);
                 while !cache.is_null() {
@@ -950,9 +949,12 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
             }
         }
 
-        let filename = format!("maps/{}.rcd", bot.aasworld.mapname);
+        let mapname_str =
+            core::ffi::CStr::from_ptr(bot.aasworld.mapname.as_ptr()).to_string_lossy();
+        let filename = format!("maps/{}.rcd", mapname_str);
+        let c_filename = std::ffi::CString::new(filename.clone()).unwrap_or_default();
         let mut fp: fileHandle_t = 0;
-        bot.botimport.FS_FOpenFile(&filename, &mut fp, FS_WRITE);
+        (bot.botimport.FS_FOpenFile.unwrap())(c_filename.as_ptr(), &mut fp, FS_WRITE);
         if fp == 0 {
             let msg = std::ffi::CString::new(format!("Unable to open file: {}\n", filename))
                 .unwrap_or_default();
@@ -977,7 +979,7 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
         ) as c_int;
         routecacheheader.numportalcache = numportalcache;
         routecacheheader.numareacache = numareacache;
-        bot.botimport.FS_Write(
+        (bot.botimport.FS_Write.unwrap())(
             &routecacheheader as *const _ as *const std::ffi::c_void,
             std::mem::size_of::<crate::be_aas_route::routecacheheader_t>() as c_int,
             fp,
@@ -987,19 +989,17 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
         for i in 0..bot.aasworld.numareas {
             let mut cache = *bot.aasworld.portalcache.add(i as usize);
             while !cache.is_null() {
-                bot.botimport
-                    .FS_Write(cache as *const std::ffi::c_void, (*cache).size, fp);
+                (bot.botimport.FS_Write.unwrap())(cache as *const std::ffi::c_void, (*cache).size, fp);
                 totalsize += (*cache).size;
                 cache = (*cache).next;
             }
         }
         for i in 0..bot.aasworld.numclusters {
-            let cluster: *const aas_cluster_t = &bot.aasworld.clusters[i as usize];
+            let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(i as usize);
             for j in 0..(*cluster).numareas {
                 let mut cache = *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize);
                 while !cache.is_null() {
-                    bot.botimport
-                        .FS_Write(cache as *const std::ffi::c_void, (*cache).size, fp);
+                    (bot.botimport.FS_Write.unwrap())(cache as *const std::ffi::c_void, (*cache).size, fp);
                     totalsize += (*cache).size;
                     cache = (*cache).next;
                 }
@@ -1007,7 +1007,7 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
         }
         // NOTE: the visarea write pass is commented out in the oracle
         // (be_aas_route.cpp:988-1002); not transcribed.
-        bot.botimport.FS_FCloseFile(fp);
+        (bot.botimport.FS_FCloseFile.unwrap())(fp);
         let msg = std::ffi::CString::new(format!("\nroute cache written to {}\n", filename))
             .unwrap_or_default();
         bot.botimport.Print.unwrap()(PRT_MESSAGE, msg.as_ptr() as *mut c_char);
@@ -1017,7 +1017,7 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
             totalsize,
         );
     }
-}
+ }}
 
 /// Raven `AAS_ReadRouteCache` — reads back the `.rcd` route-cache dump if the
 /// map/CRC/version match.
@@ -1025,14 +1025,17 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:1033-1117`
 pub fn AAS_ReadRouteCache(bot: &mut BotLib) -> c_int {
     unsafe {
-        let filename = format!("maps/{}.rcd", bot.aasworld.mapname);
+        let mapname_str =
+            core::ffi::CStr::from_ptr(bot.aasworld.mapname.as_ptr()).to_string_lossy();
+        let filename = format!("maps/{}.rcd", mapname_str);
+        let c_filename = std::ffi::CString::new(filename.clone()).unwrap_or_default();
         let mut fp: fileHandle_t = 0;
-        bot.botimport.FS_FOpenFile(&filename, &mut fp, FS_READ);
+        (bot.botimport.FS_FOpenFile.unwrap())(c_filename.as_ptr(), &mut fp, FS_READ);
         if fp == 0 {
             return qfalse;
         }
         let mut routecacheheader = crate::be_aas_route::routecacheheader_t::default();
-        bot.botimport.FS_Read(
+        (bot.botimport.FS_Read.unwrap())(
             &mut routecacheheader as *mut _ as *mut std::ffi::c_void,
             std::mem::size_of::<crate::be_aas_route::routecacheheader_t>() as c_int,
             fp,
@@ -1104,7 +1107,7 @@ pub fn AAS_ReadRouteCache(bot: &mut BotLib) -> c_int {
         }
         // NOTE: the visarea read pass is commented out in the oracle
         // (be_aas_route.cpp:1102-1113); not transcribed.
-        bot.botimport.FS_FCloseFile(fp);
+        (bot.botimport.FS_FCloseFile.unwrap())(fp);
         qtrue
     }
 }
@@ -1113,7 +1116,7 @@ pub fn AAS_ReadRouteCache(bot: &mut BotLib) -> c_int {
 /// areas its inter-area trace passes through.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:1126-1191`
-pub fn AAS_InitReachabilityAreas(bot: &mut BotLib) {
+pub fn AAS_InitReachabilityAreas(bot: &mut BotLib) { unsafe {
     // §19: `areas` is Raven's uninitialized local scratch buffer, only the
     // first `numareas` entries of which are ever read (written by
     // `AAS_TraceAreas` before use in every reachable branch); zero-init here.
@@ -1141,7 +1144,7 @@ pub fn AAS_InitReachabilityAreas(bot: &mut BotLib) {
 
     let mut numreachareas = 0;
     for i in 0..bot.aasworld.reachabilitysize {
-        let reach = bot.aasworld.reachability[i as usize];
+        let reach = (*bot.aasworld.reachability.add(i as usize));
         let mut numareas = 0;
         match reach.traveltype & TRAVELTYPE_MASK {
             t if t == TRAVEL_BARRIERJUMP || t == TRAVEL_WATERJUMP => {
@@ -1202,7 +1205,7 @@ pub fn AAS_InitReachabilityAreas(bot: &mut BotLib) {
             }
         }
     }
-}
+ }}
 
 /// Raven `AAS_NearestHideArea` — best reachable area out of enemy sight, near
 /// the source area, avoiding the enemy's position.
@@ -1217,7 +1220,7 @@ pub fn AAS_NearestHideArea(
     enemyorigin: vec3_t,
     enemyareanum: c_int,
     travelflags: c_int,
-) -> c_int {
+) -> c_int { unsafe {
     unsafe {
         // Function-scope static `hidetraveltimes` (fork-3 rule): genuine
         // cross-frame state → a field on the owning host struct.
@@ -1235,7 +1238,7 @@ pub fn AAS_NearestHideArea(
 
         let badtravelflags = !travelflags;
 
-        let curupdate: *mut aas_routingupdate_t = &mut bot.aasworld.areaupdate[areanum as usize];
+        let curupdate: *mut aas_routingupdate_t = bot.aasworld.areaupdate.add(areanum as usize);
         (*curupdate).areanum = areanum;
         (*curupdate).start = origin;
         (*curupdate).areatraveltimes =
@@ -1260,13 +1263,13 @@ pub fn AAS_NearestHideArea(
             (*curupdate).inlist = qfalse;
 
             let numreach =
-                bot.aasworld.areasettings[(*curupdate).areanum as usize].numreachableareas;
+                (*bot.aasworld.areasettings.add((*curupdate).areanum as usize)).numreachableareas;
             let firstreach =
-                bot.aasworld.areasettings[(*curupdate).areanum as usize].firstreachablearea;
+                (*bot.aasworld.areasettings.add((*curupdate).areanum as usize)).firstreachablearea;
 
             for i in 0..numreach {
                 let reach: *const aas_reachability_t =
-                    &bot.aasworld.reachability[(firstreach + i) as usize];
+                    bot.aasworld.reachability.add((firstreach + i) as usize);
 
                 if AAS_TravelFlagForType_inline(bot, (*reach).traveltype) & badtravelflags != 0 {
                     continue;
@@ -1345,7 +1348,7 @@ pub fn AAS_NearestHideArea(
                     }
                     *bot.hidetraveltimes.add(nextareanum as usize) = t;
                     let nextupdate: *mut aas_routingupdate_t =
-                        &mut bot.aasworld.areaupdate[nextareanum as usize];
+                        bot.aasworld.areaupdate.add(nextareanum as usize);
                     (*nextupdate).areanum = nextareanum;
                     (*nextupdate).tmptraveltime = t;
                     (*nextupdate).start = (*reach).end;
@@ -1365,20 +1368,20 @@ pub fn AAS_NearestHideArea(
         }
         bestarea
     }
-}
+ }}
 
 /// Raven `AAS_RemoveRoutingCacheUsingArea` — invalidates all cache that could
 /// route through `areanum` (its cluster's, or both sides if it's a portal;
 /// always the portal cache).
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:256-284`
-pub fn AAS_RemoveRoutingCacheUsingArea(bot: &mut BotLib, areanum: c_int) {
-    let clusternum = bot.aasworld.areasettings[areanum as usize].cluster;
+pub fn AAS_RemoveRoutingCacheUsingArea(bot: &mut BotLib, areanum: c_int) { unsafe {
+    let clusternum = (*bot.aasworld.areasettings.add(areanum as usize)).cluster;
     if clusternum > 0 {
         AAS_RemoveRoutingCacheInCluster(bot, clusternum);
     } else {
-        let front = bot.aasworld.portals[(-clusternum) as usize].frontcluster;
-        let back = bot.aasworld.portals[(-clusternum) as usize].backcluster;
+        let front = (*bot.aasworld.portals.add((-clusternum) as usize)).frontcluster;
+        let back = (*bot.aasworld.portals.add((-clusternum) as usize)).backcluster;
         AAS_RemoveRoutingCacheInCluster(bot, front);
         AAS_RemoveRoutingCacheInCluster(bot, back);
     }
@@ -1393,7 +1396,7 @@ pub fn AAS_RemoveRoutingCacheUsingArea(bot: &mut BotLib, areanum: c_int) {
             *bot.aasworld.portalcache.add(i as usize) = std::ptr::null_mut();
         }
     }
-}
+ }}
 
 /// Raven `AAS_FreeRoutingCaches` — tears down all routing-cache-related state.
 ///
@@ -1444,7 +1447,7 @@ pub fn AAS_GetAreaRoutingCache(
     clusternum: c_int,
     areanum: c_int,
     travelflags: c_int,
-) -> *mut aas_routingcache_t {
+) -> *mut aas_routingcache_t { unsafe {
     unsafe {
         let clusterareanum = AAS_ClusterAreaNum(bot, clusternum, areanum);
         let clustercache =
@@ -1459,11 +1462,11 @@ pub fn AAS_GetAreaRoutingCache(
         if cache.is_null() {
             cache = AAS_AllocRoutingCache(
                 bot,
-                bot.aasworld.clusters[clusternum as usize].numreachabilityareas,
+                (*bot.aasworld.clusters.add(clusternum as usize)).numreachabilityareas,
             );
             (*cache).cluster = clusternum;
             (*cache).areanum = areanum;
-            (*cache).origin = bot.aasworld.areas[areanum as usize].center;
+            (*cache).origin = (*bot.aasworld.areas.add(areanum as usize)).center;
             (*cache).starttraveltime = 1.0;
             (*cache).travelflags = travelflags;
             (*cache).prev = std::ptr::null_mut();
@@ -1482,13 +1485,13 @@ pub fn AAS_GetAreaRoutingCache(
         AAS_LinkCache(bot, cache);
         cache
     }
-}
+ }}
 
 /// Raven `AAS_EnableRoutingArea` — enables/disables/queries an area for
 /// routing.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:291-318`
-pub fn AAS_EnableRoutingArea(bot: &mut BotLib, areanum: c_int, enable: c_int) -> c_int {
+pub fn AAS_EnableRoutingArea(bot: &mut BotLib, areanum: c_int, enable: c_int) -> c_int { unsafe {
     if areanum <= 0 || areanum >= bot.aasworld.numareas {
         if bot.bot_developer != 0 {
             unsafe {
@@ -1501,22 +1504,22 @@ pub fn AAS_EnableRoutingArea(bot: &mut BotLib, areanum: c_int, enable: c_int) ->
         }
         return 0;
     }
-    let flags = bot.aasworld.areasettings[areanum as usize].areaflags & AREA_DISABLED;
+    let flags = (*bot.aasworld.areasettings.add(areanum as usize)).areaflags & AREA_DISABLED;
     if enable < 0 {
         return (flags == 0) as c_int;
     }
     if enable != 0 {
-        bot.aasworld.areasettings[areanum as usize].areaflags &= !AREA_DISABLED;
+        (*bot.aasworld.areasettings.add(areanum as usize)).areaflags &= !AREA_DISABLED;
     } else {
-        bot.aasworld.areasettings[areanum as usize].areaflags |= AREA_DISABLED;
+        (*bot.aasworld.areasettings.add(areanum as usize)).areaflags |= AREA_DISABLED;
     }
     if (flags & AREA_DISABLED)
-        != (bot.aasworld.areasettings[areanum as usize].areaflags & AREA_DISABLED)
+        != ((*bot.aasworld.areasettings.add(areanum as usize)).areaflags & AREA_DISABLED)
     {
         AAS_RemoveRoutingCacheUsingArea(bot, areanum);
     }
     (flags == 0) as c_int
-}
+ }}
 
 /// Raven `AAS_InitRouting` — one-time (per-map) routing subsystem init.
 ///
@@ -1544,20 +1547,20 @@ pub fn AAS_InitRouting(bot: &mut BotLib) {
 /// Raven `AAS_UpdatePortalRoutingCache` — Dijkstra-like portal routing-cache fill.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:1428-1519`
-pub fn AAS_UpdatePortalRoutingCache(bot: &mut BotLib, portalcache: *mut aas_routingcache_t) {
+pub fn AAS_UpdatePortalRoutingCache(bot: &mut BotLib, portalcache: *mut aas_routingcache_t) { unsafe {
     unsafe {
         let curupdate: *mut aas_routingupdate_t =
-            &mut bot.aasworld.portalupdate[bot.aasworld.numportals as usize];
+            bot.aasworld.portalupdate.add(bot.aasworld.numportals as usize);
         (*curupdate).cluster = (*portalcache).cluster;
         (*curupdate).areanum = (*portalcache).areanum;
-        (*curupdate).tmptraveltime = (*portalcache).starttraveltime;
+        (*curupdate).tmptraveltime = (*portalcache).starttraveltime as u16;
 
-        let clusternum = bot.aasworld.areasettings[(*portalcache).areanum as usize].cluster;
+        let clusternum = (*bot.aasworld.areasettings.add((*portalcache).areanum as usize)).cluster;
         if clusternum < 0 {
             *(*portalcache)
                 .traveltimes
                 .as_mut_ptr()
-                .add((-clusternum) as usize) = (*portalcache).starttraveltime;
+                .add((-clusternum) as usize) = (*portalcache).starttraveltime as u16;
         }
 
         (*curupdate).next = std::ptr::null_mut();
@@ -1576,7 +1579,7 @@ pub fn AAS_UpdatePortalRoutingCache(bot: &mut BotLib, portalcache: *mut aas_rout
             (*curupdate).inlist = qfalse;
 
             let cluster: *const aas_cluster_t =
-                &bot.aasworld.clusters[(*curupdate).cluster as usize];
+                bot.aasworld.clusters.add((*curupdate).cluster as usize);
 
             let cache = AAS_GetAreaRoutingCache(
                 bot,
@@ -1586,8 +1589,8 @@ pub fn AAS_UpdatePortalRoutingCache(bot: &mut BotLib, portalcache: *mut aas_rout
             );
 
             for i in 0..(*cluster).numportals {
-                let portalnum = bot.aasworld.portalindex[((*cluster).firstportal + i) as usize];
-                let portal: *const aas_portal_t = &bot.aasworld.portals[portalnum as usize];
+                let portalnum = (*bot.aasworld.portalindex.add(((*cluster).firstportal + i) as usize));
+                let portal: *const aas_portal_t = bot.aasworld.portals.add(portalnum as usize);
                 if (*portal).areanum == (*curupdate).areanum {
                     continue;
                 }
@@ -1609,7 +1612,7 @@ pub fn AAS_UpdatePortalRoutingCache(bot: &mut BotLib, portalcache: *mut aas_rout
                         .as_mut_ptr()
                         .add(portalnum as usize) = t;
                     let nextupdate: *mut aas_routingupdate_t =
-                        &mut bot.aasworld.portalupdate[portalnum as usize];
+                        bot.aasworld.portalupdate.add(portalnum as usize);
                     if (*portal).frontcluster == (*curupdate).cluster {
                         (*nextupdate).cluster = (*portal).backcluster;
                     } else {
@@ -1633,7 +1636,7 @@ pub fn AAS_UpdatePortalRoutingCache(bot: &mut BotLib, portalcache: *mut aas_rout
             }
         }
     }
-}
+ }}
 
 /// Raven `AAS_GetPortalRoutingCache` — finds or builds the portal routing
 /// cache for the given travel flags.
@@ -1644,7 +1647,7 @@ pub fn AAS_GetPortalRoutingCache(
     clusternum: c_int,
     areanum: c_int,
     travelflags: c_int,
-) -> *mut aas_routingcache_t {
+) -> *mut aas_routingcache_t { unsafe {
     unsafe {
         let mut cache = *bot.aasworld.portalcache.add(areanum as usize);
         while !cache.is_null() {
@@ -1657,7 +1660,7 @@ pub fn AAS_GetPortalRoutingCache(
             cache = AAS_AllocRoutingCache(bot, bot.aasworld.numportals);
             (*cache).cluster = clusternum;
             (*cache).areanum = areanum;
-            (*cache).origin = bot.aasworld.areas[areanum as usize].center;
+            (*cache).origin = (*bot.aasworld.areas.add(areanum as usize)).center;
             (*cache).starttraveltime = 1.0;
             (*cache).travelflags = travelflags;
             (*cache).prev = std::ptr::null_mut();
@@ -1675,7 +1678,7 @@ pub fn AAS_GetPortalRoutingCache(
         AAS_LinkCache(bot, cache);
         cache
     }
-}
+ }}
 
 /// Raven `AAS_AreaRouteToGoalArea` — the core routing query: travel time +
 /// first reachability from `areanum` toward `goalareanum`.
@@ -1689,7 +1692,7 @@ pub fn AAS_AreaRouteToGoalArea(
     mut travelflags: c_int,
     traveltime: *mut c_int,
     reachnum: *mut c_int,
-) -> c_int {
+) -> c_int { unsafe {
     unsafe {
         if bot.aasworld.initialized == qfalse {
             return qfalse;
@@ -1732,15 +1735,15 @@ pub fn AAS_AreaRouteToGoalArea(
             travelflags |= TFL_DONOTENTER;
         }
 
-        let mut clusternum = bot.aasworld.areasettings[areanum as usize].cluster;
-        let mut goalclusternum = bot.aasworld.areasettings[goalareanum as usize].cluster;
+        let mut clusternum = (*bot.aasworld.areasettings.add(areanum as usize)).cluster;
+        let mut goalclusternum = (*bot.aasworld.areasettings.add(goalareanum as usize)).cluster;
         if clusternum < 0 && goalclusternum > 0 {
-            let portal: *const aas_portal_t = &bot.aasworld.portals[(-clusternum) as usize];
+            let portal: *const aas_portal_t = bot.aasworld.portals.add((-clusternum) as usize);
             if (*portal).frontcluster == goalclusternum || (*portal).backcluster == goalclusternum {
                 clusternum = goalclusternum;
             }
         } else if clusternum > 0 && goalclusternum < 0 {
-            let portal: *const aas_portal_t = &bot.aasworld.portals[(-goalclusternum) as usize];
+            let portal: *const aas_portal_t = bot.aasworld.portals.add((-goalclusternum) as usize);
             if (*portal).frontcluster == clusternum || (*portal).backcluster == clusternum {
                 goalclusternum = clusternum;
             }
@@ -1748,7 +1751,7 @@ pub fn AAS_AreaRouteToGoalArea(
         if clusternum > 0 && goalclusternum > 0 && clusternum == goalclusternum {
             let areacache = AAS_GetAreaRoutingCache(bot, clusternum, goalareanum, travelflags);
             let clusterareanum = AAS_ClusterAreaNum(bot, clusternum, areanum);
-            let cluster: *const aas_cluster_t = &bot.aasworld.clusters[clusternum as usize];
+            let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(clusternum as usize);
             if clusterareanum >= (*cluster).numreachabilityareas {
                 return 0;
             }
@@ -1757,23 +1760,23 @@ pub fn AAS_AreaRouteToGoalArea(
                 .as_ptr()
                 .add(clusterareanum as usize);
             if tt != 0 {
-                *reachnum = bot.aasworld.areasettings[areanum as usize].firstreachablearea
+                *reachnum = (*bot.aasworld.areasettings.add(areanum as usize)).firstreachablearea
                     + *(*areacache).reachabilities.add(clusterareanum as usize) as c_int;
                 if origin.is_null() {
                     *traveltime = tt as c_int;
                     return qtrue;
                 }
-                let reach = &bot.aasworld.reachability[*reachnum as usize];
+                let reach = &*bot.aasworld.reachability.add(*reachnum as usize);
                 *traveltime =
                     tt as c_int + AAS_AreaTravelTime(bot, areanum, *origin, reach.start) as c_int;
                 return qtrue;
             }
         }
 
-        clusternum = bot.aasworld.areasettings[areanum as usize].cluster;
-        goalclusternum = bot.aasworld.areasettings[goalareanum as usize].cluster;
+        clusternum = (*bot.aasworld.areasettings.add(areanum as usize)).cluster;
+        goalclusternum = (*bot.aasworld.areasettings.add(goalareanum as usize)).cluster;
         if goalclusternum < 0 {
-            let portal: *const aas_portal_t = &bot.aasworld.portals[(-goalclusternum) as usize];
+            let portal: *const aas_portal_t = bot.aasworld.portals.add((-goalclusternum) as usize);
             goalclusternum = (*portal).frontcluster;
         }
         let portalcache = AAS_GetPortalRoutingCache(bot, goalclusternum, goalareanum, travelflags);
@@ -1782,20 +1785,20 @@ pub fn AAS_AreaRouteToGoalArea(
                 .traveltimes
                 .as_ptr()
                 .add((-clusternum) as usize) as c_int;
-            *reachnum = bot.aasworld.areasettings[areanum as usize].firstreachablearea
+            *reachnum = (*bot.aasworld.areasettings.add(areanum as usize)).firstreachablearea
                 + *(*portalcache).reachabilities.add((-clusternum) as usize) as c_int;
             return qtrue;
         }
 
         let mut besttime: u16 = 0;
         let mut bestreachnum: c_int = -1;
-        let cluster: *const aas_cluster_t = &bot.aasworld.clusters[clusternum as usize];
+        let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(clusternum as usize);
         for i in 0..(*cluster).numportals {
-            let portalnum = bot.aasworld.portalindex[((*cluster).firstportal + i) as usize];
+            let portalnum = (*bot.aasworld.portalindex.add(((*cluster).firstportal + i) as usize));
             if *(*portalcache).traveltimes.as_ptr().add(portalnum as usize) == 0 {
                 continue;
             }
-            let portal: *const aas_portal_t = &bot.aasworld.portals[portalnum as usize];
+            let portal: *const aas_portal_t = bot.aasworld.portals.add(portalnum as usize);
             let areacache =
                 AAS_GetAreaRoutingCache(bot, clusternum, (*portal).areanum, travelflags);
             let clusterareanum = AAS_ClusterAreaNum(bot, clusternum, areanum);
@@ -1818,9 +1821,9 @@ pub fn AAS_AreaRouteToGoalArea(
             t += *bot.aasworld.portalmaxtraveltimes.add(portalnum as usize) as u16;
 
             if !origin.is_null() {
-                *reachnum = bot.aasworld.areasettings[areanum as usize].firstreachablearea
+                *reachnum = (*bot.aasworld.areasettings.add(areanum as usize)).firstreachablearea
                     + *(*areacache).reachabilities.add(clusterareanum as usize) as c_int;
-                let reach = &bot.aasworld.reachability[*reachnum as usize];
+                let reach = &*bot.aasworld.reachability.add(*reachnum as usize);
                 t += AAS_AreaTravelTime(bot, areanum, *origin, reach.start);
             }
             if besttime == 0 || t < besttime {
@@ -1835,7 +1838,7 @@ pub fn AAS_AreaRouteToGoalArea(
         *traveltime = besttime as c_int;
         qtrue
     }
-}
+ }}
 
 /// Raven `AAS_AreaTravelTimeToGoalArea`.
 ///
@@ -1895,7 +1898,7 @@ pub fn AAS_AreaReachabilityToGoalArea(
 /// cache between all reachable area pairs.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:870-888`
-pub fn AAS_CreateAllRoutingCache(bot: &mut BotLib) {
+pub fn AAS_CreateAllRoutingCache(bot: &mut BotLib) { unsafe {
     bot.aasworld.initialized = qtrue;
     unsafe {
         bot.botimport.Print.unwrap()(
@@ -1917,14 +1920,14 @@ pub fn AAS_CreateAllRoutingCache(bot: &mut BotLib) {
             let _t = AAS_AreaTravelTimeToGoalArea(
                 bot,
                 i,
-                bot.aasworld.areas[i as usize].center,
+                (*bot.aasworld.areas.add(i as usize)).center,
                 j,
                 TFL_DEFAULT,
             );
         }
     }
     bot.aasworld.initialized = qfalse;
-}
+ }}
 
 /// Raven `AAS_PredictRoute` — walks the reachability chain from `areanum`
 /// toward `goalareanum`, stopping early on any of the requested stop events.
@@ -1943,7 +1946,7 @@ pub fn AAS_PredictRoute(
     stopcontents: c_int,
     stoptfl: c_int,
     stopareanum: c_int,
-) -> c_int {
+) -> c_int { unsafe {
     unsafe {
         (*route).stopevent = RSE_NONE;
         (*route).endarea = goalareanum;
@@ -1971,13 +1974,13 @@ pub fn AAS_PredictRoute(
                 (*route).stopevent = RSE_NOROUTE;
                 return qfalse;
             }
-            let reach = bot.aasworld.reachability[reachnum as usize];
+            let reach = (*bot.aasworld.reachability.add(reachnum as usize));
 
             if stopevent & RSE_USETRAVELTYPE != 0 {
                 if AAS_TravelFlagForType_inline(bot, reach.traveltype) & stoptfl != 0 {
                     (*route).stopevent = RSE_USETRAVELTYPE;
                     (*route).endarea = curareanum;
-                    (*route).endcontents = bot.aasworld.areasettings[curareanum as usize].contents;
+                    (*route).endcontents = (*bot.aasworld.areasettings.add(curareanum as usize)).contents;
                     (*route).endtravelflags = AAS_TravelFlagForType_inline(bot, reach.traveltype);
                     (*route).endpos = reach.start;
                     return qtrue;
@@ -1986,7 +1989,7 @@ pub fn AAS_PredictRoute(
                     (*route).stopevent = RSE_USETRAVELTYPE;
                     (*route).endarea = reach.areanum;
                     (*route).endcontents =
-                        bot.aasworld.areasettings[reach.areanum as usize].contents;
+                        (*bot.aasworld.areasettings.add(reach.areanum as usize)).contents;
                     (*route).endtravelflags =
                         AAS_AreaContentsTravelFlags_inline(bot, reach.areanum);
                     (*route).endpos = reach.end;
@@ -1995,7 +1998,7 @@ pub fn AAS_PredictRoute(
                     return qtrue;
                 }
             }
-            let reachareas = bot.aasworld.reachabilityareas[reachnum as usize];
+            let reachareas = (*bot.aasworld.reachabilityareas.add(reachnum as usize));
             for j in 0..(reachareas.numareas + 1) {
                 let testareanum = if j >= reachareas.numareas {
                     reach.areanum
@@ -2005,11 +2008,11 @@ pub fn AAS_PredictRoute(
                         .add((reachareas.firstarea + j) as usize)
                 };
                 if stopevent & RSE_ENTERCONTENTS != 0
-                    && bot.aasworld.areasettings[testareanum as usize].contents & stopcontents != 0
+                    && (*bot.aasworld.areasettings.add(testareanum as usize)).contents & stopcontents != 0
                 {
                     (*route).stopevent = RSE_ENTERCONTENTS;
                     (*route).endarea = testareanum;
-                    (*route).endcontents = bot.aasworld.areasettings[testareanum as usize].contents;
+                    (*route).endcontents = (*bot.aasworld.areasettings.add(testareanum as usize)).contents;
                     (*route).endpos = reach.end;
                     (*route).time += AAS_AreaTravelTime(bot, areanum, origin, reach.start) as c_int;
                     (*route).time += reach.traveltime as c_int;
@@ -2018,7 +2021,7 @@ pub fn AAS_PredictRoute(
                 if stopevent & RSE_ENTERAREA != 0 && testareanum == stopareanum {
                     (*route).stopevent = RSE_ENTERAREA;
                     (*route).endarea = testareanum;
-                    (*route).endcontents = bot.aasworld.areasettings[testareanum as usize].contents;
+                    (*route).endcontents = (*bot.aasworld.areasettings.add(testareanum as usize)).contents;
                     (*route).endpos = reach.start;
                     return qtrue;
                 }
@@ -2027,7 +2030,7 @@ pub fn AAS_PredictRoute(
             (*route).time += AAS_AreaTravelTime(bot, areanum, origin, reach.start) as c_int;
             (*route).time += reach.traveltime as c_int;
             (*route).endarea = reach.areanum;
-            (*route).endcontents = bot.aasworld.areasettings[reach.areanum as usize].contents;
+            (*route).endcontents = (*bot.aasworld.areasettings.add(reach.areanum as usize)).contents;
             (*route).endtravelflags = AAS_TravelFlagForType_inline(bot, reach.traveltype);
             (*route).endpos = reach.end;
 
@@ -2044,7 +2047,7 @@ pub fn AAS_PredictRoute(
         }
         qtrue
     }
-}
+ }}
 
 /// Raven `AAS_RandomGoalArea` — picks a random reachable goal area at least a
 /// minimum ground-face size away, not too close to a wall drop-off.
@@ -2057,7 +2060,7 @@ pub fn AAS_RandomGoalArea(
     travelflags: c_int,
     goalareanum: *mut c_int,
     goalorigin: *mut vec3_t,
-) -> c_int {
+) -> c_int { unsafe {
     unsafe {
         if crate::be_aas_reach_fns::AAS_AreaReachability(bot, areanum) == 0 {
             return qfalse;
@@ -2078,17 +2081,17 @@ pub fn AAS_RandomGoalArea(
                 let t = AAS_AreaTravelTimeToGoalArea(
                     bot,
                     areanum,
-                    bot.aasworld.areas[areanum as usize].center,
+                    (*bot.aasworld.areas.add(areanum as usize)).center,
                     n,
                     travelflags,
                 );
                 if t > 0 {
                     if crate::be_aas_reach_fns::AAS_AreaSwim(bot, n) != 0 {
                         *goalareanum = n;
-                        *goalorigin = bot.aasworld.areas[n as usize].center;
+                        *goalorigin = (*bot.aasworld.areas.add(n as usize)).center;
                         return qtrue;
                     }
-                    let mut start = bot.aasworld.areas[n as usize].center;
+                    let mut start = (*bot.aasworld.areas.add(n as usize)).center;
                     if crate::be_aas_sample_fns::AAS_PointAreaNum(bot, start) == 0 {
                         let msg = std::ffi::CString::new(format!(
                             "area {} center {} {} {} in solid?",
@@ -2123,4 +2126,4 @@ pub fn AAS_RandomGoalArea(
         }
         qfalse
     }
-}
+ }}

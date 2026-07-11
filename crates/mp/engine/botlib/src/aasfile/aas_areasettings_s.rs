@@ -3,6 +3,7 @@
 /// Raven `aas_areasettings_t` — per-area settings.
 ///
 /// Type definition source: `oracle/codemp/botlib/aasfile.h:119-129`
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct aas_areasettings_t {
 	//could also add all kind of statistic fields
