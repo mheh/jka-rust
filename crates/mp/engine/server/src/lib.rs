@@ -8,8 +8,10 @@ pub mod gameCallbacks;
 pub mod npcnav;
 pub mod server;
 pub mod server_host;
+pub mod sv_bot;
 pub mod sv_client;
 pub mod sv_game;
+pub mod sv_main;
 pub mod sv_net_chan;
 pub mod sv_snapshot;
 

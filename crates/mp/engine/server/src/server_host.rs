@@ -1,8 +1,9 @@
 //! `Server` (the `Engine.sv` island host) + `ServerGame` (the game dispatcher's
 //! reborrowed host state) + `sv_game_system_calls` (the MP game dispatcher).
 
-use core::ffi::c_int;
+use core::ffi::{c_char, c_int};
 
+use mp_qshared::common::mp::botlib::botlib_export_s::botlib_export_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::siege_pers::siegePers_t;
 use mp_qshared::shared::limits::MAX_WPARRAY_SIZE as MAX_WPARRAY_SIZE_I32;
@@ -146,6 +147,21 @@ pub struct Server {
     ///
     /// Source: `oracle/codemp/server/sv_game.cpp:454`
     pub sv_siegePersData: siegePers_t,
+    /// Raven `botlib_export` (`extern botlib_export_t *`, defined by the botlib
+    /// interface `be_interface.cpp`, referenced from `sv_bot.cpp`). Null until
+    /// `SV_BotInitBotLib` assigns it.
+    // Divergence: the true owner is the botlib interface (`bot: BotLib`), not
+    // yet landed as a receiver; the packet threads it through `Server`, so the
+    // pointer mirror lives here pending the botlib waves.
+    /// Source: `oracle/codemp/server/sv_bot.cpp:19`
+    pub botlib_export: *mut botlib_export_t,
+    /// Raven `SV_ExpandNewlines::string` (`static char string[1024]`) — the
+    /// newline-expansion return buffer; a function-scope static whose pointer is
+    /// returned to the caller, so it lives as cross-call `Server` state (fork-3
+    /// kind 3).
+    ///
+    /// Source: `oracle/codemp/server/sv_main.cpp:60`
+    pub sv_expand_newlines_string: [c_char; 1024],
 }
 
 /// engine-seam's name for the game dispatcher's `&mut ServerGame` argument — the

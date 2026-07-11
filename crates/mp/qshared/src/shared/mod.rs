@@ -32,6 +32,7 @@ pub mod mark_fragment;
 pub mod print_parm;
 pub mod q_color;
 pub mod q_math;
+pub mod q_string;
 pub mod q_math_rand;
 pub mod world_size;
 #[path = "qint64.rs"]
