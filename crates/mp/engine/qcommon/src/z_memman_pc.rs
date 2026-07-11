@@ -29,16 +29,12 @@ use crate::vm_fns::VM_Clear;
 use crate::z_memman::zone_header_s::zoneHeader_t;
 use crate::z_memman::zone_tail_s::zoneTail_t;
 
-// PORT-NOTE(rm-types): `RenderModels`/`RmManager`/`Ghoul2System`/`Server` are
-// the state-receiver types pinned by the engine-fork-discovery preamble's
-// receiver order (rmg-terrain.md / ghoul2-server.md / server crate own their
-// real shape); none has landed importable here yet. Referenced by their
-// exact resolved-signature names per the no-stub rule (common_fns.rs/
-// vm_fns.rs precedent); reported as missing symbols for the finisher.
+// `Ghoul2System`/`Server` are type-erased receiver slots (real types live in
+// the above-tier engine crates); `Ghoul2System` is re-exported at this
+// historical home, defined once in `common::opaque_slots`.
 #[allow(dead_code)]
 use crate::cm_load::RenderModels;
-#[allow(dead_code)]
-pub(crate) struct Ghoul2System;
+pub use crate::common::opaque_slots::Ghoul2System;
 #[allow(dead_code)]
 use crate::cmd_pc::Server;
 

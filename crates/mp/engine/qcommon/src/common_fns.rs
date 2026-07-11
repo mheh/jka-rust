@@ -32,12 +32,13 @@ use crate::cm_load::RenderModels;
 use crate::cm_load::RmManager;
 #[allow(dead_code)]
 use crate::z_memman_pc::Ghoul2System;
-#[allow(dead_code)]
-pub(crate) struct BotLib;
+// `Server`/`Client`/`BotLib` are type-erased receiver slots (real types live in
+// the above-tier engine crates); re-exported at this historical home, defined
+// once in `common::opaque_slots`.
+pub use crate::common::opaque_slots::BotLib;
 #[allow(dead_code)]
 use crate::cmd_pc::Server;
-#[allow(dead_code)]
-pub(crate) struct Client;
+pub use crate::common::opaque_slots::Client;
 
 // Sweep: extern forward-declares eliminated. Genuinely-unported callees
 // referenced at their canonical future homes (cvar.cpp/cmd/files/zone/stringed

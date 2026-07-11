@@ -10,6 +10,7 @@ pub mod common_consts;
 pub mod engine_hooks;
 pub mod error;
 pub mod journal;
+pub mod opaque_slots;
 pub mod qrand;
 pub mod sys_event_queue;
 

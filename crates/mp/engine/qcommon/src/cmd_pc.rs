@@ -14,10 +14,11 @@ use crate::common::Common;
 use crate::common_fns::Com_Filter;
 use crate::z_memman_pc::{CopyString, S_Malloc, Z_Free};
 
-// `Server` is a pinned-receiver placeholder: the real type lives in
+// `Server` is a type-erased receiver slot: the real type lives in
 // mp_engine_server, which depends on this crate (importing it would cycle).
+// Re-exported at this historical home; defined once in `common::opaque_slots`.
 pub(crate) use crate::cm_load::{RenderModels, RmManager};
-pub(crate) struct Server;
+pub use crate::common::opaque_slots::Server;
 
 use crate::common::com_printf;
 use crate::cvar_fns::Cvar_Command;

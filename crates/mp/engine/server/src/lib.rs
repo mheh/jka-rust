@@ -18,7 +18,9 @@ pub mod sv_net_chan;
 pub mod sv_snapshot;
 pub mod sv_world;
 
-pub use server_host::{game_system_calls_shim, sv_game_system_calls, Server, ServerGame};
+pub use server_host::{
+    game_system_calls_shim, server_from_slot, server_slot, sv_game_system_calls, Server, ServerGame,
+};
 
 // Crate-root re-exports for the SV_* free functions that cross-module call sites
 // reach as `crate::SV_*` (matching Raven's flat global namespace at the seam).

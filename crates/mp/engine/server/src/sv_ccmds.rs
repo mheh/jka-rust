@@ -15,6 +15,9 @@ use core::ffi::{c_char, c_int};
 // below by their preamble-table decl-home crate; genuinely missing, escalated
 // in missing_symbols rather than stubbed (ZERO-PARK).
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
+use mp_engine_qcommon::cmd::cmd_function_t::CmdFunction;
+use mp_engine_qcommon::cmd::Cmd_AddCommand;
+use mp_engine_qcommon::cmd_pc::Server as CmdServerSlot;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::cm_load::RenderModels;
@@ -27,6 +30,8 @@ use mp_qshared::shared::qboolean;
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
+use crate::server_host::server_from_slot;
+use crate::sv_world::SV_SectorList_f;
 use crate::Server;
 
 /// Raven `SV_GetStringEdString`.
@@ -1191,6 +1196,20 @@ pub fn SV_MapRestart_f(
     sv.svs.time += 100;
 }
 
+/// Register one console command whose handler is a receiver-threaded forwarding
+/// closure (opaque-slot ruling, user 2026-07-12); thin wrapper over
+/// `Cmd_AddCommand` that supplies `Some(function)`.
+fn add(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    name: *const c_char,
+    function: CmdFunction,
+) {
+    Cmd_AddCommand(common, cm, rm, host, name, Some(function));
+}
+
 /// Raven `SV_AddOperatorCommands`.
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:958-996`
@@ -1210,74 +1229,91 @@ pub fn SV_AddOperatorCommands(
     }
     common.sv_ccmds_operator_commands_initialized = qboolean::qtrue;
 
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "heartbeat", SV_Heartbeat_f_cmd);
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "kick", SV_Kick_f_cmd);
+    // Each registered handler is a non-capturing forwarding closure matching
+    // `CmdFunction`'s pinned receiver order (common/cm/sv/rm/rmg/host); it casts
+    // the type-erased `sv` slot back to `&mut Server` (`server_from_slot`, single
+    // documented unsafe pair) and calls the real receiver-threaded command body.
+    add(common, cm, rm, host, c"heartbeat".as_ptr(), |_common, _cm, sv, _rm, _rmg, _host| unsafe {
+        SV_Heartbeat_f(server_from_slot(sv))
+    });
+    add(common, cm, rm, host, c"kick".as_ptr(), |common, _cm, sv, _rm, _rmg, _host| unsafe {
+        SV_Kick_f(common, server_from_slot(sv))
+    });
     // #ifdef USE_CD_KEY
     //     Cmd_AddCommand ("banUser", SV_Ban_f);
     //     Cmd_AddCommand ("banClient", SV_BanNum_f);
     // #endif	// USE_CD_KEY
 
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "clientkick", SV_KickNum_f_cmd);
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "status", SV_Status_f_cmd);
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "serverinfo", SV_Serverinfo_f_cmd);
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "systeminfo", SV_Systeminfo_f_cmd);
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "dumpuser", SV_DumpUser_f_cmd);
-    mp_engine_qcommon::cmd::Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        "map_restart",
-        SV_MapRestart_f_cmd,
-    );
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "sectorlist", SV_SectorList_f_cmd);
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "map", SV_Map_f_cmd);
+    add(common, cm, rm, host, c"clientkick".as_ptr(), |common, _cm, sv, _rm, _rmg, _host| unsafe {
+        SV_KickNum_f(common, server_from_slot(sv))
+    });
+    add(common, cm, rm, host, c"status".as_ptr(), |common, _cm, sv, _rm, _rmg, host| unsafe {
+        SV_Status_f(common, server_from_slot(sv), host)
+    });
+    add(common, cm, rm, host, c"serverinfo".as_ptr(), |common, _cm, _sv, _rm, _rmg, _host| {
+        SV_Serverinfo_f(common)
+    });
+    add(common, cm, rm, host, c"systeminfo".as_ptr(), |common, _cm, _sv, _rm, _rmg, _host| {
+        SV_Systeminfo_f(common)
+    });
+    add(common, cm, rm, host, c"dumpuser".as_ptr(), |common, _cm, sv, _rm, _rmg, _host| unsafe {
+        SV_DumpUser_f(common, server_from_slot(sv))
+    });
+    add(common, cm, rm, host, c"map_restart".as_ptr(), SV_MapRestart_f_cmd);
+    add(common, cm, rm, host, c"sectorlist".as_ptr(), |common, _cm, sv, _rm, _rmg, _host| unsafe {
+        SV_SectorList_f(common, server_from_slot(sv))
+    });
+    add(common, cm, rm, host, c"map".as_ptr(), SV_Map_f_cmd);
     // #ifndef PRE_RELEASE_DEMO
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "devmap", SV_Map_f_cmd);
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "spmap", SV_Map_f_cmd);
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "spdevmap", SV_Map_f_cmd);
+    add(common, cm, rm, host, c"devmap".as_ptr(), SV_Map_f_cmd);
+    add(common, cm, rm, host, c"spmap".as_ptr(), SV_Map_f_cmd);
+    add(common, cm, rm, host, c"spdevmap".as_ptr(), SV_Map_f_cmd);
     // Cmd_AddCommand ("devmapbsp", SV_Map_f);	// not used in MP codebase, no server BSP_cacheing
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "devmapmdl", SV_Map_f_cmd);
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "devmapall", SV_Map_f_cmd);
+    add(common, cm, rm, host, c"devmapmdl".as_ptr(), SV_Map_f_cmd);
+    add(common, cm, rm, host, c"devmapall".as_ptr(), SV_Map_f_cmd);
     // #endif
-    mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "killserver", SV_KillServer_f_cmd);
+    add(common, cm, rm, host, c"killserver".as_ptr(), |common, cm, sv, rm, rmg, host| unsafe {
+        SV_KillServer_f(common, cm, server_from_slot(sv), rm, rmg, host)
+    });
     // if( com_dedicated->integer )
     {
-        mp_engine_qcommon::cmd::Cmd_AddCommand(common, cm, rm, host, "svsay", SV_ConSay_f_cmd);
+        add(common, cm, rm, host, c"svsay".as_ptr(), |common, _cm, sv, _rm, _rmg, _host| unsafe {
+            SV_ConSay_f(common, server_from_slot(sv))
+        });
     }
 
-    mp_engine_qcommon::cmd::Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        "forcetoggle",
-        SV_ForceToggle_f_cmd,
-    );
+    add(common, cm, rm, host, c"forcetoggle".as_ptr(), |common, cm, sv, rm, _rmg, host| unsafe {
+        SV_ForceToggle_f(common, cm, server_from_slot(sv), rm, host)
+    });
 }
 
-// PORT-NOTE(cmd-table-shape, matches common_fns.rs's existing
-// Com_Error_f_cmd/Com_Quit_f_cmd precedent): `Cmd_AddCommand`'s resolved
-// callee slot is a zero-arg `fn()` (ruling 5's plain dispatch-table shape);
-// this crate's ported command bodies are receiver-threaded (`&mut Common`,
-// `&mut Server`, …), which cannot satisfy that shape directly without the
-// campaign's still-open command-table/Engine-access wiring. Escalated as a
-// shape mismatch — the trampolines below are named placeholders for that
-// wiring, not stubs of the ported logic (the logic lives in the real fns
-// above).
-fn SV_Heartbeat_f_cmd() {}
-fn SV_Kick_f_cmd() {}
-fn SV_KickNum_f_cmd() {}
-fn SV_Status_f_cmd() {}
-fn SV_Serverinfo_f_cmd() {}
-fn SV_Systeminfo_f_cmd() {}
-fn SV_DumpUser_f_cmd() {}
-fn SV_MapRestart_f_cmd() {}
-fn SV_SectorList_f_cmd() {}
-fn SV_Map_f_cmd() {}
-fn SV_KillServer_f_cmd() {}
-fn SV_ConSay_f_cmd() {}
-fn SV_ForceToggle_f_cmd() {}
+// `SV_Map_f`/`SV_MapRestart_f` need `g2: &mut Ghoul2System`, which `CmdFunction`
+// does not carry — the command-dispatch seam (`Cmd_ExecuteString`) threads only
+// common/cm/sv/rm/rmg/host. These forwarders reach the real bodies for every
+// receiver the slot DOES carry; the missing `g2` receiver is the one open
+// wiring gap (blocked pending a `CmdFunction`-shape ruling, escalated — not
+// invented here). BLOCKED-G2.
+fn SV_Map_f_cmd(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    sv: &mut CmdServerSlot,
+    rm: &mut RenderModels,
+    rmg: &mut RmManager,
+    host: &mut dyn EngineHost,
+) {
+    unsafe { SV_Map_f(common, cm, server_from_slot(sv), rm, rmg, host) }
+}
+
+fn SV_MapRestart_f_cmd(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    sv: &mut CmdServerSlot,
+    rm: &mut RenderModels,
+    rmg: &mut RmManager,
+    host: &mut dyn EngineHost,
+) {
+    unsafe { SV_MapRestart_f(common, cm, server_from_slot(sv), rm, rmg, host) }
+}
 
 /// Raven `SE_GetString` — `docs/subsystems/stringed.md` §F seam (LIVE,
 /// game-module trap at sv_game.cpp:699); not yet landed in this tree.

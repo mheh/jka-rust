@@ -38,6 +38,11 @@ use crate::z_memman_pc::Ghoul2System;
 /// The qcommon upcall table (see module doc). Field names are the exact Raven
 /// symbol names for greppability; each signature is fixed by its qcommon call
 /// site(s). A field of `Common`.
+///
+/// `Server`/`Client`/`BotLib`/`Ghoul2System` receivers here are the type-erased
+/// opaque slots (`common::opaque_slots`): qcommon threads them through without
+/// dereferencing, and the owning engine crate casts each back to its real
+/// `&mut State` at its hook boundary (opaque-slot ruling, user 2026-07-12).
 #[allow(non_snake_case)]
 pub struct EngineHooks {
     // ---- client tier (null-build defaults; `null_client.cpp`) ----

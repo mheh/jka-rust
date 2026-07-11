@@ -12,6 +12,7 @@ use mp_qshared::shared::limits::MAX_WPARRAY_SIZE as MAX_WPARRAY_SIZE_I32;
 use mp_qshared::shared::wpobject_t;
 
 use mp_engine_qcommon::vm::vm_s::vm_t;
+use mp_engine_qcommon::cmd_pc::Server as CmdServerSlot;
 
 use crate::server::bot_debugpoly_t::bot_debugpoly_t;
 use crate::server::server_static_t::serverStatic_t;
@@ -162,6 +163,28 @@ pub struct Server {
     ///
     /// Source: `oracle/codemp/server/sv_main.cpp:60`
     pub sv_expand_newlines_string: [c_char; 1024],
+}
+
+/// Wrap a live `&mut Server` into qcommon's type-erased command slot for
+/// passing INTO qcommon's registration/dispatch seam
+/// (`Cmd_AddCommand`/`Cmd_ExecuteString`/`Cbuf_ExecuteText`). qcommon never
+/// dereferences the slot — it only threads it back to our command handlers,
+/// where `server_from_slot` casts it back. Opaque-slot ruling (user,
+/// 2026-07-12, option A).
+pub fn server_slot(sv: &mut Server) -> CmdServerSlot {
+    CmdServerSlot::from_raw(sv as *mut Server as *mut ())
+}
+
+/// Cast a qcommon command slot back into the live `&mut Server`, inside a
+/// registered-command or hook handler body.
+///
+/// SAFETY: every slot reaching a handler was constructed by `server_slot` from
+/// a live, unique `&mut Server` that outlives the entire dispatch call (the
+/// engine is single-threaded and holds no other borrow of that `Server` across
+/// the seam), so the erased pointer is non-null, well-aligned, and uniquely
+/// borrowable for the returned reference's lifetime.
+pub unsafe fn server_from_slot(slot: &mut CmdServerSlot) -> &mut Server {
+    &mut *(slot.as_raw() as *mut Server)
 }
 
 /// engine-seam's name for the game dispatcher's `&mut ServerGame` argument — the

@@ -25,6 +25,7 @@ use mp_abi::game::imports::MpGameImport as G;
 use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
 use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::svEntity_t;
+use crate::server_host::server_slot;
 use crate::Server;
 
 // PORT-NOTE(engine-host-state): `CollisionWorld`, `Common`, and `EngineHost`
@@ -792,7 +793,7 @@ pub fn SV_GameSystemCalls(
             mp_engine_qcommon::cmd_common::Cbuf_ExecuteText(
                 common,
                 cm,
-                sv,
+                &mut server_slot(sv),
                 rm,
                 rmg,
                 host,
