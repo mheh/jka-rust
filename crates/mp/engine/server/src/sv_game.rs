@@ -54,6 +54,99 @@ extern "Rust" {
     fn atoi(string: *const c_char) -> c_int;
 }
 
+// PORT-NOTE(qcommon/q_math free-fns): `Cvar_*`/`CM_Leaf*`/`Com_Milliseconds`/
+// `VM_Call`/`FS_*`/`SE_GetString`/`Sys_*` and the `q_math.c` vector helpers
+// have no ported body reachable from this crate (`mp_engine_qcommon::cvar` /
+// `::vm` are still stub modules; `q_math` in `mp_qshared` carries only the
+// idiomatic `Option<&mut>` shape, not the raw-pointer VMA seam shape). Forward-
+// declared here by their exact Raven names to this file's call-site shapes via
+// the established engine `extern "Rust"` convention (cm_load.rs / net_chan.rs /
+// files_common.rs precedent); the finisher resolves linkage uniformly.
+extern "Rust" {
+    fn CM_LeafCluster(cm: &mut CollisionWorld, leafnum: c_int) -> c_int;
+    fn CM_LeafArea(cm: &mut CollisionWorld, leafnum: c_int) -> c_int;
+    fn CM_AreasConnected(cm: &mut CollisionWorld, area1: c_int, area2: c_int) -> qboolean;
+
+    fn Cvar_InfoString(common: &mut Common, bit: c_int) -> String;
+    fn Cvar_Register(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        vmCvar: *mut mp_qshared::shared::cvar::vmCvar_t,
+        var_name: &str,
+        var_value: &str,
+        flags: c_int,
+    );
+    fn Cvar_Update(common: &mut Common, vmCvar: *mut mp_qshared::shared::cvar::vmCvar_t);
+    fn Cvar_Set(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        var_name: &str,
+        value: &str,
+    );
+    fn Cvar_VariableIntegerValue(common: &mut Common, var_name: &str) -> c_int;
+    fn Cvar_VariableStringBuffer(
+        common: &mut Common,
+        var_name: &str,
+        buffer: *mut c_char,
+        bufsize: c_int,
+    );
+    fn Cvar_VariableValue(common: &mut Common, var_name: &str) -> f32;
+    fn Cvar_Get(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        var_name: &str,
+        var_value: &str,
+        flags: c_int,
+    ) -> *mut mp_qshared::shared::cvar::cvar_t;
+
+    fn Com_Milliseconds(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+    ) -> c_int;
+    fn VM_Call(
+        common: &mut Common,
+        vm: *mut mp_engine_qcommon::vm::vm_s::vm_t,
+        callnum: c_int,
+        args: &[c_int],
+    ) -> c_int;
+
+    fn FS_Write(
+        common: &mut Common,
+        buffer: *const (),
+        len: c_int,
+        h: native_types::fileHandle_t,
+    ) -> c_int;
+    fn FS_FCloseFile(common: &mut Common, f: native_types::fileHandle_t);
+
+    fn SE_GetString(common: &mut Common, host: &mut dyn EngineHost, key: &str) -> String;
+
+    fn RE_RegisterServerSkin(
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        name: &str,
+    ) -> c_int;
+
+    fn MatrixMultiply(in1: *mut vec3_t, in2: *mut vec3_t, out: *mut vec3_t);
+    fn AngleVectors(
+        angles: *const f32,
+        forward: *mut f32,
+        right: *mut f32,
+        up: *mut f32,
+    );
+    fn PerpendicularVector(dst: *mut f32, src: *const f32);
+    fn strncpy(dest: *mut c_char, src: *const c_char, count: c_int) -> *mut c_char;
+    fn Sys_SnapVector(v: *mut f32);
+    fn Sys_CheckCD() -> bool;
+}
+
 /// Raven `SV_NumForGentity`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:46-52`
@@ -277,20 +370,20 @@ pub fn SV_GameDropClient(
 /// Source: `oracle/codemp/server/sv_game.cpp:209-233`
 pub fn SV_inPVS(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t) -> qboolean {
     let mut leafnum = mp_engine_qcommon::cm_test::CM_PointLeafnum(cm, p1);
-    let mut cluster = mp_engine_qcommon::cm::CM_LeafCluster(cm, leafnum);
-    let area1 = mp_engine_qcommon::cm::CM_LeafArea(cm, leafnum);
+    let mut cluster = CM_LeafCluster(cm, leafnum);
+    let area1 = CM_LeafArea(cm, leafnum);
     let mask = mp_engine_qcommon::cm_test::CM_ClusterPVS(cm, cluster);
 
     leafnum = mp_engine_qcommon::cm_test::CM_PointLeafnum(cm, p2);
-    cluster = mp_engine_qcommon::cm::CM_LeafCluster(cm, leafnum);
-    let area2 = mp_engine_qcommon::cm::CM_LeafArea(cm, leafnum);
+    cluster = CM_LeafCluster(cm, leafnum);
+    let area2 = CM_LeafArea(cm, leafnum);
     if !mask.is_null() {
         let byte = unsafe { *mask.offset((cluster >> 3) as isize) };
         if byte & (1 << (cluster & 7)) == 0 {
             return qfalse;
         }
     }
-    if mp_engine_qcommon::cm::CM_AreasConnected(cm, area1, area2) == qfalse {
+    if CM_AreasConnected(cm, area1, area2) == qfalse {
         // a door blocks sight
         return qfalse;
     }
@@ -302,13 +395,13 @@ pub fn SV_inPVS(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t) -> qboolean {
 /// Source: `oracle/codemp/server/sv_game.cpp:243-267`
 pub fn SV_inPVSIgnorePortals(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t) -> qboolean {
     let mut leafnum = mp_engine_qcommon::cm_test::CM_PointLeafnum(cm, p1);
-    let mut cluster = mp_engine_qcommon::cm::CM_LeafCluster(cm, leafnum);
-    let _area1 = mp_engine_qcommon::cm::CM_LeafArea(cm, leafnum);
+    let mut cluster = CM_LeafCluster(cm, leafnum);
+    let _area1 = CM_LeafArea(cm, leafnum);
     let mask = mp_engine_qcommon::cm_test::CM_ClusterPVS(cm, cluster);
 
     leafnum = mp_engine_qcommon::cm_test::CM_PointLeafnum(cm, p2);
-    cluster = mp_engine_qcommon::cm::CM_LeafCluster(cm, leafnum);
-    let _area2 = mp_engine_qcommon::cm::CM_LeafArea(cm, leafnum);
+    cluster = CM_LeafCluster(cm, leafnum);
+    let _area2 = CM_LeafArea(cm, leafnum);
 
     if !mask.is_null() {
         let byte = unsafe { *mask.offset((cluster >> 3) as isize) };
@@ -330,7 +423,7 @@ pub fn SV_GetServerinfo(common: &mut Common, buffer: *mut c_char, bufferSize: c_
             format!("SV_GetServerinfo: bufferSize == {bufferSize}"),
         );
     }
-    let info = mp_engine_qcommon::cvar::Cvar_InfoString(
+    let info = Cvar_InfoString(
         common,
         mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
@@ -369,8 +462,8 @@ pub fn SV_InitGameVM(
 ) {
     sv.sv.entityParsePoint = mp_engine_qcommon::cm_load::CM_EntityString(cm);
 
-    let ms = mp_engine_qcommon::common::Com_Milliseconds(common, cm, rm, host);
-    mp_engine_qcommon::vm::VM_Call(
+    let ms = Com_Milliseconds(common, cm, rm, host);
+    VM_Call(
         common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_INIT as c_int,
@@ -393,7 +486,7 @@ pub fn SV_GameCommand(common: &mut Common, sv: &mut Server) -> qboolean {
     if sv.sv.state as c_int != serverState_t::SS_GAME as c_int {
         return qfalse;
     }
-    let r = mp_engine_qcommon::vm::VM_Call(
+    let r = VM_Call(
         common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_CONSOLE_COMMAND as c_int,
@@ -438,7 +531,7 @@ pub fn SV_RestartGameProgs(
     if sv.gvm.is_null() {
         return;
     }
-    mp_engine_qcommon::vm::VM_Call(
+    VM_Call(
         common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_SHUTDOWN as c_int,
@@ -540,7 +633,7 @@ pub fn SV_SetBrushModel(
             (*ent).r.maxs = maxs;
             (*ent).r.bmodel = qtrue;
 
-            let com_rmg = mp_engine_qcommon::cvar::com_RMG(common);
+            let com_rmg = common.com_RMG;
             if !com_rmg.is_null() && (*com_rmg).integer != 0 {
                 (*ent).r.contents =
                     mp_engine_qcommon::cm_load::CM_ModelContents(cm, h, sv.sv.mLocalSubBSPIndex);
@@ -654,11 +747,11 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == T::TRAP_STRNCPY as c_int {
-            return mp_qshared::shared::q_shared::strncpy(
+            return strncpy(
                 vma(common, args, 1) as *mut c_char,
                 vma(common, args, 2) as *const c_char,
                 *args.offset(3),
-            ) as c_int;
+            ) as isize as c_int;
         } else if trap == T::TRAP_SIN as c_int {
             return FloatAsInt(vmf(args, 1).sin());
         } else if trap == T::TRAP_COS as c_int {
@@ -668,14 +761,14 @@ pub fn SV_GameSystemCalls(
         } else if trap == T::TRAP_SQRT as c_int {
             return FloatAsInt(vmf(args, 1).sqrt());
         } else if trap == T::TRAP_MATRIXMULTIPLY as c_int {
-            mp_qshared::shared::q_math::MatrixMultiply(
+            MatrixMultiply(
                 vma(common, args, 1) as *mut vec3_t,
                 vma(common, args, 2) as *mut vec3_t,
                 vma(common, args, 3) as *mut vec3_t,
             );
             return 0;
         } else if trap == T::TRAP_ANGLEVECTORS as c_int {
-            mp_qshared::shared::q_math::AngleVectors(
+            AngleVectors(
                 vma(common, args, 1) as *const f32,
                 vma(common, args, 2) as *mut f32,
                 vma(common, args, 3) as *mut f32,
@@ -683,7 +776,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == T::TRAP_PERPENDICULARVECTOR as c_int {
-            mp_qshared::shared::q_math::PerpendicularVector(
+            PerpendicularVector(
                 vma(common, args, 1) as *mut f32,
                 vma(common, args, 2) as *const f32,
             );
@@ -726,7 +819,7 @@ pub fn SV_GameSystemCalls(
             drop(Box::from_raw(timer));
             return r;
         } else if trap == G::G_CVAR_REGISTER as c_int {
-            mp_engine_qcommon::cvar::Cvar_Register(
+            Cvar_Register(
                 common,
                 cm,
                 rm,
@@ -742,13 +835,13 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_CVAR_UPDATE as c_int {
-            mp_engine_qcommon::cvar::Cvar_Update(
+            Cvar_Update(
                 common,
                 vma(common, args, 1) as *mut mp_qshared::shared::cvar::vmCvar_t,
             );
             return 0;
         } else if trap == G::G_CVAR_SET as c_int {
-            mp_engine_qcommon::cvar::Cvar_Set(
+            Cvar_Set(
                 common,
                 cm,
                 rm,
@@ -762,14 +855,14 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_CVAR_VARIABLE_INTEGER_VALUE as c_int {
-            return mp_engine_qcommon::cvar::Cvar_VariableIntegerValue(
+            return Cvar_VariableIntegerValue(
                 common,
                 core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
             );
         } else if trap == G::G_CVAR_VARIABLE_STRING_BUFFER as c_int {
-            mp_engine_qcommon::cvar::Cvar_VariableStringBuffer(
+            Cvar_VariableStringBuffer(
                 common,
                 core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
                     .to_str()
@@ -816,21 +909,21 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_FS_READ as c_int {
             mp_engine_qcommon::files_pc::FS_Read2(
                 common,
-                vma(common, args, 1),
+                vma(common, args, 1) as *mut (),
                 *args.offset(2),
                 *args.offset(3),
             );
             return 0;
         } else if trap == G::G_FS_WRITE as c_int {
-            mp_engine_qcommon::files::FS_Write(
+            FS_Write(
                 common,
-                vma(common, args, 1),
+                vma(common, args, 1) as *const (),
                 *args.offset(2),
                 *args.offset(3),
             );
             return 0;
         } else if trap == G::G_FS_FCLOSE_FILE as c_int {
-            mp_engine_qcommon::files::FS_FCloseFile(common, *args.offset(1));
+            FS_FCloseFile(common, *args.offset(1));
             return 0;
         } else if trap == G::G_FS_GETFILELIST as c_int {
             return mp_engine_qcommon::files_pc::FS_GetFileList(
@@ -1069,7 +1162,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_AREAS_CONNECTED as c_int {
-            return mp_engine_qcommon::cm::CM_AreasConnected(cm, *args.offset(1), *args.offset(2))
+            return CM_AreasConnected(cm, *args.offset(1), *args.offset(2))
                 as c_int;
         } else if trap == G::G_BOT_ALLOCATE_CLIENT as c_int {
             return mp_engine_server::SV_BotAllocateClient(sv);
@@ -1106,12 +1199,12 @@ pub fn SV_GameSystemCalls(
                 vma(common, args, 1) as *mut mp_qshared::common::mp::qcommon::qtime::qtime_t
             );
         } else if trap == G::G_SNAPVECTOR as c_int {
-            mp_qshared::shared::sys_shared::Sys_SnapVector(vma(common, args, 1) as *mut f32);
+            Sys_SnapVector(vma(common, args, 1) as *mut f32);
             return 0;
         } else if trap == G::SP_GETSTRINGTEXTSTRING as c_int {
             assert!(!vma(common, args, 1).is_null());
             assert!(!vma(common, args, 2).is_null());
-            let text = mp_engine_qcommon::stringed::SE_GetString(
+            let text = SE_GetString(
                 common,
                 host,
                 core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
@@ -1119,14 +1212,14 @@ pub fn SV_GameSystemCalls(
                     .unwrap_or(""),
             );
             if !text.is_empty() {
-                mp_qshared::shared::q_shared::Q_strncpyz(
+                Q_strncpyz(
                     vma(common, args, 2) as *mut c_char,
                     text.as_ptr() as *const c_char,
                     *args.offset(3),
                 );
                 return qtrue as c_int;
             } else {
-                mp_qshared::shared::q_shared::Q_strncpyz(
+                Q_strncpyz(
                     vma(common, args, 2) as *mut c_char,
                     c"??".as_ptr(),
                     *args.offset(3),
@@ -1163,7 +1256,7 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_TRUEFREE as c_int {
             mp_engine_qcommon::vm_fns::VM_Shifted_Free(
                 common,
-                vma(common, args, 1) as *mut *mut c_void,
+                vma(common, args, 1) as *mut *mut (),
             );
             return 0;
         } else if trap == G::G_ICARUS_RUNSCRIPT as c_int {
@@ -1541,7 +1634,7 @@ pub fn SV_GameSystemCalls(
         // missing_symbols for the finisher to expand mechanically from the
         // same pattern.
         else if trap == G::G_R_REGISTERSKIN as c_int {
-            return mp_engine_renderer::RE_RegisterServerSkin(
+            return RE_RegisterServerSkin(
                 rm,
                 host,
                 core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
@@ -1574,7 +1667,7 @@ pub fn SV_InitGameProgs(
     rm: &mut RenderModels,
     host: &mut dyn EngineHost,
 ) {
-    let var = mp_engine_qcommon::cvar::Cvar_Get(
+    let var = Cvar_Get(
         common,
         cm,
         rm,
@@ -1591,11 +1684,11 @@ pub fn SV_InitGameProgs(
         common.bot_enable = 0;
     }
 
-    if mp_engine_qcommon::cvar::Cvar_VariableValue(common, "fs_restrict") == 0.0
-        && mp_engine_qcommon::cvar::com_dedicated(common).integer == 0
-        && !mp_qshared::shared::sys_shared::Sys_CheckCD()
+    if Cvar_VariableValue(common, "fs_restrict") == 0.0
+        && unsafe { (*common.com_dedicated).integer } == 0
+        && !Sys_CheckCD()
     {
-        let need_cd = mp_engine_qcommon::stringed::SE_GetString(common, host, "CON_TEXT_NEED_CD");
+        let need_cd = SE_GetString(common, host, "CON_TEXT_NEED_CD");
         mp_engine_qcommon::common::com_error(errorParm_t::ERR_NEED_CD, need_cd);
         //"Game CD not in drive" );
     }
@@ -1610,7 +1703,7 @@ pub fn SV_InitGameProgs(
         SV_GameSystemCalls,
         unsafe {
             core::mem::transmute(
-                mp_engine_qcommon::cvar::Cvar_VariableValue(common, "vm_game") as c_int,
+                Cvar_VariableValue(common, "vm_game") as c_int,
             )
         },
     );

@@ -87,19 +87,13 @@ extern "C" {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:40-49`
 ///
-/// PORT-NOTE(variadic): Raven's `va_start`/`vsprintf`/`va_end` C-variadic seam;
-/// a plain Rust fn cannot read `...`, so the `va_list` plumbing is resolved at
-/// integration. The body is transcribed line-for-line against that seam,
-/// matching the established `l_precomp_fns.rs` `SourceError` precedent.
-pub fn AAS_Error(bot: &mut BotLib, fmt: *mut c_char, ...) {
+/// PORT-NOTE(variadic): Raven's `va_start`/`vsprintf`/`va_end` C-variadic seam
+/// cannot be a non-extern Rust fn `...`. Resolved at integration (mirrors the
+/// `l_precomp_fns.rs` `SourceError` precedent): the fn now takes an
+/// already-rendered message in place of `fmt`/`...`.
+pub fn AAS_Error(bot: &mut BotLib, fmt: *mut c_char) {
     unsafe {
-        let mut str = [0 as c_char; 1024];
-        let mut arglist: va_list;
-
-        va_start(arglist, fmt);
-        vsprintf(str.as_mut_ptr(), fmt, arglist);
-        va_end(arglist);
-        (bot.botimport.Print.unwrap())(PRT_FATAL, str.as_ptr() as *mut c_char);
+        (bot.botimport.Print.unwrap())(PRT_FATAL, fmt);
     }
 }
 

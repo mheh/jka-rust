@@ -249,7 +249,7 @@ pub fn ReadNumber(
         //check for minus sign
         if token.r#type == TT_PUNCTUATION {
             if (*fd).r#type & FT_UNSIGNED != 0 {
-                crate::l_precomp_fns::SourceError(
+                crate::l_precomp_fns::source_error!(
                     bot,
                     source,
                     c"expected unsigned value, found %s".as_ptr() as *mut c_char,
@@ -259,7 +259,7 @@ pub fn ReadNumber(
             }
             //if not a minus sign
             if libc::strcmp(token.string.as_ptr(), c"-".as_ptr()) != 0 {
-                crate::l_precomp_fns::SourceError(
+                crate::l_precomp_fns::source_error!(
                     bot,
                     source,
                     c"unexpected punctuation %s".as_ptr() as *mut c_char,
@@ -275,7 +275,7 @@ pub fn ReadNumber(
         }
         //check if it is a number
         if token.r#type != TT_NUMBER {
-            crate::l_precomp_fns::SourceError(
+            crate::l_precomp_fns::source_error!(
                 bot,
                 source,
                 c"expected number, found %s".as_ptr() as *mut c_char,
@@ -300,7 +300,7 @@ pub fn ReadNumber(
             };
             if (*fd).r#type & FT_BOUNDED != 0 {
                 if floatval < (*fd).floatmin as f64 || floatval > (*fd).floatmax as f64 {
-                    crate::l_precomp_fns::SourceError(
+                    crate::l_precomp_fns::source_error!(
                         bot,
                         source,
                         c"float out of range [%f, %f]".as_ptr() as *mut c_char,
@@ -346,7 +346,7 @@ pub fn ReadNumber(
                 intmax = if intmax < fmax { intmax } else { fmax };
             }
             if intval < intmin || intval > intmax {
-                crate::l_precomp_fns::SourceError(
+                crate::l_precomp_fns::source_error!(
                     bot,
                     source,
                     c"value %d out of range [%d, %d]".as_ptr() as *mut c_char,
@@ -360,7 +360,7 @@ pub fn ReadNumber(
             if (*fd).r#type & FT_BOUNDED != 0
                 && ((intval as f32) < (*fd).floatmin || (intval as f32) > (*fd).floatmax)
             {
-                crate::l_precomp_fns::SourceError(
+                crate::l_precomp_fns::source_error!(
                     bot,
                     source,
                     c"value %d out of range [%f, %f]".as_ptr() as *mut c_char,
@@ -489,7 +489,7 @@ pub fn ReadStructure(
             //find the field with the name
             fd = FindField((*def).fields, token.string.as_mut_ptr());
             if fd.is_null() {
-                crate::l_precomp_fns::SourceError(
+                crate::l_precomp_fns::source_error!(
                     bot,
                     source,
                     c"unknown structure field %s".as_ptr() as *mut c_char,
@@ -573,7 +573,7 @@ pub fn ReadStructure(
                         break;
                     }
                     if libc::strcmp(token.string.as_ptr(), c",".as_ptr()) != 0 {
-                        crate::l_precomp_fns::SourceError(
+                        crate::l_precomp_fns::source_error!(
                             bot,
                             source,
                             c"expected a comma, found %s".as_ptr() as *mut c_char,

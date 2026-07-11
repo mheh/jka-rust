@@ -63,11 +63,11 @@ use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
 use mp_qshared::common::mp::botlib::line_color::LINECOLOR_RED;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE, PRT_WARNING};
-use mp_qshared::shared::surface_flags::{
-    CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER, MASK_WATER, SURF_SKY,
-};
 use mp_qshared::shared::q_math::{
     AngleVectors, CrossProduct, VectorInverse, VectorLength, VectorNormalize,
+};
+use mp_qshared::shared::surface_flags::{
+    CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER, MASK_WATER, SURF_SKY,
 };
 use mp_qshared::shared::{vec3_t, vec_t};
 
@@ -86,8 +86,8 @@ use crate::be_aas_bspq3_fns::{
 use crate::be_aas_debug_fns::AAS_PermanentLine;
 use crate::be_aas_main::AAS_Error;
 use crate::be_aas_move::{
-    AAS_BFGJumpZVelocity, AAS_ClientMovementHitBBox, AAS_DropToFloor, AAS_HorizontalVelocityForJump,
-    AAS_PredictClientMovement, AAS_RocketJumpZVelocity,
+    AAS_BFGJumpZVelocity, AAS_ClientMovementHitBBox, AAS_DropToFloor,
+    AAS_HorizontalVelocityForJump, AAS_PredictClientMovement, AAS_RocketJumpZVelocity,
 };
 use crate::be_aas_sample_fns::{
     AAS_AreaPresenceType, AAS_LinkEntityClientBBox, AAS_PointAreaNum, AAS_PointInsideFace,
@@ -1319,7 +1319,8 @@ pub fn AAS_StoreReachability(bot: &mut BotLib) {
         }
         bot.aasworld.reachability = GetClearedMemory(
             bot,
-            (bot.numlreachabilities + 10) as u64 * core::mem::size_of::<aas_reachability_t>() as u64,
+            (bot.numlreachabilities + 10) as u64
+                * core::mem::size_of::<aas_reachability_t>() as u64,
         ) as *mut aas_reachability_t;
         bot.aasworld.reachabilitysize = 1;
         let mut i = 0;
@@ -3038,8 +3039,8 @@ pub fn AAS_Reachability_Elevator(bot: &mut BotLib) {
 pub fn AAS_Reachability_FuncBobbing(bot: &mut BotLib) {
     unsafe {
         let mut spawnflags: c_int = 0;
-        let modelnum: c_int;
-        let axis: usize;
+        let mut modelnum: c_int;
+        let mut axis: usize;
         let mut numareas: c_int;
         let mut areas: [c_int; 10] = [0; 10];
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
@@ -3116,7 +3117,7 @@ pub fn AAS_Reachability_FuncBobbing(bot: &mut BotLib) {
                 origin = [0.0, 0.0, 0.0];
             }
             //
-            AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, ptr::null_mut());
+            AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, [0.0, 0.0, 0.0]);
             //
             mins = [
                 mins[0] + origin[0],
@@ -3154,10 +3155,8 @@ pub fn AAS_Reachability_FuncBobbing(bot: &mut BotLib) {
             move_start[axis] -= height;
             move_end[axis] += height;
             //
-            Log_Write(
-                bot,
-                c"funcbob model %d, start = {%1.1f, %1.1f, %1.1f} end = {%1.1f, %1.1f, %1.1f}\n"
-                    .as_ptr() as *mut c_char,
+            let log_msg = std::ffi::CString::new(format!(
+                "funcbob model {}, start = {{{:.1}, {:.1}, {:.1}}} end = {{{:.1}, {:.1}, {:.1}}}\n",
                 modelnum,
                 move_start[0] as f64,
                 move_start[1] as f64,
@@ -3165,7 +3164,9 @@ pub fn AAS_Reachability_FuncBobbing(bot: &mut BotLib) {
                 move_end[0] as f64,
                 move_end[1] as f64,
                 move_end[2] as f64,
-            );
+            ))
+            .unwrap();
+            Log_Write(bot, log_msg.as_ptr() as *mut c_char);
             //
             let mut i = 0;
             while i < 4 {
@@ -3265,12 +3266,13 @@ pub fn AAS_Reachability_FuncBobbing(bot: &mut BotLib) {
                     while !endreach.is_null() {
                         let nextendreach = (*endreach).next;
                         //
-                        Log_Write(
-                            bot,
-                            c"funcbob reach from area %d to %d\n".as_ptr() as *mut c_char,
+                        let log_msg = std::ffi::CString::new(format!(
+                            "funcbob reach from area {} to {}\n",
                             (*startreach).areanum,
                             (*endreach).areanum,
-                        );
+                        ))
+                        .unwrap();
+                        Log_Write(bot, log_msg.as_ptr() as *mut c_char);
                         //
                         if i == 0 {
                             org = move_start_top;
@@ -3416,14 +3418,12 @@ pub fn AAS_Reachability_Grapple(bot: &mut BotLib, area1num: c_int, area2num: c_i
         //if not a swim area
         if AAS_AreaSwim(bot, area1num) == 0 {
             if AAS_PointAreaNum(bot, start) == 0 {
-                Log_Write(
-                    bot,
-                    c"area %d center %f %f %f in solid?\r\n".as_ptr() as *mut c_char,
-                    area1num,
-                    start[0] as f64,
-                    start[1] as f64,
-                    start[2] as f64,
-                );
+                let log_msg = std::ffi::CString::new(format!(
+                    "area {} center {} {} {} in solid?\r\n",
+                    area1num, start[0] as f64, start[1] as f64, start[2] as f64,
+                ))
+                .unwrap();
+                Log_Write(bot, log_msg.as_ptr() as *mut c_char);
             }
             end = start;
             end[2] -= 1000.0;
@@ -4841,14 +4841,12 @@ pub fn AAS_Reachability_WeaponJump(bot: &mut BotLib, area1num: c_int, area2num: 
         start = (*bot.aasworld.areas.add(area1num as usize)).center;
         //if not a swim area
         if AAS_PointAreaNum(bot, start) == 0 {
-            Log_Write(
-                bot,
-                c"area %d center %f %f %f in solid?\r\n".as_ptr() as *mut c_char,
-                area1num,
-                start[0] as f64,
-                start[1] as f64,
-                start[2] as f64,
-            );
+            let log_msg = std::ffi::CString::new(format!(
+                "area {} center {} {} {} in solid?\r\n",
+                area1num, start[0] as f64, start[1] as f64, start[2] as f64,
+            ))
+            .unwrap();
+            Log_Write(bot, log_msg.as_ptr() as *mut c_char);
         }
         end = start;
         end[2] -= 1000.0;

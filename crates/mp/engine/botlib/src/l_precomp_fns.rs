@@ -16,7 +16,9 @@ use core::ffi::{c_char, c_int, c_long, c_ulong};
 
 use libc::{abs, ctime, free, sprintf, strcat, strcmp, strcpy, strlen, strncat, strncpy, time};
 
+use crate::l_log_fns::Log_Write;
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory, GetMemory};
+use crate::l_script_fns::FreeScript;
 use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
 
 use crate::l_precomp::builtin_defines::{
@@ -120,6 +122,8 @@ macro_rules! source_warning {
         SourceWarning($bot, $source, __sw_text.as_ptr())
     }};
 }
+pub(crate) use source_error;
+pub(crate) use source_warning;
 
 /// Raven `PC_InitTokenHeap` — the static token heap is entirely commented out in
 /// Raven; the body is a no-op.
@@ -375,10 +379,14 @@ pub fn PC_FindHashedDefine(definehash: *mut *mut define_t, name: *mut c_char) ->
 pub fn PC_PrintDefineHashTable(bot: &mut BotLib, definehash: *mut *mut define_t) {
     unsafe {
         for i in 0..DEFINEHASHSIZE {
-            Log_Write(bot, c"%4d:".as_ptr() as *mut c_char, i as c_int);
+            let mut buf = [0 as c_char; 64];
+            sprintf(buf.as_mut_ptr(), c"%4d:".as_ptr() as *mut c_char, i as c_int);
+            Log_Write(bot, buf.as_mut_ptr());
             let mut d: *mut define_t = *definehash.add(i);
             while !d.is_null() {
-                Log_Write(bot, c" %s".as_ptr() as *mut c_char, (*d).name);
+                let mut buf = [0 as c_char; 128];
+                sprintf(buf.as_mut_ptr(), c" %s".as_ptr() as *mut c_char, (*d).name);
+                Log_Write(bot, buf.as_mut_ptr());
                 d = (*d).hashnext;
             }
             Log_Write(bot, c"\n".as_ptr() as *mut c_char);

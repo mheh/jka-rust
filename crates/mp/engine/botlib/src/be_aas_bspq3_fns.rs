@@ -453,12 +453,15 @@ pub fn AAS_ParseBSPEntities(bot: &mut BotLib) {
 
         while PS_ReadToken(bot, script, &mut token) != 0 {
             if libc::strcmp(token.string.as_ptr(), c"{".as_ptr()) != 0 {
-                ScriptError(
-                    bot,
-                    script,
-                    c"invalid %s\n".as_ptr() as *mut c_char,
+                // PORT-NOTE(variadic): reproduces Raven's `vsprintf`-into-buffer step
+                // before forwarding to `ScriptError` (see l_script_fns.rs script_error!).
+                let mut __se_text = [0 as c_char; 1024];
+                libc::sprintf(
+                    __se_text.as_mut_ptr(),
+                    c"invalid %s\n".as_ptr(),
                     token.string.as_ptr(),
                 );
+                ScriptError(bot, script, __se_text.as_ptr());
                 AAS_FreeBSPEntities(bot);
                 FreeScript(bot, script);
                 return;
@@ -485,12 +488,13 @@ pub fn AAS_ParseBSPEntities(bot: &mut BotLib) {
                 (*epair).next = (*ent).epairs;
                 (*ent).epairs = epair;
                 if token.r#type != TT_STRING {
-                    ScriptError(
-                        bot,
-                        script,
-                        c"invalid %s\n".as_ptr() as *mut c_char,
+                    let mut __se_text = [0 as c_char; 1024];
+                    libc::sprintf(
+                        __se_text.as_mut_ptr(),
+                        c"invalid %s\n".as_ptr(),
                         token.string.as_ptr(),
                     );
+                    ScriptError(bot, script, __se_text.as_ptr());
                     AAS_FreeBSPEntities(bot);
                     FreeScript(bot, script);
                     return;

@@ -1982,12 +1982,8 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
                     token.string.as_ptr(),
                     core::mem::size_of_val(&(*ii).classname) - 1,
                 );
-                if ReadStructure(
-                    bot,
-                    source,
-                    &mut bot.iteminfo_struct as *mut structdef_t,
-                    ii as *mut c_char,
-                ) == 0
+                let iteminfo_struct_ptr = &mut bot.iteminfo_struct as *mut structdef_t;
+                if ReadStructure(bot, source, iteminfo_struct_ptr, ii as *mut c_char) == 0
                 {
                     FreeMemory(bot, ic as *mut ());
                     FreeSource(bot, source);

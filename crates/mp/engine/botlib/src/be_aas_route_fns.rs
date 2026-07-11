@@ -8,7 +8,7 @@
 //! constants-only) — `.rs` + `/mod.rs` for the same module name cannot coexist,
 //! so this file lands at the `_fns` escape per `_PREAMBLE.md`'s destination rule.
 
-use std::os::raw::{c_int, c_ulong};
+use std::os::raw::{c_char, c_int, c_ulong};
 
 use mp_qshared::common::mp::botlib::aas_predictroute_s::aas_predictroute_s;
 use mp_qshared::common::mp::botlib::aas_route_stop_event::{
