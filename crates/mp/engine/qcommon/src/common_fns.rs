@@ -1960,19 +1960,48 @@ pub fn Com_Init(
             }
 
             if !common.com_developer.is_null() && (*common.com_developer).integer != 0 {
-                Cmd_AddCommand(common, cm, rm, host, c"error".as_ptr(), Com_Error_f_cmd as *const ());
-                Cmd_AddCommand(common, cm, rm, host, c"crash".as_ptr(), Com_Crash_f_cmd as *const ());
+                Cmd_AddCommand(
+                    common,
+                    cm,
+                    rm,
+                    host,
+                    c"error".as_ptr(),
+                    Some(|common, _cm, _sv, _rm, _host| Com_Error_f(common)),
+                );
+                Cmd_AddCommand(
+                    common,
+                    cm,
+                    rm,
+                    host,
+                    c"crash".as_ptr(),
+                    Some(|_common, _cm, _sv, _rm, _host| Com_Crash_f()),
+                );
                 Cmd_AddCommand(
                     common,
                     cm,
                     rm,
                     host,
                     c"freeze".as_ptr(),
-                    Com_Freeze_f_cmd as *const (),
+                    Some(|common, cm, _sv, rm, host| Com_Freeze_f(common, cm, rm, host)),
                 );
             }
         }
-        unsafe { Cmd_AddCommand(common, cm, rm, host, c"quit".as_ptr(), Com_Quit_f_cmd as *const ()) };
+        // `Com_Quit_f` needs `rmg: &mut RmManager` (SV_Shutdown/Com_Shutdown), a
+        // receiver NOT in scope at the dispatch site (`Cmd_ExecuteString`/
+        // `Cbuf_Execute` thread common/cm/sv/rm/host, and the registration chain
+        // `Com_Init` has no `rmg`): receiver-unavailable per the 2026-07-11
+        // ruling's constraint 5 — the real handler is referenced at its canonical
+        // home with `rmg` the honest missing receiver (E0425), reported.
+        unsafe {
+            Cmd_AddCommand(
+                common,
+                cm,
+                rm,
+                host,
+                c"quit".as_ptr(),
+                Some(|common, cm, sv, rm, host| Com_Quit_f(common, cm, sv, rm, rmg, host)),
+            )
+        };
         unsafe {
             Cmd_AddCommand(
                 common,
@@ -1980,7 +2009,7 @@ pub fn Com_Init(
                 rm,
                 host,
                 c"changeVectors".as_ptr(),
-                crate::msg::MSG_ReportChangeVectors_f as *const (),
+                Some(|common, _cm, _sv, _rm, _host| crate::msg::MSG_ReportChangeVectors_f(common)),
             )
         };
         unsafe {
@@ -1990,7 +2019,7 @@ pub fn Com_Init(
                 rm,
                 host,
                 c"writeconfig".as_ptr(),
-                Com_WriteConfig_f_cmd as *const (),
+                Some(|common, _cm, _sv, _rm, _host| Com_WriteConfig_f(common)),
             )
         };
 
@@ -2087,17 +2116,6 @@ pub fn Com_Init(
 }
 
 // --- local helpers (not Raven fns; keep the bodies above straight-line) ---
-
-fn Com_Error_f_cmd() {
-    // The bare fn() command-table slot can't carry `common`, so this (and the
-    // Freeze/Quit/WriteConfig cmd shims below) never calls the real Com_Error_f.
-}
-fn Com_Crash_f_cmd() {
-    Com_Crash_f();
-}
-fn Com_Freeze_f_cmd() {}
-fn Com_Quit_f_cmd() {}
-fn Com_WriteConfig_f_cmd() {}
 
 unsafe fn c_str_to_string(p: *const c_char) -> String {
     if p.is_null() {

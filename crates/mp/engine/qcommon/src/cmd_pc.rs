@@ -8,27 +8,17 @@ use core::ffi::{c_char, c_int, CStr};
 
 use mp_host_interface::engine_host::EngineHost;
 
-use crate::cmd::cmd_function_t::cmd_function_t;
+use crate::cmd::cmd_function_t::{cmd_function_t, CmdFunction};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use crate::common_fns::Com_Filter;
-use crate::qcommon::xcommand_t::xcommand_t;
 use crate::z_memman_pc::{CopyString, S_Malloc, Z_Free};
 
-// PORT-NOTE(rm-types): `RenderModels`/`Server` are state-receiver types pinned
-// by the engine-fork-discovery preamble's receiver order; neither has landed
-// in this crate yet (`Server` lives in `mp_engine_server`, which already
-// depends on this crate — importing it here would cycle). Referenced by their
-// exact resolved-signature names per the no-stub rule; reported as missing
-// symbols (`cmd_common.rs` precedent).
+// `Server` is a pinned-receiver placeholder: the real type lives in
+// mp_engine_server, which depends on this crate (importing it would cycle).
 pub(crate) use crate::cm_load::RenderModels;
 pub(crate) struct Server;
 
-// Sweep: extern forward-declares eliminated. Real qshared/in-crate callees
-// imported; `Cvar_Command` at its canonical cvar_fns home; the client/server
-// dispatch entrypoints (`CL_GameCommand`/`UI_GameCommand`/
-// `CL_ForwardCommandToServer`/`SV_GameCommand`) sit across the engine cycle
-// seam with no importable home — left bare; reported.
 use crate::common::com_printf;
 use crate::cvar_fns::Cvar_Command;
 use mp_qshared::shared::q_string::Q_stricmp;
@@ -42,7 +32,7 @@ pub fn Cmd_AddCommand(
     rm: &mut RenderModels,
     host: &mut dyn EngineHost,
     cmd_name: *const c_char,
-    function: *const (),
+    function: Option<CmdFunction>,
 ) {
     unsafe {
         // fail if the command already exists
@@ -50,7 +40,7 @@ pub fn Cmd_AddCommand(
         while !cmd.is_null() {
             if libc::strcmp(cmd_name, (*cmd).name) == 0 {
                 // allow completion-only commands to be silently doubled
-                if !function.is_null() {
+                if function.is_some() {
                     let name = CStr::from_ptr(cmd_name).to_string_lossy();
                     com_printf(common, &format!("Cmd_AddCommand: {name} already defined\n"));
                 }
@@ -68,7 +58,7 @@ pub fn Cmd_AddCommand(
             core::mem::size_of::<cmd_function_t>() as c_int,
         ) as *mut cmd_function_t;
         (*cmd).name = CopyString(common, cm, rm, host, cmd_name);
-        (*cmd).function = core::mem::transmute::<*const (), Option<xcommand_t>>(function);
+        (*cmd).function = function;
         (*cmd).next = common.cmd_functions;
         common.cmd_functions = cmd;
     }
@@ -191,7 +181,7 @@ pub fn Cmd_ExecuteString(
 
                 // perform the action
                 if let Some(function) = (*cmd).function {
-                    function();
+                    function(common, cm, sv, rm, host);
                 } else {
                     // let the cgame or game handle it
                     break;

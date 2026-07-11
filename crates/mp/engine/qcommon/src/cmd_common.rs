@@ -488,7 +488,7 @@ pub fn Cmd_Init(
             rm,
             host,
             b"cmdlist\0".as_ptr() as *const c_char,
-            Cmd_List_f as *const (),
+            Some(|common, _cm, _sv, _rm, _host| Cmd_List_f(common)),
         );
         Cmd_AddCommand(
             common,
@@ -496,7 +496,7 @@ pub fn Cmd_Init(
             rm,
             host,
             b"exec\0".as_ptr() as *const c_char,
-            Cmd_Exec_f as *const (),
+            Some(|common, cm, _sv, rm, host| Cmd_Exec_f(common, cm, rm, host)),
         );
         Cmd_AddCommand(
             common,
@@ -504,7 +504,7 @@ pub fn Cmd_Init(
             rm,
             host,
             b"vstr\0".as_ptr() as *const c_char,
-            Cmd_Vstr_f as *const (),
+            Some(|common, _cm, _sv, _rm, _host| Cmd_Vstr_f(common)),
         );
         Cmd_AddCommand(
             common,
@@ -512,7 +512,7 @@ pub fn Cmd_Init(
             rm,
             host,
             b"echo\0".as_ptr() as *const c_char,
-            Cmd_Echo_f as *const (),
+            Some(|common, _cm, _sv, _rm, _host| Cmd_Echo_f(common)),
         );
         Cmd_AddCommand(
             common,
@@ -520,7 +520,7 @@ pub fn Cmd_Init(
             rm,
             host,
             b"wait\0".as_ptr() as *const c_char,
-            Cmd_Wait_f as *const (),
+            Some(|common, _cm, _sv, _rm, _host| Cmd_Wait_f(common)),
         );
     }
 }

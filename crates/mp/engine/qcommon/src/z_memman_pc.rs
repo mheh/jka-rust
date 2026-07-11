@@ -635,14 +635,21 @@ pub fn Com_InitZoneMemory(
     //#endif
 
     unsafe {
-        Cmd_AddCommand(common, cm, rm, host, c"zone_stats".as_ptr(), Z_Stats_f as *const ());
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            c"zone_stats".as_ptr(),
+            Some(|common, _cm, _sv, _rm, _host| Z_Stats_f(common)),
+        );
         Cmd_AddCommand(
             common,
             cm,
             rm,
             host,
             c"zone_details".as_ptr(),
-            Z_Details_f as *const (),
+            Some(|common, _cm, _sv, _rm, _host| Z_Details_f(common)),
         );
     }
 

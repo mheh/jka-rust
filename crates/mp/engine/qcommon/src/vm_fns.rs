@@ -574,10 +574,6 @@ pub fn VM_Init(
     // client wants to know if the server is using vm's for certain modules,
     // so if pure we can force the same method (be it vm or dll) -rww
 
-    // PORT-NOTE(cmd-table): `Cmd_AddCommand`'s resolved receiver-taking
-    // signature isn't landed in this shard (dispatch-table wave, ruling 5);
-    // referenced by its exact resolved name/receivers per the no-stub rule,
-    // reported as a missing symbol.
     unsafe {
         Cmd_AddCommand(
             common,
@@ -585,9 +581,16 @@ pub fn VM_Init(
             rm,
             host,
             c"vmprofile".as_ptr(),
-            VM_VmProfile_f as _,
+            Some(|common, cm, _sv, rm, host| VM_VmProfile_f(common, cm, rm, host)),
         );
-        Cmd_AddCommand(common, cm, rm, host, c"vminfo".as_ptr(), VM_VmInfo_f as _);
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            c"vminfo".as_ptr(),
+            Some(|common, _cm, _sv, _rm, _host| VM_VmInfo_f(common)),
+        );
     }
 
     common.vmTable = unsafe { core::mem::zeroed() };
