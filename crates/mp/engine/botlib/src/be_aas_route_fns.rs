@@ -960,16 +960,16 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
         routecacheheader.version = crate::be_aas_route::RCVERSION;
         routecacheheader.numareas = bot.aasworld.numareas;
         routecacheheader.numclusters = bot.aasworld.numclusters;
-        routecacheheader.areacrc = crate::l_crc::CRC_ProcessString(
+        routecacheheader.areacrc = crate::l_crc_fns::CRC_ProcessString(
             bot,
-            bot.aasworld.areas as *const u8,
+            bot.aasworld.areas as *mut core::ffi::c_uchar,
             std::mem::size_of::<aas_area_t>() as c_int * bot.aasworld.numareas,
-        );
-        routecacheheader.clustercrc = crate::l_crc::CRC_ProcessString(
+        ) as c_int;
+        routecacheheader.clustercrc = crate::l_crc_fns::CRC_ProcessString(
             bot,
-            bot.aasworld.clusters as *const u8,
+            bot.aasworld.clusters as *mut core::ffi::c_uchar,
             std::mem::size_of::<aas_cluster_t>() as c_int * bot.aasworld.numclusters,
-        );
+        ) as c_int;
         routecacheheader.numportalcache = numportalcache;
         routecacheheader.numareacache = numareacache;
         bot.botimport.FS_Write(
@@ -1054,20 +1054,20 @@ pub fn AAS_ReadRouteCache(bot: &mut BotLib) -> c_int {
             return qfalse;
         }
         if routecacheheader.areacrc
-            != crate::l_crc::CRC_ProcessString(
+            != crate::l_crc_fns::CRC_ProcessString(
                 bot,
-                bot.aasworld.areas as *const u8,
+                bot.aasworld.areas as *mut core::ffi::c_uchar,
                 std::mem::size_of::<aas_area_t>() as c_int * bot.aasworld.numareas,
-            )
+            ) as c_int
         {
             return qfalse;
         }
         if routecacheheader.clustercrc
-            != crate::l_crc::CRC_ProcessString(
+            != crate::l_crc_fns::CRC_ProcessString(
                 bot,
-                bot.aasworld.clusters as *const u8,
+                bot.aasworld.clusters as *mut core::ffi::c_uchar,
                 std::mem::size_of::<aas_cluster_t>() as c_int * bot.aasworld.numclusters,
-            )
+            ) as c_int
         {
             return qfalse;
         }

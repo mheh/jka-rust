@@ -207,6 +207,17 @@ pub struct Navigator {
     ///
     /// Source: `oracle/codemp/server/NPCNav/navigator.cpp:478-484`
     pub cvars_initialized: bool,
+
+    /// Raven `pathsCalculated` — same public `CNavigator` field as
+    /// [`paths_calculated`](Self::paths_calculated) above; kept under its
+    /// verbatim Raven spelling too because `sv_game.rs`'s
+    /// `G_NAV_GETPATHSCALCULATED`/`G_NAV_SETPATHSCALCULATED` arms reference
+    /// it by that exact name (state-struct field-merge round, not a design
+    /// choice — reconciling the two spellings into one is call-site work,
+    /// out of scope for this file).
+    ///
+    /// Source: `oracle/codemp/server/NPCNav/navigator.h:215`
+    pub pathsCalculated: qboolean,
 }
 
 impl Default for Navigator {
@@ -232,6 +243,7 @@ impl Default for Navigator {
             paths_calculated: qfalse,
             checked_nodes: BTreeMap::new(),
             cvars_initialized: true,
+            pathsCalculated: qfalse,
         }
     }
 }

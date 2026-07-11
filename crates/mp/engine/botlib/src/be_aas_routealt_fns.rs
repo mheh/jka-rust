@@ -182,8 +182,8 @@ pub fn AAS_AlternativeRouteGoals(
             // this is a mid range area
             let mra = bot.midrangeareas.add(i as usize);
             (*mra).valid = qtrue;
-            (*mra).starttime = starttime;
-            (*mra).goaltime = goaltime;
+            (*mra).starttime = starttime as u16;
+            (*mra).goaltime = goaltime as u16;
             Log_Write(
                 bot,
                 format!("{} midrange area {}", nummidrangeareas, i).as_ptr()
@@ -230,9 +230,10 @@ pub fn AAS_AlternativeRouteGoals(
             goal.origin = (*bot.aasworld.areas.add(bestareanum as usize)).center;
             goal.areanum = bestareanum;
             let mra = bot.midrangeareas.add(bestareanum as usize);
-            goal.starttraveltime = (*mra).starttime as i16;
-            goal.goaltraveltime = (*mra).goaltime as i16;
-            goal.extratraveltime = (((*mra).starttime + (*mra).goaltime) - goaltraveltime) as i16;
+            goal.starttraveltime = (*mra).starttime;
+            goal.goaltraveltime = (*mra).goaltime;
+            goal.extratraveltime =
+                (((*mra).starttime as c_int + (*mra).goaltime as c_int) - goaltraveltime) as u16;
             numaltroutegoals += 1;
             // don't return more than the maximum alternative route goals
             if numaltroutegoals >= maxaltroutegoals {

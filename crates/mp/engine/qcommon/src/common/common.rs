@@ -225,6 +225,10 @@ pub struct Common {
     pub com_cameraMode: *mut cvar_t,
     pub com_RMG: *mut cvar_t,
     pub com_validateZone: *mut cvar_t,
+    /// Raven `server.h` `sv_maxclients` cvar pointer.
+    ///
+    /// Source: `oracle/codemp/server/server.h:244`
+    pub sv_maxclients: *mut cvar_t,
     /// Raven `Com_EventLoop`'s `random()` drop-sim seed (fn-static hoist).
     ///
     /// Source: `oracle/codemp/qcommon/common.cpp:900-915`

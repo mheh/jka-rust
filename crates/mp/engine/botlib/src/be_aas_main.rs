@@ -439,7 +439,7 @@ pub fn AAS_LoadMap(bot: &mut BotLib, mapname: *const c_char) -> c_int {
             return 0;
         }
         //
-        bot.aasworld.initialized = mp_qshared::qfalse as c_int;
+        bot.aasworld.initialized = mp_qshared::shared::qfalse as c_int;
         // NOTE: free the routing caches before loading a new map because
         // to free the caches the old number of areas, number of clusters
         // and number of areas in a clusters must be available
@@ -447,7 +447,7 @@ pub fn AAS_LoadMap(bot: &mut BotLib, mapname: *const c_char) -> c_int {
         // load the map
         let errnum = AAS_LoadFiles(bot, mapname);
         if errnum != BLERR_NOERROR {
-            bot.aasworld.loaded = mp_qshared::qfalse as c_int;
+            bot.aasworld.loaded = mp_qshared::shared::qfalse as c_int;
             return errnum;
         }
         //
@@ -576,7 +576,7 @@ pub fn AAS_Shutdown(bot: &mut BotLib) {
             core::mem::size_of::<crate::be_aas_def::aas_s::aas_t>(),
         );
         // aas has not been initialized
-        bot.aasworld.initialized = mp_qshared::qfalse as c_int;
+        bot.aasworld.initialized = mp_qshared::shared::qfalse as c_int;
         // NOTE: as soon as a new .bsp file is loaded the .bsp file memory is
         // freed an reallocated, so there's no need to free that memory here
         // print shutdown

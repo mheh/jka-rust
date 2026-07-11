@@ -23,7 +23,7 @@
 //! PORT-NOTE(unsafe): the AAS arena is a graph of raw pointers (`aasworld.*`);
 //! bodies deref explicitly inside `unsafe` per porting-rules §D11.
 
-use core::ffi::{c_char, c_int, c_ushort, c_void};
+use core::ffi::{c_char, c_int, c_ushort};
 use core::ptr;
 
 use crate::aasfile::aas_area_s::aas_area_t;
@@ -97,6 +97,10 @@ use crate::be_interface_fns::Sys_MilliSeconds;
 use crate::l_libvar_fns::{LibVarGetValue, LibVarValue};
 use crate::l_log_fns::Log_Write;
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory};
+
+/// Raven `M_PI` (`<math.h>`).
+/// Source: `oracle/codemp/botlib/be_aas_reach.cpp:3900` (usage site).
+const M_PI: f64 = std::f64::consts::PI;
 
 /// Raven `AAS_FaceArea` — area of one AAS face.
 ///
@@ -390,7 +394,7 @@ pub fn AAS_AreaVolume(bot: &mut BotLib, areanum: c_int) -> f32 {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:459-463`
 pub fn AAS_ShutDownReachabilityHeap(bot: &mut BotLib) {
-    FreeMemory(bot, bot.reachabilityheap as *mut c_void);
+    FreeMemory(bot, bot.reachabilityheap as *mut ());
     bot.numlreachabilities = 0;
 }
 
@@ -420,7 +424,7 @@ pub fn AAS_AllocReachability(bot: &mut BotLib) -> *mut aas_lreachability_t {
 pub fn AAS_FreeReachability(bot: &mut BotLib, lreach: *mut aas_lreachability_t) {
     unsafe {
         Com_Memset(
-            lreach as *mut c_void,
+            lreach as *mut (),
             0,
             core::mem::size_of::<aas_lreachability_t>(),
         );
@@ -980,7 +984,7 @@ pub fn AAS_Reachability_EqualFloorHeight(
         let mut foundreach: c_int = qfalse;
         let mut lr: aas_lreachability_t = core::mem::zeroed();
         Com_Memset(
-            (&mut lr as *mut aas_lreachability_t) as *mut c_void,
+            (&mut lr as *mut aas_lreachability_t) as *mut (),
             0,
             core::mem::size_of::<aas_lreachability_t>(),
         ); //make the compiler happy
@@ -1311,7 +1315,7 @@ pub fn AAS_FindFaceReachabilities(
 pub fn AAS_StoreReachability(bot: &mut BotLib) {
     unsafe {
         if !bot.aasworld.reachability.is_null() {
-            FreeMemory(bot, bot.aasworld.reachability as *mut c_void);
+            FreeMemory(bot, bot.aasworld.reachability as *mut ());
         }
         bot.aasworld.reachability = GetClearedMemory(
             bot,
@@ -3369,8 +3373,6 @@ pub fn AAS_Reachability_FuncBobbing(bot: &mut BotLib) {
 
 /// Raven `AAS_Reachability_Grapple`.
 ///
-/// PORT-NOTE(M_PI): `M_PI` resolves to mp_game's copy (rosetta) which the engine
-/// crate cannot yet reach; referenced verbatim, reported in missing_symbols.
 /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:3776-3910`
 pub fn AAS_Reachability_Grapple(bot: &mut BotLib, area1num: c_int, area2num: c_int) -> c_int {
     unsafe {
@@ -4001,7 +4003,7 @@ pub fn AAS_BestReachableFromJumpPadArea(
             //
             cmdmove = [0.0, 0.0, 0.0];
             Com_Memset(
-                (&mut r#move as *mut aas_clientmove_t) as *mut c_void,
+                (&mut r#move as *mut aas_clientmove_t) as *mut (),
                 0,
                 core::mem::size_of::<aas_clientmove_t>(),
             );
@@ -5047,7 +5049,7 @@ pub fn AAS_Reachability_JumpPad(bot: &mut BotLib) {
             if velocity[0] != 0.0 || velocity[1] != 0.0 {
                 cmdmove = [0.0, 0.0, 0.0];
                 Com_Memset(
-                    (&mut r#move as *mut aas_clientmove_t) as *mut c_void,
+                    (&mut r#move as *mut aas_clientmove_t) as *mut (),
                     0,
                     core::mem::size_of::<aas_clientmove_t>(),
                 );
@@ -5463,7 +5465,7 @@ pub fn AAS_ContinueInitReachability(bot: &mut BotLib, time: f32) -> c_int {
             //free the reachability link heap
             AAS_ShutDownReachabilityHeap(bot);
             //
-            FreeMemory(bot, bot.areareachability as *mut c_void);
+            FreeMemory(bot, bot.areareachability as *mut ());
             //
             bot.aasworld.numreachabilityareas += 1;
             //

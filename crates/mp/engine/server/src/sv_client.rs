@@ -490,7 +490,7 @@ pub fn SV_ExecuteClientCommand(
     let mut matched = false;
     match name.as_ref() {
         "userinfo" => {
-            SV_UpdateUserinfo_f(common, sv, cl);
+            SV_UpdateUserinfo_f(common, sv, host, cl);
             matched = true;
         }
         "disconnect" => {

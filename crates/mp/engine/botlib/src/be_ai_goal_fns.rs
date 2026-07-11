@@ -217,15 +217,21 @@ fn vec_scale(a: vec3_t, s: f32) -> vec3_t {
 pub fn BotGoalStateFromHandle(bot: &mut BotLib, handle: c_int) -> *mut bot_goalstate_t {
     if handle <= 0 || handle > MAX_CLIENTS as c_int {
         unsafe {
-            bot.botimport
-                .Print(PRT_FATAL, "goal state handle %d out of range\n", handle);
+            bot.botimport.Print.unwrap()(
+                PRT_FATAL,
+                c"goal state handle %d out of range\n".as_ptr() as *mut c_char,
+                handle,
+            );
         }
         return core::ptr::null_mut();
     }
     if bot.botgoalstates[handle as usize].is_null() {
         unsafe {
-            bot.botimport
-                .Print(PRT_FATAL, "invalid goal state %d\n", handle);
+            bot.botimport.Print.unwrap()(
+                PRT_FATAL,
+                c"invalid goal state %d\n".as_ptr() as *mut c_char,
+                handle,
+            );
         }
         return core::ptr::null_mut();
     }
@@ -429,7 +435,10 @@ pub fn AllocLevelItem(bot: &mut BotLib) -> *mut levelitem_t {
     let li = bot.freelevelitems;
     if li.is_null() {
         unsafe {
-            bot.botimport.Print(PRT_FATAL, "out of level items\n");
+            bot.botimport.Print.unwrap()(
+                PRT_FATAL,
+                c"out of level items\n".as_ptr() as *mut c_char,
+            );
         }
         return core::ptr::null_mut();
     }
@@ -847,7 +856,10 @@ pub fn BotPushGoal(bot: &mut BotLib, goalstate: c_int, goal: *mut bot_goal_t) {
     }
     unsafe {
         if (*gs).goalstacktop >= MAX_GOALSTACK as c_int - 1 {
-            bot.botimport.Print(PRT_ERROR, "goal heap overflow\n");
+            bot.botimport.Print.unwrap()(
+                PRT_ERROR,
+                c"goal heap overflow\n".as_ptr() as *mut c_char,
+            );
             BotDumpGoalStack(bot, goalstate);
             return;
         }
@@ -1036,12 +1048,12 @@ pub fn BotInitInfoEntities(bot: &mut BotLib) {
                     );
                     (*cs).areanum = AAS_PointAreaNum(bot, (*cs).origin);
                     if (*cs).areanum == 0 {
-                        bot.botimport.Print(
+                        bot.botimport.Print.unwrap()(
                             PRT_MESSAGE,
-                            "camp spot at %1.1f %1.1f %1.1f in solid\n",
-                            (*cs).origin[0],
-                            (*cs).origin[1],
-                            (*cs).origin[2],
+                            c"camp spot at %1.1f %1.1f %1.1f in solid\n".as_ptr() as *mut c_char,
+                            (*cs).origin[0] as f64,
+                            (*cs).origin[1] as f64,
+                            (*cs).origin[2] as f64,
                         );
                         FreeMemory(bot, cs as *mut ());
                         ent = AAS_NextBSPEntity(bot, ent);
@@ -1058,10 +1070,16 @@ pub fn BotInitInfoEntities(bot: &mut BotLib) {
     }
     if bot.bot_developer != 0 {
         unsafe {
-            bot.botimport
-                .Print(PRT_MESSAGE, "%d map locations\n", numlocations);
-            bot.botimport
-                .Print(PRT_MESSAGE, "%d camp spots\n", numcampspots);
+            bot.botimport.Print.unwrap()(
+                PRT_MESSAGE,
+                c"%d map locations\n".as_ptr() as *mut c_char,
+                numlocations,
+            );
+            bot.botimport.Print.unwrap()(
+                PRT_MESSAGE,
+                c"%d camp spots\n".as_ptr() as *mut c_char,
+                numcampspots,
+            );
         }
     }
 }
@@ -1296,15 +1314,21 @@ pub fn BotUpdateEntityItems(bot: &mut BotLib) {
 pub fn BotFreeGoalState(bot: &mut BotLib, handle: c_int) {
     if handle <= 0 || handle > MAX_CLIENTS as c_int {
         unsafe {
-            bot.botimport
-                .Print(PRT_FATAL, "goal state handle %d out of range\n", handle);
+            bot.botimport.Print.unwrap()(
+                PRT_FATAL,
+                c"goal state handle %d out of range\n".as_ptr() as *mut c_char,
+                handle,
+            );
         }
         return;
     }
     if bot.botgoalstates[handle as usize].is_null() {
         unsafe {
-            bot.botimport
-                .Print(PRT_FATAL, "invalid goal state handle %d\n", handle);
+            bot.botimport.Print.unwrap()(
+                PRT_FATAL,
+                c"invalid goal state handle %d\n".as_ptr() as *mut c_char,
+                handle,
+            );
         }
         return;
     }
@@ -1432,8 +1456,11 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                     origin.as_mut_ptr(),
                 ) == 0
                 {
-                    bot.botimport
-                        .Print(PRT_ERROR, "item %s without origin\n", classname.as_ptr());
+                    bot.botimport.Print.unwrap()(
+                        PRT_ERROR,
+                        c"item %s without origin\n".as_ptr() as *mut c_char,
+                        classname.as_ptr(),
+                    );
                     ent = AAS_NextBSPEntity(bot, ent);
                     continue;
                 }
@@ -1518,13 +1545,13 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                 //if not a stationary item
                 if spawnflags & 1 == 0 {
                     if AAS_DropToFloor(bot, origin.as_mut_ptr(), (*ii).mins, (*ii).maxs) == 0 {
-                        bot.botimport.Print(
+                        bot.botimport.Print.unwrap()(
                             PRT_MESSAGE,
-                            "%s in solid at (%1.1f %1.1f %1.1f)\n",
+                            c"%s in solid at (%1.1f %1.1f %1.1f)\n".as_ptr() as *mut c_char,
                             classname.as_ptr(),
-                            origin[0],
-                            origin[1],
-                            origin[2],
+                            origin[0] as f64,
+                            origin[1] as f64,
+                            origin[2] as f64,
                         );
                     }
                 }
@@ -1546,13 +1573,14 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                         (*li).goalorigin.as_mut_ptr(),
                     );
                     if (*li).goalareanum == 0 {
-                        bot.botimport.Print(
+                        bot.botimport.Print.unwrap()(
                             PRT_MESSAGE,
-                            "%s not reachable for bots at (%1.1f %1.1f %1.1f)\n",
+                            c"%s not reachable for bots at (%1.1f %1.1f %1.1f)\n".as_ptr()
+                                as *mut c_char,
                             classname.as_ptr(),
-                            origin[0],
-                            origin[1],
-                            origin[2],
+                            origin[0] as f64,
+                            origin[1] as f64,
+                            origin[2] as f64,
                         );
                     }
                 }
@@ -1561,8 +1589,11 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
             }
             ent = AAS_NextBSPEntity(bot, ent);
         }
-        bot.botimport
-            .Print(PRT_MESSAGE, "found %d level items\n", bot.numlevelitems);
+        bot.botimport.Print.unwrap()(
+            PRT_MESSAGE,
+            c"found %d level items\n".as_ptr() as *mut c_char,
+            bot.numlevelitems,
+        );
     }
 }
 
@@ -1885,8 +1916,11 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
             c"256".as_ptr() as *mut c_char,
         ) as c_int;
         if max_iteminfo < 0 {
-            bot.botimport
-                .Print(PRT_ERROR, "max_iteminfo = %d\n", max_iteminfo);
+            bot.botimport.Print.unwrap()(
+                PRT_ERROR,
+                c"max_iteminfo = %d\n".as_ptr() as *mut c_char,
+                max_iteminfo,
+            );
             max_iteminfo = 256;
             LibVarSet(
                 bot,
@@ -1904,8 +1938,11 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
         PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
         let source = LoadSourceFile(bot, path.as_ptr());
         if source.is_null() {
-            bot.botimport
-                .Print(PRT_ERROR, "counldn't load %s\n", path.as_ptr());
+            bot.botimport.Print.unwrap()(
+                PRT_ERROR,
+                c"counldn't load %s\n".as_ptr() as *mut c_char,
+                path.as_ptr(),
+            );
             return core::ptr::null_mut();
         }
         //initialize item config
@@ -1974,10 +2011,16 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
         FreeSource(bot, source);
 
         if (*ic).numiteminfo == 0 {
-            bot.botimport.Print(PRT_WARNING, "no item info loaded\n");
+            bot.botimport.Print.unwrap()(
+                PRT_WARNING,
+                c"no item info loaded\n".as_ptr() as *mut c_char,
+            );
         }
-        bot.botimport
-            .Print(PRT_MESSAGE, "loaded %s\n", path.as_ptr());
+        bot.botimport.Print.unwrap()(
+            PRT_MESSAGE,
+            c"loaded %s\n".as_ptr() as *mut c_char,
+            path.as_ptr(),
+        );
         ic
     }
 }
@@ -1994,7 +2037,10 @@ pub fn BotLoadItemWeights(bot: &mut BotLib, goalstate: c_int, filename: *mut c_c
         //load the weight configuration
         (*gs).itemweightconfig = ReadWeightConfig(bot, filename);
         if (*gs).itemweightconfig.is_null() {
-            bot.botimport.Print(PRT_FATAL, "couldn't load weights\n");
+            bot.botimport.Print.unwrap()(
+                PRT_FATAL,
+                c"couldn't load weights\n".as_ptr() as *mut c_char,
+            );
             return BLERR_CANNOTLOADITEMWEIGHTS;
         }
         //if there's no item configuration
@@ -2028,8 +2074,10 @@ pub fn BotSetupGoalAI(bot: &mut BotLib) -> c_int {
         //load the item configuration
         bot.itemconfig = LoadItemConfig(bot, filename);
         if bot.itemconfig.is_null() {
-            bot.botimport
-                .Print(PRT_FATAL, "couldn't load item config\n");
+            bot.botimport.Print.unwrap()(
+                PRT_FATAL,
+                c"couldn't load item config\n".as_ptr() as *mut c_char,
+            );
             return BLERR_CANNOTLOADITEMCONFIG;
         }
 

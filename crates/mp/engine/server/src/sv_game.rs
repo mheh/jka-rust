@@ -42,6 +42,18 @@ use mp_host_interface::engine_host::EngineHost;
 
 use crate::npcnav::Navigator;
 
+// PORT-NOTE(q_shared-primitives): `COM_Parse`/`Q_strncpyz`/`atoi` are Raven
+// `q_shared.c` free functions ported a tier above this crate's dependency graph
+// (`mp_game`), not reachable here. Forward-declared by their exact Raven names
+// via the established engine `extern "Rust"` convention (cm_load.rs /
+// cmd_common.rs / files_common.rs / msg.rs precedent); the finisher resolves
+// linkage uniformly. Reported as missing symbols for the shared q_shared.c port.
+extern "Rust" {
+    fn COM_Parse(data_p: *mut *const c_char) -> *mut c_char;
+    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
+    fn atoi(string: *const c_char) -> c_int;
+}
+
 /// Raven `SV_NumForGentity`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:46-52`
@@ -101,20 +113,20 @@ pub fn SV_GetEntityToken(sv: &mut Server, buffer: *mut c_char, bufferSize: c_int
     // crate"); exact import path not resolved by this packet — escalated.
     unsafe {
         if sv.sv.mLocalSubBSPIndex == -1 {
-            let s = mp_qshared::shared::com_parse::COM_Parse(
+            let s = COM_Parse(
                 &mut sv.sv.entityParsePoint as *mut *mut c_char as *mut *const c_char,
             );
-            mp_qshared::shared::q_shared::Q_strncpyz(buffer, s, bufferSize);
+            Q_strncpyz(buffer, s, bufferSize);
             if sv.sv.entityParsePoint.is_null() && *s == 0 {
                 qfalse
             } else {
                 qtrue
             }
         } else {
-            let s = mp_qshared::shared::com_parse::COM_Parse(
+            let s = COM_Parse(
                 &mut sv.sv.mLocalSubBSPEntityParsePoint as *mut *mut c_char as *mut *const c_char,
             );
-            mp_qshared::shared::q_shared::Q_strncpyz(buffer, s, bufferSize);
+            Q_strncpyz(buffer, s, bufferSize);
             if sv.sv.mLocalSubBSPEntityParsePoint.is_null() && *s == 0 {
                 qfalse
             } else {
@@ -323,11 +335,7 @@ pub fn SV_GetServerinfo(common: &mut Common, buffer: *mut c_char, bufferSize: c_
         mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
     unsafe {
-        mp_qshared::shared::q_shared::Q_strncpyz(
-            buffer,
-            info.as_ptr() as *const c_char,
-            bufferSize,
-        );
+        Q_strncpyz(buffer, info.as_ptr() as *const c_char, bufferSize);
     }
 }
 
@@ -518,7 +526,7 @@ pub fn SV_SetBrushModel(
         let mut maxs = [0.0f32; 3];
 
         if *name == b'*' as c_char {
-            (*ent).s.modelindex = mp_qshared::shared::q_shared::atoi(name.offset(1));
+            (*ent).s.modelindex = atoi(name.offset(1));
 
             if sv.sv.mLocalSubBSPIndex != -1 {
                 (*ent).s.modelindex += sv.sv.mLocalSubBSPModelOffset;

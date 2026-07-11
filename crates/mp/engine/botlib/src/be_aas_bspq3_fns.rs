@@ -313,7 +313,8 @@ pub fn AAS_ValueForBSPEpairKey(
 pub fn AAS_FreeBSPEntities(bot: &mut BotLib) {
     unsafe {
         for i in 1..bot.bspworld.numentities {
-            let ent = &mut bot.bspworld.entities[i as usize] as *mut _;
+            let ent =
+                &mut bot.bspworld.entities[i as usize] as *mut crate::be_aas_bspq3::bsp_entity_t;
             let mut epair = (*ent).epairs;
             while !epair.is_null() {
                 let nextepair = (*epair).next;
@@ -469,7 +470,8 @@ pub fn AAS_ParseBSPEntities(bot: &mut BotLib) {
                 );
                 break;
             }
-            let ent = &mut bot.bspworld.entities[bot.bspworld.numentities as usize] as *mut _;
+            let ent = &mut bot.bspworld.entities[bot.bspworld.numentities as usize]
+                as *mut crate::be_aas_bspq3::bsp_entity_t;
             bot.bspworld.numentities += 1;
             (*ent).epairs = core::ptr::null_mut();
             while PS_ReadToken(bot, script, &mut token) != 0 {
