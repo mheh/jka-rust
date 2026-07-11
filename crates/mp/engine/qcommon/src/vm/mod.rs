@@ -21,3 +21,5 @@ pub use module_slot::ModuleSlot;
 pub use module_transport::ModuleTransport;
 pub use slot_id::SlotId;
 pub use trampoline::{arm_game_slot, game_syscall_trampoline, game_syscall_trampoline_words};
+
+pub use crate::vm_fns::VM_Call;

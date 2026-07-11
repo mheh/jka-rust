@@ -31,7 +31,9 @@ use mp_host_interface::engine_host::EngineHost;
 
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
-use crate::sv_game::SV_GentityNum;
+use crate::sv_game::{SV_GentityNum, SV_InitGameProgs, SV_ShutdownGameProgs};
+use crate::sv_bot::SV_BotInitBotLib;
+use mp_engine_qcommon::vm::VM_Call;
 use crate::Server;
 
 // Canonical homes for the qcommon/qshared free functions this file calls
@@ -56,12 +58,7 @@ use crate::sv_client::{SV_DropClient, SV_SendClientMapChange};
 use crate::sv_main::SV_SendServerCommand;
 use crate::sv_world::SV_ClearWorld;
 
-// PORT-NOTE(bot-lib-type): the `bot: &mut BotLib` receiver (ruling 2/preamble
-// pinned order) has no owning struct anywhere in the tree yet. Declared
-// locally (common_fns.rs precedent) so `SV_Init`'s resolved signature can
-// transcribe verbatim; escalated in missing_symbols instead of stubbed.
-#[allow(dead_code)]
-struct BotLib;
+use mp_engine_botlib::BotLib;
 
 // PORT-NOTE(cvar-globals): `sv_maxclients`/`sv_gametype`/`sv_pure`/`sv_*`/
 // `com_dedicated`/`gvm`/`cvar_modifiedFlags` are file-scope `cvar_t*`/scalar
@@ -801,7 +798,7 @@ pub fn SV_SpawnServer(
             common,
             sv.gvm,
             MpGameExport::GAME_RUN_FRAME as i32,
-            &[sv.svs.time as isize],
+            &[sv.svs.time],
         );
         SV_BotFrame(common, sv, sv.svs.time);
         sv.svs.time += 100;
@@ -836,7 +833,7 @@ pub fn SV_SpawnServer(
                         common,
                         sv.gvm,
                         MpGameExport::GAME_CLIENT_CONNECT as i32,
-                        &[i as isize, 0, isBot as isize],
+                        &[i, 0, isBot as c_int],
                     ),
                 ) as *mut c_char;
                 if !denied.is_null() {
@@ -860,7 +857,7 @@ pub fn SV_SpawnServer(
                         common,
                         sv.gvm,
                         MpGameExport::GAME_CLIENT_BEGIN as i32,
-                        &[i as isize],
+                        &[i],
                     );
                 }
             }
@@ -872,7 +869,7 @@ pub fn SV_SpawnServer(
         common,
         sv.gvm,
         MpGameExport::GAME_RUN_FRAME as i32,
-        &[sv.svs.time as isize],
+        &[sv.svs.time],
     );
     SV_BotFrame(common, sv, sv.svs.time);
     sv.svs.time += 100;

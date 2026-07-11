@@ -882,6 +882,62 @@ pub fn VM_Create(
     }
 }
 
+/// `VM_Call` — engine→module dispatch.
+///
+/// Raven packs up to 16 `int` args into a stack frame and, on the native-dll
+/// arm (`vm->entryPoint`), forwards `callnum` + all 16 words to the module's
+/// `vmMain`; the callee's fixed parameter list silently drops unused extras
+/// (`vm.cpp:806-816`). This port reproduces that native arm exactly. The QVM
+/// `VM_CallCompiled`/`VM_CallInterpreted` arms (`vm.cpp:817-820`) are not part
+/// of the native-dll build (MP ships native modules), so a non-native `vm` is a
+/// fatal misconfiguration here.
+///
+/// Source: `oracle/codemp/qcommon/vm.cpp:787-819`
+pub fn VM_Call(common: &mut Common, vm: *mut vm_t, callnum: c_int, args: &[c_int]) -> c_int {
+    if vm.is_null() {
+        crate::common::com_error(errorParm_t::ERR_FATAL, "VM_Call with NULL vm".to_string());
+    }
+
+    // SAFETY: `vm` is non-null (guarded above) and points at a live `vmTable`
+    // slot; `entryPoint` is a module `vmMain` address filled by `Sys_LoadDll`
+    // during `VM_Create`, valid for the duration of this synchronous call.
+    unsafe {
+        let oldVM = common.currentVM;
+        common.currentVM = vm;
+        common.lastVM = vm;
+
+        if common.vm_debugLevel != 0 {
+            crate::common::com_printf(common, &format!("VM_Call( {callnum} )\n"));
+        }
+
+        // if we have a dll loaded, call it directly (native arm, vm.cpp:806-816)
+        let r = if let Some(entry) = (*vm).entryPoint {
+            let mut a = [0 as c_int; 16];
+            for (i, v) in args.iter().take(16).enumerate() {
+                a[i] = *v;
+            }
+            entry(
+                callnum, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11],
+                a[12], a[13], a[14], a[15],
+            )
+        } else {
+            // The QVM `VM_CallCompiled`/`VM_CallInterpreted` arms are dead
+            // surface in the native-dll build (§20): no bytecode VM is ever
+            // loaded, so `entryPoint` is always set.
+            crate::common::com_error(
+                errorParm_t::ERR_FATAL,
+                "VM_Call: non-native VM (QVM interpreter not built)".to_string(),
+            );
+        };
+
+        // bk001220 - assert(currentVM!=NULL) for oldVM==NULL
+        if !oldVM.is_null() {
+            common.currentVM = oldVM;
+        }
+        r
+    }
+}
+
 /// `VM_Restart`.
 ///
 /// Source: `oracle/codemp/qcommon/vm.cpp:391-458`

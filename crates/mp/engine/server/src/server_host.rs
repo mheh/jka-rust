@@ -5,6 +5,9 @@ use std::io::Write;
 use mp_abi::game::imports::MpGameImport;
 use core::ffi::{c_char, c_int};
 
+use mp_qshared::shared::error_parm::errorParm_t;
+use mp_engine_qcommon::vm::game_syscall_trampoline_words;
+
 use mp_engine_botlib::be_interface::botlib_export_s::botlib_export_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::siege_pers::siegePers_t;
@@ -235,23 +238,25 @@ pub type ServerGame = Server;
 pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize {
     let _ = engine;
 
-    // Slice-0 minimal dispatch: only the GAME_INIT-era traps the minimal
-    // module emits. The full exhaustive TryFrom<i32>-decoded match (SEAM-D3)
-    // and the ERR_DROP bad-number fallback (sv_game.cpp:1654) land with it:
-    //TODO: Port SV_GameSystemCalls exhaustive dispatch
-    // Source: oracle/codemp/server/sv_game.cpp:458-1654
+    // Minimal ctx-less dispatch: only the traps this SEAM-D3 shim decodes
+    // without the full receiver set (`G_PRINT`). The exhaustive receiver-rich
+    // dispatcher is `sv_game.rs::SV_GameSystemCalls`; wiring it as the slot
+    // target awaits the full engine-state capture. Any other trap falls through
+    // to Raven's own default (`Com_Error(ERR_DROP, "Bad game system trap: %i")`,
+    // sv_game.cpp:1654).
     let trap = args[0] as i32;
     if trap == MpGameImport::G_PRINT as i32 {
         // `case G_PRINT: Com_Printf( "%s", VMA(1) );` (sv_game.cpp:503-505;
-        // VMA is a native-DLL identity cast, vm.cpp:648-649). Slice-0 sink is
-        // the com_printf minimal console write; routing through
-        // `&mut Common` lands with the ServerGame reborrow wiring.
+        // VMA is a native-DLL identity cast, vm.cpp:648-649).
         let msg = unsafe { core::ffi::CStr::from_ptr(args[1] as *const core::ffi::c_char) };
         print!("{}", msg.to_string_lossy());
         let _ = std::io::stdout().flush();
         return 0;
     }
-    todo!("Port SV_GameSystemCalls trap {trap} — oracle/codemp/server/sv_game.cpp:458")
+    mp_engine_qcommon::common::com_error(
+        errorParm_t::ERR_DROP,
+        format!("Bad game system trap: {trap}"),
+    )
 }
 
 /// The injected `SlotSyscall` target (LOAD-D8 injection): unpacks the
@@ -285,25 +290,42 @@ pub extern "C-unwind" fn game_system_calls_shim(
         return sv_game_system_calls(server_game, frame);
     }
 
-    // Null-ctx fallback (Slice-0): sv_init_game_progs has not yet wired the
-    // `&mut Engine.sv` injection, so no `&mut ServerGame` exists to dispatch
-    // against — G_PRINT needs no host state and is handled inline; anything
-    // else fails loudly rather than reading fake state.
-    //TODO: Port SV_InitGameProgs ctx injection (&mut Engine.sv)
-    // Source: docs/architecture/engine-seam.md § Engine-side dispatchers;
-    // oracle/codemp/server/sv_game.cpp:1734-1753
+    // Null-ctx path: a slot armed without a `&mut ServerGame` (the core-crate
+    // Slice-0 loader arms `ctx = null`). G_PRINT needs no host state; every
+    // other trap falls through to Raven's own default rather than reading fake
+    // state (`Com_Error(ERR_DROP, "Bad game system trap: %i")`,
+    // sv_game.cpp:1654).
     let trap = frame[0] as i32;
     if trap == MpGameImport::G_PRINT as i32 {
         // `case G_PRINT: Com_Printf( "%s", VMA(1) );` (sv_game.cpp:503-505;
-        // VMA is a native-DLL identity cast, vm.cpp:648-649). Slice-0 sink is
-        // the com_printf minimal console write; routing through
-        // `&mut Common` lands with the ctx injection wiring.
+        // VMA is a native-DLL identity cast, vm.cpp:648-649).
         let msg = unsafe { core::ffi::CStr::from_ptr(frame[1] as *const core::ffi::c_char) };
         print!("{}", msg.to_string_lossy());
         let _ = std::io::stdout().flush();
         return 0;
     }
-    todo!(
-        "Port SV_InitGameProgs ctx injection (&mut Engine.sv) — null ctx, trap {trap} needs host state — oracle/codemp/server/sv_game.cpp:1734-1753"
+    mp_engine_qcommon::common::com_error(
+        errorParm_t::ERR_DROP,
+        format!("Bad game system trap: {trap}"),
     )
+}
+
+/// The `int (*)(int*)` C-ABI adapter handed to `VM_Create` as `systemCalls`
+/// (`vm.cpp:471-472`, stored `vm->systemCall`). On the SEAM-D11 native path the
+/// module reaches the engine through `game_syscall_trampoline` → the armed
+/// `GAME_SLOT`, so `vm->systemCall` (the legacy `VM_DllSyscall` target,
+/// `vm.cpp:363-380`) is vestigial; this adapter widens the legacy contiguous
+/// int arg block to the trampoline's `isize` words and forwards to the same
+/// armed slot for parity if ever invoked.
+pub extern "C" fn sv_game_system_call(args: *mut c_int) -> c_int {
+    // SAFETY: the legacy `VM_DllSyscall` convention passes a contiguous 16-int
+    // arg block (`args[i] = va_arg(...)`, vm.cpp:366); widen it to the
+    // trampoline frame and dispatch through the armed game slot.
+    unsafe {
+        let mut frame = [0isize; 16];
+        for (i, w) in frame.iter_mut().enumerate() {
+            *w = *args.add(i) as isize;
+        }
+        game_syscall_trampoline_words(frame.as_ptr()) as c_int
+    }
 }

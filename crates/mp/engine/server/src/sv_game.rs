@@ -28,8 +28,10 @@ use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
 use crate::{SV_BotAllocateClient, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity, SV_BotLibSetup, SV_BotLibShutdown, SV_DropClient, SV_SendServerCommand, SV_SetUserinfo};
 use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::svEntity_t;
-use crate::server_host::{ghoul2_slot, server_slot};
+use crate::server_host::{ghoul2_slot, server_slot, sv_game_system_call};
+use crate::game_system_calls_shim;
 use crate::Server;
+use mp_engine_qcommon::vm::{arm_game_slot, VM_Call};
 
 // PORT-NOTE(engine-host-state): `CollisionWorld`, `Common`, and `EngineHost`
 // exist in `mp_engine_qcommon`/`mp_host_interface`; `RenderModels` (rm),
@@ -1617,13 +1619,21 @@ pub fn SV_InitGameProgs(
 
     // load the dll or bytecode
     let vm_game = Cvar_VariableValue(common, cm, rm, host, c"vm_game".as_ptr());
+    // SEAM-D11 slot arming: the module reaches the engine through
+    // `game_syscall_trampoline` → the armed `GAME_SLOT`, so before the module
+    // is loaded (and its `GAME_INIT` round-trip runs) arm the game slot with
+    // the `&mut Server` ctx + the inbound dispatch shim. `VM_Create`'s
+    // `systemCalls` parameter (Raven `SV_GameSystemCalls`, `vm.cpp:471-472`)
+    // takes the C-ABI `sv_game_system_call` adapter, which routes the legacy
+    // `VM_DllSyscall` path to the same slot.
+    arm_game_slot(sv as *mut Server as *mut c_void, game_system_calls_shim);
     sv.gvm = mp_engine_qcommon::vm_fns::VM_Create(
         common,
         cm,
         rm,
         host,
-        "jampgame",
-        SV_GameSystemCalls,
+        c"jampgame".as_ptr(),
+        Some(sv_game_system_call),
         unsafe { core::mem::transmute(vm_game as c_int) },
     );
     if sv.gvm.is_null() {
@@ -1634,4 +1644,21 @@ pub fn SV_InitGameProgs(
     }
 
     SV_InitGameVM(common, cm, sv, rm, host, qfalse);
+}
+
+/// Raven `SV_ShutdownGameProgs` — called every time a map changes.
+///
+/// Source: `oracle/codemp/server/sv_game.cpp:1665-1673`
+pub fn SV_ShutdownGameProgs(common: &mut Common, sv: &mut Server) {
+    if sv.gvm.is_null() {
+        return;
+    }
+    VM_Call(
+        common,
+        sv.gvm,
+        mp_abi::game::exports::MpGameExport::GAME_SHUTDOWN as c_int,
+        &[qfalse as c_int],
+    );
+    mp_engine_qcommon::vm_fns::VM_Free(common, sv.gvm);
+    sv.gvm = core::ptr::null_mut();
 }

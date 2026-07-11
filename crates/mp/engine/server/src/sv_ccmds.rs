@@ -21,6 +21,7 @@ use mp_engine_qcommon::cmd_pc::Server as CmdServerSlot;
 use mp_engine_qcommon::common::opaque_slots::Ghoul2System as CmdGhoul2Slot;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::vm::VM_Call;
 use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::cm_load::RmManager;
 use mp_host_interface::engine_host::EngineHost;
@@ -1161,7 +1162,7 @@ pub fn SV_MapRestart_f(
                 common,
                 sv.gvm,
                 mp_abi::game::exports::MpGameExport::GAME_CLIENT_CONNECT as c_int,
-                &[i, qboolean::qfalse as isize, isBot as isize],
+                &[i, qboolean::qfalse as c_int, isBot as c_int],
             ),
         ) as *mut c_char;
         if !denied.is_null() {

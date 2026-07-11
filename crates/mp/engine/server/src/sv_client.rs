@@ -1964,7 +1964,7 @@ pub fn SV_DropClient(
             common,
             sv.gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_DISCONNECT as c_int,
-            &[drop_index],
+            &[drop_index as c_int],
         );
 
         // add the disconnect command
