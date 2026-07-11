@@ -47,8 +47,14 @@ use mp_engine_qcommon::cvar_fns::{
 };
 use mp_engine_qcommon::files_common::FS_FCloseFile;
 use mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr;
+use mp_engine_qcommon::z_memman_pc::Z_Free;
 use mp_qshared::shared::q_format::FmtArg;
-use mp_qshared::shared::q_string::{Q_stricmp, Q_strncpyz, va};
+use mp_qshared::shared::q_string::{Info_ValueForKey, Q_stricmp, Q_strncpyz, va};
+
+use crate::sv_ccmds::SV_AddOperatorCommands;
+use crate::sv_client::{SV_DropClient, SV_SendClientMapChange};
+use crate::sv_main::SV_SendServerCommand;
+use crate::sv_world::SV_ClearWorld;
 
 // PORT-NOTE(bot-lib-type): the `bot: &mut BotLib` receiver (ruling 2/preamble
 // pinned order) has no owning struct anywhere in the tree yet. Declared
@@ -252,6 +258,54 @@ pub fn SV_GetUserinfo(
         let client = sv.svs.clients.offset(index as isize);
         Q_strncpyz(buffer, (*client).userinfo.as_ptr(), bufferSize);
     }
+}
+
+/// Raven `SV_SetUserinfo`.
+///
+/// Source: `oracle/codemp/server/sv_init.cpp:168-179`
+pub fn SV_SetUserinfo(common: &mut Common, sv: &mut Server, index: c_int, mut val: *const c_char) {
+    unsafe {
+        if index < 0 || index >= (*common.sv_maxclients).integer {
+            mp_engine_qcommon::common::com_error(
+                errorParm_t::ERR_DROP,
+                format!("SV_SetUserinfo: bad index {}\n", index),
+            );
+        }
+
+        if val.is_null() {
+            val = c"".as_ptr();
+        }
+
+        let client = sv.svs.clients.offset(index as isize);
+        Q_strncpyz(
+            (*client).userinfo.as_mut_ptr(),
+            val,
+            (*client).userinfo.len() as c_int,
+        );
+        Q_strncpyz(
+            (*client).name.as_mut_ptr(),
+            Info_ValueForKey(val as *mut c_char, c"name".as_ptr() as *mut c_char),
+            (*client).name.len() as c_int,
+        );
+    }
+}
+
+/// Raven `SV_ClearServer`.
+///
+/// Source: `oracle/codemp/server/sv_init.cpp:365-387`
+pub fn SV_ClearServer(common: &mut Common, sv: &mut Server) {
+    for i in 0..MAX_CONFIGSTRINGS {
+        if !sv.sv.configstrings[i].is_null() {
+            Z_Free(common, sv.sv.configstrings[i] as *mut ());
+        }
+    }
+
+    //	CM_ClearMap();
+
+    // nope, can't do this anymore.. sv contains entitystates with STL in them.
+    //	memset (&sv, 0, sizeof(sv));
+    SV_InitSV(sv);
+    //	Com_Memset (&sv, 0, sizeof(sv));
 }
 
 /// Raven `SV_BoundMaxClients`.
@@ -766,7 +820,7 @@ pub fn SV_SpawnServer(
             if (*client).state >= clientState_t::CS_CONNECTED {
                 if (*client).netchan.remoteAddress.r#type == netadrtype_t::NA_BOT {
                     if killBots != 0 {
-                        SV_DropClient(common, sv, client, "");
+                        SV_DropClient(common, sv, client, c"".as_ptr());
                         continue;
                     }
                     isBot = qboolean::from(1);
@@ -788,12 +842,7 @@ pub fn SV_SpawnServer(
                 if !denied.is_null() {
                     // this generally shouldn't happen, because the client
                     // was connected before the level change
-                    SV_DropClient(
-                        common,
-                        sv,
-                        client,
-                        &core::ffi::CStr::from_ptr(denied).to_string_lossy(),
-                    );
+                    SV_DropClient(common, sv, client, denied);
                 } else if isBot == 0 {
                     // when we get the next packet from a connected client,
                     // the new gamestate will be sent

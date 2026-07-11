@@ -58,6 +58,16 @@ pub fn SV_GetStringEdString(
     Box::leak(boxed).as_ptr() as *const c_char
 }
 
+/// Rust-native twin of `SV_GetStringEdString` returning an owned `String`
+/// (used where callers `format!` the result directly rather than needing the
+/// raw `*const c_char` return). Same `@@@`-marked stringed reference shape.
+///
+/// Source: `oracle/codemp/server/sv_ccmds.cpp:16-32`
+pub fn SV_GetStringEdString_str(sv: &mut Server, _refSection: &str, refName: &str) -> String {
+    let _ = sv;
+    format!("@@@{}", refName)
+}
+
 /// Raven `SV_GetPlayerByFedName`.
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:354-387`

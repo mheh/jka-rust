@@ -19,3 +19,13 @@ pub mod sv_snapshot;
 pub mod sv_world;
 
 pub use server_host::{game_system_calls_shim, sv_game_system_calls, Server, ServerGame};
+
+// Crate-root re-exports for the SV_* free functions that cross-module call sites
+// reach as `crate::SV_*` (matching Raven's flat global namespace at the seam).
+pub use sv_ccmds::SV_GetStringEdString_str;
+pub use sv_client::{SV_CloseDownload, SV_DropClient};
+pub use sv_init::SV_SetUserinfo;
+pub use sv_main::{SV_AddServerCommand, SV_SendServerCommand};
+pub use sv_snapshot::{
+    SV_SendClientSnapshot, SV_SendMessageToClient, SV_UpdateServerCommandsToClient,
+};

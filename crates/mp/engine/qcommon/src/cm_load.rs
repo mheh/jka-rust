@@ -162,6 +162,30 @@ pub fn CM_EntityString(cm: &mut CollisionWorld) -> *mut c_char {
     cm.cmg.entityString
 }
 
+/// Raven `CM_LeafCluster`.
+///
+/// Source: `oracle/codemp/qcommon/cm_load.cpp:907-912`
+pub fn CM_LeafCluster(cm: &mut CollisionWorld, leafnum: c_int) -> c_int {
+    unsafe {
+        if leafnum < 0 || leafnum >= cm.cmg.numLeafs {
+            com_error(errorParm_t::ERR_DROP, "CM_LeafCluster: bad number".to_string());
+        }
+        (*cm.cmg.leafs.offset(leafnum as isize)).cluster
+    }
+}
+
+/// Raven `CM_LeafArea`.
+///
+/// Source: `oracle/codemp/qcommon/cm_load.cpp:914-919`
+pub fn CM_LeafArea(cm: &mut CollisionWorld, leafnum: c_int) -> c_int {
+    unsafe {
+        if leafnum < 0 || leafnum >= cm.cmg.numLeafs {
+            com_error(errorParm_t::ERR_DROP, "CM_LeafArea: bad number".to_string());
+        }
+        (*cm.cmg.leafs.offset(leafnum as isize)).area
+    }
+}
+
 /// Raven `CM_SubBSPEntityString`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:902-905`

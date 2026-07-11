@@ -13,6 +13,7 @@ use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::cm_load::RmManager;
+use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
@@ -28,6 +29,7 @@ use crate::server::moveclip_t::moveclip_t;
 use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::{svEntity_t, MAX_ENT_CLUSTERS};
 use crate::server::world_sector_s::{worldSector_t, AREA_DEPTH, AREA_NODES, MAX_TOTAL_ENT_LEAFS};
+use crate::sv_game::SV_SvEntityForGentity;
 use crate::Server;
 
 // G2API_CollisionDetect[Cache]: the ported ghoul2 fns take &mut CGhoul2Info_v

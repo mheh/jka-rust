@@ -20,6 +20,7 @@ use core::ffi::{c_char, c_int};
 
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::qcommon::net_limits::MAX_DOWNLOAD_WINDOW;
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_host_interface::engine_host::EngineHost;
 // PORT-NOTE(engine-host-state, matches sv_game.rs's identical note): `RmManager`
@@ -1371,7 +1372,7 @@ pub fn SV_VerifyPaks_f(
     cl: *mut client_t,
 ) {
     // _XBOX is not defined in this build — the whole body is live.
-    if (*common.sv_pure).integer == 0 {
+    if unsafe { (*common.sv_pure).integer } == 0 {
         return;
     }
 
@@ -1896,6 +1897,119 @@ pub fn SV_ExecuteClientMessage(
                 common,
                 &format!("WARNING: bad command byte for client {}\n", client_num),
             );
+        }
+    }
+}
+
+/// Raven `SV_DropClient` — called when the player is totally leaving the
+/// server, either willingly or unwillingly. This is NOT called if the entire
+/// server is quiting or crashing — `SV_FinalMessage()` handles that.
+///
+/// Source: `oracle/codemp/server/sv_client.cpp:580-666`
+pub fn SV_DropClient(
+    common: &mut Common,
+    sv: &mut Server,
+    drop: *mut client_t,
+    reason: *const c_char,
+) {
+    unsafe {
+        let drop_index = (drop as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+            / core::mem::size_of::<client_t>() as isize;
+
+        if (*drop).state == clientState_t::CS_ZOMBIE {
+            return; // already dropped
+        }
+
+        if (*drop).gentity.is_null() || (*(*drop).gentity).r.svFlags & SVF_BOT == 0 {
+            // see if we already have a challenge for this ip
+            for i in 0..MAX_CHALLENGES {
+                let challenge = &mut sv.svs.challenges[i];
+                if mp_engine_qcommon::net_chan::NET_CompareAdr(
+                    common,
+                    (*drop).netchan.remoteAddress,
+                    challenge.adr,
+                ) == qtrue
+                {
+                    challenge.connected = qfalse;
+                    break;
+                }
+            }
+        }
+
+        // Kill any download
+        crate::SV_CloseDownload(common, drop);
+
+        // tell everyone why they got dropped
+        let name = core::ffi::CStr::from_ptr((*drop).name.as_ptr()).to_string_lossy();
+        let reason_str = core::ffi::CStr::from_ptr(reason).to_string_lossy();
+        crate::SV_SendServerCommand(
+            common,
+            sv,
+            core::ptr::null_mut(),
+            // "%s" S_COLOR_WHITE " %s\n" — S_COLOR_WHITE is "^7"
+            &format!("print \"{}^7 {}\n\"", name, reason_str),
+        );
+
+        mp_engine_qcommon::common_fns::Com_DPrintf(common, &format!("Going to CS_ZOMBIE for {}\n", name));
+        (*drop).state = clientState_t::CS_ZOMBIE; // become free in a few seconds
+
+        if (*drop).download != 0 {
+            mp_engine_qcommon::files_common::FS_FCloseFile(common, (*drop).download);
+            (*drop).download = 0;
+        }
+
+        // call the prog function for removing a client
+        // this will remove the body, among other things
+        mp_engine_qcommon::vm::VM_Call(
+            common,
+            sv.gvm,
+            mp_abi::game::exports::MpGameExport::GAME_CLIENT_DISCONNECT as c_int,
+            &[drop_index],
+        );
+
+        // add the disconnect command
+        crate::SV_SendServerCommand(common, sv, drop, &format!("disconnect \"{}\"", reason_str));
+
+        if (*drop).netchan.remoteAddress.r#type == netadrtype_t::NA_BOT {
+            SV_BotFreeClient(drop_index as c_int);
+        }
+
+        // nuke user info
+        crate::SV_SetUserinfo(common, sv, drop_index as c_int, c"".as_ptr());
+
+        // if this was the last client on the server, send a heartbeat
+        // to the master so it is known the server is empty
+        let mut i = 0;
+        while i < (*common.sv_maxclients).integer {
+            if (*sv.svs.clients.offset(i as isize)).state >= clientState_t::CS_CONNECTED {
+                break;
+            }
+            i += 1;
+        }
+        if i == (*common.sv_maxclients).integer {
+            crate::sv_ccmds::SV_Heartbeat_f(sv);
+        }
+    }
+}
+
+/// Raven `SV_CloseDownload` — clear/free any download vars.
+///
+/// Source: `oracle/codemp/server/sv_client.cpp:988-1006`
+pub fn SV_CloseDownload(common: &mut Common, cl: *mut client_t) {
+    unsafe {
+        // EOF
+        if (*cl).download != 0 {
+            mp_engine_qcommon::files_common::FS_FCloseFile(common, (*cl).download);
+        }
+        (*cl).download = 0;
+        (*cl).downloadName[0] = 0;
+
+        // Free the temporary buffer space
+        for i in 0..MAX_DOWNLOAD_WINDOW {
+            if !(*cl).downloadBlocks[i].is_null() {
+                mp_engine_qcommon::z_memman_pc::Z_Free(common, (*cl).downloadBlocks[i] as *mut ());
+                (*cl).downloadBlocks[i] = core::ptr::null_mut();
+            }
         }
     }
 }

@@ -38,6 +38,7 @@ use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::roff::RoffSystem;
 use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::cm_load::RmManager;
+use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_host_interface::engine_host::EngineHost;
 
 use crate::npcnav::Navigator;
@@ -147,6 +148,24 @@ pub fn FloatAsInt(f: f32) -> c_int {
     f.to_bits() as c_int
 }
 
+/// Raven `SV_SvEntityForGentity`.
+///
+/// Source: `oracle/codemp/server/sv_game.cpp:70-75`
+pub fn SV_SvEntityForGentity(sv: &mut Server, gEnt: *mut sharedEntity_t) -> *mut svEntity_t {
+    unsafe {
+        if gEnt.is_null()
+            || (*gEnt).s.number < 0
+            || (*gEnt).s.number >= mp_qshared::shared::limits::MAX_GENTITIES as c_int
+        {
+            mp_engine_qcommon::common::com_error(
+                errorParm_t::ERR_DROP,
+                "SV_SvEntityForGentity: bad gEnt".to_string(),
+            );
+        }
+        &mut sv.sv.svEntities[(*gEnt).s.number as usize] as *mut svEntity_t
+    }
+}
+
 /// Raven `SV_GEntityForSvEntity`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:77-82`
@@ -249,13 +268,13 @@ pub fn SV_GameSendServerCommand(
 ) {
     let msg = unsafe { core::ffi::CStr::from_ptr(text) }.to_string_lossy();
     if clientNum == -1 {
-        crate::sv_send_server_command(common, sv, core::ptr::null_mut(), &msg);
+        crate::SV_SendServerCommand(common, sv, core::ptr::null_mut(), &msg);
     } else {
         if clientNum < 0 || clientNum >= (unsafe { (*common.sv_maxclients).integer }) {
             return;
         }
         let client = unsafe { sv.svs.clients.offset(clientNum as isize) };
-        crate::sv_send_server_command(common, sv, client, &msg);
+        crate::SV_SendServerCommand(common, sv, client, &msg);
     }
 }
 
@@ -272,7 +291,7 @@ pub fn SV_GameDropClient(
         return;
     }
     let client = unsafe { sv.svs.clients.offset(clientNum as isize) };
-    crate::sv_drop_client(common, sv, client, reason);
+    crate::SV_DropClient(common, sv, client, reason);
 }
 
 /// Raven `SV_inPVS`.
@@ -409,7 +428,7 @@ pub fn SV_AdjustAreaPortalState(
     ent: *mut sharedEntity_t,
     open: qboolean,
 ) {
-    let svEnt = mp_engine_qcommon::common::SV_SvEntityForGentity(sv, ent);
+    let svEnt = SV_SvEntityForGentity(sv, ent);
     unsafe {
         if (*svEnt).areanum2 == -1 {
             return;
@@ -1013,11 +1032,10 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_SET_USERINFO as c_int {
             crate::SV_SetUserinfo(
+                common,
                 sv,
                 *args.offset(1),
-                core::ffi::CStr::from_ptr(vma(common, args, 2) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
+                vma(common, args, 2) as *const c_char,
             );
             return 0;
         } else if trap == G::G_GET_USERINFO as c_int {

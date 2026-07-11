@@ -91,6 +91,102 @@ pub fn SV_ReplacePendingServerCommands(client: *mut client_t, cmd: *const c_char
     }
 }
 
+/// Raven `SV_AddServerCommand` — the given command will be transmitted to the
+/// client, and is guaranteed to not have future snapshot_t executed before it
+/// is executed.
+///
+/// Source: `oracle/codemp/server/sv_main.cpp:116-141`
+pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut client_t, cmd: &str) {
+    use mp_engine_qcommon::common::common::com_printf;
+
+    unsafe {
+        // this is very ugly but it's also a waste to for instance send multiple
+        // config string updates for the same config string index in one snapshot
+        //	if ( SV_ReplacePendingServerCommands( client, cmd ) ) {
+        //		return;
+        //	}
+
+        (*client).reliableSequence += 1;
+        // if we would be losing an old command that hasn't been acknowledged,
+        // we must drop the connection
+        // we check == instead of >= so a broadcast print added by SV_DropClient()
+        // doesn't cause a recursive drop client
+        if (*client).reliableSequence - (*client).reliableAcknowledge
+            == MAX_RELIABLE_COMMANDS as c_int + 1
+        {
+            com_printf(common, "===== pending server commands =====\n");
+            let mut i = (*client).reliableAcknowledge + 1;
+            while i <= (*client).reliableSequence {
+                let slot = &(*client).reliableCommands[(i & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize];
+                com_printf(
+                    common,
+                    &format!(
+                        "cmd {:5}: {}\n",
+                        i,
+                        core::ffi::CStr::from_ptr(slot.as_ptr()).to_string_lossy()
+                    ),
+                );
+                i += 1;
+            }
+            com_printf(common, &format!("cmd {:5}: {}\n", i, cmd));
+            crate::SV_DropClient(common, sv, client, c"Server command overflow".as_ptr());
+            return;
+        }
+        let index = ((*client).reliableSequence & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize;
+        // Q_strncpyz needs a C string; build a nul-terminated copy of `cmd`.
+        let buf: Vec<c_char> = cmd
+            .bytes()
+            .map(|b| b as c_char)
+            .chain(core::iter::once(0))
+            .collect();
+        Q_strncpyz(
+            (*client).reliableCommands[index].as_mut_ptr(),
+            buf.as_ptr(),
+            (*client).reliableCommands[index].len() as c_int,
+        );
+    }
+}
+
+/// Raven `SV_SendServerCommand` — sends a reliable command string to be
+/// interpreted by the client game module ("cp", "print", "chat", etc). A NULL
+/// client will broadcast to all clients.
+///
+/// Raven's variadic `vsprintf` into `message` is done by the callers, which
+/// pass the already-formatted command text in `fmt`.
+///
+/// Source: `oracle/codemp/server/sv_main.cpp:153-180`
+pub fn SV_SendServerCommand(common: &mut Common, sv: &mut Server, cl: *mut client_t, fmt: &str) {
+    use mp_engine_qcommon::common::common::com_printf;
+
+    if !cl.is_null() {
+        SV_AddServerCommand(common, sv, cl, fmt);
+        return;
+    }
+
+    unsafe {
+        // hack to echo broadcast prints to console
+        if (*common.com_dedicated).integer != 0 && fmt.as_bytes().starts_with(b"print") {
+            let mut message: Vec<c_char> = fmt
+                .bytes()
+                .map(|b| b as c_char)
+                .chain(core::iter::once(0))
+                .collect();
+            let expanded = SV_ExpandNewlines(sv, message.as_mut_ptr());
+            let expanded = core::ffi::CStr::from_ptr(expanded).to_string_lossy();
+            com_printf(common, &format!("broadcast: {}\n", expanded));
+        }
+
+        // send the data to all relevent clients
+        for j in 0..(*common.sv_maxclients).integer {
+            let client = sv.svs.clients.offset(j as isize);
+            if ((*client).state as c_int) < clientState_t::CS_PRIMED as c_int {
+                continue;
+            }
+            SV_AddServerCommand(common, sv, client, fmt);
+        }
+    }
+}
+
 /// Raven `SV_CheckPaused` — only pause if there is just a single client
 /// connected.
 ///
