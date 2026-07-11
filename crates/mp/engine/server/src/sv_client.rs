@@ -219,17 +219,20 @@ pub fn SV_WriteRMGAutomapSymbols(
     host: &mut dyn EngineHost,
     msg: *mut msg_t,
 ) {
-    let count = rmg.GetAutomapSymbolCount(host);
+    // SAFETY: `rmg` is the opaque `cm_load::RmManager` slot; cast it back to the
+    // real `mp_engine_rmg::RmManager` at the server boundary (opaque-slot ruling).
+    let rmg = unsafe { crate::server_host::rmg_from_slot(rmg) };
+    let _ = host;
+    let count = rmg.automap_symbol_count();
 
     mp_engine_qcommon::msg::MSG_WriteShort(common, msg, count);
 
     for i in 0..count {
-        let symbol = rmg.GetAutomapSymbol(host, i);
-        unsafe {
-            mp_engine_qcommon::msg::MSG_WriteByte(common, msg, (*symbol).mType as c_int);
-            mp_engine_qcommon::msg::MSG_WriteByte(common, msg, (*symbol).mSide as c_int);
-            mp_engine_qcommon::msg::MSG_WriteLong(common, msg, (*symbol).mOrigin[0] as c_int);
-            mp_engine_qcommon::msg::MSG_WriteLong(common, msg, (*symbol).mOrigin[1] as c_int);
+        if let Some(symbol) = rmg.automap_symbol(i) {
+            mp_engine_qcommon::msg::MSG_WriteByte(common, msg, symbol.mType as c_int);
+            mp_engine_qcommon::msg::MSG_WriteByte(common, msg, symbol.mSide as c_int);
+            mp_engine_qcommon::msg::MSG_WriteLong(common, msg, symbol.mOrigin[0] as c_int);
+            mp_engine_qcommon::msg::MSG_WriteLong(common, msg, symbol.mOrigin[1] as c_int);
         }
     }
 }

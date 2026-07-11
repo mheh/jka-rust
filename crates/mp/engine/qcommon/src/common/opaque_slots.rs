@@ -67,6 +67,25 @@ impl BotLib {
     }
 }
 
+/// Type-erased slot for the `mp_engine_rmg` `RmManager` state; qcommon is
+/// pass-through only — never dereferences it. Cast back to the real
+/// `mp_engine_rmg::rm_manager::RmManager` at the server-crate boundary. Re-exported
+/// as `cm_load::RmManager`, the name the cm_load/server threading uses.
+///
+/// Ruling: opaque-slot (user, 2026-07-12, option A).
+#[repr(transparent)]
+pub struct RmManager(*mut ());
+
+impl RmManager {
+    pub fn from_raw(p: *mut ()) -> RmManager {
+        RmManager(p)
+    }
+
+    pub fn as_raw(&mut self) -> *mut () {
+        self.0
+    }
+}
+
 /// Type-erased slot for the `mp_engine_ghoul2` `Ghoul2System` state; qcommon is
 /// pass-through only — never dereferences it.
 ///

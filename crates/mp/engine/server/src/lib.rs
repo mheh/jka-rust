@@ -4,6 +4,7 @@
 // keep their original casing across the ABI seam, matching `mp_game`'s policy.
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
+pub mod botlib_import;
 pub mod gameCallbacks;
 pub mod npcnav;
 pub mod server;
@@ -25,8 +26,9 @@ pub use server_host::{
 // Crate-root re-exports for the SV_* free functions that cross-module call sites
 // reach as `crate::SV_*` (matching Raven's flat global namespace at the seam).
 pub use sv_bot::{
-    SV_BotAllocateClient, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity,
-    SV_BotLibSetup, SV_BotLibShutdown,
+    BotImport_DebugPolygonCreate, BotImport_DebugPolygonDelete, SV_BotAllocateClient,
+    SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity, SV_BotLibSetup,
+    SV_BotLibShutdown,
 };
 pub use sv_ccmds::SV_GetStringEdString_str;
 pub use sv_client::{SV_CloseDownload, SV_DropClient};

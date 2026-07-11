@@ -238,6 +238,7 @@ dependencies = [
 name = "mp_engine_server"
 version = "0.1.0"
 dependencies = [
+ "cc",
  "libc",
  "mp_abi",
  "mp_bg",

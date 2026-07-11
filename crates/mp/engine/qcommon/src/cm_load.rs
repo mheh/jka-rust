@@ -15,23 +15,9 @@
 //!
 //! Source: `oracle/codemp/qcommon/cm_load.cpp`
 //!
-//! PORT-NOTE(rm-types): `RenderModels`/`RmManager` are state-receiver types
-//! pinned by the engine-fork-discovery preamble's receiver order
-//! (rmg-terrain.md/tr-model.md own their real shape); neither has landed in
-//! this crate yet. Referenced by their exact resolved-signature names per the
-//! no-stub rule (common_fns.rs/vm_x86.rs/cm_polylib.rs precedent); reported as
-//! missing symbols for the finisher to replace with the real imports once
-//! they land.
-//!
-//! PORT-NOTE(cm-fields): `CollisionWorld` (`crate::collision_world`) is still
-//! a `//TODO: Port CollisionWorld fields` placeholder (`_private: ()`).
-//! Bodies below reach it as `cm.cmg`/`cm.SubBSP`/`cm.NumSubBSP`/
-//! `cm.TotalSubModels`/`cm.box_model`/`cm.box_planes`/`cm.box_brush`/
-//! `cm.cmod_base`/`cm.cm_noAreas`/`cm.cm_noCurves`/`cm.cm_playerCurveClip`/
-//! `cm.gpvCachedMapDiskImage`/`cm.gsCachedMapDiskImage`/
-//! `cm.gbUsingCachedMapDataRightNow`/`cm.last_checksum` — the exact Raven
-//! global names per the STATE THREADED tables (STATE FIELDS rule) — reported
-//! in missing_symbols for the finisher to add once the struct lands.
+//! `RenderModels` below is still a unit placeholder — its real shape is owned
+//! by the renderer-model wave (tr-model.md); `RmManager` threads as the
+//! opaque-slot re-export, cast back at the server boundary.
 
 use core::ffi::{c_char, c_int, c_uint, c_void};
 
@@ -81,11 +67,16 @@ use crate::qfiles::lump_indices::{
 use crate::qfiles::lump_t::lump_t;
 use crate::qfiles::map_surface_type_t::mapSurfaceType_t;
 
-// PORT-NOTE(rm-types): see module doc.
 #[allow(dead_code)]
 pub struct RenderModels;
-#[allow(dead_code)]
-pub struct RmManager;
+
+/// `RmManager` — the type-erased opaque slot for `mp_engine_rmg`'s real
+/// `RmManager`, threaded (never dereferenced) by cm_load/server. The owning
+/// server crate casts it back at its boundary (`rmg_from_slot`). Named here
+/// because the cm_load/server threading refers to `cm_load::RmManager`.
+///
+/// Ruling: opaque-slot (user, 2026-07-12, option A).
+pub use crate::common::opaque_slots::RmManager;
 
 // PORT-NOTE(rmg-terrain): `CCMLandScape` is the rmg-terrain.md §F design's
 // class (porting-rules §F) — not the type rosetta. Referenced opaquely here

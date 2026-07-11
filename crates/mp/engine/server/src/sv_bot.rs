@@ -19,14 +19,18 @@ use mp_engine_qcommon::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_host_interface::engine_host::EngineHost;
 use mp_abi::game::exports::MpGameExport;
 use mp_qshared::shared::cvar::CVAR_CHEAT;
-use mp_qshared::common::mp::botlib::botlib_import_s::botlib_import_t;
 use mp_qshared::common::mp::botlib::botlib_misc::BOTLIB_API_VERSION;
 use mp_qshared::common::mp::game::g_public::SVF_BOT;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::q_math::{
+    CrossProduct, VectorNormalize, VectorSet, _DotProduct, _VectorMA, _VectorSubtract,
+};
+use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::{qfalse, qtrue};
 
+use crate::botlib_import::{arm_botlib_slot, botlib_import_table};
 use crate::server::bot_debugpoly_t::bot_debugpoly_t;
 use crate::server::client_state_t::clientState_t;
 use crate::sv_game::SV_GentityNum;
@@ -60,10 +64,11 @@ pub fn SV_BotLibSetup(common: &mut Common, sv: &mut Server, bot: &mut BotLib) ->
 /// The `debugpolygons` pool is (re)allocated from `bot_maxdebugpolys` exactly
 /// as Raven does. The `botlib_import` fn-pointer fields are the C-ABI
 /// `BotImport_*` engine callbacks (`botlib.h:157-193`); each reaches threaded
-/// engine state (`Com_Printf`/`SV_Trace`/`Z_Malloc`/…) that a bare
-/// `extern "C" fn` cannot carry, so populating them awaits the botlib import
-/// slot — the state-capture dual of the game `GAME_SLOT`. The table is
-/// zero-initialised (every field `None`) until that seam lands.
+/// engine state (`Com_Printf`/`SV_PointContents`/`Z_Malloc`/…) that a bare
+/// `extern "C" fn` cannot carry, so the botlib import slot (`botlib_import.rs`)
+/// — the state-capture dual of the game `GAME_SLOT` — is armed here with the
+/// islands the thunks need, and `botlib_import_table` builds the C-ABI thunk
+/// table (four fields deferred; see its doc).
 ///
 /// Source: `oracle/codemp/server/sv_bot.cpp:684-724`
 pub fn SV_BotInitBotLib(
@@ -90,14 +95,73 @@ pub fn SV_BotInitBotLib(
         0,
     ) as *mut bot_debugpoly_t;
 
-    // SAFETY: `botlib_import_t` is a `#[repr(C)]` table of `Option<fn>` plus POD
-    // fields; an all-zero value is every field `None`, the valid initial state
-    // Raven overwrites field-by-field (deferred to the botlib import slot here).
-    let mut botlib_import: botlib_import_t = unsafe { core::mem::zeroed() };
+    // Arm the botlib-import slot with the islands the `BotImport_*` thunks need,
+    // then build the `botlib_import_t` table (`botlib_import.rs`) — the
+    // state-capture dual of `arm_game_slot`. Raven assigns each field a file-
+    // static `BotImport_*` fn (`sv_bot.cpp:691-720`); we assign C-ABI thunks
+    // that recover the armed islands and enter the receiver-threaded bodies.
+    arm_botlib_slot(common, cm, sv, rm, host);
+    let mut botlib_import = botlib_import_table();
 
     sv.botlib_export = GetBotLibAPI(bot, BOTLIB_API_VERSION, &mut botlib_import);
     // bk001129 - somehow we end up with a zero import.
     debug_assert!(!sv.botlib_export.is_null());
+}
+
+/// Raven `BotImport_DebugPolygonCreate` — claim the first free slot in the
+/// debug-polygon pool (starting at index 1, matching Raven), storing the polygon
+/// verbatim. Returns the slot index, or `0` if the pool is unallocated/full.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:471-491`
+pub fn BotImport_DebugPolygonCreate(
+    sv: &mut Server,
+    color: c_int,
+    numPoints: c_int,
+    points: *const vec3_t,
+) -> c_int {
+    if sv.bot.debugpolygons.is_null() {
+        return 0;
+    }
+    unsafe {
+        let mut i: c_int = 1;
+        while i < sv.bot.bot_maxdebugpolys {
+            if (*sv.bot.debugpolygons.offset(i as isize)).inuse == qfalse {
+                break;
+            }
+            i += 1;
+        }
+        if i >= sv.bot.bot_maxdebugpolys {
+            return 0;
+        }
+        let poly = sv.bot.debugpolygons.offset(i as isize);
+        (*poly).inuse = qtrue;
+        (*poly).color = color;
+        (*poly).numPoints = numPoints;
+        core::ptr::copy_nonoverlapping(points, (*poly).points.as_mut_ptr(), numPoints as usize);
+        i
+    }
+}
+
+/// Raven `BotImport_DebugPolygonShow` — overwrite an existing pool slot by id.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:498-507`
+pub fn BotImport_DebugPolygonShow(
+    sv: &mut Server,
+    id: c_int,
+    color: c_int,
+    numPoints: c_int,
+    points: *const vec3_t,
+) {
+    if sv.bot.debugpolygons.is_null() {
+        return;
+    }
+    unsafe {
+        let poly = sv.bot.debugpolygons.offset(id as isize);
+        (*poly).inuse = qtrue;
+        (*poly).color = color;
+        (*poly).numPoints = numPoints;
+        core::ptr::copy_nonoverlapping(points, (*poly).points.as_mut_ptr(), numPoints as usize);
+    }
 }
 
 /// Raven `BotImport_DebugPolygonDelete`.
@@ -110,6 +174,57 @@ pub fn BotImport_DebugPolygonDelete(sv: &mut Server, id: c_int) {
     unsafe {
         (*sv.bot.debugpolygons.offset(id as isize)).inuse = qfalse;
     }
+}
+
+/// Raven `BotImport_DebugLineCreate` — a zero-point polygon standing in for a
+/// debug line handle.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:525-528`
+pub fn BotImport_DebugLineCreate(sv: &mut Server) -> c_int {
+    let points: [vec3_t; 1] = [[0.0; 3]];
+    BotImport_DebugPolygonCreate(sv, 0, 0, points.as_ptr())
+}
+
+/// Raven `BotImport_DebugLineDelete`.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:535-537`
+pub fn BotImport_DebugLineDelete(sv: &mut Server, line: c_int) {
+    BotImport_DebugPolygonDelete(sv, line);
+}
+
+/// Raven `BotImport_DebugLineShow` — build a 2-unit-wide quad along the
+/// `start`→`end` segment and show it in the given pool slot.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:544-570`
+pub fn BotImport_DebugLineShow(
+    sv: &mut Server,
+    line: c_int,
+    start: vec3_t,
+    end: vec3_t,
+    color: c_int,
+) {
+    let up: vec3_t = [0.0, 0.0, 1.0];
+    let mut points: [vec3_t; 4] = [start, start, end, end];
+    let mut dir: vec3_t = [0.0; 3];
+    _VectorSubtract(end, start, &mut dir);
+    VectorNormalize(&mut dir);
+    let dot = _DotProduct(dir, up);
+    let mut cross: vec3_t = [0.0; 3];
+    if dot > 0.99 || dot < -0.99 {
+        VectorSet(&mut cross, 1.0, 0.0, 0.0);
+    } else {
+        CrossProduct(dir, up, &mut cross);
+    }
+    VectorNormalize(&mut cross);
+    let p0 = points[0];
+    _VectorMA(p0, 2.0, cross, &mut points[0]);
+    let p1 = points[1];
+    _VectorMA(p1, -2.0, cross, &mut points[1]);
+    let p2 = points[2];
+    _VectorMA(p2, -2.0, cross, &mut points[2]);
+    let p3 = points[3];
+    _VectorMA(p3, 2.0, cross, &mut points[3]);
+    BotImport_DebugPolygonShow(sv, line, color, 4, points.as_ptr());
 }
 
 /// Raven `SV_BotLibShutdown`.
