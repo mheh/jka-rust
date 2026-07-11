@@ -23,6 +23,7 @@ use mp_qshared::shared::qboolean;
 // note). Imported below by their preamble-table decl-home crate where one
 // exists; genuinely missing types are escalated in missing_symbols rather
 // than stubbed (ZERO-PARK), following the sibling files' precedent exactly.
+use mp_engine_ghoul2::api_collision::g2api_set_time;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::{com_printf, Common};
@@ -765,7 +766,7 @@ pub fn SV_SpawnServer(
     }
 
     //rww - RAGDOLL_BEGIN
-    G2API_SetTime(g2, host, sv.svs.time, 0);
+    g2api_set_time(g2, sv.svs.time, 0);
     //rww - RAGDOLL_END
 
     // make sure we are not paused
@@ -847,7 +848,7 @@ pub fn SV_SpawnServer(
     // run a few frames to allow everything to settle
     for _ in 0..3 {
         //rww - RAGDOLL_BEGIN
-        G2API_SetTime(g2, host, sv.svs.time, 0);
+        g2api_set_time(g2, sv.svs.time, 0);
         //rww - RAGDOLL_END
         VM_Call(
             common,
@@ -859,7 +860,7 @@ pub fn SV_SpawnServer(
         sv.svs.time += 100;
     }
     //rww - RAGDOLL_BEGIN
-    G2API_SetTime(g2, host, sv.svs.time, 0);
+    g2api_set_time(g2, sv.svs.time, 0);
     //rww - RAGDOLL_END
 
     // create a baseline for more efficient communications
@@ -929,7 +930,7 @@ pub fn SV_SpawnServer(
     SV_BotFrame(common, sv, sv.svs.time);
     sv.svs.time += 100;
     //rww - RAGDOLL_BEGIN
-    G2API_SetTime(g2, host, sv.svs.time, 0);
+    g2api_set_time(g2, sv.svs.time, 0);
     //rww - RAGDOLL_END
 
     unsafe {
@@ -1272,14 +1273,10 @@ pub fn SV_Init(
     // init the botlib here because we need the pre-compiler in the UI
     SV_BotInitBotLib(common, cm, sv, bot, rm, host);
 
-    // Only allocated once, no point in moving it around and fragmenting
-    // create a heap for Ghoul2 to use for game side model vertex transforms used in collision detection
-    //
-    // PORT-NOTE(g2-vert-space): `G2VertSpaceServer`/`CMiniHeap_singleton`
-    // (file-scope statics, sv_init.cpp:468-469) have no ported home yet;
-    // referenced by their exact Raven identifiers, escalated in
-    // missing_symbols for the finisher.
-    common.G2VertSpaceServer = &mut common.CMiniHeap_singleton;
+    // Raven allocates `G2VertSpaceServer = new CMiniHeap(...)` here for game-side
+    // model vertex transforms (sv_init.cpp:468-469); `CMiniHeap` is deleted per
+    // the ghoul2-server design (the collision path threads no scratch heap), so
+    // this allocation drops.
 }
 
 /// Raven `SV_FinalMessage` — used by `SV_Shutdown` to send a final message to

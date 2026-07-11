@@ -8,7 +8,9 @@
 
 use core::ffi::c_int;
 
+use mp_engine_ghoul2::api_collision::{g2api_collision_detect, g2api_collision_detect_cache};
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
+use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::cm_load::RenderModels;
@@ -37,10 +39,6 @@ use crate::server::sv_entity_s::{svEntity_t, MAX_ENT_CLUSTERS};
 use crate::server::world_sector_s::{worldSector_t, AREA_DEPTH, AREA_NODES, MAX_TOTAL_ENT_LEAFS};
 use crate::sv_game::SV_SvEntityForGentity;
 use crate::Server;
-
-// G2API_CollisionDetect[Cache]: the ported ghoul2 fns take &mut CGhoul2Info_v
-// and return Vec<CollisionRecord_t>; this file's g2trace loop expects the
-// out-param array form — call sites bend when the ghoul2 server wave lands.
 
 /// Raven `VectorDistance` (`sv_world.cpp`-local `static float`).
 ///
@@ -645,7 +643,7 @@ pub fn SV_ClipMoveToEntities(
     rm: &mut RenderModels,
     rmg: &mut RmManager,
     g2: &mut Ghoul2System,
-    host: &mut dyn EngineHost,
+    mut host: &mut dyn EngineHost,
     clip: *mut moveclip_t,
 ) {
     unsafe {
@@ -824,14 +822,6 @@ pub fn SV_ClipMoveToEntities(
                     }
                 }
 
-                let mut g2trace =
-                    [mp_qshared::common::mp::qcommon::collision_record::CollisionRecord_t::default(
-                    );
-                        mp_qshared::common::mp::qcommon::collision_record::MAX_G2_COLLISIONS];
-                for slot in g2trace.iter_mut() {
-                    slot.mEntityNum = -1;
-                }
-
                 if ((*touch).s.number) < MAX_CLIENTS as c_int {
                     VectorCopy((*touch).s.apos.trBase, &mut angles2);
                 } else {
@@ -858,64 +848,60 @@ pub fn SV_ClipMoveToEntities(
                     );
                 }
 
-                let bestTr;
-                if host.cvar_integer("com_optvehtrace") != 0
+                // The ported `g2api_collision_detect[_cache]` fns return the
+                // distance-sorted, populated collision records as an owned
+                // `Vec<CollisionRecord_t>` (the out-param array + `CMiniHeap
+                // *G2VertSpace` scratch arg both drop, per the ghoul2-server
+                // design); `(*touch).ghoul2` is the opaque `*mut CGhoul2Info_v`.
+                let ghoul2 = &mut *((*touch).ghoul2 as *mut CGhoul2Info_v);
+                let sv_time = host.sv_time();
+                let g2trace = if host.cvar_integer("com_optvehtrace") != 0
                     && (*touch).s.eType == mp_bg::public::entity_type::entityType_t::ET_NPC as c_int
                     && (*touch).s.NPC_class == class_t::CLASS_VEHICLE as c_int
                     && !(*touch).m_pVehicle.is_null()
                 {
                     //for vehicles cache the transform data.
-                    mp_engine_ghoul2::G2API_CollisionDetectCache(
+                    g2api_collision_detect_cache(
                         g2,
-                        host,
-                        &mut g2trace,
-                        (*touch).ghoul2,
+                        &mut host,
+                        ghoul2,
                         angles2,
                         (*touch).r.currentOrigin,
-                        host.sv_time(),
+                        sv_time,
                         (*touch).s.number,
                         (*clip).start,
                         (*clip).end,
                         (*touch).modelScale,
-                        g2.G2VertSpaceServer,
                         0,
                         (*clip).useLod,
                         fRadius,
-                    );
+                    )
                 } else {
-                    mp_engine_ghoul2::G2API_CollisionDetect(
+                    g2api_collision_detect(
                         g2,
-                        host,
-                        &mut g2trace,
-                        (*touch).ghoul2,
+                        &mut host,
+                        ghoul2,
                         angles2,
                         (*touch).r.currentOrigin,
-                        host.sv_time(),
+                        sv_time,
                         (*touch).s.number,
                         (*clip).start,
                         (*clip).end,
                         (*touch).modelScale,
-                        g2.G2VertSpaceServer,
                         0,
                         (*clip).useLod,
                         fRadius,
-                    );
-                }
-
-                let mut tN = 0usize;
-                bestTr = loop {
-                    if tN >= mp_qshared::common::mp::qcommon::collision_record::MAX_G2_COLLISIONS {
-                        break -1i32;
-                    }
-                    if g2trace[tN].mEntityNum == (*touch).s.number {
-                        // ok, valid
-                        break tN as i32;
-                    } else if g2trace[tN].mEntityNum == -1 {
-                        // there should not be any after the first -1
-                        break -1i32;
-                    }
-                    tN += 1;
+                    )
                 };
+
+                // The returned records are the populated entries only
+                // (distance-ordered), so the oracle's "stop at the first
+                // `mEntityNum == -1`" scan reduces to the first record matching
+                // this entity.
+                let bestTr = g2trace
+                    .iter()
+                    .position(|r| r.mEntityNum == (*touch).s.number)
+                    .map_or(-1i32, |i| i as i32);
 
                 if bestTr == -1 {
                     // Well then, put the trace back to the old one.
