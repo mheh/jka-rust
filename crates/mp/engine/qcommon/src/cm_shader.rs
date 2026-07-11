@@ -277,9 +277,10 @@ pub fn CM_LoadShaderFiles(
             cm,
             rm,
             host,
-            (sum + numShaders * 2) as usize,
+            (sum + numShaders * 2) as c_int,
             memtag_t::TAG_SHADERTEXT,
-            true,
+            mp_qshared::shared::qtrue,
+            4,
         )
     } as *mut c_char;
 
@@ -310,7 +311,7 @@ pub fn CM_FreeShaderText(common: &mut Common, cm: &mut CollisionWorld) {
     //TODO: Port shaderText
     // Source: oracle/codemp/qcommon/cm_shader.cpp:28
     if !cm.shaderText.is_null() {
-        unsafe { Z_Free(common, cm.shaderText) };
+        unsafe { Z_Free(common, cm.shaderText as *mut ()) };
         cm.shaderText = core::ptr::null_mut();
     }
 }

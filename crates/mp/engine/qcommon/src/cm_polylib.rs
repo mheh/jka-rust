@@ -278,7 +278,16 @@ pub fn AllocWinding(
     // PORT-NOTE(missing-callee): `Z_Malloc` is part of the still-unlanded
     // z_memman unit; called with the exact resolved receivers and reported
     // as a missing symbol (cm_trace.rs/vm_x86.rs precedent).
-    let w = Z_Malloc(common, cm, rm, host, s, memtag_t::TAG_BSP, true) as *mut winding_t;
+    let w = Z_Malloc(
+        common,
+        cm,
+        rm,
+        host,
+        s,
+        memtag_t::TAG_BSP,
+        mp_qshared::shared::qtrue,
+        4,
+    ) as *mut winding_t;
     // Raven: qtrue param in Z_Malloc does this (Com_Memset commented out).
     w
 }

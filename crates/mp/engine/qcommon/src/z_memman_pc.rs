@@ -11,7 +11,7 @@
 //!
 //! Source: `oracle/codemp/qcommon/z_memman_pc.cpp`
 
-use core::ffi::c_int;
+use core::ffi::{c_char, c_int};
 
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
@@ -92,6 +92,348 @@ pub fn Zone_FreeBlock(common: &mut Common, pMemory: *mut zoneHeader_t) {
             // debug-only double-free counter block is dropped per the
             // #ifdef's own condition.
         }
+    }
+}
+
+// static mem blocks to reduce a lot of small zone overhead
+//
+// Raven declares these `#pragma pack(1)` (`z_memman_pc.cpp:122-137`). The packed
+// layout is behaviorally inert here: static blocks are never linked into
+// `TheZone` (`pNext`/`pPrev` stay null) so `Z_Validate` never walks them, and
+// `Z_Free`/`Z_Size` early-out on `TAG_STATIC` before reading the tail — so only
+// `Header` and (for `CopyString`) `mem` are ever read, both at
+// `sizeof(zoneHeader_t)`-aligned offsets. Natural `#[repr(C)]` is used to avoid
+// Rust misaligned-access UB on the static's own address.
+
+/// Raven `StaticZeroMem_t`.
+/// Type definition source: `oracle/codemp/qcommon/z_memman_pc.cpp:124-129`
+#[repr(C)]
+struct StaticZeroMem_t {
+    Header: zoneHeader_t,
+    Tail: zoneTail_t,
+}
+
+/// Raven `StaticMem_t`.
+/// Type definition source: `oracle/codemp/qcommon/z_memman_pc.cpp:131-136`
+#[repr(C)]
+struct StaticMem_t {
+    Header: zoneHeader_t,
+    mem: [u8; 2],
+    Tail: zoneTail_t,
+}
+
+/// Sync wrapper for the read-only static zone blocks (raw-pointer list links
+/// keep the payload `!Sync`; the blocks are never mutated in this build).
+struct ZoneStatic<T>(T);
+unsafe impl<T> Sync for ZoneStatic<T> {}
+
+/// Const constructor for a `StaticMem_t` block (`TAG_STATIC`, size 2).
+const fn new_static_mem(mem: [u8; 2]) -> StaticMem_t {
+    StaticMem_t {
+        Header: zoneHeader_t {
+            iMagic: ZONE_MAGIC,
+            eTag: memtag_t::TAG_STATIC,
+            iSize: 2,
+            pNext: core::ptr::null_mut(),
+            pPrev: core::ptr::null_mut(),
+        },
+        mem,
+        Tail: zoneTail_t { iMagic: ZONE_MAGIC },
+    }
+}
+
+/// Raven `gZeroMalloc` — the block handed back for a zero-byte `Z_Malloc`.
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:139-140`
+static gZeroMalloc: ZoneStatic<StaticZeroMem_t> = ZoneStatic(StaticZeroMem_t {
+    Header: zoneHeader_t {
+        iMagic: ZONE_MAGIC,
+        eTag: memtag_t::TAG_STATIC,
+        iSize: 0,
+        pNext: core::ptr::null_mut(),
+        pPrev: core::ptr::null_mut(),
+    },
+    Tail: zoneTail_t { iMagic: ZONE_MAGIC },
+});
+
+/// Raven `gEmptyString` — `CopyString("")`'s static empty-string block.
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:141-142`
+static gEmptyString: ZoneStatic<StaticMem_t> = ZoneStatic(new_static_mem([b'\0', b'\0']));
+
+/// Raven `gNumberString[]` — `CopyString`'s static single-digit blocks.
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:143-154`
+static gNumberString: ZoneStatic<[StaticMem_t; 10]> = ZoneStatic([
+    new_static_mem([b'0', b'\0']),
+    new_static_mem([b'1', b'\0']),
+    new_static_mem([b'2', b'\0']),
+    new_static_mem([b'3', b'\0']),
+    new_static_mem([b'4', b'\0']),
+    new_static_mem([b'5', b'\0']),
+    new_static_mem([b'6', b'\0']),
+    new_static_mem([b'7', b'\0']),
+    new_static_mem([b'8', b'\0']),
+    new_static_mem([b'9', b'\0']),
+]);
+
+/// Raven `Z_Validate` — walks the zone list checking every header/tail magic.
+///
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:82-116`
+pub fn Z_Validate(common: &Common) {
+    if common.com_validateZone.is_null() || unsafe { (*common.com_validateZone).integer } == 0 {
+        return;
+    }
+
+    let mut pMemory: *mut zoneHeader_t = common.TheZone.Header.pNext;
+    unsafe {
+        while !pMemory.is_null() {
+            if (*pMemory).iMagic != ZONE_MAGIC {
+                crate::common::error::com_error(
+                    errorParm_t::ERR_FATAL,
+                    "Z_Validate(): Corrupt zone header!".to_string(),
+                );
+            }
+
+            if (*ZoneTailFromHeader(pMemory)).iMagic != ZONE_MAGIC {
+                crate::common::error::com_error(
+                    errorParm_t::ERR_FATAL,
+                    "Z_Validate(): Corrupt zone tail!".to_string(),
+                );
+            }
+
+            pMemory = (*pMemory).pNext;
+        }
+    }
+}
+
+/// Raven `Z_Malloc` — the zone allocator: wraps `malloc`/`calloc` with a magic
+/// header/tail and per-tag stats, and on failure dumps non-vital caches and
+/// retries before giving up.
+///
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:157-308`
+pub fn Z_Malloc(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    iSize: c_int,
+    eTag: memtag_t,
+    bZeroit: qboolean,
+    iUnusedAlign: c_int,
+) -> *mut () {
+    let _ = iUnusedAlign;
+    // The file-scope `gbMemFreeupOccured` flag only gated the `#ifdef _WIN32`
+    // `Sleep` hint and the `#ifdef _DEBUG` recover-test, both dropped in this
+    // build, so it has no reader here and is omitted.
+
+    if iSize == 0 {
+        let pMemory = &gZeroMalloc.0 as *const StaticZeroMem_t as *mut zoneHeader_t;
+        return unsafe { pMemory.add(1) as *mut () };
+    }
+
+    // Add in tracking info
+    //
+    let iRealSize: c_int = iSize
+        + core::mem::size_of::<zoneHeader_t>() as c_int
+        + core::mem::size_of::<zoneTail_t>() as c_int;
+
+    // Allocate a chunk...
+    //
+    let mut pMemory: *mut zoneHeader_t = core::ptr::null_mut();
+    while pMemory.is_null() {
+        // #ifdef _WIN32: the `Sleep(1000)` de-fragmentation hint is dropped for
+        // this build config.
+
+        pMemory = if bZeroit != 0 {
+            unsafe { libc::calloc(iRealSize as usize, 1) as *mut zoneHeader_t }
+        } else {
+            unsafe { libc::malloc(iRealSize as usize) as *mut zoneHeader_t }
+        };
+        if pMemory.is_null() {
+            // new bit, if we fail to malloc memory, try dumping some of the
+            // cached stuff that's non-vital and try again...
+
+            // ditch the BSP cache...
+            //
+            if crate::cm_load::CM_DeleteCachedMap(common, cm, native_types::qfalse) != 0 {
+                continue; // we've just ditched a whole load of memory, so try again with the malloc
+            }
+
+            // ditch any sounds not used on this level...
+            //
+            if SND_RegisterAudio_LevelLoadEnd(host, native_types::qtrue) != 0 {
+                continue; // we've dropped at least one sound, so try again with the malloc
+            }
+
+            // #ifndef DEDICATED: the `RE_RegisterImages_LevelLoadEnd` image-cache
+            // dump is dropped for the dedicated-server build config.
+
+            // ditch the model-binaries cache...  (must be getting desperate here!)
+            //
+            if RE_RegisterModels_LevelLoadEnd(rm, host, native_types::qtrue) != 0 {
+                continue;
+            }
+
+            // as a last panic measure, dump all the audio memory, but not if
+            // we're in the audio loader (which is annoying, but I'm not sure how
+            // to ensure we're not dumping any memory needed by the sound
+            // currently being loaded if that was the case)...
+            //
+            if gbInsideLoadSound == 0 {
+                let mut iBytesFreed = SND_FreeOldestSound(host);
+                if iBytesFreed != 0 {
+                    loop {
+                        let iTheseBytesFreed = SND_FreeOldestSound(host);
+                        if iTheseBytesFreed == 0 {
+                            break;
+                        }
+                        iBytesFreed += iTheseBytesFreed;
+                        if iBytesFreed >= iRealSize {
+                            break; // early opt-out since we've managed to recover enough
+                        }
+                    }
+                    continue;
+                }
+            }
+
+            // sigh, dunno what else to try, I guess we'll have to give up and
+            // report this as an out-of-mem error...
+            //
+            // findlabel:  "recovermem"
+            Com_Printf(
+                common,
+                &format!(
+                    "^1Z_Malloc(): Failed to alloc {} bytes (TAG_{}) !!!!!\n",
+                    iSize, psTagStrings[eTag as usize]
+                ),
+            );
+            Z_Details_f(common);
+            crate::common::error::com_error(
+                errorParm_t::ERR_FATAL,
+                format!(
+                    "(Repeat): Z_Malloc(): Failed to alloc {} bytes (TAG_{}) !!!!!\n",
+                    iSize, psTagStrings[eTag as usize]
+                ),
+            );
+        }
+    }
+
+    unsafe {
+        // Link in
+        (*pMemory).iMagic = ZONE_MAGIC;
+        (*pMemory).eTag = eTag;
+        (*pMemory).iSize = iSize;
+        (*pMemory).pNext = common.TheZone.Header.pNext;
+        common.TheZone.Header.pNext = pMemory;
+        if !(*pMemory).pNext.is_null() {
+            (*(*pMemory).pNext).pPrev = pMemory;
+        }
+        (*pMemory).pPrev = &mut common.TheZone.Header as *mut zoneHeader_t;
+        //
+        // add tail...
+        //
+        (*ZoneTailFromHeader(pMemory)).iMagic = ZONE_MAGIC;
+
+        // Update stats...
+        //
+        common.TheZone.Stats.iCurrent += iSize;
+        common.TheZone.Stats.iCount += 1;
+        common.TheZone.Stats.iSizesPerTag[eTag as usize] += iSize;
+        common.TheZone.Stats.iCountsPerTag[eTag as usize] += 1;
+
+        if common.TheZone.Stats.iCurrent > common.TheZone.Stats.iPeak {
+            common.TheZone.Stats.iPeak = common.TheZone.Stats.iCurrent;
+        }
+    }
+
+    Z_Validate(common); // check for corruption
+
+    unsafe { pMemory.add(1) as *mut () }
+}
+
+/// Raven `Z_Free` — validates and frees a zone block (no-op on null / static).
+///
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:404-443`
+pub fn Z_Free(common: &mut Common, pvAddress: *mut ()) {
+    // I've put this in as a safety measure because of some bits of #ifdef BSPC
+    // stuff -Ste.
+    if pvAddress.is_null() {
+        return;
+    }
+
+    unsafe {
+        let pMemory: *mut zoneHeader_t = (pvAddress as *mut zoneHeader_t).wrapping_sub(1);
+
+        if (*pMemory).eTag == memtag_t::TAG_STATIC {
+            return;
+        }
+
+        // DETAILED_ZONE_DEBUG_CODE is not defined in this build; the debug-only
+        // already-freed check is dropped per the #ifdef.
+
+        if (*pMemory).iMagic != ZONE_MAGIC {
+            crate::common::error::com_error(
+                errorParm_t::ERR_FATAL,
+                "Z_Free(): Corrupt zone header!".to_string(),
+            );
+        }
+        if (*ZoneTailFromHeader(pMemory)).iMagic != ZONE_MAGIC {
+            crate::common::error::com_error(
+                errorParm_t::ERR_FATAL,
+                "Z_Free(): Corrupt zone tail!".to_string(),
+            );
+        }
+
+        Zone_FreeBlock(common, pMemory);
+    }
+}
+
+/// Raven `S_Malloc` — `TAG_SMALL` `Z_Malloc` shorthand.
+///
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:480-482`
+pub fn S_Malloc(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    iSize: c_int,
+) -> *mut () {
+    Z_Malloc(
+        common,
+        cm,
+        rm,
+        host,
+        iSize,
+        memtag_t::TAG_SMALL,
+        native_types::qfalse,
+        4,
+    )
+}
+
+/// Raven `CopyString` — duplicates a string into the zone, returning shared
+/// static blocks for `""` and single digits.
+///
+/// Raven NOTE: never write over the memory `CopyString` returns because memory
+/// from a memstatic_t might be returned.
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:607-622`
+pub fn CopyString(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    in_: *const c_char,
+) -> *mut c_char {
+    unsafe {
+        if *in_ == 0 {
+            return (&gEmptyString.0 as *const StaticMem_t as *const u8)
+                .add(core::mem::size_of::<zoneHeader_t>()) as *mut c_char;
+        } else if *in_.add(1) == 0 && *in_ >= b'0' as c_char && *in_ <= b'9' as c_char {
+            let idx = (*in_ - b'0' as c_char) as usize;
+            return (&gNumberString.0[idx] as *const StaticMem_t as *const u8)
+                .add(core::mem::size_of::<zoneHeader_t>()) as *mut c_char;
+        }
+
+        let out = S_Malloc(common, cm, rm, host, (libc::strlen(in_) + 1) as c_int) as *mut c_char;
+        libc::strcpy(out, in_);
+        out
     }
 }
 

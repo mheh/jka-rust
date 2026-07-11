@@ -987,7 +987,7 @@ pub fn Com_EventLoop(
 
         // free any block data
         if !ev.evPtr.is_null() {
-            unsafe { Z_Free(common, ev.evPtr) };
+            unsafe { Z_Free(common, ev.evPtr as *mut ()) };
         }
     }
 }

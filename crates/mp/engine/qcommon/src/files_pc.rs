@@ -51,11 +51,11 @@ mod null {
 // `z_memman_pc`. All genuinely unported; reported.
 use crate::files::unz_file::unzOpenCurrentFile;
 use crate::files_common::{
-    CopyString, FS_AddGameDirectory, FS_CopyFile, FS_CreatePath, FS_FCloseFile, FS_FileForHandle,
+    FS_AddGameDirectory, FS_CopyFile, FS_CreatePath, FS_FCloseFile, FS_FileForHandle,
     FS_FOpenFileRead, FS_FOpenFileWrite, FS_FreeFileList, FS_HandleForFile, FS_ListFiles, FS_Read,
     FS_Restart, FS_SV_FOpenFileRead,
 };
-use crate::z_memman_pc::{Z_Free, Z_Malloc};
+use crate::z_memman_pc::{CopyString, Z_Free, Z_Malloc};
 use native_platform::{
     Sys_BeginStreamedFile, Sys_FreeFileList, Sys_ListFiles, Sys_StreamedRead, Sys_StreamSeek,
 };
@@ -1166,9 +1166,10 @@ pub fn Sys_ConcatenateFileLists(
             cm,
             rm,
             host,
-            (total_length + 1) * core::mem::size_of::<*mut c_char>(),
+            ((total_length + 1) * core::mem::size_of::<*mut c_char>()) as c_int,
             memtag_t::TAG_FILESYS,
             mp_qshared::shared::qtrue,
+            4,
         )
     } as *mut *mut c_char;
     let mut dst = cat;
