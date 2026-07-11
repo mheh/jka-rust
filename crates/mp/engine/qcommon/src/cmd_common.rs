@@ -31,6 +31,7 @@ use crate::cmd::Cmd_AddCommand;
 use crate::common::{com_error, com_printf};
 use crate::cvar_fns::Cvar_VariableString;
 use crate::files_common::{FS_FreeFile, FS_ReadFile};
+use mp_qshared::shared::q_format::FmtArg;
 use mp_qshared::shared::q_string::{va, COM_DefaultExtension, Q_strncpyz};
 
 // PORT-NOTE(rm-types): `RenderModels`/`Server` are state-receiver types pinned
@@ -250,10 +251,6 @@ pub fn Cmd_Wait_f(common: &mut Common) {
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:324-326`
 pub fn Cmd_ArgvBuffer(common: &mut Common, arg: c_int, buffer: *mut c_char, bufferLength: c_int) {
-    // PORT-NOTE(Q_strncpyz): `Q_strncpyz` is currently only ported in the
-    // `mp_game` tier (`crates/mp/game/src/q_shared.rs`); the engine crate
-    // cannot depend on it (layering: game sits above engine). Referenced by
-    // its exact Raven name per the no-stub rule — missing-symbol escalation.
     unsafe {
         Q_strncpyz(buffer, Cmd_Argv(common, arg), bufferLength);
     }
@@ -408,12 +405,13 @@ pub fn Cmd_Vstr_f(common: &mut Common) {
         return;
     }
 
-    // PORT-NOTE(Cvar_VariableString/va): neither is ported in this crate yet
-    // (missing-symbol escalation) — referenced by exact Raven name.
     unsafe {
         let arg1 = Cmd_Argv(common, 1);
         let v = Cvar_VariableString(common, arg1);
-        Cbuf_InsertText(common, va(b"%s\n\0".as_ptr() as *const c_char, v));
+        Cbuf_InsertText(
+            common,
+            va(b"%s\n\0".as_ptr() as *const c_char, &[FmtArg::cstr(v)]),
+        );
     }
 }
 

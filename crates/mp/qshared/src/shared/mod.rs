@@ -37,6 +37,7 @@ pub mod mark_fragment;
 pub mod pc_token;
 pub mod print_parm;
 pub mod q_color;
+pub mod q_format;
 pub mod q_math;
 pub mod q_math_rand;
 pub mod q_string;

@@ -9,6 +9,9 @@
 //!
 //! Source: `oracle/codemp/game/q_math.c`
 
+use core::ffi::c_int;
+
+use crate::shared::collision::{cplane_t, PLANE_X, PLANE_Y, PLANE_Z};
 use crate::shared::{vec3_t, vec_t};
 
 /// Raven `VectorNormalize`.
@@ -267,4 +270,103 @@ pub fn AngleVectors(
         up[1] = cr * sp * sy + -sr * cy;
         up[2] = cr * cp;
     }
+}
+
+/// Raven `PlaneTypeForNormal`. The `q_math.c` function is `#if 0`'d out; the
+/// live definition is the `q_shared.h` macro (`PLANE_NON_AXIAL` = 3).
+///
+/// Source: `oracle/codemp/game/q_shared.h:1856`
+pub fn PlaneTypeForNormal(x: vec3_t) -> c_int {
+    if x[0] == 1.0 {
+        PLANE_X
+    } else if x[1] == 1.0 {
+        PLANE_Y
+    } else if x[2] == 1.0 {
+        PLANE_Z
+    } else {
+        3 // PLANE_NON_AXIAL
+    }
+}
+
+/// Raven `SetPlaneSignbits`.
+///
+/// Source: `oracle/codemp/game/q_math.c:751-762`
+pub fn SetPlaneSignbits(out: *mut cplane_t) {
+    let out = unsafe { &mut *out };
+    // for fast box on planeside test
+    let mut bits: u8 = 0;
+    for j in 0..3 {
+        if out.normal[j] < 0.0 {
+            bits |= 1 << j;
+        }
+    }
+    out.signbits = bits;
+}
+
+/// Raven `BoxOnPlaneSide`.
+///
+/// Returns 1, 2, or 1 + 2. This is the fast axial/general-case version (the
+/// naked-asm variant is dropped per the frozen fork ruling; the plain-C
+/// fallback path is the one that ships).
+/// Source: `oracle/codemp/game/q_math.c:809-871`
+pub fn BoxOnPlaneSide(emins: vec3_t, emaxs: vec3_t, p: *mut cplane_t) -> c_int {
+    let p = unsafe { &*p };
+
+    // fast axial cases
+    if (p.r#type as i32) < 3 {
+        let t = p.r#type as usize;
+        if p.dist <= emins[t] {
+            return 1;
+        }
+        if p.dist >= emaxs[t] {
+            return 2;
+        }
+        return 3;
+    }
+
+    // general case
+    let (dist1, dist2) = match p.signbits {
+        0 => (
+            p.normal[0] * emaxs[0] + p.normal[1] * emaxs[1] + p.normal[2] * emaxs[2],
+            p.normal[0] * emins[0] + p.normal[1] * emins[1] + p.normal[2] * emins[2],
+        ),
+        1 => (
+            p.normal[0] * emins[0] + p.normal[1] * emaxs[1] + p.normal[2] * emaxs[2],
+            p.normal[0] * emaxs[0] + p.normal[1] * emins[1] + p.normal[2] * emins[2],
+        ),
+        2 => (
+            p.normal[0] * emaxs[0] + p.normal[1] * emins[1] + p.normal[2] * emaxs[2],
+            p.normal[0] * emins[0] + p.normal[1] * emaxs[1] + p.normal[2] * emins[2],
+        ),
+        3 => (
+            p.normal[0] * emins[0] + p.normal[1] * emins[1] + p.normal[2] * emaxs[2],
+            p.normal[0] * emaxs[0] + p.normal[1] * emaxs[1] + p.normal[2] * emins[2],
+        ),
+        4 => (
+            p.normal[0] * emaxs[0] + p.normal[1] * emaxs[1] + p.normal[2] * emins[2],
+            p.normal[0] * emins[0] + p.normal[1] * emins[1] + p.normal[2] * emaxs[2],
+        ),
+        5 => (
+            p.normal[0] * emins[0] + p.normal[1] * emaxs[1] + p.normal[2] * emins[2],
+            p.normal[0] * emaxs[0] + p.normal[1] * emins[1] + p.normal[2] * emaxs[2],
+        ),
+        6 => (
+            p.normal[0] * emaxs[0] + p.normal[1] * emins[1] + p.normal[2] * emins[2],
+            p.normal[0] * emins[0] + p.normal[1] * emaxs[1] + p.normal[2] * emaxs[2],
+        ),
+        7 => (
+            p.normal[0] * emins[0] + p.normal[1] * emins[1] + p.normal[2] * emins[2],
+            p.normal[0] * emaxs[0] + p.normal[1] * emaxs[1] + p.normal[2] * emaxs[2],
+        ),
+        _ => (0.0, 0.0), // shut up compiler
+    };
+
+    let mut sides = 0;
+    if dist1 >= p.dist {
+        sides = 1;
+    }
+    if dist2 < p.dist {
+        sides |= 2;
+    }
+    sides
 }

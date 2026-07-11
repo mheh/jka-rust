@@ -60,6 +60,22 @@ use crate::msg::MSG_Init;
 use crate::stringed::api::SE_Init;
 use crate::z_memman_pc::Z_Free;
 
+/// Raven `Com_DPrintf` — a `Com_Printf` that only shows up if the `developer`
+/// cvar is set. Engine callers pre-render the format through Rust `format!`, so
+/// this takes the already-rendered `&str` and forwards it to `com_printf` after
+/// the developer gate.
+///
+/// Source: `oracle/codemp/qcommon/common.cpp:210-224`
+pub fn Com_DPrintf(common: &mut Common, msg: &str) {
+    // don't confuse non-developers with techie stuff...
+    unsafe {
+        if common.com_developer.is_null() || (*common.com_developer).integer == 0 {
+            return;
+        }
+    }
+    crate::common::com_printf(common, msg);
+}
+
 /// `Com_BeginRedirect`.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:96-105`

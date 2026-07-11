@@ -3,7 +3,18 @@
 
 use core::ffi::{c_char, c_int};
 
-use crate::shared::limits::BIG_INFO_STRING;
+use crate::shared::limits::{BIG_INFO_STRING, MAX_INFO_STRING, MAX_TOKEN_CHARS};
+use crate::shared::q_format::{c_vsprintf, FmtArg};
+use crate::shared::{qboolean, qfalse, qtrue, MAX_QPATH};
+
+// Parse-session state (mirrors Raven's file-static globals in q_shared.c);
+// module-island duplicate of the same statics in `mp_game`'s `q_shared.rs`.
+static mut COM_LINES: c_int = 0;
+static mut COM_TOKEN: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
+
+// va() rotating-buffer statics (2-slot rotating return buffer).
+static mut VA_STRING: [[c_char; 32000]; 2] = [[0; 32000]; 2];
+static mut VA_INDEX: usize = 0;
 
 /// Raven `Q_strncpyz`.
 ///
@@ -378,5 +389,412 @@ pub fn COM_Compress(data_p: *mut c_char) -> c_int {
         }
         *out = 0;
         out.offset_from(data_p) as c_int
+    }
+}
+
+/// Raven `SkipWhitespace`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:336-351`
+pub fn SkipWhitespace(data: *const c_char, hasNewLines: *mut qboolean) -> *const c_char {
+    unsafe {
+        let mut c: c_int;
+        let mut p = data;
+
+        loop {
+            c = *p as c_int;
+            if c > b' ' as c_int {
+                break;
+            }
+            if c == 0 {
+                return std::ptr::null();
+            }
+            if c == b'\n' as c_int {
+                COM_LINES += 1;
+                *hasNewLines = qtrue;
+            }
+            p = p.offset(1);
+        }
+
+        p
+    }
+}
+
+/// Raven `COM_ParseExt`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:421-526`
+pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *mut c_char {
+    unsafe {
+        let mut c: c_int = 0;
+        let mut len: c_int;
+        let mut hasNewLines = qfalse;
+        let mut data = *data_p;
+
+        len = 0;
+        COM_TOKEN[0] = 0;
+
+        // make sure incoming data is valid
+        if data.is_null() {
+            *data_p = std::ptr::null();
+            return (&raw mut COM_TOKEN).cast::<c_char>();
+        }
+
+        loop {
+            // skip whitespace
+            data = SkipWhitespace(data, &mut hasNewLines);
+            if data.is_null() {
+                *data_p = std::ptr::null();
+                return (&raw mut COM_TOKEN).cast::<c_char>();
+            }
+            if hasNewLines == qtrue && allowLineBreaks == qfalse {
+                *data_p = data;
+                return (&raw mut COM_TOKEN).cast::<c_char>();
+            }
+
+            c = *data as c_int;
+
+            // skip double slash comments
+            if c == b'/' as c_int && *data.offset(1) == b'/' as c_char {
+                data = data.offset(2);
+                while *data != 0 && *data != b'\n' as c_char {
+                    data = data.offset(1);
+                }
+            } else if c == b'/' as c_int && *data.offset(1) == b'*' as c_char {
+                data = data.offset(2);
+                while *data != 0 && !(*data == b'*' as c_char && *data.offset(1) == b'/' as c_char)
+                {
+                    data = data.offset(1);
+                }
+                if *data != 0 {
+                    data = data.offset(2);
+                }
+            } else {
+                break;
+            }
+        }
+
+        // handle quoted strings
+        if c == b'"' as c_int {
+            data = data.offset(1);
+            loop {
+                c = *data as c_int;
+                data = data.offset(1);
+                if c == b'"' as c_int || c == 0 {
+                    // Raven's quoted path omits the `len == MAX_TOKEN_CHARS`
+                    // reset the word path below applies, so a buffer-filling
+                    // token writes the terminator one past `com_token`. Clamp
+                    // to the last slot rather than reproduce that overrun.
+                    COM_TOKEN[len.min(MAX_TOKEN_CHARS as c_int - 1) as usize] = 0;
+                    *data_p = data as *const c_char;
+                    return (&raw mut COM_TOKEN).cast::<c_char>();
+                }
+                if len < MAX_TOKEN_CHARS as c_int {
+                    COM_TOKEN[len as usize] = c as c_char;
+                    len += 1;
+                }
+            }
+        }
+
+        // parse a regular word
+        loop {
+            if len < MAX_TOKEN_CHARS as c_int {
+                COM_TOKEN[len as usize] = c as c_char;
+                len += 1;
+            }
+            data = data.offset(1);
+            c = *data as c_int;
+            if c == b'\n' as c_int {
+                COM_LINES += 1;
+            }
+            if !(c > b' ' as c_int) {
+                break;
+            }
+        }
+
+        if len == MAX_TOKEN_CHARS as c_int {
+            len = 0;
+        }
+        COM_TOKEN[len as usize] = 0;
+
+        *data_p = data as *const c_char;
+        (&raw mut COM_TOKEN).cast::<c_char>()
+    }
+}
+
+/// Raven `COM_Parse`.
+///
+/// Engine-island reshape: the engine's `VM_LoadSymbols` walks a Rust `&str`
+/// cursor, so this returns `(token, remaining)` over the borrow rather than
+/// Raven's `char **data` / `static char com_token[]` pointer channel. Behavior
+/// is `COM_ParseExt(data, qtrue)` — the tokenizer is reused verbatim by copying
+/// the cursor into a NUL-terminated buffer and mapping the consumed byte count
+/// back onto the input slice.
+/// Source: `oracle/codemp/game/q_shared.c:295-298`
+pub fn COM_Parse(data: &str) -> (String, &str) {
+    let c = std::ffi::CString::new(data).unwrap_or_default();
+    let start = c.as_ptr();
+    let mut p: *const c_char = start;
+    let token = COM_ParseExt(&mut p, qtrue);
+    let token_str = unsafe { std::ffi::CStr::from_ptr(token) }
+        .to_string_lossy()
+        .into_owned();
+    let rest = if p.is_null() {
+        ""
+    } else {
+        let consumed = (p as usize) - (start as usize);
+        data.get(consumed..).unwrap_or("")
+    };
+    (token_str, rest)
+}
+
+/// Raven `SkipBracedSection`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:685-701`
+pub fn SkipBracedSection(program: *mut *const c_char) {
+    unsafe {
+        let mut depth: c_int = 0;
+        loop {
+            let token = COM_ParseExt(program, qtrue);
+            if *token.offset(1) == 0 {
+                if *token == b'{' as c_char {
+                    depth += 1;
+                } else if *token == b'}' as c_char {
+                    depth -= 1;
+                }
+            }
+            if !(depth != 0 && !(*program).is_null()) {
+                break;
+            }
+        }
+    }
+}
+
+/// Raven `SkipRestOfLine`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:708-721`
+pub fn SkipRestOfLine(data: *mut *const c_char) {
+    unsafe {
+        let mut p = *data;
+        let mut c: c_int;
+
+        loop {
+            c = *p as c_int;
+            p = p.offset(1);
+            if c == 0 {
+                break;
+            }
+            if c == b'\n' as c_int {
+                COM_LINES += 1;
+                break;
+            }
+        }
+
+        *data = p;
+    }
+}
+
+/// Raven `COM_StripExtension`.
+///
+/// Engine-island reshape: callers hand a Rust `&str` and want an owned result,
+/// so this returns the stripped `String` rather than writing Raven's `out`
+/// buffer. Behavior is identical — copy up to the first `.` (Raven's faithful
+/// first-dot truncation).
+/// Source: `oracle/codemp/game/q_shared.c:99-104`
+pub fn COM_StripExtension(r#in: &str) -> String {
+    match r#in.find('.') {
+        Some(i) => r#in[..i].to_string(),
+        None => r#in.to_string(),
+    }
+}
+
+/// Raven `COM_DefaultExtension`.
+///
+/// Uses a fixed `"%s%s"` pattern (`oldPath`, `extension`) — inlined directly
+/// rather than routed through a generic `Com_sprintf` seam (a statically-known
+/// format with known args is a mechanical identity, not a design choice).
+/// Source: `oracle/codemp/game/q_shared.c:112-131`
+pub fn COM_DefaultExtension(path: *mut c_char, maxSize: c_int, extension: *const c_char) {
+    unsafe {
+        let len = c_strlen(path);
+        let _ = len;
+        let mut src = path.offset(c_strlen(path) as isize - 1);
+        while *src != b'/' as c_char && src != path {
+            if *src == b'.' as c_char {
+                return; // it has an extension
+            }
+            src = src.offset(-1);
+        }
+
+        // Raven copies `path` into `oldPath[MAX_QPATH]` via Q_strncpyz first,
+        // truncating to MAX_QPATH-1 bytes before the "%s%s" concatenation.
+        let path_bytes = std::ffi::CStr::from_ptr(path).to_bytes();
+        let ext_bytes = std::ffi::CStr::from_ptr(extension).to_bytes();
+        let old_len = path_bytes.len().min(MAX_QPATH as usize - 1);
+        let mut combined: Vec<c_char> = Vec::with_capacity(old_len + ext_bytes.len() + 1);
+        combined.extend(path_bytes[..old_len].iter().map(|&b| b as c_char));
+        combined.extend(ext_bytes.iter().map(|&b| b as c_char));
+        combined.push(0);
+        // Com_sprintf(path, maxSize, ...) truncates to maxSize-1 + NUL.
+        let cap = maxSize.max(1) as usize;
+        let n = combined.len().min(cap);
+        std::ptr::copy_nonoverlapping(combined.as_ptr(), path, n - 1);
+        *path.offset(n as isize - 1) = 0;
+    }
+}
+
+/// Raven `Com_sprintf`.
+///
+/// Engine-island reshape: engine callers pre-render the format through Rust
+/// `format!`, so this takes the already-rendered `&str` (mirroring the `FmtArg`
+/// reshape rationale of `mp_game`'s copy) and reproduces only the buffer
+/// semantics — the 32000-byte bigbuffer `ERR_FATAL` (→ panic, frozen Group A),
+/// the `len >= size` overflow warning, and the closing `Q_strncpyz`.
+/// Source: `oracle/codemp/game/q_shared.c:985-1005`
+pub fn Com_sprintf(dest: *mut c_char, size: c_int, s: &str) {
+    unsafe {
+        let bytes = s.as_bytes();
+        let len = bytes.len();
+        if len >= 32000 {
+            // Com_Error(ERR_FATAL, "Com_sprintf: overflowed bigbuffer") -> panic.
+            panic!("Com_sprintf: overflowed bigbuffer");
+        }
+        if len as c_int >= size {
+            com_printf_lit(&format!("Com_sprintf: overflow of {len} in {size}\n"));
+        }
+        // Q_strncpyz needs a NUL-terminated source.
+        let mut cbig: Vec<c_char> = bytes.iter().map(|&b| b as c_char).collect();
+        cbig.push(0);
+        Q_strncpyz(dest, cbig.as_ptr() as *const c_char, size);
+    }
+}
+
+/// Raven `va` — does a varargs printf into a temp buffer, so I don't need to
+/// have varargs versions of all text functions.
+///
+/// Diverges: a `>= 32000`-byte result truncates instead of overrunning (Raven UB).
+/// Source: `oracle/codemp/game/q_shared.c:1017-1031`
+pub fn va(format: *const c_char, args: &[FmtArg]) -> *mut c_char {
+    unsafe {
+        let buf = VA_STRING[VA_INDEX & 1].as_mut_ptr();
+        VA_INDEX += 1;
+
+        let fmt_bytes = std::ffi::CStr::from_ptr(format).to_bytes();
+        let formatted = c_vsprintf(fmt_bytes, args);
+        let copy_len = formatted.len().min(32000 - 1);
+        std::ptr::copy_nonoverlapping(formatted.as_ptr() as *const c_char, buf, copy_len);
+        *buf.offset(copy_len as isize) = 0;
+
+        buf
+    }
+}
+
+/// Raven `Info_RemoveKey`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:1147-1195`
+pub fn Info_RemoveKey(mut s: *mut c_char, key: *const c_char) {
+    unsafe {
+        if c_strlen(s as *const c_char) >= MAX_INFO_STRING {
+            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+            panic!("Info_RemoveKey: oversize infostring");
+        }
+
+        if !c_strchr(key, b'\\' as c_char).is_null() {
+            return;
+        }
+
+        loop {
+            let start = s;
+            let mut p = start as *const c_char;
+            if *p == b'\\' as c_char {
+                p = p.offset(1);
+            }
+            let mut pkey: Vec<c_char> = Vec::new();
+            loop {
+                if *p == b'\\' as c_char {
+                    break;
+                }
+                if *p == 0 {
+                    return;
+                }
+                pkey.push(*p);
+                p = p.offset(1);
+            }
+            pkey.push(0);
+            p = p.offset(1);
+
+            let mut value: Vec<c_char> = Vec::new();
+            loop {
+                if *p == b'\\' as c_char || *p == 0 {
+                    break;
+                }
+                if *p == 0 {
+                    return;
+                }
+                value.push(*p);
+                p = p.offset(1);
+            }
+            value.push(0);
+
+            if c_strcmp(key, pkey.as_ptr()) == 0 {
+                c_strcpy(start, p); // remove this part
+                return;
+            }
+
+            if *p == 0 {
+                return;
+            }
+            // advance `s` to just past this pair for the next iteration.
+            s = p as *mut c_char;
+        }
+    }
+}
+
+/// Raven `Info_SetValueForKey`.
+///
+/// The `Com_sprintf(newi, sizeof(newi), "\\%s\\%s", key, value)` call has a
+/// statically-known 2-arg format, so it's inlined directly (mechanical
+/// identity).
+/// Source: `oracle/codemp/game/q_shared.c:1280-1319`
+pub fn Info_SetValueForKey(s: *mut c_char, key: *const c_char, value: *const c_char) {
+    unsafe {
+        if c_strlen(s as *const c_char) >= MAX_INFO_STRING {
+            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+            panic!("Info_SetValueForKey: oversize infostring");
+        }
+
+        if !c_strchr(key, b'\\' as c_char).is_null() || !c_strchr(value, b'\\' as c_char).is_null()
+        {
+            com_printf_lit("Can't use keys or values with a \\\n");
+            return;
+        }
+
+        if !c_strchr(key, b';' as c_char).is_null() || !c_strchr(value, b';' as c_char).is_null() {
+            com_printf_lit("Can't use keys or values with a semicolon\n");
+            return;
+        }
+
+        if !c_strchr(key, b'"' as c_char).is_null() || !c_strchr(value, b'"' as c_char).is_null() {
+            com_printf_lit("Can't use keys or values with a \"\n");
+            return;
+        }
+
+        Info_RemoveKey(s, key);
+        if value.is_null() || c_strlen(value) == 0 {
+            return;
+        }
+
+        let key_s = std::ffi::CStr::from_ptr(key).to_string_lossy();
+        let value_s = std::ffi::CStr::from_ptr(value).to_string_lossy();
+        let newi = format!("\\{key_s}\\{value_s}");
+        let s_s = std::ffi::CStr::from_ptr(s).to_string_lossy();
+
+        if newi.len() + s_s.len() > MAX_INFO_STRING {
+            com_printf_lit("Info string length exceeded\n");
+            return;
+        }
+
+        // strcat(newi, s); strcpy(s, newi);
+        let full = format!("{newi}{s_s}");
+        let cstr = std::ffi::CString::new(full).unwrap();
+        c_strcpy(s, cstr.as_ptr());
     }
 }
