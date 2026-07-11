@@ -9,6 +9,7 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_engine_qcommon::vm::game_syscall_trampoline_words;
 
 use mp_engine_botlib::be_interface::botlib_export_s::botlib_export_t;
+use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::siege_pers::siegePers_t;
 use mp_qshared::shared::limits::MAX_WPARRAY_SIZE as MAX_WPARRAY_SIZE_I32;
@@ -136,6 +137,12 @@ pub struct Server {
     ///
     /// Source: `oracle/codemp/server/sv_main.cpp:192`
     pub master_heartbeat: [c_int; MAX_MASTER_SERVERS],
+    /// Raven `SV_MasterHeartbeat::adr[MAX_MASTER_SERVERS]` (`static netadr_t`) —
+    /// the resolved master-server addresses cached across heartbeats so DNS is
+    /// only re-hit when a name changes or the re-resolve interval elapses.
+    ///
+    /// Source: `oracle/codemp/server/sv_main.cpp:213`
+    pub master_adr: [netadr_t; MAX_MASTER_SERVERS],
     /// Raven `gLocalModifier` (`sv_game.cpp` file-scope static) — the
     /// `ConvertedEntity` shifted-pointer scratch buffer.
     ///

@@ -20,6 +20,7 @@ use core::ffi::{c_char, c_int};
 
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::cvar_fns::Cvar_VariableValue;
 use mp_engine_qcommon::qcommon::net_limits::{MAX_DOWNLOAD_BLKSIZE, MAX_DOWNLOAD_WINDOW};
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_host_interface::engine_host::EngineHost;
@@ -131,12 +132,17 @@ pub fn SV_UserinfoChanged(common: &mut Common, host: &mut dyn EngineHost, cl: *m
 /// Source: `oracle/codemp/server/sv_client.cpp:31-130`
 pub fn SV_GetChallenge(
     common: &mut Common,
+    cm: &mut CollisionWorld,
     sv: &mut Server,
+    rm: &mut RenderModels,
     host: &mut dyn EngineHost,
     from: netadr_t,
 ) {
-    if mp_engine_qcommon::cvar::Cvar_VariableValue(
+    if Cvar_VariableValue(
         common,
+        cm,
+        rm,
+        host,
         c"ui_singlePlayerActive".as_ptr() as *const c_char,
     ) != 0.0
     {
@@ -574,7 +580,14 @@ pub fn SV_ClientThink(
 /// Raven `SV_AuthorizeIpPacket`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:142-211`
-pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t) {
+pub fn SV_AuthorizeIpPacket(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    sv: &mut Server,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    from: netadr_t,
+) {
     if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(common, from, sv.svs.authorizeAddress)
         == qfalse
     {
@@ -617,8 +630,11 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
         )
     } == 0
     {
-        if mp_engine_qcommon::cvar::Cvar_VariableValue(
+        if Cvar_VariableValue(
             common,
+            cm,
+            rm,
+            host,
             c"fs_restrict".as_ptr() as *const c_char,
         ) != 0.0
         {

@@ -12,10 +12,13 @@ use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::error::com_error;
-use mp_engine_qcommon::cvar_fns::Cvar_VariableIntegerValue;
+use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_VariableIntegerValue};
 use mp_engine_qcommon::qcommon::net_limits::{MAX_RELIABLE_COMMANDS, PACKET_MASK};
+use mp_engine_qcommon::vm::VM_Call;
 use mp_engine_qcommon::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_host_interface::engine_host::EngineHost;
+use mp_abi::game::exports::MpGameExport;
+use mp_qshared::shared::cvar::CVAR_CHEAT;
 use mp_qshared::common::mp::botlib::botlib_import_s::botlib_import_t;
 use mp_qshared::common::mp::botlib::botlib_misc::BOTLIB_API_VERSION;
 use mp_qshared::common::mp::game::g_public::SVF_BOT;
@@ -215,4 +218,67 @@ pub fn SV_BotFreeClient(common: &mut Common, sv: &mut Server, clientNum: c_int) 
             (*(*cl).gentity).r.svFlags &= !SVF_BOT;
         }
     }
+}
+
+/// Raven `SV_BotFrame`.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:586-591`
+pub fn SV_BotFrame(common: &mut Common, sv: &mut Server, time: c_int) {
+    if common.bot_enable == 0 {
+        return;
+    }
+    // NOTE: maybe the game is already shutdown
+    if sv.gvm.is_null() {
+        return;
+    }
+    VM_Call(
+        common,
+        sv.gvm,
+        MpGameExport::BOTAI_START_FRAME as c_int,
+        &[time],
+    );
+}
+
+/// Raven `SV_BotInitCvars`.
+///
+/// Initialize bot cvars so they are listed and can be set before the botlib
+/// loads.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:633-665`
+pub fn SV_BotInitCvars(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+) {
+    Cvar_Get(common, cm, rm, host, c"bot_enable".as_ptr(), c"1".as_ptr(), 0); //enable the bot
+    Cvar_Get(common, cm, rm, host, c"bot_developer".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //bot developer mode
+    Cvar_Get(common, cm, rm, host, c"bot_debug".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //enable bot debugging
+    Cvar_Get(common, cm, rm, host, c"bot_maxdebugpolys".as_ptr(), c"2".as_ptr(), 0); //maximum number of debug polys
+    Cvar_Get(common, cm, rm, host, c"bot_groundonly".as_ptr(), c"1".as_ptr(), 0); //only show ground faces of areas
+    Cvar_Get(common, cm, rm, host, c"bot_reachability".as_ptr(), c"0".as_ptr(), 0); //show all reachabilities to other areas
+    Cvar_Get(common, cm, rm, host, c"bot_visualizejumppads".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //show jumppads
+    Cvar_Get(common, cm, rm, host, c"bot_forceclustering".as_ptr(), c"0".as_ptr(), 0); //force cluster calculations
+    Cvar_Get(common, cm, rm, host, c"bot_forcereachability".as_ptr(), c"0".as_ptr(), 0); //force reachability calculations
+    Cvar_Get(common, cm, rm, host, c"bot_forcewrite".as_ptr(), c"0".as_ptr(), 0); //force writing aas file
+    Cvar_Get(common, cm, rm, host, c"bot_aasoptimize".as_ptr(), c"0".as_ptr(), 0); //no aas file optimisation
+    Cvar_Get(common, cm, rm, host, c"bot_saveroutingcache".as_ptr(), c"0".as_ptr(), 0); //save routing cache
+    Cvar_Get(common, cm, rm, host, c"bot_thinktime".as_ptr(), c"100".as_ptr(), CVAR_CHEAT); //msec the bots thinks
+    Cvar_Get(common, cm, rm, host, c"bot_reloadcharacters".as_ptr(), c"0".as_ptr(), 0); //reload the bot characters each time
+    Cvar_Get(common, cm, rm, host, c"bot_testichat".as_ptr(), c"0".as_ptr(), 0); //test ichats
+    Cvar_Get(common, cm, rm, host, c"bot_testrchat".as_ptr(), c"0".as_ptr(), 0); //test rchats
+    Cvar_Get(common, cm, rm, host, c"bot_testsolid".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //test for solid areas
+    Cvar_Get(common, cm, rm, host, c"bot_testclusters".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //test the AAS clusters
+    Cvar_Get(common, cm, rm, host, c"bot_fastchat".as_ptr(), c"0".as_ptr(), 0); //fast chatting bots
+    Cvar_Get(common, cm, rm, host, c"bot_nochat".as_ptr(), c"0".as_ptr(), 0); //disable chats
+    Cvar_Get(common, cm, rm, host, c"bot_pause".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //pause the bots thinking
+    Cvar_Get(common, cm, rm, host, c"bot_report".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //get a full report in ctf
+    Cvar_Get(common, cm, rm, host, c"bot_grapple".as_ptr(), c"0".as_ptr(), 0); //enable grapple
+    Cvar_Get(common, cm, rm, host, c"bot_rocketjump".as_ptr(), c"1".as_ptr(), 0); //enable rocket jumping
+    Cvar_Get(common, cm, rm, host, c"bot_challenge".as_ptr(), c"0".as_ptr(), 0); //challenging bot
+    Cvar_Get(common, cm, rm, host, c"bot_minplayers".as_ptr(), c"0".as_ptr(), 0); //minimum players in a team or the game
+    Cvar_Get(common, cm, rm, host, c"bot_interbreedchar".as_ptr(), c"".as_ptr(), CVAR_CHEAT); //bot character used for interbreeding
+    Cvar_Get(common, cm, rm, host, c"bot_interbreedbots".as_ptr(), c"10".as_ptr(), CVAR_CHEAT); //number of bots used for interbreeding
+    Cvar_Get(common, cm, rm, host, c"bot_interbreedcycle".as_ptr(), c"20".as_ptr(), CVAR_CHEAT); //bot interbreeding cycle
+    Cvar_Get(common, cm, rm, host, c"bot_interbreedwrite".as_ptr(), c"".as_ptr(), CVAR_CHEAT); //write interbreeded bots to this file
 }

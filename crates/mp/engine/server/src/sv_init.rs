@@ -35,7 +35,8 @@ use crate::server::server_state_t::serverState_t;
 use crate::server_host::{ghoul2_slot, server_slot};
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use crate::sv_game::{SV_GentityNum, SV_InitGameProgs, SV_ShutdownGameProgs};
-use crate::sv_bot::SV_BotInitBotLib;
+use crate::sv_bot::{SV_BotFrame, SV_BotInitBotLib, SV_BotInitCvars};
+use crate::sv_ccmds::SV_Heartbeat_f;
 use mp_engine_qcommon::vm::VM_Call;
 use crate::Server;
 
@@ -50,7 +51,13 @@ use mp_engine_qcommon::common_fns::{Com_Memset, Com_Milliseconds};
 use mp_engine_qcommon::cvar_fns::{
     Cvar_Get, Cvar_InfoString, Cvar_InfoString_Big, Cvar_Set, Cvar_VariableValue,
 };
-use mp_engine_qcommon::files_common::FS_FCloseFile;
+use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Restart};
+use mp_engine_qcommon::files_pc::{
+    FS_ClearPakReferences, FS_LoadedPakChecksums, FS_LoadedPakNames, FS_ReferencedPakChecksums,
+    FS_ReferencedPakNames,
+};
+use mp_qshared::shared::fileHandle_t;
+use std::ffi::CString;
 use mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr;
 use mp_engine_qcommon::z_memman_pc::{
     CopyString, Hunk_AllocateTempMemory, Hunk_Clear, Hunk_FreeTempMemory, Hunk_SetMark, Z_Free,
@@ -61,7 +68,10 @@ use mp_qshared::shared::q_string::{Info_ValueForKey, Q_stricmp, Q_strncpyz, va};
 
 use crate::sv_ccmds::SV_AddOperatorCommands;
 use crate::sv_client::{SV_DropClient, SV_SendClientMapChange};
-use crate::sv_main::SV_SendServerCommand;
+use crate::sv_main::{SV_MasterShutdown, SV_SendServerCommand};
+use crate::sv_ccmds::SV_RemoveOperatorCommands;
+use crate::sv_snapshot::SV_SendClientSnapshot;
+use mp_engine_qcommon::cm_load::{CM_ClearMap, CM_LoadMap};
 use crate::sv_world::SV_ClearWorld;
 
 use mp_engine_botlib::BotLib;
@@ -359,14 +369,24 @@ pub fn SV_TouchCGame(
     rm: &mut RenderModels,
     host: &mut dyn EngineHost,
 ) {
+    let mut f: fileHandle_t = 0;
     let filename: String = if Cvar_VariableValue(common, cm, rm, host, c"vm_cgame".as_ptr()) != 0.0 {
         Com_sprintf_vm_qvm("cgame")
     } else {
         "cgamex86.dll".to_string()
     };
 
-    let f = FS_FOpenFileRead(common, cm, rm, host, &filename, qboolean::from(0));
-    if let Some(f) = f {
+    let filename_c = CString::new(filename).unwrap_or_default();
+    FS_FOpenFileRead(
+        common,
+        cm,
+        rm,
+        host,
+        filename_c.as_ptr(),
+        &mut f,
+        qboolean::from(0),
+    );
+    if f != 0 {
         FS_FCloseFile(common, f);
     }
 }
@@ -765,17 +785,18 @@ pub fn SV_SpawnServer(
     FS_Restart(common, cm, rm, host, sv.sv.checksumFeed);
 
     unsafe {
-        let map_va = format!(
+        let map_va = CString::new(format!(
             "maps/{}.bsp",
             core::ffi::CStr::from_ptr(server).to_string_lossy()
-        );
+        ))
+        .unwrap_or_default();
         CM_LoadMap(
             common,
             cm,
             rm,
             rmg,
             host,
-            &map_va,
+            map_va.as_ptr(),
             qboolean::from(0),
             &mut checksum,
         );
@@ -1230,7 +1251,10 @@ pub fn SV_Init(
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
-    common.sv_master[0] = Cvar_Get(common, cm, rm, host, c"sv_master1".as_ptr(), MASTER_SERVER_NAME, 0);
+    // `MASTER_SERVER_NAME` (`qcommon/protocol.rs`) as a c-string cvar default,
+    // matching the inline-literal precedent of the sibling sv_masterN defaults.
+    common.sv_master[0] =
+        Cvar_Get(common, cm, rm, host, c"sv_master1".as_ptr(), c"masterjk3.ravensoft.com".as_ptr(), 0);
     common.sv_master[1] = Cvar_Get(common, cm, rm, host, c"sv_master2".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
     common.sv_master[2] = Cvar_Get(common, cm, rm, host, c"sv_master3".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
     common.sv_master[3] = Cvar_Get(common, cm, rm, host, c"sv_master4".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
@@ -1256,4 +1280,88 @@ pub fn SV_Init(
     // referenced by their exact Raven identifiers, escalated in
     // missing_symbols for the finisher.
     common.G2VertSpaceServer = &mut common.CMiniHeap_singleton;
+}
+
+/// Raven `SV_FinalMessage` — used by `SV_Shutdown` to send a final message to
+/// all connected clients before the server goes down. The messages are sent
+/// immediately, not just stuck on the outgoing message list, because the server
+/// is going to totally exit after returning from this function.
+///
+/// Source: `oracle/codemp/server/sv_init.cpp:900-918`
+pub fn SV_FinalMessage(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    sv: &mut Server,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    message: &str,
+) {
+    // send it twice, ignoring rate
+    for _j in 0..2 {
+        let maxclients = unsafe { (*common.sv_maxclients).integer };
+        for i in 0..maxclients {
+            let cl = unsafe { sv.svs.clients.offset(i as isize) };
+            if unsafe { (*cl).state } >= clientState_t::CS_CONNECTED {
+                // don't send a disconnect to a local client
+                if unsafe { (*cl).netchan.remoteAddress.r#type } != netadrtype_t::NA_LOOPBACK {
+                    SV_SendServerCommand(common, sv, cl, &format!("print \"{}\"", message));
+                    SV_SendServerCommand(common, sv, cl, "disconnect");
+                }
+                // force a snapshot to be sent
+                unsafe {
+                    (*cl).nextSnapshotTime = -1;
+                }
+                SV_SendClientSnapshot(common, cm, sv, rm, host, cl);
+            }
+        }
+    }
+}
+
+/// Raven `SV_Shutdown` — called when each game quits, before `Sys_Quit` or
+/// `Sys_Error`.
+///
+/// Source: `oracle/codemp/server/sv_init.cpp:929-990`
+pub fn SV_Shutdown(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    sv: &mut Server,
+    rm: &mut RenderModels,
+    rmg: &mut RmManager,
+    host: &mut dyn EngineHost,
+    finalmsg: &str,
+) {
+    if common.com_sv_running.is_null() || unsafe { (*common.com_sv_running).integer } == 0 {
+        return;
+    }
+
+    if !sv.svs.clients.is_null() && common.com_errorEntered == qboolean::from(0) {
+        SV_FinalMessage(common, cm, sv, rm, host, finalmsg);
+    }
+
+    SV_RemoveOperatorCommands();
+    // `#ifndef _XBOX` — no master on Xbox; this build is never Xbox.
+    SV_MasterShutdown(common, cm, rm, host, sv);
+    SV_ShutdownGameProgs(common, sv);
+
+    // de allocate the snapshot entities
+    if !sv.svs.snapshotEntities.is_null() {
+        Z_Free(common, sv.svs.snapshotEntities as *mut _);
+        sv.svs.snapshotEntities = core::ptr::null_mut();
+    }
+
+    // free current level
+    SV_ClearServer(common, sv);
+    // jfm: add a clear here since it's commented out in clearServer. This
+    // prevents crashing cmShaderTable on exit.
+    CM_ClearMap(cm, rmg);
+
+    // free server static data
+    if !sv.svs.clients.is_null() {
+        Z_Free(common, sv.svs.clients as *mut _);
+    }
+    let svs_size = core::mem::size_of_val(&sv.svs);
+    Com_Memset(&mut sv.svs as *mut _ as *mut (), 0, svs_size);
+
+    Cvar_Set(common, cm, rm, host, c"sv_running".as_ptr(), c"0".as_ptr());
+    Cvar_Set(common, cm, rm, host, c"ui_singlePlayerActive".as_ptr(), c"0".as_ptr());
 }

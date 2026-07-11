@@ -33,6 +33,7 @@ use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
 use crate::server_host::{ghoul2_from_slot, server_from_slot};
+use crate::sv_init::SV_Shutdown;
 use crate::sv_world::SV_SectorList_f;
 use crate::Server;
 
