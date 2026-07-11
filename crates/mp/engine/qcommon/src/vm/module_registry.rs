@@ -4,7 +4,9 @@ use crate::common::error::{com_error, ErrorLevel};
 use core::ffi::c_void;
 
 use native_platform::entrypoints::RawSyscall;
-use native_platform::module_loader::{ModuleSearchPolicy, RestartKind};
+use native_platform::module_loader::{
+    sys_load_dll, unload_module, ModuleSearchPolicy, RestartKind,
+};
 
 use super::engine_slot::SlotSyscall;
 use super::module_slot::ModuleSlot;
@@ -156,7 +158,31 @@ impl ModuleRegistry {
         name: &str,
         syscall: RawSyscall,
     ) {
-        let _ = (&self.slots, slot, kind, policy, name, syscall);
-        todo!("Port VM_Restart — oracle/codemp/qcommon/vm.cpp:391-458")
+        match kind {
+            // DLL's can't be restarted in place (vm.cpp:398): the native arm
+            // saves `systemCall`/`name` off the vm, `VM_Free`s it, then re-runs
+            // `VM_Create` (vm.cpp:399-409). The QVM in-place reload arm
+            // (vm.cpp:412-457) is out of scope (native-only). Here the slot's
+            // stored `EngineSlot` stands in for the saved `systemCall`, and the
+            // recreate lands back in the same slot (drop+recreate in place).
+            RestartKind::DropRecreate => {
+                let Some(old) = self.slots[slot.0 as usize].take() else {
+                    return;
+                };
+                // Save the injected engine seam before freeing (vm.cpp:403).
+                let engine = old.engine;
+                // VM_Free (vm.cpp:406): unload the old artifact.
+                unload_module(old.module);
+                // VM_Create (vm.cpp:408): reload, reinjecting the saved seam.
+                // None = artifact not found (mirrors `sys_load_dll`'s contract);
+                // the slot is left empty for the caller's fatal disposition.
+                self.slots[slot.0 as usize] =
+                    sys_load_dll(policy, name, syscall).map(|module| ModuleSlot {
+                        name: name.to_string(),
+                        module,
+                        engine,
+                    });
+            }
+        }
     }
 }

@@ -18,6 +18,7 @@ use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_GENTITIES};
+use mp_qshared::shared::q_math::RadiusFromBounds;
 use mp_qshared::shared::surface_flags::{
     CONTENTS_BODY, CONTENTS_LIGHTSABER, CONTENTS_NOSHOT, CONTENTS_SOLID, MASK_SHOT, SOLID_BMODEL,
 };
@@ -69,14 +70,6 @@ fn VectorCopy(src: vec3_t, dst: &mut vec3_t) {
 
 fn VectorLength(v: vec3_t) -> f32 {
     (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
-}
-
-// PORT-NOTE(radius-from-bounds): `RadiusFromBounds` (qshared `q_math.c`) is
-// currently only reachable at `mp_qshared::shared::q_math::RadiusFromBounds` (grepped —
-// no qshared/native_math home yet); called by that path, escalated in
-// missing_symbols for the eventual qshared relocation.
-fn RadiusFromBounds(mins: vec3_t, maxs: vec3_t) -> f32 {
-    mp_qshared::shared::q_math::RadiusFromBounds(mins, maxs)
 }
 
 /// Raven `SV_CreateworldSector`.

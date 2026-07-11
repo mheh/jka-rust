@@ -21,6 +21,7 @@ use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::cm_load::RmManager;
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
+use mp_qshared::shared::q_string::Q_CleanStr;
 use mp_qshared::shared::qboolean;
 
 use crate::server::client_s::client_t;

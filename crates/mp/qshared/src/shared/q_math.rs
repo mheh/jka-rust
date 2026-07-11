@@ -114,6 +114,19 @@ pub fn VectorLengthSquared(v: vec3_t) -> vec_t {
     v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
 }
 
+/// Raven `RadiusFromBounds`.
+///
+/// Source: `oracle/codemp/game/q_math.c:1114-1126`
+pub fn RadiusFromBounds(mins: vec3_t, maxs: vec3_t) -> f32 {
+    let mut corner: vec3_t = [0.0; 3];
+    for i in 0..3 {
+        let a = mins[i].abs();
+        let b = maxs[i].abs();
+        corner[i] = if a > b { a } else { b };
+    }
+    VectorLength(corner)
+}
+
 /// Raven `VectorNormalize2`.
 ///
 /// Source: `oracle/codemp/game/q_math.c:1188-1212`

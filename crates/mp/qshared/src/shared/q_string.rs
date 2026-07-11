@@ -16,6 +16,10 @@ static mut COM_TOKEN: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
 static mut VA_STRING: [[c_char; 32000]; 2] = [[0; 32000]; 2];
 static mut VA_INDEX: usize = 0;
 
+// Info_ValueForKey rotating-buffer statics (same rotating idiom as va()).
+static mut INFO_VALUE: [[c_char; 8192]; 2] = [[0; 8192]; 2]; // BIG_INFO_VALUE
+static mut INFO_VALUEINDEX: c_int = 0;
+
 /// Raven `Q_strncpyz`.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:826-840`
@@ -810,5 +814,104 @@ pub fn Info_SetValueForKey(s: *mut c_char, key: *const c_char, value: *const c_c
         let full = format!("{newi}{s_s}");
         let cstr = std::ffi::CString::new(full).unwrap();
         c_strcpy(s, cstr.as_ptr());
+    }
+}
+
+/// Raven `Info_ValueForKey`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:1051-1098`
+pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
+    unsafe {
+        let mut pkey: [c_char; 8192] = [0; 8192]; // BIG_INFO_KEY
+        let mut o: *mut c_char;
+
+        if s.is_null() || key.is_null() {
+            return c"".as_ptr() as *mut c_char;
+        }
+
+        if c_strlen(s) >= BIG_INFO_STRING {
+            // Raven guards on `BIG_INFO_STRING` (8192), not `MAX_INFO_STRING`.
+            // Com_Error(ERR_DROP, ...) -> panic.
+            panic!("Info_ValueForKey: oversize infostring");
+        }
+
+        INFO_VALUEINDEX ^= 1;
+        let mut p = s;
+        if *p == b'\\' as c_char {
+            p = p.offset(1);
+        }
+
+        loop {
+            o = pkey.as_mut_ptr();
+            while *p != b'\\' as c_char {
+                if *p == 0 {
+                    return c"".as_ptr() as *mut c_char;
+                }
+                if o.offset_from(pkey.as_ptr()) < 8191 {
+                    *o = *p;
+                    o = o.offset(1);
+                }
+                p = p.offset(1);
+            }
+            *o = 0;
+            p = p.offset(1);
+
+            o = INFO_VALUE[INFO_VALUEINDEX as usize].as_mut_ptr();
+
+            while *p != b'\\' as c_char && *p != 0 {
+                if o.offset_from(INFO_VALUE[INFO_VALUEINDEX as usize].as_ptr()) < 8191 {
+                    *o = *p;
+                    o = o.offset(1);
+                }
+                p = p.offset(1);
+            }
+            *o = 0;
+
+            // Raven matches the key case-INSENSITIVELY (`!Q_stricmp(key,pkey)`).
+            if Q_stricmp(key, pkey.as_ptr() as *const c_char) == 0 {
+                return INFO_VALUE[INFO_VALUEINDEX as usize].as_mut_ptr();
+            }
+
+            if *p == 0 {
+                break;
+            }
+            p = p.offset(1);
+        }
+
+        c"".as_ptr() as *mut c_char
+    }
+}
+
+/// Raven `Q_CleanStr`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:963-982`
+pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
+    unsafe {
+        let mut s = string as *const c_char;
+        let mut d = string;
+        loop {
+            let c = *s;
+            if c == 0 {
+                break;
+            }
+            // `Q_IsColorString(s)` = `^` followed by a digit '0'..='7' (see
+            // Q_PrintStrlen); inlined here rather than invoking an unresolved
+            // symbol.
+            let n = *s.offset(1);
+            if c == b'^' as c_char
+                && n != 0
+                && n != b'^' as c_char
+                && n >= b'0' as c_char
+                && n <= b'7' as c_char
+            {
+                s = s.offset(1);
+            } else if c >= 0x20 && c <= 0x7E {
+                *d = c;
+                d = d.offset(1);
+            }
+            s = s.offset(1);
+        }
+        *d = 0;
+        string
     }
 }
