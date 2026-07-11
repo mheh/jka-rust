@@ -183,6 +183,14 @@ pub struct Common {
     ///
     /// Source: `oracle/codemp/qcommon/msg.cpp:1410-1568`
     pub player_state_fields: Vec<crate::qcommon::net_field_t::netField_t>,
+    /// Raven `g_netfBitStorage` / `g_psfBitStorage` — heads of the linked lists
+    /// that stash the default `bits` of each netf/psf field so
+    /// `MSG_CheckNETFPSFOverrides` can restore them before re-applying an
+    /// override file. Null (zero-valid) until first override check.
+    ///
+    /// Source: `oracle/codemp/qcommon/msg.cpp:2002-2003`
+    pub g_netfBitStorage: *mut crate::qcommon::bit_storage_t::bitStorage_t,
+    pub g_psfBitStorage: *mut crate::qcommon::bit_storage_t::bitStorage_t,
 
     // ---- `common.cpp` file-scope globals (verbatim Raven names) ----
     /// Raven `com_frameTime`/`com_frameMsec`/`com_frameNumber` (int).

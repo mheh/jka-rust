@@ -25,6 +25,15 @@ use crate::common::com_error;
 use libc::strlen;
 use mp_qshared::shared::q_string::Q_strncpyz;
 
+// `MSG_CheckNETFPSFOverrides` callees (netf/psf mod-override reload).
+use crate::common::com_printf;
+use crate::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Read};
+use crate::qcommon::bit_storage_t::bitStorage_t;
+use crate::z_memman_pc::Z_Malloc;
+use mp_qshared::common::mp::qcommon::tags::memtag_t;
+use mp_qshared::shared::limits::GENTITYNUM_BITS;
+use native_types::fileHandle_t;
+
 // The `sv`/`SV_GentityNum` cross-crate reach (server depends on qcommon) is
 // resolved through the sanctioned host edge `EngineHost::
 // sv_shownet_entity_classname` (ruling 56c); see `MSG_ReadDeltaEntity`.
@@ -127,9 +136,7 @@ pub fn MSG_Init(
     length: c_int,
 ) {
     if !common.g_nOverrideChecked {
-        // Check for netf overrides, then for psf overrides. `MSG_CheckNETFPSFOverrides`
-        // is a large file-loading callee not yet ported; called at its canonical
-        // home (honest E0425).
+        // Check for netf overrides, then for psf overrides.
         MSG_CheckNETFPSFOverrides(common, cm, rm, host, qfalse);
         MSG_CheckNETFPSFOverrides(common, cm, rm, host, qtrue);
 
@@ -144,6 +151,250 @@ pub fn MSG_Init(
         crate::common_fns::Com_Memset(buf as *mut (), 0, core::mem::size_of::<msg_t>());
         (*buf).data = data;
         (*buf).maxsize = length;
+    }
+}
+
+/// `strcmp(cbuf, s) == 0` for a NUL-terminated `c_char` buffer against a Rust
+/// `&str` (no embedded NUL): equal bytes and the C string ends exactly where
+/// `s` does.
+fn msg_override_cstr_eq(cbuf: &[c_char], s: &str) -> bool {
+    let sb = s.as_bytes();
+    if sb.len() >= cbuf.len() {
+        return false;
+    }
+    for (k, &b) in sb.iter().enumerate() {
+        if cbuf[k] as u8 != b {
+            return false;
+        }
+    }
+    cbuf[sb.len()] as u8 == 0
+}
+
+/// Render a NUL-terminated `c_char` buffer as a `String` for a `%s` warning.
+fn msg_override_cstr_str(cbuf: &[c_char]) -> String {
+    let nul = cbuf.iter().position(|&c| c == 0).unwrap_or(cbuf.len());
+    let bytes = unsafe { core::slice::from_raw_parts(cbuf.as_ptr() as *const u8, nul) };
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+/// Raven `MSG_CheckNETFPSFOverrides` — rww's mod hook: reload
+/// `ext_data/MP/{netf,psf}_overrides.txt` and stomp the delta-coder field
+/// `bits`. On the first call it stashes each field's default `bits` into a
+/// `bitStorage_t` list; subsequent calls restore those defaults before
+/// re-applying the file's `name, bits` lines. Live only under `!_XBOX`.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:2005-2197`
+pub fn MSG_CheckNETFPSFOverrides(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    psfOverrides: qboolean,
+) {
+    let mut overrideFile: [c_char; 4096] = [0; 4096];
+    let mut entryName: [c_char; 4096] = [0; 4096];
+    let mut bits: [c_char; 4096] = [0; 4096];
+    let fileName: &str;
+    let mut i: c_int = 0;
+    let mut j: c_int;
+    let len: c_int;
+    let numFields: c_int;
+    let mut f: fileHandle_t = 0;
+    // Raven's `bitStorage_t **bitStorage` walking cursor: it starts at the
+    // address of the head field on `Common` and advances through `->next`.
+    let mut bitStorage: *mut *mut bitStorage_t;
+
+    if psfOverrides != qfalse {
+        //do PSF overrides instead of NETF
+        fileName = "psf_overrides.txt";
+        bitStorage = &mut common.g_psfBitStorage;
+        numFields = common.player_state_fields.len() as c_int;
+    } else {
+        fileName = "netf_overrides.txt";
+        bitStorage = &mut common.g_netfBitStorage;
+        numFields = common.entity_state_fields.len() as c_int;
+    }
+
+    if !unsafe { *bitStorage }.is_null() {
+        //if we have saved off the defaults before we want to stuff them all back in now
+        let mut restore: *mut bitStorage_t = unsafe { *bitStorage };
+
+        while i < numFields {
+            // Raven's `assert(restore)` is debug-only (NDEBUG here) and omitted;
+            // a defaults list shorter than `numFields` would null-deref, matching C.
+            unsafe {
+                if psfOverrides != qfalse {
+                    common.player_state_fields[i as usize].bits = (*restore).bits;
+                } else {
+                    common.entity_state_fields[i as usize].bits = (*restore).bits;
+                }
+                i += 1;
+                restore = (*restore).next;
+            }
+        }
+    }
+
+    let path = std::ffi::CString::new(format!("ext_data/MP/{}", fileName)).unwrap();
+    len = FS_FOpenFileRead(common, cm, rm, host, path.as_ptr(), &mut f, qfalse);
+
+    if f == 0 {
+        //silently exit since this file is not needed to proceed.
+        return;
+    }
+
+    if len >= 4096 {
+        com_printf(
+            common,
+            &format!("WARNING: {} is >= 4096 bytes and is being ignored\n", fileName),
+        );
+        FS_FCloseFile(common, f);
+        return;
+    }
+
+    //Get contents of the file
+    FS_Read(common, overrideFile.as_mut_ptr() as *mut (), len, f);
+    FS_FCloseFile(common, f);
+
+    //because FS_Read does not do this for us.
+    overrideFile[len as usize] = 0;
+
+    //If we haven't saved off the initial stuff yet then stuff it all into
+    //a list.
+    if unsafe { *bitStorage }.is_null() {
+        i = 0;
+
+        while i < numFields {
+            //Alloc memory for this new ptr
+            let node = Z_Malloc(
+                common,
+                cm,
+                rm,
+                host,
+                core::mem::size_of::<bitStorage_t>() as c_int,
+                memtag_t::TAG_GENERAL,
+                qtrue,
+                4,
+            ) as *mut bitStorage_t;
+
+            unsafe {
+                *bitStorage = node;
+
+                if psfOverrides != qfalse {
+                    (*node).bits = common.player_state_fields[i as usize].bits;
+                } else {
+                    (*node).bits = common.entity_state_fields[i as usize].bits;
+                }
+
+                //Point to the ->next of the existing current ptr
+                bitStorage = &mut (*node).next;
+            }
+            i += 1;
+        }
+    }
+
+    i = 0;
+    //Now parse through. Lines beginning with ; are disabled.
+    // Faithful to C's unchecked buffer walk: malformed input (any final line —
+    // comment or value — lacking its trailing newline) runs past `len` and
+    // panics on the Rust bounds check where C would read adjacent stack (UB).
+    while overrideFile[i as usize] != 0 {
+        if overrideFile[i as usize] == b';' as c_char {
+            //parse to end of the line
+            while overrideFile[i as usize] != b'\n' as c_char {
+                i += 1;
+            }
+        }
+
+        if overrideFile[i as usize] != b';' as c_char
+            && overrideFile[i as usize] != b'\n' as c_char
+            && overrideFile[i as usize] != b'\r' as c_char
+        {
+            //on a valid char I guess, parse it
+            j = 0;
+
+            while overrideFile[i as usize] != 0 && overrideFile[i as usize] != b',' as c_char {
+                entryName[j as usize] = overrideFile[i as usize];
+                j += 1;
+                i += 1;
+            }
+            entryName[j as usize] = 0;
+
+            if overrideFile[i as usize] == 0 {
+                //just give up, this shouldn't happen
+                com_printf(common, &format!("WARNING: Parsing error for {}\n", fileName));
+                return;
+            }
+
+            while overrideFile[i as usize] == b',' as c_char
+                || overrideFile[i as usize] == b' ' as c_char
+            {
+                //parse to the start of the value
+                i += 1;
+            }
+
+            j = 0;
+            while overrideFile[i as usize] != b'\n' as c_char
+                && overrideFile[i as usize] != b'\r' as c_char
+            {
+                //now read the value in
+                bits[j as usize] = overrideFile[i as usize];
+                j += 1;
+                i += 1;
+            }
+            bits[j as usize] = 0;
+
+            if bits[0] != 0 {
+                let ibits: c_int;
+                if msg_override_cstr_eq(&bits, "GENTITYNUM_BITS") {
+                    //special case
+                    ibits = GENTITYNUM_BITS;
+                } else {
+                    ibits = unsafe { libc::atoi(bits.as_ptr()) };
+                }
+
+                j = 0;
+
+                //Now go through all the fields and see if we can find a match
+                while j < numFields {
+                    if psfOverrides != qfalse {
+                        //check psf fields
+                        if msg_override_cstr_eq(&entryName, common.player_state_fields[j as usize].name)
+                        {
+                            //found it, set the bits
+                            common.player_state_fields[j as usize].bits = ibits;
+                            break;
+                        }
+                    } else {
+                        //otherwise check netf fields
+                        if msg_override_cstr_eq(&entryName, common.entity_state_fields[j as usize].name)
+                        {
+                            //found it, set the bits
+                            common.entity_state_fields[j as usize].bits = ibits;
+                            break;
+                        }
+                    }
+                    j += 1;
+                }
+
+                if j == numFields {
+                    //failed to find the value
+                    com_printf(
+                        common,
+                        &format!(
+                            "WARNING: Value '{}' from {} is not valid\n",
+                            msg_override_cstr_str(&entryName),
+                            fileName
+                        ),
+                    );
+                }
+            } else {
+                //also should not happen
+                com_printf(common, &format!("WARNING: Parsing error for {}\n", fileName));
+                return;
+            }
+        }
+
+        i += 1;
     }
 }
 

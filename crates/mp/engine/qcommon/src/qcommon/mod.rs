@@ -1,5 +1,6 @@
 //! `qcommon` types.
 
+pub mod bit_storage_t;
 pub mod clc_ops_e;
 pub mod cpuid;
 pub mod filesystem_limits;
