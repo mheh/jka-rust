@@ -1,11 +1,5 @@
 //! `files_pc.cpp` — filesystem PC-platform logic (pak purity, path
 //! normalization, referenced/loaded pak-list info strings, seek/rename/read).
-//!
-//! Ported fns carry a `// PORT-NOTE(state):` where the packet's threaded
-//! `common` receiver reaches `Engine`/`Common` fields (`fs_*` globals,
-//! `fsh[]`) that are not yet landed on `Common` (see `missing_symbols` in the
-//! porter report) — referenced verbatim per the packet's resolved state
-//! table, never stubbed.
 
 #![allow(non_snake_case, non_upper_case_globals, unused_variables)]
 
@@ -29,9 +23,6 @@ use crate::files::searchpath_s::searchpath_t;
 use crate::qcommon::filesystem_limits::{
     FS_CGAME_REF, FS_GENERAL_REF, FS_QAGAME_REF, FS_UI_REF, MAX_FILE_HANDLES, NUM_ID_PAKS,
 };
-// PORT-NOTE(render-models): `RenderModels` is the tr-model state-home receiver
-// pinned by the preamble's state-receiver order (ruling 53); not yet landed
-// in the tree. Reported in missing_symbols.
 use crate::cm_load::RenderModels;
 
 // Raven `S_ClearSoundBuffer` (Raven: `return;` in the null/no-sound build) is
@@ -64,8 +55,6 @@ use native_platform::{
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:39-56`
 pub fn FS_PakIsPure(common: &mut Common, pack: *mut pack_t) -> qboolean {
-    // PORT-NOTE(state): fs_numServerPaks/fs_serverPaks are not yet fields on
-    // `Common` — referenced verbatim per the packet's state table.
     if common.fs_numServerPaks != 0 {
         for i in 0..common.fs_numServerPaks {
             // FIXME: also use hashed file names
@@ -97,9 +86,6 @@ pub fn FS_HashFileName(fname: *const c_char, hashSize: c_int) -> c_long {
             if letter == b'\\' as c_char {
                 letter = b'/' as c_char; // damn path names
             }
-            // PORT-NOTE(PATH_SEP): `PATH_SEP` is a platform macro (`/` on
-            // unix, per ruling 8's unix-semantics stance) — normalized here
-            // as `/`.
             if letter == b'/' as c_char {
                 letter = b'/' as c_char; // damn path names
             }
@@ -125,14 +111,9 @@ pub fn FS_Remove(osPath: *const c_char) {
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:568-598`
 ///
-/// PORT-NOTE(win32): Raven's body is Win32 `CreateFile`/`GetFileTime` — the
-/// engine targets unix per ruling 8; this reads the file's mtime through the
-/// std filesystem metadata as the faithful unix-semantics substitute.
+/// Raven's body is Win32 `CreateFile`/`GetFileTime`; this unix target has no
+/// faithful substitute wired through this `c_int`-only signature yet.
 pub fn Sys_GetFileTime(psFileName: c_int, ft: &mut c_int) -> bool {
-    // PORT-NOTE(shape): the packet's resolved signature is LAW, but Raven's
-    // params are `LPCSTR`/`FILETIME&` (Win32 types); reported in
-    // shape_mismatches — the faithful body needs a real path string and a
-    // real time out-param, not `c_int`.
     let _ = (psFileName, ft);
     false
 }
@@ -145,9 +126,6 @@ pub fn Sys_FileOutOfDate(
     psFinalFileName: c_int,
     psDataFileName: c_int,
 ) -> bool {
-    // PORT-NOTE(shape): mirrors Sys_GetFileTime's Win32 FILETIME shape
-    // mismatch (shape_mismatches) — psFinalFileName/psDataFileName should be
-    // path strings per the oracle body.
     let mut ftFinalFile: c_int = 0;
     let mut ftDataFile: c_int = 0;
     if Sys_GetFileTime(psFinalFileName, &mut ftFinalFile)
@@ -161,7 +139,6 @@ pub fn Sys_FileOutOfDate(
     }
 
     // extra error check, report as suspicious if you find a file locally but not out on the net.,.
-    // PORT-NOTE(state): com_developer is not yet a field on `Common`.
     if unsafe { (*common.com_developer).integer } != 0 {
         if !Sys_GetFileTime(psDataFileName, &mut ftDataFile) {
             crate::common::com_printf(
@@ -181,7 +158,6 @@ pub fn Sys_FileOutOfDate(
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:634-642`
 pub fn FS_FileCacheable(common: &mut Common, filename: *const c_char) -> bool {
-    // PORT-NOTE(state): com_buildScript is not yet a field on `Common`.
     if !common.com_buildScript.is_null() && unsafe { (*common.com_buildScript).integer } != 0 {
         return true;
     }
@@ -318,8 +294,6 @@ pub fn FS_PathCmp(s1: *const c_char, s2: *const c_char) -> c_int {
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2445-2476`
 pub fn FS_ReorderPurePaks(common: &mut Common) {
-    // PORT-NOTE(state): fs_reordered/fs_numServerPaks/fs_searchpaths/
-    // fs_serverPaks are not yet fields on `Common`.
     // only relevant when connected to pure server
     if common.fs_numServerPaks == 0 {
         return;
@@ -358,7 +332,6 @@ pub fn FS_ReorderPurePaks(common: &mut Common) {
 pub fn FS_GamePureChecksum(common: &mut Common) -> *const c_char {
     // §19: static char info[MAX_STRING_TOKENS] is a rotating scratch/return
     // buffer per the fork-3 three-kind rule -> owned return value on Common.
-    // PORT-NOTE(state): fs_searchpaths is not yet a field on `Common`.
     common.fs_game_pure_checksum_info[0] = 0;
 
     unsafe {
@@ -465,8 +438,6 @@ pub fn FS_ReferencedPakChecksums(common: &mut Common) -> *const c_char {
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2783-2822`
 pub fn FS_ReferencedPakPureChecksums(common: &mut Common) -> *const c_char {
     let mut info = String::new();
-    // PORT-NOTE(state): fs_checksumFeed/fs_fakeChkSum/fs_searchpaths are not
-    // yet fields on `Common`.
     let mut checksum = common.fs_checksumFeed;
     let mut numPaks: c_int = 0;
 
@@ -554,7 +525,6 @@ pub fn FS_ClearPakReferences(common: &mut Common, mut flags: c_int) {
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:3128-3130`
 pub fn FS_Flush(common: &mut Common, f: fileHandle_t) {
-    // PORT-NOTE(state): fsh is not yet a field on `Common`.
     unsafe {
         libc::fflush(common.fsh[f as usize].handleFiles.file.o as *mut libc::FILE);
     }
@@ -596,7 +566,6 @@ pub fn FS_idPak(pak: *mut c_char, base: *mut c_char) -> qboolean {
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:3118-3126`
 pub fn FS_FTell(common: &mut Common, f: fileHandle_t) -> c_int {
-    // PORT-NOTE(state): fsh is not yet a field on `Common`.
     unsafe {
         if common.fsh[f as usize].zipFile == mp_qshared::shared::qtrue {
             crate::unzip::unztell(common.fsh[f as usize].handleFiles.file.z) as c_int
@@ -610,7 +579,6 @@ pub fn FS_FTell(common: &mut Common, f: fileHandle_t) -> c_int {
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:227-240`
 pub fn FS_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
-    // PORT-NOTE(state): fs_gamedir/fs_homepath are not yet fields on `Common`.
     unsafe {
         let testpath = crate::files_common::FS_BuildOSPath4(
             common,
@@ -659,8 +627,6 @@ pub fn FS_ComparePaks(
     len: c_int,
     dlstring: qboolean,
 ) -> qboolean {
-    // PORT-NOTE(state): fs_numServerReferencedPaks/fs_serverReferencedPakNames/
-    // fs_serverReferencedPaks/fs_searchpaths are not yet fields on `Common`.
     if common.fs_numServerReferencedPaks == 0 {
         return mp_qshared::shared::qfalse; // Server didn't send any pack information along
     }
@@ -744,8 +710,6 @@ pub fn FS_ComparePaks(
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:272-304`
 pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fileHandle_t {
-    // PORT-NOTE(state): fsh/fs_debug/fs_homepath/fs_searchpaths are not yet
-    // fields on `Common`.
     if common.fs_searchpaths.is_null() {
         crate::common::com_error(
             errorParm_t::ERR_FATAL,

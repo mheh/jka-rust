@@ -7,13 +7,7 @@
 //! `CCMShader` lookups (by BSP index or by name) through `cmShaderTable`.
 //!
 //! Source: `oracle/codemp/qcommon/cm_shader.cpp`
-//!
-//! PORT-NOTE(rm-types): `RenderModels`/`RmManager` are the state-receiver
-//! types pinned by the engine-fork-discovery preamble's receiver order
-//! (rmg-terrain.md owns their shape); neither has landed in the tree yet.
-//! Referenced by their exact resolved-signature names per the no-stub rule
-//! (`common_fns.rs` precedent); reported as missing symbols/shape mismatches
-//! for the finisher.
+
 #[allow(dead_code)]
 use crate::cm_load::{RenderModels, RmManager};
 
@@ -58,8 +52,6 @@ pub fn SV_ParseSurfaceParm(
     shader: *mut CCMShader,
     text: *mut *const c_char,
 ) {
-    //TODO: Port svInfoParms
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:226-259
     let numsvInfoParms: c_int = cm.svInfoParms.len() as c_int;
 
     let token = unsafe { COM_ParseExt(text, qfalse) };
@@ -80,8 +72,6 @@ pub fn SV_ParseSurfaceParm(
 ///
 /// Source: `oracle/codemp/qcommon/cm_shader.cpp:489-496`
 pub fn CM_ShutdownShaderProperties(cm: &mut CollisionWorld) {
-    //TODO: Port cmShaderTable
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:30
     if cm.cmShaderTable.count() != 0 {
         //		Com_Printf("Shutting down cmShaderTable .....\n");
         cm.cmShaderTable.clear();
@@ -91,14 +81,12 @@ pub fn CM_ShutdownShaderProperties(cm: &mut CollisionWorld) {
 /// Raven `CM_GetShaderInfo( int shaderNum )` — the BSP-index overload:
 /// bounds-checked pointer into `cmg.shaders`.
 ///
-/// PORT-NOTE(overload): Raven overloads `CM_GetShaderInfo` by parameter type
-/// (`int` vs `const char *`); Rust has no overloading, so the by-name form
-/// below is `CM_GetShaderInfo_ByName` (packet `qcommon__2130_CM_GetShaderInfo.md`).
+/// Raven overloads `CM_GetShaderInfo` by parameter type (`int` vs
+/// `const char *`); Rust has no overloading, so the by-name form below is
+/// `CM_GetShaderInfo_ByName`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_shader.cpp:526-536`
 pub fn CM_GetShaderInfo(cm: &mut CollisionWorld, shaderNum: c_int) -> *mut CCMShader {
-    //TODO: Port cmg
-    // Source: oracle/codemp/qcommon/cm_local.h:220
     if shaderNum < 0 || shaderNum >= cm.cmg.numShaders {
         return core::ptr::null_mut();
     }
@@ -115,8 +103,6 @@ pub fn CM_CreateShaderTextHash(
     rmg: &mut RmManager,
     host: &mut dyn EngineHost,
 ) {
-    //TODO: Port shaderText
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:28
     let mut p: *const c_char = cm.shaderText;
     // look for label
     while !p.is_null() {
@@ -175,8 +161,6 @@ pub fn CM_LoadShaderFiles(
     // scan for shader files
     let shaderFiles1 =
         unsafe { FS_ListFiles(common, cm, rm, host, c"shaders".as_ptr(), c".shader".as_ptr(), &mut numShaders1) };
-    //TODO: Port FINAL_BUILD
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:75
     let mut numShaders2: c_int = 0;
     let shaderFiles2 = unsafe {
         FS_ListFiles(
@@ -191,8 +175,6 @@ pub fn CM_LoadShaderFiles(
     };
 
     if shaderFiles1.is_null() || numShaders1 == 0 {
-        //TODO: Port WARNING
-        // Source: oracle/codemp/qcommon/cm_shader.cpp:92
         crate::common::com_printf(
             common,
             &format!("{}WARNING: no shader files found\n", S_COLOR_YELLOW),
@@ -269,8 +251,6 @@ pub fn CM_LoadShaderFiles(
     }
 
     // build single large buffer
-    //TODO: Port shaderText
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:28
     cm.shaderText = unsafe {
         Z_Malloc(
             common,
@@ -308,8 +288,6 @@ pub fn CM_LoadShaderFiles(
 /// Source: `oracle/codemp/qcommon/cm_shader.cpp:176-184`
 pub fn CM_FreeShaderText(common: &mut Common, cm: &mut CollisionWorld) {
     cm.shaderTextTable.clear();
-    //TODO: Port shaderText
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:28
     if !cm.shaderText.is_null() {
         unsafe { Z_Free(common, cm.shaderText as *mut ()) };
         cm.shaderText = core::ptr::null_mut();
@@ -339,8 +317,6 @@ pub fn SV_ParseMaterial(
         return;
     }
     for i in 0..MATERIAL_LAST {
-        //TODO: Port svMaterialNames
-        // Source: oracle/codemp/qcommon/cm_shader.cpp:285-288
         if unsafe { Q_stricmp(token, cm.svMaterialNames[i as usize]) } == 0 {
             unsafe {
                 (*shader).surfaceFlags |= i;
@@ -424,8 +400,6 @@ pub fn CM_LoadShaderText(
     if forceReload != 0 {
         CM_FreeShaderText(common, cm);
     }
-    //TODO: Port shaderText
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:28
     if !cm.shaderText.is_null() {
         return;
     }
@@ -567,14 +541,10 @@ pub fn CM_SetupShaderProperties(
     rmg: &mut RmManager,
     host: &mut dyn EngineHost,
 ) {
-    //TODO: Port cmg
-    // Source: oracle/codemp/qcommon/cm_local.h:220
     // Add all basic shaders to the cmShaderTable
     let numShaders = cm.cmg.numShaders;
     for i in 0..numShaders {
         let s = CM_GetShaderInfo(cm, i);
-        //TODO: Port cmShaderTable
-        // Source: oracle/codemp/qcommon/cm_shader.cpp:30
         cm.cmShaderTable.insert(s);
     }
     // Go through and parse evaluate shader names to shadernums
@@ -590,9 +560,8 @@ pub fn CM_SetupShaderProperties(
 /// Raven `CM_GetShaderInfo( const char *name )` — the by-name overload:
 /// looks up (or lazily allocates + parses) the `CCMShader` for `name`.
 ///
-/// PORT-NOTE(overload): disambiguated from the by-index overload
-/// (`CM_GetShaderInfo` above, packet `qcommon__0110_CM_GetShaderInfo.md` /
-/// `qcommon__2130_CM_GetShaderInfo.md`) since Rust has no overloading.
+/// Disambiguated from the by-index overload (`CM_GetShaderInfo` above) since
+/// Rust has no overloading.
 ///
 /// Source: `oracle/codemp/qcommon/cm_shader.cpp:498-524`
 pub fn CM_GetShaderInfo_ByName(
@@ -603,16 +572,12 @@ pub fn CM_GetShaderInfo_ByName(
     host: &mut dyn EngineHost,
     name: *const c_char,
 ) -> *mut CCMShader {
-    //TODO: Port cmShaderTable
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:30
     let mut out = cm.cmShaderTable[name];
     if !out.is_null() {
         return out;
     }
 
     // Create a new CCMShader class
-    //TODO: Port h_high
-    // Source: oracle/codemp/qcommon/cm_shader.cpp:510
     out = unsafe {
         Hunk_Alloc(
             common,

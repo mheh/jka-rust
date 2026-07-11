@@ -13,22 +13,6 @@
 //! the write-file/printf-to-file surface.
 //!
 //! Source: `oracle/codemp/qcommon/files_common.cpp`
-//!
-//! PORT-NOTE(state): `Common` does not yet carry the `fs_*` filesystem
-//! globals (`fs_searchpaths`, `fs_loadStack`, `fs_basepath`, `fs_gamedir`,
-//! `fs_gamedirvar`, `lastValidBase`, `lastValidGame`, `initialized`) nor the
-//! two `FS_BuildOSPath` overloads' fn-scope statics (`ospath`/`toggle`,
-//! fork-3 category 3 — the returned pointer must outlive the call, so they
-//! thread as host fields, not owned return values). Referenced verbatim by
-//! their exact Raven names per the files_pc.rs precedent; every one is
-//! reported in missing_symbols for the finisher to add once the struct
-//! lands.
-//!
-//! PORT-NOTE(rm-types): `RenderModels` (state-receiver type pinned by the
-//! engine-fork-discovery preamble's receiver order; rmg-terrain.md/
-//! tr-model.md own its real shape) has not landed in this crate yet —
-//! imported by its resolved-signature name per the no-stub rule
-//! (cm_load.rs precedent); reported as a missing symbol.
 
 use core::ffi::{c_char, c_int, c_long, c_uint, c_void};
 
@@ -41,16 +25,7 @@ use native_types::fileHandle_t;
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use crate::files::files_consts::BASEGAME;
-// PORT-NOTE(rm-types): see module doc above; `RenderModels` lands via the
-// cm_load.rs precedent (files_pc.rs imports it the same way), since qcommon
-// has no Cargo edge to the renderer's real render_models.rs.
 use crate::cm_load::RenderModels;
-// PORT-NOTE(MAX_OSPATH): the packet's rosetta row points at
-// `mp_engine_client::client::client_connection_t::MAX_OSPATH`, but that
-// const is a private, file-local `const MAX_OSPATH: usize = 1024;` inside a
-// crate `mp_engine_qcommon` has no Cargo dependency on — not importable as
-// printed. Landed here as a qcommon-local const at the same value per the
-// module doc's own suggested fix.
 // Source: `mp_engine_client::client::client_connection_t::MAX_OSPATH` (value 1024)
 const MAX_OSPATH: usize = 1024;
 
@@ -104,8 +79,6 @@ use native_platform::{
 ///
 /// Source: `oracle/codemp/qcommon/files_common.cpp:243-245`
 pub fn FS_Initialized(common: &mut Common) -> qboolean {
-    // PORT-NOTE(state): see module doc — `fs_searchpaths` referenced
-    // verbatim.
     if !common.fs_searchpaths.is_null() {
         qtrue
     } else {
@@ -117,7 +90,6 @@ pub fn FS_Initialized(common: &mut Common) -> qboolean {
 ///
 /// Source: `oracle/codemp/qcommon/files_common.cpp:253-256`
 pub fn FS_LoadStack(common: &mut Common) -> c_int {
-    // PORT-NOTE(state): see module doc — `fs_loadStack` referenced verbatim.
     common.fs_loadStack
 }
 
@@ -125,9 +97,7 @@ pub fn FS_LoadStack(common: &mut Common) -> c_int {
 ///
 /// Source: `oracle/codemp/qcommon/files_common.cpp:277-285`
 pub fn FS_ReplaceSeparators(path: *mut c_char) {
-    // PORT-NOTE(PATH_SEP): `PATH_SEP` is a platform macro with no rosetta
-    // row (seam-supplied, files_pc.rs precedent) — normalized here as `/`
-    // per ruling 8's unix-semantics stance.
+    // Raven's platform `PATH_SEP` macro normalizes to `/` on this unix target.
     unsafe {
         let mut s = path;
         while *s != 0 {
@@ -182,9 +152,6 @@ pub fn FS_FilenameCompare(s1: *const c_char, s2: *const c_char) -> qboolean {
 /// Source: `oracle/codemp/qcommon/files_common.cpp:294-315`
 pub fn FS_BuildOSPath(common: &mut Common, mut qpath: *const c_char) -> *mut c_char {
     let mut temp: [c_char; 1024] = [0; 1024];
-    // PORT-NOTE(state): see module doc — `ospath`/`toggle` (fork-3 category
-    // 3: the returned pointer must outlive the call) threaded as
-    // `common.fs_build_os_path_buf`/`common.fs_build_os_path_toggle`.
     common.fs_build_os_path_toggle ^= 1; // flip-flop to allow two returns without clash
 
     unsafe {
@@ -220,9 +187,8 @@ pub fn FS_BuildOSPath(common: &mut Common, mut qpath: *const c_char) -> *mut c_c
 
 /// Raven `FS_BuildOSPath` (`base`/`game`/`qpath` overload).
 ///
-/// PORT-NOTE(overload): Raven overloads `FS_BuildOSPath` by arity (C++
-/// name mangling distinguishes them); Rust has no fn overloading, so this
-/// 4-arg overload is named `FS_BuildOSPath4` (shape_mismatches).
+/// Raven overloads `FS_BuildOSPath` by arity; Rust has no fn overloading, so
+/// this 4-arg overload is named `FS_BuildOSPath4`.
 ///
 /// Source: `oracle/codemp/qcommon/files_common.cpp:317-336`
 pub fn FS_BuildOSPath4(
@@ -232,15 +198,12 @@ pub fn FS_BuildOSPath4(
     qpath: *const c_char,
 ) -> *mut c_char {
     let mut temp: [c_char; 1024] = [0; 1024];
-    // PORT-NOTE(state): see module doc — this overload's own `ospath[4]`/
-    // `toggle` are a SEPARATE fn-scope-static pair from the single-`qpath`
-    // overload above (Raven gives each overload its own statics); threaded
-    // as `common.fs_build_os_path4_buf`/`common.fs_build_os_path4_toggle`.
+    // Raven gives each overload its own fn-scope statics; this overload's
+    // `ospath[4]`/`toggle` are separate from the single-`qpath` overload above.
     common.fs_build_os_path4_toggle = (common.fs_build_os_path4_toggle + 1) & 3; // allows four returns without clash (increased from 2 during fs_copyfiles 2 enhancement)
 
     unsafe {
         if game.is_null() || *game == 0 {
-            // PORT-NOTE(state): `fs_gamedir` referenced verbatim (see module doc).
             game = common.fs_gamedir.as_ptr();
         }
 
@@ -271,7 +234,6 @@ pub fn FS_BuildOSPath4(
 ///
 /// Source: `oracle/codemp/qcommon/files_common.cpp:229-235`
 pub fn FS_CheckInit(common: &mut Common) {
-    // PORT-NOTE(state): `initialized` referenced verbatim (see module doc).
     if common.initialized == qfalse {
         unsafe {
             com_error(errorParm_t::ERR_FATAL, "Filesystem call made without initialization\n".to_string());
@@ -282,11 +244,8 @@ pub fn FS_CheckInit(common: &mut Common) {
 /// Raven `FS_Printf`.
 ///
 /// Source: `oracle/codemp/qcommon/files_common.cpp:375-384`
-// PORT-NOTE(variadic): Raven's C `... ` variadic collapses to a
-// pre-formatted `msg: &str` — Rust has no safe C-variadic fn definitions.
-// `vsprintf`/`strlen` (the externals the packet lists) are subsumed by the
-// caller having already formatted `msg`; `FS_Write` receives its bytes
-// exactly as Raven's vsprintf-then-FS_Write body does.
+// Raven's C `...` variadic collapses to a pre-formatted `msg: &str` — Rust has
+// no safe C-variadic fn definitions; the caller formats `msg` before the call.
 pub fn FS_Printf(common: &mut Common, h: fileHandle_t, msg: &str) {
     let bytes = msg.as_bytes();
     unsafe {
@@ -299,7 +258,6 @@ pub fn FS_Printf(common: &mut Common, h: fileHandle_t, msg: &str) {
 /// Source: `oracle/codemp/qcommon/files_common.cpp:401-421`
 pub fn FS_WriteFile(common: &mut Common, qpath: *const c_char, buffer: *const (), size: c_int) {
     unsafe {
-        // PORT-NOTE(state): `fs_searchpaths` referenced verbatim (see module doc).
         if common.fs_searchpaths.is_null() {
             com_error(errorParm_t::ERR_FATAL, "Filesystem call made without initialization\n".to_string());
         }
@@ -345,7 +303,6 @@ pub fn FS_InitFilesystem(
         // try to start up normally
         let basegame = std::ffi::CString::new(BASEGAME).unwrap();
         FS_Startup(common, cm, rm, host, basegame.as_ptr());
-        // PORT-NOTE(state): `initialized` referenced verbatim (see module doc).
         common.initialized = qtrue;
 
         // see if we are going to allow add-ons
@@ -365,14 +322,9 @@ pub fn FS_InitFilesystem(
         ) <= 0
         {
             // bk001208 - SafeMode see below, FIXME?
-            // PORT-NOTE(shape): Com_Error's full resolved signature
-            // (qcommon__1592_CM_DeleteCachedMap.md) also carries `sv`/`rmg`;
-            // not available here (shape_mismatches).
             com_error(errorParm_t::ERR_FATAL, "Couldn't load mpdefault.cfg".to_string());
         }
 
-        // PORT-NOTE(state): `lastValidBase`/`lastValidGame`/`fs_basepath`/
-        // `fs_gamedirvar` referenced verbatim (see module doc).
         Q_strncpyz(
             common.lastValidBase.as_mut_ptr(),
             (*common.fs_basepath).string,

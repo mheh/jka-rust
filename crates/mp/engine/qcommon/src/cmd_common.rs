@@ -34,20 +34,10 @@ use crate::files_common::{FS_FreeFile, FS_ReadFile};
 use mp_qshared::shared::q_format::FmtArg;
 use mp_qshared::shared::q_string::{va, COM_DefaultExtension, Q_strncpyz};
 
-// PORT-NOTE(rm-types): `RenderModels`/`Server` are state-receiver types pinned
-// by the engine-fork-discovery preamble's receiver order; neither has landed
-// in this crate yet (`Server` lives in `mp_engine_server`, which already
-// depends on this crate — importing it here would cycle). Imported from
-// `cmd_pc` (which declares the same placeholders) so both files' call sites
-// share one type and unify at `Cmd_ExecuteString`'s call boundary.
-
 /// `Cbuf_Init`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:54-59`
 pub fn Cbuf_Init(common: &mut Common) {
-    // PORT-NOTE(cmd_t): `cmd_t` (`data`/`maxsize`/`cursize`) has no rosetta
-    // row; referenced verbatim as the resolved `common.cmd_text` field shape
-    // (missing-symbol escalation).
     common.cmd_text.data = common.cmd_text_buf.as_mut_ptr();
     common.cmd_text.maxsize = MAX_CMD_BUFFER as c_int;
     common.cmd_text.cursize = 0;
@@ -294,8 +284,6 @@ pub fn Cbuf_InsertText(common: &mut Common, text: *const c_char) {
     unsafe {
         let len = strlen(text) as c_int + 1;
         if len + common.cmd_text.cursize > common.cmd_text.maxsize {
-            // PORT-NOTE(Com_Printf): `Com_Printf` is not yet ported in this
-            // crate (missing-symbol escalation) — referenced verbatim.
             com_printf(common, "Cbuf_InsertText overflowed\n");
             return;
         }

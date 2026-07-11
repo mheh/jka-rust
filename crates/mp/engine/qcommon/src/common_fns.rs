@@ -26,14 +26,6 @@ use crate::qcommon::net_limits::MAX_MSGLEN;
 use crate::qcommon::sys_event_t::sysEvent_t;
 use crate::qcommon::sys_event_type_t::sysEventType_t;
 
-// PORT-NOTE(rm-types): `RenderModels`/`RmManager`/`Ghoul2System`/`BotLib` are
-// the state-receiver types pinned by the engine-fork-discovery preamble's
-// receiver order (rmg-terrain.md / ghoul2-server.md own their shape); none
-// has landed in the tree yet, and `Server`/`Client` cannot be imported here
-// (`mp_engine_server`/`mp_engine_client` already depend on this crate — a
-// `use` would cycle). Referenced by their exact resolved-signature names per
-// the no-stub rule; reported as missing symbols/shape mismatches for the
-// finisher (cm_trace.rs precedent).
 #[allow(dead_code)]
 use crate::cm_load::RenderModels;
 #[allow(dead_code)]
@@ -89,9 +81,6 @@ pub fn Com_BeginRedirect(
     if buffer.is_null() || buffersize == 0 || flush.is_null() {
         return;
     }
-    // PORT-NOTE(rd-fields): `rd_buffer`/`rd_buffersize`/`rd_flush` are
-    // `common.cpp` file statics not yet fields on `Common` — written with
-    // Raven's verbatim names per STATE-D fields rule; integration adds them.
     common.rd_buffer = buffer;
     common.rd_buffersize = buffersize;
     common.rd_flush = flush as *mut extern "C" fn(*mut c_char);
@@ -117,10 +106,6 @@ pub fn Com_EndRedirect(common: &mut Common) {
 /// `Com_OPrintf`.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:226-239`
-/// PORT-NOTE(variadic): the Raven `va_list`/`vsprintf` formatting collapses
-/// to a pre-formatted `msg` at the Rust call site (the qshared `va`/
-/// `Com_sprintf` surface is already ported); this fn's own body is the
-/// platform print, unix path (ruling 8/10) — no `OutputDebugString`.
 pub fn Com_OPrintf(msg: &str) {
     print!("{msg}");
 }
@@ -203,8 +188,6 @@ pub fn Com_HashKey(string: *mut c_char, maxlen: c_int) -> c_int {
 /// `Com_RealTime`.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:713-733`
-/// PORT-NOTE(time): `time`/`localtime` are the libc externals named in the
-/// packet's call surface; `std::time`/`libc` supply them at the seam.
 pub fn Com_RealTime(qtime: *mut qtime_t) -> c_int {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1149,10 +1132,7 @@ pub fn Com_Frame(
         //
         // report timing information
         //
-        // PORT-NOTE(com-speeds-report): the all/sv/ev/cl breakdown reads
-        // timeBefore*/timeAfter locals that only the branches above set;
-        // faithful only when com_speeds is on for the whole frame — same
-        // shape Raven has (uninitialized on the untaken paths, §19-class).
+        // Raven prints a com_speeds all/sv/ev/cl frame-timing breakdown here; not implemented, this block is a silent no-op.
 
         //
         // trace optimization tracking
@@ -1228,15 +1208,11 @@ pub fn Com_ParseTextFile(
 /// or null on failed parse; 3-arg `writeable` form).
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:2209-2239`
-/// PORT-NOTE(gp2-writeable): the landed `GenericParser2::parse` takes
-/// `(text, clean_first)` — no `writeable` flag exists on the GP2 port yet;
-/// `writeable` is read here (shape mismatch vs. this fn's own resolved
-/// signature) but has nowhere to go until GP2 grows it.
 ///
-/// PORT-NOTE(overload): Raven overloads `Com_ParseTextFile` by arity (C++
-/// allows same-name/different-signature; Rust does not) — this is the
-/// 3-arg `(file, cleanFirst, writeable)` overload, suffixed `2` per the
-/// SE_GetString/SE_GetFlags arity precedent (ruling 57).
+/// Raven overloads `Com_ParseTextFile` by arity; this is the 3-arg
+/// `(file, cleanFirst, writeable)` overload, suffixed `2`.
+/// `writeable` is accepted but discarded — `GenericParser2::parse` has no
+/// writeable flag yet.
 pub fn Com_ParseTextFile2(
     common: &mut Common,
     cm: &mut CollisionWorld,
@@ -1955,10 +1931,8 @@ pub fn Com_Init(
 // --- local helpers (not Raven fns; keep the bodies above straight-line) ---
 
 fn Com_Error_f_cmd() {
-    // PORT-NOTE(cmd-table-shape): `Cmd_AddCommand`'s resolved receiver-taking
-    // signature isn't in this shard; `Com_Error_f` needs `common` which a bare
-    // `fn()` command-table slot can't carry yet. Reported as a shape mismatch
-    // for the dispatch-table wave (ruling 5) to reconcile.
+    // The bare fn() command-table slot can't carry `common`, so this (and the
+    // Freeze/Quit/WriteConfig cmd shims below) never calls the real Com_Error_f.
 }
 fn Com_Crash_f_cmd() {
     Com_Crash_f();
