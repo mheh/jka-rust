@@ -640,17 +640,17 @@ pub fn SV_GameSystemCalls(
         // have cases in sv_game, cl_cgame, and cl_ui. They must also all be
         // in the same order, and start at 100.
         if trap == T::TRAP_MEMSET as c_int {
-            mp_qshared::shared::q_shared::Com_Memset(
-                vma(common, args, 1),
+            mp_engine_qcommon::common_fns::Com_Memset(
+                vma(common, args, 1) as *mut (),
                 *args.offset(2),
-                *args.offset(3),
+                *args.offset(3) as usize,
             );
             return 0;
         } else if trap == T::TRAP_MEMCPY as c_int {
-            mp_qshared::shared::q_shared::Com_Memcpy(
-                vma(common, args, 1),
-                vma(common, args, 2),
-                *args.offset(3),
+            mp_engine_qcommon::common_fns::Com_Memcpy(
+                vma(common, args, 1) as *mut (),
+                vma(common, args, 2) as *const (),
+                *args.offset(3) as usize,
             );
             return 0;
         } else if trap == T::TRAP_STRNCPY as c_int {
@@ -710,7 +710,7 @@ pub fn SV_GameSystemCalls(
             mp_engine_qcommon::common::com_error(errorParm_t::ERR_DROP, s);
             return 0;
         } else if trap == G::G_MILLISECONDS as c_int {
-            return mp_qshared::shared::sys_shared::Sys_Milliseconds();
+            return mp_engine_qcommon::timing::sys_milliseconds(common);
         } else if trap == G::G_PRECISIONTIMER_START as c_int {
             // rww - precision timer funcs. -ALWAYS- call end after start with
             // supplied ptr, or you'll get a nasty memory leak. Not that you

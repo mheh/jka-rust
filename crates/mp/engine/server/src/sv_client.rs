@@ -59,11 +59,11 @@ pub fn SV_ResetPureClient_f(cl: *mut client_t) {
 /// Source: `oracle/codemp/server/sv_client.cpp:1452-1500`
 pub fn SV_UserinfoChanged(common: &mut Common, host: &mut dyn EngineHost, cl: *mut client_t) {
     unsafe {
-        let name = mp_qshared::shared::Info_ValueForKey(
+        let name = mp_qshared::shared::q_shared::Info_ValueForKey(
             (*cl).userinfo.as_mut_ptr(),
             c"name".as_ptr() as *mut c_char,
         );
-        mp_qshared::shared::Q_strncpyz((*cl).name.as_mut_ptr(), name, (*cl).name.len() as c_int);
+        mp_qshared::shared::q_shared::Q_strncpyz((*cl).name.as_mut_ptr(), name, (*cl).name.len() as c_int);
 
         // if the client is on the same subnet as the server and we aren't running an
         // internet public server, assume they don't need a rate choke
@@ -73,7 +73,7 @@ pub fn SV_UserinfoChanged(common: &mut Common, host: &mut dyn EngineHost, cl: *m
             // lans should not rate limit
             (*cl).rate = 99999;
         } else {
-            let val = mp_qshared::shared::Info_ValueForKey(
+            let val = mp_qshared::shared::q_shared::Info_ValueForKey(
                 (*cl).userinfo.as_mut_ptr(),
                 c"rate".as_ptr() as *mut c_char,
             );
@@ -90,14 +90,14 @@ pub fn SV_UserinfoChanged(common: &mut Common, host: &mut dyn EngineHost, cl: *m
             }
         }
 
-        let val = mp_qshared::shared::Info_ValueForKey(
+        let val = mp_qshared::shared::q_shared::Info_ValueForKey(
             (*cl).userinfo.as_mut_ptr(),
             c"handicap".as_ptr() as *mut c_char,
         );
         if mp_qshared::shared::strlen(val) != 0 {
             let i = mp_qshared::shared::atoi(val);
             if i <= 0 || i > 100 || mp_qshared::shared::strlen(val) > 4 {
-                mp_qshared::shared::Info_SetValueForKey(
+                mp_qshared::shared::q_shared::Info_SetValueForKey(
                     (*cl).userinfo.as_mut_ptr(),
                     c"handicap".as_ptr() as *mut c_char,
                     c"100".as_ptr() as *mut c_char,
@@ -106,7 +106,7 @@ pub fn SV_UserinfoChanged(common: &mut Common, host: &mut dyn EngineHost, cl: *m
         }
 
         // snaps command
-        let val = mp_qshared::shared::Info_ValueForKey(
+        let val = mp_qshared::shared::q_shared::Info_ValueForKey(
             (*cl).userinfo.as_mut_ptr(),
             c"snaps".as_ptr() as *mut c_char,
         );
@@ -398,7 +398,7 @@ pub fn SV_BeginDownload_f(common: &mut Common, cl: *mut client_t) {
     // cl->downloadName is non-zero now, SV_WriteDownloadToClient will see this and open
     // the file itself
     unsafe {
-        mp_qshared::shared::Q_strncpyz(
+        mp_qshared::shared::q_shared::Q_strncpyz(
             (*cl).downloadName.as_mut_ptr(),
             mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
             (*cl).downloadName.len() as c_int,
@@ -429,7 +429,7 @@ pub fn SV_UpdateUserinfo_f(
     cl: *mut client_t,
 ) {
     unsafe {
-        mp_qshared::shared::Q_strncpyz(
+        mp_qshared::shared::q_shared::Q_strncpyz(
             (*cl).userinfo.as_mut_ptr(),
             mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
             (*cl).userinfo.len() as c_int,
@@ -604,7 +604,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
         .into_owned();
     let r = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 3); // reason
 
-    if mp_qshared::shared::Q_stricmp(
+    if mp_qshared::shared::q_shared::Q_stricmp(
         s.as_ptr() as *const c_char,
         c"demo".as_ptr() as *const c_char,
     ) == 0
@@ -634,7 +634,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
         sv.svs.challenges[i] = unsafe { core::mem::zeroed::<challenge_t>() };
         return;
     }
-    if mp_qshared::shared::Q_stricmp(
+    if mp_qshared::shared::q_shared::Q_stricmp(
         s.as_ptr() as *const c_char,
         c"accept".as_ptr() as *const c_char,
     ) == 0
@@ -647,7 +647,7 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
         );
         return;
     }
-    if mp_qshared::shared::Q_stricmp(
+    if mp_qshared::shared::q_shared::Q_stricmp(
         s.as_ptr() as *const c_char,
         c"unknown".as_ptr() as *const c_char,
     ) == 0
@@ -714,13 +714,13 @@ pub fn SV_DirectConnect(
 
         let userinfo_ptr = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1);
         let mut userinfo = [0 as c_char; mp_qshared::shared::MAX_INFO_STRING as usize];
-        mp_qshared::shared::Q_strncpyz(
+        mp_qshared::shared::q_shared::Q_strncpyz(
             userinfo.as_mut_ptr(),
             userinfo_ptr,
             userinfo.len() as c_int,
         );
 
-        let version = mp_qshared::shared::atoi(mp_qshared::shared::Info_ValueForKey(
+        let version = mp_qshared::shared::atoi(mp_qshared::shared::q_shared::Info_ValueForKey(
             userinfo.as_mut_ptr(),
             c"protocol".as_ptr() as *mut c_char,
         ));
@@ -741,11 +741,11 @@ pub fn SV_DirectConnect(
             return;
         }
 
-        let challenge = mp_qshared::shared::atoi(mp_qshared::shared::Info_ValueForKey(
+        let challenge = mp_qshared::shared::atoi(mp_qshared::shared::q_shared::Info_ValueForKey(
             userinfo.as_mut_ptr(),
             c"challenge".as_ptr() as *mut c_char,
         ));
-        let qport = mp_qshared::shared::atoi(mp_qshared::shared::Info_ValueForKey(
+        let qport = mp_qshared::shared::atoi(mp_qshared::shared::q_shared::Info_ValueForKey(
             userinfo.as_mut_ptr(),
             c"qport".as_ptr() as *mut c_char,
         ));
@@ -816,7 +816,7 @@ pub fn SV_DirectConnect(
                 return;
             }
             // force the IP key/value pair so the game can filter based on ip
-            mp_qshared::shared::Info_SetValueForKey(
+            mp_qshared::shared::q_shared::Info_SetValueForKey(
                 userinfo.as_mut_ptr(),
                 c"ip".as_ptr() as *mut c_char,
                 mp_engine_qcommon::net_chan::NET_AdrToString(common, from) as *mut c_char,
@@ -901,7 +901,7 @@ pub fn SV_DirectConnect(
             }
         } else {
             // force the "ip" info key to "localhost"
-            mp_qshared::shared::Info_SetValueForKey(
+            mp_qshared::shared::q_shared::Info_SetValueForKey(
                 userinfo.as_mut_ptr(),
                 c"ip".as_ptr() as *mut c_char,
                 c"localhost".as_ptr() as *mut c_char,
@@ -965,7 +965,7 @@ pub fn SV_DirectConnect(
                 // if "sv_privateClients" is set > 0, then that number
                 // of client slots will be reserved for connections that
                 // have "password" set to the value of "sv_privatePassword"
-                let password = mp_qshared::shared::Info_ValueForKey(
+                let password = mp_qshared::shared::q_shared::Info_ValueForKey(
                     userinfo.as_mut_ptr(),
                     c"password".as_ptr() as *mut c_char,
                 );
@@ -1071,7 +1071,7 @@ pub fn SV_DirectConnect(
         );
 
         // save the userinfo
-        mp_qshared::shared::Q_strncpyz(
+        mp_qshared::shared::q_shared::Q_strncpyz(
             (*cl_ptr).userinfo.as_mut_ptr(),
             userinfo.as_ptr(),
             (*cl_ptr).userinfo.len() as c_int,
@@ -1663,7 +1663,7 @@ pub fn SV_ClientCommand(
 
         (*cl).lastClientCommand = seq;
         let s_str = core::ffi::CStr::from_ptr(s).to_string_lossy();
-        mp_qshared::shared::Com_sprintf(
+        mp_qshared::shared::q_shared::Com_sprintf(
             (*cl).lastClientCommandString.as_mut_ptr(),
             (*cl).lastClientCommandString.len() as c_int,
             &s_str,

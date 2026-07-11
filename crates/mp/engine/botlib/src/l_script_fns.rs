@@ -33,6 +33,8 @@
 
 use core::ffi::{c_char, c_int, c_long, c_ulong, c_void};
 
+use libc::sprintf;
+
 use crate::l_script::consts::{
     MAX_TOKEN, P_RSHIFT_ASSIGN, SCFL_NOERRORS, SCFL_NOSTRINGESCAPECHARS, SCFL_NOSTRINGWHITESPACES,
     SCFL_NOWARNINGS, SCFL_PRIMITIVE, TT_BINARY, TT_DECIMAL, TT_FLOAT, TT_HEX, TT_INTEGER,
@@ -89,25 +91,25 @@ pub fn PunctuationFromNum(script: *mut script_t, num: c_int) -> *mut c_char {
 /// script file and line.
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:216-235`
-pub fn ScriptError(bot: &mut BotLib, script: *mut script_t, str: *mut c_char, ...) {
+///
+/// PORT-NOTE(variadic): Raven's `va_start`/`vsprintf`/`va_end` C-variadic seam
+/// cannot be a non-extern Rust fn `...`. Resolved at integration (same seam as
+/// `SourceError`/`SourceWarning` in `l_precomp_fns.rs`): the fn now takes an
+/// already-rendered message; the `script_error!` macro below reproduces the
+/// original `vsprintf`-into-buffer step at each call site.
+pub fn ScriptError(bot: &mut BotLib, script: *mut script_t, text: *const c_char) {
     unsafe {
-        let mut text = [0 as c_char; 1024];
-        let mut ap: va_list;
-
         if (*script).flags & SCFL_NOERRORS != 0 {
             return;
         }
 
-        va_start(ap, str);
-        vsprintf(text.as_mut_ptr(), str, ap);
-        va_end(ap);
         // #ifdef BOTLIB (defined)
         (bot.botimport.Print.unwrap())(
             PRT_ERROR,
             c"file %s, line %d: %s\n".as_ptr() as *mut c_char,
             (*script).filename.as_ptr(),
             (*script).line,
-            text.as_ptr(),
+            text,
         );
     }
 }
@@ -116,27 +118,45 @@ pub fn ScriptError(bot: &mut BotLib, script: *mut script_t, str: *mut c_char, ..
 /// script file and line.
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:242-261`
-pub fn ScriptWarning(bot: &mut BotLib, script: *mut script_t, str: *mut c_char, ...) {
+///
+/// PORT-NOTE(variadic): see `ScriptError` — same `va_list` seam.
+pub fn ScriptWarning(bot: &mut BotLib, script: *mut script_t, text: *const c_char) {
     unsafe {
-        let mut text = [0 as c_char; 1024];
-        let mut ap: va_list;
-
         if (*script).flags & SCFL_NOWARNINGS != 0 {
             return;
         }
 
-        va_start(ap, str);
-        vsprintf(text.as_mut_ptr(), str, ap);
-        va_end(ap);
         // #ifdef BOTLIB (defined)
         (bot.botimport.Print.unwrap())(
             PRT_WARNING,
             c"file %s, line %d: %s\n".as_ptr() as *mut c_char,
             (*script).filename.as_ptr(),
             (*script).line,
-            text.as_ptr(),
+            text,
         );
     }
+}
+
+// PORT-NOTE(variadic): reproduces Raven's `vsprintf(text, str, ap)` step at
+// each `ScriptError`/`ScriptWarning` call site (the C variadic seam resolved
+// above), then forwards the rendered buffer.
+macro_rules! script_error {
+    ($bot:expr, $script:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
+        let mut __se_text = [0 as c_char; 1024];
+        unsafe {
+            sprintf(__se_text.as_mut_ptr(), $fmt $(, $arg)*);
+        }
+        ScriptError($bot, $script, __se_text.as_ptr())
+    }};
+}
+macro_rules! script_warning {
+    ($bot:expr, $script:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
+        let mut __sw_text = [0 as c_char; 1024];
+        unsafe {
+            sprintf(__sw_text.as_mut_ptr(), $fmt $(, $arg)*);
+        }
+        ScriptWarning($bot, $script, __sw_text.as_ptr())
+    }};
 }
 
 /// Raven `PS_ReadWhiteSpace` — skip whitespace and `//`/`/* */` comments.
@@ -530,7 +550,7 @@ pub fn PS_ReadEscapeCharacter(bot: &mut BotLib, script: *mut script_t, ch: *mut 
                 }
                 (*script).script_p = (*script).script_p.offset(-1);
                 if val > 0xFF {
-                    ScriptWarning(
+                    script_warning!(
                         bot,
                         script,
                         c"too large value in escape character".as_ptr() as *mut c_char,
@@ -542,7 +562,7 @@ pub fn PS_ReadEscapeCharacter(bot: &mut BotLib, script: *mut script_t, ch: *mut 
             // NOTE: decimal ASCII code, NOT octal
             _ => {
                 if *(*script).script_p < b'0' as c_char || *(*script).script_p > b'9' as c_char {
-                    ScriptError(bot, script, c"unknown escape char".as_ptr() as *mut c_char);
+                    script_error!(bot, script, c"unknown escape char".as_ptr() as *mut c_char);
                 }
                 let mut val: c_int = 0;
                 loop {
@@ -556,7 +576,7 @@ pub fn PS_ReadEscapeCharacter(bot: &mut BotLib, script: *mut script_t, ch: *mut 
                 }
                 (*script).script_p = (*script).script_p.offset(-1);
                 if val > 0xFF {
-                    ScriptWarning(
+                    script_warning!(
                         bot,
                         script,
                         c"too large value in escape character".as_ptr() as *mut c_char,
@@ -587,7 +607,7 @@ pub fn PS_ReadName(bot: &mut BotLib, script: *mut script_t, token: *mut token_t)
             (*script).script_p = (*script).script_p.offset(1);
             len += 1;
             if len >= MAX_TOKEN {
-                ScriptError(
+                script_error!(
                     bot,
                     script,
                     c"name longer than MAX_TOKEN = %d".as_ptr() as *mut c_char,
@@ -646,7 +666,7 @@ pub fn PS_ReadNumber(bot: &mut BotLib, script: *mut script_t, token: *mut token_
                 (*script).script_p = (*script).script_p.offset(1);
                 len += 1;
                 if len >= MAX_TOKEN {
-                    ScriptError(
+                    script_error!(
                         bot,
                         script,
                         c"hexadecimal number longer than MAX_TOKEN = %d".as_ptr() as *mut c_char,
@@ -676,7 +696,7 @@ pub fn PS_ReadNumber(bot: &mut BotLib, script: *mut script_t, token: *mut token_
                 (*script).script_p = (*script).script_p.offset(1);
                 len += 1;
                 if len >= MAX_TOKEN {
-                    ScriptError(
+                    script_error!(
                         bot,
                         script,
                         c"binary number longer than MAX_TOKEN = %d".as_ptr() as *mut c_char,
@@ -707,7 +727,7 @@ pub fn PS_ReadNumber(bot: &mut BotLib, script: *mut script_t, token: *mut token_
                 (*script).script_p = (*script).script_p.offset(1);
                 len += 1;
                 if len >= MAX_TOKEN - 1 {
-                    ScriptError(
+                    script_error!(
                         bot,
                         script,
                         c"number longer than MAX_TOKEN = %d".as_ptr() as *mut c_char,
@@ -767,7 +787,7 @@ pub fn PS_ReadPrimitive(bot: &mut BotLib, script: *mut script_t, token: *mut tok
         let mut len: usize = 0;
         while *(*script).script_p > b' ' as c_char && *(*script).script_p != b';' as c_char {
             if len >= MAX_TOKEN {
-                ScriptError(
+                script_error!(
                     bot,
                     script,
                     c"primitive token longer than MAX_TOKEN = %d".as_ptr() as *mut c_char,
@@ -914,7 +934,7 @@ pub fn PS_ReadString(
         loop {
             // minus 2 because trailing double quote and zero have to be appended
             if len >= MAX_TOKEN - 2 {
-                ScriptError(
+                script_error!(
                     bot,
                     script,
                     c"string longer than MAX_TOKEN = %d".as_ptr() as *mut c_char,
@@ -960,7 +980,7 @@ pub fn PS_ReadString(
             } else {
                 if *(*script).script_p == 0 {
                     (*token).string[len] = 0;
-                    ScriptError(
+                    script_error!(
                         bot,
                         script,
                         c"missing trailing quote".as_ptr() as *mut c_char,
@@ -969,7 +989,7 @@ pub fn PS_ReadString(
                 }
                 if *(*script).script_p == b'\n' as c_char {
                     (*token).string[len] = 0;
-                    ScriptError(
+                    script_error!(
                         bot,
                         script,
                         c"newline inside string %s".as_ptr() as *mut c_char,
@@ -1004,7 +1024,7 @@ pub fn PS_ReadLiteral(bot: &mut BotLib, script: *mut script_t, token: *mut token
         (*script).script_p = (*script).script_p.offset(1);
         // check for end of file
         if *(*script).script_p == 0 {
-            ScriptError(
+            script_error!(
                 bot,
                 script,
                 c"end of file before trailing '".as_ptr() as *mut c_char,
@@ -1022,7 +1042,7 @@ pub fn PS_ReadLiteral(bot: &mut BotLib, script: *mut script_t, token: *mut token
         }
         // check for trailing quote
         if *(*script).script_p != b'\'' as c_char {
-            ScriptWarning(
+            script_warning!(
                 bot,
                 script,
                 c"too many characters in literal, ignored".as_ptr() as *mut c_char,
@@ -1127,7 +1147,7 @@ pub fn PS_ReadToken(bot: &mut BotLib, script: *mut script_t, token: *mut token_t
         }
         // check for punctuations
         else if PS_ReadPunctuation(script, token) == 0 {
-            ScriptError(bot, script, c"can't read token".as_ptr() as *mut c_char);
+            script_error!(bot, script, c"can't read token".as_ptr() as *mut c_char);
             return 0;
         }
         // copy the token into the script structure
@@ -1251,7 +1271,7 @@ pub fn PS_ExpectTokenString(bot: &mut BotLib, script: *mut script_t, string: *mu
         let mut token = core::mem::zeroed::<token_t>();
 
         if PS_ReadToken(bot, script, &mut token) == 0 {
-            ScriptError(
+            script_error!(
                 bot,
                 script,
                 c"couldn't find expected %s".as_ptr() as *mut c_char,
@@ -1261,7 +1281,7 @@ pub fn PS_ExpectTokenString(bot: &mut BotLib, script: *mut script_t, string: *mu
         }
 
         if libc::strcmp(token.string.as_ptr(), string) != 0 {
-            ScriptError(
+            script_error!(
                 bot,
                 script,
                 c"expected %s, found %s".as_ptr() as *mut c_char,
@@ -1289,7 +1309,7 @@ pub fn PS_ExpectTokenType(
         let mut str = [0 as c_char; MAX_TOKEN];
 
         if PS_ReadToken(bot, script, token) == 0 {
-            ScriptError(
+            script_error!(
                 bot,
                 script,
                 c"couldn't read expected token".as_ptr() as *mut c_char,
@@ -1313,7 +1333,7 @@ pub fn PS_ExpectTokenType(
             if r#type == TT_PUNCTUATION {
                 libc::strcpy(str.as_mut_ptr(), c"punctuation".as_ptr());
             }
-            ScriptError(
+            script_error!(
                 bot,
                 script,
                 c"expected a %s, found %s".as_ptr() as *mut c_char,
@@ -1348,7 +1368,7 @@ pub fn PS_ExpectTokenType(
                 if subtype & TT_INTEGER != 0 {
                     libc::strcat(str.as_mut_ptr(), c" integer".as_ptr());
                 }
-                ScriptError(
+                script_error!(
                     bot,
                     script,
                     c"expected %s, found %s".as_ptr() as *mut c_char,
@@ -1359,7 +1379,7 @@ pub fn PS_ExpectTokenType(
             }
         } else if (*token).r#type == TT_PUNCTUATION {
             if subtype < 0 {
-                ScriptError(
+                script_error!(
                     bot,
                     script,
                     c"BUG: wrong punctuation subtype".as_ptr() as *mut c_char,
@@ -1367,7 +1387,7 @@ pub fn PS_ExpectTokenType(
                 return 0;
             }
             if (*token).subtype != subtype {
-                ScriptError(
+                script_error!(
                     bot,
                     script,
                     c"expected %s, found %s".as_ptr() as *mut c_char,
@@ -1387,7 +1407,7 @@ pub fn PS_ExpectTokenType(
 pub fn PS_ExpectAnyToken(bot: &mut BotLib, script: *mut script_t, token: *mut token_t) -> c_int {
     unsafe {
         if PS_ReadToken(bot, script, token) == 0 {
-            ScriptError(
+            script_error!(
                 bot,
                 script,
                 c"couldn't read expected token".as_ptr() as *mut c_char,
@@ -1485,7 +1505,7 @@ pub fn ReadSignedFloat(bot: &mut BotLib, script: *mut script_t) -> long_double {
             sign = -1.0;
             PS_ExpectTokenType(bot, script, TT_NUMBER, 0, &mut token);
         } else if token.r#type != TT_NUMBER {
-            ScriptError(
+            script_error!(
                 bot,
                 script,
                 c"expected float value, found %s\n".as_ptr() as *mut c_char,
@@ -1509,7 +1529,7 @@ pub fn ReadSignedInt(bot: &mut BotLib, script: *mut script_t) -> c_long {
             sign = -1;
             PS_ExpectTokenType(bot, script, TT_NUMBER, TT_INTEGER, &mut token);
         } else if token.r#type != TT_NUMBER || token.subtype == TT_FLOAT {
-            ScriptError(
+            script_error!(
                 bot,
                 script,
                 c"expected integer value, found %s\n".as_ptr() as *mut c_char,

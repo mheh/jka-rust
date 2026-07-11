@@ -63,21 +63,17 @@ pub fn Log_Close(bot: &mut BotLib) {
 ///
 /// Source: `oracle/codemp/botlib/l_log.cpp:96-106`
 ///
-/// PORT-NOTE(variadic): Raven's `va_start`/`vfprintf`/`va_end` C-variadic
-/// seam; a plain Rust fn cannot read `...`, so the `va_list` plumbing is
-/// resolved at integration. The body is transcribed line-for-line against
-/// that seam, matching the established `be_aas_main.rs` `AAS_Error`
-/// precedent.
-pub fn Log_Write(bot: &mut BotLib, fmt: *mut c_char, ...) {
+/// PORT-NOTE(variadic): stable Rust cannot define a C-variadic fn (only
+/// `extern "C"` may use `...`); per the established `Com_OPrintf` precedent
+/// (`crates/mp/engine/qcommon/src/common_fns.rs`), the `va_list`/`vfprintf`
+/// formatting collapses to a pre-formatted `msg` written verbatim at the
+/// Rust call site.
+pub fn Log_Write(bot: &mut BotLib, msg: *mut c_char) {
     unsafe {
-        let mut ap: va_list;
-
         if bot.logfile.fp.is_null() {
             return;
         }
-        va_start(ap, fmt);
-        libc::vfprintf(bot.logfile.fp, fmt, ap);
-        va_end(ap);
+        libc::fprintf(bot.logfile.fp, c"%s".as_ptr(), msg);
         //fprintf(logfile.fp, "\r\n");
         libc::fflush(bot.logfile.fp);
     }
@@ -87,11 +83,9 @@ pub fn Log_Write(bot: &mut BotLib, fmt: *mut c_char, ...) {
 ///
 /// Source: `oracle/codemp/botlib/l_log.cpp:113-131`
 ///
-/// PORT-NOTE(variadic): same `va_list` seam as `Log_Write` above.
-pub fn Log_WriteTimeStamped(bot: &mut BotLib, fmt: *mut c_char, ...) {
+/// PORT-NOTE(variadic): same collapsed-`msg` seam as `Log_Write` above.
+pub fn Log_WriteTimeStamped(bot: &mut BotLib, msg: *mut c_char) {
     unsafe {
-        let mut ap: va_list;
-
         if bot.logfile.fp.is_null() {
             return;
         }
@@ -105,9 +99,7 @@ pub fn Log_WriteTimeStamped(bot: &mut BotLib, fmt: *mut c_char, ...) {
             ((bot.botlibglobals.time * 100.0) as core::ffi::c_int)
                 - (bot.botlibglobals.time as core::ffi::c_int) * 100,
         );
-        va_start(ap, fmt);
-        libc::vfprintf(bot.logfile.fp, fmt, ap);
-        va_end(ap);
+        libc::fprintf(bot.logfile.fp, c"%s".as_ptr(), msg);
         libc::fprintf(bot.logfile.fp, c"\r\n".as_ptr());
         bot.logfile.numwrites += 1;
         libc::fflush(bot.logfile.fp);
