@@ -284,10 +284,19 @@ pub struct Common {
     pub cmd_functions: *mut crate::cmd_pc::cmd_function_t,
 
     // ---- `cvar.cpp` ----
+    /// Raven `cvar_vars` — head of the registered-cvar linked list.
+    ///
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:6`
+    pub cvar_vars: *mut cvar_t,
     /// Raven `cvar_modifiedFlags`.
     ///
     /// Source: `oracle/codemp/qcommon/cvar.cpp:8`
     pub cvar_modifiedFlags: c_int,
+    /// Raven `Cvar_InfoString_Big`'s `static char info[BIG_INFO_STRING]`
+    /// return buffer (fork-3 return-buffer static → owning host field).
+    ///
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:855`
+    pub cvar_info_string_big: [c_char; BIG_INFO_STRING],
 
     // ---- collision (`cm_load.cpp`) trace counters ----
     /// Raven `c_pointcontents` / `c_traces` / `c_brush_traces` / `c_patch_traces`.

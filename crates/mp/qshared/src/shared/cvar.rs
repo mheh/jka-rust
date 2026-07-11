@@ -42,6 +42,8 @@ pub const CVAR_TEMP: c_int = 0x0000_0100;
 pub const CVAR_CHEAT: c_int = 0x0000_0200;
 /// Raven `CVAR_NORESTART` — do not clear when a cvar_restart is issued.
 pub const CVAR_NORESTART: c_int = 0x0000_0400;
+/// Raven `CVAR_INTERNAL` — cvar won't be displayed, ever (for passwords and such).
+pub const CVAR_INTERNAL: c_int = 0x0000_0800;
 
 /// Raven `cvar_t` — the engine-side cvar registry node.
 ///

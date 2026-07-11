@@ -21,6 +21,7 @@ pub mod collision_world;
 pub mod common;
 pub mod common_fns;
 pub mod cvar;
+pub mod cvar_fns;
 pub mod files;
 pub mod files_common;
 pub mod files_pc;
