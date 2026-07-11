@@ -972,15 +972,7 @@ pub fn FS_Seek(
                     common.fsh[f as usize].zipFilePos as c_ulong,
                 );
             }
-            unsafe {
-                unzOpenCurrentFile(
-                    common,
-                    cm,
-                    rm,
-                    host,
-                    common.fsh[f as usize].handleFiles.file.z,
-                )
-            }
+            unsafe { unzOpenCurrentFile(common.fsh[f as usize].handleFiles.file.z) }
         } else if offset < 65536 {
             // set the file position in the zip file (also sets the current file info)
             unsafe {
@@ -990,13 +982,7 @@ pub fn FS_Seek(
                 );
             }
             unsafe {
-                unzOpenCurrentFile(
-                    common,
-                    cm,
-                    rm,
-                    host,
-                    common.fsh[f as usize].handleFiles.file.z,
-                );
+                unzOpenCurrentFile(common.fsh[f as usize].handleFiles.file.z);
             }
             unsafe { FS_Read(common, foo.as_mut_ptr() as *mut (), offset as c_int, f) }
         } else {

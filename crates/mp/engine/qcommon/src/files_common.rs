@@ -990,7 +990,7 @@ pub fn FS_Read(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_t
             }
             len
         } else {
-            unzReadCurrentFile(common.fsh[f as usize].handleFiles.file.z, buffer, len)
+            unzReadCurrentFile(common.fsh[f as usize].handleFiles.file.z, buffer, len as c_uint)
         }
     }
 }
@@ -1241,7 +1241,7 @@ fn FS_LoadZipFile(
                 uf,
                 &mut file_info,
                 filename_inzip.as_mut_ptr(),
-                filename_inzip.len() as c_uint,
+                filename_inzip.len() as core::ffi::c_ulong,
                 core::ptr::null_mut(),
                 0,
                 core::ptr::null_mut(),
@@ -1326,7 +1326,7 @@ fn FS_LoadZipFile(
                 uf,
                 &mut file_info,
                 filename_inzip.as_mut_ptr(),
-                filename_inzip.len() as c_uint,
+                filename_inzip.len() as core::ffi::c_ulong,
                 core::ptr::null_mut(),
                 0,
                 core::ptr::null_mut(),

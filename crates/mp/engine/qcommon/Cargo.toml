@@ -8,6 +8,9 @@ name = "mp_engine_qcommon"
 
 [dependencies]
 libc = "0.2"
+# User ruling 2026-07-11: back minizip's raw-DEFLATE inflate with flate2's
+# `Decompress` rather than porting zlib32's inflate (see src/unzip.rs).
+flate2 = "1"
 mp_qshared = { path = "../../qshared" }
 abi_transport = { path = "../../../abi-transport" }
 native_platform = { path = "../../../native/platform" }

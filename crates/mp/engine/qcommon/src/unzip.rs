@@ -4,22 +4,52 @@
 
 use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong};
 
-use libc::{SEEK_CUR, SEEK_SET};
+use flate2::{Decompress, FlushDecompress, Status};
+use libc::{SEEK_CUR, SEEK_END, SEEK_SET};
 
 use crate::files::unz_file::unzFile;
 use crate::files::unz_types::{
-    tm_unz, uInt, uLong, unz_file_info, unz_file_info_internal, unz_global_info, unz_s, z_stream,
-    FILE, ZF_DEFLATED, Z_OK, Z_STREAM_END,
+    file_in_zip_read_info_s, tm_unz, uInt, uLong, unz_file_info, unz_file_info_internal,
+    unz_global_info, unz_s, z_stream, Z_DATA_ERROR, Z_OK, Z_STREAM_END, ZF_DEFLATED, FILE,
 };
 use crate::files::unzip_consts::{
-    CASESENSITIVITYDEFAULTVALUE, SIZECENTRALDIRITEM, SIZEZIPLOCALHEADER, UNZ_BADZIPFILE,
-    UNZ_BUFSIZE, UNZ_END_OF_LIST_OF_FILE, UNZ_EOF, UNZ_ERRNO, UNZ_MAXFILENAMEINZIP, UNZ_OK,
-    UNZ_PARAMERROR,
+    BUFREADCOMMENT, CASESENSITIVITYDEFAULTVALUE, SIZECENTRALDIRITEM, SIZEZIPLOCALHEADER,
+    UNZ_BADZIPFILE, UNZ_BUFSIZE, UNZ_END_OF_LIST_OF_FILE, UNZ_EOF, UNZ_ERRNO, UNZ_MAXFILENAMEINZIP,
+    UNZ_OK, UNZ_PARAMERROR,
 };
 
-// Sweep: extern forward-declare eliminated. `inflate` is the vendored zlib32
-// DEFLATE decompressor (`oracle/codemp/zlib32`), an unported external C
-// library with no Rust home — referenced by its bare Raven name; reported.
+/// flate2-backed replacement for Raven's zlib32 `inflate` (user ruling 2026-07-11:
+/// back raw DEFLATE with flate2's `Decompress` rather than porting zlib32's inflate).
+///
+/// Drives `decomp` from the zlib-style `z_stream` cursors, advancing
+/// `next_in`/`avail_in`/`total_in` and `next_out`/`avail_out`/`total_out` exactly as
+/// zlib's `inflate` would so the surrounding minizip loop is transcribed unchanged.
+/// Source: `oracle/codemp/qcommon/unzip.cpp:1144` (the replaced `inflate` call).
+fn inflate(stream: &mut z_stream, decomp: &mut Decompress) -> c_int {
+    unsafe {
+        let input = core::slice::from_raw_parts(stream.next_in, stream.avail_in as usize);
+        let output = core::slice::from_raw_parts_mut(stream.next_out, stream.avail_out as usize);
+        let in_before = decomp.total_in();
+        let out_before = decomp.total_out();
+        let status = decomp.decompress(input, output, FlushDecompress::None);
+        let consumed = (decomp.total_in() - in_before) as uInt;
+        let produced = (decomp.total_out() - out_before) as uInt;
+        stream.next_in = stream.next_in.add(consumed as usize);
+        stream.avail_in -= consumed;
+        stream.total_in += consumed as uLong;
+        stream.next_out = stream.next_out.add(produced as usize);
+        stream.avail_out -= produced;
+        stream.total_out += produced as uLong;
+        match status {
+            Ok(Status::StreamEnd) => Z_STREAM_END,
+            // A stall (no progress possible) is zlib's Z_BUF_ERROR; mapping it
+            // to Z_OK would spin the caller's read loop on truncated entries.
+            Ok(Status::BufError) => Z_BUF_ERROR,
+            Ok(_) => Z_OK,
+            Err(_) => Z_DATA_ERROR,
+        }
+    }
+}
 
 /// Raven `unzlocal_getShort` — reads a little-endian 16-bit value from `fin` into `*pX`.
 ///
@@ -238,7 +268,9 @@ pub fn unzReadCurrentFile(file: unzFile, buf: *mut (), len: c_uint) -> c_int {
             } else {
                 let uTotalOutBefore: uLong = (*pfile_in_zip_read_info).stream.total_out;
 
-                err = inflate(&mut (*pfile_in_zip_read_info).stream);
+                let strm = &mut (*pfile_in_zip_read_info).stream as *mut z_stream;
+                let dec = (*pfile_in_zip_read_info).decompress.as_mut().unwrap() as *mut Decompress;
+                err = inflate(&mut *strm, &mut *dec);
 
                 let uTotalOutAfter: uLong = (*pfile_in_zip_read_info).stream.total_out;
                 let uOutThis: uLong = uTotalOutAfter - uTotalOutBefore;
@@ -914,4 +946,324 @@ pub fn unzLocateFile(file: unzFile, szFileName: *const c_char, iCaseSensitivity:
         (*s).pos_in_central_dir = pos_in_central_dirSaved;
         err
     }
+}
+
+/// Raven `unzlocal_SearchCentralDir` — scans backwards from the end of `fin` for the
+/// end-of-central-directory signature, returning its byte offset (0 if not found).
+///
+/// Source: `oracle/codemp/qcommon/unzip.cpp:335-386`
+fn unzlocal_SearchCentralDir(fin: *mut FILE) -> uLong {
+    let mut uMaxBack: uLong = 0xffff; /* maximum size of global comment */
+    let mut uPosFound: uLong = 0;
+
+    unsafe {
+        if libc::fseek(fin, 0, SEEK_END) != 0 {
+            return 0;
+        }
+
+        let uSizeFile: uLong = libc::ftell(fin) as uLong;
+
+        if uMaxBack > uSizeFile {
+            uMaxBack = uSizeFile;
+        }
+
+        let mut buf = [0u8; BUFREADCOMMENT as usize + 4];
+
+        let mut uBackRead: uLong = 4;
+        while uBackRead < uMaxBack {
+            if uBackRead + BUFREADCOMMENT as uLong > uMaxBack {
+                uBackRead = uMaxBack;
+            } else {
+                uBackRead += BUFREADCOMMENT as uLong;
+            }
+            let uReadPos: uLong = uSizeFile - uBackRead;
+
+            let uReadSize: uLong = if (BUFREADCOMMENT as uLong + 4) < (uSizeFile - uReadPos) {
+                BUFREADCOMMENT as uLong + 4
+            } else {
+                uSizeFile - uReadPos
+            };
+            if libc::fseek(fin, uReadPos as c_long, SEEK_SET) != 0 {
+                break;
+            }
+
+            if libc::fread(
+                buf.as_mut_ptr() as *mut libc::c_void,
+                uReadSize as usize,
+                1,
+                fin,
+            ) != 1
+            {
+                break;
+            }
+
+            // Raven's `for (i=(int)uReadSize-3; (i--)>0;)`: test the old `i`, then use the
+            // decremented value in the body (scanning down to index 0).
+            let mut i: c_int = uReadSize as c_int - 3;
+            while {
+                let old = i;
+                i -= 1;
+                old > 0
+            } {
+                let bi = i as usize;
+                if buf[bi] == 0x50 && buf[bi + 1] == 0x4b && buf[bi + 2] == 0x05 && buf[bi + 3] == 0x06
+                {
+                    uPosFound = uReadPos + i as uLong;
+                    break;
+                }
+            }
+
+            if uPosFound != 0 {
+                break;
+            }
+        }
+    }
+    uPosFound
+}
+
+/// Raven `unzReOpen` — reopens `path` on a fresh OS file handle while cloning the already-parsed
+/// central-directory state of `file` (Raven addition: lets each concurrently-open pak file get its
+/// own `FILE*` without re-scanning the archive).
+///
+/// Source: `oracle/codemp/qcommon/unzip.cpp:388-402`
+pub fn unzReOpen(path: *const c_char, file: unzFile) -> unzFile {
+    unsafe {
+        let fin = libc::fopen(path, c"rb".as_ptr());
+        if fin.is_null() {
+            return core::ptr::null_mut();
+        }
+
+        // Com_Memcpy(s, file, sizeof(unz_s)): unz_s is plain-old-data (only `uLong`s and raw
+        // pointers), so a bitwise clone reproduces the memcpy; `pfile_in_zip_read` is null on a
+        // pak-directory handle, so no aliased read state is duplicated.
+        let mut s = Box::new(core::ptr::read(file as *const unz_s));
+        s.file = fin;
+        Box::into_raw(s) as unzFile
+    }
+}
+
+/// Raven `unzOpen` — opens the zip archive at `path`, locating and parsing its end-of-central-
+/// directory record; returns null on any failure.
+///
+/// Source: `oracle/codemp/qcommon/unzip.cpp:413-500`
+pub fn unzOpen(path: *const c_char) -> unzFile {
+    // §19: `us` is written field-by-field below; zero-init the unread tail (`cur_file_info`,
+    // cursors) rather than leave Raven's uninitialized stack `unz_s` — the fast-path memcpy and
+    // `unzGoToFirstFile` set those before use.
+    let mut us: unz_s = unsafe { core::mem::zeroed() };
+    let mut uL: uLong = 0;
+    let mut number_disk: uLong = 0;
+    let mut number_disk_with_CD: uLong = 0;
+    let mut number_entry_CD: uLong = 0;
+    let mut err = UNZ_OK;
+
+    unsafe {
+        let fin = libc::fopen(path, c"rb".as_ptr());
+        if fin.is_null() {
+            return core::ptr::null_mut();
+        }
+
+        let central_pos = unzlocal_SearchCentralDir(fin);
+        if central_pos == 0 {
+            err = UNZ_ERRNO;
+        }
+
+        if libc::fseek(fin, central_pos as c_long, SEEK_SET) != 0 {
+            err = UNZ_ERRNO;
+        }
+
+        /* the signature, already checked */
+        if unzlocal_getLong(fin, &mut uL) != UNZ_OK {
+            err = UNZ_ERRNO;
+        }
+
+        /* number of this disk */
+        if unzlocal_getShort(fin, &mut number_disk) != UNZ_OK {
+            err = UNZ_ERRNO;
+        }
+
+        /* number of the disk with the start of the central directory */
+        if unzlocal_getShort(fin, &mut number_disk_with_CD) != UNZ_OK {
+            err = UNZ_ERRNO;
+        }
+
+        /* total number of entries in the central dir on this disk */
+        if unzlocal_getShort(fin, &mut us.gi.number_entry) != UNZ_OK {
+            err = UNZ_ERRNO;
+        }
+
+        /* total number of entries in the central dir */
+        if unzlocal_getShort(fin, &mut number_entry_CD) != UNZ_OK {
+            err = UNZ_ERRNO;
+        }
+
+        if number_entry_CD != us.gi.number_entry || number_disk_with_CD != 0 || number_disk != 0 {
+            err = UNZ_BADZIPFILE;
+        }
+
+        /* size of the central directory */
+        if unzlocal_getLong(fin, &mut us.size_central_dir) != UNZ_OK {
+            err = UNZ_ERRNO;
+        }
+
+        /* offset of start of central directory with respect to the
+        starting disk number */
+        if unzlocal_getLong(fin, &mut us.offset_central_dir) != UNZ_OK {
+            err = UNZ_ERRNO;
+        }
+
+        /* zipfile comment length */
+        if unzlocal_getShort(fin, &mut us.gi.size_comment) != UNZ_OK {
+            err = UNZ_ERRNO;
+        }
+
+        if central_pos < us.offset_central_dir + us.size_central_dir && err == UNZ_OK {
+            err = UNZ_BADZIPFILE;
+        }
+
+        if err != UNZ_OK {
+            libc::fclose(fin);
+            return core::ptr::null_mut();
+        }
+
+        us.file = fin;
+        us.byte_before_the_zipfile = central_pos - (us.offset_central_dir + us.size_central_dir);
+        us.central_pos = central_pos;
+        us.pfile_in_zip_read = core::ptr::null_mut();
+
+        Box::into_raw(Box::new(us)) as unzFile
+    }
+}
+
+/// Raven `unzClose` — closes an archive opened by [`unzOpen`]/[`unzReOpen`], closing any open
+/// current file first and releasing the handle.
+///
+/// Source: `oracle/codemp/qcommon/unzip.cpp:508-521`
+pub fn unzClose(file: unzFile) -> c_int {
+    if file.is_null() {
+        return UNZ_PARAMERROR;
+    }
+    unsafe {
+        let s = file as *mut unz_s;
+
+        if !(*s).pfile_in_zip_read.is_null() {
+            unzCloseCurrentFile(file);
+        }
+
+        libc::fclose((*s).file);
+        drop(Box::from_raw(s));
+    }
+    UNZ_OK
+}
+
+/// Raven `unzOpenCurrentFile` — prepares the archive's current file for reading, validating its
+/// local header and initializing the decompression stream.
+///
+/// Source: `oracle/codemp/qcommon/unzip.cpp:963-1037`
+pub fn unzOpenCurrentFile(file: unzFile) -> c_int {
+    let mut err = UNZ_OK;
+    let mut iSizeVar: uInt = 0;
+    let mut offset_local_extrafield: uLong = 0; /* offset of the static extra field */
+    let mut size_local_extrafield: uInt = 0; /* size of the static extra field */
+
+    if file.is_null() {
+        return UNZ_PARAMERROR;
+    }
+    unsafe {
+        let s = file as *mut unz_s;
+        if (*s).current_file_ok == 0 {
+            return UNZ_PARAMERROR;
+        }
+
+        if !(*s).pfile_in_zip_read.is_null() {
+            unzCloseCurrentFile(file);
+        }
+
+        if unzlocal_CheckCurrentFileCoherencyHeader(
+            s,
+            &mut iSizeVar,
+            &mut offset_local_extrafield,
+            &mut size_local_extrafield,
+        ) != UNZ_OK
+        {
+            return UNZ_BADZIPFILE;
+        }
+
+        let Store = (*s).cur_file_info.compression_method == 0;
+        if (*s).cur_file_info.compression_method != 0
+            && (*s).cur_file_info.compression_method != ZF_DEFLATED
+        {
+            err = UNZ_BADZIPFILE;
+        }
+
+        // User ruling 2026-07-11: `inflateInit(&stream, Z_SYNC_FLUSH, 1)` (raw DEFLATE, no zlib
+        // header) → flate2 `Decompress::new(false)`; the `Box` drop in `unzCloseCurrentFile`
+        // stands in for `inflateEnd`.
+        let mut stream_initialised: uLong = 0;
+        let decompress = if !Store {
+            stream_initialised = 1;
+            Some(Decompress::new(false))
+        } else {
+            None
+        };
+
+        let read_buffer = libc::malloc(UNZ_BUFSIZE as usize) as *mut u8;
+
+        let pfile_in_zip_read_info = Box::into_raw(Box::new(file_in_zip_read_info_s {
+            read_buffer,
+            stream: core::mem::zeroed(),
+            pos_in_zipfile: (*s).cur_file_info_internal.offset_curfile
+                + SIZEZIPLOCALHEADER as uLong
+                + iSizeVar as uLong,
+            stream_initialised,
+            offset_local_extrafield,
+            size_local_extrafield,
+            pos_local_extrafield: 0,
+            crc32: 0,
+            // Raven sets `crc32_wait` from the central-dir CRC, but its CRC accumulation and the
+            // `UNZ_CRCERROR` check are both commented out in the oracle, so it is never consulted.
+            crc32_wait: (*s).cur_file_info.crc,
+            rest_read_compressed: (*s).cur_file_info.compressed_size,
+            rest_read_uncompressed: (*s).cur_file_info.uncompressed_size,
+            file: (*s).file,
+            compression_method: (*s).cur_file_info.compression_method,
+            byte_before_the_zipfile: (*s).byte_before_the_zipfile,
+            decompress,
+        }));
+
+        (*s).pfile_in_zip_read = pfile_in_zip_read_info;
+        let _ = err;
+        UNZ_OK
+    }
+}
+
+/// Raven `unzCloseCurrentFile` — releases the current file's read/decompression state.
+///
+/// (Raven's `UNZ_CRCERROR` check is commented out in the oracle, so this always returns
+/// `UNZ_OK`.)
+///
+/// Source: `oracle/codemp/qcommon/unzip.cpp:1269-1302`
+pub fn unzCloseCurrentFile(file: unzFile) -> c_int {
+    let err = UNZ_OK;
+
+    if file.is_null() {
+        return UNZ_PARAMERROR;
+    }
+    unsafe {
+        let s = file as *mut unz_s;
+        let pfile_in_zip_read_info = (*s).pfile_in_zip_read;
+
+        if pfile_in_zip_read_info.is_null() {
+            return UNZ_PARAMERROR;
+        }
+
+        libc::free((*pfile_in_zip_read_info).read_buffer as *mut libc::c_void);
+        (*pfile_in_zip_read_info).read_buffer = core::ptr::null_mut();
+        // The `Box` drop runs flate2's `Decompress` destructor, standing in for `inflateEnd`.
+        (*pfile_in_zip_read_info).stream_initialised = 0;
+        drop(Box::from_raw(pfile_in_zip_read_info));
+
+        (*s).pfile_in_zip_read = core::ptr::null_mut();
+    }
+    err
 }

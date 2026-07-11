@@ -118,6 +118,12 @@ pub struct file_in_zip_read_info_s {
     pub file: *mut FILE,
     pub compression_method: uLong,
     pub byte_before_the_zipfile: uLong,
+
+    // User ruling 2026-07-11: the raw-DEFLATE decompressor is flate2's `Decompress`
+    // (backing Raven's zlib `z_stream` istate/dstate + `inflateInit`/`inflateEnd`);
+    // `None` for stored (uncompressed) entries. Internal-only field — this struct
+    // never crosses the ABI seam (only its pointer is stored in `unz_s`).
+    pub decompress: Option<flate2::Decompress>,
 }
 
 /// minizip `unz_s` — internal info about the open zipfile.
