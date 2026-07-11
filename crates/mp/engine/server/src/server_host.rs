@@ -150,9 +150,7 @@ pub struct Server {
     /// Raven `botlib_export` (`extern botlib_export_t *`, defined by the botlib
     /// interface `be_interface.cpp`, referenced from `sv_bot.cpp`). Null until
     /// `SV_BotInitBotLib` assigns it.
-    // Divergence: the true owner is the botlib interface (`bot: BotLib`), not
-    // yet landed as a receiver; the packet threads it through `Server`, so the
-    // pointer mirror lives here pending the botlib waves.
+    // Mirrored here per the packet's `sv` threading; real owner is `Engine.bot` (ruling 43).
     /// Source: `oracle/codemp/server/sv_bot.cpp:19`
     pub botlib_export: *mut botlib_export_t,
     /// Raven `SV_ExpandNewlines::string` (`static char string[1024]`) — the
