@@ -1,5 +1,7 @@
 //! MP game-module common support.
 
+pub mod class_t;
+pub mod g_public;
 pub mod q3_infinite;
 pub mod waypoint_none;
 

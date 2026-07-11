@@ -7,6 +7,7 @@
 
 use core::ffi::{c_char, c_int};
 
+use mp_qshared::common::mp::game::g_public::SVF_NOSERVERINFO;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;

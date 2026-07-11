@@ -47,3 +47,4 @@ pub mod vm_interpreted;
 pub mod vm_x86;
 pub mod z_memman;
 pub mod z_memman_pc;
+pub mod zlib_seam;

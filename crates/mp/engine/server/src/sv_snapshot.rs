@@ -9,6 +9,7 @@ use mp_engine_qcommon::cvar_fns::Cvar_Set;
 use mp_engine_qcommon::qcommon::net_limits::{MAX_MSGLEN, MAX_RELIABLE_COMMANDS, PACKET_MASK};
 use mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e;
 use mp_host_interface::engine_host::EngineHost;
+use mp_qshared::common::mp::game::g_public::SVF_BOT;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;

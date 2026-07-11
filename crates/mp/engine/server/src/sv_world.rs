@@ -15,6 +15,11 @@ use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::cm_load::RmManager;
 use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_host_interface::engine_host::EngineHost;
+use mp_qshared::common::mp::game::class_t::class_t;
+use mp_qshared::common::mp::game::g_public::{
+    G2TRFLAG_DOGHOULTRACE, G2TRFLAG_GETSURFINDEX, G2TRFLAG_HITCORPSES, G2TRFLAG_THICK, SVF_CAPSULE,
+    SVF_OWNERNOTSHARED,
+};
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_GENTITIES};
@@ -261,11 +266,6 @@ pub fn SV_ClipHandleForEntity(cm: &mut CollisionWorld, ent: *const sharedEntity_
         mp_engine_qcommon::cm_load::CM_TempBoxModel(cm, (*ent).r.mins, (*ent).r.maxs, 0)
     }
 }
-
-// PORT-NOTE(SVF_CAPSULE): `SVF_CAPSULE` is imported per the packet's CONSTS
-// table (`mp_game::g_public_consts`); pulled in as a fully qualified path
-// below to avoid an unresolved `use` if the const has since moved.
-use mp_game::g_public_consts::SVF_CAPSULE;
 
 /// Raven `SV_LinkEntity`.
 ///
@@ -768,7 +768,7 @@ pub fn SV_ClipMoveToEntities(
             );
 
             let mut oldTrace: trace_t = core::mem::zeroed();
-            if (*clip).traceFlags & mp_game::g_public_consts::G2TRFLAG_DOGHOULTRACE != 0 {
+            if (*clip).traceFlags & G2TRFLAG_DOGHOULTRACE != 0 {
                 // keep these older variables around for a bit, incase we need to
                 // replace them in the Ghoul2 Collision check
                 oldTrace = (*clip).trace;
@@ -797,10 +797,10 @@ pub fn SV_ClipMoveToEntities(
             //rww - since this is multiplayer and we don't have the luxury of
             //violating networking rules in horrible ways, this must be done
             //somewhat differently.
-            if ((*clip).traceFlags & mp_game::g_public_consts::G2TRFLAG_DOGHOULTRACE != 0)
+            if ((*clip).traceFlags & G2TRFLAG_DOGHOULTRACE != 0)
                 && trace.entityNum == (*touch).s.number as core::ffi::c_short
                 && !(*touch).ghoul2.is_null()
-                && (((*clip).traceFlags & mp_game::g_public_consts::G2TRFLAG_HITCORPSES != 0)
+                && (((*clip).traceFlags & G2TRFLAG_HITCORPSES != 0)
                     || ((*touch).s.eFlags & mp_bg::public::entity_flags::EF_DEAD) == 0)
             {
                 //standard behavior will be to ignore g2 col on dead ents, but if
@@ -817,7 +817,7 @@ pub fn SV_ClipMoveToEntities(
                         / 2.0;
                 }
 
-                if (*clip).traceFlags & mp_game::g_public_consts::G2TRFLAG_THICK != 0 {
+                if (*clip).traceFlags & G2TRFLAG_THICK != 0 {
                     //if using this flag, make sure it's at least 1.0f
                     if fRadius < 1.0 {
                         fRadius = 1.0;
@@ -861,7 +861,7 @@ pub fn SV_ClipMoveToEntities(
                 let bestTr;
                 if host.cvar_integer("com_optvehtrace") != 0
                     && (*touch).s.eType == mp_bg::public::entity_type::entityType_t::ET_NPC as c_int
-                    && (*touch).s.NPC_class == mp_game::g_utils::CLASS_VEHICLE
+                    && (*touch).s.NPC_class == class_t::CLASS_VEHICLE as c_int
                     && !(*touch).m_pVehicle.is_null()
                 {
                     //for vehicles cache the transform data.
@@ -930,7 +930,7 @@ pub fn SV_ClipMoveToEntities(
                         &mut (*clip).trace.plane.normal,
                     );
 
-                    if (*clip).traceFlags & mp_game::g_public_consts::G2TRFLAG_GETSURFINDEX != 0 {
+                    if (*clip).traceFlags & G2TRFLAG_GETSURFINDEX != 0 {
                         //we have requested that surfaceFlags be stomped over
                         //with the g2 hit surface index.
                         if (*clip).trace.entityNum == g2trace[bt].mEntityNum as core::ffi::c_short {
