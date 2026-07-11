@@ -5,21 +5,37 @@
 //! (`Cvar_VariableString`/`FS_BuildOSPath`/`FS_Read`/`FS_Seek`) that sits ABOVE
 //! `native_platform`, so they are hosted here in `qcommon` (per §B state is
 //! threaded, not reached). Behavior source: `oracle/codemp/unix/unix_main.c`.
+//!
+//! The `Sys_QueEvent`/`Sys_GetEvent` event pump also lives here: its ring is
+//! `Common.sys_events` and it allocates event payloads through `Z_Malloc`, both
+//! engine-tier, while the console/packet polling is delegated to
+//! `native_platform`/`sys_net`.
 
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int, c_long, c_void};
 
 use mp_host_interface::engine_host::EngineHost;
+use mp_qshared::common::mp::qcommon::msg_t::msg_t;
+use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::qfalse;
 use native_types::fileHandle_t;
 
 use crate::cm_load::RenderModels;
 use crate::collision_world::CollisionWorld;
-use crate::common::{com_error, com_printf, Common};
+use crate::common::{com_error, com_printf, Common, MASK_QUED_EVENTS, MAX_QUED_EVENTS};
 use crate::cvar_fns::Cvar_VariableString;
 use crate::files_common::{FS_BuildOSPath4, FS_Read};
 use crate::files_pc::FS_Seek;
+use crate::msg::MSG_Init;
+use crate::qcommon::net_limits::MAX_MSGLEN;
+use crate::qcommon::sys_event_t::sysEvent_t;
+use crate::qcommon::sys_event_type_t::sysEventType_t;
+use crate::sys_net::Sys_GetPacket;
+use crate::timing::sys_milliseconds;
+use crate::z_memman_pc::{Z_Free, Z_Malloc};
+use mp_qshared::common::mp::qcommon::tags::memtag_t;
 
 /// The module `dllEntry` C entry: `void (*)(int (*syscallptr)(int, ...))`.
 /// The syscall arg is our SEAM-D11 `isize`-variadic trampoline; a fn pointer is
@@ -183,4 +199,117 @@ pub fn Sys_StreamSeek(
     origin: c_int,
 ) {
     FS_Seek(common, cm, rm, host, f, offset, origin);
+}
+
+/// Raven `Sys_QueEvent` (unix) — push one event onto the 256-entry
+/// `eventQue`/`eventHead`/`eventTail` ring (`Common.sys_events`), warning and
+/// discarding (freeing any payload) the oldest on overflow.
+///
+/// Source: `oracle/codemp/unix/unix_main.c:960-988`
+///
+/// # Safety
+/// `ptr` (when non-null) must be a `Z_Malloc`'d block the event owner later
+/// frees, per Raven's contract.
+pub unsafe fn Sys_QueEvent(
+    common: &mut Common,
+    time: c_int,
+    r#type: sysEventType_t,
+    value: c_int,
+    value2: c_int,
+    ptrLength: c_int,
+    ptr: *mut c_void,
+) {
+    let idx = (common.sys_events.head as usize) & MASK_QUED_EVENTS;
+
+    // bk000305 - was missing
+    if common.sys_events.head - common.sys_events.tail >= MAX_QUED_EVENTS as c_int {
+        com_printf(common, "Sys_QueEvent: overflow\n");
+        // we are discarding an event, but don't leak memory
+        let evPtr = common.sys_events.que[idx].evPtr;
+        if !evPtr.is_null() {
+            Z_Free(common, evPtr as *mut ());
+        }
+        common.sys_events.tail += 1;
+    }
+
+    common.sys_events.head += 1;
+
+    let time = if time == 0 {
+        sys_milliseconds(common)
+    } else {
+        time
+    };
+
+    let ev = &mut common.sys_events.que[idx];
+    ev.evTime = time;
+    ev.evType = r#type;
+    ev.evValue = value;
+    ev.evValue2 = value2;
+    ev.evPtrLength = ptrLength;
+    ev.evPtr = ptr;
+}
+
+/// Raven `Sys_GetEvent` (unix) — drain the `eventQue`, else pump the system:
+/// `Sys_ConsoleInput` (queued as `SE_CONSOLE`) and `Sys_GetPacket` (queued as
+/// `SE_PACKET`), returning the next queued event or an empty timestamped one.
+///
+/// `Sys_SendKeyEvents`/`IN_Frame` are X11 window/input pumps with no window in
+/// the headless module host, so they queue nothing and are elided.
+///
+/// Source: `oracle/codemp/unix/unix_main.c:995-1051`
+pub fn Sys_GetEvent(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+) -> sysEvent_t {
+    // return if we have data
+    if common.sys_events.head > common.sys_events.tail {
+        common.sys_events.tail += 1;
+        return common.sys_events.que[((common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
+    }
+
+    // check for console commands
+    if let Some(s) = native_platform::net::sys_console_input() {
+        let bytes = s.as_bytes();
+        let len = bytes.len() as c_int + 1;
+        let b = Z_Malloc(common, cm, rm, host, len, memtag_t::TAG_EVENT, qfalse, 4) as *mut u8;
+        // strcpy( b, s ): copy the line and NUL-terminate.
+        unsafe {
+            core::ptr::copy_nonoverlapping(bytes.as_ptr(), b, bytes.len());
+            *b.add(bytes.len()) = 0;
+            Sys_QueEvent(common, 0, sysEventType_t::SE_CONSOLE, 0, 0, len, b as *mut c_void);
+        }
+    }
+
+    // check for network packets
+    let mut netmsg: msg_t = unsafe { core::mem::zeroed() };
+    let pkt = common.sys_packetReceived.as_mut_ptr();
+    MSG_Init(common, cm, rm, host, &mut netmsg, pkt, MAX_MSGLEN as c_int);
+    let mut adr: netadr_t = unsafe { core::mem::zeroed() };
+    if Sys_GetPacket(common, &mut adr, &mut netmsg) {
+        // copy out to a seperate buffer for qeueing
+        let len = core::mem::size_of::<netadr_t>() as c_int + netmsg.cursize;
+        let buf = Z_Malloc(common, cm, rm, host, len, memtag_t::TAG_EVENT, qfalse, 4) as *mut netadr_t;
+        unsafe {
+            *buf = adr;
+            core::ptr::copy_nonoverlapping(
+                netmsg.data,
+                buf.add(1) as *mut u8,
+                netmsg.cursize as usize,
+            );
+            Sys_QueEvent(common, 0, sysEventType_t::SE_PACKET, 0, 0, len, buf as *mut c_void);
+        }
+    }
+
+    // return if we have data
+    if common.sys_events.head > common.sys_events.tail {
+        common.sys_events.tail += 1;
+        return common.sys_events.que[((common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
+    }
+
+    // create an empty event to return
+    let mut ev: sysEvent_t = unsafe { core::mem::zeroed() };
+    ev.evTime = sys_milliseconds(common);
+    ev
 }

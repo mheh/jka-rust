@@ -4,6 +4,7 @@
 pub mod entrypoints;
 pub mod mem;
 pub mod module_loader;
+pub mod net;
 pub mod platform;
 pub mod sys_main;
 pub mod sys_shared;

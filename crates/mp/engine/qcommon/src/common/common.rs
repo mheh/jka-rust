@@ -12,6 +12,7 @@ use mp_qshared::shared::limits::{
 use mp_qshared::shared::qboolean;
 
 use crate::qcommon::net_chan_cpp_consts::MAX_LOOPBACK;
+use crate::qcommon::net_limits::MAX_MSGLEN;
 use crate::z_memman::zone_header_s::zoneHeader_t;
 
 use super::error::ErrorState;
@@ -118,6 +119,10 @@ pub struct Common {
     pub journal: Journal,
     /// `eventQue[256]` (`Sys_QueEvent` ring; distinct from `com_pushedEvents`).
     pub sys_events: SysEventQueue,
+    /// Raven `sys_packetReceived[MAX_MSGLEN]` (unix) — the fixed receive buffer
+    /// `Sys_GetEvent` wires into a `msg_t` before `Sys_GetPacket`.
+    /// Source: `oracle/codemp/unix/unix_main.c:949`
+    pub sys_packetReceived: [u8; MAX_MSGLEN],
     /// `vmTable[MAX_VM]` replacement (LIFE-Q5 / STATE-D10) — the module registry
     /// nests here, `engine.common.modules`.
     pub modules: ModuleRegistry,

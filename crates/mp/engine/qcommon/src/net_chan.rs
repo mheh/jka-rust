@@ -24,21 +24,10 @@ use crate::qcommon::protocol::PORT_SERVER;
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::shared::cvar::cvar_t;
 
-// PORT-NOTE(engine-host-state): `RenderModels`'s real definition
-// (`mp_renderer::tr_model::render_models::RenderModels`) is unreachable —
-// `mp_renderer` depends on `mp_engine_qcommon`, so importing it here would
-// cycle. Local placeholder struct matching the cm_load.rs/vm_fns.rs/
-// cmd_common.rs precedent throughout this crate.
+// `RenderModels` here is a local placeholder: `mp_renderer` depends on this crate, so importing the real type would cycle (matches cm_load.rs's precedent).
 #[allow(dead_code)]
 use crate::cm_load::RenderModels;
 
-// PORT-NOTE(cvar-flags-reach): `CVAR_INIT`/`CVAR_TEMP` (q_shared.h) live in
-// `mp_game::q_shared_cvar_flags`, a tier above this crate (`mp_game` depends
-// on `mp_engine_qcommon`, so depending back would cycle) — same reachability
-// gap as common_fns.rs/vm_fns.rs's identical `mp_game::q_shared_cvar_flags::*`
-// references. Escalated in missing_symbols; local consts transcribed here
-// pending the canonical q_shared.h flags home landing somewhere both crates
-// can reach (e.g. mp_qshared).
 /// Raven `CVAR_INIT`.
 /// Source: `oracle/codemp/game/q_shared.h:1788`
 const CVAR_INIT: c_int = 0x0000_0010;
@@ -46,43 +35,16 @@ const CVAR_INIT: c_int = 0x0000_0010;
 /// Source: `oracle/codemp/game/q_shared.h:1799`
 const CVAR_TEMP: c_int = 0x0000_0100;
 
-// PORT-NOTE(cvar-globals): `showpackets`/`showdrop`/`qport`/
-// `net_killdroppedfragments` are file-scope `cvar_t*` globals
-// (net_chan.cpp:40-43) with no `EngineCvars`/`Common` home yet (grepped:
-// `Common` has no cvar sub-struct). Following the existing `cl_shownet`
-// precedent in `common.rs` (collapsed `->integer` read, cvar-registry not
-// landed), these are referenced as bare `common.showpackets` / `.showdrop` /
-// `.net_qport` / `.net_killdroppedfragments` plain-`i32` fields — escalated
-// in missing_symbols for the finisher to wire once `EngineCvars`/the cvar
-// sub-struct lands.
-//
-// PORT-NOTE(loopback-state): `loopbacks[2]` (net_chan.cpp:486) is genuine
-// cross-frame state (fork-3 case 3) → an `Engine`/`Common`-owned field,
-// `common.loopbacks: [loopback_t; 2]`. `loopback_t` has no rosetta row —
-// referenced from its natural home (`crate::qcommon::loopback_t::loopback_t`,
-// mirroring `netchan_t`'s file placement) though it does not exist in the
-// tree; escalated in missing_symbols.
-//
-// PORT-NOTE(net-adr-to-string-buf): `NET_AdrToString`'s `static char s[64]`
-// is a rotating single-slot return buffer (fork-3 case 2) but the resolved
-// signature returns a raw `*const c_char` into it, so it must outlive the
-// call — modeled as a `common.net_adr_to_string_buf: [u8; 64]` field per
-// ruling 2/3 exactly as `MSG_ReadString`'s scratch buffers already sit on
-// `Common`. The field does not exist yet; escalated in missing_symbols.
-
 /// Raven `netsrcString[2]` (net_chan.cpp:45-48) — file-scope const table
 /// (fork-3 case 1: const table, no mutation).
 ///
 /// Source: `oracle/codemp/qcommon/net_chan.cpp:45-48`
 const NETSRC_STRING: [&str; 2] = ["client", "server"];
 
-// Genuinely-unported callees referenced at their canonical future homes
-// (sweep: extern forward-declares eliminated). `Com_sprintf` is a q_shared.c
-// helper whose qshared home is not yet landed; `Cvar_Get` awaits cvar.cpp.
-// `Sys_StringToAdr`/`Sys_SendPacket` are `PlatformHost` methods with no
-// free-fn home threaded through `NET_*`'s pinned signatures — left bare and
-// reported (cycle/shape seam).
+// `Com_sprintf` is a q_shared.c helper whose qshared home is not yet landed;
+// `Cvar_Get` awaits cvar.cpp.
 use crate::cvar_fns::Cvar_Get;
+use crate::sys_net::{Sys_SendPacket, Sys_StringToAdr};
 use mp_qshared::shared::q_string::Com_sprintf;
 
 /// Raven `NET_AdrToString`.
@@ -255,7 +217,7 @@ pub fn NET_SendPacket(
             return;
         }
 
-        Sys_SendPacket(length, data, to);
+        Sys_SendPacket(common, length, data, to);
     }
 }
 
@@ -273,9 +235,7 @@ pub fn NET_StringToAdr(s: *const c_char, a: *mut netadr_t) -> qboolean {
         }
 
         // look for a port number
-        // PORT-NOTE(Q_strncpyz): Raven copies into a fixed `char
-        // base[MAX_STRING_CHARS]` via `Q_strncpyz` before scanning for ':';
-        // collapsed to an owned `String` with the same truncation length.
+        // Raven copies into a fixed `char base[MAX_STRING_CHARS]` via `Q_strncpyz` before scanning for ':'; collapsed here to an owned `String` truncated to the same length.
         let mut base = s_str;
         if base.len() > (MAX_STRING_CHARS - 1) {
             base.truncate(MAX_STRING_CHARS - 1);
@@ -288,10 +248,6 @@ pub fn NET_StringToAdr(s: *const c_char, a: *mut netadr_t) -> qboolean {
             None
         };
 
-        // PORT-NOTE(host-seam-gap): the resolved signature carries no host
-        // receiver to reach `Sys_StringToAdr` (a `PlatformHost` method) —
-        // called bare by its Raven name exactly as the packet's LAW
-        // signature prints it; escalated (shape_mismatches/missing_symbols).
         let r: bool = Sys_StringToAdr(&base, &mut *a);
 
         if !r {
@@ -306,10 +262,7 @@ pub fn NET_StringToAdr(s: *const c_char, a: *mut netadr_t) -> qboolean {
         }
 
         if let Some(p) = port_str {
-            // PORT-NOTE(atoi): manual leading-integer scan matching C
-            // `atoi` semantics (leading whitespace/sign, stop at first
-            // non-digit, 0 on no digits) rather than `str::parse`'s
-            // all-or-nothing behavior.
+            // Manual leading-integer scan matches C `atoi` semantics (leading whitespace/sign, stop at first non-digit, 0 on no digits) rather than `str::parse`'s all-or-nothing behavior.
             let trimmed = p.trim_start();
             let neg = trimmed.starts_with('-');
             let digits: String = trimmed
@@ -344,9 +297,7 @@ pub fn Netchan_Init(
     let port = port & 0xffff;
 
     unsafe {
-        // PORT-NOTE(cvar-globals): see the file-level note — `->integer`
-        // reads collapse the not-yet-landed cvar registry to plain `i32`
-        // fields, following `common.rs`'s existing `cl_shownet` precedent.
+        // `->integer` is cached into a plain `i32` field once here, not re-read live like Raven's `cvar_t*` — a runtime `/set` won't be reflected after init.
         let showpackets_cvar = Cvar_Get(common, cm, rm, host, c"showpackets".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
         common.showpackets = (*showpackets_cvar).integer;
 

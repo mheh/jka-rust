@@ -5,16 +5,22 @@ use crate::qcommon::sys_event_t::sysEvent_t;
 /// `MAX_QUED_EVENTS` (`win_main.cpp:1162`).
 pub const MAX_QUED_EVENTS: usize = 256;
 
+/// `MASK_QUED_EVENTS` (`win_main.cpp:1163`) — `MAX_QUED_EVENTS - 1`, the ring
+/// index mask.
+pub const MASK_QUED_EVENTS: usize = MAX_QUED_EVENTS - 1;
+
 /// Faithful queue semantics of `eventQue[256]` (`win_main.cpp:1162-1203`). NOT
 /// the 1024-entry `com_pushedEvents` ring (`Common.event_queue`).
 ///
+/// The `Sys_QueEvent`/`Sys_GetEvent` logic lives in `sys_engine.rs` (it threads
+/// `Common` for `Z_Free`/`Sys_Milliseconds`), so the ring exposes its fields
+/// `pub(crate)` rather than owning the behavior.
+///
 /// Source: `oracle/codemp/win32/win_main.cpp:1162-1166`
-// Ported engine-boot state; read once the `Sys_QueEvent`/`Sys_GetEvent` slice is wired.
-#[allow(dead_code)]
 pub struct SysEventQueue {
     /// `eventQue[MAX_QUED_EVENTS]`.
-    que: [sysEvent_t; MAX_QUED_EVENTS],
-    /// Monotonic; `& (MAX_QUED_EVENTS-1)` to index.
-    head: usize,
-    tail: usize,
+    pub(crate) que: [sysEvent_t; MAX_QUED_EVENTS],
+    /// `eventHead`/`eventTail`, monotonic; `& MASK_QUED_EVENTS` to index.
+    pub(crate) head: i32,
+    pub(crate) tail: i32,
 }

@@ -37,6 +37,7 @@ pub mod qfiles;
 pub mod roff;
 pub mod stringed;
 pub mod sys_engine;
+pub mod sys_net;
 pub mod terrain_handle;
 pub mod timing;
 pub mod unzip;

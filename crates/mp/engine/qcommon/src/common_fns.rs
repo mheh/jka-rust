@@ -52,6 +52,7 @@ use crate::files_common::{
 };
 use crate::msg::{MSG_Init, MSG_shutdownHuffman};
 use crate::stringed::api::SE_Init;
+use crate::sys_engine::Sys_GetEvent;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 
@@ -636,9 +637,7 @@ pub fn Com_GetRealEvent(
             }
         }
     } else {
-        // Raven `Sys_GetEvent()` — a PlatformHost seam with no host receiver in
-        // the resolved signature; called bare by its Raven name (honest E0425).
-        ev = Sys_GetEvent();
+        ev = Sys_GetEvent(common, cm, rm, host);
 
         // write the journal value out if needed
         if unsafe { (*common.com_journal).integer } == 1 {

@@ -19,4 +19,4 @@ pub use engine_hooks::EngineHooks;
 pub use error::{com_error, ComError, ErrorLevel, ErrorState};
 pub use journal::Journal;
 pub use qrand::QRand;
-pub use sys_event_queue::{SysEventQueue, MAX_QUED_EVENTS};
+pub use sys_event_queue::{SysEventQueue, MASK_QUED_EVENTS, MAX_QUED_EVENTS};
