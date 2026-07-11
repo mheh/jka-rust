@@ -34,6 +34,7 @@ use mp_host_interface::engine_host::EngineHost;
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
 use crate::server_host::{ghoul2_slot, server_slot};
+use crate::sv_renderer::{R_InitShaders, R_SVModelInit, RE_RegisterMedia_LevelLoadBegin};
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use crate::sv_game::{SV_GentityNum, SV_InitGameProgs, SV_ShutdownGameProgs};
 use crate::sv_bot::{SV_BotFrame, SV_BotInitBotLib, SV_BotInitCvars};

@@ -86,6 +86,30 @@ impl RmManager {
     }
 }
 
+/// Type-erased slot for the `mp_renderer` `RenderModels` state (the FROZEN
+/// `tr-model.md` model registry, owned by `Engine.render_models`); qcommon is
+/// pass-through only — never dereferences it. Cast back to the real
+/// `mp_renderer::tr_model::render_models::RenderModels` at the server-crate
+/// boundary. Re-exported as `cm_load::RenderModels`, the name the cm_load/server
+/// threading uses.
+///
+/// Ruling: opaque-slot (user, 2026-07-12, option A) — same treatment as the
+/// sibling `RmManager`/`Ghoul2System` receivers, since qcommon sits below
+/// `mp_renderer`/`mp_engine_server` in the crate graph and cannot name the real
+/// state struct without cycling.
+#[repr(transparent)]
+pub struct RenderModels(*mut ());
+
+impl RenderModels {
+    pub fn from_raw(p: *mut ()) -> RenderModels {
+        RenderModels(p)
+    }
+
+    pub fn as_raw(&mut self) -> *mut () {
+        self.0
+    }
+}
+
 /// Type-erased slot for the `mp_engine_ghoul2` `Ghoul2System` state; qcommon is
 /// pass-through only — never dereferences it.
 ///

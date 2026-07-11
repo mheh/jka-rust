@@ -16,6 +16,7 @@ pub mod sv_game;
 pub mod sv_init;
 pub mod sv_main;
 pub mod sv_net_chan;
+pub mod sv_renderer;
 pub mod sv_snapshot;
 pub mod sv_world;
 

@@ -19,9 +19,11 @@ use mp_engine_qcommon::vm::vm_s::vm_t;
 use mp_engine_qcommon::cmd_pc::Server as CmdServerSlot;
 use mp_engine_qcommon::common::opaque_slots::Ghoul2System as CmdGhoul2Slot;
 use mp_engine_qcommon::cm_load::RmManager as CmRmManagerSlot;
+use mp_engine_qcommon::cm_load::RenderModels as CmRenderModelsSlot;
 
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_rmg::rm_manager::RmManager as RealRmManager;
+use mp_engine_renderer::tr_model::render_models::RenderModels as RealRenderModels;
 
 use crate::server::bot_debugpoly_t::bot_debugpoly_t;
 use crate::server::server_static_t::serverStatic_t;
@@ -242,6 +244,29 @@ pub fn rmg_slot(rmg: &mut RealRmManager) -> CmRmManagerSlot {
 /// uniquely borrowable for the returned reference's lifetime.
 pub unsafe fn rmg_from_slot(slot: &mut CmRmManagerSlot) -> &mut RealRmManager {
     &mut *(slot.as_raw() as *mut RealRmManager)
+}
+
+/// Wrap a live `&mut RenderModels` (the real `mp_renderer` model registry, owned
+/// by `Engine.render_models`, `tr-model.md`) into qcommon's type-erased
+/// `cm_load::RenderModels` slot for passing INTO the cm_load/server threading.
+/// qcommon never dereferences the slot — it only threads it back to server
+/// handlers, where `rm_from_slot` casts it back. Opaque-slot ruling (user,
+/// 2026-07-12, option A).
+pub fn rm_slot(rm: &mut RealRenderModels) -> CmRenderModelsSlot {
+    CmRenderModelsSlot::from_raw(rm as *mut RealRenderModels as *mut ())
+}
+
+/// Cast a qcommon `cm_load::RenderModels` slot back into the live real
+/// `mp_renderer::tr_model::render_models::RenderModels`, inside a server handler
+/// body (the model-registry entry points in `sv_renderer.rs`).
+///
+/// SAFETY: every slot reaching a server handler was constructed by `rm_slot`
+/// from a live, unique `&mut RenderModels` that outlives the entire dispatch
+/// call (the engine is single-threaded and holds no other borrow of that
+/// `RenderModels` across the seam), so the erased pointer is non-null,
+/// well-aligned, and uniquely borrowable for the returned reference's lifetime.
+pub unsafe fn rm_from_slot(slot: &mut CmRenderModelsSlot) -> &mut RealRenderModels {
+    &mut *(slot.as_raw() as *mut RealRenderModels)
 }
 
 /// engine-seam's name for the game dispatcher's `&mut ServerGame` argument — the

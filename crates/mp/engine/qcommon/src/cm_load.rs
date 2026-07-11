@@ -67,8 +67,15 @@ use crate::qfiles::lump_indices::{
 use crate::qfiles::lump_t::lump_t;
 use crate::qfiles::map_surface_type_t::mapSurfaceType_t;
 
-#[allow(dead_code)]
-pub struct RenderModels;
+/// `RenderModels` — the type-erased opaque slot for `mp_renderer`'s real
+/// `RenderModels` (the FROZEN `tr-model.md` model registry, owned by
+/// `Engine.render_models`), threaded (never dereferenced) by cm_load/server.
+/// The owning server crate casts it back at its boundary (`rm_from_slot`).
+/// Named here because the cm_load/server threading refers to
+/// `cm_load::RenderModels`. Same treatment as the sibling `RmManager` slot.
+///
+/// Ruling: opaque-slot (user, 2026-07-12, option A).
+pub use crate::common::opaque_slots::RenderModels;
 
 /// `RmManager` — the type-erased opaque slot for `mp_engine_rmg`'s real
 /// `RmManager`, threaded (never dereferenced) by cm_load/server. The owning
