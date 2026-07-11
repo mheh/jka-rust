@@ -4,6 +4,7 @@
 ///
 /// Type definition source: `oracle/codemp/qcommon/../server/server.h:114-121`
 #[repr(i32)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum clientState_t {
     /// can be reused for a new connection
     CS_FREE = 0,

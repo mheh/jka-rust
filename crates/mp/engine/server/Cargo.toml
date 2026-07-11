@@ -7,7 +7,12 @@ edition = "2021"
 name = "mp_engine_server"
 
 [dependencies]
+libc = "0.2"
 mp_qshared = { path = "../../qshared" }
+# bg_public constants/enums (entity_type, entity_flags, configstring, gametype)
+# that Raven's server includes via bg_public.h; acyclic (bg is Tier 1, below the
+# engine) — mirrors mp_engine_botlib's existing mp_bg dependency.
+mp_bg = { path = "../../bg" }
 mp_engine_qcommon = { path = "../qcommon" }
 mp_abi = { path = "../../abi" }
 # EngineHost trait seam consumed by the npcnav host-taking methods (NAV-D3 /

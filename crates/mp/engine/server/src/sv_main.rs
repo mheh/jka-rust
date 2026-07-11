@@ -18,10 +18,7 @@ use crate::server_host::NEW_RESOLVE_DURATION;
 use crate::Server;
 use mp_qshared::shared::q_string::{Q_strncmp, Q_strncpyz};
 
-extern "C" {
-    fn strlen(s: *const c_char) -> usize;
-    fn sscanf(s: *const c_char, fmt: *const c_char, ...) -> c_int;
-}
+use libc::{sscanf, strlen};
 
 /// Raven `SV_ExpandNewlines` — expands `\n` in a string to a slash and 'n'
 /// (so it can be printed on a single line).

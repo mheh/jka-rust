@@ -4,6 +4,7 @@
 ///
 /// Type definition source: `oracle/codemp/qcommon/../server/server.h:47-51`
 #[repr(i32)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum serverState_t {
     /// no map loaded
     SS_DEAD = 0,

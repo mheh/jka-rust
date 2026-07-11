@@ -8,12 +8,12 @@
 
 use core::ffi::c_int;
 
-use mp_engine_ghoul2::Ghoul2System;
+use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
-use mp_engine_renderer::RenderModels;
-use mp_engine_rmg::RmManager;
-use mp_host_interface::EngineHost;
+use mp_engine_qcommon::cm_load::RenderModels;
+use mp_engine_qcommon::cm_load::RmManager;
+use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_GENTITIES};
@@ -30,18 +30,9 @@ use crate::server::sv_entity_s::{svEntity_t, MAX_ENT_CLUSTERS};
 use crate::server::world_sector_s::{worldSector_t, AREA_DEPTH, AREA_NODES, MAX_TOTAL_ENT_LEAFS};
 use crate::Server;
 
-// PORT-NOTE(missing-symbols): `SV_SvEntityForGentity`, `Com_Printf`,
-// `Com_DPrintf` (engine-side, `common`-receiver forms), and the
-// `CollisionWorld`-receiver `CM_InlineModel`/`CM_ModelBounds`/
-// `CM_BoxLeafnums`/`CM_LeafArea`/`CM_LeafCluster`/`CM_PointContents`/
-// `CM_TransformedPointContents`/`CM_TempBoxModel`/`CM_FindSubBSP`-family
-// functions are called here by bare/qualified name exactly as the packets
-// resolve them; none exist in the tree at this shard's cut (grepped — no
-// hits under `crates/mp/engine/qcommon/src`). Escalated in missing_symbols
-// rather than stubbed, per the zero-park rule. `G2API_CollisionDetect`/
-// `G2API_CollisionDetectCache` (the engine-side `(g2, host)`-receiver forms,
-// distinct from the game-tier trap wrappers in `mp_game::trap`) are likewise
-// absent and escalated.
+// G2API_CollisionDetect[Cache]: the ported ghoul2 fns take &mut CGhoul2Info_v
+// and return Vec<CollisionRecord_t>; this file's g2trace loop expects the
+// out-param array form — call sites bend when the ghoul2 server wave lands.
 
 /// Raven `VectorDistance` (`sv_world.cpp`-local `static float`).
 ///
@@ -79,11 +70,11 @@ fn VectorLength(v: vec3_t) -> f32 {
 }
 
 // PORT-NOTE(radius-from-bounds): `RadiusFromBounds` (qshared `q_math.c`) is
-// currently only reachable at `mp_game::q_math::RadiusFromBounds` (grepped —
+// currently only reachable at `mp_qshared::shared::q_math::RadiusFromBounds` (grepped —
 // no qshared/native_math home yet); called by that path, escalated in
 // missing_symbols for the eventual qshared relocation.
 fn RadiusFromBounds(mins: vec3_t, maxs: vec3_t) -> f32 {
-    mp_game::q_math::RadiusFromBounds(mins, maxs)
+    mp_qshared::shared::q_math::RadiusFromBounds(mins, maxs)
 }
 
 /// Raven `SV_CreateworldSector`.
@@ -156,7 +147,7 @@ pub fn SV_SectorList_f(common: &mut Common, sv: &mut Server) {
                 ent = (*ent).nextEntityInWorldSector;
             }
         }
-        mp_engine_qcommon::common::common::Com_Printf(
+        mp_engine_qcommon::common::common::com_printf(
             common,
             &format!("sector {}: {} entities\n", i, c),
         );
@@ -168,7 +159,7 @@ pub fn SV_SectorList_f(common: &mut Common, sv: &mut Server) {
 /// Source: `oracle/codemp/server/sv_world.cpp:151-179`
 pub fn SV_UnlinkEntity(common: &mut Common, sv: &mut Server, gEnt: *mut sharedEntity_t) {
     unsafe {
-        let ent = mp_engine_qcommon::common::common::SV_SvEntityForGentity(sv, gEnt);
+        let ent = SV_SvEntityForGentity(sv, gEnt);
 
         (*gEnt).r.linked = 0;
 
@@ -192,7 +183,7 @@ pub fn SV_UnlinkEntity(common: &mut Common, sv: &mut Server, gEnt: *mut sharedEn
             scan = (*scan).nextEntityInWorldSector;
         }
 
-        mp_engine_qcommon::common::common::Com_Printf(
+        mp_engine_qcommon::common::common::com_printf(
             common,
             "WARNING: SV_UnlinkEntity: not found in worldSector\n",
         );
@@ -213,7 +204,7 @@ pub fn SV_AreaEntities_r(
         while !check.is_null() {
             let next = (*check).nextEntityInWorldSector;
 
-            let gcheck = mp_engine_qcommon::common::common::SV_GEntityForSvEntity(sv, check);
+            let gcheck = crate::sv_game::SV_GEntityForSvEntity(sv, check);
 
             if (*gcheck).r.absmin[0] > (*ap).maxs.offset(0).read()
                 || (*gcheck).r.absmin[1] > (*ap).maxs.offset(1).read()
@@ -227,7 +218,7 @@ pub fn SV_AreaEntities_r(
             }
 
             if (*ap).count == (*ap).maxcount {
-                mp_engine_qcommon::common::common::Com_DPrintf(
+                mp_engine_qcommon::common_fns::Com_DPrintf(
                     common,
                     "SV_AreaEntities: MAXCOUNT\n",
                 );
@@ -264,15 +255,15 @@ pub fn SV_ClipHandleForEntity(cm: &mut CollisionWorld, ent: *const sharedEntity_
     unsafe {
         if (*ent).r.bmodel != 0 {
             // explicit hulls in the BSP model
-            return mp_engine_qcommon::cm::CM_InlineModel(cm, (*ent).s.modelindex);
+            return mp_engine_qcommon::cm_load::CM_InlineModel(cm, (*ent).s.modelindex);
         }
         if (*ent).r.svFlags & SVF_CAPSULE != 0 {
             // create a temp capsule from bounding box sizes
-            return mp_engine_qcommon::cm::CM_TempBoxModel(cm, (*ent).r.mins, (*ent).r.maxs, 1);
+            return mp_engine_qcommon::cm_load::CM_TempBoxModel(cm, (*ent).r.mins, (*ent).r.maxs, 1);
         }
 
         // create a temp tree from bounding box sizes
-        mp_engine_qcommon::cm::CM_TempBoxModel(cm, (*ent).r.mins, (*ent).r.maxs, 0)
+        mp_engine_qcommon::cm_load::CM_TempBoxModel(cm, (*ent).r.mins, (*ent).r.maxs, 0)
     }
 }
 
@@ -292,7 +283,7 @@ pub fn SV_LinkEntity(
     gEnt: *mut sharedEntity_t,
 ) {
     unsafe {
-        let ent = mp_engine_qcommon::common::common::SV_SvEntityForGentity(sv, gEnt);
+        let ent = SV_SvEntityForGentity(sv, gEnt);
 
         if !(*ent).worldSector.is_null() {
             SV_UnlinkEntity(common, sv, gEnt); // unlink from old position
@@ -379,7 +370,7 @@ pub fn SV_LinkEntity(
         //get all leafs, including solids
         let mut leafs: [c_int; MAX_TOTAL_ENT_LEAFS] = [0; MAX_TOTAL_ENT_LEAFS];
         let mut lastLeaf: c_int = 0;
-        let num_leafs = mp_engine_qcommon::cm::CM_BoxLeafnums(
+        let num_leafs = mp_engine_qcommon::cm_test::CM_BoxLeafnums(
             cm,
             (*gEnt).r.absmin,
             (*gEnt).r.absmax,
@@ -397,7 +388,7 @@ pub fn SV_LinkEntity(
         // set areas, even from clusters that don't fit in the entity array
         let mut i: c_int = 0;
         while i < num_leafs {
-            let area = mp_engine_qcommon::cm::CM_LeafArea(cm, leafs[i as usize]);
+            let area = CM_LeafArea(cm, leafs[i as usize]);
             if area != -1 {
                 // doors may legally straggle two areas,
                 // but nothing should evern need more than that
@@ -406,7 +397,7 @@ pub fn SV_LinkEntity(
                         && (*ent).areanum2 != area
                         && sv.sv.state == serverState_t::SS_LOADING
                     {
-                        mp_engine_qcommon::common::common::Com_DPrintf(
+                        mp_engine_qcommon::common_fns::Com_DPrintf(
                             common,
                             &format!(
                                 "Object {} touching 3 areas at {} {} {}\n",
@@ -429,7 +420,7 @@ pub fn SV_LinkEntity(
         (*ent).numClusters = 0;
         let mut i: c_int = 0;
         while i < num_leafs {
-            let cluster = mp_engine_qcommon::cm::CM_LeafCluster(cm, leafs[i as usize]);
+            let cluster = CM_LeafCluster(cm, leafs[i as usize]);
             if cluster != -1 {
                 (*ent).clusternums[(*ent).numClusters as usize] = cluster;
                 (*ent).numClusters += 1;
@@ -442,7 +433,7 @@ pub fn SV_LinkEntity(
 
         // store off a last cluster if we need to
         if i != num_leafs {
-            (*ent).lastCluster = mp_engine_qcommon::cm::CM_LeafCluster(cm, lastLeaf);
+            (*ent).lastCluster = CM_LeafCluster(cm, lastLeaf);
         }
 
         (*gEnt).r.linkcount += 1;
@@ -491,12 +482,10 @@ pub fn SV_AreaEntities(
         maxcount,
     };
 
-    SV_AreaEntities_r(
-        common,
-        sv,
-        sv.world_sectors.sv_worldSectors.as_mut_ptr(),
-        &mut ap,
-    );
+    // Take the raw node pointer before passing `sv` — the raw pointer aliases
+    // into `sv.world_sectors` (as in Raven) without holding a borrow.
+    let node = sv.world_sectors.sv_worldSectors.as_mut_ptr();
+    SV_AreaEntities_r(common, sv, node, &mut ap);
 
     ap.count
 }
@@ -516,10 +505,12 @@ pub fn SV_ClearWorld(cm: &mut CollisionWorld, sv: &mut Server) {
     sv.world_sectors.sv_numworldSectors = 0;
 
     // get world map bounds
-    let h = mp_engine_qcommon::cm::CM_InlineModel(cm, 0);
+    let h = mp_engine_qcommon::cm_load::CM_InlineModel(cm, 0);
     let mut mins: vec3_t = [0.0; 3];
     let mut maxs: vec3_t = [0.0; 3];
-    mp_engine_qcommon::cm::CM_ModelBounds(cm, h, &mut mins, &mut maxs);
+    // CM_ModelBounds now takes mins/maxs by value (shape-mismatch out-param
+    // documented at its definition, cm_load.rs); reconciled call, no write-back.
+    mp_engine_qcommon::cm_load::CM_ModelBounds(cm, h, mins, maxs);
     SV_CreateworldSector(sv, 0, mins, maxs);
 }
 
@@ -534,11 +525,11 @@ pub fn SV_PointContents(
     passEntityNum: c_int,
 ) -> c_int {
     // get base contents from world
-    let mut contents = mp_engine_qcommon::cm::CM_PointContents(cm, p, 0);
+    let mut contents = mp_engine_qcommon::cm_test::CM_PointContents(cm, p, 0);
 
     // or in contents from all the other entities
     let mut touch: [c_int; MAX_GENTITIES as usize] = [0; MAX_GENTITIES as usize];
-    let num = SV_AreaEntities(common, sv, p, p, touch.as_mut_ptr(), MAX_GENTITIES);
+    let num = SV_AreaEntities(common, sv, p, p, touch.as_mut_ptr(), MAX_GENTITIES as c_int);
 
     unsafe {
         for i in 0..num {
@@ -553,7 +544,7 @@ pub fn SV_PointContents(
                 angles = VEC3_ORIGIN; // boxes don't rotate
             }
 
-            let c2 = mp_engine_qcommon::cm::CM_TransformedPointContents(
+            let c2 = mp_engine_qcommon::cm_test::CM_TransformedPointContents(
                 cm,
                 p,
                 clipHandle,
@@ -670,7 +661,7 @@ pub fn SV_ClipMoveToEntities(
             (*clip).boxmins,
             (*clip).boxmaxs,
             touchlist.as_mut_ptr(),
-            MAX_GENTITIES,
+            MAX_GENTITIES as c_int,
         );
 
         let passOwnerNum: c_int;
@@ -846,20 +837,20 @@ pub fn SV_ClipMoveToEntities(
                     slot.mEntityNum = -1;
                 }
 
-                if ((*touch).s.number) < MAX_CLIENTS {
+                if ((*touch).s.number) < MAX_CLIENTS as c_int {
                     VectorCopy((*touch).s.apos.trBase, &mut angles2);
                 } else {
                     VectorCopy((*touch).r.currentAngles, &mut angles2);
                 }
-                angles2[mp_game::q_math::ROLL as usize] = 0.0;
-                angles2[mp_game::q_math::PITCH as usize] = 0.0;
+                angles2[mp_qshared::shared::q_math::ROLL as usize] = 0.0;
+                angles2[mp_qshared::shared::q_math::PITCH as usize] = 0.0;
 
                 // PORT-NOTE(FINAL_BUILD): Raven guards this Com_Printf debug
                 // line with `#ifndef FINAL_BUILD`; FINAL_BUILD is undefined
                 // for this build per plan appendix, so the guard is always
                 // true and the print is unconditional here.
                 if host.cvar_integer("sv_showghoultraces") != 0 {
-                    mp_engine_qcommon::common::common::Com_Printf(
+                    mp_engine_qcommon::common::common::com_printf(
                         common,
                         &format!(
                             "Ghoul2 trace   lod={:1}   length={:6.0}   to {}\n",

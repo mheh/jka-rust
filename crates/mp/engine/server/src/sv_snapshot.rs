@@ -2,7 +2,7 @@
 
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
-use mp_engine_renderer::tr_model::render_models::RenderModels;
+use mp_engine_qcommon::cm_load::RenderModels;
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 

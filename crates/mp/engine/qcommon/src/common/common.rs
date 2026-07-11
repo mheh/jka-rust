@@ -254,6 +254,40 @@ pub struct Common {
     ///
     /// Source: `oracle/codemp/server/server.h:244`
     pub sv_maxclients: *mut cvar_t,
+    /// Raven `sv_main.cpp` server file-scope `cvar_t*` globals (the `sv_*` set),
+    /// homed on `Common` alongside `sv_maxclients`/`sv_paused`.
+    ///
+    /// Source: `oracle/codemp/server/sv_main.cpp:14-42`; `server.h:238-264`
+    pub sv_fps: *mut cvar_t,
+    pub sv_timeout: *mut cvar_t,
+    pub sv_zombietime: *mut cvar_t,
+    pub sv_rconPassword: *mut cvar_t,
+    pub sv_privatePassword: *mut cvar_t,
+    pub sv_privateClients: *mut cvar_t,
+    pub sv_hostname: *mut cvar_t,
+    pub sv_allowDownload: *mut cvar_t,
+    /// `cvar_t *sv_master[MAX_MASTER_SERVERS]` (MAX_MASTER_SERVERS == 5).
+    pub sv_master: [*mut cvar_t; 5],
+    pub sv_reconnectlimit: *mut cvar_t,
+    pub sv_showghoultraces: *mut cvar_t,
+    pub sv_showloss: *mut cvar_t,
+    pub sv_padPackets: *mut cvar_t,
+    pub sv_killserver: *mut cvar_t,
+    pub sv_mapname: *mut cvar_t,
+    pub sv_mapChecksum: *mut cvar_t,
+    pub sv_serverid: *mut cvar_t,
+    pub sv_maxRate: *mut cvar_t,
+    pub sv_minPing: *mut cvar_t,
+    pub sv_maxPing: *mut cvar_t,
+    pub sv_gametype: *mut cvar_t,
+    pub sv_pure: *mut cvar_t,
+    pub sv_floodProtect: *mut cvar_t,
+    pub sv_needpass: *mut cvar_t,
+    /// Raven `SV_AddOperatorCommands`'s `static qboolean initialized` guard
+    /// (fn-static hoist).
+    ///
+    /// Source: `oracle/codemp/server/sv_ccmds.cpp:959`
+    pub sv_ccmds_operator_commands_initialized: qboolean,
     /// Raven `Com_EventLoop`'s `random()` drop-sim seed (fn-static hoist).
     ///
     /// Source: `oracle/codemp/qcommon/common.cpp:900-915`
