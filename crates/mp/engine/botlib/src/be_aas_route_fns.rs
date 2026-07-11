@@ -8,14 +8,14 @@
 //! constants-only) — `.rs` + `/mod.rs` for the same module name cannot coexist,
 //! so this file lands at the `_fns` escape per `_PREAMBLE.md`'s destination rule.
 
-use std::os::raw::c_int;
+use std::os::raw::{c_int, c_ulong};
 
 use mp_qshared::common::mp::botlib::aas_predictroute_s::aas_predictroute_s;
 use mp_qshared::common::mp::botlib::aas_route_stop_event::{
     RSE_ENTERAREA, RSE_ENTERCONTENTS, RSE_NONE, RSE_NOROUTE, RSE_USETRAVELTYPE,
 };
 use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
-use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE, PRT_WARNING};
+use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL, PRT_MESSAGE, PRT_WARNING};
 use mp_qshared::common::mp::botlib::travel_flags::{
     TFL_AIR, TFL_BARRIERJUMP, TFL_BFGJUMP, TFL_BRIDGE, TFL_CROUCH, TFL_DEFAULT, TFL_DONOTENTER,
     TFL_DOUBLEJUMP, TFL_ELEVATOR, TFL_FUNCBOB, TFL_GRAPPLEHOOK, TFL_INVALID, TFL_JUMP, TFL_JUMPPAD,
@@ -267,7 +267,7 @@ pub fn AAS_FreeRoutingCache(bot: &mut BotLib, cache: *mut aas_routingcache_t) {
     unsafe {
         bot.routingcachesize -= (*cache).size;
     }
-    crate::l_memory::FreeMemory(bot, cache as *mut std::ffi::c_void);
+    crate::l_memory_fns::FreeMemory(bot, cache as *mut ());
 }
 
 /// Raven `AAS_RoutingTime`.
@@ -308,7 +308,8 @@ pub fn AAS_ReadCache(bot: &mut BotLib, fp: fileHandle_t) -> *mut aas_routingcach
             std::mem::size_of::<c_int>() as c_int,
             fp,
         );
-        let cache = crate::l_memory::GetMemory(bot, size) as *mut aas_routingcache_t;
+        let cache =
+            crate::l_memory_fns::GetMemory(bot, size as c_ulong) as *mut aas_routingcache_t;
         (*cache).size = size;
         let size_field = std::mem::size_of::<c_int>() as c_int;
         bot.botimport.FS_Read(
@@ -477,6 +478,65 @@ pub fn AAS_ReachabilityFromNum(bot: &mut BotLib, num: c_int, reach: *mut aas_rea
     }
 }
 
+/// Raven `AAS_NextAreaReachability`.
+///
+/// Source: `oracle/codemp/botlib/be_aas_route.cpp:1922-1950`
+pub fn AAS_NextAreaReachability(bot: &mut BotLib, areanum: c_int, reachnum: c_int) -> c_int {
+    if bot.aasworld.initialized == qfalse {
+        return 0;
+    }
+    if areanum <= 0 || areanum >= bot.aasworld.numareas {
+        bot.botimport.Print(
+            PRT_ERROR,
+            &format!("AAS_NextAreaReachability: areanum {} out of range\n", areanum),
+        );
+        return 0;
+    }
+    let settings = bot.aasworld.areasettings[areanum as usize];
+    if reachnum == 0 {
+        return settings.firstreachablearea;
+    }
+    if reachnum < settings.firstreachablearea {
+        bot.botimport.Print(
+            PRT_FATAL,
+            "AAS_NextAreaReachability: reachnum < settings->firstreachableara",
+        );
+        return 0;
+    }
+    let reachnum = reachnum + 1;
+    if reachnum >= settings.firstreachablearea + settings.numreachableareas {
+        return 0;
+    }
+    reachnum
+}
+
+/// Raven `AAS_NextModelReachability`.
+///
+/// Source: `oracle/codemp/botlib/be_aas_route.cpp:1957-1977`
+pub fn AAS_NextModelReachability(bot: &mut BotLib, num: c_int, modelnum: c_int) -> c_int {
+    let mut num = num;
+    if num <= 0 {
+        num = 1;
+    } else if num >= bot.aasworld.reachabilitysize {
+        return 0;
+    } else {
+        num += 1;
+    }
+    for i in num..bot.aasworld.reachabilitysize {
+        let reach = &bot.aasworld.reachability[i as usize];
+        if (reach.traveltype & TRAVELTYPE_MASK) == TRAVEL_ELEVATOR {
+            if reach.facenum == modelnum {
+                return i;
+            }
+        } else if (reach.traveltype & TRAVELTYPE_MASK) == TRAVEL_FUNCBOB {
+            if (reach.facenum & 0x0000_FFFF) == modelnum {
+                return i;
+            }
+        }
+    }
+    0
+}
+
 /// Raven `DistancePointToLine`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:2049-2056`
@@ -526,14 +586,14 @@ pub fn AAS_RemoveRoutingCacheInCluster(bot: &mut BotLib, clusternum: c_int) {
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:385-395`
 pub fn AAS_InitAreaContentsTravelFlags(bot: &mut BotLib) {
     if !bot.aasworld.areacontentstravelflags.is_null() {
-        crate::l_memory::FreeMemory(
+        crate::l_memory_fns::FreeMemory(
             bot,
-            bot.aasworld.areacontentstravelflags as *mut std::ffi::c_void,
+            bot.aasworld.areacontentstravelflags as *mut (),
         );
     }
-    bot.aasworld.areacontentstravelflags = crate::l_memory::GetClearedMemory(
+    bot.aasworld.areacontentstravelflags = crate::l_memory_fns::GetClearedMemory(
         bot,
-        bot.aasworld.numareas * std::mem::size_of::<c_int>() as c_int,
+        (bot.aasworld.numareas * std::mem::size_of::<c_int>() as c_int) as c_ulong,
     ) as *mut c_int;
     for i in 0..bot.aasworld.numareas {
         let flags = AAS_GetAreaContentsTravelFlags(bot, i);
@@ -549,15 +609,15 @@ pub fn AAS_InitAreaContentsTravelFlags(bot: &mut BotLib) {
 pub fn AAS_CreateReversedReachability(bot: &mut BotLib) {
     unsafe {
         if !bot.aasworld.reversedreachability.is_null() {
-            crate::l_memory::FreeMemory(
+            crate::l_memory_fns::FreeMemory(
                 bot,
-                bot.aasworld.reversedreachability as *mut std::ffi::c_void,
+                bot.aasworld.reversedreachability as *mut (),
             );
         }
         let total = bot.aasworld.numareas as usize
             * std::mem::size_of::<aas_reversedreachability_t>()
             + bot.aasworld.reachabilitysize as usize * std::mem::size_of::<aas_reversedlink_t>();
-        let mut ptr = crate::l_memory::GetClearedMemory(bot, total as c_int) as *mut u8;
+        let mut ptr = crate::l_memory_fns::GetClearedMemory(bot, total as c_ulong) as *mut u8;
 
         bot.aasworld.reversedreachability = ptr as *mut aas_reversedreachability_t;
         ptr = ptr.add(
@@ -610,7 +670,7 @@ pub fn AAS_CreateReversedReachability(bot: &mut BotLib) {
 pub fn AAS_CalculateAreaTravelTimes(bot: &mut BotLib) {
     unsafe {
         if !bot.aasworld.areatraveltimes.is_null() {
-            crate::l_memory::FreeMemory(bot, bot.aasworld.areatraveltimes as *mut std::ffi::c_void);
+            crate::l_memory_fns::FreeMemory(bot, bot.aasworld.areatraveltimes as *mut ());
         }
         let mut size = bot.aasworld.numareas as usize * std::mem::size_of::<*mut *mut u16>();
         for i in 0..bot.aasworld.numareas {
@@ -622,7 +682,7 @@ pub fn AAS_CalculateAreaTravelTimes(bot: &mut BotLib) {
                 * (*revreach).numlinks as usize
                 * std::mem::size_of::<u16>();
         }
-        let mut ptr = crate::l_memory::GetClearedMemory(bot, size as c_int) as *mut u8;
+        let mut ptr = crate::l_memory_fns::GetClearedMemory(bot, size as c_ulong) as *mut u8;
         bot.aasworld.areatraveltimes = ptr as *mut *mut *mut u16;
         ptr = ptr.add(bot.aasworld.numareas as usize * std::mem::size_of::<*mut *mut u16>());
 
@@ -660,14 +720,14 @@ pub fn AAS_CalculateAreaTravelTimes(bot: &mut BotLib) {
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:583-596`
 pub fn AAS_InitPortalMaxTravelTimes(bot: &mut BotLib) {
     if !bot.aasworld.portalmaxtraveltimes.is_null() {
-        crate::l_memory::FreeMemory(
+        crate::l_memory_fns::FreeMemory(
             bot,
-            bot.aasworld.portalmaxtraveltimes as *mut std::ffi::c_void,
+            bot.aasworld.portalmaxtraveltimes as *mut (),
         );
     }
-    bot.aasworld.portalmaxtraveltimes = crate::l_memory::GetClearedMemory(
+    bot.aasworld.portalmaxtraveltimes = crate::l_memory_fns::GetClearedMemory(
         bot,
-        bot.aasworld.numportals * std::mem::size_of::<c_int>() as c_int,
+        (bot.aasworld.numportals * std::mem::size_of::<c_int>() as c_int) as c_ulong,
     ) as *mut c_int;
     for i in 0..bot.aasworld.numportals {
         let t = AAS_PortalMaxTravelTime(bot, i);
@@ -733,7 +793,8 @@ pub fn AAS_AllocRoutingCache(bot: &mut BotLib, numtraveltimes: c_int) -> *mut aa
         + numtraveltimes * std::mem::size_of::<u8>() as c_int;
     bot.routingcachesize += size;
     unsafe {
-        let cache = crate::l_memory::GetClearedMemory(bot, size) as *mut aas_routingcache_t;
+        let cache =
+            crate::l_memory_fns::GetClearedMemory(bot, size as c_ulong) as *mut aas_routingcache_t;
         (*cache).reachabilities = (cache as *mut u8).add(
             std::mem::size_of::<aas_routingcache_t>()
                 + numtraveltimes as usize * std::mem::size_of::<u16>(),
@@ -764,7 +825,7 @@ pub fn AAS_FreeAllClusterAreaCache(bot: &mut BotLib) {
                     std::ptr::null_mut();
             }
         }
-        crate::l_memory::FreeMemory(bot, bot.aasworld.clusterareacache as *mut std::ffi::c_void);
+        crate::l_memory_fns::FreeMemory(bot, bot.aasworld.clusterareacache as *mut ());
         bot.aasworld.clusterareacache = std::ptr::null_mut();
     }
 }
@@ -779,10 +840,10 @@ pub fn AAS_InitClusterAreaCache(bot: &mut BotLib) {
         size += bot.aasworld.clusters[i as usize].numareas;
     }
     unsafe {
-        let mut ptr = crate::l_memory::GetClearedMemory(
+        let mut ptr = crate::l_memory_fns::GetClearedMemory(
             bot,
-            bot.aasworld.numclusters * std::mem::size_of::<*mut *mut aas_routingcache_t>() as c_int
-                + size * std::mem::size_of::<*mut aas_routingcache_t>() as c_int,
+            (bot.aasworld.numclusters * std::mem::size_of::<*mut *mut aas_routingcache_t>() as c_int
+                + size * std::mem::size_of::<*mut aas_routingcache_t>() as c_int) as c_ulong,
         ) as *mut u8;
         bot.aasworld.clusterareacache = ptr as *mut *mut *mut aas_routingcache_t;
         ptr = ptr.add(
@@ -815,7 +876,7 @@ pub fn AAS_FreeAllPortalCache(bot: &mut BotLib) {
             }
             *bot.aasworld.portalcache.add(i as usize) = std::ptr::null_mut();
         }
-        crate::l_memory::FreeMemory(bot, bot.aasworld.portalcache as *mut std::ffi::c_void);
+        crate::l_memory_fns::FreeMemory(bot, bot.aasworld.portalcache as *mut ());
         bot.aasworld.portalcache = std::ptr::null_mut();
     }
 }
@@ -824,9 +885,9 @@ pub fn AAS_FreeAllPortalCache(bot: &mut BotLib) {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:828-833`
 pub fn AAS_InitPortalCache(bot: &mut BotLib) {
-    bot.aasworld.portalcache = crate::l_memory::GetClearedMemory(
+    bot.aasworld.portalcache = crate::l_memory_fns::GetClearedMemory(
         bot,
-        bot.aasworld.numareas * std::mem::size_of::<*mut aas_routingcache_t>() as c_int,
+        (bot.aasworld.numareas * std::mem::size_of::<*mut aas_routingcache_t>() as c_int) as c_ulong,
     ) as *mut *mut aas_routingcache_t;
 }
 
@@ -836,7 +897,7 @@ pub fn AAS_InitPortalCache(bot: &mut BotLib) {
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:840-863`
 pub fn AAS_InitRoutingUpdate(bot: &mut BotLib) {
     if !bot.aasworld.areaupdate.is_null() {
-        crate::l_memory::FreeMemory(bot, bot.aasworld.areaupdate as *mut std::ffi::c_void);
+        crate::l_memory_fns::FreeMemory(bot, bot.aasworld.areaupdate as *mut ());
     }
     let mut maxreachabilityareas = 0;
     for i in 0..bot.aasworld.numclusters {
@@ -844,17 +905,18 @@ pub fn AAS_InitRoutingUpdate(bot: &mut BotLib) {
             maxreachabilityareas = bot.aasworld.clusters[i as usize].numreachabilityareas;
         }
     }
-    bot.aasworld.areaupdate = crate::l_memory::GetClearedMemory(
+    bot.aasworld.areaupdate = crate::l_memory_fns::GetClearedMemory(
         bot,
-        maxreachabilityareas * std::mem::size_of::<aas_routingupdate_t>() as c_int,
+        (maxreachabilityareas * std::mem::size_of::<aas_routingupdate_t>() as c_int) as c_ulong,
     ) as *mut aas_routingupdate_t;
 
     if !bot.aasworld.portalupdate.is_null() {
-        crate::l_memory::FreeMemory(bot, bot.aasworld.portalupdate as *mut std::ffi::c_void);
+        crate::l_memory_fns::FreeMemory(bot, bot.aasworld.portalupdate as *mut ());
     }
-    bot.aasworld.portalupdate = crate::l_memory::GetClearedMemory(
+    bot.aasworld.portalupdate = crate::l_memory_fns::GetClearedMemory(
         bot,
-        (bot.aasworld.numportals + 1) * std::mem::size_of::<aas_routingupdate_t>() as c_int,
+        ((bot.aasworld.numportals + 1) * std::mem::size_of::<aas_routingupdate_t>() as c_int)
+            as c_ulong,
     ) as *mut aas_routingupdate_t;
 }
 
@@ -1054,24 +1116,25 @@ pub fn AAS_InitReachabilityAreas(bot: &mut BotLib) {
         [0; crate::be_aas_route::MAX_REACHABILITYPASSAREAS as usize];
 
     if !bot.aasworld.reachabilityareas.is_null() {
-        crate::l_memory::FreeMemory(bot, bot.aasworld.reachabilityareas as *mut std::ffi::c_void);
+        crate::l_memory_fns::FreeMemory(bot, bot.aasworld.reachabilityareas as *mut ());
     }
     if !bot.aasworld.reachabilityareaindex.is_null() {
-        crate::l_memory::FreeMemory(
+        crate::l_memory_fns::FreeMemory(
             bot,
-            bot.aasworld.reachabilityareaindex as *mut std::ffi::c_void,
+            bot.aasworld.reachabilityareaindex as *mut (),
         );
     }
 
-    bot.aasworld.reachabilityareas = crate::l_memory::GetClearedMemory(
+    bot.aasworld.reachabilityareas = crate::l_memory_fns::GetClearedMemory(
         bot,
-        bot.aasworld.reachabilitysize * std::mem::size_of::<aas_reachabilityareas_t>() as c_int,
+        (bot.aasworld.reachabilitysize * std::mem::size_of::<aas_reachabilityareas_t>() as c_int)
+            as c_ulong,
     ) as *mut aas_reachabilityareas_t;
-    bot.aasworld.reachabilityareaindex = crate::l_memory::GetClearedMemory(
+    bot.aasworld.reachabilityareaindex = crate::l_memory_fns::GetClearedMemory(
         bot,
-        bot.aasworld.reachabilitysize
+        (bot.aasworld.reachabilitysize
             * crate::be_aas_route::MAX_REACHABILITYPASSAREAS as c_int
-            * std::mem::size_of::<c_int>() as c_int,
+            * std::mem::size_of::<c_int>() as c_int) as c_ulong,
     ) as *mut c_int;
 
     let mut numreachareas = 0;
@@ -1157,9 +1220,9 @@ pub fn AAS_NearestHideArea(
         // Function-scope static `hidetraveltimes` (fork-3 rule): genuine
         // cross-frame state → a field on the owning host struct.
         if bot.hidetraveltimes.is_null() {
-            bot.hidetraveltimes = crate::l_memory::GetClearedMemory(
+            bot.hidetraveltimes = crate::l_memory_fns::GetClearedMemory(
                 bot,
-                bot.aasworld.numareas * std::mem::size_of::<u16>() as c_int,
+                (bot.aasworld.numareas * std::mem::size_of::<u16>() as c_int) as c_ulong,
             ) as *mut u16;
         } else {
             std::ptr::write_bytes(bot.hidetraveltimes, 0, bot.aasworld.numareas as usize);
@@ -1337,46 +1400,46 @@ pub fn AAS_FreeRoutingCaches(bot: &mut BotLib) {
     AAS_FreeAllClusterAreaCache(bot);
     AAS_FreeAllPortalCache(bot);
     if !bot.aasworld.areatraveltimes.is_null() {
-        crate::l_memory::FreeMemory(bot, bot.aasworld.areatraveltimes as *mut std::ffi::c_void);
+        crate::l_memory_fns::FreeMemory(bot, bot.aasworld.areatraveltimes as *mut ());
     }
     bot.aasworld.areatraveltimes = std::ptr::null_mut();
     if !bot.aasworld.portalmaxtraveltimes.is_null() {
-        crate::l_memory::FreeMemory(
+        crate::l_memory_fns::FreeMemory(
             bot,
-            bot.aasworld.portalmaxtraveltimes as *mut std::ffi::c_void,
+            bot.aasworld.portalmaxtraveltimes as *mut (),
         );
     }
     bot.aasworld.portalmaxtraveltimes = std::ptr::null_mut();
     if !bot.aasworld.reversedreachability.is_null() {
-        crate::l_memory::FreeMemory(
+        crate::l_memory_fns::FreeMemory(
             bot,
-            bot.aasworld.reversedreachability as *mut std::ffi::c_void,
+            bot.aasworld.reversedreachability as *mut (),
         );
     }
     bot.aasworld.reversedreachability = std::ptr::null_mut();
     if !bot.aasworld.areaupdate.is_null() {
-        crate::l_memory::FreeMemory(bot, bot.aasworld.areaupdate as *mut std::ffi::c_void);
+        crate::l_memory_fns::FreeMemory(bot, bot.aasworld.areaupdate as *mut ());
     }
     bot.aasworld.areaupdate = std::ptr::null_mut();
     if !bot.aasworld.portalupdate.is_null() {
-        crate::l_memory::FreeMemory(bot, bot.aasworld.portalupdate as *mut std::ffi::c_void);
+        crate::l_memory_fns::FreeMemory(bot, bot.aasworld.portalupdate as *mut ());
     }
     bot.aasworld.portalupdate = std::ptr::null_mut();
     if !bot.aasworld.reachabilityareas.is_null() {
-        crate::l_memory::FreeMemory(bot, bot.aasworld.reachabilityareas as *mut std::ffi::c_void);
+        crate::l_memory_fns::FreeMemory(bot, bot.aasworld.reachabilityareas as *mut ());
     }
     bot.aasworld.reachabilityareas = std::ptr::null_mut();
     if !bot.aasworld.reachabilityareaindex.is_null() {
-        crate::l_memory::FreeMemory(
+        crate::l_memory_fns::FreeMemory(
             bot,
-            bot.aasworld.reachabilityareaindex as *mut std::ffi::c_void,
+            bot.aasworld.reachabilityareaindex as *mut (),
         );
     }
     bot.aasworld.reachabilityareaindex = std::ptr::null_mut();
     if !bot.aasworld.areacontentstravelflags.is_null() {
-        crate::l_memory::FreeMemory(
+        crate::l_memory_fns::FreeMemory(
             bot,
-            bot.aasworld.areacontentstravelflags as *mut std::ffi::c_void,
+            bot.aasworld.areacontentstravelflags as *mut (),
         );
     }
     bot.aasworld.areacontentstravelflags = std::ptr::null_mut();
@@ -1663,7 +1726,7 @@ pub fn AAS_AreaRouteToGoalArea(
             }
             return qfalse;
         }
-        while crate::l_memory::AvailableMemory(bot) < 1 * 1024 * 1024 {
+        while crate::l_memory_fns::AvailableMemory(bot) < 1 * 1024 * 1024 {
             if AAS_FreeOldestCache(bot) == 0 {
                 break;
             }

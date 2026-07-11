@@ -779,7 +779,10 @@ pub fn SV_DirectConnect(
                             common,
                             &format!(
                                 "{}:reconnect rejected : too soon\n",
-                                mp_engine_qcommon::net_chan::NET_AdrToString(common, from)
+                                core::ffi::CStr::from_ptr(
+                                    mp_engine_qcommon::net_chan::NET_AdrToString(common, from)
+                                )
+                                .to_string_lossy()
                             ),
                         );
                         return;
@@ -931,7 +934,10 @@ pub fn SV_DirectConnect(
                         common,
                         &format!(
                             "{}:reconnect\n",
-                            mp_engine_qcommon::net_chan::NET_AdrToString(common, from)
+                            core::ffi::CStr::from_ptr(
+                                mp_engine_qcommon::net_chan::NET_AdrToString(common, from)
+                            )
+                            .to_string_lossy()
                         ),
                     );
                     reconnect_cl = cl;
@@ -1707,7 +1713,7 @@ pub fn SV_UserMove(
         let idx = ((*cl).reliableAcknowledge
             & (mp_engine_qcommon::qcommon::net_limits::MAX_RELIABLE_COMMANDS - 1))
             as usize;
-        key ^= mp_qshared::shared::Com_HashKey((*cl).reliableCommands[idx].as_mut_ptr(), 32);
+        key ^= mp_engine_qcommon::common_fns::Com_HashKey((*cl).reliableCommands[idx].as_mut_ptr(), 32);
 
         let mut cmds = [core::mem::zeroed::<usercmd_t>();
             mp_engine_qcommon::qcommon::net_limits::MAX_PACKET_USERCMDS as usize];

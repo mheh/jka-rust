@@ -72,6 +72,10 @@ extern "C" {
     fn LibVarSet(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char);
     fn PrintMemoryLabels();
     fn PrintUsedMemorySize();
+    // PORT-NOTE(fwd-decl): `Q_stricmp` is already ported in `mp_game::q_shared`
+    // but not reachable from this crate slice; forward-declared per the
+    // `l_precomp_fns.rs`/`l_libvar_fns.rs`/`cm_shader.rs` precedent.
+    fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int;
     // PORT-NOTE(variadic): matching the established `l_script_fns.rs`
     // forward-decl convention for the already-ported qshared `Com_sprintf`
     // seam — the C printf-format/varargs plumbing is resolved at
@@ -167,7 +171,7 @@ pub fn AAS_IndexFromString(
             if (*stringindex.offset(i as isize)).is_null() {
                 continue;
             }
-            if mp_qshared::shared::Q_stricmp(*stringindex.offset(i as isize), string) == 0 {
+            if Q_stricmp(*stringindex.offset(i as isize), string) == 0 {
                 return i;
             }
         }
@@ -231,7 +235,7 @@ pub fn AAS_UpdateStringIndexes(
                 libc::strcpy(bot.aasworld.configstrings[i as usize], src);
             }
         }
-        bot.aasworld.indexessetup = mp_qshared::qtrue as c_int;
+        bot.aasworld.indexessetup = mp_qshared::shared::qtrue as c_int;
     }
 }
 
@@ -258,7 +262,7 @@ pub fn AAS_Initialized(bot: &mut BotLib) -> c_int {
 /// §C10.
 pub fn AAS_SetInitialized(bot: &mut BotLib) {
     unsafe {
-        bot.aasworld.initialized = mp_qshared::qtrue as c_int;
+        bot.aasworld.initialized = mp_qshared::shared::qtrue as c_int;
         (bot.botimport.Print.unwrap())(PRT_MESSAGE, c"AAS initialized.\n".as_ptr() as *mut c_char);
     }
 }
@@ -298,7 +302,8 @@ pub fn AAS_ContinueInit(bot: &mut BotLib, time: f32) {
                 AAS_Optimize(bot);
             }
             // save the AAS file
-            if AAS_WriteAASFile(bot, bot.aasworld.filename.as_mut_ptr()) != 0 {
+            let filename_ptr = bot.aasworld.filename.as_mut_ptr();
+            if AAS_WriteAASFile(bot, filename_ptr) != 0 {
                 (bot.botimport.Print.unwrap())(
                     PRT_MESSAGE,
                     c"%s written succesfully\n".as_ptr() as *mut c_char,

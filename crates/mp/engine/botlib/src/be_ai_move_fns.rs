@@ -47,7 +47,7 @@ use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::common_fns::Com_Memset;
 use mp_qshared::shared::limits::MAX_MODELS;
 use mp_qshared::shared::q_math::PITCH;
-use mp_qshared::shared::Q_stricmp;
+use mp_game::q_shared::Q_stricmp;
 use mp_qshared::common::mp::botlib::aas_clientmove_s::aas_clientmove_t;
 use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_t;
 use mp_qshared::common::mp::botlib::aas_stop_event::{

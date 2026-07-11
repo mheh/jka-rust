@@ -52,6 +52,8 @@ use crate::be_ai_goal::bot_goalstate_s::{bot_goalstate_t, MAX_AVOIDGOALS, MAX_GO
 use crate::be_ai_goal::itemconfig_s::itemconfig_t;
 use crate::be_ai_goal::iteminfo_s::iteminfo_t;
 use crate::be_ai_goal::levelitem_s::levelitem_t;
+use crate::be_ai_goal::campspot_s::campspot_t;
+use crate::be_ai_goal::maplocation_s::maplocation_t;
 use crate::be_ai_weight::weightconfig_s::weightconfig_t;
 use crate::l_libvar::libvar_s::libvar_t;
 use crate::l_precomp::source_s::source_t;
@@ -338,7 +340,7 @@ pub fn BotGetLevelItemGoal(
             }
             let iteminfo_idx = (*li).iteminfo as usize;
             let ii = (*bot.itemconfig).iteminfo.add(iteminfo_idx);
-            if mp_qshared::shared::Q_stricmp(name, (*ii).name.as_ptr()) == 0 {
+            if mp_game::q_shared::Q_stricmp(name, (*ii).name.as_ptr()) == 0 {
                 (*goal).areanum = (*li).goalareanum;
                 (*goal).origin = (*li).goalorigin;
                 (*goal).entitynum = (*li).entitynum;
@@ -366,7 +368,7 @@ pub fn BotGetMapLocationGoal(bot: &mut BotLib, name: *mut c_char, goal: *mut bot
     unsafe {
         let mut ml = bot.maplocations;
         while !ml.is_null() {
-            if mp_qshared::shared::Q_stricmp((*ml).name.as_ptr() as *mut c_char, name) == 0 {
+            if mp_game::q_shared::Q_stricmp((*ml).name.as_ptr() as *mut c_char, name) == 0 {
                 (*goal).areanum = (*ml).areanum;
                 (*goal).origin = (*ml).origin;
                 (*goal).entitynum = 0;

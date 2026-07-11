@@ -236,7 +236,7 @@ pub fn SV_GameSendServerCommand(
     if clientNum == -1 {
         mp_engine_server::sv_send_server_command(common, sv, core::ptr::null_mut(), &msg);
     } else {
-        if clientNum < 0 || clientNum >= mp_engine_qcommon::cvar::sv_maxclients(common).integer {
+        if clientNum < 0 || clientNum >= (unsafe { (*common.sv_maxclients).integer }) {
             return;
         }
         let client = unsafe { sv.svs.clients.offset(clientNum as isize) };
@@ -253,7 +253,7 @@ pub fn SV_GameDropClient(
     clientNum: c_int,
     reason: *const c_char,
 ) {
-    if clientNum < 0 || clientNum >= mp_engine_qcommon::cvar::sv_maxclients(common).integer {
+    if clientNum < 0 || clientNum >= (unsafe { (*common.sv_maxclients).integer }) {
         return;
     }
     let client = unsafe { sv.svs.clients.offset(clientNum as isize) };
@@ -369,7 +369,7 @@ pub fn SV_InitGameVM(
         &[sv.svs.time, ms, restart as c_int],
     );
 
-    let max_clients = mp_engine_qcommon::cvar::sv_maxclients(common).integer;
+    let max_clients = (unsafe { (*common.sv_maxclients).integer });
     for i in 0..max_clients {
         unsafe {
             (*sv.svs.clients.offset(i as isize)).gentity = core::ptr::null_mut();
@@ -687,9 +687,9 @@ pub fn SV_GameSystemCalls(
         } else if trap == T::TRAP_TESTPRINTINT as c_int || trap == T::TRAP_TESTPRINTFLOAT as c_int {
             return 0;
         } else if trap == T::TRAP_ACOS as c_int {
-            return FloatAsInt(mp_qshared::shared::q_math::Q_acos(vmf(args, 1)));
+            return FloatAsInt(mp_engine_qcommon::common_fns::Q_acos(vmf(args, 1)));
         } else if trap == T::TRAP_ASIN as c_int {
-            return FloatAsInt(mp_qshared::shared::q_math::Q_asin(vmf(args, 1)));
+            return FloatAsInt(mp_engine_qcommon::common_fns::Q_asin(vmf(args, 1)));
         } else if trap == G::G_PRINT as c_int {
             let s =
                 core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char).to_string_lossy();
@@ -1094,7 +1094,7 @@ pub fn SV_GameSystemCalls(
             mp_engine_server::BotImport_DebugPolygonDelete(sv, *args.offset(1));
             return 0;
         } else if trap == G::G_REAL_TIME as c_int {
-            return mp_qshared::shared::sys_shared::Com_RealTime(
+            return mp_engine_qcommon::common_fns::Com_RealTime(
                 vma(common, args, 1) as *mut mp_qshared::common::mp::qcommon::qtime::qtime_t
             );
         } else if trap == G::G_SNAPVECTOR as c_int {

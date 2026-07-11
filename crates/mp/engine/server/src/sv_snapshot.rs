@@ -48,7 +48,7 @@ pub fn SV_SendClientMessages(
     host: &mut dyn EngineHost,
 ) {
     // send a message to each connected client
-    let max_clients = mp_engine_qcommon::cvar::sv_maxclients(common).integer;
+    let max_clients = unsafe { (*common.sv_maxclients).integer };
     for i in 0..max_clients {
         let c = unsafe { sv.svs.clients.offset(i as isize) };
         unsafe {

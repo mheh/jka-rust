@@ -56,12 +56,18 @@ pub mod l_struct_fns;
 use core::ffi::{c_char, c_int, c_ushort};
 
 use mp_qshared::common::mp::botlib::bot_consolemessage_s::bot_consolemessage_t;
+use mp_qshared::common::mp::botlib::bot_input_s::bot_input_t;
 use mp_qshared::common::mp::botlib::botlib_import_s::botlib_import_t;
 use mp_qshared::shared::limits::{MAX_CLIENTS, MAX_MODELS};
-use mp_qshared::shared::MAX_QPATH;
+use mp_qshared::shared::{qboolean, vec3_t, MAX_QPATH};
 
+use crate::be_aas_bsp::be_aas_bsp_consts::MAX_EPAIRKEY;
+use crate::be_aas_bspq3::be_aas_bspq3_cpp_consts::MAX_BSPENTITIES;
+use crate::be_aas_bspq3::bsp_entity_t;
 use crate::be_aas_def::aas_s::aas_t;
 use crate::be_aas_def::aas_settings_s::aas_settings_t;
+use crate::be_aas_reach::aas_lreachability_s::aas_lreachability_t;
+use crate::be_aas_routealt::midrangearea_t;
 use crate::be_ai_chat::bot_chatstate_s::bot_chatstate_t;
 use crate::be_ai_chat::bot_ichatdata_s::bot_ichatdata_t;
 use crate::be_ai_chat::bot_matchtemplate_s::bot_matchtemplate_t;
@@ -74,6 +80,10 @@ use crate::be_ai_goal::levelitem_s::levelitem_t;
 use crate::be_ai_move::bot_movestate_s::bot_movestate_t;
 use crate::be_interface::botlib_globals_s::botlib_globals_t;
 use crate::l_libvar::libvar_s::libvar_t;
+use crate::l_log::consts::MAX_LOGFILENAMESIZE;
+use crate::l_precomp::define_s::define_t;
+use crate::l_precomp::precomp_consts::MAX_SOURCEFILES;
+use crate::l_precomp::source_s::source_t;
 use crate::l_script::punctuation_s::punctuation_t;
 use crate::l_struct::structdef_s::structdef_t;
 
@@ -217,6 +227,101 @@ pub struct BotLib {
     /// Raven `libvar_t *weapindex_rocketlauncher`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:92`
     pub weapindex_rocketlauncher: *mut libvar_t,
+
+    // ---- Round-3 field merge: file-scope globals and function-static hoists
+    // referenced by transcribed bodies but absent from the initial aggregate.
+    // All zero-valid (raw pointers, ints, floats, arrays, `#[repr(C)]` structs
+    // of those), matching Raven's zero-initialized globals. ----
+    /// Raven `qboolean addGlobalDefine`.
+    /// Source: `oracle/codemp/botlib/l_precomp.cpp:109`
+    pub addGlobalDefine: qboolean,
+    /// Raven `aas_lreachability_t **areareachability` — reachability links for every area.
+    /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:85`
+    pub areareachability: *mut *mut aas_lreachability_t,
+    /// Raven `bot_input_t *botinputs`.
+    /// Source: `oracle/codemp/botlib/be_ea.cpp:27`
+    pub botinputs: *mut bot_input_t,
+    /// Raven `bsp_t bspworld` — the global id-Software BSP entity store.
+    /// Source: `oracle/codemp/botlib/be_aas_bspq3.cpp:70`
+    pub bspworld: bsp_t,
+    /// Raven `int calcgrapplereach`.
+    /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:68`
+    pub calcgrapplereach: c_int,
+    /// Raven `campspot_t *campspots`.
+    /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:174`
+    pub campspots: *mut campspot_t,
+    /// Raven function-static `float framereachability` (hoisted from `AAS_ContinueInitReachability`).
+    /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:4350`
+    pub framereachability: f32,
+    /// Raven `define_t **globaldefines` (`DEFINEHASHING` build) — defines added to every loaded source.
+    /// Source: `oracle/codemp/botlib/l_precomp.cpp:105`
+    pub globaldefines: *mut *mut define_t,
+    /// Raven function-static `unsigned short int *hidetraveltimes` (hoisted from `AAS_CreateAllRoutingCache`).
+    /// Source: `oracle/codemp/botlib/be_aas_route.cpp:2067`
+    pub hidetraveltimes: *mut c_ushort,
+    /// Raven function-static `int lastpercentage` (hoisted from `AAS_ContinueInitReachability`).
+    /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:4351`
+    pub lastpercentage: c_int,
+    /// Raven `libvar_t *libvarlist`.
+    /// Source: `oracle/codemp/botlib/l_libvar.cpp:20`
+    pub libvarlist: *mut libvar_t,
+    /// Raven `logfile_t logfile`.
+    /// Source: `oracle/codemp/botlib/l_log.cpp:33`
+    pub logfile: logfile_t,
+    /// Raven `maplocation_t *maplocations`.
+    /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:172`
+    pub maplocations: *mut maplocation_t,
+    /// Raven `int max_routingcachesize`.
+    /// Source: `oracle/codemp/botlib/be_aas_route.cpp:68`
+    pub max_routingcachesize: c_int,
+    /// Raven `midrangearea_t *midrangeareas`.
+    /// Source: `oracle/codemp/botlib/be_aas_routealt.cpp:39`
+    pub midrangeareas: *mut midrangearea_t,
+    /// Raven `aas_lreachability_t *nextreachability` — next free reachability from the heap.
+    /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:84`
+    pub nextreachability: *mut aas_lreachability_t,
+    /// Raven `int numareacacheupdates`.
+    /// Source: `oracle/codemp/botlib/be_aas_route.cpp:63`
+    pub numareacacheupdates: c_int,
+    /// Raven `int numlreachabilities`.
+    /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:86`
+    pub numlreachabilities: c_int,
+    /// Raven `int numportalcacheupdates`.
+    /// Source: `oracle/codemp/botlib/be_aas_route.cpp:64`
+    pub numportalcacheupdates: c_int,
+    /// Raven `int numtokens`.
+    /// Source: `oracle/codemp/botlib/l_precomp.cpp:96`
+    pub numtokens: c_int,
+    /// Raven reachability-type id counters — `int reach_barrier` (jump up to a barrier)
+    /// and its siblings, each a distinct reachability class id.
+    /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:48-66`
+    pub reach_barrier: c_int,
+    pub reach_elevator: c_int,
+    pub reach_equalfloor: c_int,
+    pub reach_funcbob: c_int,
+    pub reach_grapple: c_int,
+    pub reach_jump: c_int,
+    pub reach_jumppad: c_int,
+    pub reach_ladder: c_int,
+    pub reach_rocketjump: c_int,
+    pub reach_step: c_int,
+    pub reach_swim: c_int,
+    pub reach_teleport: c_int,
+    pub reach_walk: c_int,
+    pub reach_walkoffledge: c_int,
+    pub reach_waterjump: c_int,
+    /// Raven function-static `float reachability_delay` (hoisted from `AAS_ContinueInitReachability`).
+    /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:4350`
+    pub reachability_delay: f32,
+    /// Raven `aas_lreachability_t *reachabilityheap` — heap with reachabilities.
+    /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:83`
+    pub reachabilityheap: *mut aas_lreachability_t,
+    /// Raven `int routingcachesize`.
+    /// Source: `oracle/codemp/botlib/be_aas_route.cpp:67`
+    pub routingcachesize: c_int,
+    /// Raven `source_t *sourceFiles[MAX_SOURCEFILES]`.
+    /// Source: `oracle/codemp/botlib/l_precomp.cpp:3187`
+    pub sourceFiles: [*mut source_t; MAX_SOURCEFILES],
 }
 
 impl Default for BotLib {
@@ -232,4 +337,60 @@ impl Default for BotLib {
         // → `None`, ints/floats/arrays → 0); no field type reserves a niche.
         unsafe { core::mem::zeroed() }
     }
+}
+
+// The four botlib-internal scratch types below (`bsp_t`, `campspot_t`,
+// `maplocation_t`, `logfile_t`) back `BotLib` fields but had no ported home.
+// They are non-ABI internal state, so they live here in the struct's owner file
+// (the only file this merge may edit) rather than a dedicated per-type module.
+
+/// Raven `bsp_t` — the id-Software BSP entity store backing `bspworld`.
+///
+/// Source: `oracle/codemp/botlib/be_aas_bspq3.cpp:56-67`
+#[derive(Clone, Copy)]
+pub struct bsp_t {
+    /// true when bsp file is loaded
+    pub loaded: c_int,
+    /// entity data size
+    pub entdatasize: c_int,
+    pub dentdata: *mut c_char,
+    /// bsp entities
+    pub numentities: c_int,
+    pub entities: [bsp_entity_t; MAX_BSPENTITIES as usize],
+}
+
+/// Raven `maplocation_t` — location in the map ("target_location").
+///
+/// Source: `oracle/codemp/botlib/be_ai_goal.cpp:52-58`
+#[derive(Clone, Copy)]
+pub struct maplocation_t {
+    pub origin: vec3_t,
+    pub areanum: c_int,
+    pub name: [c_char; MAX_EPAIRKEY as usize],
+    pub next: *mut maplocation_t,
+}
+
+/// Raven `campspot_t` — camp spot ("info_camp").
+///
+/// Source: `oracle/codemp/botlib/be_ai_goal.cpp:61-71`
+#[derive(Clone, Copy)]
+pub struct campspot_t {
+    pub origin: vec3_t,
+    pub areanum: c_int,
+    pub name: [c_char; MAX_EPAIRKEY as usize],
+    pub range: f32,
+    pub weight: f32,
+    pub wait: f32,
+    pub random: f32,
+    pub next: *mut campspot_t,
+}
+
+/// Raven `logfile_t` — the botlib log-file handle.
+///
+/// Source: `oracle/codemp/botlib/l_log.cpp:26-31`
+#[derive(Clone, Copy)]
+pub struct logfile_t {
+    pub filename: [c_char; MAX_LOGFILENAMESIZE as usize],
+    pub fp: *mut libc::FILE,
+    pub numwrites: c_int,
 }

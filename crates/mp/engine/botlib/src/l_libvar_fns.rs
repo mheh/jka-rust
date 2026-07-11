@@ -20,8 +20,7 @@
 
 use core::ffi::c_char;
 
-use mp_qshared::shared::qboolean;
-use mp_qshared::shared::qboolean::{qfalse, qtrue};
+use mp_qshared::shared::{qboolean, qfalse, qtrue};
 
 use crate::l_libvar::libvar_s::libvar_t;
 use crate::BotLib;
