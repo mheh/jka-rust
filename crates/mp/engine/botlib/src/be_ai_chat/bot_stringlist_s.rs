@@ -7,8 +7,8 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:152-156`
 #[repr(C)]
 pub struct bot_stringlist_t {
-	pub string: *mut c_char,
-	pub next: *mut bot_stringlist_t,
+    pub string: *mut c_char,
+    pub next: *mut bot_stringlist_t,
 }
 
 pub type bot_stringlist_s = bot_stringlist_t;

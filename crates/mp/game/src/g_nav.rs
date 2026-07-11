@@ -49,8 +49,6 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 /// Raven `G_Line`.
 ///
 /// Raven: for debug graphics; rwwFIXMEFIXME — never implemented, empty body.

@@ -50,8 +50,9 @@ fn oracle_root() -> PathBuf {
 /// Read one committed golden (`goldens/<name>`).
 fn read_golden(name: &str) -> String {
     let path = oracle_root().join("goldens").join(name);
-    std::fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("missing golden {path:?} — run tools/roff-oracle/build.sh --regen"))
+    std::fs::read_to_string(&path).unwrap_or_else(|_| {
+        panic!("missing golden {path:?} — run tools/roff-oracle/build.sh --regen")
+    })
 }
 
 /// A fresh `MockHost` with every fixture registered under the qpath the port's
@@ -64,15 +65,23 @@ fn read_golden(name: &str) -> String {
 /// the C++ oracle host).
 fn host_with_fixtures() -> MockHost {
     let fx = oracle_root().join("fixtures");
-    let read = |rel: &str| std::fs::read(fx.join(rel)).unwrap_or_else(|_| panic!("read fixture {rel}"));
+    let read =
+        |rel: &str| std::fs::read(fx.join(rel)).unwrap_or_else(|_| panic!("read fixture {rel}"));
     let mut host = MockHost::new();
-    host.files.insert("v1_basic.rof".into(), read("v1_basic.rof"));
-    host.files.insert("v1_badangle.rof".into(), read("v1_badangle.rof"));
-    host.files.insert("v2_notes.rof".into(), read("v2_notes.rof"));
     host.files
-        .insert("scripts/fallbackcase.rof".into(), read("scripts/fallbackcase.rof"));
-    host.files.insert("bad_version.rof".into(), read("bad_version.rof"));
-    host.files.insert("bad_count.rof".into(), read("bad_count.rof"));
+        .insert("v1_basic.rof".into(), read("v1_basic.rof"));
+    host.files
+        .insert("v1_badangle.rof".into(), read("v1_badangle.rof"));
+    host.files
+        .insert("v2_notes.rof".into(), read("v2_notes.rof"));
+    host.files.insert(
+        "scripts/fallbackcase.rof".into(),
+        read("scripts/fallbackcase.rof"),
+    );
+    host.files
+        .insert("bad_version.rof".into(), read("bad_version.rof"));
+    host.files
+        .insert("bad_count.rof".into(), read("bad_count.rof"));
     host
 }
 
@@ -233,11 +242,38 @@ fn playback_ent_trace_matches_oracle() {
 
     let mut out = String::new();
     // Scenario 1: non-translated v1 playback.
-    run_playback_trace(&mut out, "v1_basic.rof", 1, false, [0.0, 0.0, 0.0], 1000, 5, 100);
+    run_playback_trace(
+        &mut out,
+        "v1_basic.rof",
+        1,
+        false,
+        [0.0, 0.0, 0.0],
+        1000,
+        5,
+        100,
+    );
     // Scenario 2: translated v1 playback (yaw 90) — the `AngleVectors` path.
-    run_playback_trace(&mut out, "v1_basic.rof", 2, true, [0.0, 90.0, 0.0], 1000, 5, 100);
+    run_playback_trace(
+        &mut out,
+        "v1_basic.rof",
+        2,
+        true,
+        [0.0, 90.0, 0.0],
+        1000,
+        5,
+        100,
+    );
     // Scenario 3: v2 note firing (the `NOTE` row itself is omitted — private).
-    run_playback_trace(&mut out, "v2_notes.rof", 3, false, [0.0, 0.0, 0.0], 2000, 4, 50);
+    run_playback_trace(
+        &mut out,
+        "v2_notes.rof",
+        3,
+        false,
+        [0.0, 0.0, 0.0],
+        2000,
+        4,
+        50,
+    );
     // Scenario 4: roff-not-found error path. `Clean(false)` unloads the single
     // cached roff (equivalent to the oracle's `Unload(id)` here) while leaving
     // the ent on the playback list, so `UpdateEntities`' roff lookup misses →
@@ -257,7 +293,9 @@ fn playback_ent_trace_matches_oracle() {
     // emits no ent rows). These three prefixes uniquely select the ent dump.
     let expected: String = golden
         .lines()
-        .filter(|l| l.starts_with("  pos ") || l.starts_with("  apos ") || l.starts_with("  r.mIsRoffing"))
+        .filter(|l| {
+            l.starts_with("  pos ") || l.starts_with("  apos ") || l.starts_with("  r.mIsRoffing")
+        })
         .map(|l| format!("{l}\n"))
         .collect();
 
@@ -280,7 +318,10 @@ fn purge_ent_returns_and_console_match_oracle() {
     roff.play(5, id, false, false, &mut host);
     roff.play(6, id, false, false, &mut host);
 
-    assert!(roff.purge_ent(5, false, &mut host), "PurgeEnt(5) must succeed");
+    assert!(
+        roff.purge_ent(5, false, &mut host),
+        "PurgeEnt(5) must succeed"
+    );
     let prints_before = host.prints.len();
     assert!(
         !roff.purge_ent(99, false, &mut host),

@@ -1,5 +1,7 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use sp_qshared::shared::qboolean;
 
 /// Arguments for `CG_LANGUAGE_ISASIAN`.

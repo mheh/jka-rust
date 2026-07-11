@@ -22,49 +22,47 @@ const MAX_INFO_STRING: usize = 1024;
 /// Type definition source: `oracle/code/client/client.h:193-229`
 #[repr(C)]
 pub struct clientStatic_t {
-	/// Raven: connection status
-	pub state: connstate_t,
-	/// Raven: bit flags
-	pub keyCatchers: c_int,
+    /// Raven: connection status
+    pub state: connstate_t,
+    /// Raven: bit flags
+    pub keyCatchers: c_int,
 
-	/// Raven: name of server from original connect (used by reconnect)
-	pub servername: [c_char; MAX_OSPATH],
+    /// Raven: name of server from original connect (used by reconnect)
+    pub servername: [c_char; MAX_OSPATH],
 
-	// Raven: when the server clears the hunk, all of these must be restarted
-	pub rendererStarted: qboolean,
-	pub soundStarted: qboolean,
-	pub soundRegistered: qboolean,
-	pub uiStarted: qboolean,
-	pub cgameStarted: qboolean,
-	// Raven: #ifdef _IMMERSION
-	pub forceStarted: qboolean,
-	// Raven: #endif // _IMMERSION
+    // Raven: when the server clears the hunk, all of these must be restarted
+    pub rendererStarted: qboolean,
+    pub soundStarted: qboolean,
+    pub soundRegistered: qboolean,
+    pub uiStarted: qboolean,
+    pub cgameStarted: qboolean,
+    // Raven: #ifdef _IMMERSION
+    pub forceStarted: qboolean,
+    // Raven: #endif // _IMMERSION
+    pub framecount: c_int,
+    /// Raven: msec since last frame
+    pub frametime: c_int,
+    /// Raven: fraction of a msec since last frame
+    pub frametimeFraction: f32,
 
-	pub framecount: c_int,
-	/// Raven: msec since last frame
-	pub frametime: c_int,
-	/// Raven: fraction of a msec since last frame
-	pub frametimeFraction: f32,
+    /// Raven: ignores pause
+    pub realtime: c_int,
+    /// Raven: fraction of a msec accumulated
+    pub realtimeFraction: f32,
+    /// Raven: ignoring pause, so console always works
+    pub realFrametime: c_int,
 
-	/// Raven: ignores pause
-	pub realtime: c_int,
-	/// Raven: fraction of a msec accumulated
-	pub realtimeFraction: f32,
-	/// Raven: ignoring pause, so console always works
-	pub realFrametime: c_int,
+    // Raven: update server info
+    pub updateInfoString: [c_char; MAX_INFO_STRING],
 
-	// Raven: update server info
-	pub updateInfoString: [c_char; MAX_INFO_STRING],
-
-	// Raven: rendering info
-	pub glconfig: glconfig_t,
-	pub charSetShader: qhandle_t,
-	pub whiteShader: qhandle_t,
-	pub consoleShader: qhandle_t,
-
-	// Raven: #ifdef _XBOX
-	// 	short		mainGamepad;
-	// #endif
+    // Raven: rendering info
+    pub glconfig: glconfig_t,
+    pub charSetShader: qhandle_t,
+    pub whiteShader: qhandle_t,
+    pub consoleShader: qhandle_t,
+    // Raven: #ifdef _XBOX
+    // 	short		mainGamepad;
+    // #endif
 }
 
 const _: () = assert!(core::mem::size_of::<clientStatic_t>() == 1456);

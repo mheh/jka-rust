@@ -31,317 +31,327 @@ const MAX_VEHICLE_TURRETS: usize = 2;
 /// Type definition source: `oracle/code/game/G_Vehicles.h:135-353`
 #[repr(C)]
 pub struct vehicleInfo_t {
-	/// unique name of the vehicle
-	pub name: *mut c_char,
+    /// unique name of the vehicle
+    pub name: *mut c_char,
 
-	// general data
-	/// what kind of vehicle
-	pub r#type: vehicleType_t,
-	/// if 2 hands, no weapons, if 1 hand, can use 1-handed weapons, if 0 hands, can use 2-handed weapons
-	pub numHands: c_int,
-	/// How far you can look up and down off the forward of the vehicle
-	pub lookPitch: c_float,
-	/// How far you can look left and right off the forward of the vehicle
-	pub lookYaw: c_float,
-	/// how long it is - used for body length traces when turning/moving?
-	pub length: c_float,
-	/// how wide it is - used for body length traces when turning/moving?
-	pub width: c_float,
-	/// how tall it is - used for body length traces when turning/moving?
-	pub height: c_float,
-	/// offset from origin: {forward, right, up} as a modifier on that dimension (-1.0f is all the way back, 1.0f is all the way forward)
-	pub centerOfGravity: vec3_t,
+    // general data
+    /// what kind of vehicle
+    pub r#type: vehicleType_t,
+    /// if 2 hands, no weapons, if 1 hand, can use 1-handed weapons, if 0 hands, can use 2-handed weapons
+    pub numHands: c_int,
+    /// How far you can look up and down off the forward of the vehicle
+    pub lookPitch: c_float,
+    /// How far you can look left and right off the forward of the vehicle
+    pub lookYaw: c_float,
+    /// how long it is - used for body length traces when turning/moving?
+    pub length: c_float,
+    /// how wide it is - used for body length traces when turning/moving?
+    pub width: c_float,
+    /// how tall it is - used for body length traces when turning/moving?
+    pub height: c_float,
+    /// offset from origin: {forward, right, up} as a modifier on that dimension (-1.0f is all the way back, 1.0f is all the way forward)
+    pub centerOfGravity: vec3_t,
 
-	// speed stats
-	/// top speed
-	pub speedMax: c_float,
-	/// turbo speed
-	pub turboSpeed: c_float,
-	/// if < 0, can go in reverse
-	pub speedMin: c_float,
-	/// what speed it drifts to when no accel/decel input is given
-	pub speedIdle: c_float,
-	/// if speedIdle > 0, how quickly it goes up to that speed
-	pub accelIdle: c_float,
-	/// when pressing on accelerator
-	pub acceleration: c_float,
-	/// when giving no input, how quickly it drops to speedIdle
-	pub decelIdle: c_float,
-	/// if true, speed stays at whatever you accel/decel to, unless you turbo or brake
-	pub throttleSticks: c_float,
-	/// multiplier on current speed for strafing.  If 1.0f, you can strafe at the same speed as you're going forward, 0.5 is half, 0 is no strafing
-	pub strafePerc: c_float,
+    // speed stats
+    /// top speed
+    pub speedMax: c_float,
+    /// turbo speed
+    pub turboSpeed: c_float,
+    /// if < 0, can go in reverse
+    pub speedMin: c_float,
+    /// what speed it drifts to when no accel/decel input is given
+    pub speedIdle: c_float,
+    /// if speedIdle > 0, how quickly it goes up to that speed
+    pub accelIdle: c_float,
+    /// when pressing on accelerator
+    pub acceleration: c_float,
+    /// when giving no input, how quickly it drops to speedIdle
+    pub decelIdle: c_float,
+    /// if true, speed stays at whatever you accel/decel to, unless you turbo or brake
+    pub throttleSticks: c_float,
+    /// multiplier on current speed for strafing.  If 1.0f, you can strafe at the same speed as you're going forward, 0.5 is half, 0 is no strafing
+    pub strafePerc: c_float,
 
-	// handling stats
-	/// how quickly it pitches and rolls (not under player control)
-	pub bankingSpeed: c_float,
-	/// how far it can roll to either side
-	pub rollLimit: c_float,
-	/// how far it can roll forward or backward
-	pub pitchLimit: c_float,
-	/// when pressing on decelerator
-	pub braking: c_float,
-	/// The mouse yaw override.
-	pub mouseYaw: c_float,
-	/// The mouse pitch override.
-	pub mousePitch: c_float,
-	/// how quickly you can turn
-	pub turningSpeed: c_float,
-	/// whether or not you can turn when not moving
-	pub turnWhenStopped: qboolean,
-	/// how much your command input affects velocity
-	pub traction: c_float,
-	/// how much velocity is cut on its own
-	pub friction: c_float,
-	/// the max slope that it can go up with control
-	pub maxSlope: c_float,
-	/// vehicle turns faster the faster it's going
-	pub speedDependantTurning: qboolean,
+    // handling stats
+    /// how quickly it pitches and rolls (not under player control)
+    pub bankingSpeed: c_float,
+    /// how far it can roll to either side
+    pub rollLimit: c_float,
+    /// how far it can roll forward or backward
+    pub pitchLimit: c_float,
+    /// when pressing on decelerator
+    pub braking: c_float,
+    /// The mouse yaw override.
+    pub mouseYaw: c_float,
+    /// The mouse pitch override.
+    pub mousePitch: c_float,
+    /// how quickly you can turn
+    pub turningSpeed: c_float,
+    /// whether or not you can turn when not moving
+    pub turnWhenStopped: qboolean,
+    /// how much your command input affects velocity
+    pub traction: c_float,
+    /// how much velocity is cut on its own
+    pub friction: c_float,
+    /// the max slope that it can go up with control
+    pub maxSlope: c_float,
+    /// vehicle turns faster the faster it's going
+    pub speedDependantTurning: qboolean,
 
-	// durability stats
-	/// for momentum and impact force (player mass is 10)
-	pub mass: c_int,
-	/// total points of damage it can take
-	pub armor: c_int,
-	/// energy shield damage points
-	pub shields: c_int,
-	/// energy shield milliseconds per point recharged
-	pub shieldRechargeMS: c_int,
-	/// modifies incoming damage, 1.0 is normal, 0.5 is half, etc.  Simulates being made of tougher materials/construction
-	pub toughness: c_float,
-	/// when armor drops to or below this point, start malfunctioning
-	pub malfunctionArmorLevel: c_int,
-	/// can parts of this thing be torn off on impact? -rww
-	pub surfDestruction: c_int,
+    // durability stats
+    /// for momentum and impact force (player mass is 10)
+    pub mass: c_int,
+    /// total points of damage it can take
+    pub armor: c_int,
+    /// energy shield damage points
+    pub shields: c_int,
+    /// energy shield milliseconds per point recharged
+    pub shieldRechargeMS: c_int,
+    /// modifies incoming damage, 1.0 is normal, 0.5 is half, etc.  Simulates being made of tougher materials/construction
+    pub toughness: c_float,
+    /// when armor drops to or below this point, start malfunctioning
+    pub malfunctionArmorLevel: c_int,
+    /// can parts of this thing be torn off on impact? -rww
+    pub surfDestruction: c_int,
 
-	// individual "area" health -rww
-	pub health_front: c_int,
-	pub health_back: c_int,
-	pub health_right: c_int,
-	pub health_left: c_int,
+    // individual "area" health -rww
+    pub health_front: c_int,
+    pub health_back: c_int,
+    pub health_right: c_int,
+    pub health_left: c_int,
 
-	// visuals & sounds
-	/// what model to use - if make it an NPC's primary model, don't need this?
-	pub model: *mut c_char,
-	/// what skin to use - if make it an NPC's primary model, don't need this?
-	pub skin: *mut c_char,
-	/// render radius for the ghoul2 model
-	pub g2radius: c_int,
-	/// what animation the rider uses
-	pub riderAnim: c_int,
-	/// what icon to show on radar in MP
-	pub radarIconHandle: c_int,
-	/// NPC to attach to *droidunit tag (if it exists in the model)
-	pub droidNPC: *mut c_char,
+    // visuals & sounds
+    /// what model to use - if make it an NPC's primary model, don't need this?
+    pub model: *mut c_char,
+    /// what skin to use - if make it an NPC's primary model, don't need this?
+    pub skin: *mut c_char,
+    /// render radius for the ghoul2 model
+    pub g2radius: c_int,
+    /// what animation the rider uses
+    pub riderAnim: c_int,
+    /// what icon to show on radar in MP
+    pub radarIconHandle: c_int,
+    /// NPC to attach to *droidunit tag (if it exists in the model)
+    pub droidNPC: *mut c_char,
 
-	/// sound to play when get on it
-	pub soundOn: c_int,
-	/// sound to play when get off
-	pub soundOff: c_int,
-	/// sound to loop while riding it
-	pub soundLoop: c_int,
-	/// sound to play when ship takes off
-	pub soundTakeOff: c_int,
-	/// sound to play when ship's thrusters first activate
-	pub soundEngineStart: c_int,
-	/// sound to loop while spiraling out of control
-	pub soundSpin: c_int,
-	/// sound to play when turbo/afterburner kicks in
-	pub soundTurbo: c_int,
-	/// sound to play when ship lands
-	pub soundHyper: c_int,
-	/// sound to play when ship lands
-	pub soundLand: c_int,
-	/// sound to play when they buzz you
-	pub soundFlyBy: c_int,
-	/// alternate sound to play when they buzz you
-	pub soundFlyBy2: c_int,
-	/// sound to play when accelerating
-	pub soundShift1: c_int,
-	/// sound to play when accelerating
-	pub soundShift2: c_int,
-	/// sound to play when decelerating
-	pub soundShift3: c_int,
-	/// sound to play when decelerating
-	pub soundShift4: c_int,
+    /// sound to play when get on it
+    pub soundOn: c_int,
+    /// sound to play when get off
+    pub soundOff: c_int,
+    /// sound to loop while riding it
+    pub soundLoop: c_int,
+    /// sound to play when ship takes off
+    pub soundTakeOff: c_int,
+    /// sound to play when ship's thrusters first activate
+    pub soundEngineStart: c_int,
+    /// sound to loop while spiraling out of control
+    pub soundSpin: c_int,
+    /// sound to play when turbo/afterburner kicks in
+    pub soundTurbo: c_int,
+    /// sound to play when ship lands
+    pub soundHyper: c_int,
+    /// sound to play when ship lands
+    pub soundLand: c_int,
+    /// sound to play when they buzz you
+    pub soundFlyBy: c_int,
+    /// alternate sound to play when they buzz you
+    pub soundFlyBy2: c_int,
+    /// sound to play when accelerating
+    pub soundShift1: c_int,
+    /// sound to play when accelerating
+    pub soundShift2: c_int,
+    /// sound to play when decelerating
+    pub soundShift3: c_int,
+    /// sound to play when decelerating
+    pub soundShift4: c_int,
 
-	/// exhaust effect, played from "*exhaust" bolt(s)
-	pub iExhaustFX: c_int,
-	/// turbo exhaust effect, played from "*exhaust" bolt(s) when ship is in "turbo" mode
-	pub iTurboFX: c_int,
-	/// turbo begin effect, played from "*exhaust" bolts when "turbo" mode begins
-	pub iTurboStartFX: c_int,
-	/// trail effect, played from "*trail" bolt(s)
-	pub iTrailFX: c_int,
-	/// impact effect, for when it bumps into something
-	pub iImpactFX: c_int,
-	/// explosion effect, for when it blows up (should have the sound built into explosion effect)
-	pub iExplodeFX: c_int,
-	/// effect it makes when going across water
-	pub iWakeFX: c_int,
-	/// effect to play on damage from a weapon or something
-	pub iDmgFX: c_int,
-	/// played when armor is less than 30% of full
-	pub iArmorLowFX: c_int,
-	/// played when on armor is completely gone
-	pub iArmorGoneFX: c_int,
+    /// exhaust effect, played from "*exhaust" bolt(s)
+    pub iExhaustFX: c_int,
+    /// turbo exhaust effect, played from "*exhaust" bolt(s) when ship is in "turbo" mode
+    pub iTurboFX: c_int,
+    /// turbo begin effect, played from "*exhaust" bolts when "turbo" mode begins
+    pub iTurboStartFX: c_int,
+    /// trail effect, played from "*trail" bolt(s)
+    pub iTrailFX: c_int,
+    /// impact effect, for when it bumps into something
+    pub iImpactFX: c_int,
+    /// explosion effect, for when it blows up (should have the sound built into explosion effect)
+    pub iExplodeFX: c_int,
+    /// effect it makes when going across water
+    pub iWakeFX: c_int,
+    /// effect to play on damage from a weapon or something
+    pub iDmgFX: c_int,
+    /// played when armor is less than 30% of full
+    pub iArmorLowFX: c_int,
+    /// played when on armor is completely gone
+    pub iArmorGoneFX: c_int,
 
-	// Weapon stats
-	pub weapon: [vehWeaponStats_t; MAX_VEHICLE_WEAPONS],
+    // Weapon stats
+    pub weapon: [vehWeaponStats_t; MAX_VEHICLE_WEAPONS],
 
-	/// Which weapon a muzzle fires (has to match one of the weapons this vehicle has). So 1 would be weapon 1,
-	/// 2 would be weapon 2 and so on.
-	pub weapMuzzle: [c_int; MAX_VEHICLE_MUZZLES],
+    /// Which weapon a muzzle fires (has to match one of the weapons this vehicle has). So 1 would be weapon 1,
+    /// 2 would be weapon 2 and so on.
+    pub weapMuzzle: [c_int; MAX_VEHICLE_MUZZLES],
 
-	// turrets (if any) on the vehicle
-	pub turret: [turretStats_t; MAX_VEHICLE_TURRETS],
+    // turrets (if any) on the vehicle
+    pub turret: [turretStats_t; MAX_VEHICLE_TURRETS],
 
-	/// The max height before this ship (?) starts (auto)landing.
-	pub landingHeight: c_float,
+    /// The max height before this ship (?) starts (auto)landing.
+    pub landingHeight: c_float,
 
-	// other misc stats
-	/// normal is 800
-	pub gravity: c_int,
-	/// if 0, it's a ground vehicle
-	pub hoverHeight: c_float,
-	/// how hard it pushes off ground when less than hover height... causes "bounce", like shocks
-	pub hoverStrength: c_float,
-	/// can drive underwater if it has to
-	pub waterProof: qboolean,
-	/// when in water, how high it floats (1 is neutral bouyancy)
-	pub bouyancy: c_float,
-	/// how much fuel it can hold (capacity)
-	pub fuelMax: c_int,
-	/// how quickly is uses up fuel
-	pub fuelRate: c_int,
-	/// how long turbo lasts
-	pub turboDuration: c_int,
-	/// how long turbo takes to recharge
-	pub turboRecharge: c_int,
-	/// for sight alerts
-	pub visibility: c_int,
-	/// for sound alerts
-	pub loudness: c_int,
-	/// range of explosion
-	pub explosionRadius: c_float,
-	/// damage of explosion
-	pub explosionDamage: c_int,
+    // other misc stats
+    /// normal is 800
+    pub gravity: c_int,
+    /// if 0, it's a ground vehicle
+    pub hoverHeight: c_float,
+    /// how hard it pushes off ground when less than hover height... causes "bounce", like shocks
+    pub hoverStrength: c_float,
+    /// can drive underwater if it has to
+    pub waterProof: qboolean,
+    /// when in water, how high it floats (1 is neutral bouyancy)
+    pub bouyancy: c_float,
+    /// how much fuel it can hold (capacity)
+    pub fuelMax: c_int,
+    /// how quickly is uses up fuel
+    pub fuelRate: c_int,
+    /// how long turbo lasts
+    pub turboDuration: c_int,
+    /// how long turbo takes to recharge
+    pub turboRecharge: c_int,
+    /// for sight alerts
+    pub visibility: c_int,
+    /// for sound alerts
+    pub loudness: c_int,
+    /// range of explosion
+    pub explosionRadius: c_float,
+    /// damage of explosion
+    pub explosionDamage: c_int,
 
-	/// The max number of passengers this vehicle may have (Default = 0).
-	pub maxPassengers: c_int,
-	/// rider (and passengers?) should not be drawn
-	pub hideRider: qboolean,
-	/// if rider is on vehicle when it dies, they should die
-	pub killRiderOnDeath: qboolean,
-	/// whether or not the vehicle should catch on fire before it explodes
-	pub flammable: qboolean,
-	/// how long the vehicle should be on fire/dying before it explodes
-	pub explosionDelay: c_int,
-	// camera stuff
-	/// whether or not to use all of the following 3rd person camera override values
-	pub cameraOverride: qboolean,
-	/// how far back the camera should be - normal is 80
-	pub cameraRange: c_float,
-	/// how high over the vehicle origin the camera should be - normal is 16
-	pub cameraVertOffset: c_float,
-	/// how far to left/right (negative/positive) of of the vehicle origin the camera should be - normal is 0
-	pub cameraHorzOffset: c_float,
-	/// a modifier on the camera's pitch (up/down angle) to the vehicle - normal is 0
-	pub cameraPitchOffset: c_float,
-	/// third person camera FOV, default is 80
-	pub cameraFOV: c_float,
-	/// fade out the vehicle to this alpha (0.1-1.0f) if it's in the way of the crosshair
-	pub cameraAlpha: c_float,
-	/// use the hacky AT-ST pitch dependant vertical offset
-	pub cameraPitchDependantVertOffset: qboolean,
+    /// The max number of passengers this vehicle may have (Default = 0).
+    pub maxPassengers: c_int,
+    /// rider (and passengers?) should not be drawn
+    pub hideRider: qboolean,
+    /// if rider is on vehicle when it dies, they should die
+    pub killRiderOnDeath: qboolean,
+    /// whether or not the vehicle should catch on fire before it explodes
+    pub flammable: qboolean,
+    /// how long the vehicle should be on fire/dying before it explodes
+    pub explosionDelay: c_int,
+    // camera stuff
+    /// whether or not to use all of the following 3rd person camera override values
+    pub cameraOverride: qboolean,
+    /// how far back the camera should be - normal is 80
+    pub cameraRange: c_float,
+    /// how high over the vehicle origin the camera should be - normal is 16
+    pub cameraVertOffset: c_float,
+    /// how far to left/right (negative/positive) of of the vehicle origin the camera should be - normal is 0
+    pub cameraHorzOffset: c_float,
+    /// a modifier on the camera's pitch (up/down angle) to the vehicle - normal is 0
+    pub cameraPitchOffset: c_float,
+    /// third person camera FOV, default is 80
+    pub cameraFOV: c_float,
+    /// fade out the vehicle to this alpha (0.1-1.0f) if it's in the way of the crosshair
+    pub cameraAlpha: c_float,
+    /// use the hacky AT-ST pitch dependant vertical offset
+    pub cameraPitchDependantVertOffset: qboolean,
 
-	// NOTE: some info on what vehicle weapon to use?  Like ATST or TIE bomber or TIE fighter or X-Wing...?
+    // NOTE: some info on what vehicle weapon to use?  Like ATST or TIE bomber or TIE fighter or X-Wing...?
 
-	// THE FOLLOWING FIELDS are not in the vehFields table because they are
-	// internal variables, not read in from the .veh file
-	/// set internally, not until this vehicle is spawned into the level
-	pub modelIndex: c_int,
+    // THE FOLLOWING FIELDS are not in the vehFields table because they are
+    // internal variables, not read in from the .veh file
+    /// set internally, not until this vehicle is spawned into the level
+    pub modelIndex: c_int,
 
-	// NOTE: Please note that most of this stuff has been converted from C++ classes to generic C.
-	// This part of the structure is used to simulate inheritance for vehicles. The basic idea is that all vehicle use
-	// this vehicle interface since they declare their own functions and assign the function pointer to the
-	// corresponding function. Meanwhile, the base logic can still call the appropriate functions. In C++ talk all
-	// of these functions (pointers) are pure virtuals and this is an abstract base class (although it cannot be
-	// inherited from, only contained and reimplemented (through an object and a setup function respectively)). -AReis
-	/// Makes sure that the vehicle is properly animated.
-	pub AnimateVehicle: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
+    // NOTE: Please note that most of this stuff has been converted from C++ classes to generic C.
+    // This part of the structure is used to simulate inheritance for vehicles. The basic idea is that all vehicle use
+    // this vehicle interface since they declare their own functions and assign the function pointer to the
+    // corresponding function. Meanwhile, the base logic can still call the appropriate functions. In C++ talk all
+    // of these functions (pointers) are pure virtuals and this is an abstract base class (although it cannot be
+    // inherited from, only contained and reimplemented (through an object and a setup function respectively)). -AReis
+    /// Makes sure that the vehicle is properly animated.
+    pub AnimateVehicle: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
 
-	/// Makes sure that the rider's in this vehicle are properly animated.
-	pub AnimateRiders: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
+    /// Makes sure that the rider's in this vehicle are properly animated.
+    pub AnimateRiders: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
 
-	/// Determine whether this entity is able to board this vehicle or not.
-	pub ValidateBoard: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut gentity_t) -> bool>,
+    /// Determine whether this entity is able to board this vehicle or not.
+    pub ValidateBoard:
+        Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut gentity_t) -> bool>,
 
-	/// Set the parent entity of this Vehicle NPC.
-	pub SetParent: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pParentEntity: *mut gentity_t)>,
+    /// Set the parent entity of this Vehicle NPC.
+    pub SetParent:
+        Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pParentEntity: *mut gentity_t)>,
 
-	/// Add a pilot to the vehicle.
-	pub SetPilot: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pPilot: *mut gentity_t)>,
+    /// Add a pilot to the vehicle.
+    pub SetPilot: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pPilot: *mut gentity_t)>,
 
-	/// Add a passenger to the vehicle (false if we're full).
-	pub AddPassenger: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> bool>,
+    /// Add a passenger to the vehicle (false if we're full).
+    pub AddPassenger: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> bool>,
 
-	/// Animate the vehicle and it's riders.
-	pub Animate: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
+    /// Animate the vehicle and it's riders.
+    pub Animate: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
 
-	/// Board this Vehicle (get on). The first entity to board an empty vehicle becomes the Pilot.
-	pub Board: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut gentity_t) -> bool>,
+    /// Board this Vehicle (get on). The first entity to board an empty vehicle becomes the Pilot.
+    pub Board: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut gentity_t) -> bool>,
 
-	/// Eject an entity from the vehicle.
-	pub Eject: Option<
-		unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut gentity_t, forceEject: qboolean) -> bool,
-	>,
+    /// Eject an entity from the vehicle.
+    pub Eject: Option<
+        unsafe extern "C" fn(
+            pVeh: *mut Vehicle_t,
+            pEnt: *mut gentity_t,
+            forceEject: qboolean,
+        ) -> bool,
+    >,
 
-	/// Eject all the inhabitants of this vehicle.
-	pub EjectAll: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> bool>,
+    /// Eject all the inhabitants of this vehicle.
+    pub EjectAll: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> bool>,
 
-	/// Start a delay until the vehicle dies.
-	pub StartDeathDelay: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, iDelayTime: c_int)>,
+    /// Start a delay until the vehicle dies.
+    pub StartDeathDelay: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, iDelayTime: c_int)>,
 
-	/// Update death sequence.
-	pub DeathUpdate: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
+    /// Update death sequence.
+    pub DeathUpdate: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
 
-	/// Register all the assets used by this vehicle.
-	pub RegisterAssets: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
+    /// Register all the assets used by this vehicle.
+    pub RegisterAssets: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
 
-	/// Initialize the vehicle (should be called by Spawn?).
-	pub Initialize: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> bool>,
+    /// Initialize the vehicle (should be called by Spawn?).
+    pub Initialize: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> bool>,
 
-	/// Like a think or move command, this updates various vehicle properties.
-	pub Update: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> bool>,
+    /// Like a think or move command, this updates various vehicle properties.
+    pub Update: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> bool>,
 
-	/// Update the properties of a Rider (that may reflect what happens to the vehicle).
-	///
-	/// Raven: `[return]  bool  True if still in vehicle, false if otherwise.`
-	pub UpdateRider: Option<
-		unsafe extern "C" fn(pVeh: *mut Vehicle_t, pRider: *mut gentity_t, pUcmd: *mut usercmd_t) -> bool,
-	>,
+    /// Update the properties of a Rider (that may reflect what happens to the vehicle).
+    ///
+    /// Raven: `[return]  bool  True if still in vehicle, false if otherwise.`
+    pub UpdateRider: Option<
+        unsafe extern "C" fn(
+            pVeh: *mut Vehicle_t,
+            pRider: *mut gentity_t,
+            pUcmd: *mut usercmd_t,
+        ) -> bool,
+    >,
 
-	/// ProcessMoveCommands the Vehicle.
-	pub ProcessMoveCommands: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
+    /// ProcessMoveCommands the Vehicle.
+    pub ProcessMoveCommands: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
 
-	/// ProcessOrientCommands the Vehicle.
-	pub ProcessOrientCommands: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
+    /// ProcessOrientCommands the Vehicle.
+    pub ProcessOrientCommands: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
 
-	/// Attachs all the riders of this vehicle to their appropriate position/tag (*driver, *pass1, *pass2, whatever...).
-	pub AttachRiders: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
+    /// Attachs all the riders of this vehicle to their appropriate position/tag (*driver, *pass1, *pass2, whatever...).
+    pub AttachRiders: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
 
-	/// Make someone invisible and un-collidable.
-	pub Ghost: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut gentity_t)>,
+    /// Make someone invisible and un-collidable.
+    pub Ghost: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut gentity_t)>,
 
-	/// Make someone visible and collidable.
-	pub UnGhost: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut gentity_t)>,
+    /// Make someone visible and collidable.
+    pub UnGhost: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut gentity_t)>,
 
-	/// Get the pilot of this vehicle.
-	pub GetPilot: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> *const gentity_t>,
+    /// Get the pilot of this vehicle.
+    pub GetPilot: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> *const gentity_t>,
 
-	/// Whether this vehicle is currently inhabited (by anyone) or not.
-	pub Inhabited: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> bool>,
+    /// Whether this vehicle is currently inhabited (by anyone) or not.
+    pub Inhabited: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> bool>,
 }
 
 #[cfg(target_pointer_width = "64")]

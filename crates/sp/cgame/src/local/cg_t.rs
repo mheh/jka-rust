@@ -27,244 +27,244 @@ pub const MAX_CAPTIONTEXT: usize = 32;
 /// Type definition source: `oracle/code/cgame/cg_local.h:297-503`
 #[repr(C)]
 pub struct cg_t {
-	/// incremented each frame
-	pub clientFrame: i32,
+    /// incremented each frame
+    pub clientFrame: i32,
 
-	/// taking a level menu screenshot
-	pub levelShot: qboolean,
+    /// taking a level menu screenshot
+    pub levelShot: qboolean,
 
-	// there are only one or two snapshot_t that are relevent at a time
-	/// the number of snapshots the client system has received
-	pub latestSnapshotNum: i32,
-	/// the time from latestSnapshotNum, so we don't need to read the snapshot yet
-	pub latestSnapshotTime: i32,
-	/// the number of snapshots cgame has requested
-	pub processedSnapshotNum: i32,
-	/// cg.snap->serverTime <= cg.time
-	pub snap: *mut snapshot_t,
-	/// cg.nextSnap->serverTime > cg.time, or NULL
-	pub nextSnap: *mut snapshot_t,
+    // there are only one or two snapshot_t that are relevent at a time
+    /// the number of snapshots the client system has received
+    pub latestSnapshotNum: i32,
+    /// the time from latestSnapshotNum, so we don't need to read the snapshot yet
+    pub latestSnapshotTime: i32,
+    /// the number of snapshots cgame has requested
+    pub processedSnapshotNum: i32,
+    /// cg.snap->serverTime <= cg.time
+    pub snap: *mut snapshot_t,
+    /// cg.nextSnap->serverTime > cg.time, or NULL
+    pub nextSnap: *mut snapshot_t,
 
-	/// (float)( cg.time - cg.frame->serverTime ) / (cg.nextFrame->serverTime - cg.frame->serverTime)
-	pub frameInterpolation: f32,
+    /// (float)( cg.time - cg.frame->serverTime ) / (cg.nextFrame->serverTime - cg.frame->serverTime)
+    pub frameInterpolation: f32,
 
-	pub thisFrameTeleport: qboolean,
-	pub nextFrameTeleport: qboolean,
+    pub thisFrameTeleport: qboolean,
+    pub nextFrameTeleport: qboolean,
 
-	/// cg.time - cg.oldTime
-	pub frametime: i32,
+    /// cg.time - cg.oldTime
+    pub frametime: i32,
 
-	/// this is the time value that the client
-	/// is rendering at.
-	pub time: i32,
-	/// time at last frame, used for missile trails and prediction checking
-	pub oldTime: i32,
+    /// this is the time value that the client
+    /// is rendering at.
+    pub time: i32,
+    /// time at last frame, used for missile trails and prediction checking
+    pub oldTime: i32,
 
-	/// 5 min, 1 min, overtime
-	pub timelimitWarnings: i32,
+    /// 5 min, 1 min, overtime
+    pub timelimitWarnings: i32,
 
-	/// during deaths, chasecams, etc
-	pub renderingThirdPerson: qboolean,
+    /// during deaths, chasecams, etc
+    pub renderingThirdPerson: qboolean,
 
-	// prediction state
-	/// true if prediction has hit a trigger_teleport
-	pub hyperspace: qboolean,
-	pub predicted_player_state: playerState_t,
-	/// clear until the first call to CG_PredictPlayerState
-	pub validPPS: qboolean,
-	pub predictedErrorTime: i32,
-	pub predictedError: vec3_t,
+    // prediction state
+    /// true if prediction has hit a trigger_teleport
+    pub hyperspace: qboolean,
+    pub predicted_player_state: playerState_t,
+    /// clear until the first call to CG_PredictPlayerState
+    pub validPPS: qboolean,
+    pub predictedErrorTime: i32,
+    pub predictedError: vec3_t,
 
-	/// for stair up smoothing
-	pub stepChange: f32,
-	pub stepTime: i32,
+    /// for stair up smoothing
+    pub stepChange: f32,
+    pub stepTime: i32,
 
-	/// for duck viewheight smoothing
-	pub duckChange: f32,
-	pub duckTime: i32,
+    /// for duck viewheight smoothing
+    pub duckChange: f32,
+    pub duckTime: i32,
 
-	/// for landing hard
-	pub landChange: f32,
-	pub landTime: i32,
+    /// for landing hard
+    pub landChange: f32,
+    pub landTime: i32,
 
-	// input state sent to server
-	pub weaponSelect: i32,
-	pub saberAnimLevelPending: i32,
+    // input state sent to server
+    pub weaponSelect: i32,
+    pub saberAnimLevelPending: i32,
 
-	// auto rotating items
-	pub autoAngles: vec3_t,
-	pub autoAxis: [vec3_t; 3],
-	pub autoAnglesFast: vec3_t,
-	pub autoAxisFast: [vec3_t; 3],
+    // auto rotating items
+    pub autoAngles: vec3_t,
+    pub autoAxis: [vec3_t; 3],
+    pub autoAnglesFast: vec3_t,
+    pub autoAxisFast: [vec3_t; 3],
 
-	// view rendering
-	pub refdef: refdef_t,
-	/// will be converted to refdef.viewaxis
-	pub refdefViewAngles: vec3_t,
+    // view rendering
+    pub refdef: refdef_t,
+    /// will be converted to refdef.viewaxis
+    pub refdefViewAngles: vec3_t,
 
-	// zoom key
-	/// 0 - not zoomed, 1 - binoculars, 2 - disruptor weapon
-	pub zoomMode: i32,
-	/// -1, 1
-	pub zoomDir: i32,
-	pub zoomTime: i32,
-	pub zoomLocked: qboolean,
+    // zoom key
+    /// 0 - not zoomed, 1 - binoculars, 2 - disruptor weapon
+    pub zoomMode: i32,
+    /// -1, 1
+    pub zoomDir: i32,
+    pub zoomTime: i32,
+    pub zoomLocked: qboolean,
 
-	// gonk use
-	pub batteryChargeTime: i32,
+    // gonk use
+    pub batteryChargeTime: i32,
 
-	// FIXME:
-	pub forceCrosshairStartTime: i32,
-	pub forceCrosshairEndTime: i32,
+    // FIXME:
+    pub forceCrosshairStartTime: i32,
+    pub forceCrosshairEndTime: i32,
 
-	// information screen text during loading
-	pub infoScreenText: [c_char; MAX_STRING_CHARS],
+    // information screen text during loading
+    pub infoScreenText: [c_char; MAX_STRING_CHARS],
 
-	// centerprinting
-	pub centerPrintTime: i32,
-	pub centerPrintY: i32,
-	pub centerPrint: [c_char; 1024],
-	pub centerPrintLines: i32,
+    // centerprinting
+    pub centerPrintTime: i32,
+    pub centerPrintY: i32,
+    pub centerPrint: [c_char; 1024],
+    pub centerPrintLines: i32,
 
-	// Scrolling text, caption text and LCARS text use this
-	pub printText: [[c_char; 128]; MAX_PRINTTEXT],
-	pub printTextY: i32,
+    // Scrolling text, caption text and LCARS text use this
+    pub printText: [[c_char; 128]; MAX_PRINTTEXT],
+    pub printTextY: i32,
 
-	/// bosted for taiwanese squealy radio static speech in kejim post
-	pub captionText: [[c_char; 256]; MAX_CAPTIONTEXT],
-	pub captionTextY: i32,
+    /// bosted for taiwanese squealy radio static speech in kejim post
+    pub captionText: [[c_char; 256]; MAX_CAPTIONTEXT],
+    pub captionTextY: i32,
 
-	/// Number of lines being printed
-	pub scrollTextLines: i32,
-	pub scrollTextTime: i32,
+    /// Number of lines being printed
+    pub scrollTextLines: i32,
+    pub scrollTextTime: i32,
 
-	pub captionNextTextTime: i32,
-	pub captionTextCurrentLine: i32,
-	pub captionTextTime: i32,
-	pub captionLetterTime: i32,
+    pub captionNextTextTime: i32,
+    pub captionTextCurrentLine: i32,
+    pub captionTextTime: i32,
+    pub captionLetterTime: i32,
 
-	// For flashing health armor counter
-	pub oldhealth: i32,
-	pub oldHealthTime: i32,
-	pub oldarmor: i32,
-	pub oldArmorTime: i32,
-	pub oldammo: i32,
-	pub oldAmmoTime: i32,
+    // For flashing health armor counter
+    pub oldhealth: i32,
+    pub oldHealthTime: i32,
+    pub oldarmor: i32,
+    pub oldArmorTime: i32,
+    pub oldammo: i32,
+    pub oldAmmoTime: i32,
 
-	/// 1 = low, 2 = empty
-	pub lowAmmoWarning: i32,
+    /// 1 = low, 2 = empty
+    pub lowAmmoWarning: i32,
 
-	// crosshair client ID
-	/// who you're looking at
-	pub crosshairClientNum: i32,
-	/// last time you looked at them
-	pub crosshairClientTime: i32,
+    // crosshair client ID
+    /// who you're looking at
+    pub crosshairClientNum: i32,
+    /// last time you looked at them
+    pub crosshairClientTime: i32,
 
-	// powerup active flashing
-	pub powerupActive: i32,
-	pub powerupTime: i32,
+    // powerup active flashing
+    pub powerupActive: i32,
+    pub powerupTime: i32,
 
-	//==========================
-	pub creditsStart: i32,
+    //==========================
+    pub creditsStart: i32,
 
-	pub itemPickup: i32,
-	pub itemPickupTime: i32,
-	/// the pulse around the crosshair is timed seperately
-	pub itemPickupBlendTime: i32,
+    pub itemPickup: i32,
+    pub itemPickupTime: i32,
+    /// the pulse around the crosshair is timed seperately
+    pub itemPickupBlendTime: i32,
 
-	/// How far into opening sequence the icon HUD is
-	pub iconHUDPercent: f32,
-	/// How long the Icon HUD has been active
-	pub iconSelectTime: i32,
-	pub iconHUDActive: qboolean,
+    /// How far into opening sequence the icon HUD is
+    pub iconHUDPercent: f32,
+    /// How long the Icon HUD has been active
+    pub iconSelectTime: i32,
+    pub iconHUDActive: qboolean,
 
-	/// Current inventory item chosen on Data Pad
-	pub DataPadInventorySelect: i32,
-	/// Current weapon item chosen on Data Pad
-	pub DataPadWeaponSelect: i32,
-	/// Current force power chosen on Data Pad
-	pub DataPadforcepowerSelect: i32,
+    /// Current inventory item chosen on Data Pad
+    pub DataPadInventorySelect: i32,
+    /// Current weapon item chosen on Data Pad
+    pub DataPadWeaponSelect: i32,
+    /// Current force power chosen on Data Pad
+    pub DataPadforcepowerSelect: i32,
 
-	/// Flag to show of message lite is active
-	pub messageLitActive: qboolean,
+    /// Flag to show of message lite is active
+    pub messageLitActive: qboolean,
 
-	pub weaponSelectTime: i32,
-	pub weaponAnimation: i32,
-	pub weaponAnimationTime: i32,
+    pub weaponSelectTime: i32,
+    pub weaponAnimation: i32,
+    pub weaponAnimationTime: i32,
 
-	/// Current inventory item chosen
-	pub inventorySelect: i32,
-	pub inventorySelectTime: i32,
+    /// Current inventory item chosen
+    pub inventorySelect: i32,
+    pub inventorySelectTime: i32,
 
-	/// Current force power chosen
-	pub forcepowerSelect: i32,
-	pub forcepowerSelectTime: i32,
+    /// Current force power chosen
+    pub forcepowerSelect: i32,
+    pub forcepowerSelectTime: i32,
 
-	// blend blobs
-	pub damageTime: f32,
-	pub damageX: f32,
-	pub damageY: f32,
-	pub damageValue: f32,
+    // blend blobs
+    pub damageTime: f32,
+    pub damageX: f32,
+    pub damageY: f32,
+    pub damageValue: f32,
 
-	// status bar head
-	pub headYaw: f32,
-	pub headEndPitch: f32,
-	pub headEndYaw: f32,
-	pub headEndTime: i32,
-	pub headStartPitch: f32,
-	pub headStartYaw: f32,
-	pub headStartTime: i32,
+    // status bar head
+    pub headYaw: f32,
+    pub headEndPitch: f32,
+    pub headEndYaw: f32,
+    pub headEndTime: i32,
+    pub headStartPitch: f32,
+    pub headStartYaw: f32,
+    pub headStartTime: i32,
 
-	pub loadLCARSStage: i32,
+    pub loadLCARSStage: i32,
 
-	pub missionInfoFlashTime: i32,
-	pub missionStatusShow: qboolean,
-	pub missionStatusDeadTime: i32,
+    pub missionInfoFlashTime: i32,
+    pub missionStatusShow: qboolean,
+    pub missionStatusDeadTime: i32,
 
-	pub forceHUDTotalFlashTime: i32,
-	pub forceHUDNextFlashTime: i32,
-	/// Flag to show force hud is off/on
-	pub forceHUDActive: qboolean,
+    pub forceHUDTotalFlashTime: i32,
+    pub forceHUDNextFlashTime: i32,
+    /// Flag to show force hud is off/on
+    pub forceHUDActive: qboolean,
 
-	/// qtrue if opened
-	pub missionFailedScreen: qboolean,
+    /// qtrue if opened
+    pub missionFailedScreen: qboolean,
 
-	pub weaponPickupTextTime: i32,
+    pub weaponPickupTextTime: i32,
 
-	pub VHUDFlashTime: i32,
-	pub VHUDTurboFlag: qboolean,
-	pub HUDTickFlashTime: i32,
-	pub HUDArmorFlag: qboolean,
-	pub HUDHealthFlag: qboolean,
+    pub VHUDFlashTime: i32,
+    pub VHUDTurboFlag: qboolean,
+    pub HUDTickFlashTime: i32,
+    pub HUDArmorFlag: qboolean,
+    pub HUDHealthFlag: qboolean,
 
-	// view movement
-	pub v_dmg_time: f32,
-	pub v_dmg_pitch: f32,
-	pub v_dmg_roll: f32,
+    // view movement
+    pub v_dmg_time: f32,
+    pub v_dmg_pitch: f32,
+    pub v_dmg_roll: f32,
 
-	/// when interrogator gets you, wonky time controls "drugged" camera view.
-	pub wonkyTime: i32,
+    /// when interrogator gets you, wonky time controls "drugged" camera view.
+    pub wonkyTime: i32,
 
-	/// weapon kicks
-	pub kick_angles: vec3_t,
-	/// when the kick happened, so it gets reduced over time
-	pub kick_time: i32,
+    /// weapon kicks
+    pub kick_angles: vec3_t,
+    /// when the kick happened, so it gets reduced over time
+    pub kick_time: i32,
 
-	// temp working variables for player view
-	pub bobfracsin: f32,
-	pub bobcycle: i32,
-	pub xyspeed: f32,
+    // temp working variables for player view
+    pub bobfracsin: f32,
+    pub bobcycle: i32,
+    pub xyspeed: f32,
 
-	// development tool
-	pub testModelName: [c_char; MAX_QPATH],
-	// Ghoul2 Insert Start
-	pub testModel: i32,
-	/// had to be moved so we wouldn't wipe these out with the memset - these have STL in them and shouldn't be cleared that way
-	pub activeSnapshots: [snapshot_t; 2],
-	pub testModelEntity: refEntity_t,
-	// Ghoul2 Insert End
-	/// for overriding certain third-person camera properties
-	pub overrides: overrides_t,
+    // development tool
+    pub testModelName: [c_char; MAX_QPATH],
+    // Ghoul2 Insert Start
+    pub testModel: i32,
+    /// had to be moved so we wouldn't wipe these out with the memset - these have STL in them and shouldn't be cleared that way
+    pub activeSnapshots: [snapshot_t; 2],
+    pub testModelEntity: refEntity_t,
+    // Ghoul2 Insert End
+    /// for overriding certain third-person camera properties
+    pub overrides: overrides_t,
 }
 
 const _: () = assert!(core::mem::size_of::<cg_t>() == 321248);

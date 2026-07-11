@@ -111,9 +111,21 @@ fn clip_box_to_brush(
         let (normal, plane_dist, axis) = brush_plane(brush, face);
 
         let ofs = [
-            if normal[0] < 0.0f32 { tw_maxs[0] } else { tw_mins[0] },
-            if normal[1] < 0.0f32 { tw_maxs[1] } else { tw_mins[1] },
-            if normal[2] < 0.0f32 { tw_maxs[2] } else { tw_mins[2] },
+            if normal[0] < 0.0f32 {
+                tw_maxs[0]
+            } else {
+                tw_mins[0]
+            },
+            if normal[1] < 0.0f32 {
+                tw_maxs[1]
+            } else {
+                tw_mins[1]
+            },
+            if normal[2] < 0.0f32 {
+                tw_maxs[2]
+            } else {
+                tw_mins[2]
+            },
         ];
 
         let dist = plane_dist - (ofs[0] * normal[0] + ofs[1] * normal[1] + ofs[2] * normal[2]);
@@ -552,13 +564,7 @@ impl BgTraps for TestTraps {
     ) {
         unreachable!()
     }
-    fn cvar_register(
-        &self,
-        _a: *mut vmCvar_t,
-        _b: *const c_char,
-        _c: *const c_char,
-        _d: c_int,
-    ) {
+    fn cvar_register(&self, _a: *mut vmCvar_t, _b: *const c_char, _c: *const c_char, _d: c_int) {
         unreachable!()
     }
 }
@@ -637,13 +643,7 @@ impl GameCallbacks for TestCallbacks {
     fn client_check_impact_bbrush(&mut self, _e: c_int, _i: c_int) {
         unreachable!()
     }
-    fn flyveh_surface_destruction(
-        &mut self,
-        _e: c_int,
-        _t: *mut trace_t,
-        _m: c_int,
-        _f: qboolean,
-    ) {
+    fn flyveh_surface_destruction(&mut self, _e: c_int, _t: *mut trace_t, _m: c_int, _f: qboolean) {
         unreachable!()
     }
     fn set_anim(
@@ -717,13 +717,25 @@ fn apply_ps_override(ps: &mut playerState_t, tok: &[&str]) {
     let name = tok[1];
     match name {
         "origin" => {
-            ps.origin = [parse_float(tok[2]), parse_float(tok[3]), parse_float(tok[4])];
+            ps.origin = [
+                parse_float(tok[2]),
+                parse_float(tok[3]),
+                parse_float(tok[4]),
+            ];
         }
         "velocity" => {
-            ps.velocity = [parse_float(tok[2]), parse_float(tok[3]), parse_float(tok[4])];
+            ps.velocity = [
+                parse_float(tok[2]),
+                parse_float(tok[3]),
+                parse_float(tok[4]),
+            ];
         }
         "viewangles" => {
-            ps.viewangles = [parse_float(tok[2]), parse_float(tok[3]), parse_float(tok[4])];
+            ps.viewangles = [
+                parse_float(tok[2]),
+                parse_float(tok[3]),
+                parse_float(tok[4]),
+            ];
         }
         "delta_angles" => {
             ps.delta_angles = [parse_int(tok[2]), parse_int(tok[3]), parse_int(tok[4])];
@@ -839,10 +851,22 @@ fn parse_scenario(path: &PathBuf) -> Vec<Row> {
         }
         match tok[0] {
             "brush" if tok.len() >= 7 => {
-                let surf = if tok.len() >= 8 { parse_surf(tok[7]) } else { 0 };
+                let surf = if tok.len() >= 8 {
+                    parse_surf(tok[7])
+                } else {
+                    0
+                };
                 rows.push(Row::Brush(Brush {
-                    mins: [parse_float(tok[1]), parse_float(tok[2]), parse_float(tok[3])],
-                    maxs: [parse_float(tok[4]), parse_float(tok[5]), parse_float(tok[6])],
+                    mins: [
+                        parse_float(tok[1]),
+                        parse_float(tok[2]),
+                        parse_float(tok[3]),
+                    ],
+                    maxs: [
+                        parse_float(tok[4]),
+                        parse_float(tok[5]),
+                        parse_float(tok[6]),
+                    ],
                     surface_flags: surf,
                 }));
             }
@@ -856,7 +880,11 @@ fn parse_scenario(path: &PathBuf) -> Vec<Row> {
                 } else {
                     1
                 };
-                let yawinc = if tok.len() >= 11 { parse_int(tok[10]) } else { 0 };
+                let yawinc = if tok.len() >= 11 {
+                    parse_int(tok[10])
+                } else {
+                    0
+                };
                 rows.push(Row::Cmd(Cmd {
                     dt: parse_int(tok[1]),
                     fwd: parse_int(tok[2]),
@@ -1004,19 +1032,47 @@ fn run_trace() -> String {
                 o.push_str("reset\n");
             }
             "brush" if tok.len() >= 7 => {
-                let surf = if tok.len() >= 8 { parse_surf(tok[7]) } else { 0 };
+                let surf = if tok.len() >= 8 {
+                    parse_surf(tok[7])
+                } else {
+                    0
+                };
                 brushes.push(Brush {
-                    mins: [parse_float(tok[1]), parse_float(tok[2]), parse_float(tok[3])],
-                    maxs: [parse_float(tok[4]), parse_float(tok[5]), parse_float(tok[6])],
+                    mins: [
+                        parse_float(tok[1]),
+                        parse_float(tok[2]),
+                        parse_float(tok[3]),
+                    ],
+                    maxs: [
+                        parse_float(tok[4]),
+                        parse_float(tok[5]),
+                        parse_float(tok[6]),
+                    ],
                     surface_flags: surf,
                 });
                 let _ = writeln!(o, "brush {} surf={:x}", brushes.len() - 1, surf);
             }
             "sweep" if tok.len() >= 13 => {
-                let start = [parse_float(tok[1]), parse_float(tok[2]), parse_float(tok[3])];
-                let end = [parse_float(tok[4]), parse_float(tok[5]), parse_float(tok[6])];
-                let mins = [parse_float(tok[7]), parse_float(tok[8]), parse_float(tok[9])];
-                let maxs = [parse_float(tok[10]), parse_float(tok[11]), parse_float(tok[12])];
+                let start = [
+                    parse_float(tok[1]),
+                    parse_float(tok[2]),
+                    parse_float(tok[3]),
+                ];
+                let end = [
+                    parse_float(tok[4]),
+                    parse_float(tok[5]),
+                    parse_float(tok[6]),
+                ];
+                let mins = [
+                    parse_float(tok[7]),
+                    parse_float(tok[8]),
+                    parse_float(tok[9]),
+                ];
+                let maxs = [
+                    parse_float(tok[10]),
+                    parse_float(tok[11]),
+                    parse_float(tok[12]),
+                ];
                 let tr = trace_world(&brushes, &start, &mins, &maxs, &end);
                 let _ = writeln!(
                     o,

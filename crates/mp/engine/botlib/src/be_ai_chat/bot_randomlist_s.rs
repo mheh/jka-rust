@@ -9,10 +9,10 @@ use super::bot_randomstring_s::bot_randomstring_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:84-90`
 #[repr(C)]
 pub struct bot_randomlist_t {
-	pub string: *mut c_char,
-	pub numstrings: i32,
-	pub firstrandomstring: *mut bot_randomstring_t,
-	pub next: *mut bot_randomlist_t,
+    pub string: *mut c_char,
+    pub numstrings: i32,
+    pub firstrandomstring: *mut bot_randomstring_t,
+    pub next: *mut bot_randomlist_t,
 }
 
 pub type bot_randomlist_s = bot_randomlist_t;

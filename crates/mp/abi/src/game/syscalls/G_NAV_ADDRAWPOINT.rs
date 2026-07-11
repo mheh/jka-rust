@@ -2,8 +2,8 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::shared::vec3_t;
 use core::ffi::c_int;
+use mp_qshared::shared::vec3_t;
 
 /// `G_NAV_ADDRAWPOINT` outbound game-to-engine syscall.
 #[derive(Debug)]

@@ -14,26 +14,26 @@ pub const MAX_STRINGFIELD: usize = 80;
 /// Type definition source: `oracle/codemp/botlib/be_ai_goal.cpp:107-119`
 #[repr(C)]
 pub struct iteminfo_t {
-	/// classname of the item
-	pub classname: [c_char; 32],
-	/// name of the item
-	pub name: [c_char; MAX_STRINGFIELD],
-	/// model of the item
-	pub model: [c_char; MAX_STRINGFIELD],
-	/// model index
-	pub modelindex: i32,
-	/// item type
-	pub r#type: i32,
-	/// index in the inventory
-	pub index: i32,
-	/// respawn time
-	pub respawntime: f32,
-	/// mins of the item
-	pub mins: vec3_t,
-	/// maxs of the item
-	pub maxs: vec3_t,
-	/// number of the item info
-	pub number: i32,
+    /// classname of the item
+    pub classname: [c_char; 32],
+    /// name of the item
+    pub name: [c_char; MAX_STRINGFIELD],
+    /// model of the item
+    pub model: [c_char; MAX_STRINGFIELD],
+    /// model index
+    pub modelindex: i32,
+    /// item type
+    pub r#type: i32,
+    /// index in the inventory
+    pub index: i32,
+    /// respawn time
+    pub respawntime: f32,
+    /// mins of the item
+    pub mins: vec3_t,
+    /// maxs of the item
+    pub maxs: vec3_t,
+    /// number of the item info
+    pub number: i32,
 }
 
 pub type iteminfo_s = iteminfo_t;

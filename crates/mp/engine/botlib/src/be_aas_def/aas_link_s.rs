@@ -5,12 +5,12 @@
 /// Type definition source: `oracle/codemp/botlib/be_aas_def.h:50-56`
 #[repr(C)]
 pub struct aas_link_t {
-	pub entnum: i32,
-	pub areanum: i32,
-	pub next_ent: *mut aas_link_t,
-	pub prev_ent: *mut aas_link_t,
-	pub next_area: *mut aas_link_t,
-	pub prev_area: *mut aas_link_t,
+    pub entnum: i32,
+    pub areanum: i32,
+    pub next_ent: *mut aas_link_t,
+    pub prev_ent: *mut aas_link_t,
+    pub next_area: *mut aas_link_t,
+    pub prev_area: *mut aas_link_t,
 }
 
 pub type aas_link_s = aas_link_t;

@@ -14,7 +14,6 @@ use crate::prelude::*;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
 use crate::entity::flags::{FL_BBRUSH, FL_NOTARGET};
 use crate::g_team::OnSameTeam;
 use crate::g_utils::G_RadiusList;

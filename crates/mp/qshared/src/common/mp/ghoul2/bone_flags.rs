@@ -48,7 +48,8 @@ pub const BONE_ANGLES_IK: c_int = 0x4000;
 /// Raven `BONE_ANGLES_TOTAL`.
 ///
 /// Source: `oracle/codemp/ghoul2/G2.h:21`
-pub const BONE_ANGLES_TOTAL: c_int = BONE_ANGLES_PREMULT | BONE_ANGLES_POSTMULT | BONE_ANGLES_REPLACE;
+pub const BONE_ANGLES_TOTAL: c_int =
+    BONE_ANGLES_PREMULT | BONE_ANGLES_POSTMULT | BONE_ANGLES_REPLACE;
 
 /// Raven `BONE_ANIM_OVERRIDE`.
 ///

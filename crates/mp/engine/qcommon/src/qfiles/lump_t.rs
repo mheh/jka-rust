@@ -5,8 +5,8 @@
 /// Type definition source: `oracle/codemp/qcommon/qfiles.h:410-412`
 #[repr(C)]
 pub struct lump_t {
-	pub fileofs: i32,
-	pub filelen: i32,
+    pub fileofs: i32,
+    pub filelen: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<lump_t>() == 8);

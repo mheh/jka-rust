@@ -12,8 +12,8 @@ const MAX_SERVERSTATUSREQUESTS: usize = 16;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:698-701`
 #[repr(C)]
 pub struct pendingServerStatus_t {
-	pub num: i32,
-	pub server: [pendingServer_t; MAX_SERVERSTATUSREQUESTS],
+    pub num: i32,
+    pub server: [pendingServer_t; MAX_SERVERSTATUSREQUESTS],
 }
 
 const _: () = assert!(core::mem::size_of::<pendingServerStatus_t>() == 2244);

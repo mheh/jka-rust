@@ -14,8 +14,6 @@ use mp_qshared::shared::MAX_GENTITIES;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 // PORT-COMPLETE: g_timer.c 12/0
 
 /// Raven `gtimer_t` — a single timer with a name, expiration time, and link to next.

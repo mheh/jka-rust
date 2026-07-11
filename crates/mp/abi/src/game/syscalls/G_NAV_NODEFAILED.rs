@@ -2,9 +2,9 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
+use core::ffi::c_int;
 use mp_qshared::common::mp::gentity_t;
 use mp_qshared::shared::qboolean;
-use core::ffi::c_int;
 
 /// `G_NAV_NODEFAILED` outbound game-to-engine syscall.
 ///

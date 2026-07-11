@@ -7,11 +7,11 @@ use crate::shared::vec3_t;
 /// Type definition source: `oracle/codemp/game/be_aas.h:180-187`
 #[repr(C)]
 pub struct aas_altroutegoal_t {
-	pub origin: vec3_t,
-	pub areanum: i32,
-	pub starttraveltime: u16,
-	pub goaltraveltime: u16,
-	pub extratraveltime: u16,
+    pub origin: vec3_t,
+    pub areanum: i32,
+    pub starttraveltime: u16,
+    pub goaltraveltime: u16,
+    pub extratraveltime: u16,
 }
 
 pub type aas_altroutegoal_s = aas_altroutegoal_t;

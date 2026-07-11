@@ -2125,7 +2125,8 @@ impl PmoveContext<'_> {
             }
             if fps < 0.0 {
                 unsafe {
-                    (*animset.offset(animNum as isize)).frameLerp = (1000.0f32 / fps).floor() as i16;
+                    (*animset.offset(animNum as isize)).frameLerp =
+                        (1000.0f32 / fps).floor() as i16;
                 }
             } else {
                 unsafe {

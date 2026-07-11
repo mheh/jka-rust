@@ -724,7 +724,8 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
                         hitAlly = qtrue; //us!
                     } else if enemyInFOV != qfalse {
                         //if enemy is FOV, go ahead and check for shooting
-                        let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy, Some(&mut impactPos));
+                        let hit =
+                            crate::NPC_combat::NPC_ShotEntity(ctx, enemy, Some(&mut impactPos));
                         let hitEnt = ge.add(hit as usize);
                         let hitEnt_client = (*hitEnt).client as *mut gclient_t;
 
@@ -1223,7 +1224,8 @@ pub fn Jedi_BattleTaunt(ctx: GameContext<'_>) -> qboolean {
                 && (*enemy_client).NPC_class == CLASS_JEDI
             {
                 //a jedi fighting a jedi - training
-                if (*client).NPC_class == CLASS_JEDI && (*npc_info).rank as c_int == RANK_COMMANDER as c_int
+                if (*client).NPC_class == CLASS_JEDI
+                    && (*npc_info).rank as c_int == RANK_COMMANDER as c_int
                 {
                     //only trainer taunts
                     event = entity_event_t::EV_TAUNT1 as c_int;
@@ -1638,12 +1640,16 @@ pub fn Jedi_AdjustSaberAnimLevel(ctx: GameContext<'_>, self_: *mut gentity_t, ne
             return;
         }
         if (*client).playerTeam == NPCTEAM_ENEMY as c_int {
-            if (*snpc).rank as c_int == RANK_CIVILIAN as c_int || (*snpc).rank as c_int == RANK_LT_JG as c_int {
+            if (*snpc).rank as c_int == RANK_CIVILIAN as c_int
+                || (*snpc).rank as c_int == RANK_LT_JG as c_int
+            {
                 //grunt and fencer always uses quick attacks
                 (*client).ps.fd.saberAnimLevel = FORCE_LEVEL_1;
                 return;
             }
-            if (*snpc).rank as c_int == RANK_CREWMAN as c_int || (*snpc).rank as c_int == RANK_ENSIGN as c_int {
+            if (*snpc).rank as c_int == RANK_CREWMAN as c_int
+                || (*snpc).rank as c_int == RANK_ENSIGN as c_int
+            {
                 //acrobat & force-users always use medium attacks
                 (*client).ps.fd.saberAnimLevel = FORCE_LEVEL_2;
                 return;
@@ -2384,7 +2390,8 @@ pub fn Jedi_CheckFlipEvasions(
                 return evasionType_t::EVASION_OTHER;
             }
         } else if (*client).NPC_class != CLASS_DESANN
-            && ((*snpc).rank as c_int == RANK_CREWMAN as c_int || (*snpc).rank as c_int >= RANK_LT as c_int)
+            && ((*snpc).rank as c_int == RANK_CREWMAN as c_int
+                || (*snpc).rank as c_int >= RANK_LT as c_int)
             && (*world).bg_state.rng.Q_irand(0, 1) != 0
             && crate::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim) == qfalse
             && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
@@ -2808,7 +2815,8 @@ pub fn Jedi_QuickReactions(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
         let world = ctx.world;
         let npc_info = (*world).globals.NPCInfo;
         let client = (*self_).client as *mut gclient_t;
-        if ((*client).NPC_class == CLASS_JEDI && (*npc_info).rank as c_int == RANK_COMMANDER as c_int)
+        if ((*client).NPC_class == CLASS_JEDI
+            && (*npc_info).rank as c_int == RANK_COMMANDER as c_int)
             || (*client).NPC_class == CLASS_TAVION
             || ((*client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] > FORCE_LEVEL_1
                 && (*world).cvars.g_spskill.integer > 1)
@@ -2911,7 +2919,8 @@ pub fn Jedi_SaberBlockGo(
         {
             let snpc = (*self_).NPC as *mut gNPC_t;
             if !(*self_).NPC.is_null()
-                && ((*snpc).rank as c_int == RANK_CREWMAN as c_int || (*snpc).rank as c_int >= RANK_LT_JG as c_int)
+                && ((*snpc).rank as c_int == RANK_CREWMAN as c_int
+                    || (*snpc).rank as c_int >= RANK_LT_JG as c_int)
             {
                 if (*client).ps.groundEntityNum != ENTITYNUM_NONE
                     && ((*client).ps.pm_flags & PMF_DUCKED) == 0
@@ -3201,7 +3210,8 @@ pub fn Jedi_SaberBlockGo(
             } else {
                 //gotta jump!
                 if !(*self_).NPC.is_null()
-                    && ((*snpc).rank as c_int == RANK_CREWMAN as c_int || (*snpc).rank as c_int > RANK_LT_JG as c_int)
+                    && ((*snpc).rank as c_int == RANK_CREWMAN as c_int
+                        || (*snpc).rank as c_int > RANK_LT_JG as c_int)
                     && ((*world).bg_state.rng.Q_irand(0, 10) == 0
                         || ((*world).bg_state.rng.Q_irand(0, 2) == 0
                             && ((*cmd).forwardmove != 0 || (*cmd).rightmove != 0)))
@@ -3713,7 +3723,9 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
             }
         } else {
             let mut dodgeTime = (*client).ps.torsoTimer;
-            if (*npc_info).rank as c_int > RANK_LT_COMM as c_int && (*client).NPC_class != CLASS_DESANN {
+            if (*npc_info).rank as c_int > RANK_LT_COMM as c_int
+                && (*client).NPC_class != CLASS_DESANN
+            {
                 dodgeTime -= 200;
             }
             crate::g_timer::TIMER_Set(ctx, npc, c"parryReCalcTime".as_ptr(), dodgeTime);
@@ -4816,7 +4828,8 @@ pub fn Jedi_AttackDecide(ctx: GameContext<'_>, enemy_dist: c_int) -> qboolean {
                 chance = 20;
             } else if (*client).NPC_class == CLASS_TAVION {
                 chance = 10;
-            } else if (*client).NPC_class == CLASS_REBORN && (*npc_info).rank as c_int == RANK_LT_JG as c_int
+            } else if (*client).NPC_class == CLASS_REBORN
+                && (*npc_info).rank as c_int == RANK_LT_JG as c_int
             {
                 chance = 5;
             } else {
@@ -4840,8 +4853,10 @@ pub fn Jedi_AttackDecide(ctx: GameContext<'_>, enemy_dist: c_int) -> qboolean {
         }
 
         if (*client).NPC_class == CLASS_TAVION
-            || ((*client).NPC_class == CLASS_REBORN && (*npc_info).rank as c_int == RANK_LT_JG as c_int)
-            || ((*client).NPC_class == CLASS_JEDI && (*npc_info).rank as c_int == RANK_COMMANDER as c_int)
+            || ((*client).NPC_class == CLASS_REBORN
+                && (*npc_info).rank as c_int == RANK_LT_JG as c_int)
+            || ((*client).NPC_class == CLASS_JEDI
+                && (*npc_info).rank as c_int == RANK_COMMANDER as c_int)
         {
             if (crate::bg_panimate::PM_SaberInParry((*client).ps.saberMove) != qfalse
                 || crate::bg_panimate::PM_SaberInKnockaway((*client).ps.saberMove) != qfalse)
@@ -5330,7 +5345,9 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                     || (*enemy_client).ps.legsAnim == BOTH_JUMPFLIPSTABDOWN as c_int
                 {
                     //enemy is flipping over me
-                    if (*world).bg_state.rng.Q_irand(0, (*npc_info).rank as c_int) < RANK_LT as c_int {
+                    if (*world).bg_state.rng.Q_irand(0, (*npc_info).rank as c_int)
+                        < RANK_LT as c_int
+                    {
                         //be nice and stand still for him...
                         (*world).globals.ucmd.forwardmove = 0;
                         (*world).globals.ucmd.rightmove = 0;
@@ -5368,7 +5385,8 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                     if (*enemy_client).ps.groundEntityNum == ENTITYNUM_NONE {
                         //still in air
                         if enemy_dist < 256.0 {
-                            if (*world).bg_state.rng.Q_irand(0, (*npc_info).rank as c_int) < RANK_LT as c_int
+                            if (*world).bg_state.rng.Q_irand(0, (*npc_info).rank as c_int)
+                                < RANK_LT as c_int
                             {
                                 let mut enemyFwd: vec3_t = [0.0; 3];
                                 let mut dest: vec3_t = [0.0; 3];

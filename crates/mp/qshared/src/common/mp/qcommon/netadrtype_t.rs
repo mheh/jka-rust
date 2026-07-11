@@ -7,7 +7,7 @@
 #[repr(i32)]
 pub enum netadrtype_t {
     NA_BOT = 0,
-    NA_BAD = 1,              // an address lookup failed
+    NA_BAD = 1, // an address lookup failed
     NA_LOOPBACK = 2,
     NA_BROADCAST = 3,
     NA_IP = 4,

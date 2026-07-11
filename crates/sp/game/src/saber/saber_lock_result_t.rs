@@ -5,7 +5,7 @@
 /// Type definition source: `oracle/code/game/wp_saber.h:37-42`
 #[repr(i32)]
 pub enum saberLockResult_t {
-	LOCK_VICTORY = 0, // one side won
-	LOCK_STALEMATE,    // neither side won
-	LOCK_DRAW,         // both people fall back
+    LOCK_VICTORY = 0, // one side won
+    LOCK_STALEMATE,   // neither side won
+    LOCK_DRAW,        // both people fall back
 }

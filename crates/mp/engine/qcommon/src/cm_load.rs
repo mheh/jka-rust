@@ -1346,7 +1346,11 @@ pub fn CM_LoadMap_Actual(
         let name_cstr = std::ffi::CStr::from_ptr(name);
         Com_DPrintf(
             common,
-            &format!("CM_LoadMap( {}, {} )\n", name_cstr.to_string_lossy(), clientload),
+            &format!(
+                "CM_LoadMap( {}, {} )\n",
+                name_cstr.to_string_lossy(),
+                clientload
+            ),
         );
 
         let cmap_name = std::ffi::CStr::from_ptr(cmap.name.as_ptr());

@@ -7,9 +7,9 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:57-62`
 #[repr(C)]
 pub struct bot_chatmessage_t {
-	pub chatmessage: *mut c_char,
-	pub time: f32,
-	pub next: *mut bot_chatmessage_t,
+    pub chatmessage: *mut c_char,
+    pub time: f32,
+    pub next: *mut bot_chatmessage_t,
 }
 
 pub type bot_chatmessage_s = bot_chatmessage_t;

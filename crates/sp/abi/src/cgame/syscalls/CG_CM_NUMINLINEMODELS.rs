@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `CG_CM_NUMINLINEMODELS` SP cgame imports syscall ABI token.
 ///

@@ -943,8 +943,7 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
         // `DEG2RAD(a)` is `(a * M_PI) / 180.0F` in f32; `cos`/`sin` are the double
         // libm functions and each `origin[k]*cos(...)` term evaluates in f64
         // before narrowing to the f32 result.
-        let rotation =
-            ((*ctx.world).level.mRotationAdjust * std::f32::consts::PI) / 180.0;
+        let rotation = ((*ctx.world).level.mRotationAdjust * std::f32::consts::PI) / 180.0;
         let cos_r = (rotation as f64).cos();
         let sin_r = (rotation as f64).sin();
         new_origin[0] = (origin[0] as f64 * cos_r - origin[1] as f64 * sin_r) as f32;
@@ -978,8 +977,7 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
             // `fmod` is a double-precision truncated remainder whose sign follows
             // the dividend; `rem_euclid` (least non-negative) differs by 360 for a
             // negative sum.
-            angles[1] =
-                ((angles[1] + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
+            angles[1] = ((angles[1] + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
             let temp = format!("{:.0} {:.0} {:.0}", angles[0], angles[1], angles[2]);
             let temp_c = CString::new(temp).unwrap();
             AddSpawnField(
@@ -1010,8 +1008,7 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
         if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
             sscanf_3f(value, &mut direction);
         }
-        direction[1] =
-            ((direction[1] + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
+        direction[1] = ((direction[1] + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
         let temp = format!(
             "{:.0} {:.0} {:.0}",
             direction[0], direction[1], direction[2]

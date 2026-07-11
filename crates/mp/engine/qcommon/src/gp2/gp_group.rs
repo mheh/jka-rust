@@ -87,7 +87,10 @@ impl<'a> GpGroup<'a> {
     /// insertion order.
     pub fn subgroups(&self) -> impl Iterator<Item = GpGroup<'a>> + '_ {
         let doc = self.doc;
-        self.node().subgroups.iter().map(move |&id| GpGroup { doc, id })
+        self.node()
+            .subgroups
+            .iter()
+            .map(move |&id| GpGroup { doc, id })
     }
 
     /// Raven `CGPGroup::GetInOrderSubGroups` + `GetInOrderNext` chain (see
@@ -116,7 +119,8 @@ impl<'a> GpGroup<'a> {
     /// Raven `CGPGroup::FindSubGroup` — first subgroup whose name matches
     /// case-insensitively, in insertion order.
     pub fn find_sub_group(&self, name: &str) -> Option<GpGroup<'a>> {
-        self.subgroups().find(|g| g.name().eq_ignore_ascii_case(name))
+        self.subgroups()
+            .find(|g| g.name().eq_ignore_ascii_case(name))
     }
 
     /// Raven `CGPGroup::FindPair`.

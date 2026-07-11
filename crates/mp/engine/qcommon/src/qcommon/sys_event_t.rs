@@ -9,12 +9,12 @@ use super::sys_event_type_t::sysEventType_t;
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct sysEvent_t {
-	pub evTime: i32,
-	pub evType: sysEventType_t,
-	pub evValue: i32,
-	pub evValue2: i32,
-	pub evPtrLength: i32, // bytes of data pointed to by evPtr, for journaling
-	pub evPtr: *mut ::core::ffi::c_void, // this must be manually freed if not NULL
+    pub evTime: i32,
+    pub evType: sysEventType_t,
+    pub evValue: i32,
+    pub evValue2: i32,
+    pub evPtrLength: i32, // bytes of data pointed to by evPtr, for journaling
+    pub evPtr: *mut ::core::ffi::c_void, // this must be manually freed if not NULL
 }
 
 const _: () = assert!(core::mem::size_of::<sysEvent_t>() == 32);

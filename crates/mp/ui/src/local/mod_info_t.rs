@@ -7,8 +7,8 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:711-714`
 #[repr(C)]
 pub struct modInfo_t {
-	pub modName: *const c_char,
-	pub modDescr: *const c_char,
+    pub modName: *const c_char,
+    pub modDescr: *const c_char,
 }
 
 const _: () = assert!(core::mem::size_of::<modInfo_t>() == 16);

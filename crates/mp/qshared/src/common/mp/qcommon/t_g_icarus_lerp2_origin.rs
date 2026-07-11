@@ -8,10 +8,10 @@ use crate::shared::vec3_t;
 /// Type definition source: `oracle/codemp/game/g_public.h:828-834`
 #[repr(C)]
 pub struct T_G_ICARUS_LERP2ORIGIN {
-	pub taskID: i32,
-	pub entID: i32,
-	pub origin: vec3_t,
-	pub duration: f32,
+    pub taskID: i32,
+    pub entID: i32,
+    pub origin: vec3_t,
+    pub duration: f32,
 }
 
 const _: () = assert!(core::mem::size_of::<T_G_ICARUS_LERP2ORIGIN>() == 24);

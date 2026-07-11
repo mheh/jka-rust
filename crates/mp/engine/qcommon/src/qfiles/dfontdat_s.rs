@@ -10,15 +10,15 @@ pub const GLYPH_COUNT: usize = 256;
 /// Type definition source: `oracle/codemp/qcommon/qfiles.h:591-601`
 #[repr(C)]
 pub struct dfontdat_t {
-	pub mGlyphs: [glyphInfo_t; GLYPH_COUNT],
+    pub mGlyphs: [glyphInfo_t; GLYPH_COUNT],
 
-	pub mPointSize: i16,
-	/// max height of font
-	pub mHeight: i16,
-	pub mAscender: i16,
-	pub mDescender: i16,
+    pub mPointSize: i16,
+    /// max height of font
+    pub mHeight: i16,
+    pub mAscender: i16,
+    pub mDescender: i16,
 
-	pub mKoreanHack: i16,
+    pub mKoreanHack: i16,
 }
 
 const _: () = assert!(core::mem::size_of::<dfontdat_t>() == 7180);

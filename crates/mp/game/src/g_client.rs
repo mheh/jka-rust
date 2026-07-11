@@ -108,8 +108,6 @@ const S_COLOR_WHITE: &str = "^7";
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 /// Raven `playerMins` — the standard player bounding-box mins.
 /// Source: `oracle/codemp/game/g_client.c:9`
 pub static playerMins: vec3_t = [-15.0, -15.0, DEFAULT_MINS_2 as vec_t];
@@ -2839,23 +2837,11 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         // Get the skin RGB based on his userinfo
         let value = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("char_color_red").as_ptr());
-        (*client).ps.customRGBA[0] = if !value.is_null() {
-            atoi(value)
-        } else {
-            255
-        };
+        (*client).ps.customRGBA[0] = if !value.is_null() { atoi(value) } else { 255 };
         let value = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("char_color_green").as_ptr());
-        (*client).ps.customRGBA[1] = if !value.is_null() {
-            atoi(value)
-        } else {
-            255
-        };
+        (*client).ps.customRGBA[1] = if !value.is_null() { atoi(value) } else { 255 };
         let value = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("char_color_blue").as_ptr());
-        (*client).ps.customRGBA[2] = if !value.is_null() {
-            atoi(value)
-        } else {
-            255
-        };
+        (*client).ps.customRGBA[2] = if !value.is_null() { atoi(value) } else { 255 };
 
         if ((*client).ps.customRGBA[0] as c_int
             + (*client).ps.customRGBA[1] as c_int

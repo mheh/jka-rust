@@ -1,5 +1,7 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use sp_qshared::shared::fileHandle_t;
 
 /// Arguments for `CG_FS_FCLOSEFILE`.

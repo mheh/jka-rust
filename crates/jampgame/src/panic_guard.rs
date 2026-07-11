@@ -69,7 +69,10 @@ mod tests {
     #[test]
     fn format_record_names_file_line_and_message() {
         let r = format_record(Some("g_main.rs:42:9"), "boom");
-        assert!(r.contains("g_main.rs:42:9"), "record must name file:line: {r}");
+        assert!(
+            r.contains("g_main.rs:42:9"),
+            "record must name file:line: {r}"
+        );
         assert!(r.contains("boom"), "record must carry the payload: {r}");
     }
 

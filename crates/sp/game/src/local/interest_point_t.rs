@@ -9,8 +9,8 @@ use sp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/code/game/g_local.h:84-88`
 #[repr(C)]
 pub struct interestPoint_t {
-	pub origin: vec3_t,
-	pub target: *mut c_char,
+    pub origin: vec3_t,
+    pub target: *mut c_char,
 }
 
 #[cfg(target_pointer_width = "64")]

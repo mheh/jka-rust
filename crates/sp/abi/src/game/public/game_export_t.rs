@@ -47,7 +47,8 @@ pub struct game_export_t {
     // ReadLevel is called after the default map information has been
     // loaded with SpawnEntities
     pub WriteLevel: Option<unsafe extern "C-unwind" fn(qbAutosave: qboolean)>,
-    pub ReadLevel: Option<unsafe extern "C-unwind" fn(qbAutosave: qboolean, qbLoadTransition: qboolean)>,
+    pub ReadLevel:
+        Option<unsafe extern "C-unwind" fn(qbAutosave: qboolean, qbLoadTransition: qboolean)>,
     pub GameAllowedToSaveHere: Option<unsafe extern "C-unwind" fn() -> qboolean>,
 
     // return NULL if the client is allowed to connect, otherwise return

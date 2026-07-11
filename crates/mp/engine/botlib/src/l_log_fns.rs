@@ -138,7 +138,12 @@ pub fn Log_Shutdown(bot: &mut BotLib) {
 /// Source: `oracle/codemp/botlib/l_log.cpp:41-62`
 pub fn Log_Open(bot: &mut BotLib, filename: *mut c_char) {
     unsafe {
-        if LibVarValue(bot, c"log".as_ptr() as *mut c_char, c"0".as_ptr() as *mut c_char) == 0.0 {
+        if LibVarValue(
+            bot,
+            c"log".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+        ) == 0.0
+        {
             return;
         }
         if filename.is_null() || libc::strlen(filename) == 0 {

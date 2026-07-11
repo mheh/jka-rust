@@ -12,13 +12,13 @@ use mp_qshared::shared::qhandle_t;
 /// Type definition source: `oracle/codemp/cgame/cg_local.h:708-720`
 #[repr(C)]
 pub struct itemInfo_t {
-	pub registered: qboolean,
-	pub models: [qhandle_t; MAX_ITEM_MODELS],
-	pub icon: qhandle_t,
-	// Ghoul2 Insert Start
-	pub g2Models: [*mut c_void; MAX_ITEM_MODELS],
-	pub radius: [f32; MAX_ITEM_MODELS],
-	// Ghoul2 Insert End
+    pub registered: qboolean,
+    pub models: [qhandle_t; MAX_ITEM_MODELS],
+    pub icon: qhandle_t,
+    // Ghoul2 Insert Start
+    pub g2Models: [*mut c_void; MAX_ITEM_MODELS],
+    pub radius: [f32; MAX_ITEM_MODELS],
+    // Ghoul2 Insert End
 }
 
 #[cfg(target_pointer_width = "64")]

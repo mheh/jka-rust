@@ -4,4 +4,3 @@
 //! are ported under `crates/sp/game/src/weapons/`, not here.
 //! Source: `oracle/code/game/weapons.h`
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
-

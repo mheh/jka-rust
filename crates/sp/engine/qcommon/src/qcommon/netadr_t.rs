@@ -7,9 +7,9 @@ use super::netadrtype_t::netadrtype_t;
 /// Type definition source: `oracle/code/qcommon/qcommon.h:137-141`
 #[repr(C)]
 pub struct netadr_t {
-	pub r#type: netadrtype_t,
+    pub r#type: netadrtype_t,
 
-	pub port: u16,
+    pub port: u16,
 }
 
 const _: () = assert!(core::mem::size_of::<netadr_t>() == 8);

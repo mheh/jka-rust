@@ -352,7 +352,13 @@ pub fn unzGetLocalExtrafield(file: unzFile, buf: *mut (), len: c_uint) -> c_int 
             return UNZ_ERRNO;
         }
 
-        if libc::fread(buf as *mut libc::c_void, size_to_read as usize, 1, (*pfile_in_zip_read_info).file) != 1 {
+        if libc::fread(
+            buf as *mut libc::c_void,
+            size_to_read as usize,
+            1,
+            (*pfile_in_zip_read_info).file,
+        ) != 1
+        {
             return UNZ_ERRNO;
         }
 
@@ -381,7 +387,13 @@ pub fn unzGetGlobalComment(file: unzFile, szComment: *mut c_char, uSizeBuf: uLon
 
         if uReadThis > 0 {
             *szComment = 0;
-            if libc::fread(szComment as *mut libc::c_void, uReadThis as usize, 1, (*s).file) != 1 {
+            if libc::fread(
+                szComment as *mut libc::c_void,
+                uReadThis as usize,
+                1,
+                (*s).file,
+            ) != 1
+            {
                 return UNZ_ERRNO;
             }
         }
@@ -536,7 +548,13 @@ pub fn unzlocal_GetCurrentFileInfoInternal(
             }
 
             if file_info.size_filename > 0 && fileNameBufferSize > 0 {
-                if libc::fread(szFileName as *mut libc::c_void, uSizeRead as usize, 1, (*s).file) != 1 {
+                if libc::fread(
+                    szFileName as *mut libc::c_void,
+                    uSizeRead as usize,
+                    1,
+                    (*s).file,
+                ) != 1
+                {
                     err = UNZ_ERRNO;
                 }
             }
@@ -558,7 +576,13 @@ pub fn unzlocal_GetCurrentFileInfoInternal(
                 }
             }
             if file_info.size_file_extra > 0 && extraFieldBufferSize > 0 {
-                if libc::fread(extraField as *mut libc::c_void, uSizeRead as usize, 1, (*s).file) != 1 {
+                if libc::fread(
+                    extraField as *mut libc::c_void,
+                    uSizeRead as usize,
+                    1,
+                    (*s).file,
+                ) != 1
+                {
                     err = UNZ_ERRNO;
                 }
             }
@@ -584,7 +608,13 @@ pub fn unzlocal_GetCurrentFileInfoInternal(
                 }
             }
             if file_info.size_file_comment > 0 && commentBufferSize > 0 {
-                if libc::fread(szComment as *mut libc::c_void, uSizeRead as usize, 1, (*s).file) != 1 {
+                if libc::fread(
+                    szComment as *mut libc::c_void,
+                    uSizeRead as usize,
+                    1,
+                    (*s).file,
+                ) != 1
+                {
                     err = UNZ_ERRNO;
                 }
             }

@@ -8,10 +8,10 @@ use mp_qshared::common::mp::botlib::weaponinfo_s::weaponinfo_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_weap.cpp:96-102`
 #[repr(C)]
 pub struct weaponconfig_t {
-	pub numweapons: i32,
-	pub numprojectiles: i32,
-	pub projectileinfo: *mut projectileinfo_t,
-	pub weaponinfo: *mut weaponinfo_t,
+    pub numweapons: i32,
+    pub numprojectiles: i32,
+    pub projectileinfo: *mut projectileinfo_t,
+    pub weaponinfo: *mut weaponinfo_t,
 }
 
 pub type weaponconfig_s = weaponconfig_t;

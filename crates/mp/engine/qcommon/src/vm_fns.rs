@@ -936,8 +936,7 @@ pub fn VM_Create(
 
         // the stack is implicitly at the end of the image
         (*vm).programStack = (*vm).dataMask + 1;
-        (*vm).stackBottom =
-            (*vm).programStack - crate::vm::vm_stack_consts::STACK_SIZE as i32;
+        (*vm).stackBottom = (*vm).programStack - crate::vm::vm_stack_consts::STACK_SIZE as i32;
 
         vm
     }

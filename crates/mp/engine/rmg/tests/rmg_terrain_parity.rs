@@ -126,7 +126,12 @@ fn dump_seed() -> String {
     // `printf("== holdrand LCG substrate (platform-width c_ulong; RMG-D4f) ==\n")`.
     out.push_str("== holdrand LCG substrate (platform-width c_ulong; RMG-D4f) ==\n");
     // `printf("sizeof(unsigned long)=%d\n", (int)sizeof(unsigned long))`.
-    writeln!(out, "sizeof(unsigned long)={}", core::mem::size_of::<c_ulong>()).unwrap();
+    writeln!(
+        out,
+        "sizeof(unsigned long)={}",
+        core::mem::size_of::<c_ulong>()
+    )
+    .unwrap();
 
     // `static const unsigned seeds[] = { 0x89abcdefu, 1, 42, 1234567 };`.
     const SEEDS: [u32; 4] = [0x89ab_cdef, 1, 42, 1_234_567];
@@ -136,7 +141,12 @@ fn dump_seed() -> String {
         // `Rand_Init((int)seeds[s])` then the `-- seed 0x%08x  state=0x%016lx --`
         // header ((unsigned)seed for the label, (int)seed for the re-seed).
         host.rand_init(seed as i32);
-        writeln!(out, "-- seed 0x{seed:08x}  state=0x{:016x} --", host.rng_state()).unwrap();
+        writeln!(
+            out,
+            "-- seed 0x{seed:08x}  state=0x{:016x} --",
+            host.rng_state()
+        )
+        .unwrap();
 
         for i in 0..6 {
             let a = host.irand(4, 9);

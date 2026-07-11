@@ -9,11 +9,11 @@ use super::bot_matchpiece_s::bot_matchpiece_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:124-131`
 #[repr(C)]
 pub struct bot_matchtemplate_t {
-	pub context: c_ulong,
-	pub r#type: i32,
-	pub subtype: i32,
-	pub first: *mut bot_matchpiece_t,
-	pub next: *mut bot_matchtemplate_t,
+    pub context: c_ulong,
+    pub r#type: i32,
+    pub subtype: i32,
+    pub first: *mut bot_matchpiece_t,
+    pub next: *mut bot_matchtemplate_t,
 }
 
 pub type bot_matchtemplate_s = bot_matchtemplate_t;

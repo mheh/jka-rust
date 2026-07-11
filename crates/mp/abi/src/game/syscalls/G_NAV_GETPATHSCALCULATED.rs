@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use mp_qshared::shared::qboolean;
 
 /// `G_NAV_GETPATHSCALCULATED` outbound game-to-engine syscall.

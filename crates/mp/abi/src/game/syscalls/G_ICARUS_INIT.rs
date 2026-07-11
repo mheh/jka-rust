@@ -1,6 +1,8 @@
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_INIT` outbound game-to-engine syscall.
 ///

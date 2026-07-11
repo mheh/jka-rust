@@ -9,89 +9,89 @@ use sp_qshared::shared::{qboolean, vec3_t, vec4_t, MAX_QPATH};
 /// Type definition source: `oracle/code/cgame/cg_camera.h:30-118`
 #[repr(C)]
 pub struct camera_t {
-	//Position / Facing information
-	pub origin: vec3_t,
-	pub angles: vec3_t,
+    //Position / Facing information
+    pub origin: vec3_t,
+    pub angles: vec3_t,
 
-	pub origin2: vec3_t,
-	pub angles2: vec3_t,
+    pub origin2: vec3_t,
+    pub angles2: vec3_t,
 
-	//Movement information
-	pub move_duration: f32,
-	pub move_time: f32,
-	pub move_type: i32, //CMOVE_LINEAR, CMOVE_BEZIER
+    //Movement information
+    pub move_duration: f32,
+    pub move_time: f32,
+    pub move_type: i32, //CMOVE_LINEAR, CMOVE_BEZIER
 
-	//FOV information
-	pub FOV: f32,
-	pub FOV2: f32,
-	pub FOV_duration: f32,
-	pub FOV_time: f32,
-	pub FOV_vel: f32,
-	pub FOV_acc: f32,
+    //FOV information
+    pub FOV: f32,
+    pub FOV2: f32,
+    pub FOV_duration: f32,
+    pub FOV_time: f32,
+    pub FOV_vel: f32,
+    pub FOV_acc: f32,
 
-	//Pan information
-	pub pan_time: f32,
-	pub pan_duration: f32,
+    //Pan information
+    pub pan_time: f32,
+    pub pan_duration: f32,
 
-	//Following information
-	pub cameraGroup: [c_char; MAX_QPATH],
-	pub cameraGroupZOfs: f32,
-	pub cameraGroupTag: [c_char; MAX_QPATH],
-	pub subjectPos: vec3_t,
-	pub subjectSpeed: f32,
-	pub followSpeed: f32,
-	pub followInitLerp: qboolean,
-	pub distance: f32,
-	pub distanceInitLerp: qboolean,
-	//int		aimEntNum;//FIXME: remove
+    //Following information
+    pub cameraGroup: [c_char; MAX_QPATH],
+    pub cameraGroupZOfs: f32,
+    pub cameraGroupTag: [c_char; MAX_QPATH],
+    pub subjectPos: vec3_t,
+    pub subjectSpeed: f32,
+    pub followSpeed: f32,
+    pub followInitLerp: qboolean,
+    pub distance: f32,
+    pub distanceInitLerp: qboolean,
+    //int		aimEntNum;//FIXME: remove
 
-	//Tracking information
-	pub trackEntNum: i32,
-	pub trackToOrg: vec3_t,
-	pub moveDir: vec3_t,
-	pub speed: f32,
-	pub initSpeed: f32,
-	pub trackInitLerp: f32,
-	pub nextTrackEntUpdateTime: i32,
+    //Tracking information
+    pub trackEntNum: i32,
+    pub trackToOrg: vec3_t,
+    pub moveDir: vec3_t,
+    pub speed: f32,
+    pub initSpeed: f32,
+    pub trackInitLerp: f32,
+    pub nextTrackEntUpdateTime: i32,
 
-	//Cine-bar information
-	pub bar_alpha: f32,
-	pub bar_alpha_source: f32,
-	pub bar_alpha_dest: f32,
-	pub bar_time: f32,
+    //Cine-bar information
+    pub bar_alpha: f32,
+    pub bar_alpha_source: f32,
+    pub bar_alpha_dest: f32,
+    pub bar_time: f32,
 
-	pub bar_height_source: f32,
-	pub bar_height_dest: f32,
-	pub bar_height: f32,
+    pub bar_height_source: f32,
+    pub bar_height_dest: f32,
+    pub bar_height: f32,
 
-	pub fade_color: vec4_t,
-	pub fade_source: vec4_t,
-	pub fade_dest: vec4_t,
-	pub fade_time: f32,
-	pub fade_duration: f32,
+    pub fade_color: vec4_t,
+    pub fade_source: vec4_t,
+    pub fade_dest: vec4_t,
+    pub fade_time: f32,
+    pub fade_duration: f32,
 
-	//State information
-	pub info_state: i32,
+    //State information
+    pub info_state: i32,
 
-	//Shake information
-	pub shake_intensity: f32,
-	pub shake_duration: i32,
-	pub shake_start: i32,
+    //Shake information
+    pub shake_intensity: f32,
+    pub shake_duration: i32,
+    pub shake_start: i32,
 
-	//Smooth information
-	pub smooth_intensity: f32,
-	pub smooth_duration: i32,
-	pub smooth_start: i32,
-	pub smooth_origin: vec3_t,
-	pub smooth_active: bool, // means smooth_origin and angles are valid
+    //Smooth information
+    pub smooth_intensity: f32,
+    pub smooth_duration: i32,
+    pub smooth_start: i32,
+    pub smooth_origin: vec3_t,
+    pub smooth_active: bool, // means smooth_origin and angles are valid
 
-	// ROFF information
-	pub sRoff: [c_char; MAX_QPATH], // name of a cached roff
-	pub roff_frame: i32,            // current frame in the roff data
-	pub next_roff_time: i32,        // time when it's ok to apply the next roff frame
-	                                 //#ifdef _XBOX
-	                                 //	qboolean	widescreen;
-	                                 //#endif
+    // ROFF information
+    pub sRoff: [c_char; MAX_QPATH], // name of a cached roff
+    pub roff_frame: i32,            // current frame in the roff data
+    pub next_roff_time: i32,        // time when it's ok to apply the next roff frame
+                                    //#ifdef _XBOX
+                                    //	qboolean	widescreen;
+                                    //#endif
 }
 
 const _: () = assert!(core::mem::size_of::<camera_t>() == 500);

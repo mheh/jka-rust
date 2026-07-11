@@ -1,5 +1,7 @@
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// `UI_COS` SP UI imports syscall ABI token.

@@ -5,8 +5,8 @@
 /// Type definition source: `oracle/code/renderer/tr_local.h:261-266`
 #[repr(i32)]
 pub enum acff_t {
-	ACFF_NONE = 0,
-	ACFF_MODULATE_RGB = 1,
-	ACFF_MODULATE_RGBA = 2,
-	ACFF_MODULATE_ALPHA = 3,
+    ACFF_NONE = 0,
+    ACFF_MODULATE_RGB = 1,
+    ACFF_MODULATE_RGBA = 2,
+    ACFF_MODULATE_ALPHA = 3,
 }

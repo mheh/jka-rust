@@ -40,7 +40,6 @@ unsafe fn VALIDSTRING(a: *const c_char) -> bool {
     !a.is_null() && *a != 0
 }
 
-
 /// Raven `TurretPain`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:11-32`
@@ -668,8 +667,7 @@ pub fn turret_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
                 let atst_name = c"atst_vehicle".as_ptr();
                 let target_is_atst = Q_stricmp((*target).NPC_type, atst_name) == 0;
                 let has_best = !bestTarget.is_null();
-                let best_is_atst =
-                    has_best && Q_stricmp((*bestTarget).NPC_type, atst_name) == 0;
+                let best_is_atst = has_best && Q_stricmp((*bestTarget).NPC_type, atst_name) == 0;
 
                 if enemyDist < bestDist || (target_is_atst && has_best && !best_is_atst) {
                     if (*self_).attackDebounceTime < (*ctx.world).level.time {

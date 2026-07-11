@@ -60,11 +60,11 @@ const MELEE_DIST_SQUARED: f32 = 6400.0; // 80*80
 const MIN_LOB_DIST_SQUARED: f32 = 65536.0; // 256*256
 const MAX_LOB_DIST_SQUARED: f32 = 200704.0; // 448*448
 const REPEATER_ALT_SIZE: f32 = 3.0; // half of bbox size
-// Raven `#define GENERATOR_HEALTH 25`.
-// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:23`
+                                    // Raven `#define GENERATOR_HEALTH 25`.
+                                    // Source: `oracle/codemp/game/NPC_AI_GalakMech.c:23`
 const GENERATOR_HEALTH: c_int = 25; // Shield generator health threshold
-// Raven `#define ARMOR_EFFECT_TIME 500` (was a guessed 3000 — corrected).
-// Source: `oracle/codemp/game/w_saber.h:1`
+                                    // Raven `#define ARMOR_EFFECT_TIME 500` (was a guessed 3000 — corrected).
+                                    // Source: `oracle/codemp/game/w_saber.h:1`
 const ARMOR_EFFECT_TIME: c_int = 500;
 
 /// Inline helper from `oracle/codemp/game/bg_public.h:1524-1564`

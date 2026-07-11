@@ -1,5 +1,7 @@
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_ROFF_UPDATE_ENTITIES`.
 ///

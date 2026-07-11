@@ -191,7 +191,13 @@ fn pF(o: &mut String, tag: &str, v: f32) {
     let _ = writeln!(o, "{tag} {:08x}", v.to_bits());
 }
 fn pV(o: &mut String, tag: &str, v: &[f32; 3]) {
-    let _ = writeln!(o, "{tag} {:08x} {:08x} {:08x}", v[0].to_bits(), v[1].to_bits(), v[2].to_bits());
+    let _ = writeln!(
+        o,
+        "{tag} {:08x} {:08x} {:08x}",
+        v[0].to_bits(),
+        v[1].to_bits(),
+        v[2].to_bits()
+    );
 }
 fn pS(o: &mut String, tag: &str, p: *mut c_char) {
     let _ = writeln!(o, "{tag} {}", cs(p));
@@ -232,8 +238,12 @@ fn sec_trajectory(o: &mut String) {
         let _ = writeln!(
             o,
             "T {idx} et {:08x} {:08x} {:08x} ed {:08x} {:08x} {:08x}",
-            rp[0].to_bits(), rp[1].to_bits(), rp[2].to_bits(),
-            rd[0].to_bits(), rd[1].to_bits(), rd[2].to_bits()
+            rp[0].to_bits(),
+            rp[1].to_bits(),
+            rp[2].to_bits(),
+            rd[0].to_bits(),
+            rd[1].to_bits(),
+            rd[2].to_bits()
         );
         idx += 1;
     }
@@ -301,9 +311,16 @@ fn sec_findid(o: &mut String) {
     }
     let _ = writeln!(o, "powerup 999 {}", itemidx(BG_FindItemForPowerup(999)));
     let names = [
-        "weapon_saber", "weapon_blaster", "ammo_blaster", "item_shield_sm_instant",
-        "team_CTF_redflag", "item_medpac", "item_force_enlighten_light", "weapon_stun_baton",
-        "nonexistent_item", "",
+        "weapon_saber",
+        "weapon_blaster",
+        "ammo_blaster",
+        "item_shield_sm_instant",
+        "team_CTF_redflag",
+        "item_medpac",
+        "item_force_enlighten_light",
+        "weapon_stun_baton",
+        "nonexistent_item",
+        "",
     ];
     for n in names {
         let c = std::ffi::CString::new(n).unwrap();
@@ -318,9 +335,20 @@ fn sec_weapondata(o: &mut String) {
         let _ = writeln!(
             o,
             "wd {w} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
-            d.ammoIndex, d.ammoLow, d.energyPerShot, d.fireTime, d.range, d.altEnergyPerShot,
-            d.altFireTime, d.altRange, d.chargeSubTime, d.altChargeSubTime, d.chargeSub,
-            d.altChargeSub, d.maxCharge, d.altMaxCharge
+            d.ammoIndex,
+            d.ammoLow,
+            d.energyPerShot,
+            d.fireTime,
+            d.range,
+            d.altEnergyPerShot,
+            d.altFireTime,
+            d.altRange,
+            d.chargeSubTime,
+            d.altChargeSubTime,
+            d.chargeSub,
+            d.altChargeSub,
+            d.maxCharge,
+            d.altMaxCharge
         );
     }
     o.push_str("== ammodata ==\n");
@@ -446,7 +474,11 @@ fn sec_ps2es(o: &mut String) {
             "ps" => ps_set(&mut ps, &tok[1..]),
             "run" => {
                 let mut s: entityState_t = unsafe { core::mem::zeroed() };
-                BG_PlayerStateToEntityState(&mut ps, &mut s, if snap != 0 { qtrue } else { qfalse });
+                BG_PlayerStateToEntityState(
+                    &mut ps,
+                    &mut s,
+                    if snap != 0 { qtrue } else { qfalse },
+                );
                 dump_es(o, tok[1], &ps, &s);
             }
             c => panic!("ps2es: unknown cmd '{c}'"),

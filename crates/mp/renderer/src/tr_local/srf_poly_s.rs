@@ -10,11 +10,11 @@ use super::surface_type_t::surfaceType_t;
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:692-698`
 #[repr(C)]
 pub struct srfPoly_t {
-	pub surfaceType: surfaceType_t,
-	pub hShader: qhandle_t,
-	pub fogIndex: i32,
-	pub numVerts: i32,
-	pub verts: *mut polyVert_t,
+    pub surfaceType: surfaceType_t,
+    pub hShader: qhandle_t,
+    pub fogIndex: i32,
+    pub numVerts: i32,
+    pub verts: *mut polyVert_t,
 }
 
 /// Raven `srfPoly_s` is the C tag; `srfPoly_t` is the typedef used everywhere.

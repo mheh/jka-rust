@@ -7,11 +7,11 @@
 /// Type definition source: `oracle/codemp/qcommon/vm_local.h:101-106`
 #[repr(C)]
 pub struct vmSymbol_t {
-	pub next: *mut vmSymbol_t,
-	pub symValue: i32,
-	pub profileCount: i32,
-	// variable sized
-	pub symName: [core::ffi::c_char; 1],
+    pub next: *mut vmSymbol_t,
+    pub symValue: i32,
+    pub profileCount: i32,
+    // variable sized
+    pub symName: [core::ffi::c_char; 1],
 }
 
 /// Raven C tag `vmSymbol_s` for the same type.

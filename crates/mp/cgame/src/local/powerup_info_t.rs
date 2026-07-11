@@ -5,7 +5,7 @@
 /// Type definition source: `oracle/codemp/cgame/cg_local.h:723-725`
 #[repr(C)]
 pub struct powerupInfo_t {
-	pub itemNum: i32,
+    pub itemNum: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<powerupInfo_t>() == 4);

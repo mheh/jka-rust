@@ -8,8 +8,8 @@ use super::mfield_t::mfield_t;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:187-191`
 #[repr(C)]
 pub struct menufield_s {
-	pub generic: menucommon_s,
-	pub field: mfield_t,
+    pub generic: menucommon_s,
+    pub field: mfield_t,
 }
 
 #[cfg(target_pointer_width = "64")]

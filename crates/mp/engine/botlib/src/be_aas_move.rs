@@ -25,10 +25,6 @@
 use core::ffi::{c_char, c_int, c_void};
 
 use mp_engine_qcommon::common::Common;
-use mp_qshared::shared::q_math::{
-    vec3_origin, AngleVectors, VectorClear, VectorCompare, VectorLength, VectorNormalize, PITCH,
-    ROLL, YAW,
-};
 use mp_qshared::common::mp::botlib::aas_clientmove_s::{aas_clientmove_s, aas_clientmove_t};
 use mp_qshared::common::mp::botlib::aas_stop_event::{
     SE_ENTERAREA, SE_ENTERLAVA, SE_ENTERSLIME, SE_ENTERWATER, SE_GAP, SE_HITBOUNDINGBOX,
@@ -39,6 +35,10 @@ use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
 use mp_qshared::common::mp::botlib::line_color::{LINECOLOR_BLUE, LINECOLOR_RED};
 use mp_qshared::common::mp::botlib::print_type::PRT_MESSAGE;
+use mp_qshared::shared::q_math::{
+    vec3_origin, AngleVectors, VectorClear, VectorCompare, VectorLength, VectorNormalize, PITCH,
+    ROLL, YAW,
+};
 use mp_qshared::shared::surface_flags::{
     CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER,
 };

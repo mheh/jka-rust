@@ -7,8 +7,8 @@ use sp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/code/game/g_roff.h:31-36`
 #[repr(C)]
 pub struct move_rotate_t {
-	pub origin_delta: vec3_t,
-	pub rotate_delta: vec3_t,
+    pub origin_delta: vec3_t,
+    pub rotate_delta: vec3_t,
 }
 
 const _: () = assert!(core::mem::size_of::<move_rotate_t>() == 24);

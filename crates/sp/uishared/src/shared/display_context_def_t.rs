@@ -78,7 +78,12 @@ pub struct displayContextDef_t {
     pub modelBounds:
         Option<unsafe extern "C" fn(model: qhandle_t, min: *mut vec3_t, max: *mut vec3_t)>,
     pub ownerDrawHandleKey: Option<
-        unsafe extern "C" fn(ownerDraw: c_int, flags: c_int, special: *mut f32, key: c_int) -> qboolean,
+        unsafe extern "C" fn(
+            ownerDraw: c_int,
+            flags: c_int,
+            special: *mut f32,
+            key: c_int,
+        ) -> qboolean,
     >,
     pub ownerDrawItem: Option<
         unsafe extern "C" fn(

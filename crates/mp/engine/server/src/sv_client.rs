@@ -80,10 +80,7 @@ pub fn SV_ResetPureClient_f(cl: *mut client_t) {
 /// Source: `oracle/codemp/server/sv_client.cpp:1452-1500`
 pub fn SV_UserinfoChanged(common: &mut Common, host: &mut dyn EngineHost, cl: *mut client_t) {
     unsafe {
-        let name = Info_ValueForKey(
-            (*cl).userinfo.as_mut_ptr(),
-            c"name".as_ptr() as *mut c_char,
-        );
+        let name = Info_ValueForKey((*cl).userinfo.as_mut_ptr(), c"name".as_ptr() as *mut c_char);
         Q_strncpyz((*cl).name.as_mut_ptr(), name, (*cl).name.len() as c_int);
 
         // if the client is on the same subnet as the server and we aren't running an
@@ -94,10 +91,8 @@ pub fn SV_UserinfoChanged(common: &mut Common, host: &mut dyn EngineHost, cl: *m
             // lans should not rate limit
             (*cl).rate = 99999;
         } else {
-            let val = Info_ValueForKey(
-                (*cl).userinfo.as_mut_ptr(),
-                c"rate".as_ptr() as *mut c_char,
-            );
+            let val =
+                Info_ValueForKey((*cl).userinfo.as_mut_ptr(), c"rate".as_ptr() as *mut c_char);
             if strlen(val) != 0 {
                 let i = atoi(val);
                 (*cl).rate = i;
@@ -506,8 +501,9 @@ pub fn SV_ExecuteClientCommand(
     mp_engine_qcommon::cmd_common::Cmd_TokenizeString(common, s);
 
     // see if it is a server level command
-    let name = unsafe { core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 0)) }
-        .to_string_lossy();
+    let name =
+        unsafe { core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 0)) }
+            .to_string_lossy();
     let mut matched = false;
     match name.as_ref() {
         "userinfo" => {
@@ -593,7 +589,9 @@ pub fn SV_ClientThink(
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:142-211`
 pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t) {
-    if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(common, from, sv.svs.authorizeAddress) == qfalse {
+    if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(common, from, sv.svs.authorizeAddress)
+        == qfalse
+    {
         mp_engine_qcommon::common::common::com_printf(
             common,
             "SV_AuthorizeIpPacket: not from authorize server\n",
@@ -620,9 +618,10 @@ pub fn SV_AuthorizeIpPacket(common: &mut Common, sv: &mut Server, from: netadr_t
 
     // send a packet back to the original client
     sv.svs.challenges[i].pingTime = sv.svs.time;
-    let s = unsafe { core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 2)) }
-        .to_string_lossy()
-        .into_owned();
+    let s =
+        unsafe { core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 2)) }
+            .to_string_lossy()
+            .into_owned();
     let r = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 3); // reason
 
     if unsafe {
@@ -741,11 +740,7 @@ pub fn SV_DirectConnect(
 
         let userinfo_ptr = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1);
         let mut userinfo = [0 as c_char; mp_qshared::shared::limits::MAX_INFO_STRING as usize];
-        Q_strncpyz(
-            userinfo.as_mut_ptr(),
-            userinfo_ptr,
-            userinfo.len() as c_int,
-        );
+        Q_strncpyz(userinfo.as_mut_ptr(), userinfo_ptr, userinfo.len() as c_int);
 
         let version = atoi(Info_ValueForKey(
             userinfo.as_mut_ptr(),
@@ -824,8 +819,11 @@ pub fn SV_DirectConnect(
         if mp_engine_qcommon::net_chan::NET_IsLocalAddress(from) == qfalse {
             let mut i: usize = 0;
             while i < MAX_CHALLENGES {
-                if mp_engine_qcommon::net_chan::NET_CompareAdr(common, from, sv.svs.challenges[i].adr)
-                    == qtrue
+                if mp_engine_qcommon::net_chan::NET_CompareAdr(
+                    common,
+                    from,
+                    sv.svs.challenges[i].adr,
+                ) == qtrue
                 {
                     if challenge == sv.svs.challenges[i].challenge {
                         break; // good
@@ -992,10 +990,8 @@ pub fn SV_DirectConnect(
                 // if "sv_privateClients" is set > 0, then that number
                 // of client slots will be reserved for connections that
                 // have "password" set to the value of "sv_privatePassword"
-                let password = Info_ValueForKey(
-                    userinfo.as_mut_ptr(),
-                    c"password".as_ptr() as *mut c_char,
-                );
+                let password =
+                    Info_ValueForKey(userinfo.as_mut_ptr(), c"password".as_ptr() as *mut c_char);
                 let start_index: c_int = if strcmp(
                     password,
                     mp_engine_qcommon::cvar::sv_privatePassword(common)
@@ -1117,8 +1113,8 @@ pub fn SV_DirectConnect(
             // shared-memory arg-ptr accessor yet (only vm_call's isize
             // return); resolving the denied-connect reason string needs
             // that seam, escalated rather than guessed.
-            let denied_ptr =
-                mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr(common, sv.gvm, denied) as *const c_char;
+            let denied_ptr = mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr(common, sv.gvm, denied)
+                as *const c_char;
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                 common,
                 netsrc_t::NS_SERVER,
@@ -1740,7 +1736,10 @@ pub fn SV_UserMove(
         let idx = ((*cl).reliableAcknowledge
             & (mp_engine_qcommon::qcommon::net_limits::MAX_RELIABLE_COMMANDS - 1))
             as usize;
-        key ^= mp_engine_qcommon::common_fns::Com_HashKey((*cl).reliableCommands[idx].as_mut_ptr(), 32);
+        key ^= mp_engine_qcommon::common_fns::Com_HashKey(
+            (*cl).reliableCommands[idx].as_mut_ptr(),
+            32,
+        );
 
         let mut cmds = [core::mem::zeroed::<usercmd_t>();
             mp_engine_qcommon::qcommon::net_limits::MAX_PACKET_USERCMDS as usize];

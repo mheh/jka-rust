@@ -185,8 +185,7 @@ const _: () = assert!(core::mem::offset_of!(MP3STREAM, iRewind_FinalReductionCod
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(MP3STREAM, iRewind_FinalConvertCode) == 22016);
 #[cfg(target_pointer_width = "64")]
-const _: () =
-    assert!(core::mem::offset_of!(MP3STREAM, iRewind_SourceBytesRemaining) == 22020);
+const _: () = assert!(core::mem::offset_of!(MP3STREAM, iRewind_SourceBytesRemaining) == 22020);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(MP3STREAM, iRewind_SourceReadIndex) == 22024);
 #[cfg(target_pointer_width = "64")]

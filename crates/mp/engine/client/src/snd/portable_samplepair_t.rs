@@ -6,8 +6,8 @@
 /// Type definition source: `oracle/codemp/client/snd_local.h:30-33`
 #[repr(C)]
 pub struct portable_samplepair_t {
-	pub left: i32,
-	pub right: i32,
+    pub left: i32,
+    pub right: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<portable_samplepair_t>() == 8);

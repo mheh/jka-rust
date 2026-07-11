@@ -7,10 +7,10 @@
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum ELastCommand {
-	LAST_COMMAND_NONE = 0,
-	LAST_COMMAND_MOV_EDI_EAX = 1,
-	LAST_COMMAND_SUB_DI_4 = 2,
-	LAST_COMMAND_SUB_DI_8 = 3,
+    LAST_COMMAND_NONE = 0,
+    LAST_COMMAND_MOV_EDI_EAX = 1,
+    LAST_COMMAND_SUB_DI_4 = 2,
+    LAST_COMMAND_SUB_DI_8 = 3,
 }
 
 const _: () = assert!(core::mem::size_of::<ELastCommand>() == 4);

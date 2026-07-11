@@ -22,8 +22,6 @@ use crate::q_math::vec3_origin;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 // `FRAMETIME` resolves via the crate prelude glob (`crate::g_items`); the
 // shadowing local copy was removed by the placeholder-const sweep.
 

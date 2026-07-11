@@ -14,10 +14,10 @@ use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void};
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
 use mp_qshared::shared::fs_origin::fsOrigin_t;
 use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_STRING_TOKENS};
 use mp_qshared::shared::qboolean;
+use mp_qshared::shared::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
 use native_types::fileHandle_t;
 
 use crate::collision_world::CollisionWorld;
@@ -859,7 +859,8 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
         }
 
         // Com_DPrintf( "writing to: %s\n", ospath );
-        common.fsh[f as usize].handleFiles.file.o = libc::fopen(ospath, c"wb".as_ptr()) as *mut c_void;
+        common.fsh[f as usize].handleFiles.file.o =
+            libc::fopen(ospath, c"wb".as_ptr()) as *mut c_void;
 
         copy_cname(
             common.fsh[f as usize].name.as_mut_ptr(),
@@ -1015,7 +1016,8 @@ pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileH
             return 0;
         }
 
-        common.fsh[f as usize].handleFiles.file.o = libc::fopen(ospath, c"ab".as_ptr()) as *mut c_void;
+        common.fsh[f as usize].handleFiles.file.o =
+            libc::fopen(ospath, c"ab".as_ptr()) as *mut c_void;
         common.fsh[f as usize].handleSync = mp_qshared::shared::qfalse;
         if common.fsh[f as usize].handleFiles.file.o.is_null() {
             return 0;
@@ -1128,7 +1130,10 @@ pub fn FS_Seek(
             x if x == fsOrigin_t::FS_SEEK_END as c_int => libc::SEEK_END,
             x if x == fsOrigin_t::FS_SEEK_SET as c_int => libc::SEEK_SET,
             _ => {
-                crate::common::com_error(errorParm_t::ERR_FATAL, "Bad origin in FS_Seek\n".to_string());
+                crate::common::com_error(
+                    errorParm_t::ERR_FATAL,
+                    "Bad origin in FS_Seek\n".to_string(),
+                );
                 libc::SEEK_CUR
             }
         };
@@ -1371,9 +1376,7 @@ pub fn FS_PureServerSetReferencedPaks(
 
     for i in 0..c as usize {
         if !common.fs_serverReferencedPakNames[i].is_null() {
-            unsafe {
-                Z_Free(common, common.fs_serverReferencedPakNames[i] as *mut ())
-            };
+            unsafe { Z_Free(common, common.fs_serverReferencedPakNames[i] as *mut ()) };
         }
         common.fs_serverReferencedPakNames[i] = core::ptr::null_mut();
     }
@@ -1610,15 +1613,7 @@ pub fn FS_FOpenFileByMode(
     let r;
     match mode {
         m if m == FS_READ => unsafe {
-            r = FS_FOpenFileRead(
-                common,
-                cm,
-                rm,
-                host,
-                qpath,
-                f,
-                mp_qshared::shared::qtrue,
-            );
+            r = FS_FOpenFileRead(common, cm, rm, host, qpath, f, mp_qshared::shared::qtrue);
         },
         m if m == FS_WRITE => unsafe {
             *f = FS_FOpenFileWrite(common, qpath);
@@ -1634,7 +1629,10 @@ pub fn FS_FOpenFileByMode(
             r = if *f == 0 { -1 } else { 0 };
         },
         _ => {
-            crate::common::com_error(errorParm_t::ERR_FATAL, "FSH_FOpenFile: bad mode".to_string());
+            crate::common::com_error(
+                errorParm_t::ERR_FATAL,
+                "FSH_FOpenFile: bad mode".to_string(),
+            );
         }
     }
 
@@ -1649,7 +1647,8 @@ pub fn FS_FOpenFileByMode(
                     crate::unzip::unztell(common.fsh[*f as usize].handleFiles.file.z) as c_int;
             } else {
                 common.fsh[*f as usize].baseOffset =
-                    libc::ftell(common.fsh[*f as usize].handleFiles.file.o as *mut libc::FILE) as c_int;
+                    libc::ftell(common.fsh[*f as usize].handleFiles.file.o as *mut libc::FILE)
+                        as c_int;
             }
             common.fsh[*f as usize].fileSize = r;
             common.fsh[*f as usize].streamed = mp_qshared::shared::qfalse;
@@ -1688,8 +1687,7 @@ pub fn FS_GetFileList(
         }
 
         let mut n_files: c_int = 0;
-        let p_files =
-            FS_ListFiles(common, cm, rm, host, path, extension, &mut n_files);
+        let p_files = FS_ListFiles(common, cm, rm, host, path, extension, &mut n_files);
 
         let mut i = 0;
         let mut listbuf = listbuf;

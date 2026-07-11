@@ -9,9 +9,9 @@ use super::fieldtype_save_t::fieldtypeSAVE_t;
 /// Type definition source: `oracle/code/game/fields.h:55-60`
 #[repr(C)]
 pub struct save_field_t {
-	pub psName: *mut c_char,
-	pub iOffset: c_int,
-	pub eFieldType: fieldtypeSAVE_t,
+    pub psName: *mut c_char,
+    pub iOffset: c_int,
+    pub eFieldType: fieldtypeSAVE_t,
 }
 
 const _: () = assert!(core::mem::size_of::<save_field_t>() == 16);

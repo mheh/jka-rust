@@ -76,7 +76,7 @@ pub struct saberInfo_t {
 
     // ===PRIMARY BLADES=====================
     pub trailStyle: c_int,
-    pub g2MarksShader: [c_char; MAX_QPATH],       // SP: raw shader-name string, not a handle
+    pub g2MarksShader: [c_char; MAX_QPATH], // SP: raw shader-name string, not a handle
     pub g2WeaponMarkShader: [c_char; MAX_QPATH],
     pub hitSound: [qhandle_t; 3],
     pub blockSound: [qhandle_t; 3],

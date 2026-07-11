@@ -139,26 +139,76 @@ fn dump_parse_lookup() -> String {
     dump_flags(&mut out, &pkg);
 
     out.push_str("== LOOKUP se_debug=0 ==\n"); // se_debug default "0"
-    writeln!(out, "hit           |{}|", pkg.get_string("OBJECTIVES_MISSION01", &mut host)).unwrap();
-    writeln!(out, "uppercasefold |{}|", pkg.get_string("objectives_mission01", &mut host)).unwrap();
-    writeln!(out, "2arg          |{}|", pkg.get_string2("OBJECTIVES", "MISSION01", &mut host))
-        .unwrap();
-    writeln!(out, "2arg menus    |{}|", pkg.get_string2("MENUS", "START_GAME", &mut host)).unwrap();
+    writeln!(
+        out,
+        "hit           |{}|",
+        pkg.get_string("OBJECTIVES_MISSION01", &mut host)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "uppercasefold |{}|",
+        pkg.get_string("objectives_mission01", &mut host)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "2arg          |{}|",
+        pkg.get_string2("OBJECTIVES", "MISSION01", &mut host)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "2arg menus    |{}|",
+        pkg.get_string2("MENUS", "START_GAME", &mut host)
+    )
+    .unwrap();
     out.push_str("greeting(crlf)|");
-    put_esc(&mut out, pkg.get_string("OBJECTIVES_GREETING", &mut host).as_bytes());
+    put_esc(
+        &mut out,
+        pkg.get_string("OBJECTIVES_GREETING", &mut host).as_bytes(),
+    );
     out.push_str("|\n");
     out.push_str("hichar        |");
-    put_esc(&mut out, pkg.get_string("OBJECTIVES_HICHAR", &mut host).as_bytes());
+    put_esc(
+        &mut out,
+        pkg.get_string("OBJECTIVES_HICHAR", &mut host).as_bytes(),
+    );
     out.push_str("|\n");
-    writeln!(out, "miss          |{}|", pkg.get_string("NOPE_NOPE", &mut host)).unwrap(); // -> ""
-    writeln!(out, "flags m01     {}", pkg.get_flags("OBJECTIVES_MISSION01")).unwrap();
-    writeln!(out, "flags m02(2a) {}", pkg.get_flags2("OBJECTIVES", "MISSION02")).unwrap();
+    writeln!(
+        out,
+        "miss          |{}|",
+        pkg.get_string("NOPE_NOPE", &mut host)
+    )
+    .unwrap(); // -> ""
+    writeln!(
+        out,
+        "flags m01     {}",
+        pkg.get_flags("OBJECTIVES_MISSION01")
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "flags m02(2a) {}",
+        pkg.get_flags2("OBJECTIVES", "MISSION02")
+    )
+    .unwrap();
     writeln!(out, "flags miss    {}", pkg.get_flags("NOPE_NOPE")).unwrap(); // SE-V3 -> 0
 
     out.push_str("== LOOKUP se_debug=1 ==\n"); // debug branch: m_strDebug
     host.set_cvar("se_debug", "1");
-    writeln!(out, "dbg m01       |{}|", pkg.get_string("OBJECTIVES_MISSION01", &mut host)).unwrap();
-    writeln!(out, "dbg menus     |{}|", pkg.get_string("MENUS_QUIT", &mut host)).unwrap();
+    writeln!(
+        out,
+        "dbg m01       |{}|",
+        pkg.get_string("OBJECTIVES_MISSION01", &mut host)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "dbg menus     |{}|",
+        pkg.get_string("MENUS_QUIT", &mut host)
+    )
+    .unwrap();
     host.set_cvar("se_debug", "0");
 
     out.push_str("== LEET sp_leet=42 ==\n"); // Leetify char-substitution on reload
@@ -168,32 +218,56 @@ fn dump_parse_lookup() -> String {
     host.set_cvar("sp_leet", "0");
 
     out.push_str("== ERRORS (SE_Load_Actual direct, non-critical) ==\n"); // ParseLine msgs
-    // Reset parse state so the truncated probe fires (faithful quirk: the oracle
-    // clears the end-marker flag only in Clear(), not SetupNewFileParse — a
-    // prior file's ENDMARKER would otherwise mask a later truncation).
+                                                                          // Reset parse state so the truncated probe fires (faithful quirk: the oracle
+                                                                          // clears the end-marker flag only in Clear(), not SetupNewFileParse — a
+                                                                          // prior file's ENDMARKER would otherwise mask a later truncation).
     se_new_language(&mut pkg);
     writeln!(
         out,
         "truncated  |{}|",
-        ok_or_msg(&se_load_actual(&mut pkg, "misc/truncated.str", false, false, &mut host))
+        ok_or_msg(&se_load_actual(
+            &mut pkg,
+            "misc/truncated.str",
+            false,
+            false,
+            &mut host
+        ))
     )
     .unwrap();
     writeln!(
         out,
         "badversion |{}|",
-        ok_or_msg(&se_load_actual(&mut pkg, "misc/badversion.str", false, false, &mut host))
+        ok_or_msg(&se_load_actual(
+            &mut pkg,
+            "misc/badversion.str",
+            false,
+            false,
+            &mut host
+        ))
     )
     .unwrap();
     writeln!(
         out,
         "unknownkw  |{}|",
-        ok_or_msg(&se_load_actual(&mut pkg, "misc/unknownkw.str", false, false, &mut host))
+        ok_or_msg(&se_load_actual(
+            &mut pkg,
+            "misc/unknownkw.str",
+            false,
+            false,
+            &mut host
+        ))
     )
     .unwrap();
     writeln!(
         out,
         "missing    |{}|",
-        ok_or_msg(&se_load_actual(&mut pkg, "misc/nope.str", false, false, &mut host))
+        ok_or_msg(&se_load_actual(
+            &mut pkg,
+            "misc/nope.str",
+            false,
+            false,
+            &mut host
+        ))
     )
     .unwrap();
 
@@ -226,13 +300,23 @@ fn dump_reference_stability() -> String {
     se_init(&mut pkg, &mut host); // loads english (debug on)
 
     out.push_str("== BEFORE (english) ==\n");
-    writeln!(out, "m01 str  |{}|", pkg.get_string("OBJECTIVES_MISSION01", &mut host)).unwrap();
+    writeln!(
+        out,
+        "m01 str  |{}|",
+        pkg.get_string("OBJECTIVES_MISSION01", &mut host)
+    )
+    .unwrap();
     writeln!(out, "m01 flags {}", pkg.get_flags("OBJECTIVES_MISSION01")).unwrap();
     dump_flags(&mut out, &pkg);
 
     out.push_str("== SE_NewLanguage : Clear(SE_TRUE) ==\n"); // flag tables survive
     se_new_language(&mut pkg);
-    writeln!(out, "numFlags={} (name table survives)", pkg.get_num_flags()).unwrap();
+    writeln!(
+        out,
+        "numFlags={} (name table survives)",
+        pkg.get_num_flags()
+    )
+    .unwrap();
     writeln!(
         out,
         "m01 after clear |{}| (entries cleared)",
@@ -243,10 +327,24 @@ fn dump_reference_stability() -> String {
     out.push_str("== reload german (NewLanguage keeps flag masks) ==\n");
     host.set_cvar("se_language", "german");
     se_load_language(&mut pkg, "german", true, &mut host); // loads .str then .ste override
-    writeln!(out, "m01 german |{}|", pkg.get_string("OBJECTIVES_MISSION01", &mut host)).unwrap(); // .ste override
-    writeln!(out, "m02 #same  |{}|", pkg.get_string("OBJECTIVES_MISSION02", &mut host)).unwrap(); // -> cached english
-    writeln!(out, "numFlags={} (masks persist; german entries carry 0)", pkg.get_num_flags())
-        .unwrap();
+    writeln!(
+        out,
+        "m01 german |{}|",
+        pkg.get_string("OBJECTIVES_MISSION01", &mut host)
+    )
+    .unwrap(); // .ste override
+    writeln!(
+        out,
+        "m02 #same  |{}|",
+        pkg.get_string("OBJECTIVES_MISSION02", &mut host)
+    )
+    .unwrap(); // -> cached english
+    writeln!(
+        out,
+        "numFlags={} (masks persist; german entries carry 0)",
+        pkg.get_num_flags()
+    )
+    .unwrap();
     writeln!(
         out,
         "m01 flags  {} (rebuilt entry, no FLAGS lines)",
@@ -257,8 +355,12 @@ fn dump_reference_stability() -> String {
     out.push_str("== SE_CheckForLanguageUpdates (cvar_take_modified flow) ==\n");
     host.set_cvar("se_language", "english"); // sets modified=qtrue
     se_check_for_language_updates(&mut pkg, &mut host); // reload english, clear modified
-    writeln!(out, "m01 after update |{}|", pkg.get_string("OBJECTIVES_MISSION01", &mut host))
-        .unwrap();
+    writeln!(
+        out,
+        "m01 after update |{}|",
+        pkg.get_string("OBJECTIVES_MISSION01", &mut host)
+    )
+    .unwrap();
     se_check_for_language_updates(&mut pkg, &mut host); // modified now false -> no-op
     writeln!(
         out,

@@ -125,7 +125,12 @@ fn arena_matches_oracle_golden() {
         g2.info_array.is_valid(0) as i32
     )
     .unwrap();
-    writeln!(out, "IsValid(h0)      = {}", g2.info_array.is_valid(h0) as i32).unwrap();
+    writeln!(
+        out,
+        "IsValid(h0)      = {}",
+        g2.info_array.is_valid(h0) as i32
+    )
+    .unwrap();
     writeln!(
         out,
         "IsValid(h0|junk) = {}  (stale generation -> false)",
@@ -155,7 +160,10 @@ fn arena_matches_oracle_golden() {
 
     ghoul2_info_array_free(&mut g2); // `Ghoul2InfoArray_Free()` — no dump output
 
-    assert_eq!(out, golden, "arena handle scheme diverges from the C++ oracle");
+    assert_eq!(
+        out, golden,
+        "arena handle scheme diverges from the C++ oracle"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +186,11 @@ fn zero_surface() -> surfaceInfo_t {
 
 /// Reproduce `dump_bolts.cpp`'s `dump`: `%-26s size=%d` then, per slot,
 /// ` | [%zu] bone=%d surf=%d type=%d used=%d`.
-fn dump_bolts(out: &mut String, label: &str, b: &[mp_engine_ghoul2::shared::bolt_info_t::boltInfo_t]) {
+fn dump_bolts(
+    out: &mut String,
+    label: &str,
+    b: &[mp_engine_ghoul2::shared::bolt_info_t::boltInfo_t],
+) {
     write!(out, "{:<26} size={}", label, b.len()).unwrap();
     for (i, bolt) in b.iter().enumerate() {
         write!(
@@ -264,7 +276,11 @@ fn bolts_matches_oracle_golden() {
     .unwrap();
     dump_bolts(&mut out, "after 2nd remove", &bolts);
 
-    writeln!(out, "\n== RemoveRedundantBolts (drop bolts to inactive surfaces) ==").unwrap();
+    writeln!(
+        out,
+        "\n== RemoveRedundantBolts (drop bolts to inactive surfaces) =="
+    )
+    .unwrap();
     // Re-add two surface bolts, then mark surface 0 inactive.
     g2_add_bolt_surf_num(&gh, &mut bolts, &slist, 0);
     g2_add_bolt_surf_num(&gh, &mut bolts, &slist, 1);
@@ -335,9 +351,18 @@ fn surfaces_matches_oracle_golden() {
     writeln!(out, "add (surf=4,poly=4,lod=5) -> {s2} (genLod clamped)").unwrap();
     dump_surfaces(&mut out, "after clamp add", &gh.slist);
 
-    writeln!(out, "\n== find override surface (matches surface==10000 marker) ==").unwrap();
+    writeln!(
+        out,
+        "\n== find override surface (matches surface==10000 marker) =="
+    )
+    .unwrap();
     let f = g2_find_override_surface(10000, &gh.slist).is_some();
-    writeln!(out, "find 10000 -> {} (idx0)", if f { "found" } else { "null" }).unwrap();
+    writeln!(
+        out,
+        "find 10000 -> {} (idx0)",
+        if f { "found" } else { "null" }
+    )
+    .unwrap();
     writeln!(
         out,
         "find 12345 (absent) -> {}",
@@ -351,10 +376,20 @@ fn surfaces_matches_oracle_golden() {
 
     writeln!(out, "\n== remove middle then tail (tail resize) ==").unwrap();
     // Remove idx1 (marks surface=-1, no tail resize since idx2 still active).
-    writeln!(out, "remove idx1 -> {}", g2_remove_surface(&mut gh.slist, 1) as i32).unwrap();
+    writeln!(
+        out,
+        "remove idx1 -> {}",
+        g2_remove_surface(&mut gh.slist, 1) as i32
+    )
+    .unwrap();
     dump_surfaces(&mut out, "after remove idx1", &gh.slist);
     // Remove idx2 (tail): now idx1,idx2 both -1 -> resize drops both.
-    writeln!(out, "remove idx2 -> {}", g2_remove_surface(&mut gh.slist, 2) as i32).unwrap();
+    writeln!(
+        out,
+        "remove idx2 -> {}",
+        g2_remove_surface(&mut gh.slist, 2) as i32
+    )
+    .unwrap();
     dump_surfaces(&mut out, "after remove idx2 (resize)", &gh.slist);
 
     writeln!(out, "\n== add reuses the freed (-1) slot before growing ==").unwrap();
@@ -362,5 +397,8 @@ fn surfaces_matches_oracle_golden() {
     writeln!(out, "add (surf=2,poly=2) -> {s3} (reused freed slot)").unwrap();
     dump_surfaces(&mut out, "after reuse add", &gh.slist);
 
-    assert_eq!(out, golden, "generated-surface list diverges from the C++ oracle");
+    assert_eq!(
+        out, golden,
+        "generated-surface list diverges from the C++ oracle"
+    );
 }

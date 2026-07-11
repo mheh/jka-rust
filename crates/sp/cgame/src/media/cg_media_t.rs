@@ -19,7 +19,6 @@ pub struct cgMedia_t {
     pub crosshairShader: [qhandle_t; 9],
     pub backTileShader: qhandle_t,
     // Raven: `//\tqhandle_t\tnoammoShader;` — commented out in the oracle.
-
     pub numberShaders: [qhandle_t; 11],
     pub smallnumberShaders: [qhandle_t; 11],
     pub chunkyNumberShaders: [qhandle_t; 11],

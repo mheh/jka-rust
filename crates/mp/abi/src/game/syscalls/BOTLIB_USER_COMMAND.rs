@@ -2,8 +2,8 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::common::mp::qcommon::usercmd_t;
 use core::ffi::c_int;
+use mp_qshared::common::mp::qcommon::usercmd_t;
 
 /// `BOTLIB_USER_COMMAND` outbound game-to-engine syscall.
 ///

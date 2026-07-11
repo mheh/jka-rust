@@ -32,7 +32,6 @@ use mp_qshared::shared::{qfalse, qtrue};
 use native_types::qboolean;
 
 use crate::l_precomp::source_s::source_t;
-use crate::BotLib;
 use crate::l_script::consts::{TT_LITERAL, TT_NUMBER, TT_PUNCTUATION};
 use crate::l_script::token_s::token_t;
 use crate::l_struct::fielddef_s::fielddef_t;
@@ -40,6 +39,7 @@ use crate::l_struct::l_struct_consts::{
     FT_ARRAY, FT_BOUNDED, FT_CHAR, FT_FLOAT, FT_INT, FT_STRING, FT_STRUCT, FT_TYPE, FT_UNSIGNED,
 };
 use crate::l_struct::structdef_s::structdef_t;
+use crate::BotLib;
 
 /// Raven `FindField` — linear-search a `fielddef_t[]` by name.
 ///

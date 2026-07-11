@@ -8,9 +8,9 @@ use sp_qshared::shared::qboolean;
 /// Type definition source: `oracle/code/client/keys.h:3-7`
 #[repr(C)]
 pub struct qkey_t {
-	pub down: qboolean,
-	pub repeats: i32, // if > 1, it is autorepeating
-	pub binding: *mut c_char,
+    pub down: qboolean,
+    pub repeats: i32, // if > 1, it is autorepeating
+    pub binding: *mut c_char,
 }
 
 const _: () = assert!(core::mem::size_of::<qkey_t>() == 16);

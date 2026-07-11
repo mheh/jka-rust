@@ -1,4 +1,9 @@
-#![allow(non_camel_case_types, non_snake_case, unused_variables, unused_assignments)]
+#![allow(
+    non_camel_case_types,
+    non_snake_case,
+    unused_variables,
+    unused_assignments
+)]
 //! `l_precomp.cpp` — the botlib preprocessor (function bodies).
 //!
 //! One Rust module per oracle source file (`l_precomp.cpp`); the stem collides
@@ -30,17 +35,17 @@ use crate::l_precomp::builtin_defines::{
 use crate::l_precomp::define_flags::{DEFINE_FIXED, DEFINE_GLOBAL};
 use crate::l_precomp::define_s::define_t;
 use crate::l_precomp::directive_s::directive_t;
-use crate::l_precomp::operator_s::operator_t;
-use crate::l_precomp::value_s::value_t;
 use crate::l_precomp::indent_s::indent_t;
 use crate::l_precomp::indent_type::{
     INDENT_ELIF, INDENT_ELSE, INDENT_IF, INDENT_IFDEF, INDENT_IFNDEF,
 };
+use crate::l_precomp::operator_s::operator_t;
 use crate::l_precomp::path_seperator_consts::{PATHSEPERATOR_CHAR, PATHSEPERATOR_STR};
 use crate::l_precomp::precomp_consts::{
     DEFINEHASHSIZE, MAX_DEFINEPARMS, MAX_OPERATORS, MAX_PATH, MAX_SOURCEFILES, MAX_VALUES,
 };
 use crate::l_precomp::source_s::source_t;
+use crate::l_precomp::value_s::value_t;
 use crate::l_script::consts::{
     MAX_TOKEN, P_ADD, P_BIN_AND, P_BIN_NOT, P_BIN_OR, P_BIN_XOR, P_COLON, P_DEC, P_DIV, P_INC,
     P_LOGIC_AND, P_LOGIC_EQ, P_LOGIC_GEQ, P_LOGIC_GREATER, P_LOGIC_LEQ, P_LOGIC_LESS, P_LOGIC_NOT,
@@ -51,11 +56,11 @@ use crate::l_script::consts::{
 use crate::l_script::punctuation_s::punctuation_t;
 use crate::l_script::script_s::script_t;
 use crate::l_script::token_s::token_t;
+use crate::BotLib;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_WARNING};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::pc_token_t;
 use mp_qshared::shared::{qfalse, qtrue};
-use crate::BotLib;
 
 // PORT-NOTE(Q_stricmp): forward-declared per the l_libvar_fns.rs precedent
 // (no Q_stricmp in the engine-reachable mp_qshared tier yet; only mp_game's
@@ -145,7 +150,8 @@ pub fn PC_InitTokenHeap() {
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:165-176`
 pub fn PC_PushIndent(bot: &mut BotLib, source: *mut source_t, r#type: c_int, skip: c_int) {
     unsafe {
-        let indent: *mut indent_t = GetMemory(bot, core::mem::size_of::<indent_t>() as c_ulong) as *mut indent_t;
+        let indent: *mut indent_t =
+            GetMemory(bot, core::mem::size_of::<indent_t>() as c_ulong) as *mut indent_t;
         (*indent).r#type = r#type;
         (*indent).script = (*source).scriptstack;
         (*indent).skip = (skip != 0) as c_int;
@@ -385,7 +391,11 @@ pub fn PC_PrintDefineHashTable(bot: &mut BotLib, definehash: *mut *mut define_t)
     unsafe {
         for i in 0..DEFINEHASHSIZE {
             let mut buf = [0 as c_char; 64];
-            sprintf(buf.as_mut_ptr(), c"%4d:".as_ptr() as *mut c_char, i as c_int);
+            sprintf(
+                buf.as_mut_ptr(),
+                c"%4d:".as_ptr() as *mut c_char,
+                i as c_int,
+            );
             Log_Write(bot, buf.as_mut_ptr());
             let mut d: *mut define_t = *definehash.add(i);
             while !d.is_null() {
@@ -572,7 +582,11 @@ pub fn PC_ExpandBuiltinDefine(
 /// unlinked.
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:1479-1515`
-pub fn PC_CopyDefine(bot: &mut BotLib, source: *mut source_t, define: *mut define_t) -> *mut define_t {
+pub fn PC_CopyDefine(
+    bot: &mut BotLib,
+    source: *mut source_t,
+    define: *mut define_t,
+) -> *mut define_t {
     unsafe {
         let newdefine: *mut define_t = GetMemory(
             bot,
@@ -778,7 +792,11 @@ pub fn PC_EvaluateTokens(
             'sw: {
                 if (*t).r#type == TT_NAME {
                     if lastwasvalue != 0 || negativevalue != 0 {
-                        source_error!(bot, source, c"syntax error in #if/#elif".as_ptr() as *mut c_char);
+                        source_error!(
+                            bot,
+                            source,
+                            c"syntax error in #if/#elif".as_ptr() as *mut c_char
+                        );
                         error = 1;
                         break 'sw;
                     }
@@ -815,8 +833,11 @@ pub fn PC_EvaluateTokens(
                     let v: *mut value_t = &mut value_heap[numvalues as usize];
                     numvalues += 1;
                     // #if DEFINEHASHING (live)
-                    if !PC_FindHashedDefine((*source).definehash, (*t).string.as_ptr() as *mut c_char)
-                        .is_null()
+                    if !PC_FindHashedDefine(
+                        (*source).definehash,
+                        (*t).string.as_ptr() as *mut c_char,
+                    )
+                    .is_null()
                     {
                         (*v).intvalue = 1;
                         (*v).floatvalue = 1.0;
@@ -850,7 +871,11 @@ pub fn PC_EvaluateTokens(
                     lastwasvalue = 1;
                 } else if (*t).r#type == TT_NUMBER {
                     if lastwasvalue != 0 {
-                        source_error!(bot, source, c"syntax error in #if/#elif".as_ptr() as *mut c_char);
+                        source_error!(
+                            bot,
+                            source,
+                            c"syntax error in #if/#elif".as_ptr() as *mut c_char
+                        );
                         error = 1;
                         break 'sw;
                     }
@@ -1034,10 +1059,18 @@ pub fn PC_EvaluateTokens(
         }
         if error == 0 {
             if lastwasvalue == 0 {
-                source_error!(bot, source, c"trailing operator in #if/#elif".as_ptr() as *mut c_char);
+                source_error!(
+                    bot,
+                    source,
+                    c"trailing operator in #if/#elif".as_ptr() as *mut c_char
+                );
                 error = 1;
             } else if parentheses != 0 {
-                source_error!(bot, source, c"too many ( in #if/#elif".as_ptr() as *mut c_char);
+                source_error!(
+                    bot,
+                    source,
+                    c"too many ( in #if/#elif".as_ptr() as *mut c_char
+                );
                 error = 1;
             }
         }
@@ -1068,7 +1101,11 @@ pub fn PC_EvaluateTokens(
                 }
                 // if there's no value or no next value
                 if v.is_null() {
-                    source_error!(bot, source, c"mising values in #if/#elif".as_ptr() as *mut c_char);
+                    source_error!(
+                        bot,
+                        source,
+                        c"mising values in #if/#elif".as_ptr() as *mut c_char
+                    );
                     error = 1;
                     break;
                 }
@@ -1175,7 +1212,11 @@ pub fn PC_EvaluateTokens(
                 }
                 P_COLON => {
                     if gotquestmarkvalue == 0 {
-                        source_error!(bot, source, c": without ? in #if/#elif".as_ptr() as *mut c_char);
+                        source_error!(
+                            bot,
+                            source,
+                            c": without ? in #if/#elif".as_ptr() as *mut c_char
+                        );
                         error = 1;
                     } else {
                         if integer != 0 {
@@ -1190,7 +1231,11 @@ pub fn PC_EvaluateTokens(
                 }
                 P_QUESTIONMARK => {
                     if gotquestmarkvalue != 0 {
-                        source_error!(bot, source, c"? after ? in #if/#elif".as_ptr() as *mut c_char);
+                        source_error!(
+                            bot,
+                            source,
+                            c"? after ? in #if/#elif".as_ptr() as *mut c_char
+                        );
                         error = 1;
                     } else {
                         questmarkintvalue = (*v1).intvalue as c_int;
@@ -1352,7 +1397,11 @@ pub fn PC_ReadSourceToken(bot: &mut BotLib, source: *mut source_t, token: *mut t
             FreeScript(bot, script);
         }
         // copy the already available token
-        Com_Memcpy(token.cast(), (*source).tokens.cast(), core::mem::size_of::<token_t>());
+        Com_Memcpy(
+            token.cast(),
+            (*source).tokens.cast(),
+            core::mem::size_of::<token_t>(),
+        );
         // free the read token
         let t = (*source).tokens;
         (*source).tokens = (*(*source).tokens).next;
@@ -1481,7 +1530,11 @@ pub fn PC_ReadDefineParms(
                     indent -= 1;
                     if indent <= 0 {
                         if (*parms.add(((*define).numparms - 1) as usize)).is_null() {
-                            source_warning!(bot, source, c"too few define parms".as_ptr() as *mut c_char);
+                            source_warning!(
+                                bot,
+                                source,
+                                c"too few define parms".as_ptr() as *mut c_char
+                            );
                         }
                         done = 1;
                         break;
@@ -1520,11 +1573,19 @@ pub fn PC_Directive_include(bot: &mut BotLib, source: *mut source_t) -> c_int {
         }
         //
         if PC_ReadSourceToken(bot, source, &mut token) == 0 {
-            source_error!(bot, source, c"#include without file name".as_ptr() as *mut c_char);
+            source_error!(
+                bot,
+                source,
+                c"#include without file name".as_ptr() as *mut c_char
+            );
             return qfalse;
         }
         if token.linescrossed > 0 {
-            source_error!(bot, source, c"#include without file name".as_ptr() as *mut c_char);
+            source_error!(
+                bot,
+                source,
+                c"#include without file name".as_ptr() as *mut c_char
+            );
             return qfalse;
         }
         if token.r#type == TT_STRING {
@@ -1549,7 +1610,11 @@ pub fn PC_Directive_include(bot: &mut BotLib, source: *mut source_t) -> c_int {
                 strncat(path.as_mut_ptr(), token.string.as_ptr(), MAX_PATH);
             }
             if token.string[0] != b'>' as c_char {
-                source_warning!(bot, source, c"#include missing trailing >".as_ptr() as *mut c_char);
+                source_warning!(
+                    bot,
+                    source,
+                    c"#include missing trailing >".as_ptr() as *mut c_char
+                );
             }
             if strlen(path.as_ptr()) == 0 {
                 source_error!(
@@ -1562,7 +1627,11 @@ pub fn PC_Directive_include(bot: &mut BotLib, source: *mut source_t) -> c_int {
             PC_ConvertPath(path.as_mut_ptr());
             script = LoadScriptFile(bot, path.as_ptr());
         } else {
-            source_error!(bot, source, c"#include without file name".as_ptr() as *mut c_char);
+            source_error!(
+                bot,
+                source,
+                c"#include without file name".as_ptr() as *mut c_char
+            );
             return qfalse;
         }
         // #ifdef QUAKE (not defined) omitted.
@@ -1735,19 +1804,28 @@ pub fn PC_Directive_define(bot: &mut BotLib, source: *mut source_t) -> c_int {
             return qtrue;
         }
         // if it is a define with parameters
-        if PC_WhiteSpaceBeforeToken(&mut token) == 0 && strcmp(token.string.as_ptr(), c"(".as_ptr()) == 0
+        if PC_WhiteSpaceBeforeToken(&mut token) == 0
+            && strcmp(token.string.as_ptr(), c"(".as_ptr()) == 0
         {
             // read the define parameters
             last = core::ptr::null_mut();
             if PC_CheckTokenString(bot, source, c")".as_ptr() as *mut c_char) == 0 {
                 loop {
                     if PC_ReadLine(bot, source, &mut token) == 0 {
-                        source_error!(bot, source, c"expected define parameter".as_ptr() as *mut c_char);
+                        source_error!(
+                            bot,
+                            source,
+                            c"expected define parameter".as_ptr() as *mut c_char
+                        );
                         return qfalse;
                     }
                     // if it isn't a name
                     if token.r#type != TT_NAME {
-                        source_error!(bot, source, c"invalid define parameter".as_ptr() as *mut c_char);
+                        source_error!(
+                            bot,
+                            source,
+                            c"invalid define parameter".as_ptr() as *mut c_char
+                        );
                         return qfalse;
                     }
                     //
@@ -1785,7 +1863,11 @@ pub fn PC_Directive_define(bot: &mut BotLib, source: *mut source_t) -> c_int {
                     }
                     // then it must be a comma
                     if strcmp(token.string.as_ptr(), c",".as_ptr()) != 0 {
-                        source_error!(bot, source, c"define not terminated".as_ptr() as *mut c_char);
+                        source_error!(
+                            bot,
+                            source,
+                            c"define not terminated".as_ptr() as *mut c_char
+                        );
                         return qfalse;
                     }
                 }
@@ -1827,7 +1909,11 @@ pub fn PC_Directive_define(bot: &mut BotLib, source: *mut source_t) -> c_int {
             if strcmp((*(*define).tokens).string.as_ptr(), c"##".as_ptr()) == 0
                 || strcmp((*last).string.as_ptr(), c"##".as_ptr()) == 0
             {
-                source_error!(bot, source, c"define with misplaced ##".as_ptr() as *mut c_char);
+                source_error!(
+                    bot,
+                    source,
+                    c"define with misplaced ##".as_ptr() as *mut c_char
+                );
                 return qfalse;
             }
         }
@@ -1845,9 +1931,18 @@ pub fn PC_DefineFromString(bot: &mut BotLib, string: *mut c_char) -> *mut define
 
         PC_InitTokenHeap();
 
-        let script: *mut script_t = LoadScriptMemory(bot, string, strlen(string) as c_int, c"*extern".as_ptr() as *mut c_char);
+        let script: *mut script_t = LoadScriptMemory(
+            bot,
+            string,
+            strlen(string) as c_int,
+            c"*extern".as_ptr() as *mut c_char,
+        );
         // create a new source
-        Com_Memset((&mut src as *mut source_t).cast(), 0, core::mem::size_of::<source_t>());
+        Com_Memset(
+            (&mut src as *mut source_t).cast(),
+            0,
+            core::mem::size_of::<source_t>(),
+        );
         strncpy(src.filename.as_mut_ptr(), c"*extern".as_ptr(), MAX_PATH);
         src.scriptstack = script;
         // #if DEFINEHASHING (live)
@@ -2023,7 +2118,13 @@ pub fn PC_ExpandDefine(
         }
         // if the define has parameters
         if (*define).numparms != 0 {
-            if PC_ReadDefineParms(bot, source, define, parms.as_mut_ptr(), MAX_DEFINEPARMS as c_int) == 0
+            if PC_ReadDefineParms(
+                bot,
+                source,
+                define,
+                parms.as_mut_ptr(),
+                MAX_DEFINEPARMS as c_int,
+            ) == 0
             {
                 return qfalse;
             }
@@ -2069,7 +2170,11 @@ pub fn PC_ExpandDefine(
                         dt = (*dt).next;
                         // stringize the define parameter tokens
                         if PC_StringizeTokens(parms[parmnum as usize], &mut token) == 0 {
-                            source_error!(bot, source, c"can't stringize tokens".as_ptr() as *mut c_char);
+                            source_error!(
+                                bot,
+                                source,
+                                c"can't stringize tokens".as_ptr() as *mut c_char
+                            );
                             return qfalse;
                         }
                         t = PC_CopyToken(bot, &mut token);
@@ -2077,7 +2182,8 @@ pub fn PC_ExpandDefine(
                         source_warning!(
                             bot,
                             source,
-                            c"stringizing operator without define parameter".as_ptr() as *mut c_char,
+                            c"stringizing operator without define parameter".as_ptr()
+                                as *mut c_char,
                         );
                         dt = (*dt).next;
                         continue;
@@ -2101,7 +2207,9 @@ pub fn PC_ExpandDefine(
         while !t.is_null() {
             if !(*t).next.is_null() {
                 // if the merging operator
-                if (*(*t).next).string[0] == b'#' as c_char && (*(*t).next).string[1] == b'#' as c_char {
+                if (*(*t).next).string[0] == b'#' as c_char
+                    && (*(*t).next).string[1] == b'#' as c_char
+                {
                     t1 = t;
                     t2 = (*(*t).next).next;
                     if !t2.is_null() {
@@ -2158,7 +2266,15 @@ pub fn PC_ExpandDefineIntoSource(
         let mut firsttoken: *mut token_t = core::ptr::null_mut();
         let mut lasttoken: *mut token_t = core::ptr::null_mut();
 
-        if PC_ExpandDefine(bot, source, deftoken, define, &mut firsttoken, &mut lasttoken) == 0 {
+        if PC_ExpandDefine(
+            bot,
+            source,
+            deftoken,
+            define,
+            &mut firsttoken,
+            &mut lasttoken,
+        ) == 0
+        {
             return qfalse;
         }
 
@@ -2175,7 +2291,11 @@ pub fn PC_ExpandDefineIntoSource(
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2429-2433`
 pub fn PC_Directive_line(bot: &mut BotLib, source: *mut source_t) -> c_int {
-    source_error!(bot, source, c"#line directive not supported".as_ptr() as *mut c_char);
+    source_error!(
+        bot,
+        source,
+        c"#line directive not supported".as_ptr() as *mut c_char
+    );
     qfalse
 }
 
@@ -2205,7 +2325,11 @@ pub fn PC_Directive_pragma(bot: &mut BotLib, source: *mut source_t) -> c_int {
     unsafe {
         let mut token: token_t = core::mem::zeroed();
 
-        source_warning!(bot, source, c"#pragma directive not supported".as_ptr() as *mut c_char);
+        source_warning!(
+            bot,
+            source,
+            c"#pragma directive not supported".as_ptr() as *mut c_char
+        );
         while PC_ReadLine(bot, source, &mut token) != 0 {}
         qtrue
     }
@@ -2245,7 +2369,11 @@ pub fn PC_Directive_eval(bot: &mut BotLib, source: *mut source_t) -> c_int {
         token.whitespace_p = (*(*source).scriptstack).script_p;
         token.endwhitespace_p = (*(*source).scriptstack).script_p;
         token.linescrossed = 0;
-        sprintf(token.string.as_mut_ptr(), c"%d".as_ptr(), abs(value as c_int));
+        sprintf(
+            token.string.as_mut_ptr(),
+            c"%d".as_ptr(),
+            abs(value as c_int),
+        );
         token.r#type = TT_NUMBER;
         token.subtype = TT_INTEGER | TT_LONG | TT_DECIMAL;
         PC_UnreadSourceToken(bot, source, &mut token);
@@ -2296,29 +2424,83 @@ fn PC_Directive_sentinel(_bot: &mut BotLib, _source: *mut source_t) -> c_int {
 /// terminator row ends the walk.
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2535-2551`.
 const directives: [directive_t; 15] = [
-    directive_t { name: c"if".as_ptr(), func: PC_Directive_if },
-    directive_t { name: c"ifdef".as_ptr(), func: PC_Directive_ifdef },
-    directive_t { name: c"ifndef".as_ptr(), func: PC_Directive_ifndef },
-    directive_t { name: c"elif".as_ptr(), func: PC_Directive_elif },
-    directive_t { name: c"else".as_ptr(), func: PC_Directive_else },
-    directive_t { name: c"endif".as_ptr(), func: PC_Directive_endif },
-    directive_t { name: c"include".as_ptr(), func: PC_Directive_include },
-    directive_t { name: c"define".as_ptr(), func: PC_Directive_define },
-    directive_t { name: c"undef".as_ptr(), func: PC_Directive_undef },
-    directive_t { name: c"line".as_ptr(), func: PC_Directive_line },
-    directive_t { name: c"error".as_ptr(), func: PC_Directive_error },
-    directive_t { name: c"pragma".as_ptr(), func: PC_Directive_pragma },
-    directive_t { name: c"eval".as_ptr(), func: PC_Directive_eval },
-    directive_t { name: c"evalfloat".as_ptr(), func: PC_Directive_evalfloat },
-    directive_t { name: core::ptr::null(), func: PC_Directive_sentinel },
+    directive_t {
+        name: c"if".as_ptr(),
+        func: PC_Directive_if,
+    },
+    directive_t {
+        name: c"ifdef".as_ptr(),
+        func: PC_Directive_ifdef,
+    },
+    directive_t {
+        name: c"ifndef".as_ptr(),
+        func: PC_Directive_ifndef,
+    },
+    directive_t {
+        name: c"elif".as_ptr(),
+        func: PC_Directive_elif,
+    },
+    directive_t {
+        name: c"else".as_ptr(),
+        func: PC_Directive_else,
+    },
+    directive_t {
+        name: c"endif".as_ptr(),
+        func: PC_Directive_endif,
+    },
+    directive_t {
+        name: c"include".as_ptr(),
+        func: PC_Directive_include,
+    },
+    directive_t {
+        name: c"define".as_ptr(),
+        func: PC_Directive_define,
+    },
+    directive_t {
+        name: c"undef".as_ptr(),
+        func: PC_Directive_undef,
+    },
+    directive_t {
+        name: c"line".as_ptr(),
+        func: PC_Directive_line,
+    },
+    directive_t {
+        name: c"error".as_ptr(),
+        func: PC_Directive_error,
+    },
+    directive_t {
+        name: c"pragma".as_ptr(),
+        func: PC_Directive_pragma,
+    },
+    directive_t {
+        name: c"eval".as_ptr(),
+        func: PC_Directive_eval,
+    },
+    directive_t {
+        name: c"evalfloat".as_ptr(),
+        func: PC_Directive_evalfloat,
+    },
+    directive_t {
+        name: core::ptr::null(),
+        func: PC_Directive_sentinel,
+    },
 ];
 
 /// Raven `dollardirectives[]` — file-scope `$`-directive dispatch table.
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2648-2653`.
 const dollardirectives: [directive_t; 3] = [
-    directive_t { name: c"evalint".as_ptr(), func: PC_DollarDirective_evalint },
-    directive_t { name: c"evalfloat".as_ptr(), func: PC_DollarDirective_evalfloat },
-    directive_t { name: core::ptr::null(), func: PC_Directive_sentinel },
+    directive_t {
+        name: c"evalint".as_ptr(),
+        func: PC_DollarDirective_evalint,
+    },
+    directive_t {
+        name: c"evalfloat".as_ptr(),
+        func: PC_DollarDirective_evalfloat,
+    },
+    directive_t {
+        name: core::ptr::null(),
+        func: PC_Directive_sentinel,
+    },
 ];
 
 /// Raven `PC_ReadDirective` — dispatch a `#`-directive to its handler.
@@ -2342,7 +2524,11 @@ pub fn PC_ReadDirective(bot: &mut BotLib, source: *mut source_t) -> c_int {
         // directive name must be on the same line
         if token.linescrossed > 0 {
             PC_UnreadSourceToken(bot, source, &mut token);
-            source_error!(bot, source, c"found # at end of line".as_ptr() as *mut c_char);
+            source_error!(
+                bot,
+                source,
+                c"found # at end of line".as_ptr() as *mut c_char
+            );
             return qfalse;
         }
         // if if is a name
@@ -2384,7 +2570,11 @@ pub fn PC_ReadDollarDirective(bot: &mut BotLib, source: *mut source_t) -> c_int 
         // directive name must be on the same line
         if token.linescrossed > 0 {
             PC_UnreadSourceToken(bot, source, &mut token);
-            source_error!(bot, source, c"found $ at end of line".as_ptr() as *mut c_char);
+            source_error!(
+                bot,
+                source,
+                c"found $ at end of line".as_ptr() as *mut c_char
+            );
             return qfalse;
         }
         // if if is a name
@@ -2425,7 +2615,11 @@ pub fn PC_DollarDirective_evalint(bot: &mut BotLib, source: *mut source_t) -> c_
         token.whitespace_p = (*(*source).scriptstack).script_p;
         token.endwhitespace_p = (*(*source).scriptstack).script_p;
         token.linescrossed = 0;
-        sprintf(token.string.as_mut_ptr(), c"%d".as_ptr(), abs(value as c_int));
+        sprintf(
+            token.string.as_mut_ptr(),
+            c"%d".as_ptr(),
+            abs(value as c_int),
+        );
         token.r#type = TT_NUMBER;
         token.subtype = TT_INTEGER | TT_LONG | TT_DECIMAL;
         // #ifdef NUMBERVALUE (not defined) omitted.
@@ -2491,7 +2685,11 @@ pub fn PC_Evaluate(
         }
         //
         if PC_ReadLine(bot, source, &mut token) == 0 {
-            source_error!(bot, source, c"no value after #if/#elif".as_ptr() as *mut c_char);
+            source_error!(
+                bot,
+                source,
+                c"no value after #if/#elif".as_ptr() as *mut c_char
+            );
             return qfalse;
         }
         firsttoken = core::ptr::null_mut();
@@ -2773,7 +2971,10 @@ pub fn PC_ReadToken(bot: &mut BotLib, source: *mut source_t, token: *mut token_t
                             );
                             return qfalse;
                         }
-                        strcat((*token).string.as_mut_ptr(), newtoken.string.as_ptr().add(1));
+                        strcat(
+                            (*token).string.as_mut_ptr(),
+                            newtoken.string.as_ptr().add(1),
+                        );
                     } else {
                         PC_UnreadToken(bot, source, &mut newtoken);
                     }
@@ -2895,7 +3096,11 @@ pub fn PC_ExpectTokenType(
         let mut str = [0 as c_char; MAX_TOKEN];
 
         if PC_ReadToken(bot, source, token) == 0 {
-            source_error!(bot, source, c"couldn't read expected token".as_ptr() as *mut c_char);
+            source_error!(
+                bot,
+                source,
+                c"couldn't read expected token".as_ptr() as *mut c_char
+            );
             return qfalse;
         }
 
@@ -2981,7 +3186,11 @@ pub fn PC_ExpectTokenType(
 pub fn PC_ExpectAnyToken(bot: &mut BotLib, source: *mut source_t, token: *mut token_t) -> c_int {
     unsafe {
         if PC_ReadToken(bot, source, token) == 0 {
-            source_error!(bot, source, c"couldn't read expected token".as_ptr() as *mut c_char);
+            source_error!(
+                bot,
+                source,
+                c"couldn't read expected token".as_ptr() as *mut c_char
+            );
             qfalse
         } else {
             qtrue
@@ -3029,7 +3238,11 @@ pub fn PC_CheckTokenType(
         }
         // if the type matches
         if tok.r#type == r#type && (tok.subtype & subtype) == subtype {
-            Com_Memcpy(token.cast(), (&tok as *const token_t).cast(), core::mem::size_of::<token_t>());
+            Com_Memcpy(
+                token.cast(),
+                (&tok as *const token_t).cast(),
+                core::mem::size_of::<token_t>(),
+            );
             return qtrue;
         }
         //
@@ -3252,7 +3465,10 @@ pub fn PC_SourceFileAndLine(
             return qfalse;
         }
 
-        strcpy(filename, (*bot.sourceFiles[handle as usize]).filename.as_ptr());
+        strcpy(
+            filename,
+            (*bot.sourceFiles[handle as usize]).filename.as_ptr(),
+        );
         if !(*bot.sourceFiles[handle as usize]).scriptstack.is_null() {
             *line = (*(*bot.sourceFiles[handle as usize]).scriptstack).line;
         } else {

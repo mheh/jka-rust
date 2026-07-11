@@ -9,9 +9,9 @@ use sp_qshared::shared::MAX_QPATH;
 /// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:457-461`
 #[repr(C)]
 pub struct dshader_t {
-	pub shader: [c_char; MAX_QPATH],
-	pub surfaceFlags: i32,
-	pub contentFlags: i32,
+    pub shader: [c_char; MAX_QPATH],
+    pub surfaceFlags: i32,
+    pub contentFlags: i32,
 }
 
 pub type dshader_s = dshader_t;

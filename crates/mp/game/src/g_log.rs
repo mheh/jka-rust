@@ -268,7 +268,10 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
                 ctx,
                 cstr(&format!(
                     "{:>15}:  Damage: {:>6},  Kills: {:>5},  Dmg per Shot: {:.6}\n",
-                    weaponName(j), totaldamage[j], totalkills[j], pershot
+                    weaponName(j),
+                    totaldamage[j],
+                    totalkills[j],
+                    pershot
                 ))
                 .as_ptr(),
             );
@@ -341,7 +344,10 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
             if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
-                    write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogPickups[i][j]));
+                    write(&format!(
+                        "\t{}",
+                        (*ctx.world).globals.G_WeaponLogPickups[i][j]
+                    ));
                 }
                 write("\n");
             }
@@ -363,7 +369,10 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
             if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
-                    write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogFired[i][j]));
+                    write(&format!(
+                        "\t{}",
+                        (*ctx.world).globals.G_WeaponLogFired[i][j]
+                    ));
                 }
                 write("\n");
             }
@@ -407,7 +416,10 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
             if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
-                    write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogDeaths[i][j]));
+                    write(&format!(
+                        "\t{}",
+                        (*ctx.world).globals.G_WeaponLogDeaths[i][j]
+                    ));
                 }
                 write("\n");
             }
@@ -488,7 +500,10 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
             if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..MODN {
-                    write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogDamage.0[i][j]));
+                    write(&format!(
+                        "\t{}",
+                        (*ctx.world).globals.G_WeaponLogDamage.0[i][j]
+                    ));
                 }
                 write("\n");
             }
@@ -510,7 +525,10 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
             if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..MODN {
-                    write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogKills.0[i][j]));
+                    write(&format!(
+                        "\t{}",
+                        (*ctx.world).globals.G_WeaponLogKills.0[i][j]
+                    ));
                 }
                 write("\n");
             }
@@ -693,7 +711,9 @@ pub fn CalculateLogistics(
                 }
                 n_stuff_used += (*ctx.world).globals.G_WeaponLogItems[i as usize][j];
             }
-            if n_different >= 4 && n_different >= n_most_different && n_stuff_used > n_most_stuff_used
+            if n_different >= 4
+                && n_different >= n_most_different
+                && n_stuff_used > n_most_stuff_used
             {
                 n_most_different = n_different;
                 n_most_stuff_used = n_stuff_used;
@@ -737,7 +757,8 @@ pub fn CalculateTactician(
         if (play_time as f32) < 0.3 {
             return qfalse;
         }
-        if ((*ec).ps.persistant[persEnum_t::PERS_SCORE as usize] as f32) / (play_time as f32) < 2.0 {
+        if ((*ec).ps.persistant[persEnum_t::PERS_SCORE as usize] as f32) / (play_time as f32) < 2.0
+        {
             return qfalse;
         }
 
@@ -769,7 +790,8 @@ pub fn CalculateTactician(
             let mut kills_with_weapon = [0i32; WP_NUM_WEAPONS as usize + 1];
             for i in 0..meansOfDeath_t::MOD_MAX as usize {
                 let weapon = weaponFromMOD[i] as usize;
-                kills_with_weapon[weapon] += (*ctx.world).globals.G_WeaponLogKills.0[person as usize][i];
+                kills_with_weapon[weapon] +=
+                    (*ctx.world).globals.G_WeaponLogKills.0[person as usize][i];
             }
 
             let mut weapon = WP_STUN_BATON;

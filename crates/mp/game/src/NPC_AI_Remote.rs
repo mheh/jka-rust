@@ -265,7 +265,8 @@ pub fn Remote_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean, r
         }
 
         // Get our direction from the navigator if we can't see our target
-        if crate::NPC_move::NPC_GetMoveDirection(ctx, &mut forward, &mut distance as *mut f32) == 0 {
+        if crate::NPC_move::NPC_GetMoveDirection(ctx, &mut forward, &mut distance as *mut f32) == 0
+        {
             return;
         }
     } else {

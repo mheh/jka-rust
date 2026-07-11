@@ -5,194 +5,194 @@
 /// Type definition source: `oracle/code/game/wp_saber.h:221-412`
 #[repr(i32)]
 pub enum saberMoveName_t {
-	// Invalid, or saber not armed
-	LS_INVALID = -1,
-	LS_NONE = 0,
+    // Invalid, or saber not armed
+    LS_INVALID = -1,
+    LS_NONE = 0,
 
-	// General movements with saber
-	LS_READY,
-	LS_DRAW,
-	LS_PUTAWAY,
+    // General movements with saber
+    LS_READY,
+    LS_DRAW,
+    LS_PUTAWAY,
 
-	// Attacks
-	LS_A_TL2BR, // 4
-	LS_A_L2R,
-	LS_A_BL2TR,
-	LS_A_BR2TL,
-	LS_A_R2L,
-	LS_A_TR2BL,
-	LS_A_T2B,
-	LS_A_BACKSTAB,
-	LS_A_BACK,
-	LS_A_BACK_CR,
-	LS_ROLL_STAB,
-	LS_A_LUNGE,
-	LS_A_JUMP_T__B_,
-	LS_A_FLIP_STAB,
-	LS_A_FLIP_SLASH,
-	LS_JUMPATTACK_DUAL,
-	LS_JUMPATTACK_ARIAL_LEFT,
-	LS_JUMPATTACK_ARIAL_RIGHT,
-	LS_JUMPATTACK_CART_LEFT,
-	LS_JUMPATTACK_CART_RIGHT,
-	LS_JUMPATTACK_STAFF_LEFT,
-	LS_JUMPATTACK_STAFF_RIGHT,
-	LS_BUTTERFLY_LEFT,
-	LS_BUTTERFLY_RIGHT,
-	LS_A_BACKFLIP_ATK,
-	LS_SPINATTACK_DUAL,
-	LS_SPINATTACK,
-	LS_LEAP_ATTACK,
-	LS_SWOOP_ATTACK_RIGHT,
-	LS_SWOOP_ATTACK_LEFT,
-	LS_TAUNTAUN_ATTACK_RIGHT,
-	LS_TAUNTAUN_ATTACK_LEFT,
-	LS_KICK_F,
-	LS_KICK_B,
-	LS_KICK_R,
-	LS_KICK_L,
-	LS_KICK_S,
-	LS_KICK_BF,
-	LS_KICK_RL,
-	LS_KICK_F_AIR,
-	LS_KICK_B_AIR,
-	LS_KICK_R_AIR,
-	LS_KICK_L_AIR,
-	LS_STABDOWN,
-	LS_STABDOWN_STAFF,
-	LS_STABDOWN_DUAL,
-	LS_DUAL_SPIN_PROTECT,
-	LS_STAFF_SOULCAL,
-	LS_A1_SPECIAL,
-	LS_A2_SPECIAL,
-	LS_A3_SPECIAL,
-	LS_UPSIDE_DOWN_ATTACK,
-	LS_PULL_ATTACK_STAB,
-	LS_PULL_ATTACK_SWING,
-	LS_SPINATTACK_ALORA,
-	LS_DUAL_FB,
-	LS_DUAL_LR,
-	LS_HILT_BASH,
+    // Attacks
+    LS_A_TL2BR, // 4
+    LS_A_L2R,
+    LS_A_BL2TR,
+    LS_A_BR2TL,
+    LS_A_R2L,
+    LS_A_TR2BL,
+    LS_A_T2B,
+    LS_A_BACKSTAB,
+    LS_A_BACK,
+    LS_A_BACK_CR,
+    LS_ROLL_STAB,
+    LS_A_LUNGE,
+    LS_A_JUMP_T__B_,
+    LS_A_FLIP_STAB,
+    LS_A_FLIP_SLASH,
+    LS_JUMPATTACK_DUAL,
+    LS_JUMPATTACK_ARIAL_LEFT,
+    LS_JUMPATTACK_ARIAL_RIGHT,
+    LS_JUMPATTACK_CART_LEFT,
+    LS_JUMPATTACK_CART_RIGHT,
+    LS_JUMPATTACK_STAFF_LEFT,
+    LS_JUMPATTACK_STAFF_RIGHT,
+    LS_BUTTERFLY_LEFT,
+    LS_BUTTERFLY_RIGHT,
+    LS_A_BACKFLIP_ATK,
+    LS_SPINATTACK_DUAL,
+    LS_SPINATTACK,
+    LS_LEAP_ATTACK,
+    LS_SWOOP_ATTACK_RIGHT,
+    LS_SWOOP_ATTACK_LEFT,
+    LS_TAUNTAUN_ATTACK_RIGHT,
+    LS_TAUNTAUN_ATTACK_LEFT,
+    LS_KICK_F,
+    LS_KICK_B,
+    LS_KICK_R,
+    LS_KICK_L,
+    LS_KICK_S,
+    LS_KICK_BF,
+    LS_KICK_RL,
+    LS_KICK_F_AIR,
+    LS_KICK_B_AIR,
+    LS_KICK_R_AIR,
+    LS_KICK_L_AIR,
+    LS_STABDOWN,
+    LS_STABDOWN_STAFF,
+    LS_STABDOWN_DUAL,
+    LS_DUAL_SPIN_PROTECT,
+    LS_STAFF_SOULCAL,
+    LS_A1_SPECIAL,
+    LS_A2_SPECIAL,
+    LS_A3_SPECIAL,
+    LS_UPSIDE_DOWN_ATTACK,
+    LS_PULL_ATTACK_STAB,
+    LS_PULL_ATTACK_SWING,
+    LS_SPINATTACK_ALORA,
+    LS_DUAL_FB,
+    LS_DUAL_LR,
+    LS_HILT_BASH,
 
-	// starts
-	LS_S_TL2BR, // 26
-	LS_S_L2R,
-	LS_S_BL2TR, // # Start of attack chaining to SLASH LR2UL
-	LS_S_BR2TL, // # Start of attack chaining to SLASH LR2UL
-	LS_S_R2L,
-	LS_S_TR2BL,
-	LS_S_T2B,
+    // starts
+    LS_S_TL2BR, // 26
+    LS_S_L2R,
+    LS_S_BL2TR, // # Start of attack chaining to SLASH LR2UL
+    LS_S_BR2TL, // # Start of attack chaining to SLASH LR2UL
+    LS_S_R2L,
+    LS_S_TR2BL,
+    LS_S_T2B,
 
-	// returns
-	LS_R_TL2BR, // 33
-	LS_R_L2R,
-	LS_R_BL2TR,
-	LS_R_BR2TL,
-	LS_R_R2L,
-	LS_R_TR2BL,
-	LS_R_T2B,
+    // returns
+    LS_R_TL2BR, // 33
+    LS_R_L2R,
+    LS_R_BL2TR,
+    LS_R_BR2TL,
+    LS_R_R2L,
+    LS_R_TR2BL,
+    LS_R_T2B,
 
-	// transitions
-	LS_T1_BR__R, // 40
-	LS_T1_BR_TR,
-	LS_T1_BR_T_,
-	LS_T1_BR_TL,
-	LS_T1_BR__L,
-	LS_T1_BR_BL,
-	LS_T1__R_BR, // 46
-	LS_T1__R_TR,
-	LS_T1__R_T_,
-	LS_T1__R_TL,
-	LS_T1__R__L,
-	LS_T1__R_BL,
-	LS_T1_TR_BR, // 52
-	LS_T1_TR__R,
-	LS_T1_TR_T_,
-	LS_T1_TR_TL,
-	LS_T1_TR__L,
-	LS_T1_TR_BL,
-	LS_T1_T__BR, // 58
-	LS_T1_T___R,
-	LS_T1_T__TR,
-	LS_T1_T__TL,
-	LS_T1_T___L,
-	LS_T1_T__BL,
-	LS_T1_TL_BR, // 64
-	LS_T1_TL__R,
-	LS_T1_TL_TR,
-	LS_T1_TL_T_,
-	LS_T1_TL__L,
-	LS_T1_TL_BL,
-	LS_T1__L_BR, // 70
-	LS_T1__L__R,
-	LS_T1__L_TR,
-	LS_T1__L_T_,
-	LS_T1__L_TL,
-	LS_T1__L_BL,
-	LS_T1_BL_BR, // 76
-	LS_T1_BL__R,
-	LS_T1_BL_TR,
-	LS_T1_BL_T_,
-	LS_T1_BL_TL,
-	LS_T1_BL__L,
+    // transitions
+    LS_T1_BR__R, // 40
+    LS_T1_BR_TR,
+    LS_T1_BR_T_,
+    LS_T1_BR_TL,
+    LS_T1_BR__L,
+    LS_T1_BR_BL,
+    LS_T1__R_BR, // 46
+    LS_T1__R_TR,
+    LS_T1__R_T_,
+    LS_T1__R_TL,
+    LS_T1__R__L,
+    LS_T1__R_BL,
+    LS_T1_TR_BR, // 52
+    LS_T1_TR__R,
+    LS_T1_TR_T_,
+    LS_T1_TR_TL,
+    LS_T1_TR__L,
+    LS_T1_TR_BL,
+    LS_T1_T__BR, // 58
+    LS_T1_T___R,
+    LS_T1_T__TR,
+    LS_T1_T__TL,
+    LS_T1_T___L,
+    LS_T1_T__BL,
+    LS_T1_TL_BR, // 64
+    LS_T1_TL__R,
+    LS_T1_TL_TR,
+    LS_T1_TL_T_,
+    LS_T1_TL__L,
+    LS_T1_TL_BL,
+    LS_T1__L_BR, // 70
+    LS_T1__L__R,
+    LS_T1__L_TR,
+    LS_T1__L_T_,
+    LS_T1__L_TL,
+    LS_T1__L_BL,
+    LS_T1_BL_BR, // 76
+    LS_T1_BL__R,
+    LS_T1_BL_TR,
+    LS_T1_BL_T_,
+    LS_T1_BL_TL,
+    LS_T1_BL__L,
 
-	// Bounces
-	LS_B1_BR,
-	LS_B1__R,
-	LS_B1_TR,
-	LS_B1_T_,
-	LS_B1_TL,
-	LS_B1__L,
-	LS_B1_BL,
+    // Bounces
+    LS_B1_BR,
+    LS_B1__R,
+    LS_B1_TR,
+    LS_B1_T_,
+    LS_B1_TL,
+    LS_B1__L,
+    LS_B1_BL,
 
-	// Deflected attacks
-	LS_D1_BR,
-	LS_D1__R,
-	LS_D1_TR,
-	LS_D1_T_,
-	LS_D1_TL,
-	LS_D1__L,
-	LS_D1_BL,
-	LS_D1_B_,
+    // Deflected attacks
+    LS_D1_BR,
+    LS_D1__R,
+    LS_D1_TR,
+    LS_D1_T_,
+    LS_D1_TL,
+    LS_D1__L,
+    LS_D1_BL,
+    LS_D1_B_,
 
-	// Reflected attacks
-	LS_V1_BR,
-	LS_V1__R,
-	LS_V1_TR,
-	LS_V1_T_,
-	LS_V1_TL,
-	LS_V1__L,
-	LS_V1_BL,
-	LS_V1_B_,
+    // Reflected attacks
+    LS_V1_BR,
+    LS_V1__R,
+    LS_V1_TR,
+    LS_V1_T_,
+    LS_V1_TL,
+    LS_V1__L,
+    LS_V1_BL,
+    LS_V1_B_,
 
-	// Broken parries
-	LS_H1_T_, //
-	LS_H1_TR,
-	LS_H1_TL,
-	LS_H1_BR,
-	LS_H1_B_,
-	LS_H1_BL,
+    // Broken parries
+    LS_H1_T_, //
+    LS_H1_TR,
+    LS_H1_TL,
+    LS_H1_BR,
+    LS_H1_B_,
+    LS_H1_BL,
 
-	// Knockaways
-	LS_K1_T_, //
-	LS_K1_TR,
-	LS_K1_TL,
-	LS_K1_BR,
-	LS_K1_BL,
+    // Knockaways
+    LS_K1_T_, //
+    LS_K1_TR,
+    LS_K1_TL,
+    LS_K1_BR,
+    LS_K1_BL,
 
-	// Parries
-	LS_PARRY_UP, //
-	LS_PARRY_UR,
-	LS_PARRY_UL,
-	LS_PARRY_LR,
-	LS_PARRY_LL,
+    // Parries
+    LS_PARRY_UP, //
+    LS_PARRY_UR,
+    LS_PARRY_UL,
+    LS_PARRY_LR,
+    LS_PARRY_LL,
 
-	// Projectile Reflections
-	LS_REFLECT_UP, //
-	LS_REFLECT_UR,
-	LS_REFLECT_UL,
-	LS_REFLECT_LR,
-	LS_REFLECT_LL,
+    // Projectile Reflections
+    LS_REFLECT_UP, //
+    LS_REFLECT_UR,
+    LS_REFLECT_UL,
+    LS_REFLECT_LR,
+    LS_REFLECT_LL,
 
-	LS_MOVE_MAX, //
+    LS_MOVE_MAX, //
 }

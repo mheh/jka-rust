@@ -5,12 +5,12 @@
 /// Type definition source: `oracle/codemp/client/snd_local.h:67-74`
 #[repr(C)]
 pub struct dma_t {
-	pub channels: i32,
-	pub samples: i32,          // mono samples in buffer
-	pub submission_chunk: i32, // don't mix less than this #
-	pub samplebits: i32,
-	pub speed: i32,
-	pub buffer: *mut u8,
+    pub channels: i32,
+    pub samples: i32,          // mono samples in buffer
+    pub submission_chunk: i32, // don't mix less than this #
+    pub samplebits: i32,
+    pub speed: i32,
+    pub buffer: *mut u8,
 }
 
 #[cfg(target_pointer_width = "64")]

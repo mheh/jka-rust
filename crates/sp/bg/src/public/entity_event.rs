@@ -29,16 +29,16 @@ pub enum entity_event_t {
 
     EV_JUMP = 13,
     EV_ROLL = 14,
-    EV_WATER_TOUCH = 15,   // foot touches
-    EV_WATER_LEAVE = 16,   // foot leaves
-    EV_WATER_UNDER = 17,   // head touches
-    EV_WATER_CLEAR = 18,   // head leaves
-    EV_WATER_GURP1 = 19,   // need air 1
-    EV_WATER_GURP2 = 20,   // need air 2
-    EV_WATER_DROWN = 21,   // drowned
-    EV_LAVA_TOUCH = 22,    // foot touches
-    EV_LAVA_LEAVE = 23,    // foot leaves
-    EV_LAVA_UNDER = 24,    // head touches
+    EV_WATER_TOUCH = 15, // foot touches
+    EV_WATER_LEAVE = 16, // foot leaves
+    EV_WATER_UNDER = 17, // head touches
+    EV_WATER_CLEAR = 18, // head leaves
+    EV_WATER_GURP1 = 19, // need air 1
+    EV_WATER_GURP2 = 20, // need air 2
+    EV_WATER_DROWN = 21, // drowned
+    EV_LAVA_TOUCH = 22,  // foot touches
+    EV_LAVA_LEAVE = 23,  // foot leaves
+    EV_LAVA_UNDER = 24,  // head touches
 
     EV_ITEM_PICKUP = 25,
 
@@ -54,12 +54,12 @@ pub enum entity_event_t {
 
     EV_BATTERIES_CHARGED = 34,
 
-    EV_GRENADE_BOUNCE = 35,        // eventParm will be the soundindex
-    EV_MISSILE_STICK = 36,         // eventParm will be the soundindex
+    EV_GRENADE_BOUNCE = 35, // eventParm will be the soundindex
+    EV_MISSILE_STICK = 36,  // eventParm will be the soundindex
 
     EV_BMODEL_SOUND = 37,
     EV_GENERAL_SOUND = 38,
-    EV_GLOBAL_SOUND = 39,          // no attenuation
+    EV_GLOBAL_SOUND = 39, // no attenuation
 
     //#ifdef _IMMERSION
     //	EV_ENTITY_FORCE,
@@ -92,27 +92,27 @@ pub enum entity_event_t {
 
     EV_DISINTEGRATION = 56,
 
-    EV_ANGER1 = 57,         //Say when acquire an enemy when didn't have one before
+    EV_ANGER1 = 57, //Say when acquire an enemy when didn't have one before
     EV_ANGER2 = 58,
     EV_ANGER3 = 59,
 
-    EV_VICTORY1 = 60,       //Say when killed an enemy
+    EV_VICTORY1 = 60, //Say when killed an enemy
     EV_VICTORY2 = 61,
     EV_VICTORY3 = 62,
 
-    EV_CONFUSE1 = 63,       //Say when confused
+    EV_CONFUSE1 = 63, //Say when confused
     EV_CONFUSE2 = 64,
     EV_CONFUSE3 = 65,
 
-    EV_PUSHED1 = 66,        //Say when pushed
+    EV_PUSHED1 = 66, //Say when pushed
     EV_PUSHED2 = 67,
     EV_PUSHED3 = 68,
 
-    EV_CHOKE1 = 69,         //Say when choking
+    EV_CHOKE1 = 69, //Say when choking
     EV_CHOKE2 = 70,
     EV_CHOKE3 = 71,
 
-    EV_FFWARN = 72,         //ffire founds
+    EV_FFWARN = 72, //ffire founds
     EV_FFTURN = 73,
     //extra sounds for ST
     EV_CHASE1 = 74,
@@ -185,7 +185,7 @@ pub enum entity_event_t {
 
     EV_USE_FORCE = 138,
 
-    EV_DRUGGED = 139,       // hit by an interrogator
+    EV_DRUGGED = 139, // hit by an interrogator
 
     EV_DEBUG_LINE = 140,
     EV_KOTHOS_BEAM = 141,

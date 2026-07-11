@@ -47,7 +47,9 @@ pub fn G_BounceObject(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut tra
 
     // FIXME: customized or material-based impact/bounce sounds
     if unsafe { (*ent).flags & FL_BOUNCE_HALF } != 0 {
-        crate::q_math::_VectorScale(unsafe { (*ent).s.pos.trDelta }, 0.5f32, unsafe { &mut (*ent).s.pos.trDelta });
+        crate::q_math::_VectorScale(unsafe { (*ent).s.pos.trDelta }, 0.5f32, unsafe {
+            &mut (*ent).s.pos.trDelta
+        });
 
         // check for stop
         let normal_z = unsafe { (*trace).plane.normal[2] };
@@ -60,9 +62,15 @@ pub fn G_BounceObject(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut tra
             // G_SetOrigin( ent, trace->endpos );
             // ent->nextthink = level.time + 500;
             unsafe { (*ent).s.apos.trType = TR_STATIONARY };
-            crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe { &mut (*ent).s.apos.trBase });
-            crate::q_math::_VectorCopy(unsafe { (*trace).endpos }, unsafe { &mut (*ent).r.currentOrigin });
-            crate::q_math::_VectorCopy(unsafe { (*trace).endpos }, unsafe { &mut (*ent).s.pos.trBase });
+            crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe {
+                &mut (*ent).s.apos.trBase
+            });
+            crate::q_math::_VectorCopy(unsafe { (*trace).endpos }, unsafe {
+                &mut (*ent).r.currentOrigin
+            });
+            crate::q_math::_VectorCopy(unsafe { (*trace).endpos }, unsafe {
+                &mut (*ent).s.pos.trBase
+            });
             unsafe { (*ent).s.pos.trTime = world.level.time };
             return;
         }
@@ -71,11 +79,17 @@ pub fn G_BounceObject(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut tra
     // NEW--It would seem that we want to set our trBase to the trace endpos
     // and set the trTime to the actual time of impact....
     // FIXME: Should we still consider adding the normal though??
-    crate::q_math::_VectorCopy(unsafe { (*trace).endpos }, unsafe { &mut (*ent).r.currentOrigin });
+    crate::q_math::_VectorCopy(unsafe { (*trace).endpos }, unsafe {
+        &mut (*ent).r.currentOrigin
+    });
     unsafe { (*ent).s.pos.trTime = hit_time };
 
-    crate::q_math::_VectorCopy(unsafe { (*ent).r.currentOrigin }, unsafe { &mut (*ent).s.pos.trBase });
-    crate::q_math::_VectorCopy(unsafe { (*trace).plane.normal }, unsafe { &mut (*ent).pos1 }); //???
+    crate::q_math::_VectorCopy(unsafe { (*ent).r.currentOrigin }, unsafe {
+        &mut (*ent).s.pos.trBase
+    });
+    crate::q_math::_VectorCopy(unsafe { (*trace).plane.normal }, unsafe {
+        &mut (*ent).pos1
+    }); //???
 }
 
 /// Raven `G_RunObject`. Main object physics simulation.
@@ -92,7 +106,9 @@ pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
     // FIXME: floaters need to stop floating up after a while, even if gravity stays negative?
     if unsafe { (*ent).s.pos.trType } == TR_STATIONARY {
         unsafe { (*ent).s.pos.trType = TR_GRAVITY };
-        crate::q_math::_VectorCopy(unsafe { (*ent).r.currentOrigin }, unsafe { &mut (*ent).s.pos.trBase });
+        crate::q_math::_VectorCopy(unsafe { (*ent).r.currentOrigin }, unsafe {
+            &mut (*ent).s.pos.trBase
+        });
         unsafe { (*ent).s.pos.trTime = world.level.previousTime };
         if world.cvars.g_gravity.value == 0.0f32 {
             unsafe { (*ent).s.pos.trDelta[2] += 100.0f32 };
@@ -157,7 +173,9 @@ pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
     if tr.fraction == 1.0f32 {
         if world.cvars.g_gravity.value <= 0.0f32 {
             if unsafe { (*ent).s.apos.trType } == TR_STATIONARY {
-                crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe { &mut (*ent).s.apos.trBase });
+                crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe {
+                    &mut (*ent).s.apos.trBase
+                });
                 unsafe { (*ent).s.apos.trType = TR_LINEAR };
                 unsafe {
                     (*ent).s.apos.trDelta[1] = world.bg_state.rng.flrand(-300.0f32, 300.0f32)
@@ -175,8 +193,12 @@ pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 friction = 0.1f32;
             }
 
-            crate::q_math::_VectorScale(unsafe { (*ent).s.pos.trDelta }, friction, unsafe { &mut (*ent).s.pos.trDelta });
-            crate::q_math::_VectorCopy(unsafe { (*ent).r.currentOrigin }, unsafe { &mut (*ent).s.pos.trBase });
+            crate::q_math::_VectorScale(unsafe { (*ent).s.pos.trDelta }, friction, unsafe {
+                &mut (*ent).s.pos.trDelta
+            });
+            crate::q_math::_VectorCopy(unsafe { (*ent).r.currentOrigin }, unsafe {
+                &mut (*ent).s.pos.trBase
+            });
             unsafe { (*ent).s.pos.trTime = world.level.time };
         }
         return;
@@ -235,7 +257,9 @@ pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
             crate::npc_c::pitch_roll_for_slope(ctx, ent, Some(&mut tr.plane.normal));
             // ent->r.currentAngles[0] = 0;//FIXME: match to slope
             // ent->r.currentAngles[2] = 0;//FIXME: match to slope
-            crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe { &mut (*ent).s.apos.trBase });
+            crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe {
+                &mut (*ent).s.apos.trBase
+            });
             // okay, we hit the floor, might as well stop or prediction will
             // make us go through the floor!
             // FIXME: this means we can't fall if something is pulled out from under us...
@@ -246,7 +270,9 @@ pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
         crate::npc_c::pitch_roll_for_slope(ctx, ent, Some(&mut tr.plane.normal));
         // ent->r.currentAngles[0] = 0;//FIXME: match to slope
         // ent->r.currentAngles[2] = 0;//FIXME: match to slope
-        crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe { &mut (*ent).s.apos.trBase });
+        crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe {
+            &mut (*ent).s.apos.trBase
+        });
     }
 
     // call touch func
@@ -262,8 +288,12 @@ pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_object.c:244-258`
 pub fn G_StopObjectMoving(object: *mut gentity_t) {
     unsafe { (*object).s.pos.trType = TR_STATIONARY };
-    crate::q_math::_VectorCopy(unsafe { (*object).r.currentOrigin }, unsafe { &mut (*object).s.origin });
-    crate::q_math::_VectorCopy(unsafe { (*object).r.currentOrigin }, unsafe { &mut (*object).s.pos.trBase });
+    crate::q_math::_VectorCopy(unsafe { (*object).r.currentOrigin }, unsafe {
+        &mut (*object).s.origin
+    });
+    crate::q_math::_VectorCopy(unsafe { (*object).r.currentOrigin }, unsafe {
+        &mut (*object).s.pos.trBase
+    });
     unsafe { (*object).s.pos.trDelta = [0.0f32; 3] };
 
     // Stop spinning (commented out in Raven)
@@ -293,7 +323,9 @@ pub fn G_StartObjectMoving(
 
     // object->s.eType = ET_GENERAL;
     unsafe { (*object).s.pos.trType = trType };
-    crate::q_math::_VectorCopy(unsafe { (*object).r.currentOrigin }, unsafe { &mut (*object).s.pos.trBase });
+    crate::q_math::_VectorCopy(unsafe { (*object).r.currentOrigin }, unsafe {
+        &mut (*object).s.pos.trBase
+    });
     crate::q_math::_VectorScale(dir_mut, speed, unsafe { &mut (*object).s.pos.trDelta });
     unsafe { (*object).s.pos.trTime = world.level.time };
 

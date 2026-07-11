@@ -16,8 +16,8 @@ use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use mp_qshared::shared::surface_flags::CONTENTS_LIGHTSABER;
+use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use native_math::vector::vec3_t;
 use native_types::clipHandle_t;
 
@@ -128,19 +128,11 @@ extern "Rust" {
 
     fn SE_GetString(common: &mut Common, host: &mut dyn EngineHost, key: &str) -> String;
 
-    fn RE_RegisterServerSkin(
-        rm: &mut RenderModels,
-        host: &mut dyn EngineHost,
-        name: &str,
-    ) -> c_int;
+    fn RE_RegisterServerSkin(rm: &mut RenderModels, host: &mut dyn EngineHost, name: &str)
+        -> c_int;
 
     fn MatrixMultiply(in1: *mut vec3_t, in2: *mut vec3_t, out: *mut vec3_t);
-    fn AngleVectors(
-        angles: *const f32,
-        forward: *mut f32,
-        right: *mut f32,
-        up: *mut f32,
-    );
+    fn AngleVectors(angles: *const f32, forward: *mut f32, right: *mut f32, up: *mut f32);
     fn PerpendicularVector(dst: *mut f32, src: *const f32);
     fn strncpy(dest: *mut c_char, src: *const c_char, count: c_int) -> *mut c_char;
     fn Sys_SnapVector(v: *mut f32);
@@ -206,9 +198,8 @@ pub fn SV_GetEntityToken(sv: &mut Server, buffer: *mut c_char, bufferSize: c_int
     // crate"); exact import path not resolved by this packet — escalated.
     unsafe {
         if sv.sv.mLocalSubBSPIndex == -1 {
-            let s = COM_Parse(
-                &mut sv.sv.entityParsePoint as *mut *mut c_char as *mut *const c_char,
-            );
+            let s =
+                COM_Parse(&mut sv.sv.entityParsePoint as *mut *mut c_char as *mut *const c_char);
             Q_strncpyz(buffer, s, bufferSize);
             if sv.sv.entityParsePoint.is_null() && *s == 0 {
                 qfalse
@@ -423,10 +414,7 @@ pub fn SV_GetServerinfo(common: &mut Common, buffer: *mut c_char, bufferSize: c_
             format!("SV_GetServerinfo: bufferSize == {bufferSize}"),
         );
     }
-    let info = Cvar_InfoString(
-        common,
-        mp_qshared::shared::cvar::CVAR_SERVERINFO,
-    );
+    let info = Cvar_InfoString(common, mp_qshared::shared::cvar::CVAR_SERVERINFO);
     unsafe {
         Q_strncpyz(buffer, info.as_ptr() as *const c_char, bufferSize);
     }
@@ -643,15 +631,14 @@ pub fn SV_SetBrushModel(
         } else if *name == b'#' as c_char {
             let bsp_name = format!("maps/{}.bsp", &name_str[1..]);
             (*ent).s.modelindex = mp_engine_qcommon::cm_load::CM_LoadSubBSP(
-                common,
-                cm,
-                rm,
-                rmg,
-                host,
-                &bsp_name,
-                qfalse,
+                common, cm, rm, rmg, host, &bsp_name, qfalse,
             );
-            mp_engine_qcommon::cm_load::CM_ModelBounds(cm, (*ent).s.modelindex, &mut mins, &mut maxs);
+            mp_engine_qcommon::cm_load::CM_ModelBounds(
+                cm,
+                (*ent).s.modelindex,
+                &mut mins,
+                &mut maxs,
+            );
 
             (*ent).r.mins = mins;
             (*ent).r.maxs = maxs;
@@ -1162,8 +1149,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_AREAS_CONNECTED as c_int {
-            return CM_AreasConnected(cm, *args.offset(1), *args.offset(2))
-                as c_int;
+            return CM_AreasConnected(cm, *args.offset(1), *args.offset(2)) as c_int;
         } else if trap == G::G_BOT_ALLOCATE_CLIENT as c_int {
             return mp_engine_server::SV_BotAllocateClient(sv);
         } else if trap == G::G_BOT_FREE_CLIENT as c_int {
@@ -1701,11 +1687,7 @@ pub fn SV_InitGameProgs(
         host,
         "jampgame",
         SV_GameSystemCalls,
-        unsafe {
-            core::mem::transmute(
-                Cvar_VariableValue(common, "vm_game") as c_int,
-            )
-        },
+        unsafe { core::mem::transmute(Cvar_VariableValue(common, "vm_game") as c_int) },
     );
     if sv.gvm.is_null() {
         mp_engine_qcommon::common::com_error(

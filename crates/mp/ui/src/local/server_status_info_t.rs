@@ -23,11 +23,11 @@ const MAX_SERVERSTATUS_TEXT: usize = 1024;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:703-709`
 #[repr(C)]
 pub struct serverStatusInfo_t {
-	pub address: [c_char; MAX_ADDRESSLENGTH],
-	pub lines: [[*mut c_char; 4]; MAX_SERVERSTATUS_LINES],
-	pub text: [c_char; MAX_SERVERSTATUS_TEXT],
-	pub pings: [c_char; MAX_CLIENTS * 3],
-	pub numLines: i32,
+    pub address: [c_char; MAX_ADDRESSLENGTH],
+    pub lines: [[*mut c_char; 4]; MAX_SERVERSTATUS_LINES],
+    pub text: [c_char; MAX_SERVERSTATUS_TEXT],
+    pub pings: [c_char; MAX_CLIENTS * 3],
+    pub numLines: i32,
 }
 
 #[cfg(target_pointer_width = "64")]

@@ -28,18 +28,22 @@ pub struct botlib_export_s {
     //shutdown the bot library, returns BLERR_
     pub BotLibShutdown: Option<unsafe extern "C" fn() -> c_int>,
     //sets a library variable returns BLERR_
-    pub BotLibVarSet: Option<unsafe extern "C" fn(var_name: *mut c_char, value: *mut c_char) -> c_int>,
+    pub BotLibVarSet:
+        Option<unsafe extern "C" fn(var_name: *mut c_char, value: *mut c_char) -> c_int>,
     //gets a library variable returns BLERR_
-    pub BotLibVarGet:
-        Option<unsafe extern "C" fn(var_name: *mut c_char, value: *mut c_char, size: c_int) -> c_int>,
+    pub BotLibVarGet: Option<
+        unsafe extern "C" fn(var_name: *mut c_char, value: *mut c_char, size: c_int) -> c_int,
+    >,
 
     //sets a C-like define returns BLERR_
     pub PC_AddGlobalDefine: Option<unsafe extern "C" fn(string: *mut c_char) -> c_int>,
     pub PC_LoadSourceHandle: Option<unsafe extern "C" fn(filename: *const c_char) -> c_int>,
     pub PC_FreeSourceHandle: Option<unsafe extern "C" fn(handle: c_int) -> c_int>,
-    pub PC_ReadTokenHandle: Option<unsafe extern "C" fn(handle: c_int, pc_token: *mut pc_token_t) -> c_int>,
-    pub PC_SourceFileAndLine:
-        Option<unsafe extern "C" fn(handle: c_int, filename: *mut c_char, line: *mut c_int) -> c_int>,
+    pub PC_ReadTokenHandle:
+        Option<unsafe extern "C" fn(handle: c_int, pc_token: *mut pc_token_t) -> c_int>,
+    pub PC_SourceFileAndLine: Option<
+        unsafe extern "C" fn(handle: c_int, filename: *mut c_char, line: *mut c_int) -> c_int,
+    >,
     pub PC_LoadGlobalDefines: Option<unsafe extern "C" fn(filename: *const c_char) -> c_int>,
     pub PC_RemoveAllGlobalDefines: Option<unsafe extern "C" fn()>,
 
@@ -52,7 +56,12 @@ pub struct botlib_export_s {
         Option<unsafe extern "C" fn(ent: c_int, state: *mut bot_entitystate_t) -> c_int>,
     //just for testing
     pub Test: Option<
-        unsafe extern "C" fn(parm0: c_int, parm1: *mut c_char, parm2: *mut vec3_t, parm3: *mut vec3_t) -> c_int,
+        unsafe extern "C" fn(
+            parm0: c_int,
+            parm1: *mut c_char,
+            parm2: *mut vec3_t,
+            parm3: *mut vec3_t,
+        ) -> c_int,
     >,
 }
 

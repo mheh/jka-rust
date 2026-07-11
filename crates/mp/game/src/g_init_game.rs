@@ -13,13 +13,13 @@ use crate::bg_vehicleLoad::BG_VehicleLoadParms;
 use crate::g_bot::G_InitBots;
 use crate::g_client::InitBodyQue;
 use crate::g_items::{ClearRegisteredItems, G_CheckTeamItems, SaveRegisteredItems};
+use crate::g_local_consts::{SP_PODIUM_MODEL, START_TIME_NAV_CALC};
 use crate::g_log::G_LogWeaponInit;
 use crate::g_main::{G_FindTeams, G_LogPrintf, G_Printf, G_RegisterCvars, G_RemapTeamShaders};
 use crate::g_mem::G_InitMemory;
 use crate::g_saga::InitSiegeMode;
 use crate::g_session::G_InitWorldSession;
 use crate::g_spawn::G_SpawnEntitiesFromString;
-use crate::g_local_consts::{SP_PODIUM_MODEL, START_TIME_NAV_CALC};
 use crate::g_svcmds::G_LoadIPBans;
 use crate::g_timer::TIMER_Clear;
 use crate::g_utils::{G_ModelIndex, G_SoundIndex};
@@ -175,8 +175,7 @@ pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
 
                 G_LogPrintf(
                     ctx,
-                    cstr("------------------------------------------------------------\n")
-                        .as_ptr(),
+                    cstr("------------------------------------------------------------\n").as_ptr(),
                 );
                 G_LogPrintf(
                     ctx,
@@ -271,7 +270,8 @@ pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
         );
 
         let mapname_cstr = CStr::from_ptr(mapname.string.as_ptr()).to_owned();
-        let nav_loaded = trap::Nav_Load(ctx.engine, GNavLoadArgs::new(mapname_cstr, ck_sum.integer));
+        let nav_loaded =
+            trap::Nav_Load(ctx.engine, GNavLoadArgs::new(mapname_cstr, ck_sum.integer));
         world.globals.navCalculatePaths = if nav_loaded == qfalse { qtrue } else { qfalse };
 
         // parse the key/value pairs and spawn gentities
@@ -339,7 +339,8 @@ pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
 
         G_RemapTeamShaders();
 
-        if world.cvars.g_gametype.integer == GT_DUEL || world.cvars.g_gametype.integer == GT_POWERDUEL
+        if world.cvars.g_gametype.integer == GT_DUEL
+            || world.cvars.g_gametype.integer == GT_POWERDUEL
         {
             G_LogPrintf(
                 ctx,
@@ -353,7 +354,8 @@ pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
 
         if world.globals.navCalculatePaths != qfalse {
             //not loaded - need to calc paths
-            world.globals.navCalcPathTime = world.level.time + START_TIME_NAV_CALC; //make sure all ents are in and linked
+            world.globals.navCalcPathTime = world.level.time + START_TIME_NAV_CALC;
+        //make sure all ents are in and linked
         } else {
             //loaded
             trap::Nav_SetPathsCalculated(ctx.engine, GNavSetpathscalculatedArgs::new(qtrue));

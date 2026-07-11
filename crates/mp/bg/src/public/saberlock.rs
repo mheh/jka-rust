@@ -27,15 +27,15 @@ pub const SABERLOCK_LOSE: c_int = 6;
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum sabersLockMode_t {
-	LOCK_FIRST = 0,
-	LOCK_TOP,
-	LOCK_DIAG_TR,
-	LOCK_DIAG_TL,
-	LOCK_DIAG_BR,
-	LOCK_DIAG_BL,
-	LOCK_R,
-	LOCK_L,
-	LOCK_RANDOM,
+    LOCK_FIRST = 0,
+    LOCK_TOP,
+    LOCK_DIAG_TR,
+    LOCK_DIAG_TL,
+    LOCK_DIAG_BR,
+    LOCK_DIAG_BL,
+    LOCK_R,
+    LOCK_L,
+    LOCK_RANDOM,
 }
 pub use sabersLockMode_t::*;
 

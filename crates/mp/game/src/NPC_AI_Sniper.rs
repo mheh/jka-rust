@@ -19,15 +19,17 @@ use crate::g_nav::NPC_SetMoveGoal;
 use crate::g_nav::{FlyingCreature, NAV_HitNavGoal};
 use crate::g_timer::{TIMER_Done, TIMER_Get, TIMER_Set};
 use crate::g_utils::GetAnglesForDirection;
+use crate::npc::g_npc_t::{ENEMY_POS_LAG_INTERVAL, MAX_ENEMY_POS_LAG};
 use crate::prelude::*;
-use crate::q_math::{vec3_origin, vectoangles, AngleNormalize360, AngleVectors, VectorNormalize, _VectorMA};
+use crate::q_math::{
+    _VectorMA, vec3_origin, vectoangles, AngleNormalize360, AngleVectors, VectorNormalize,
+};
 use crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth;
 use crate::NPC_combat::{
     NPC_ChangeWeapon, NPC_FindCombatPoint, NPC_FreeCombatPoint, NPC_MaxDistSquaredForWeapon,
     NPC_SetCombatPoint, WeaponThink,
 };
 use crate::NPC_goal::{NPC_ReachedGoal, UpdateGoal};
-use crate::npc::g_npc_t::{ENEMY_POS_LAG_INTERVAL, MAX_ENEMY_POS_LAG};
 use crate::NPC_move::NAV_GetLastMove;
 use crate::NPC_move::NPC_MoveToGoal;
 use crate::NPC_reactions::NPC_Pain;
@@ -943,7 +945,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
                     if true {
                         // he can get right to me
                         (*NPCInfo).scriptFlags &= !0x00000040; // SCF_ALT_FIRE
-                                                         // reset fire-timing variables
+                                                               // reset fire-timing variables
                         NPC_ChangeWeapon(6); // WP_DISRUPTOR
                         NPC_UpdateAngles(ctx, qtrue, qtrue);
                         return;
@@ -960,7 +962,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
                     // SCF_ALT_FIRE = 0x00000040
                     // use alt fire
                     (*NPCInfo).scriptFlags |= 0x00000040; // SCF_ALT_FIRE
-                                                    // reset fire-timing variables
+                                                          // reset fire-timing variables
                     NPC_ChangeWeapon(6); // WP_DISRUPTOR
                     NPC_UpdateAngles(ctx, qtrue, qtrue);
                     return;

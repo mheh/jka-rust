@@ -1625,10 +1625,7 @@ pub fn VM_Compile(
                     _ => {
                         com_error(
                             errorParm_t::ERR_DROP,
-                            format!(
-                                "VM_CompileX86: bad opcode {} at offset {}",
-                                op, common.pc
-                            ),
+                            format!("VM_CompileX86: bad opcode {} at offset {}", op, common.pc),
                         );
                     }
                 }

@@ -9,9 +9,9 @@ use core::ffi::{c_char, c_int};
 use sp_qshared::common::sp::gentity::gentity_t;
 use sp_qshared::shared::{fileHandle_t, qboolean, vec3_t, MAX_QPATH};
 
+use crate::ai::consts::MAX_FRAME_GROUPS;
 use crate::ai::group_info::AIGroupInfo_t;
 use crate::shared::gclient_s::gclient_t;
-use crate::ai::consts::MAX_FRAME_GROUPS;
 
 use super::alert_event_s::alertEvent_t;
 use super::anim_file_set_t::animFileSet_t;
@@ -53,62 +53,62 @@ pub const MAX_COMBAT_POINTS: usize = 512;
 /// Type definition source: `oracle/code/game/g_local.h:161-220`
 #[repr(C)]
 pub struct level_locals_t {
-	/// `[maxclients]`
-	pub clients: *mut gclient_t,
+    /// `[maxclients]`
+    pub clients: *mut gclient_t,
 
-	// store latched cvars here that we want to get at often
-	pub maxclients: c_int,
+    // store latched cvars here that we want to get at often
+    pub maxclients: c_int,
 
-	pub framenum: c_int,
-	pub time: c_int,         // in msec
-	pub previousTime: c_int, // so movers can back up when blocked
+    pub framenum: c_int,
+    pub time: c_int,         // in msec
+    pub previousTime: c_int, // so movers can back up when blocked
 
-	pub globalTime: c_int, // global time at level initialization
+    pub globalTime: c_int, // global time at level initialization
 
-	pub mapname: [c_char; MAX_QPATH], // the server name (base1, etc)
+    pub mapname: [c_char; MAX_QPATH], // the server name (base1, etc)
 
-	pub locationLinked: qboolean, // target_locations get linked
-	pub locationHead: *mut gentity_t, // head of the location list
+    pub locationLinked: qboolean,     // target_locations get linked
+    pub locationHead: *mut gentity_t, // head of the location list
 
-	pub alertEvents: [alertEvent_t; MAX_ALERT_EVENTS],
-	pub numAlertEvents: c_int,
-	pub curAlertID: c_int,
+    pub alertEvents: [alertEvent_t; MAX_ALERT_EVENTS],
+    pub numAlertEvents: c_int,
+    pub curAlertID: c_int,
 
-	pub groups: [AIGroupInfo_t; MAX_FRAME_GROUPS],
+    pub groups: [AIGroupInfo_t; MAX_FRAME_GROUPS],
 
-	pub knownAnimFileSets: [animFileSet_t; MAX_ANIM_FILES],
-	pub numKnownAnimFileSets: c_int,
+    pub knownAnimFileSets: [animFileSet_t; MAX_ANIM_FILES],
+    pub numKnownAnimFileSets: c_int,
 
-	pub worldFlags: c_int,
+    pub worldFlags: c_int,
 
-	pub dmState: c_int, //actually, we do want save/load the dynamic music state
-	// =====================================
-	//
-	// NOTE!!!!!!   The only things beyond this point in the structure should be the ones you do NOT wish to be
-	//              affected by loading saved-games. Since loading a game first starts the map and then loads
-	//              over things like entities etc then these fields are usually the ones setup by the map loader.
-	//              If they ever get modified in-game let me know and I'll include them in the save. -Ste
-	//
-	pub logFile: fileHandle_t,
+    pub dmState: c_int, //actually, we do want save/load the dynamic music state
+    // =====================================
+    //
+    // NOTE!!!!!!   The only things beyond this point in the structure should be the ones you do NOT wish to be
+    //              affected by loading saved-games. Since loading a game first starts the map and then loads
+    //              over things like entities etc then these fields are usually the ones setup by the map loader.
+    //              If they ever get modified in-game let me know and I'll include them in the save. -Ste
+    //
+    pub logFile: fileHandle_t,
 
-	//Interest points- squadmates automatically look at these if standing around and close to them
-	pub interestPoints: [interestPoint_t; MAX_INTEREST_POINTS],
-	pub numInterestPoints: c_int,
+    //Interest points- squadmates automatically look at these if standing around and close to them
+    pub interestPoints: [interestPoint_t; MAX_INTEREST_POINTS],
+    pub numInterestPoints: c_int,
 
-	//Combat points- NPCs in bState BS_COMBAT_POINT will find their closest empty combat_point
-	pub combatPoints: [combatPoint_t; MAX_COMBAT_POINTS],
-	pub numCombatPoints: c_int,
-	pub spawntarget: [c_char; MAX_QPATH], // the targetname of the spawnpoint you want the player to start at
+    //Combat points- NPCs in bState BS_COMBAT_POINT will find their closest empty combat_point
+    pub combatPoints: [combatPoint_t; MAX_COMBAT_POINTS],
+    pub numCombatPoints: c_int,
+    pub spawntarget: [c_char; MAX_QPATH], // the targetname of the spawnpoint you want the player to start at
 
-	pub dmDebounceTime: c_int,
-	pub dmBeatTime: c_int,
+    pub dmDebounceTime: c_int,
+    pub dmBeatTime: c_int,
 
-	pub mNumBSPInstances: c_int,
-	pub mBSPInstanceDepth: c_int,
-	pub mOriginAdjust: vec3_t,
-	pub mRotationAdjust: f32,
-	pub mTargetAdjust: *mut c_char,
-	pub hasBspInstances: qboolean,
+    pub mNumBSPInstances: c_int,
+    pub mBSPInstanceDepth: c_int,
+    pub mOriginAdjust: vec3_t,
+    pub mRotationAdjust: f32,
+    pub mTargetAdjust: *mut c_char,
+    pub hasBspInstances: qboolean,
 }
 
 #[cfg(target_pointer_width = "64")]

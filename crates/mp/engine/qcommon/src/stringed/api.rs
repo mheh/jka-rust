@@ -81,9 +81,11 @@ pub fn leetify(string: &[u8], host: &mut impl EngineHost) -> Vec<u8> {
 ///
 /// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:483-574`
 pub fn cope_with_dumb_string_data(sentence: &[u8], this_language: &str) -> Vec<u8> {
-    let western = ["ENGLISH", "FRENCH", "GERMAN", "ITALIAN", "SPANISH", "POLISH", "RUSSIAN"]
-        .iter()
-        .any(|lang| lang.eq_ignore_ascii_case(this_language));
+    let western = [
+        "ENGLISH", "FRENCH", "GERMAN", "ITALIAN", "SPANISH", "POLISH", "RUSSIAN",
+    ]
+    .iter()
+    .any(|lang| lang.eq_ignore_ascii_case(this_language));
     if !western {
         return sentence.to_vec();
     }
@@ -248,9 +250,7 @@ pub fn se_load(
         if fail_is_critical {
             host.error(
                 errorParm_t::ERR_DROP,
-                &format!(
-                    "SE_Load(): Couldn't load \"{file_name}\"!\n\nError: \"{message}\"\n"
-                ),
+                &format!("SE_Load(): Couldn't load \"{file_name}\"!\n\nError: \"{message}\"\n"),
             );
         } else {
             // Com_DPrintf (developer-gated print, SE-D3).
@@ -370,7 +370,10 @@ pub fn se_get_language_dir(pkg: &StringEdPackage, lang_index: i32) -> String {
     if lang_index < 0 || lang_index as usize >= pkg.languages_available.len() {
         return String::new();
     }
-    format!("{}/{}", SE_STRINGS_DIR, pkg.languages_available[lang_index as usize])
+    format!(
+        "{}/{}",
+        SE_STRINGS_DIR, pkg.languages_available[lang_index as usize]
+    )
 }
 
 /// Raven `SE_Init` — register the three cvars and load the current language.

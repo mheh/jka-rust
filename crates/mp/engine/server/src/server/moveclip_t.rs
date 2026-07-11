@@ -8,21 +8,21 @@ use mp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/codemp/server/sv_world.cpp:440-461`
 #[repr(C)]
 pub struct moveclip_t {
-	/// enclose the test object along entire move
-	pub boxmins: vec3_t,
-	pub boxmaxs: vec3_t,
-	pub mins: *const f32,
-	/// size of the moving object
-	pub maxs: *const f32,
-	pub start: vec3_t,
-	pub end: vec3_t,
-	pub passEntityNum: i32,
-	pub contentmask: i32,
-	pub capsule: i32,
-	pub traceFlags: i32,
-	pub useLod: i32,
-	/// make sure nothing goes under here for Ghoul2 collision purposes
-	pub trace: trace_t,
+    /// enclose the test object along entire move
+    pub boxmins: vec3_t,
+    pub boxmaxs: vec3_t,
+    pub mins: *const f32,
+    /// size of the moving object
+    pub maxs: *const f32,
+    pub start: vec3_t,
+    pub end: vec3_t,
+    pub passEntityNum: i32,
+    pub contentmask: i32,
+    pub capsule: i32,
+    pub traceFlags: i32,
+    pub useLod: i32,
+    /// make sure nothing goes under here for Ghoul2 collision purposes
+    pub trace: trace_t,
 }
 
 const _: () = assert!(core::mem::size_of::<moveclip_t>() == 136);

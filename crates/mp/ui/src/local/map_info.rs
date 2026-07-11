@@ -14,16 +14,16 @@ const MAX_GAMETYPES: usize = 16;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:629-640`
 #[repr(C)]
 pub struct mapInfo {
-	pub mapName: *const c_char,
-	pub mapLoadName: *const c_char,
-	pub imageName: *const c_char,
-	pub opponentName: *const c_char,
-	pub teamMembers: i32,
-	pub typeBits: i32,
-	pub cinematic: i32,
-	pub timeToBeat: [i32; MAX_GAMETYPES],
-	pub levelShot: qhandle_t,
-	pub active: qboolean,
+    pub mapName: *const c_char,
+    pub mapLoadName: *const c_char,
+    pub imageName: *const c_char,
+    pub opponentName: *const c_char,
+    pub teamMembers: i32,
+    pub typeBits: i32,
+    pub cinematic: i32,
+    pub timeToBeat: [i32; MAX_GAMETYPES],
+    pub levelShot: qhandle_t,
+    pub active: qboolean,
 }
 
 const _: () = assert!(core::mem::size_of::<mapInfo>() == 120);

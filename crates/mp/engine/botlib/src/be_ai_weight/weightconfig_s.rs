@@ -29,9 +29,9 @@ pub const MAX_WEIGHT_FILES: usize = 128;
 /// Type definition source: `oracle/codemp/botlib/be_ai_weight.h:39-44`
 #[repr(C)]
 pub struct weightconfig_t {
-	pub numweights: i32,
-	pub weights: [weight_t; MAX_WEIGHTS],
-	pub filename: [c_char; MAX_QPATH as usize],
+    pub numweights: i32,
+    pub weights: [weight_t; MAX_WEIGHTS],
+    pub filename: [c_char; MAX_QPATH as usize],
 }
 
 pub type weightconfig_s = weightconfig_t;

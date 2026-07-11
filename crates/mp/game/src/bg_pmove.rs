@@ -19,8 +19,6 @@ use mp_bg::public::pmove_t::MAXTOUCH;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 /// Raven `#define MAX_WEAPON_CHARGE_TIME 5000`.
 /// Source: `oracle/codemp/game/bg_pmove.c:16`
 const MAX_WEAPON_CHARGE_TIME: c_int = 5000;

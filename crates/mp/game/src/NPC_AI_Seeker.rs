@@ -38,8 +38,6 @@ pub const SEEKER_SEEK_RADIUS: f32 = 1024.0f32;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 
-
-
 // Local constants for Seeker AI.
 // Source: oracle/codemp/game/NPC_AI_Seeker.c / g_local.h
 const MOD_FALLING: c_int = 38;

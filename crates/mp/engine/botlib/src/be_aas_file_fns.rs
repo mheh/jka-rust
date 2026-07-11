@@ -52,14 +52,14 @@ pub fn AAS_SwapAASData(bot: &mut BotLib) {
                 (*bb).maxs[j] = LittleLong((*bb).maxs[j]);
             } //end for
         } //end for
-        //vertexes
+          //vertexes
         for i in 0..bot.aasworld.numvertexes {
             let v = bot.aasworld.vertexes.add(i as usize);
             for j in 0..3usize {
                 (*v)[j] = LittleFloat((*v)[j]);
             }
         } //end for
-        //planes
+          //planes
         for i in 0..bot.aasworld.numplanes {
             let p = bot.aasworld.planes.add(i as usize);
             for j in 0..3usize {
@@ -68,18 +68,18 @@ pub fn AAS_SwapAASData(bot: &mut BotLib) {
             (*p).dist = LittleFloat((*p).dist);
             (*p).r#type = LittleLong((*p).r#type);
         } //end for
-        //edges
+          //edges
         for i in 0..bot.aasworld.numedges {
             let e = bot.aasworld.edges.add(i as usize);
             (*e).v[0] = LittleLong((*e).v[0]);
             (*e).v[1] = LittleLong((*e).v[1]);
         } //end for
-        //edgeindex
+          //edgeindex
         for i in 0..bot.aasworld.edgeindexsize {
             let ei = bot.aasworld.edgeindex.add(i as usize);
             *ei = LittleLong(*ei);
         } //end for
-        //faces
+          //faces
         for i in 0..bot.aasworld.numfaces {
             let f = bot.aasworld.faces.add(i as usize);
             (*f).planenum = LittleLong((*f).planenum);
@@ -89,12 +89,12 @@ pub fn AAS_SwapAASData(bot: &mut BotLib) {
             (*f).frontarea = LittleLong((*f).frontarea);
             (*f).backarea = LittleLong((*f).backarea);
         } //end for
-        //face index
+          //face index
         for i in 0..bot.aasworld.faceindexsize {
             let fi = bot.aasworld.faceindex.add(i as usize);
             *fi = LittleLong(*fi);
         } //end for
-        //convex areas
+          //convex areas
         for i in 0..bot.aasworld.numareas {
             let a = bot.aasworld.areas.add(i as usize);
             (*a).areanum = LittleLong((*a).areanum);
@@ -106,7 +106,7 @@ pub fn AAS_SwapAASData(bot: &mut BotLib) {
                 (*a).center[j] = LittleFloat((*a).center[j]);
             } //end for
         } //end for
-        //area settings
+          //area settings
         for i in 0..bot.aasworld.numareasettings {
             let s = bot.aasworld.areasettings.add(i as usize);
             (*s).contents = LittleLong((*s).contents);
@@ -117,7 +117,7 @@ pub fn AAS_SwapAASData(bot: &mut BotLib) {
             (*s).numreachableareas = LittleLong((*s).numreachableareas);
             (*s).firstreachablearea = LittleLong((*s).firstreachablearea);
         } //end for
-        //area reachability
+          //area reachability
         for i in 0..bot.aasworld.reachabilitysize {
             let r = bot.aasworld.reachability.add(i as usize);
             (*r).areanum = LittleLong((*r).areanum);
@@ -130,14 +130,14 @@ pub fn AAS_SwapAASData(bot: &mut BotLib) {
             (*r).traveltype = LittleLong((*r).traveltype);
             (*r).traveltime = LittleShort((*r).traveltime);
         } //end for
-        //nodes
+          //nodes
         for i in 0..bot.aasworld.numnodes {
             let n = bot.aasworld.nodes.add(i as usize);
             (*n).planenum = LittleLong((*n).planenum);
             (*n).children[0] = LittleLong((*n).children[0]);
             (*n).children[1] = LittleLong((*n).children[1]);
         } //end for
-        //cluster portals
+          //cluster portals
         for i in 0..bot.aasworld.numportals {
             let po = bot.aasworld.portals.add(i as usize);
             (*po).areanum = LittleLong((*po).areanum);
@@ -146,12 +146,12 @@ pub fn AAS_SwapAASData(bot: &mut BotLib) {
             (*po).clusterareanum[0] = LittleLong((*po).clusterareanum[0]);
             (*po).clusterareanum[1] = LittleLong((*po).clusterareanum[1]);
         } //end for
-        //cluster portal index
+          //cluster portal index
         for i in 0..bot.aasworld.portalindexsize {
             let pi = bot.aasworld.portalindex.add(i as usize);
             *pi = LittleLong(*pi);
         } //end for
-        //cluster
+          //cluster
         for i in 0..bot.aasworld.numclusters {
             let c = bot.aasworld.clusters.add(i as usize);
             (*c).numareas = LittleLong((*c).numareas);

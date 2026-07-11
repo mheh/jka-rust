@@ -7,9 +7,9 @@ use crate::shared::vec3_t;
 /// Type definition source: `oracle/codemp/game/be_ai_move.h:89-94`
 #[repr(C)]
 pub struct bot_avoidspot_t {
-	pub origin: vec3_t,
-	pub radius: f32,
-	pub r#type: i32,
+    pub origin: vec3_t,
+    pub radius: f32,
+    pub r#type: i32,
 }
 
 pub type bot_avoidspot_s = bot_avoidspot_t;

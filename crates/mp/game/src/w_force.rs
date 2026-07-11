@@ -35,8 +35,6 @@ use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 /// Per-file `g_entities` base-pointer helper for `EntityId` arena resolution
 /// (matches the `g_missile.rs`/`g_trigger.rs`/`NPC_combat.rs` precedent).
 #[inline]
@@ -5995,8 +5993,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                                     + ((*ctx.world).cvars.g_forceRegenTime.integer as f64
                                         * (0.6
                                             + (0.3 * (*cl).sess.wins as f32 as f64
-                                                / (*ctx.world).cvars.g_duel_fraglimit.integer
-                                                    as f32
+                                                / (*ctx.world).cvars.g_duel_fraglimit.integer as f32
                                                     as f64)))
                                         as c_int;
                             } else {

@@ -1,5 +1,7 @@
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `UI_FLOOR`.

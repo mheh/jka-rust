@@ -2261,8 +2261,7 @@ pub fn LoadPathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
                 }
                 *current_var.offset(i_cv) = 0;
 
-                thiswp.neighbors[thiswp.neighbornum as usize].num =
-                    atoi(current_var);
+                thiswp.neighbors[thiswp.neighbornum as usize].num = atoi(current_var);
 
                 if *file_string.offset(i) == b'-' as c_char {
                     i_cv = 0;

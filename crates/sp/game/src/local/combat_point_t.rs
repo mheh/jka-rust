@@ -7,13 +7,13 @@ use sp_qshared::shared::{qboolean, vec3_t};
 /// Type definition source: `oracle/code/game/g_local.h:94-103`
 #[repr(C)]
 pub struct combatPoint_t {
-	pub origin: vec3_t,
-	pub flags: i32,
-	//	char		*NPC_targetname;
-	//	team_t		team;
-	pub occupied: qboolean,
-	pub waypoint: i32,
-	pub dangerTime: i32,
+    pub origin: vec3_t,
+    pub flags: i32,
+    //	char		*NPC_targetname;
+    //	team_t		team;
+    pub occupied: qboolean,
+    pub waypoint: i32,
+    pub dangerTime: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<combatPoint_t>() == 28);

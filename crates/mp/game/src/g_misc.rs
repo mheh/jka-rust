@@ -89,8 +89,6 @@ impl Default for shooterClient_t {
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 /// Raven `SP_info_camp`.
 ///
 /// Used as a positional target for calculations in the utilities

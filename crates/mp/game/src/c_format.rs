@@ -481,7 +481,10 @@ mod tests {
         assert_eq!(f("%-8s|", &[FmtArg::Str(Some(s))]), "hello   |");
         assert_eq!(f("%.3s", &[FmtArg::Str(Some(s))]), "hel");
         assert_eq!(f("%8.3s", &[FmtArg::Str(Some(s))]), "     hel");
-        assert_eq!(f("%-20s|", &[FmtArg::Str(Some(s))]), "hello               |");
+        assert_eq!(
+            f("%-20s|", &[FmtArg::Str(Some(s))]),
+            "hello               |"
+        );
         assert_eq!(f("%s", &[FmtArg::Str(None)]), "(null)");
     }
 
@@ -523,7 +526,11 @@ mod tests {
         assert_eq!(
             f(
                 "%s has %d frags (%.1f%% acc)",
-                &[FmtArg::Str(Some(name)), FmtArg::Int(15), FmtArg::Float(42.5)]
+                &[
+                    FmtArg::Str(Some(name)),
+                    FmtArg::Int(15),
+                    FmtArg::Float(42.5)
+                ]
             ),
             "Kyle has 15 frags (42.5% acc)"
         );

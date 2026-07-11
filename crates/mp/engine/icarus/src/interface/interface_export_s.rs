@@ -23,11 +23,18 @@ pub struct InterfaceExport {
     pub i_load_file: fn(&mut Icarus, &mut dyn EngineHost, name: &str) -> Option<Vec<u8>>,
     pub i_center_print: fn(&mut Icarus, &mut dyn EngineHost, msg: &str),
     pub i_dprintf: fn(&mut Icarus, &mut dyn EngineHost, level: i32, msg: &str),
-    pub i_get_entity_by_name: fn(&mut Icarus, &mut dyn EngineHost, name: &str) -> *mut sharedEntity_t,
+    pub i_get_entity_by_name:
+        fn(&mut Icarus, &mut dyn EngineHost, name: &str) -> *mut sharedEntity_t,
     pub i_get_time: fn(&mut Icarus, &mut dyn EngineHost) -> u32,
     pub i_get_time_scale: fn(&mut Icarus, &mut dyn EngineHost) -> u32,
-    pub i_play_sound:
-        fn(&mut Icarus, &mut dyn EngineHost, task_id: i32, ent_id: i32, name: &str, channel: &str) -> i32,
+    pub i_play_sound: fn(
+        &mut Icarus,
+        &mut dyn EngineHost,
+        task_id: i32,
+        ent_id: i32,
+        name: &str,
+        channel: &str,
+    ) -> i32,
     pub i_lerp2_pos: fn(
         &mut Icarus,
         &mut dyn EngineHost,
@@ -37,28 +44,58 @@ pub struct InterfaceExport {
         angles: vec3_t,
         duration: f32,
     ),
-    pub i_lerp2_origin:
-        fn(&mut Icarus, &mut dyn EngineHost, task_id: i32, ent_id: i32, origin: vec3_t, duration: f32),
-    pub i_lerp2_angles:
-        fn(&mut Icarus, &mut dyn EngineHost, task_id: i32, ent_id: i32, angles: vec3_t, duration: f32),
-    pub i_get_tag:
-        fn(&mut Icarus, &mut dyn EngineHost, ent_id: i32, name: &str, lookup: i32, info: &mut vec3_t) -> i32,
-    pub i_lerp2_start: fn(&mut Icarus, &mut dyn EngineHost, task_id: i32, ent_id: i32, duration: f32),
+    pub i_lerp2_origin: fn(
+        &mut Icarus,
+        &mut dyn EngineHost,
+        task_id: i32,
+        ent_id: i32,
+        origin: vec3_t,
+        duration: f32,
+    ),
+    pub i_lerp2_angles: fn(
+        &mut Icarus,
+        &mut dyn EngineHost,
+        task_id: i32,
+        ent_id: i32,
+        angles: vec3_t,
+        duration: f32,
+    ),
+    pub i_get_tag: fn(
+        &mut Icarus,
+        &mut dyn EngineHost,
+        ent_id: i32,
+        name: &str,
+        lookup: i32,
+        info: &mut vec3_t,
+    ) -> i32,
+    pub i_lerp2_start:
+        fn(&mut Icarus, &mut dyn EngineHost, task_id: i32, ent_id: i32, duration: f32),
     pub i_lerp2_end: fn(&mut Icarus, &mut dyn EngineHost, task_id: i32, ent_id: i32, duration: f32),
-    pub i_set: fn(&mut Icarus, &mut dyn EngineHost, task_id: i32, ent_id: i32, type_name: &str, data: &str),
+    pub i_set: fn(
+        &mut Icarus,
+        &mut dyn EngineHost,
+        task_id: i32,
+        ent_id: i32,
+        type_name: &str,
+        data: &str,
+    ),
     pub i_use: fn(&mut Icarus, &mut dyn EngineHost, ent_id: i32, name: &str),
     pub i_kill: fn(&mut Icarus, &mut dyn EngineHost, ent_id: i32, name: &str),
     pub i_remove: fn(&mut Icarus, &mut dyn EngineHost, ent_id: i32, name: &str),
     pub i_random: fn(&mut Icarus, &mut dyn EngineHost, min: f32, max: f32) -> f32,
-    pub i_play: fn(&mut Icarus, &mut dyn EngineHost, task_id: i32, ent_id: i32, type_: &str, name: &str),
+    pub i_play:
+        fn(&mut Icarus, &mut dyn EngineHost, task_id: i32, ent_id: i32, type_: &str, name: &str),
 
     // Camera functions
-    pub i_camera_pan: fn(&mut Icarus, &mut dyn EngineHost, angles: vec3_t, dir: vec3_t, duration: f32),
+    pub i_camera_pan:
+        fn(&mut Icarus, &mut dyn EngineHost, angles: vec3_t, dir: vec3_t, duration: f32),
     pub i_camera_move: fn(&mut Icarus, &mut dyn EngineHost, origin: vec3_t, duration: f32),
     pub i_camera_zoom: fn(&mut Icarus, &mut dyn EngineHost, fov: f32, duration: f32),
     pub i_camera_roll: fn(&mut Icarus, &mut dyn EngineHost, angle: f32, duration: f32),
-    pub i_camera_follow: fn(&mut Icarus, &mut dyn EngineHost, name: &str, speed: f32, init_lerp: f32),
-    pub i_camera_track: fn(&mut Icarus, &mut dyn EngineHost, name: &str, speed: f32, init_lerp: f32),
+    pub i_camera_follow:
+        fn(&mut Icarus, &mut dyn EngineHost, name: &str, speed: f32, init_lerp: f32),
+    pub i_camera_track:
+        fn(&mut Icarus, &mut dyn EngineHost, name: &str, speed: f32, init_lerp: f32),
     pub i_camera_distance: fn(&mut Icarus, &mut dyn EngineHost, dist: f32, init_lerp: f32),
     pub i_camera_fade: fn(
         &mut Icarus,
@@ -79,12 +116,29 @@ pub struct InterfaceExport {
     pub i_camera_shake: fn(&mut Icarus, &mut dyn EngineHost, intensity: f32, duration: i32),
 
     // Variable information
-    pub i_get_float:
-        fn(&mut Icarus, &mut dyn EngineHost, ent_id: i32, var_type: i32, name: &str, value: &mut f32) -> i32,
-    pub i_get_vector:
-        fn(&mut Icarus, &mut dyn EngineHost, ent_id: i32, var_type: i32, name: &str, value: &mut vec3_t) -> i32,
-    pub i_get_string:
-        fn(&mut Icarus, &mut dyn EngineHost, ent_id: i32, var_type: i32, name: &str) -> Option<String>,
+    pub i_get_float: fn(
+        &mut Icarus,
+        &mut dyn EngineHost,
+        ent_id: i32,
+        var_type: i32,
+        name: &str,
+        value: &mut f32,
+    ) -> i32,
+    pub i_get_vector: fn(
+        &mut Icarus,
+        &mut dyn EngineHost,
+        ent_id: i32,
+        var_type: i32,
+        name: &str,
+        value: &mut vec3_t,
+    ) -> i32,
+    pub i_get_string: fn(
+        &mut Icarus,
+        &mut dyn EngineHost,
+        ent_id: i32,
+        var_type: i32,
+        name: &str,
+    ) -> Option<String>,
     pub i_evaluate: fn(
         &mut Icarus,
         &mut dyn EngineHost,
@@ -110,8 +164,8 @@ impl Default for InterfaceExport {
     fn default() -> Self {
         use crate::game_interface::ICARUS_LinkEntity;
         use crate::q3_interface::{
-            AppendToSaveGame, CGCam_Disable, CGCam_Distance, CGCam_Enable, CGCam_Follow, CGCam_Move,
-            CGCam_Pan, CGCam_Roll, CGCam_Shake, CGCam_Track, CGCam_Zoom, Q3_CameraFade,
+            AppendToSaveGame, CGCam_Disable, CGCam_Distance, CGCam_Enable, CGCam_Follow,
+            CGCam_Move, CGCam_Pan, CGCam_Roll, CGCam_Shake, CGCam_Track, CGCam_Zoom, Q3_CameraFade,
             Q3_CameraPath, Q3_CenterPrint, Q3_DebugPrint, Q3_Evaluate, Q3_GetEntityByName,
             Q3_GetFloat, Q3_GetString, Q3_GetTag, Q3_GetTime, Q3_GetTimeScale, Q3_GetVector,
             Q3_Kill, Q3_Lerp2Angles, Q3_Lerp2End, Q3_Lerp2Origin, Q3_Lerp2Pos, Q3_Lerp2Start,

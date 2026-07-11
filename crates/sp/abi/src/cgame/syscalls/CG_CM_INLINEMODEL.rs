@@ -1,6 +1,8 @@
 use super::super::types::clipHandle_t;
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_CM_INLINEMODEL`.
 ///

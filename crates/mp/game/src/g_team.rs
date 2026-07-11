@@ -28,8 +28,6 @@ use mp_qshared::shared::flag_status::{FLAG_ATBASE, FLAG_DROPPED};
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 // Raven color escape `#define`s (porting-rules §C8: `#define` -> `const`).
 // Source: `oracle/codemp/game/q_shared.h:1145-1167`
 pub const S_COLOR_RED: &CStr = c"^1";
@@ -473,7 +471,12 @@ pub fn Team_FragBonuses(
                 .pers
                 .teamState
                 .lastfraggedcarrier = world.level.time as f32;
-            AddScore(ctx, attacker, (*targ).r.currentOrigin, CTF_FRAG_CARRIER_BONUS);
+            AddScore(
+                ctx,
+                attacker,
+                (*targ).r.currentOrigin,
+                CTF_FRAG_CARRIER_BONUS,
+            );
             (*((*attacker).client as *mut gclient_t))
                 .pers
                 .teamState
@@ -679,7 +682,12 @@ pub fn Team_FragBonuses(
                 != (*((*targ).client as *mut gclient_t)).sess.sessionTeam as c_int
         {
             // we defended the base flag
-            AddScore(ctx, attacker, (*targ).r.currentOrigin, CTF_FLAG_DEFENSE_BONUS);
+            AddScore(
+                ctx,
+                attacker,
+                (*targ).r.currentOrigin,
+                CTF_FLAG_DEFENSE_BONUS,
+            );
             (*((*attacker).client as *mut gclient_t))
                 .pers
                 .teamState

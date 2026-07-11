@@ -16,7 +16,9 @@ use crate::engine::Engine;
 /// Source: `oracle/codemp/qcommon/common.cpp:1216`
 pub fn com_init(engine: &mut Engine, command_line: &str) {
     use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
-    match catch_unwind(AssertUnwindSafe(|| com_init_body(&mut *engine, command_line))) {
+    match catch_unwind(AssertUnwindSafe(|| {
+        com_init_body(&mut *engine, command_line)
+    })) {
         Ok(()) => {}
         Err(p) => match p.downcast::<ComError>() {
             // Init-time errors are always fatal: Raven's init catch →
@@ -42,26 +44,29 @@ fn com_init_body(engine: &mut Engine, command_line: &str) {
     //    CPUSTRING, __DATE__); Q3_VERSION = "JAmp: v1.0.1.0" (game_version.h:9).
     //TODO: Port CPUSTRING/__DATE__ banner fields
     // Source: oracle/codemp/qcommon/common.cpp:1219
-    com_printf(&mut engine.common, "JAmp: v1.0.1.0 (jka-rust slice 0)
-");
+    com_printf(
+        &mut engine.common,
+        "JAmp: v1.0.1.0 (jka-rust slice 0)
+",
+    );
     //TODO: Port Com_InitPushEvent — step 2
     // Source: oracle/codemp/qcommon/common.cpp:1224
     cvar_init(); // step 3 (LIFE-Q8 stub; common.cpp:1226)
-    //TODO: Port Com_ParseCommandLine — step 4
-    // Source: oracle/codemp/qcommon/common.cpp:1230
+                 //TODO: Port Com_ParseCommandLine — step 4
+                 // Source: oracle/codemp/qcommon/common.cpp:1230
     cbuf_init(); // step 5 (LIFE-Q8 stub; common.cpp:1233)
-    // step 6 Com_InitZoneMemory: dropped — Rust ownership replaces TheZone (§C9).
+                 // step 6 Com_InitZoneMemory: dropped — Rust ownership replaces TheZone (§C9).
     cmd_init(); // step 7 (LIFE-Q8 stub; common.cpp:1242)
-    //TODO: Port Com_StartupVariable/Rand_Init/CL_InitKeyCommands — steps 8-11
-    // Source: oracle/codemp/qcommon/common.cpp:1245-1254
+                //TODO: Port Com_StartupVariable/Rand_Init/CL_InitKeyCommands — steps 8-11
+                // Source: oracle/codemp/qcommon/common.cpp:1245-1254
     fs_init_filesystem(); // step 12 (LIFE-Q8 stub; common.cpp:1266)
-    //TODO: Port Com_InitJournaling + config execs + cvar block — steps 13-29
-    // Source: oracle/codemp/qcommon/common.cpp:1268-1383
-    // 30. VM_Init: the empty ModuleRegistry — already default-constructed into
-    //     Engine.common.modules by Engine::new (LIFE-Q9); nothing to do here.
-    //TODO: Port SV_Init + the dedicated/client-init tail — steps 31-39
-    // Source: oracle/codemp/qcommon/common.cpp:1385-1431
-    // 40. com_fullyInitialized = qtrue (common.cpp:1434).
+                          //TODO: Port Com_InitJournaling + config execs + cvar block — steps 13-29
+                          // Source: oracle/codemp/qcommon/common.cpp:1268-1383
+                          // 30. VM_Init: the empty ModuleRegistry — already default-constructed into
+                          //     Engine.common.modules by Engine::new (LIFE-Q9); nothing to do here.
+                          //TODO: Port SV_Init + the dedicated/client-init tail — steps 31-39
+                          // Source: oracle/codemp/qcommon/common.cpp:1385-1431
+                          // 40. com_fullyInitialized = qtrue (common.cpp:1434).
     engine.common.fully_initialized = true;
     // 41. Completion banner (common.cpp:1435).
     com_printf(

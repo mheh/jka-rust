@@ -8,25 +8,25 @@ use mp_qshared::shared::qboolean;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:461-478`
 #[repr(C)]
 pub struct lerpFrame_t {
-	pub oldFrame: i32,
-	/// time when ->oldFrame was exactly on
-	pub oldFrameTime: i32,
+    pub oldFrame: i32,
+    /// time when ->oldFrame was exactly on
+    pub oldFrameTime: i32,
 
-	pub frame: i32,
-	/// time when ->frame will be exactly on
-	pub frameTime: i32,
+    pub frame: i32,
+    /// time when ->frame will be exactly on
+    pub frameTime: i32,
 
-	pub backlerp: f32,
+    pub backlerp: f32,
 
-	pub yawAngle: f32,
-	pub yawing: qboolean,
-	pub pitchAngle: f32,
-	pub pitching: qboolean,
+    pub yawAngle: f32,
+    pub yawing: qboolean,
+    pub pitchAngle: f32,
+    pub pitching: qboolean,
 
-	pub animationNumber: i32,
-	pub animation: *mut animation_t,
-	/// time when the first frame of the animation will be exact
-	pub animationTime: i32,
+    pub animationNumber: i32,
+    pub animation: *mut animation_t,
+    /// time when the first frame of the animation will be exact
+    pub animationTime: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<lerpFrame_t>() == 56);

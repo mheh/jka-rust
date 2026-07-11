@@ -6,8 +6,8 @@
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct aas_reachabilityareas_t {
-	pub firstarea: i32,
-	pub numareas: i32,
+    pub firstarea: i32,
+    pub numareas: i32,
 }
 
 pub type aas_reachabilityareas_s = aas_reachabilityareas_t;

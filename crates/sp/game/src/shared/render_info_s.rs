@@ -89,26 +89,26 @@ pub struct renderInfo_t {
 
     pub lockYaw: f32, //
 
-    pub headPoint: vec3_t,               // Where your tag_head is
-    pub headAngles: vec3_t,              // where the tag_head in the torso is pointing
-    pub handRPoint: vec3_t,              // where your right hand is
-    pub handLPoint: vec3_t,              // where your left hand is
-    pub crotchPoint: vec3_t,             // Where your crotch is
-    pub footRPoint: vec3_t,              // where your right hand is
-    pub footLPoint: vec3_t,              // where your left hand is
-    pub torsoPoint: vec3_t,              // Where your chest is
-    pub torsoAngles: vec3_t,             // Where the chest is pointing
-    pub eyePoint: vec3_t,                // Where your eyes are
-    pub eyeAngles: vec3_t,               // Where your eyes face
-    pub lookTarget: c_int,               // Which ent to look at with lookAngles
-    pub lookMode: lookMode_t,            //
-    pub lookTargetClearTime: c_int,      // Time to clear the lookTarget
-    pub lastVoiceVolume: c_int,          // Last frame's voice volume
-    pub lastHeadAngles: vec3_t,          // Last headAngles, NOT actual facing of head model
-    pub headBobAngles: vec3_t,           // headAngle offsets
-    pub targetHeadBobAngles: vec3_t,     // head bob angles will try to get to targetHeadBobAngles
-    pub lookingDebounceTime: c_int,      // When we can stop using head looking angle behavior
-    pub legsYaw: f32,                    // yaw angle your legs are actually rendering at
+    pub headPoint: vec3_t,           // Where your tag_head is
+    pub headAngles: vec3_t,          // where the tag_head in the torso is pointing
+    pub handRPoint: vec3_t,          // where your right hand is
+    pub handLPoint: vec3_t,          // where your left hand is
+    pub crotchPoint: vec3_t,         // Where your crotch is
+    pub footRPoint: vec3_t,          // where your right hand is
+    pub footLPoint: vec3_t,          // where your left hand is
+    pub torsoPoint: vec3_t,          // Where your chest is
+    pub torsoAngles: vec3_t,         // Where the chest is pointing
+    pub eyePoint: vec3_t,            // Where your eyes are
+    pub eyeAngles: vec3_t,           // Where your eyes face
+    pub lookTarget: c_int,           // Which ent to look at with lookAngles
+    pub lookMode: lookMode_t,        //
+    pub lookTargetClearTime: c_int,  // Time to clear the lookTarget
+    pub lastVoiceVolume: c_int,      // Last frame's voice volume
+    pub lastHeadAngles: vec3_t,      // Last headAngles, NOT actual facing of head model
+    pub headBobAngles: vec3_t,       // headAngle offsets
+    pub targetHeadBobAngles: vec3_t, // head bob angles will try to get to targetHeadBobAngles
+    pub lookingDebounceTime: c_int,  // When we can stop using head looking angle behavior
+    pub legsYaw: f32,                // yaw angle your legs are actually rendering at
 }
 const _: () = assert!(core::mem::size_of::<renderInfo_t>() == 468);
 const _: () = assert!(core::mem::offset_of!(renderInfo_t, torsoModelName) == 32);

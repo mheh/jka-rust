@@ -36,8 +36,7 @@ pub fn SV_Netchan_Decode(common: &mut Common, client: *mut client_t, msg: *mut m
             .as_mut_ptr() as *mut u8;
         let mut index: i32 = 0;
 
-        let mut key: u8 =
-            ((*client).challenge ^ server_id ^ message_acknowledge) as u8;
+        let mut key: u8 = ((*client).challenge ^ server_id ^ message_acknowledge) as u8;
 
         let mut i = (*msg).readcount + SV_DECODE_START;
         while i < (*msg).cursize {
@@ -61,17 +60,9 @@ pub fn SV_Netchan_Decode(common: &mut Common, client: *mut client_t, msg: *mut m
 /// Raven `SV_Netchan_Process`.
 ///
 /// Source: `oracle/codemp/server/sv_net_chan.cpp:154-168`
-pub fn SV_Netchan_Process(
-    common: &mut Common,
-    client: *mut client_t,
-    msg: *mut msg_t,
-) -> qboolean {
+pub fn SV_Netchan_Process(common: &mut Common, client: *mut client_t, msg: *mut msg_t) -> qboolean {
     unsafe {
-        let ret = mp_engine_qcommon::net_chan::Netchan_Process(
-            common,
-            &mut (*client).netchan,
-            msg,
-        );
+        let ret = mp_engine_qcommon::net_chan::Netchan_Process(common, &mut (*client).netchan, msg);
         if ret == qfalse {
             return qfalse;
         }

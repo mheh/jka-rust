@@ -16,51 +16,51 @@ use super::lerp_frame_t::lerpFrame_t;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:480-527`
 #[repr(C)]
 pub struct playerInfo_t {
-	// model info
-	pub legsModel: qhandle_t,
-	pub legsSkin: qhandle_t,
-	pub legs: lerpFrame_t,
+    // model info
+    pub legsModel: qhandle_t,
+    pub legsSkin: qhandle_t,
+    pub legs: lerpFrame_t,
 
-	pub torsoModel: qhandle_t,
-	pub torsoSkin: qhandle_t,
-	pub torso: lerpFrame_t,
+    pub torsoModel: qhandle_t,
+    pub torsoSkin: qhandle_t,
+    pub torso: lerpFrame_t,
 
-	//	qhandle_t		headModel;
-	//	qhandle_t		headSkin;
-	pub animations: [animation_t; 1544],
+    //	qhandle_t		headModel;
+    //	qhandle_t		headSkin;
+    pub animations: [animation_t; 1544],
 
-	pub weaponModel: qhandle_t,
-	pub barrelModel: qhandle_t,
-	pub flashModel: qhandle_t,
-	pub flashDlightColor: vec3_t,
-	pub muzzleFlashTime: i32,
+    pub weaponModel: qhandle_t,
+    pub barrelModel: qhandle_t,
+    pub flashModel: qhandle_t,
+    pub flashDlightColor: vec3_t,
+    pub muzzleFlashTime: i32,
 
-	// currently in use drawing parms
-	pub viewAngles: vec3_t,
-	pub moveAngles: vec3_t,
-	pub currentWeapon: weapon_t,
-	pub legsAnim: i32,
-	pub torsoAnim: i32,
+    // currently in use drawing parms
+    pub viewAngles: vec3_t,
+    pub moveAngles: vec3_t,
+    pub currentWeapon: weapon_t,
+    pub legsAnim: i32,
+    pub torsoAnim: i32,
 
-	// animation vars
-	pub weapon: weapon_t,
-	pub lastWeapon: weapon_t,
-	pub pendingWeapon: weapon_t,
-	pub weaponTimer: i32,
-	pub pendingLegsAnim: i32,
-	pub torsoAnimationTimer: i32,
+    // animation vars
+    pub weapon: weapon_t,
+    pub lastWeapon: weapon_t,
+    pub pendingWeapon: weapon_t,
+    pub weaponTimer: i32,
+    pub pendingLegsAnim: i32,
+    pub torsoAnimationTimer: i32,
 
-	pub pendingTorsoAnim: i32,
-	pub legsAnimationTimer: i32,
+    pub pendingTorsoAnim: i32,
+    pub legsAnimationTimer: i32,
 
-	pub chat: qboolean,
-	pub newModel: qboolean,
+    pub chat: qboolean,
+    pub newModel: qboolean,
 
-	pub barrelSpinning: qboolean,
-	pub barrelAngle: f32,
-	pub barrelTime: i32,
+    pub barrelSpinning: qboolean,
+    pub barrelAngle: f32,
+    pub barrelTime: i32,
 
-	pub realWeapon: i32,
+    pub realWeapon: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<playerInfo_t>() == 11056);

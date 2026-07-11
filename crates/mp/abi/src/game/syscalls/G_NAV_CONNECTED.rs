@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use super::super::MpGameImport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for the `G_NAV_CONNECTED` outbound game-to-engine syscall.
 #[derive(Debug)]

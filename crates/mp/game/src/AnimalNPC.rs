@@ -265,7 +265,14 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
             anim = BOTH_VT_BUCK;
             iBlend = 500;
-            Vehicle_SetAnim(ctx, parent, SETANIM_LEGS, BOTH_VT_BUCK as c_int, iFlags, iBlend);
+            Vehicle_SetAnim(
+                ctx,
+                parent,
+                SETANIM_LEGS,
+                BOTH_VT_BUCK as c_int,
+                iFlags,
+                iBlend,
+            );
             return;
         }
 

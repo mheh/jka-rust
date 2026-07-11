@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ROFF_UPDATE_ENTITIES` outbound game-to-engine syscall.
 ///

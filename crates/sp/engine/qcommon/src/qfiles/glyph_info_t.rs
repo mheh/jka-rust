@@ -5,24 +5,24 @@
 /// Type definition source: `oracle/code/qcommon/qfiles.h:600-611`
 #[repr(C)]
 pub struct glyphInfo_t {
-	/// number of pixels wide
-	pub width: i16,
-	/// number of scan lines
-	pub height: i16,
-	/// number of pixels to advance to the next char
-	pub horizAdvance: i16,
-	/// x offset into space to render glyph
-	pub horizOffset: i16,
-	/// y offset
-	pub baseline: i32,
-	/// x start tex coord
-	pub s: f32,
-	/// y start tex coord
-	pub t: f32,
-	/// x end tex coord
-	pub s2: f32,
-	/// y end tex coord
-	pub t2: f32,
+    /// number of pixels wide
+    pub width: i16,
+    /// number of scan lines
+    pub height: i16,
+    /// number of pixels to advance to the next char
+    pub horizAdvance: i16,
+    /// x offset into space to render glyph
+    pub horizOffset: i16,
+    /// y offset
+    pub baseline: i32,
+    /// x start tex coord
+    pub s: f32,
+    /// y start tex coord
+    pub t: f32,
+    /// x end tex coord
+    pub s2: f32,
+    /// y end tex coord
+    pub t2: f32,
 }
 
 const _: () = assert!(core::mem::size_of::<glyphInfo_t>() == 28);

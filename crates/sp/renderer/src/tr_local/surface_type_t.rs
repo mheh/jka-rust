@@ -7,7 +7,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum surfaceType_t {
     SF_BAD = 0,
-    SF_SKIP = 1,               // ignore
+    SF_SKIP = 1, // ignore
     SF_FACE = 2,
     SF_GRID = 3,
     SF_TRIANGLES = 4,
@@ -16,8 +16,8 @@ pub enum surfaceType_t {
     SF_MD3 = 7,
     SF_MDX = 8,
     SF_FLARE = 9,
-    SF_ENTITY = 10,            // beams, rails, lightning, etc that can be determined by entity
+    SF_ENTITY = 10, // beams, rails, lightning, etc that can be determined by entity
     SF_DISPLAY_LIST = 11,
     SF_NUM_SURFACE_TYPES = 12,
-    SF_MAX = -1,               // ensures that sizeof( surfaceType_t ) == sizeof( int )
+    SF_MAX = -1, // ensures that sizeof( surfaceType_t ) == sizeof( int )
 }

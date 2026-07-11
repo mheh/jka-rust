@@ -272,7 +272,6 @@ pub struct vehicleInfo_t {
     // internal variables, not read in from the .veh file
     /// set internally, not until this vehicle is spawned into the level
     pub modelIndex: c_int,
-
     // The 25 `vehicleInfo_t` function-pointer
     // "virtual" slots (`AnimateVehicle`..`Inhabited`, Raven bg_vehicles.h:291-359)
     // are RETIRED. Raven filled them once at `.veh` load via `G_Set*VehicleFunctions`

@@ -40,9 +40,6 @@ use mp_bg::public::fieldtype::fieldtype_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::player_state::{MAX_POWERUPS, MAX_PS_EVENTS};
 
-
-
-
 // Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2. Local
 // shadows removed in the const sweep — the `q_math` canonicals reach this file
 // via `crate::prelude::*`.
@@ -591,8 +588,8 @@ pub fn vectoyaw(vec: vec3_t) -> f32 {
         if vec[PITCH] != 0.0 {
             // Raven's atan2 is the double libm call and M_PI is math.h's double;
             // the `*180/M_PI` chain evaluates in f64 then rounds to the float result.
-            yaw = ((vec[YAW] as f64).atan2(vec[PITCH] as f64) * 180.0 / std::f64::consts::PI)
-                as f32;
+            yaw =
+                ((vec[YAW] as f64).atan2(vec[PITCH] as f64) * 180.0 / std::f64::consts::PI) as f32;
         } else if vec[YAW] > 0.0 {
             yaw = 90.0;
         } else {
@@ -1154,8 +1151,8 @@ pub fn BG_EvaluateTrajectory(tr: *const trajectory_t, atTime: c_int, result: &mu
                 } else {
                     // Raven: `DEG2RAD` and the libm `cos` are double; only the
                     // f32-declared `deltaTime` product rounds to f32.
-                    let deg =
-                        90.0f32 - (90.0f32 * (t as f32 - tr_ref.trTime as f32) / tr_ref.trDuration as f32);
+                    let deg = 90.0f32
+                        - (90.0f32 * (t as f32 - tr_ref.trTime as f32) / tr_ref.trDuration as f32);
                     let c = ((deg as f64 * std::f64::consts::PI) / 180.0).cos() as f32;
                     tr_ref.trDuration as f32 * 0.001 * c
                 };
@@ -1454,11 +1451,7 @@ pub fn BG_ValidateSkinForTeam(
                     }
                     write_cstr_truncated(skinName, max_qpath, &skin);
                     // if file does not exist, set to "red"
-                    let path = format!(
-                        "models/players/{}/model_{}.skin",
-                        model_name,
-                        skin
-                    );
+                    let path = format!("models/players/{}/model_{}.skin", model_name, skin);
                     if BG_FileExists(cstr(&path).as_ptr(), bg, traps) == qfalse {
                         write_cstr_truncated(skinName, max_qpath, "red");
                     }
@@ -1490,11 +1483,7 @@ pub fn BG_ValidateSkinForTeam(
                     }
                     write_cstr_truncated(skinName, max_qpath, &skin);
                     // if file does not exist, set to "blue"
-                    let path = format!(
-                        "models/players/{}/model_{}.skin",
-                        model_name,
-                        skin
-                    );
+                    let path = format!("models/players/{}/model_{}.skin", model_name, skin);
                     if BG_FileExists(cstr(&path).as_ptr(), bg, traps) == qfalse {
                         write_cstr_truncated(skinName, max_qpath, "blue");
                     }

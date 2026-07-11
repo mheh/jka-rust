@@ -45,8 +45,6 @@ use crate::BotLib;
 
 use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::common_fns::Com_Memset;
-use mp_qshared::shared::limits::MAX_MODELS;
-use mp_qshared::shared::q_math::PITCH;
 use mp_game::q_shared::Q_stricmp;
 use mp_qshared::common::mp::botlib::aas_clientmove_s::aas_clientmove_t;
 use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_t;
@@ -63,10 +61,12 @@ use mp_qshared::common::mp::botlib::line_color::LINECOLOR_BLUE;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL, PRT_MESSAGE};
 use mp_qshared::common::mp::botlib::travel_flags::{TFL_DONOTENTER, TFL_JUMPPAD};
 use mp_qshared::common::mp::qcommon::bot_goal::bot_goal_t;
+use mp_qshared::shared::limits::MAX_MODELS;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS};
+use mp_qshared::shared::q_math::PITCH;
 use mp_qshared::shared::q_math::{
-    vectoangles, VectorLength, VectorLengthSquared, VectorNormalize, VectorNormalize2, VectorSet,
-    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract,
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
+    VectorLength, VectorLengthSquared, VectorNormalize, VectorNormalize2, VectorSet,
 };
 use mp_qshared::shared::surface_flags::{
     CONTENTS_BODY, CONTENTS_LAVA, CONTENTS_PLAYERCLIP, CONTENTS_SLIME, CONTENTS_SOLID,
@@ -1166,11 +1166,7 @@ pub fn BotResetMoveState(bot: &mut BotLib, movestate: c_int) {
         if ms.is_null() {
             return;
         }
-        Com_Memset(
-            ms as *mut (),
-            0,
-            core::mem::size_of::<bot_movestate_t>(),
-        );
+        Com_Memset(ms as *mut (), 0, core::mem::size_of::<bot_movestate_t>());
     }
 }
 
@@ -1241,7 +1237,14 @@ pub fn BotFuzzyPointReachabilityArea(bot: &mut BotLib, origin: vec3_t) -> c_int 
         }
         _VectorCopy(origin, &mut end);
         end[2] += 4.0;
-        numareas = AAS_TraceAreas(bot, origin, end, areas.as_mut_ptr(), points.as_mut_ptr(), 10);
+        numareas = AAS_TraceAreas(
+            bot,
+            origin,
+            end,
+            areas.as_mut_ptr(),
+            points.as_mut_ptr(),
+            10,
+        );
         j = 0;
         while j < numareas {
             if AAS_AreaReachability(bot, areas[j as usize]) != 0 {
@@ -1423,9 +1426,13 @@ pub fn BotAvoidSpots(
         r#type = AVOID_CLEAR;
         i = 0;
         while i < numavoidspots {
-            squaredradius = (*avoidspots.add(i as usize)).radius * (*avoidspots.add(i as usize)).radius;
-            squareddist =
-                DistanceFromLineSquared((*avoidspots.add(i as usize)).origin, origin, (*reach).start);
+            squaredradius =
+                (*avoidspots.add(i as usize)).radius * (*avoidspots.add(i as usize)).radius;
+            squareddist = DistanceFromLineSquared(
+                (*avoidspots.add(i as usize)).origin,
+                origin,
+                (*reach).start,
+            );
             // if moving towards the avoid spot
             if squareddist < squaredradius
                 && VectorDistanceSquared((*avoidspots.add(i as usize)).origin, origin) > squareddist
@@ -1515,7 +1522,8 @@ pub fn BotCheckBlocked(
                 (*ms).entitynum,
                 CONTENTS_SOLID | CONTENTS_PLAYERCLIP,
             );
-            if trace.startsolid == 0 && (trace.ent != ENTITYNUM_WORLD && trace.ent != ENTITYNUM_NONE)
+            if trace.startsolid == 0
+                && (trace.ent != ENTITYNUM_WORLD && trace.ent != ENTITYNUM_NONE)
             {
                 (*result).blocked = qtrue;
                 (*result).blockentity = trace.ent;
@@ -2141,7 +2149,15 @@ pub fn BotFinishTravel_JumpPad(
         let mut result: bot_moveresult_t = core::mem::zeroed();
 
         BotClearMoveResult(&mut result);
-        if BotAirControl(bot, (*ms).origin, (*ms).velocity, (*reach).end, hordir, &mut speed) == 0 {
+        if BotAirControl(
+            bot,
+            (*ms).origin,
+            (*ms).velocity,
+            (*reach).end,
+            hordir,
+            &mut speed,
+        ) == 0
+        {
             hordir[0] = (*reach).end[0] - (*ms).origin[0];
             hordir[1] = (*reach).end[1] - (*ms).origin[1];
             hordir[2] = 0.0;
@@ -2214,7 +2230,11 @@ pub fn BotMoveInGoalArea(
 /// Source: `oracle/codemp/botlib/be_ai_move.cpp:3558-3572`
 pub fn BotSetupMoveAI(bot: &mut BotLib) -> c_int {
     BotSetBrushModelTypes(bot);
-    bot.sv_maxstep = LibVar(bot, c"sv_step".as_ptr() as *mut c_char, c"18".as_ptr() as *mut c_char);
+    bot.sv_maxstep = LibVar(
+        bot,
+        c"sv_step".as_ptr() as *mut c_char,
+        c"18".as_ptr() as *mut c_char,
+    );
     bot.sv_maxbarrier = LibVar(
         bot,
         c"sv_maxbarrier".as_ptr() as *mut c_char,
@@ -2419,7 +2439,12 @@ pub fn BotCheckBarrierJump(
         hordir[1] = dir[1];
         hordir[2] = 0.0;
         VectorNormalize(&mut hordir);
-        _VectorMA((*ms).origin, (*ms).thinktime * speed * 0.5, hordir, &mut end);
+        _VectorMA(
+            (*ms).origin,
+            (*ms).thinktime * speed * 0.5,
+            hordir,
+            &mut end,
+        );
         _VectorCopy(trace.endpos, &mut start);
         end[2] = trace.endpos[2];
         //trace from previous trace end pos horizontally in the move direction
@@ -2539,7 +2564,9 @@ pub fn BotTravel_Elevator(
         //if standing on the plat
         if BotOnMover(bot, (*ms).origin, (*ms).entitynum, reach) != 0 {
             //if vertically not too far from the end point
-            if (((*ms).origin[2] - (*reach).end[2]) as c_int).abs() < (*bot.sv_maxbarrier).value as c_int {
+            if (((*ms).origin[2] - (*reach).end[2]) as c_int).abs()
+                < (*bot.sv_maxbarrier).value as c_int
+            {
                 //move to the end point
                 _VectorSubtract((*reach).end, (*ms).origin, &mut hordir);
                 hordir[2] = 0.0;
@@ -2577,7 +2604,8 @@ pub fn BotTravel_Elevator(
                 }
                 speed = 360.0 - (360.0 - 6.0 * dist);
                 //
-                if (*ms).moveflags & MFL_SWIMMING != 0 || BotCheckBarrierJump(bot, ms, dir, 50.0) == 0
+                if (*ms).moveflags & MFL_SWIMMING != 0
+                    || BotCheckBarrierJump(bot, ms, dir, 50.0) == 0
                 {
                     if speed > 5.0 {
                         EA_Move(bot, (*ms).client, dir, speed);
@@ -2610,7 +2638,8 @@ pub fn BotTravel_Elevator(
                 }
                 speed = 360.0 - (360.0 - 6.0 * dist);
                 //
-                if (*ms).moveflags & MFL_SWIMMING == 0 && BotCheckBarrierJump(bot, ms, dir, 50.0) == 0
+                if (*ms).moveflags & MFL_SWIMMING == 0
+                    && BotCheckBarrierJump(bot, ms, dir, 50.0) == 0
                 {
                     if speed > 5.0 {
                         EA_Move(bot, (*ms).client, dir, speed);
@@ -2733,7 +2762,8 @@ pub fn BotTravel_FuncBobbing(
                 }
                 speed = 360.0 - (360.0 - 6.0 * dist);
                 //if swimming or no barrier jump
-                if (*ms).moveflags & MFL_SWIMMING != 0 || BotCheckBarrierJump(bot, ms, dir, 50.0) == 0
+                if (*ms).moveflags & MFL_SWIMMING != 0
+                    || BotCheckBarrierJump(bot, ms, dir, 50.0) == 0
                 {
                     if speed > 5.0 {
                         EA_Move(bot, (*ms).client, dir, speed);
@@ -2767,7 +2797,8 @@ pub fn BotTravel_FuncBobbing(
                 }
                 speed = 360.0 - (360.0 - 6.0 * dist);
                 //
-                if (*ms).moveflags & MFL_SWIMMING == 0 && BotCheckBarrierJump(bot, ms, dir, 50.0) == 0
+                if (*ms).moveflags & MFL_SWIMMING == 0
+                    && BotCheckBarrierJump(bot, ms, dir, 50.0) == 0
                 {
                     if speed > 5.0 {
                         EA_Move(bot, (*ms).client, dir, speed);
@@ -3462,7 +3493,8 @@ pub fn BotMoveToGoal(
                             }
                         }
                         (*result).flags |= MOVERESULT_ONTOPOF_FUNCBOB;
-                    } else if modeltype == MODELTYPE_FUNC_STATIC || modeltype == MODELTYPE_FUNC_DOOR {
+                    } else if modeltype == MODELTYPE_FUNC_STATIC || modeltype == MODELTYPE_FUNC_DOOR
+                    {
                         // check if ontop of a door bridge ?
                         (*ms).areanum = BotFuzzyPointReachabilityArea(bot, (*ms).origin);
                         // if not in a reachability area
@@ -3605,9 +3637,7 @@ pub fn BotMoveToGoal(
                     TRAVEL_WALKOFFLEDGE => *result = BotTravel_WalkOffLedge(bot, ms, &mut reach),
                     TRAVEL_JUMP => *result = BotTravel_Jump(common, bot, ms, &mut reach),
                     TRAVEL_SWIM => *result = BotTravel_Swim(bot, ms, &mut reach),
-                    TRAVEL_WATERJUMP => {
-                        *result = BotTravel_WaterJump(common, bot, ms, &mut reach)
-                    }
+                    TRAVEL_WATERJUMP => *result = BotTravel_WaterJump(common, bot, ms, &mut reach),
                     TRAVEL_TELEPORT => *result = BotTravel_Teleport(bot, ms, &mut reach),
                     TRAVEL_ELEVATOR => *result = BotTravel_Elevator(bot, ms, &mut reach),
                     TRAVEL_GRAPPLEHOOK => *result = BotTravel_Grapple(bot, ms, &mut reach),
@@ -3642,7 +3672,12 @@ pub fn BotMoveToGoal(
 
             //special handling of jump pads when the bot uses a jump pad without knowing it
             foundjumppad = qfalse;
-            _VectorMA((*ms).origin, -2.0 * (*ms).thinktime, (*ms).velocity, &mut end);
+            _VectorMA(
+                (*ms).origin,
+                -2.0 * (*ms).thinktime,
+                (*ms).velocity,
+                &mut end,
+            );
             numareas = AAS_TraceAreas(
                 bot,
                 (*ms).origin,

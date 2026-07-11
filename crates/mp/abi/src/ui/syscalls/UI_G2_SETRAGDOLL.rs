@@ -2,8 +2,8 @@ use super::super::MpUiImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::common::mp::qcommon::sharedRagDollParams_t;
 use core::ffi::c_void;
+use mp_qshared::common::mp::qcommon::sharedRagDollParams_t;
 
 /// `UI_G2_SETRAGDOLL` outbound game-to-engine syscall.
 ///

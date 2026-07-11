@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 use mp_bg::public::holdable::HI_NUM_HOLDABLE;
 use mp_bg::weapons::weapon_t::WP_NUM_WEAPONS;
-use mp_qshared::shared::{NUM_FORCE_POWERS, qhandle_t, sfxHandle_t};
+use mp_qshared::shared::{qhandle_t, sfxHandle_t, NUM_FORCE_POWERS};
 use mp_uishared::shared::cached_assets_t::NUM_CROSSHAIRS;
 
 use super::footstep_t::footstep_t;
@@ -17,293 +17,293 @@ use super::footstep_t::footstep_t;
 /// Type definition source: `oracle/codemp/cgame/cg_local.h:1067-1380`
 #[repr(C)]
 pub struct cgMedia_t {
-	pub charsetShader: qhandle_t,
-	pub whiteShader: qhandle_t,
-
-	pub loadBarLED: qhandle_t,
-	pub loadBarLEDCap: qhandle_t,
-	pub loadBarLEDSurround: qhandle_t,
-
-	pub bryarFrontFlash: qhandle_t,
-	pub greenFrontFlash: qhandle_t,
-	pub lightningFlash: qhandle_t,
+    pub charsetShader: qhandle_t,
+    pub whiteShader: qhandle_t,
+
+    pub loadBarLED: qhandle_t,
+    pub loadBarLEDCap: qhandle_t,
+    pub loadBarLEDSurround: qhandle_t,
+
+    pub bryarFrontFlash: qhandle_t,
+    pub greenFrontFlash: qhandle_t,
+    pub lightningFlash: qhandle_t,
 
-	pub itemHoloModel: qhandle_t,
-	pub redFlagModel: qhandle_t,
-	pub blueFlagModel: qhandle_t,
+    pub itemHoloModel: qhandle_t,
+    pub redFlagModel: qhandle_t,
+    pub blueFlagModel: qhandle_t,
 
-	pub flagPoleModel: qhandle_t,
-	pub flagFlapModel: qhandle_t,
-
-	pub redFlagBaseModel: qhandle_t,
-	pub blueFlagBaseModel: qhandle_t,
-	pub neutralFlagBaseModel: qhandle_t,
+    pub flagPoleModel: qhandle_t,
+    pub flagFlapModel: qhandle_t,
+
+    pub redFlagBaseModel: qhandle_t,
+    pub blueFlagBaseModel: qhandle_t,
+    pub neutralFlagBaseModel: qhandle_t,
 
-	pub teamStatusBar: qhandle_t,
+    pub teamStatusBar: qhandle_t,
 
-	pub deferShader: qhandle_t,
-
-	pub radarShader: qhandle_t,
-	pub siegeItemShader: qhandle_t,
-	pub mAutomapPlayerIcon: qhandle_t,
-	pub mAutomapRocketIcon: qhandle_t,
-
-	pub wireframeAutomapFrame_left: qhandle_t,
-	pub wireframeAutomapFrame_right: qhandle_t,
-	pub wireframeAutomapFrame_top: qhandle_t,
-	pub wireframeAutomapFrame_bottom: qhandle_t,
-
-	// Chunks
-	// `[NUM_CHUNK_TYPES][4]` — NUM_CHUNK_TYPES is the 8-entry anonymous enum
-	// terminator at oracle/codemp/cgame/cg_local.h:1049-1059 (not
-	// separately ported; used here only as this array bound).
-	pub chunkModels: [[qhandle_t; 4]; 8],
-	pub chunkSound: sfxHandle_t,
-	pub grateSound: sfxHandle_t,
-	pub rockBreakSound: sfxHandle_t,
-	pub rockBounceSound: [sfxHandle_t; 2],
-	pub metalBounceSound: [sfxHandle_t; 2],
-	pub glassChunkSound: sfxHandle_t,
-	pub crateBreakSound: [sfxHandle_t; 2],
-
-	pub hackerIconShader: qhandle_t,
-
-	// Saber shaders
-	//-----------------------------
-	pub forceCoronaShader: qhandle_t,
-
-	pub redSaberGlowShader: qhandle_t,
-	pub redSaberCoreShader: qhandle_t,
-	pub orangeSaberGlowShader: qhandle_t,
-	pub orangeSaberCoreShader: qhandle_t,
-	pub yellowSaberGlowShader: qhandle_t,
-	pub yellowSaberCoreShader: qhandle_t,
-	pub greenSaberGlowShader: qhandle_t,
-	pub greenSaberCoreShader: qhandle_t,
-	pub blueSaberGlowShader: qhandle_t,
-	pub blueSaberCoreShader: qhandle_t,
-	pub purpleSaberGlowShader: qhandle_t,
-	pub purpleSaberCoreShader: qhandle_t,
-	pub saberBlurShader: qhandle_t,
-	pub swordTrailShader: qhandle_t,
-
-	pub yellowDroppedSaberShader: qhandle_t,
-
-	pub rivetMarkShader: qhandle_t,
-
-	pub teamRedShader: qhandle_t,
-	pub teamBlueShader: qhandle_t,
+    pub deferShader: qhandle_t,
+
+    pub radarShader: qhandle_t,
+    pub siegeItemShader: qhandle_t,
+    pub mAutomapPlayerIcon: qhandle_t,
+    pub mAutomapRocketIcon: qhandle_t,
+
+    pub wireframeAutomapFrame_left: qhandle_t,
+    pub wireframeAutomapFrame_right: qhandle_t,
+    pub wireframeAutomapFrame_top: qhandle_t,
+    pub wireframeAutomapFrame_bottom: qhandle_t,
+
+    // Chunks
+    // `[NUM_CHUNK_TYPES][4]` — NUM_CHUNK_TYPES is the 8-entry anonymous enum
+    // terminator at oracle/codemp/cgame/cg_local.h:1049-1059 (not
+    // separately ported; used here only as this array bound).
+    pub chunkModels: [[qhandle_t; 4]; 8],
+    pub chunkSound: sfxHandle_t,
+    pub grateSound: sfxHandle_t,
+    pub rockBreakSound: sfxHandle_t,
+    pub rockBounceSound: [sfxHandle_t; 2],
+    pub metalBounceSound: [sfxHandle_t; 2],
+    pub glassChunkSound: sfxHandle_t,
+    pub crateBreakSound: [sfxHandle_t; 2],
+
+    pub hackerIconShader: qhandle_t,
+
+    // Saber shaders
+    //-----------------------------
+    pub forceCoronaShader: qhandle_t,
+
+    pub redSaberGlowShader: qhandle_t,
+    pub redSaberCoreShader: qhandle_t,
+    pub orangeSaberGlowShader: qhandle_t,
+    pub orangeSaberCoreShader: qhandle_t,
+    pub yellowSaberGlowShader: qhandle_t,
+    pub yellowSaberCoreShader: qhandle_t,
+    pub greenSaberGlowShader: qhandle_t,
+    pub greenSaberCoreShader: qhandle_t,
+    pub blueSaberGlowShader: qhandle_t,
+    pub blueSaberCoreShader: qhandle_t,
+    pub purpleSaberGlowShader: qhandle_t,
+    pub purpleSaberCoreShader: qhandle_t,
+    pub saberBlurShader: qhandle_t,
+    pub swordTrailShader: qhandle_t,
+
+    pub yellowDroppedSaberShader: qhandle_t,
+
+    pub rivetMarkShader: qhandle_t,
+
+    pub teamRedShader: qhandle_t,
+    pub teamBlueShader: qhandle_t,
 
-	pub powerDuelAllyShader: qhandle_t,
-
-	pub balloonShader: qhandle_t,
-	pub vchatShader: qhandle_t,
-	pub connectionShader: qhandle_t,
-
-	pub crosshairShader: [qhandle_t; NUM_CROSSHAIRS],
-	pub lagometerShader: qhandle_t,
-	pub backTileShader: qhandle_t,
-
-	pub numberShaders: [qhandle_t; 11],
-	pub smallnumberShaders: [qhandle_t; 11],
-	pub chunkyNumberShaders: [qhandle_t; 11],
-
-	pub electricBodyShader: qhandle_t,
-	pub electricBody2Shader: qhandle_t,
-
-	pub fsrMarkShader: qhandle_t,
-	pub fslMarkShader: qhandle_t,
-	pub fshrMarkShader: qhandle_t,
-	pub fshlMarkShader: qhandle_t,
-
-	pub refractionShader: qhandle_t,
+    pub powerDuelAllyShader: qhandle_t,
+
+    pub balloonShader: qhandle_t,
+    pub vchatShader: qhandle_t,
+    pub connectionShader: qhandle_t,
+
+    pub crosshairShader: [qhandle_t; NUM_CROSSHAIRS],
+    pub lagometerShader: qhandle_t,
+    pub backTileShader: qhandle_t,
+
+    pub numberShaders: [qhandle_t; 11],
+    pub smallnumberShaders: [qhandle_t; 11],
+    pub chunkyNumberShaders: [qhandle_t; 11],
+
+    pub electricBodyShader: qhandle_t,
+    pub electricBody2Shader: qhandle_t,
+
+    pub fsrMarkShader: qhandle_t,
+    pub fslMarkShader: qhandle_t,
+    pub fshrMarkShader: qhandle_t,
+    pub fshlMarkShader: qhandle_t,
+
+    pub refractionShader: qhandle_t,
 
-	pub cloakedShader: qhandle_t,
+    pub cloakedShader: qhandle_t,
 
-	pub boltShader: qhandle_t,
+    pub boltShader: qhandle_t,
 
-	pub shadowMarkShader: qhandle_t,
+    pub shadowMarkShader: qhandle_t,
 
-	// glass shard shader
-	pub glassShardShader: qhandle_t,
+    // glass shard shader
+    pub glassShardShader: qhandle_t,
 
-	// wall mark shaders
-	pub wakeMarkShader: qhandle_t,
+    // wall mark shaders
+    pub wakeMarkShader: qhandle_t,
 
-	// Pain view shader
-	pub viewPainShader: qhandle_t,
-	pub viewPainShader_Shields: qhandle_t,
-	pub viewPainShader_ShieldsAndHealth: qhandle_t,
+    // Pain view shader
+    pub viewPainShader: qhandle_t,
+    pub viewPainShader_Shields: qhandle_t,
+    pub viewPainShader_ShieldsAndHealth: qhandle_t,
 
-	pub itemRespawningPlaceholder: qhandle_t,
-	pub itemRespawningRezOut: qhandle_t,
+    pub itemRespawningPlaceholder: qhandle_t,
+    pub itemRespawningRezOut: qhandle_t,
 
-	pub playerShieldDamage: qhandle_t,
-	pub protectShader: qhandle_t,
-	pub forceSightBubble: qhandle_t,
-	pub forceShell: qhandle_t,
-	pub sightShell: qhandle_t,
+    pub playerShieldDamage: qhandle_t,
+    pub protectShader: qhandle_t,
+    pub forceSightBubble: qhandle_t,
+    pub forceShell: qhandle_t,
+    pub sightShell: qhandle_t,
 
-	// Disruptor zoom graphics
-	pub disruptorMask: qhandle_t,
-	pub disruptorInsert: qhandle_t,
-	pub disruptorLight: qhandle_t,
-	pub disruptorInsertTick: qhandle_t,
-	pub disruptorChargeShader: qhandle_t,
+    // Disruptor zoom graphics
+    pub disruptorMask: qhandle_t,
+    pub disruptorInsert: qhandle_t,
+    pub disruptorLight: qhandle_t,
+    pub disruptorInsertTick: qhandle_t,
+    pub disruptorChargeShader: qhandle_t,
 
-	// Binocular graphics
-	pub binocularCircle: qhandle_t,
-	pub binocularMask: qhandle_t,
-	pub binocularArrow: qhandle_t,
-	pub binocularTri: qhandle_t,
-	pub binocularStatic: qhandle_t,
-	pub binocularOverlay: qhandle_t,
-
-	// weapon effect models
-	pub lightningExplosionModel: qhandle_t,
+    // Binocular graphics
+    pub binocularCircle: qhandle_t,
+    pub binocularMask: qhandle_t,
+    pub binocularArrow: qhandle_t,
+    pub binocularTri: qhandle_t,
+    pub binocularStatic: qhandle_t,
+    pub binocularOverlay: qhandle_t,
+
+    // weapon effect models
+    pub lightningExplosionModel: qhandle_t,
 
-	// explosion assets
-	pub explosionModel: qhandle_t,
-	pub surfaceExplosionShader: qhandle_t,
+    // explosion assets
+    pub explosionModel: qhandle_t,
+    pub surfaceExplosionShader: qhandle_t,
 
-	pub disruptorShader: qhandle_t,
+    pub disruptorShader: qhandle_t,
 
-	pub solidWhite: qhandle_t,
+    pub solidWhite: qhandle_t,
 
-	pub heartShader: qhandle_t,
+    pub heartShader: qhandle_t,
 
-	// All the player shells
-	pub ysaliredShader: qhandle_t,
-	pub ysaliblueShader: qhandle_t,
-	pub ysalimariShader: qhandle_t,
-	pub boonShader: qhandle_t,
-	pub endarkenmentShader: qhandle_t,
-	pub enlightenmentShader: qhandle_t,
-	pub invulnerabilityShader: qhandle_t,
+    // All the player shells
+    pub ysaliredShader: qhandle_t,
+    pub ysaliblueShader: qhandle_t,
+    pub ysalimariShader: qhandle_t,
+    pub boonShader: qhandle_t,
+    pub endarkenmentShader: qhandle_t,
+    pub enlightenmentShader: qhandle_t,
+    pub invulnerabilityShader: qhandle_t,
 
-	// sounds
-	pub selectSound: sfxHandle_t,
-	pub footsteps: [[sfxHandle_t; 4]; footstep_t::FOOTSTEP_TOTAL as usize],
+    // sounds
+    pub selectSound: sfxHandle_t,
+    pub footsteps: [[sfxHandle_t; 4]; footstep_t::FOOTSTEP_TOTAL as usize],
 
-	pub winnerSound: sfxHandle_t,
-	pub loserSound: sfxHandle_t,
+    pub winnerSound: sfxHandle_t,
+    pub loserSound: sfxHandle_t,
 
-	pub crackleSound: sfxHandle_t,
+    pub crackleSound: sfxHandle_t,
 
-	pub grenadeBounce1: sfxHandle_t,
-	pub grenadeBounce2: sfxHandle_t,
+    pub grenadeBounce1: sfxHandle_t,
+    pub grenadeBounce2: sfxHandle_t,
 
-	pub teamHealSound: sfxHandle_t,
-	pub teamRegenSound: sfxHandle_t,
+    pub teamHealSound: sfxHandle_t,
+    pub teamRegenSound: sfxHandle_t,
 
-	pub teleInSound: sfxHandle_t,
-	pub teleOutSound: sfxHandle_t,
-	pub respawnSound: sfxHandle_t,
-	pub talkSound: sfxHandle_t,
-	pub landSound: sfxHandle_t,
-	pub fallSound: sfxHandle_t,
+    pub teleInSound: sfxHandle_t,
+    pub teleOutSound: sfxHandle_t,
+    pub respawnSound: sfxHandle_t,
+    pub talkSound: sfxHandle_t,
+    pub landSound: sfxHandle_t,
+    pub fallSound: sfxHandle_t,
 
-	pub oneMinuteSound: sfxHandle_t,
-	pub fiveMinuteSound: sfxHandle_t,
+    pub oneMinuteSound: sfxHandle_t,
+    pub fiveMinuteSound: sfxHandle_t,
 
-	pub threeFragSound: sfxHandle_t,
-	pub twoFragSound: sfxHandle_t,
-	pub oneFragSound: sfxHandle_t,
+    pub threeFragSound: sfxHandle_t,
+    pub twoFragSound: sfxHandle_t,
+    pub oneFragSound: sfxHandle_t,
 
-	pub rollSound: sfxHandle_t,
+    pub rollSound: sfxHandle_t,
 
-	pub watrInSound: sfxHandle_t,
-	pub watrOutSound: sfxHandle_t,
-	pub watrUnSound: sfxHandle_t,
+    pub watrInSound: sfxHandle_t,
+    pub watrOutSound: sfxHandle_t,
+    pub watrUnSound: sfxHandle_t,
 
-	pub noforceSound: sfxHandle_t,
+    pub noforceSound: sfxHandle_t,
 
-	pub deploySeeker: sfxHandle_t,
-	pub medkitSound: sfxHandle_t,
+    pub deploySeeker: sfxHandle_t,
+    pub medkitSound: sfxHandle_t,
 
-	// teamplay sounds
-	pub redScoredSound: sfxHandle_t,
-	pub blueScoredSound: sfxHandle_t,
-	pub redLeadsSound: sfxHandle_t,
-	pub blueLeadsSound: sfxHandle_t,
-	pub teamsTiedSound: sfxHandle_t,
+    // teamplay sounds
+    pub redScoredSound: sfxHandle_t,
+    pub blueScoredSound: sfxHandle_t,
+    pub redLeadsSound: sfxHandle_t,
+    pub blueLeadsSound: sfxHandle_t,
+    pub teamsTiedSound: sfxHandle_t,
 
-	pub redFlagReturnedSound: sfxHandle_t,
-	pub blueFlagReturnedSound: sfxHandle_t,
-	pub redTookFlagSound: sfxHandle_t,
-	pub blueTookFlagSound: sfxHandle_t,
+    pub redFlagReturnedSound: sfxHandle_t,
+    pub blueFlagReturnedSound: sfxHandle_t,
+    pub redTookFlagSound: sfxHandle_t,
+    pub blueTookFlagSound: sfxHandle_t,
 
-	pub redYsalReturnedSound: sfxHandle_t,
-	pub blueYsalReturnedSound: sfxHandle_t,
-	pub redTookYsalSound: sfxHandle_t,
-	pub blueTookYsalSound: sfxHandle_t,
+    pub redYsalReturnedSound: sfxHandle_t,
+    pub blueYsalReturnedSound: sfxHandle_t,
+    pub redTookYsalSound: sfxHandle_t,
+    pub blueTookYsalSound: sfxHandle_t,
 
-	pub drainSound: sfxHandle_t,
+    pub drainSound: sfxHandle_t,
 
-	// music blips
-	pub happyMusic: sfxHandle_t,
-	pub dramaticFailure: sfxHandle_t,
+    // music blips
+    pub happyMusic: sfxHandle_t,
+    pub dramaticFailure: sfxHandle_t,
 
-	// tournament sounds
-	pub count3Sound: sfxHandle_t,
-	pub count2Sound: sfxHandle_t,
-	pub count1Sound: sfxHandle_t,
-	pub countFightSound: sfxHandle_t,
+    // tournament sounds
+    pub count3Sound: sfxHandle_t,
+    pub count2Sound: sfxHandle_t,
+    pub count1Sound: sfxHandle_t,
+    pub countFightSound: sfxHandle_t,
 
-	// new stuff
-	pub patrolShader: qhandle_t,
-	pub assaultShader: qhandle_t,
-	pub campShader: qhandle_t,
-	pub followShader: qhandle_t,
-	pub defendShader: qhandle_t,
-	pub teamLeaderShader: qhandle_t,
-	pub retrieveShader: qhandle_t,
-	pub escortShader: qhandle_t,
-	pub flagShaders: [qhandle_t; 3],
+    // new stuff
+    pub patrolShader: qhandle_t,
+    pub assaultShader: qhandle_t,
+    pub campShader: qhandle_t,
+    pub followShader: qhandle_t,
+    pub defendShader: qhandle_t,
+    pub teamLeaderShader: qhandle_t,
+    pub retrieveShader: qhandle_t,
+    pub escortShader: qhandle_t,
+    pub flagShaders: [qhandle_t; 3],
 
-	pub halfShieldModel: qhandle_t,
-	pub halfShieldShader: qhandle_t,
+    pub halfShieldModel: qhandle_t,
+    pub halfShieldShader: qhandle_t,
 
-	pub demp2Shell: qhandle_t,
-	pub demp2ShellShader: qhandle_t,
+    pub demp2Shell: qhandle_t,
+    pub demp2ShellShader: qhandle_t,
 
-	pub cursor: qhandle_t,
-	pub selectCursor: qhandle_t,
-	pub sizeCursor: qhandle_t,
+    pub cursor: qhandle_t,
+    pub selectCursor: qhandle_t,
+    pub sizeCursor: qhandle_t,
 
-	// weapon icons
-	pub weaponIcons: [qhandle_t; WP_NUM_WEAPONS as usize],
-	pub weaponIcons_NA: [qhandle_t; WP_NUM_WEAPONS as usize],
+    // weapon icons
+    pub weaponIcons: [qhandle_t; WP_NUM_WEAPONS as usize],
+    pub weaponIcons_NA: [qhandle_t; WP_NUM_WEAPONS as usize],
 
-	// holdable inventory item icons
-	pub invenIcons: [qhandle_t; HI_NUM_HOLDABLE as usize],
+    // holdable inventory item icons
+    pub invenIcons: [qhandle_t; HI_NUM_HOLDABLE as usize],
 
-	// force power icons
-	pub forcePowerIcons: [qhandle_t; NUM_FORCE_POWERS as usize],
+    // force power icons
+    pub forcePowerIcons: [qhandle_t; NUM_FORCE_POWERS as usize],
 
-	pub rageRecShader: qhandle_t,
+    pub rageRecShader: qhandle_t,
 
-	// other HUD parts
-	pub currentBackground: c_int,
-	pub weaponIconBackground: qhandle_t,
-	pub forceIconBackground: qhandle_t,
-	pub inventoryIconBackground: qhandle_t,
+    // other HUD parts
+    pub currentBackground: c_int,
+    pub weaponIconBackground: qhandle_t,
+    pub forceIconBackground: qhandle_t,
+    pub inventoryIconBackground: qhandle_t,
 
-	pub holocronPickup: sfxHandle_t,
+    pub holocronPickup: sfxHandle_t,
 
-	// Zoom
-	pub zoomStart: sfxHandle_t,
-	pub zoomLoop: sfxHandle_t,
-	pub zoomEnd: sfxHandle_t,
-	pub disruptorZoomLoop: sfxHandle_t,
+    // Zoom
+    pub zoomStart: sfxHandle_t,
+    pub zoomLoop: sfxHandle_t,
+    pub zoomEnd: sfxHandle_t,
+    pub disruptorZoomLoop: sfxHandle_t,
 
-	pub bdecal_bodyburn1: qhandle_t,
-	pub bdecal_saberglow: qhandle_t,
-	pub bdecal_burn1: qhandle_t,
-	pub mSaberDamageGlow: qhandle_t,
+    pub bdecal_bodyburn1: qhandle_t,
+    pub bdecal_saberglow: qhandle_t,
+    pub bdecal_burn1: qhandle_t,
+    pub mSaberDamageGlow: qhandle_t,
 
-	// For vehicles only now
-	pub noAmmoSound: sfxHandle_t,
+    // For vehicles only now
+    pub noAmmoSound: sfxHandle_t,
 }
 
 const _: () = assert!(core::mem::size_of::<cgMedia_t>() == 1716);

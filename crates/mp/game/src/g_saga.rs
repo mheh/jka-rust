@@ -54,8 +54,6 @@ use std::ffi::CString;
 // Raven `qboolean` is `c_int`; keep the source spelling at call sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 /// Raven `SIEGEITEM_STARTOFFRADAR` — spawnflag: siege item starts off the
 /// team radar.
 ///

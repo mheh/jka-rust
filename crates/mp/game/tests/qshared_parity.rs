@@ -24,8 +24,8 @@ use std::path::PathBuf;
 
 use mp_game::prelude::{cstr, qfalse, qtrue};
 use mp_game::q_shared::{
-    va, Com_Clamp, Com_Clampi, Com_sprintf, COM_BeginParseSession, COM_Compress,
-    COM_DefaultExtension, COM_GetCurrentParseLine, COM_ParseExt, COM_StripExtension, Info_NextPair,
+    va, COM_BeginParseSession, COM_Compress, COM_DefaultExtension, COM_GetCurrentParseLine,
+    COM_ParseExt, COM_StripExtension, Com_Clamp, Com_Clampi, Com_sprintf, Info_NextPair,
     Info_RemoveKey, Info_RemoveKey_Big, Info_SetValueForKey, Info_SetValueForKey_Big,
     Info_Validate, Info_ValueForKey, Q_CleanStr, Q_PrintStrlen, Q_isalpha, Q_islower, Q_isprint,
     Q_isupper, Q_strcat, Q_stricmp, Q_stricmpn, Q_strlwr, Q_strncmp, Q_strncpyz, Q_strrchr,
@@ -245,7 +245,9 @@ fn dump_strhelpers(o: &mut String) {
     o.push_str("== strhelpers ==\n");
 
     // isXXX predicates over signed-char edges.
-    let ic = [-1i32, 0, 0x1f, 0x20, 0x40, 0x5a, 0x61, 0x7a, 0x7e, 0x7f, 0x80, 0xff];
+    let ic = [
+        -1i32, 0, 0x1f, 0x20, 0x40, 0x5a, 0x61, 0x7a, 0x7e, 0x7f, 0x80, 0xff,
+    ];
     for &c in &ic {
         let _ = writeln!(
             o,
@@ -344,12 +346,36 @@ fn dump_strhelpers(o: &mut String) {
 
     // Q_stricmp / Q_stricmpn / Q_strncmp over case/prefix/high-bit pairs.
     let cmp_a: [&[u8]; 14] = [
-        b"", b"a", b"a", b"abc", b"abc", b"Hello", b"hello", b"abc", b"ab", b"zoo", b"Test123",
-        b"\x80x", b"a\x80", b"MixedCase",
+        b"",
+        b"a",
+        b"a",
+        b"abc",
+        b"abc",
+        b"Hello",
+        b"hello",
+        b"abc",
+        b"ab",
+        b"zoo",
+        b"Test123",
+        b"\x80x",
+        b"a\x80",
+        b"MixedCase",
     ];
     let cmp_b: [&[u8]; 14] = [
-        b"", b"a", b"A", b"abd", b"abc", b"hello", b"HELLO", b"ab", b"abc", b"zoon", b"test123",
-        b"\x80x", b"a\x7f", b"mixedcase",
+        b"",
+        b"a",
+        b"A",
+        b"abd",
+        b"abc",
+        b"hello",
+        b"HELLO",
+        b"ab",
+        b"abc",
+        b"zoon",
+        b"test123",
+        b"\x80x",
+        b"a\x7f",
+        b"mixedcase",
     ];
     let cmp_n = [0i32, 1, 2, 3, 5, 99999];
     for i in 0..cmp_a.len() {
@@ -357,10 +383,18 @@ fn dump_strhelpers(o: &mut String) {
         let b = cbuf_b(cmp_b[i]);
         let _ = writeln!(o, "stricmp {i} {}", Q_stricmp(a.as_ptr(), b.as_ptr()));
         for &n in &cmp_n {
-            let _ = writeln!(o, "stricmpn {i} {n} {}", Q_stricmpn(a.as_ptr(), b.as_ptr(), n));
+            let _ = writeln!(
+                o,
+                "stricmpn {i} {n} {}",
+                Q_stricmpn(a.as_ptr(), b.as_ptr(), n)
+            );
         }
         for &n in &cmp_n {
-            let _ = writeln!(o, "strncmp {i} {n} {}", Q_strncmp(a.as_ptr(), b.as_ptr(), n));
+            let _ = writeln!(
+                o,
+                "strncmp {i} {n} {}",
+                Q_strncmp(a.as_ptr(), b.as_ptr(), n)
+            );
         }
     }
     let x = cbuf("x");
@@ -419,8 +453,22 @@ fn dump_strhelpers(o: &mut String) {
     let _ = writeln!(o, "pslen_null {}", Q_PrintStrlen(NULLP));
 
     // Q_strrchr: dump offset of the found char (or -1).
-    let rc = ["", "a", "hello", "abracadabra", "a/b/c/d", "trailing/", "^1color"];
-    let rcc = [b'a' as c_int, b'/' as c_int, b'z' as c_int, 0, b'r' as c_int];
+    let rc = [
+        "",
+        "a",
+        "hello",
+        "abracadabra",
+        "a/b/c/d",
+        "trailing/",
+        "^1color",
+    ];
+    let rcc = [
+        b'a' as c_int,
+        b'/' as c_int,
+        b'z' as c_int,
+        0,
+        b'r' as c_int,
+    ];
     for (i, s) in rc.iter().enumerate() {
         let cb = cbuf(s);
         for &c in &rcc {
@@ -479,8 +527,12 @@ fn dump_sprintf(o: &mut String) {
 }
 
 // --- info: probe key tables mirror main_qshared.c ---
-const VKEYS: &[&str] = &["name", "team", "key2", "empty", "onlykey", "desc", "missing", "Name", ""];
-const RKEYS: &[&str] = &["name", "team", "key1", "desc", "onlykey", "missing", "quote", "semi"];
+const VKEYS: &[&str] = &[
+    "name", "team", "key2", "empty", "onlykey", "desc", "missing", "Name", "",
+];
+const RKEYS: &[&str] = &[
+    "name", "team", "key1", "desc", "onlykey", "missing", "quote", "semi",
+];
 const SKV: &[(&str, &str)] = &[
     ("name", "alice"),
     ("new", "val"),

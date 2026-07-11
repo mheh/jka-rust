@@ -9,7 +9,7 @@ pub const SIEGE_CLASS_DESC_LEN: usize = 4096;
 /// Type definition source: `oracle/codemp/game/bg_saga.h:49-52`
 #[repr(C)]
 pub struct siegeClassDesc_t {
-	pub desc: [core::ffi::c_char; SIEGE_CLASS_DESC_LEN],
+    pub desc: [core::ffi::c_char; SIEGE_CLASS_DESC_LEN],
 }
 
 const _: () = assert!(core::mem::size_of::<siegeClassDesc_t>() == 4096);

@@ -5,7 +5,7 @@
 /// Type definition source: `oracle/codemp/qcommon/z_memman_pc.cpp:39-43`
 #[repr(C)]
 pub struct zoneTail_t {
-	pub iMagic: i32,
+    pub iMagic: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<zoneTail_t>() == 4);

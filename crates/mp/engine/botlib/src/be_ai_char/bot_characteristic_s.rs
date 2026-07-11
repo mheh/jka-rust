@@ -9,10 +9,10 @@ use super::cvalue::cvalue;
 /// Type definition source: `oracle/codemp/botlib/be_ai_char.cpp:46-50`
 #[repr(C)]
 pub struct bot_characteristic_t {
-	/// characteristic type
-	pub r#type: c_char,
-	/// characteristic value
-	pub value: cvalue,
+    /// characteristic type
+    pub r#type: c_char,
+    /// characteristic value
+    pub value: cvalue,
 }
 
 pub type bot_characteristic_s = bot_characteristic_t;

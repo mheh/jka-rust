@@ -41,8 +41,6 @@ use crate::NPC_stats::NPC_LoadParms;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 /// Raven `CorpsePhysics`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:46-103`

@@ -167,14 +167,18 @@ impl TryFrom<i32> for MpGameExport {
             x if x == Self::GAME_SHUTDOWN as i32 => Self::GAME_SHUTDOWN,
             x if x == Self::GAME_CLIENT_CONNECT as i32 => Self::GAME_CLIENT_CONNECT,
             x if x == Self::GAME_CLIENT_BEGIN as i32 => Self::GAME_CLIENT_BEGIN,
-            x if x == Self::GAME_CLIENT_USERINFO_CHANGED as i32 => Self::GAME_CLIENT_USERINFO_CHANGED,
+            x if x == Self::GAME_CLIENT_USERINFO_CHANGED as i32 => {
+                Self::GAME_CLIENT_USERINFO_CHANGED
+            }
             x if x == Self::GAME_CLIENT_DISCONNECT as i32 => Self::GAME_CLIENT_DISCONNECT,
             x if x == Self::GAME_CLIENT_COMMAND as i32 => Self::GAME_CLIENT_COMMAND,
             x if x == Self::GAME_CLIENT_THINK as i32 => Self::GAME_CLIENT_THINK,
             x if x == Self::GAME_RUN_FRAME as i32 => Self::GAME_RUN_FRAME,
             x if x == Self::GAME_CONSOLE_COMMAND as i32 => Self::GAME_CONSOLE_COMMAND,
             x if x == Self::BOTAI_START_FRAME as i32 => Self::BOTAI_START_FRAME,
-            x if x == Self::GAME_ROFF_NOTETRACK_CALLBACK as i32 => Self::GAME_ROFF_NOTETRACK_CALLBACK,
+            x if x == Self::GAME_ROFF_NOTETRACK_CALLBACK as i32 => {
+                Self::GAME_ROFF_NOTETRACK_CALLBACK
+            }
             x if x == Self::GAME_SPAWN_RMG_ENTITY as i32 => Self::GAME_SPAWN_RMG_ENTITY,
             x if x == Self::GAME_ICARUS_PLAYSOUND as i32 => Self::GAME_ICARUS_PLAYSOUND,
             x if x == Self::GAME_ICARUS_SET as i32 => Self::GAME_ICARUS_SET,
@@ -192,16 +196,26 @@ impl TryFrom<i32> for MpGameExport {
             x if x == Self::GAME_ICARUS_GETVECTOR as i32 => Self::GAME_ICARUS_GETVECTOR,
             x if x == Self::GAME_ICARUS_GETSTRING as i32 => Self::GAME_ICARUS_GETSTRING,
             x if x == Self::GAME_ICARUS_SOUNDINDEX as i32 => Self::GAME_ICARUS_SOUNDINDEX,
-            x if x == Self::GAME_ICARUS_GETSETIDFORSTRING as i32 => Self::GAME_ICARUS_GETSETIDFORSTRING,
+            x if x == Self::GAME_ICARUS_GETSETIDFORSTRING as i32 => {
+                Self::GAME_ICARUS_GETSETIDFORSTRING
+            }
             x if x == Self::GAME_NAV_CLEARPATHTOPOINT as i32 => Self::GAME_NAV_CLEARPATHTOPOINT,
             x if x == Self::GAME_NAV_CLEARLOS as i32 => Self::GAME_NAV_CLEARLOS,
-            x if x == Self::GAME_NAV_CLEARPATHBETWEENPOINTS as i32 => Self::GAME_NAV_CLEARPATHBETWEENPOINTS,
-            x if x == Self::GAME_NAV_CHECKNODEFAILEDFORENT as i32 => Self::GAME_NAV_CHECKNODEFAILEDFORENT,
+            x if x == Self::GAME_NAV_CLEARPATHBETWEENPOINTS as i32 => {
+                Self::GAME_NAV_CLEARPATHBETWEENPOINTS
+            }
+            x if x == Self::GAME_NAV_CHECKNODEFAILEDFORENT as i32 => {
+                Self::GAME_NAV_CHECKNODEFAILEDFORENT
+            }
             x if x == Self::GAME_NAV_ENTISUNLOCKEDDOOR as i32 => Self::GAME_NAV_ENTISUNLOCKEDDOOR,
             x if x == Self::GAME_NAV_ENTISDOOR as i32 => Self::GAME_NAV_ENTISDOOR,
             x if x == Self::GAME_NAV_ENTISBREAKABLE as i32 => Self::GAME_NAV_ENTISBREAKABLE,
-            x if x == Self::GAME_NAV_ENTISREMOVABLEUSABLE as i32 => Self::GAME_NAV_ENTISREMOVABLEUSABLE,
-            x if x == Self::GAME_NAV_FINDCOMBATPOINTWAYPOINTS as i32 => Self::GAME_NAV_FINDCOMBATPOINTWAYPOINTS,
+            x if x == Self::GAME_NAV_ENTISREMOVABLEUSABLE as i32 => {
+                Self::GAME_NAV_ENTISREMOVABLEUSABLE
+            }
+            x if x == Self::GAME_NAV_FINDCOMBATPOINTWAYPOINTS as i32 => {
+                Self::GAME_NAV_FINDCOMBATPOINTWAYPOINTS
+            }
             x if x == Self::GAME_GETITEMINDEXBYTAG as i32 => Self::GAME_GETITEMINDEXBYTAG,
             _ => return Err(v),
         })

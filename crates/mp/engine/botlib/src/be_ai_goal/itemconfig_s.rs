@@ -7,8 +7,8 @@ use super::iteminfo_s::iteminfo_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_goal.cpp:141-145`
 #[repr(C)]
 pub struct itemconfig_t {
-	pub numiteminfo: i32,
-	pub iteminfo: *mut iteminfo_t,
+    pub numiteminfo: i32,
+    pub iteminfo: *mut iteminfo_t,
 }
 
 pub type itemconfig_s = itemconfig_t;

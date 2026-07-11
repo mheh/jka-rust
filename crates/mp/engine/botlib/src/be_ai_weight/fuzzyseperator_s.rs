@@ -5,14 +5,14 @@
 /// Type definition source: `oracle/codemp/botlib/be_ai_weight.h:19-29`
 #[repr(C)]
 pub struct fuzzyseperator_t {
-	pub index: i32,
-	pub value: i32,
-	pub r#type: i32,
-	pub weight: f32,
-	pub minweight: f32,
-	pub maxweight: f32,
-	pub child: *mut fuzzyseperator_t,
-	pub next: *mut fuzzyseperator_t,
+    pub index: i32,
+    pub value: i32,
+    pub r#type: i32,
+    pub weight: f32,
+    pub minweight: f32,
+    pub maxweight: f32,
+    pub child: *mut fuzzyseperator_t,
+    pub next: *mut fuzzyseperator_t,
 }
 
 pub type fuzzyseperator_s = fuzzyseperator_t;

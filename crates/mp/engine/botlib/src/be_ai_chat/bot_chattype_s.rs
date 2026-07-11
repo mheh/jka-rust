@@ -10,10 +10,10 @@ use super::chat_consts::MAX_CHATTYPE_NAME;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:64-70`
 #[repr(C)]
 pub struct bot_chattype_t {
-	pub name: [c_char; MAX_CHATTYPE_NAME],
-	pub numchatmessages: i32,
-	pub firstchatmessage: *mut bot_chatmessage_t,
-	pub next: *mut bot_chattype_t,
+    pub name: [c_char; MAX_CHATTYPE_NAME],
+    pub numchatmessages: i32,
+    pub firstchatmessage: *mut bot_chatmessage_t,
+    pub next: *mut bot_chattype_t,
 }
 
 pub type bot_chattype_s = bot_chattype_t;

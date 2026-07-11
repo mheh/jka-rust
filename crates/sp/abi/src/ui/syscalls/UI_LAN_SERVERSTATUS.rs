@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use super::super::SpUiImport;
 use abi_transport::generic::ptr_to_word;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `UI_LAN_SERVERSTATUS`.
 ///

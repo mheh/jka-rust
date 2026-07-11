@@ -12,20 +12,20 @@ const MAX_STRINGFIELD: usize = 80;
 /// Type definition source: `oracle/codemp/game/be_ai_weap.h:27-43`
 #[repr(C)]
 pub struct projectileinfo_t {
-	pub name: [c_char; MAX_STRINGFIELD],
-	pub model: [c_char; MAX_STRINGFIELD],
-	pub flags: i32,
-	pub gravity: f32,
-	pub damage: i32,
-	pub radius: f32,
-	pub visdamage: i32,
-	pub damagetype: i32,
-	pub healthinc: i32,
-	pub push: f32,
-	pub detonation: f32,
-	pub bounce: f32,
-	pub bouncefric: f32,
-	pub bouncestop: f32,
+    pub name: [c_char; MAX_STRINGFIELD],
+    pub model: [c_char; MAX_STRINGFIELD],
+    pub flags: i32,
+    pub gravity: f32,
+    pub damage: i32,
+    pub radius: f32,
+    pub visdamage: i32,
+    pub damagetype: i32,
+    pub healthinc: i32,
+    pub push: f32,
+    pub detonation: f32,
+    pub bounce: f32,
+    pub bouncefric: f32,
+    pub bouncestop: f32,
 }
 
 pub type projectileinfo_s = projectileinfo_t;

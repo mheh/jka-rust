@@ -7,12 +7,12 @@ use mp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/codemp/botlib/be_aas_def.h:67-75`
 #[repr(C)]
 pub struct bsp_entdata_t {
-	pub origin: vec3_t,
-	pub angles: vec3_t,
-	pub absmins: vec3_t,
-	pub absmaxs: vec3_t,
-	pub solid: i32,
-	pub modelnum: i32,
+    pub origin: vec3_t,
+    pub angles: vec3_t,
+    pub absmins: vec3_t,
+    pub absmaxs: vec3_t,
+    pub solid: i32,
+    pub modelnum: i32,
 }
 
 pub type bsp_entdata_s = bsp_entdata_t;

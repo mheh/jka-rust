@@ -9,8 +9,8 @@ use super::fuzzyseperator_s::fuzzyseperator_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_weight.h:32-36`
 #[repr(C)]
 pub struct weight_t {
-	pub name: *mut c_char,
-	pub firstseperator: *mut fuzzyseperator_t,
+    pub name: *mut c_char,
+    pub firstseperator: *mut fuzzyseperator_t,
 }
 
 pub type weight_s = weight_t;

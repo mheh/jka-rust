@@ -5,14 +5,14 @@
 /// Type definition source: `oracle/codemp/botlib/aasfile.h:144-150`
 #[repr(C)]
 pub struct aas_cluster_t {
-	/// number of areas in the cluster
-	pub numareas: i32,
-	/// number of areas with reachabilities
-	pub numreachabilityareas: i32,
-	/// number of cluster portals
-	pub numportals: i32,
-	/// first cluster portal in the index
-	pub firstportal: i32,
+    /// number of areas in the cluster
+    pub numareas: i32,
+    /// number of areas with reachabilities
+    pub numreachabilityareas: i32,
+    /// number of cluster portals
+    pub numportals: i32,
+    /// first cluster portal in the index
+    pub firstportal: i32,
 }
 
 pub type aas_cluster_s = aas_cluster_t;

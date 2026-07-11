@@ -5,4 +5,3 @@
 //! `class_flags.rs`, `class_desc.rs`, `class.rs`, `team.rs`).
 //! Source: `oracle/codemp/game/bg_saga.h`
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
-

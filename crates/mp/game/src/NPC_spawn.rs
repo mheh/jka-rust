@@ -1139,7 +1139,8 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
         if (*ent).NPC_type.is_null() {
             (*ent).NPC_type = c"random".as_ptr() as *mut c_char;
         } else {
-            (*ent).NPC_type = crate::q_shared::Q_strlwr(crate::g_spawn::G_NewString(ctx, 
+            (*ent).NPC_type = crate::q_shared::Q_strlwr(crate::g_spawn::G_NewString(
+                ctx,
                 (*ent).NPC_type as *const c_char,
             ));
         }
@@ -2983,9 +2984,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
             Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
             for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
                 // Raven `TeamNames[]` (NPC_stats.c:133) — the NPC team_t names.
-                Com_Printf(
-                    cstr(&format!("{}\n", TEAM_NAMES[n as usize])).as_ptr(),
-                );
+                Com_Printf(cstr(&format!("{}\n", TEAM_NAMES[n as usize])).as_ptr());
             }
             Com_Printf(c"nonally - kills all but your teammates\n".as_ptr() as *const c_char);
             return;
@@ -3012,9 +3011,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                 Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
                 for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
                     // Raven `TeamNames[]` (NPC_stats.c:133) — the NPC team_t names.
-                    Com_Printf(
-                        cstr(&format!("{}\n", TEAM_NAMES[n as usize])).as_ptr(),
-                    );
+                    Com_Printf(cstr(&format!("{}\n", TEAM_NAMES[n as usize])).as_ptr());
                 }
                 Com_Printf(c"nonally - kills all but your teammates\n".as_ptr() as *const c_char);
                 return;

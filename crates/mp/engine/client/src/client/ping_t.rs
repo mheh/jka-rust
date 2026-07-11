@@ -10,10 +10,10 @@ use mp_qshared::shared::MAX_INFO_STRING;
 /// Type definition source: `oracle/codemp/client/client.h:247-255`
 #[repr(C)]
 pub struct ping_t {
-	pub adr: netadr_t,
-	pub start: i32,
-	pub time: i32,
-	pub info: [c_char; MAX_INFO_STRING],
+    pub adr: netadr_t,
+    pub start: i32,
+    pub time: i32,
+    pub info: [c_char; MAX_INFO_STRING],
 }
 
 const _: () = assert!(core::mem::size_of::<ping_t>() == 1052);

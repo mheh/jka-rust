@@ -12,10 +12,10 @@ use super::bot_characteristic_s::bot_characteristic_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_char.cpp:53-58`
 #[repr(C)]
 pub struct bot_character_t {
-	pub filename: [c_char; MAX_QPATH as usize],
-	pub skill: f32,
-	/// variable sized
-	pub c: [bot_characteristic_t; 1],
+    pub filename: [c_char; MAX_QPATH as usize],
+    pub skill: f32,
+    /// variable sized
+    pub c: [bot_characteristic_t; 1],
 }
 
 pub type bot_character_s = bot_character_t;

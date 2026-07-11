@@ -66,8 +66,6 @@ pub const FUNC_WALL_OFF: c_int = 1;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 // Raven file-scope `#define`s (this file's own bitflags on `ent->spawnflags`).
 // Source: `oracle/codemp/game/g_mover.c:26-33`
 const MOVER_START_ON: c_int = 1;
@@ -2738,8 +2736,10 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: *mut gentity_t) {
         // volume down based on how many chunks we have.
         // Raven: `sqrt( sqrt( org[0]*org[1]*org[2] )) * 1.75f`. Both sqrts are the double
         // libm call and the whole product stays double until it narrows to float on assign.
-        let mut scale =
-            (((org_size[0] * org_size[1] * org_size[2]) as f64).sqrt().sqrt() * 1.75) as f32;
+        let mut scale = (((org_size[0] * org_size[1] * org_size[2]) as f64)
+            .sqrt()
+            .sqrt()
+            * 1.75) as f32;
 
         let size = if scale > 48.0 {
             2

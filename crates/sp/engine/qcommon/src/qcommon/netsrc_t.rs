@@ -6,6 +6,6 @@
 /// Type definition source: `oracle/code/qcommon/qcommon.h:132-135`
 #[repr(i32)]
 pub enum netsrc_t {
-	NS_CLIENT,
-	NS_SERVER,
+    NS_CLIENT,
+    NS_SERVER,
 }

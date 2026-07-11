@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
+use crate::cgame::types::markFragment_t;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::cgame::types::markFragment_t;
 use sp_qshared::shared::vec3_t;
 
 /// Arguments for `CG_CM_MARKFRAGMENTS`.

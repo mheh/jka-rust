@@ -828,7 +828,10 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         );
                     } else {
                         //else, maybe just a random chance
-                        if (*ctx.world).bg_state.rng.Q_irand(0, (*selfNpc).rank as c_int)
+                        if (*ctx.world)
+                            .bg_state
+                            .rng
+                            .Q_irand(0, (*selfNpc).rank as c_int)
                             > (*memberNpc).rank as c_int
                         {
                             //lower rank they are, higher rank I am, more likely they are to flee

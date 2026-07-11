@@ -265,7 +265,10 @@ impl MockHost {
     pub fn gentity_mut(&mut self, ent_num: i32) -> &mut sharedEntity_t {
         let stride = core::mem::size_of::<sharedEntity_t>();
         let n = ent_num as usize;
-        assert!(n < MAX_GENTITIES, "gentity_mut: ent_num {ent_num} out of range");
+        assert!(
+            n < MAX_GENTITIES,
+            "gentity_mut: ent_num {ent_num} out of range"
+        );
         // SAFETY: the arena is `MAX_GENTITIES * stride` zeroed bytes; slot `n`
         // is in bounds and `sharedEntity_t` is a `#[repr(C)]` POD whose
         // all-zero bit pattern is a valid value.
@@ -442,7 +445,10 @@ impl EngineHost for MockHost {
 
     fn cvar_string(&mut self, name: &str) -> String {
         // Missing name reads "" (Cvar_VariableString, cvar.cpp:133-140).
-        self.cvars.get(name).map(|c| c.string.clone()).unwrap_or_default()
+        self.cvars
+            .get(name)
+            .map(|c| c.string.clone())
+            .unwrap_or_default()
     }
 
     fn cvar_take_modified(&mut self, name: &str) -> bool {
@@ -608,7 +614,9 @@ mod tests {
         let mut host = MockHost::new();
         let mut tr: trace_t = unsafe { core::mem::zeroed() };
         let end = [1.0, 2.0, 3.0];
-        host.trace(&mut tr, &[0.0; 3], &[0.0; 3], &[0.0; 3], &end, 0, 0, false, 0, 0);
+        host.trace(
+            &mut tr, &[0.0; 3], &[0.0; 3], &[0.0; 3], &end, 0, 0, false, 0, 0,
+        );
         assert_eq!(tr.fraction, 1.0);
         assert_eq!(tr.entityNum, ENTITYNUM_NONE as i16);
         assert_eq!(tr.endpos, end);
@@ -736,8 +744,10 @@ mod tests {
         let mut host = MockHost::new()
             .with_file("models/players/kyle/model.glm", b"glm".to_vec())
             .with_file("models/local/tweak.glm", b"glm".to_vec());
-        host.pak_files
-            .insert("models/players/kyle/model.glm".to_string(), 0x1234_abcd_u32 as i32);
+        host.pak_files.insert(
+            "models/players/kyle/model.glm".to_string(),
+            0x1234_abcd_u32 as i32,
+        );
 
         // In a pure pak: Some(pure_checksum) (files.cpp:1650-1653).
         assert_eq!(
@@ -760,13 +770,19 @@ mod tests {
             .with_file("strings/readme.txt", b"d".to_vec());
 
         // ext "/" lists distinct subdirectory names (SE_R_ListFiles convention).
-        assert_eq!(host.fs_list_files("strings", "/", false), vec!["deutsch", "english"]);
+        assert_eq!(
+            host.fs_list_files("strings", "/", false),
+            vec!["deutsch", "english"]
+        );
         // Direct children by extension.
         assert_eq!(
             host.fs_list_files("strings/english", ".str", false),
             vec!["menus.str", "mp.str"]
         );
-        assert_eq!(host.fs_list_files("strings", ".str", false), Vec::<String>::new());
+        assert_eq!(
+            host.fs_list_files("strings", ".str", false),
+            Vec::<String>::new()
+        );
         // want_subs extends into subdirectories (ruled surface).
         assert_eq!(
             host.fs_list_files("strings", ".str", true),

@@ -10,10 +10,10 @@
 
 use crate::entity::flags::FL_NOTARGET;
 use crate::g_combat::G_AlertTeam;
-use crate::g_team::S_COLOR_RED;
 use crate::g_items::{Add_Ammo, CheckItemCanBePickedUpByNPC};
 use crate::g_nav::NAV_FindClosestWaypointForPoint2;
 use crate::g_nav::{NAV_ClearPathToPoint, NAV_GetNearestNode, NPC_SetMoveGoal};
+use crate::g_team::S_COLOR_RED;
 use crate::g_timer::{TIMER_Done, TIMER_Exists, TIMER_Set};
 use crate::g_utils::{vtos, G_Sound};
 use crate::g_utils::{G_CheckInSolid, G_FreeEntity, G_SetOrigin};
@@ -2519,13 +2519,8 @@ pub fn NPC_FindCombatPoint(
             //much larger radius since most will be dropped?
             collRad = CP_COLLECT_RADIUS * 4.0;
         }
-        let numPoints = NPC_CollectCombatPoints(
-            ctx,
-            enemyPosition,
-            collRad,
-            points.as_mut_ptr(),
-            flags,
-        ); //position
+        let numPoints =
+            NPC_CollectCombatPoints(ctx, enemyPosition, collRad, points.as_mut_ptr(), flags); //position
 
         for j in 0..(numPoints as usize) {
             let i = points[j].index as usize;

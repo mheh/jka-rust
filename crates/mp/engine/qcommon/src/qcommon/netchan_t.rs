@@ -11,30 +11,30 @@ use super::net_limits::MAX_MSGLEN;
 /// Type definition source: `oracle/codemp/qcommon/qcommon.h:163-186`
 #[repr(C)]
 pub struct netchan_t {
-	pub sock: netsrc_t,
+    pub sock: netsrc_t,
 
-	// between last packet and previous
-	pub dropped: i32,
+    // between last packet and previous
+    pub dropped: i32,
 
-	pub remoteAddress: netadr_t,
-	// qport value to write when transmitting
-	pub qport: i32,
+    pub remoteAddress: netadr_t,
+    // qport value to write when transmitting
+    pub qport: i32,
 
-	// sequencing variables
-	pub incomingSequence: i32,
-	pub outgoingSequence: i32,
+    // sequencing variables
+    pub incomingSequence: i32,
+    pub outgoingSequence: i32,
 
-	// incoming fragment assembly buffer
-	pub fragmentSequence: i32,
-	pub fragmentLength: i32,
-	pub fragmentBuffer: [u8; MAX_MSGLEN],
+    // incoming fragment assembly buffer
+    pub fragmentSequence: i32,
+    pub fragmentLength: i32,
+    pub fragmentBuffer: [u8; MAX_MSGLEN],
 
-	// outgoing fragment buffer
-	// we need to space out the sending of large fragmented messages
-	pub unsentFragments: qboolean,
-	pub unsentFragmentStart: i32,
-	pub unsentLength: i32,
-	pub unsentBuffer: [u8; MAX_MSGLEN],
+    // outgoing fragment buffer
+    // we need to space out the sending of large fragmented messages
+    pub unsentFragments: qboolean,
+    pub unsentFragmentStart: i32,
+    pub unsentLength: i32,
+    pub unsentBuffer: [u8; MAX_MSGLEN],
 }
 
 const _: () = assert!(core::mem::size_of::<netchan_t>() == 98364);

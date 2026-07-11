@@ -1,7 +1,9 @@
 use super::super::MpGameImport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ROFF_PLAY` outbound game-to-engine syscall.
 ///

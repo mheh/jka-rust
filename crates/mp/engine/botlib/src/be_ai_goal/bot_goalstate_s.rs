@@ -19,22 +19,22 @@ pub const MAX_AVOIDGOALS: usize = 256;
 /// Type definition source: `oracle/codemp/botlib/be_ai_goal.cpp:148-161`
 #[repr(C)]
 pub struct bot_goalstate_t {
-	/// weight config
-	pub itemweightconfig: *mut weightconfig_t,
-	/// index from item to weight
-	pub itemweightindex: *mut i32,
-	/// client using this goal state
-	pub client: i32,
-	/// last area with reachabilities the bot was in
-	pub lastreachabilityarea: i32,
-	/// goal stack
-	pub goalstack: [bot_goal_t; MAX_GOALSTACK],
-	/// the top of the goal stack
-	pub goalstacktop: i32,
-	/// goals to avoid
-	pub avoidgoals: [i32; MAX_AVOIDGOALS],
-	/// times to avoid the goals
-	pub avoidgoaltimes: [f32; MAX_AVOIDGOALS],
+    /// weight config
+    pub itemweightconfig: *mut weightconfig_t,
+    /// index from item to weight
+    pub itemweightindex: *mut i32,
+    /// client using this goal state
+    pub client: i32,
+    /// last area with reachabilities the bot was in
+    pub lastreachabilityarea: i32,
+    /// goal stack
+    pub goalstack: [bot_goal_t; MAX_GOALSTACK],
+    /// the top of the goal stack
+    pub goalstacktop: i32,
+    /// goals to avoid
+    pub avoidgoals: [i32; MAX_AVOIDGOALS],
+    /// times to avoid the goals
+    pub avoidgoaltimes: [f32; MAX_AVOIDGOALS],
 }
 
 pub type bot_goalstate_s = bot_goalstate_t;

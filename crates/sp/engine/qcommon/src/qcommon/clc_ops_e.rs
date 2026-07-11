@@ -6,8 +6,8 @@
 /// Type definition source: `oracle/code/qcommon/qcommon.h:222-227`
 #[repr(i32)]
 pub enum clc_ops_e {
-	clc_bad,
-	clc_nop,
-	clc_move,			// [[usercmd_t]
-	clc_clientCommand,	// [string] message
+    clc_bad,
+    clc_nop,
+    clc_move,          // [[usercmd_t]
+    clc_clientCommand, // [string] message
 }

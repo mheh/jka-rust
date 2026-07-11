@@ -12,9 +12,9 @@ use super::bot_chat_s::bot_chat_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:175-179`
 #[repr(C)]
 pub struct bot_ichatdata_t {
-	pub chat: *mut bot_chat_t,
-	pub filename: [c_char; MAX_QPATH as usize],
-	pub chatname: [c_char; MAX_QPATH as usize],
+    pub chat: *mut bot_chat_t,
+    pub filename: [c_char; MAX_QPATH as usize],
+    pub chatname: [c_char; MAX_QPATH as usize],
 }
 
 pub type bot_ichatdata_s = bot_ichatdata_t;

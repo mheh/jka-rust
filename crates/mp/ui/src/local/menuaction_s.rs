@@ -7,7 +7,7 @@ use super::menucommon_s::menucommon_s;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:221-224`
 #[repr(C)]
 pub struct menuaction_s {
-	pub generic: menucommon_s,
+    pub generic: menucommon_s,
 }
 
 const _: () = assert!(core::mem::size_of::<menuaction_s>() == 88);

@@ -5,11 +5,11 @@
 /// Type definition source: `oracle/codemp/cgame/cg_local.h:1611-1618`
 #[repr(C)]
 pub struct siegeExtended_t {
-	pub health: i32,
-	pub maxhealth: i32,
-	pub ammo: i32,
-	pub weapon: i32,
-	pub lastUpdated: i32,
+    pub health: i32,
+    pub maxhealth: i32,
+    pub ammo: i32,
+    pub weapon: i32,
+    pub lastUpdated: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<siegeExtended_t>() == 20);

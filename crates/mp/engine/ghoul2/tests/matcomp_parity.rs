@@ -71,7 +71,15 @@ fn matcomp_matches_oracle_golden() {
     writeln!(out, "=== MC_UnCompressQuat (7 x u16: quat wxyz + xlat) ===").unwrap();
     // Mirrors `dump_matcomp.cpp`'s `inputs[][7]` literals exactly.
     let inputs: [[u16; 7]; 5] = [
-        [16383 * 2, 16383 * 2, 16383 * 2, 16383 * 2, 512 * 64, 512 * 64, 512 * 64],
+        [
+            16383 * 2,
+            16383 * 2,
+            16383 * 2,
+            16383 * 2,
+            512 * 64,
+            512 * 64,
+            512 * 64,
+        ],
         [16383 * 3, 16383 * 2, 16383 * 2, 16383 * 2, 0, 0, 0],
         [20000, 10000, 30000, 5000, 40000, 20000, 1000],
         [0, 0, 0, 0, 65535, 0, 32768],
@@ -88,7 +96,11 @@ fn matcomp_matches_oracle_golden() {
     writeln!(out, "\n=== MC_Compress -> MC_UnCompress round-trip ===").unwrap();
     // Mirrors `dump_matcomp.cpp`'s `mats[][3][4]` literals exactly.
     let mats: [[[f32; 4]; 3]; 2] = [
-        [[1.0, 0.0, 0.0, 10.0], [0.0, 1.0, 0.0, -20.0], [0.0, 0.0, 1.0, 30.0]],
+        [
+            [1.0, 0.0, 0.0, 10.0],
+            [0.0, 1.0, 0.0, -20.0],
+            [0.0, 0.0, 1.0, 30.0],
+        ],
         [
             [0.5, -0.5, 0.25, 100.0],
             [-1.0, 1.0, -1.0, -100.0],

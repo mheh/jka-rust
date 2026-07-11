@@ -12,7 +12,7 @@ pub struct bot_consolemessage_t {
     pub time: c_float, //message time
     pub r#type: c_int, //message type
     // MAX_MESSAGE_SIZE == 256. Source: oracle/codemp/game/be_ai_chat.h:16
-    pub message: [c_char; 256], //message
+    pub message: [c_char; 256],          //message
     pub prev: *mut bot_consolemessage_t, //prev and next in list
     pub next: *mut bot_consolemessage_t,
 }

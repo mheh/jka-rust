@@ -9,10 +9,10 @@ use super::bot_matchpiece_s::bot_matchpiece_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:134-140`
 #[repr(C)]
 pub struct bot_replychatkey_t {
-	pub flags: i32,
-	pub string: *mut c_char,
-	pub r#match: *mut bot_matchpiece_t,
-	pub next: *mut bot_replychatkey_t,
+    pub flags: i32,
+    pub string: *mut c_char,
+    pub r#match: *mut bot_matchpiece_t,
+    pub next: *mut bot_replychatkey_t,
 }
 
 pub type bot_replychatkey_s = bot_replychatkey_t;

@@ -570,13 +570,11 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, count) == 840);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, bounceCount) == 844);
 #[cfg(target_pointer_width = "64")]
-const _: () =
-    assert!(core::mem::offset_of!(gentity_t, fly_sound_debounce_time) == 848);
+const _: () = assert!(core::mem::offset_of!(gentity_t, fly_sound_debounce_time) == 848);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, painDebounceTime) == 852);
 #[cfg(target_pointer_width = "64")]
-const _: () =
-    assert!(core::mem::offset_of!(gentity_t, disconnectDebounceTime) == 856);
+const _: () = assert!(core::mem::offset_of!(gentity_t, disconnectDebounceTime) == 856);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, attackDebounceTime) == 860);
 #[cfg(target_pointer_width = "64")]

@@ -5,7 +5,7 @@
 /// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:159-161`
 #[repr(C)]
 pub struct md3St_t {
-	pub st: [f32; 2],
+    pub st: [f32; 2],
 }
 
 const _: () = assert!(core::mem::size_of::<md3St_t>() == 8);

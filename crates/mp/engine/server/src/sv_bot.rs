@@ -12,7 +12,7 @@ use mp_engine_qcommon::qcommon::net_limits::{MAX_RELIABLE_COMMANDS, PACKET_MASK}
 use mp_qshared::shared::{qfalse, qtrue};
 
 use crate::Server;
-use mp_qshared::shared::q_string::{Q_strncpyz};
+use mp_qshared::shared::q_string::Q_strncpyz;
 
 /// Raven `BotImport_DebugPolygonDelete`.
 ///
@@ -40,7 +40,12 @@ pub fn SV_BotLibShutdown(sv: &mut Server) -> c_int {
 /// Raven `SV_BotGetConsoleMessage`.
 ///
 /// Source: `oracle/codemp/server/sv_bot.cpp:736-757`
-pub fn SV_BotGetConsoleMessage(sv: &mut Server, client: c_int, buf: *mut c_char, size: c_int) -> c_int {
+pub fn SV_BotGetConsoleMessage(
+    sv: &mut Server,
+    client: c_int,
+    buf: *mut c_char,
+    size: c_int,
+) -> c_int {
     unsafe {
         let cl = sv.svs.clients.offset(client as isize);
         (*cl).lastPacketTime = sv.svs.time;
@@ -71,8 +76,7 @@ pub fn SV_BotGetSnapshotEntity(sv: &mut Server, client: c_int, sequence: c_int) 
         if sequence < 0 || sequence >= frame.num_entities {
             return -1;
         }
-        (*sv
-            .svs
+        (*sv.svs
             .snapshotEntities
             .offset(((frame.first_entity + sequence) % sv.svs.numSnapshotEntities) as isize))
         .number

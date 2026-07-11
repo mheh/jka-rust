@@ -23,8 +23,6 @@ use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 // These define the working combat range for these suckers
 // Source: `oracle/codemp/game/NPC_AI_Wampa.c:5-9`
 const MIN_DISTANCE: c_int = 48;

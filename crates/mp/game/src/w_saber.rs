@@ -69,6 +69,7 @@ use mp_qshared::shared::q_math_rand::RAND_MAX;
 // --- pass-2 shard-2 body-fill callee imports (resolved owning files per packet) ---
 use crate::ai_wpnav::G_TestLine;
 use crate::bg_misc::BG_EvaluateTrajectory;
+use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri};
 use crate::bg_panimate::{
     BG_BrokenParryForParry, BG_InSpecialJump, BG_KnockawayForParry, BG_SaberInAttackPure,
@@ -99,7 +100,6 @@ use crate::saber::saber_flags::{
 use crate::tri_coll_test::tri_tri_intersect;
 use crate::w_force::{ForceThrow, WP_ForcePowerUsable};
 use crate::NPC_AI_Jedi::{Jedi_Ambush, Jedi_SaberBlockGo, Jedi_WaitingAmbush};
-use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 use crate::NPC_senses::InFront;
 use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 

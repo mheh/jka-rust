@@ -6,8 +6,8 @@
 /// Type definition source: `oracle/codemp/game/g_public.h:866-870`
 #[repr(C)]
 pub struct T_G_ICARUS_USE {
-	pub entID: i32,
-	pub target: [i8; 2048],
+    pub entID: i32,
+    pub target: [i8; 2048],
 }
 
 const _: () = assert!(core::mem::size_of::<T_G_ICARUS_USE>() == 2052);

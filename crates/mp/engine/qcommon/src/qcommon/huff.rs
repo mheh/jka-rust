@@ -13,8 +13,8 @@
 use core::ffi::{c_char, c_int};
 use core::ptr;
 
-use super::huffman_consts::{INTERNAL_NODE, NYT};
 use super::huff_t::huff_t;
+use super::huffman_consts::{INTERNAL_NODE, NYT};
 use super::huffman_t::huffman_t;
 use super::nodetype::node_t;
 
@@ -270,7 +270,12 @@ pub unsafe fn Huff_addRef(huff: *mut huff_t, ch: u8) {
 /// Raven `Huff_Receive` — get a symbol.
 ///
 /// Source: `oracle/codemp/qcommon/huffman.cpp:236-249`
-unsafe fn Huff_Receive(mut node: *mut node_t, ch: &mut c_int, fin: *mut u8, bloc: &mut c_int) -> c_int {
+unsafe fn Huff_Receive(
+    mut node: *mut node_t,
+    ch: &mut c_int,
+    fin: *mut u8,
+    bloc: &mut c_int,
+) -> c_int {
     while !node.is_null() && (*node).symbol == INTERNAL_NODE {
         if get_bit(fin, bloc) != 0 {
             node = (*node).right;
@@ -289,7 +294,12 @@ unsafe fn Huff_Receive(mut node: *mut node_t, ch: &mut c_int, fin: *mut u8, bloc
 /// Raven `Huff_offsetReceive` — get a symbol.
 ///
 /// Source: `oracle/codemp/qcommon/huffman.cpp:252-269`
-pub unsafe fn Huff_offsetReceive(mut node: *mut node_t, ch: &mut c_int, fin: *mut u8, offset: &mut c_int) {
+pub unsafe fn Huff_offsetReceive(
+    mut node: *mut node_t,
+    ch: &mut c_int,
+    fin: *mut u8,
+    offset: &mut c_int,
+) {
     let mut bloc = *offset;
     while !node.is_null() && (*node).symbol == INTERNAL_NODE {
         if get_bit(fin, &mut bloc) != 0 {
@@ -404,7 +414,11 @@ pub unsafe fn Huff_Decompress(mbuf: *mut msg_t, offset: c_int) {
         Huff_addRef(&mut huff, ch as u8); // Increment node
     }
     (*mbuf).cursize = cch + offset;
-    ptr::copy_nonoverlapping(seq.as_ptr(), (*mbuf).data.add(offset as usize), cch as usize);
+    ptr::copy_nonoverlapping(
+        seq.as_ptr(),
+        (*mbuf).data.add(offset as usize),
+        cch as usize,
+    );
 }
 
 /// Raven `Huff_Compress`.

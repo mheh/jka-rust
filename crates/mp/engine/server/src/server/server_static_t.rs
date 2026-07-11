@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
+use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::shared::qboolean;
 
 use super::challenge_t::challenge_t;

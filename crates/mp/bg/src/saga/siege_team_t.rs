@@ -54,10 +54,10 @@ pub const SIEGETEAM_TEAM2: i32 = 2;
 /// Type definition source: `oracle/codemp/game/bg_saga.h:82-88`
 #[repr(C)]
 pub struct siegeTeam_t {
-	pub name: [core::ffi::c_char; 512],
-	pub classes: [*mut siegeClass_t; MAX_SIEGE_CLASSES_PER_TEAM],
-	pub numClasses: i32,
-	pub friendlyShader: i32,
+    pub name: [core::ffi::c_char; 512],
+    pub classes: [*mut siegeClass_t; MAX_SIEGE_CLASSES_PER_TEAM],
+    pub numClasses: i32,
+    pub friendlyShader: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<siegeTeam_t>() == 648);

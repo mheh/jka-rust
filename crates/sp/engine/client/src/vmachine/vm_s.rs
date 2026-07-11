@@ -5,7 +5,7 @@
 /// Type definition source: `oracle/code/client/vmachine.h:48-50`
 #[repr(C)]
 pub struct vm_t {
-	pub entryPoint: Option<unsafe extern "C" fn(callNum: i32, ...) -> i32>,
+    pub entryPoint: Option<unsafe extern "C" fn(callNum: i32, ...) -> i32>,
 }
 
 /// Raven C tag `vm_s` for the same type.

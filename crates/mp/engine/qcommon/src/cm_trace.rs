@@ -29,10 +29,10 @@ use mp_qshared::shared::{
 // names bind here to the reshaped `_`-prefixed / plain fns (inputs by value,
 // outputs `&mut`) per the rosetta vec3 stanza.
 use mp_qshared::shared::q_math::{
+    _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorCopy as VectorCopy,
+    _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
     AngleVectors, Square, VectorAdvance, VectorClear, VectorInverse, VectorLength,
-    VectorLengthSquared, VectorNormalize, VectorSet, _DotProduct as DotProduct,
-    _VectorAdd as VectorAdd, _VectorCopy as VectorCopy, _VectorMA as VectorMA,
-    _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
+    VectorLengthSquared, VectorNormalize, VectorSet,
 };
 
 use crate::cm::c_leaf_t::cLeaf_t;
@@ -49,7 +49,7 @@ use crate::cm::leaf_list_s::leafList_t;
 use crate::cm::sphere_t::sphere_t;
 use crate::cm::trace_work_s::{traceWork_s, traceWork_t};
 use crate::cm_load::{
-    CCMLandScape, RenderModels, RmManager, CM_ClipHandleToModel, CM_ModelBounds, CM_TempBoxModel,
+    CCMLandScape, CM_ClipHandleToModel, CM_ModelBounds, CM_TempBoxModel, RenderModels, RmManager,
 };
 use crate::cm_patch_fns::{CM_PositionTestInPatchCollide, CM_TraceThroughPatchCollide};
 use crate::cm_test::{CM_BoxLeafnums_r, CM_StoreLeafs};

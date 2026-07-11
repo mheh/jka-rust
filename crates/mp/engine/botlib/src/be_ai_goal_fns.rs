@@ -52,7 +52,6 @@ use crate::be_ai_goal::bot_goalstate_s::{bot_goalstate_t, MAX_AVOIDGOALS, MAX_GO
 use crate::be_ai_goal::itemconfig_s::itemconfig_t;
 use crate::be_ai_goal::iteminfo_s::iteminfo_t;
 use crate::be_ai_goal::levelitem_s::levelitem_t;
-use crate::{campspot_t, maplocation_t};
 use crate::be_ai_weight::weightconfig_s::weightconfig_t;
 use crate::l_libvar::libvar_s::libvar_t;
 use crate::l_precomp::source_s::source_t;
@@ -60,6 +59,7 @@ use crate::l_script::consts::TT_STRING;
 use crate::l_script::token_s::token_t;
 use crate::l_struct::structdef_s::structdef_t;
 use crate::BotLib;
+use crate::{campspot_t, maplocation_t};
 
 // ---------------------------------------------------------------------
 // Externally-ported callees this file reaches (signatures inferred from
@@ -1983,8 +1983,7 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
                     core::mem::size_of_val(&(*ii).classname) - 1,
                 );
                 let iteminfo_struct_ptr = &mut bot.iteminfo_struct as *mut structdef_t;
-                if ReadStructure(bot, source, iteminfo_struct_ptr, ii as *mut c_char) == 0
-                {
+                if ReadStructure(bot, source, iteminfo_struct_ptr, ii as *mut c_char) == 0 {
                     FreeMemory(bot, ic as *mut ());
                     FreeSource(bot, source);
                     return core::ptr::null_mut();

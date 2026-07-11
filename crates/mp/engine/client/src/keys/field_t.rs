@@ -5,11 +5,11 @@
 /// Type definition source: `oracle/codemp/client/keys.h:12-17`
 #[repr(C)]
 pub struct field_t {
-	pub cursor: i32,
-	pub scroll: i32,
-	pub widthInChars: i32,
-	// Raven's `#define MAX_EDIT_LINE 256` (oracle/codemp/client/keys.h:9).
-	pub buffer: [core::ffi::c_char; 256],
+    pub cursor: i32,
+    pub scroll: i32,
+    pub widthInChars: i32,
+    // Raven's `#define MAX_EDIT_LINE 256` (oracle/codemp/client/keys.h:9).
+    pub buffer: [core::ffi::c_char; 256],
 }
 
 const _: () = assert!(core::mem::size_of::<field_t>() == 268);

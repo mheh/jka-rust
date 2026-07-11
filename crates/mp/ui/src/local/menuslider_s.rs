@@ -7,13 +7,13 @@ use super::menucommon_s::menucommon_s;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:193-202`
 #[repr(C)]
 pub struct menuslider_s {
-	pub generic: menucommon_s,
+    pub generic: menucommon_s,
 
-	pub minvalue: f32,
-	pub maxvalue: f32,
-	pub curvalue: f32,
+    pub minvalue: f32,
+    pub maxvalue: f32,
+    pub curvalue: f32,
 
-	pub range: f32,
+    pub range: f32,
 }
 
 const _: () = assert!(core::mem::size_of::<menuslider_s>() == 104);

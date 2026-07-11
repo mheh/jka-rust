@@ -8,12 +8,12 @@ use super::netadrtype_t::netadrtype_t;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct netadr_t {
-	pub r#type: netadrtype_t,
+    pub r#type: netadrtype_t,
 
-	pub ip: [u8; 4],
-	pub ipx: [u8; 10],
+    pub ip: [u8; 4],
+    pub ipx: [u8; 10],
 
-	pub port: u16,
+    pub port: u16,
 }
 
 const _: () = assert!(core::mem::size_of::<netadr_t>() == 20);

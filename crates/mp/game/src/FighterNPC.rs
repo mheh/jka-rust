@@ -13,8 +13,6 @@ use crate::prelude::*;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 // Integration round-1: these cross-file callees already exist in-crate; the
 // staged skeleton had faithfully transcribed them as an `extern "C" { .. }`
 // block (as if resolved at link time), which cannot work for plain-Rust
@@ -28,11 +26,11 @@ use crate::g_vehicles::{
     G_VehicleTrace, Update as vehicle_base_update, SHIPSURF_BROKEN_C, SHIPSURF_BROKEN_D,
     SHIPSURF_BROKEN_E, SHIPSURF_BROKEN_F,
 };
-use crate::veh_dispatch;
 use crate::q_math::{
     _DotProduct, _VectorMA, _VectorScale, AngleVectors, VectorClear, VectorLength,
 };
 use crate::q_math::{AngleNormalize180, AngleNormalize360, AngleSubtract};
+use crate::veh_dispatch;
 
 // Constants used by the vehicle move/orient/animate bodies below. Values from the
 // oracle; defined locally (mirroring `SpeederNPC.rs`) so the flight bodies don't
@@ -124,7 +122,11 @@ pub fn BG_FighterUpdate(
                 .unwrap_or(0);
             let mut i: c_int = 0;
             while i < maxPassengers {
-                veh_dispatch::ghost(ctx, pVeh, (*pVeh).m_ppPassengers[i as usize].cast::<gentity_t>());
+                veh_dispatch::ghost(
+                    ctx,
+                    pVeh,
+                    (*pVeh).m_ppPassengers[i as usize].cast::<gentity_t>(),
+                );
                 i += 1;
             }
         }

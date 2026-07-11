@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_R_WEATHER_CONTENTS_OVERRIDE`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

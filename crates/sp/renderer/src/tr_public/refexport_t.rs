@@ -7,7 +7,9 @@ use sp_qshared::common::sp::renderer::poly_vert_t::polyVert_t;
 use sp_qshared::common::sp::renderer::ref_entity_t::refEntity_t;
 use sp_qshared::common::sp::renderer::refdef_t::refdef_t;
 use sp_qshared::common::sp::renderer::stereo_frame_t::stereoFrame_t;
-use sp_qshared::shared::{markFragment_t, orientation_t, qboolean, qhandle_t, vec3_t, ForceReload_e};
+use sp_qshared::shared::{
+    markFragment_t, orientation_t, qboolean, qhandle_t, vec3_t, ForceReload_e,
+};
 
 /// Raven `refexport_t` — renderer export function table (`re` in the client),
 /// handed from the loaded renderer module to the engine.
@@ -50,15 +52,24 @@ pub struct refexport_t {
     pub BeginRegistration: Option<unsafe extern "C" fn(config: *mut glconfig_t)>,
     pub RegisterModel: Option<unsafe extern "C" fn(name: *const c_char) -> qhandle_t>,
     pub RegisterSkin: Option<unsafe extern "C" fn(name: *const c_char) -> qhandle_t>,
-    pub GetAnimationCFG:
-        Option<unsafe extern "C" fn(psCFGFilename: *const c_char, psDest: *mut c_char, iDestSize: c_int) -> c_int>,
+    pub GetAnimationCFG: Option<
+        unsafe extern "C" fn(
+            psCFGFilename: *const c_char,
+            psDest: *mut c_char,
+            iDestSize: c_int,
+        ) -> c_int,
+    >,
     pub RegisterShader: Option<unsafe extern "C" fn(name: *const c_char) -> qhandle_t>,
     pub RegisterShaderNoMip: Option<unsafe extern "C" fn(name: *const c_char) -> qhandle_t>,
     pub LoadWorld: Option<unsafe extern "C" fn(name: *const c_char)>,
 
     // these two functions added to help with the new model alloc scheme...
     pub RegisterMedia_LevelLoadBegin: Option<
-        unsafe extern "C" fn(psMapName: *const c_char, eForceReload: ForceReload_e, bAllowScreenDissolve: qboolean),
+        unsafe extern "C" fn(
+            psMapName: *const c_char,
+            eForceReload: ForceReload_e,
+            bAllowScreenDissolve: qboolean,
+        ),
     >,
     pub RegisterMedia_LevelLoadEnd: Option<unsafe extern "C" fn()>,
 
@@ -77,7 +88,13 @@ pub struct refexport_t {
     pub AddPolyToScene:
         Option<unsafe extern "C" fn(hShader: qhandle_t, numVerts: c_int, verts: *const polyVert_t)>,
     pub AddLightToScene: Option<
-        unsafe extern "C" fn(org: *const vec3_t, intensity: c_float, r: c_float, g: c_float, b: c_float),
+        unsafe extern "C" fn(
+            org: *const vec3_t,
+            intensity: c_float,
+            r: c_float,
+            g: c_float,
+            b: c_float,
+        ),
     >,
     pub RenderScene: Option<unsafe extern "C" fn(fd: *const refdef_t)>,
     pub GetLighting: Option<
@@ -154,7 +171,13 @@ pub struct refexport_t {
         ),
     >,
     pub UploadCinematic: Option<
-        unsafe extern "C" fn(cols: c_int, rows: c_int, data: *const u8, client: c_int, dirty: qboolean),
+        unsafe extern "C" fn(
+            cols: c_int,
+            rows: c_int,
+            data: *const u8,
+            client: c_int,
+            dirty: qboolean,
+        ),
     >,
 
     pub BeginFrame: Option<unsafe extern "C" fn(stereoFrame: stereoFrame_t)>,
@@ -205,18 +228,21 @@ pub struct refexport_t {
             tagName: *const c_char,
         ),
     >,
-    pub ModelBounds: Option<unsafe extern "C" fn(model: qhandle_t, mins: *mut vec3_t, maxs: *mut vec3_t)>,
+    pub ModelBounds:
+        Option<unsafe extern "C" fn(model: qhandle_t, mins: *mut vec3_t, maxs: *mut vec3_t)>,
 
     // color4ub_t decays to byte* as a function parameter
     pub GetLightStyle: Option<unsafe extern "C" fn(style: c_int, color: *mut u8)>,
     pub SetLightStyle: Option<unsafe extern "C" fn(style: c_int, color: c_int)>,
 
-    pub GetBModelVerts: Option<unsafe extern "C" fn(bmodelIndex: c_int, vec: *mut vec3_t, normal: *mut vec3_t)>,
+    pub GetBModelVerts:
+        Option<unsafe extern "C" fn(bmodelIndex: c_int, vec: *mut vec3_t, normal: *mut vec3_t)>,
     pub WorldEffectCommand: Option<unsafe extern "C" fn(command: *const c_char)>,
 
     pub RegisterFont: Option<unsafe extern "C" fn(name: *const c_char) -> c_int>,
     pub Font_HeightPixels: Option<unsafe extern "C" fn(index: c_int, scale: c_float) -> c_int>,
-    pub Font_StrLenPixels: Option<unsafe extern "C" fn(s: *const c_char, index: c_int, scale: c_float) -> c_int>,
+    pub Font_StrLenPixels:
+        Option<unsafe extern "C" fn(s: *const c_char, index: c_int, scale: c_float) -> c_int>,
     pub Font_DrawString: Option<
         unsafe extern "C" fn(
             x: c_int,

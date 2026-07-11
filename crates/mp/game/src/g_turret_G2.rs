@@ -7,6 +7,7 @@
 //! `EntPain`/`EntDie` dispatch enums that `gentity_t` carries.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
 use crate::entity::flags::{FL_BBRUSH, FL_NOTARGET};
 use crate::g_combat::{AddScore, G_RadiusDamage, ObjectDie};
@@ -25,7 +26,6 @@ use crate::q_math::{
     VectorNormalize,
 };
 use crate::q_shared::Q_stricmp;
-use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 use crate::NPC_combat::G_SetEnemy;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
