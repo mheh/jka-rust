@@ -147,6 +147,13 @@ impl Engine {
             // Raven static initializer is 0x89abcdef (non-zero), so it is
             // written through its Default rather than left zeroed.
             addr_of_mut!((*p).common.qrand).write(Default::default());
+            // Common.hooks (ruling 2026-07-12): the qcommon->server/client/sound
+            // upcall table. Option<fn> is null-niche zero-valid (all None under
+            // the alloc_zeroed mass), but boot installs the null-build client/
+            // sound no-op defaults; SV_*/RE_* stay None until their subsystem
+            // installs them.
+            addr_of_mut!((*p).common.hooks)
+                .write(mp_engine_qcommon::common::EngineHooks::null_dedicated());
             Box::from_raw(p)
         }
     }

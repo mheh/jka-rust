@@ -259,7 +259,13 @@ pub fn Z_Malloc(
 
             // ditch any sounds not used on this level...
             //
-            if SND_RegisterAudio_LevelLoadEnd(host, native_types::qtrue) != 0 {
+            if (common
+                .hooks
+                .SND_RegisterAudio_LevelLoadEnd
+                .expect("SND_RegisterAudio_LevelLoadEnd hook"))(
+                host, native_types::qtrue
+            ) != 0
+            {
                 continue; // we've dropped at least one sound, so try again with the malloc
             }
 
@@ -268,7 +274,11 @@ pub fn Z_Malloc(
 
             // ditch the model-binaries cache...  (must be getting desperate here!)
             //
-            if RE_RegisterModels_LevelLoadEnd(rm, host, native_types::qtrue) != 0 {
+            if (common.hooks.RE_RegisterModels_LevelLoadEnd.expect(
+                "RE_RegisterModels_LevelLoadEnd hook — installed by the renderer-model subsystem",
+            ))(rm, host, native_types::qtrue)
+                != 0
+            {
                 continue;
             }
 
@@ -277,11 +287,13 @@ pub fn Z_Malloc(
             // to ensure we're not dumping any memory needed by the sound
             // currently being loaded if that was the case)...
             //
-            if gbInsideLoadSound == 0 {
-                let mut iBytesFreed = SND_FreeOldestSound(host);
+            if common.gbInsideLoadSound == 0 {
+                let snd_free_oldest_sound =
+                    common.hooks.SND_FreeOldestSound.expect("SND_FreeOldestSound hook");
+                let mut iBytesFreed = snd_free_oldest_sound(host);
                 if iBytesFreed != 0 {
                     loop {
-                        let iTheseBytesFreed = SND_FreeOldestSound(host);
+                        let iTheseBytesFreed = snd_free_oldest_sound(host);
                         if iTheseBytesFreed == 0 {
                             break;
                         }
@@ -883,17 +895,22 @@ pub fn Hunk_Clear(
     // the engine-fork-discovery rulings treat DEDICATED as the live
     // configuration), so the `#ifndef DEDICATED` client blocks
     // (CL_ShutdownCGame/CL_ShutdownUI/CIN_CloseAllVideos) are dropped.
-    unsafe {
-        SV_ShutdownGameProgs(common, sv);
-    }
+    let sv_shutdown_game_progs = common
+        .hooks
+        .SV_ShutdownGameProgs
+        .expect("SV_ShutdownGameProgs hook — installed by mp_engine_server at boot");
+    sv_shutdown_game_progs(common, sv);
 
     common.hunk_tag = memtag_t::TAG_HUNK_MARK1;
     Z_TagFree(common, memtag_t::TAG_HUNK_MARK1);
     Z_TagFree(common, memtag_t::TAG_HUNK_MARK2);
 
-    unsafe {
-        R_HunkClearCrap(rm, host);
-    }
+    (common
+        .hooks
+        .R_HunkClearCrap
+        .expect("R_HunkClearCrap hook — installed by the renderer-model subsystem"))(
+        rm, host,
+    );
 
     //	Com_Printf( "Hunk_Clear: reset the hunk ok\n" );
     VM_Clear(common);

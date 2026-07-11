@@ -201,22 +201,28 @@ pub fn Cmd_ExecuteString(
     // PORT-NOTE(com_cl_running/com_sv_running): `Common`'s `cvar_t*` handle
     // fields aren't landed yet (the cvar sub-struct TODO in `common/common.rs`);
     // referenced verbatim as missing symbols.
+    let cl_game_command = common.hooks.CL_GameCommand.expect("CL_GameCommand hook");
     if !common.com_cl_running.is_null()
-        && unsafe { (*common.com_cl_running).integer != 0 && CL_GameCommand() != 0 }
+        && unsafe { (*common.com_cl_running).integer != 0 && cl_game_command() != 0 }
     {
         return;
     }
 
     // check server game commands
+    let sv_game_command = common
+        .hooks
+        .SV_GameCommand
+        .expect("SV_GameCommand hook — installed by mp_engine_server at boot");
     if !common.com_sv_running.is_null()
-        && unsafe { (*common.com_sv_running).integer != 0 && SV_GameCommand(common, sv) != 0 }
+        && unsafe { (*common.com_sv_running).integer != 0 && sv_game_command(common, sv) != 0 }
     {
         return;
     }
 
     // check ui commands
+    let ui_game_command = common.hooks.UI_GameCommand.expect("UI_GameCommand hook");
     if !common.com_cl_running.is_null()
-        && unsafe { (*common.com_cl_running).integer != 0 && UI_GameCommand() != 0 }
+        && unsafe { (*common.com_cl_running).integer != 0 && ui_game_command() != 0 }
     {
         return;
     }
@@ -224,7 +230,8 @@ pub fn Cmd_ExecuteString(
     // send it as a server command if we are connected
     // this will usually result in a chat message
     //CL_ForwardCommandToServer ( text );
-    unsafe {
-        CL_ForwardCommandToServer(text);
-    }
+    (common
+        .hooks
+        .CL_ForwardCommandToServer
+        .expect("CL_ForwardCommandToServer hook"))(text);
 }

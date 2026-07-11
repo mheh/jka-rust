@@ -556,6 +556,19 @@ pub struct Common {
     ///
     /// Source: `oracle/codemp/server/sv_bot.cpp:20`
     pub bot_enable: c_int,
+
+    // ---- qcommon->server/client/sound/renderer upcall seam ----
+    /// The qcommon upcall table (ruling 2026-07-12): `Option<fn(..)>` hooks
+    /// installed by the app/core layer at boot, standing in for the `SV_*`/
+    /// `CL_*`/`SND_*`/`RE_*` symbols Raven resolves at link time. See
+    /// `engine_hooks.rs`.
+    pub hooks: super::engine_hooks::EngineHooks,
+    /// Raven `null_snddma.cpp`'s `gbInsideLoadSound` global — set while a sound
+    /// is loading so the panic-free memory recovery won't dump audio in use.
+    /// Zero-valid (`qfalse`), matching Raven's initializer.
+    ///
+    /// Source: `oracle/codemp/null/null_snddma.cpp:7`
+    pub gbInsideLoadSound: qboolean,
 }
 
 /// Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching the FS field sizes).
