@@ -717,15 +717,15 @@ pub fn Com_InitJournaling(
 
         if (*common.com_journal).integer == 1 {
             crate::common::com_printf(common, "Journaling events\n");
-            common.com_journalFile = FS_FOpenFileWrite(common, "journal.dat");
-            common.com_journalDataFile = FS_FOpenFileWrite(common, "journaldata.dat");
+            common.com_journalFile = FS_FOpenFileWrite(common, c"journal.dat".as_ptr());
+            common.com_journalDataFile = FS_FOpenFileWrite(common, c"journaldata.dat".as_ptr());
         } else if (*common.com_journal).integer == 2 {
             crate::common::com_printf(common, "Replaying journaled events\n");
             let mut jf = common.com_journalFile;
-            FS_FOpenFileRead(common, cm, rm, host, "journal.dat", &mut jf, qtrue);
+            FS_FOpenFileRead(common, cm, rm, host, c"journal.dat".as_ptr(), &mut jf, qtrue);
             common.com_journalFile = jf;
             let mut jdf = common.com_journalDataFile;
-            FS_FOpenFileRead(common, cm, rm, host, "journaldata.dat", &mut jdf, qtrue);
+            FS_FOpenFileRead(common, cm, rm, host, c"journaldata.dat".as_ptr(), &mut jdf, qtrue);
             common.com_journalDataFile = jdf;
         }
 
@@ -749,7 +749,7 @@ pub fn Com_InitJournaling(
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1446-1461`
 pub fn Com_WriteConfigToFile(common: &mut Common, filename: *const c_char) {
-    let f = unsafe { FS_FOpenFileWrite(common, unsafe { &c_str_to_string(filename) }) };
+    let f = unsafe { FS_FOpenFileWrite(common, filename) };
     if f == 0 {
         crate::common::com_printf(
             common,

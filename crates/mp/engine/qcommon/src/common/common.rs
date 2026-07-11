@@ -359,6 +359,23 @@ pub struct Common {
     pub fs_cdpath: *mut cvar_t,
     pub fs_homepath: *mut cvar_t,
     pub fs_gamedirvar: *mut cvar_t,
+    /// Raven `fs_basegame`/`fs_copyfiles`/`fs_restrict`/`fs_dirbeforepak` cvars.
+    ///
+    /// Source: `oracle/codemp/qcommon/files_common.cpp:187-192`
+    pub fs_basegame: *mut cvar_t,
+    pub fs_copyfiles: *mut cvar_t,
+    pub fs_restrict: *mut cvar_t,
+    pub fs_dirbeforepak: *mut cvar_t,
+    /// Raven `fs_readCount`/`fs_loadCount`/`fs_packFiles` byte/file counters.
+    ///
+    /// Source: `oracle/codemp/qcommon/files_common.cpp:194-197`
+    pub fs_readCount: c_int,
+    pub fs_loadCount: c_int,
+    pub fs_packFiles: c_int,
+    /// Raven `fs_serverPakNames[MAX_SEARCH_PATHS]` — pure-server pk3 names.
+    ///
+    /// Source: `oracle/codemp/qcommon/files_common.cpp:208`
+    pub fs_serverPakNames: [*mut c_char; MAX_SEARCH_PATHS],
     /// Raven `fs_gamedir[MAX_OSPATH]` (single game-dir name).
     ///
     /// Source: `oracle/codemp/qcommon/files_common.cpp:183`

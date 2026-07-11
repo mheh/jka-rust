@@ -1474,14 +1474,8 @@ pub fn FS_GetModList(
                     let desc_path_str = format!("{}/description.txt", name_str);
                     let desc_path_c = std::ffi::CString::new(desc_path_str).unwrap();
                     let mut desc_handle: fileHandle_t = 0;
-                    let mut n_desc_len = FS_SV_FOpenFileRead(
-                        common,
-                        cm,
-                        rm,
-                        host,
-                        desc_path_c.as_ptr(),
-                        &mut desc_handle,
-                    );
+                    let mut n_desc_len =
+                        FS_SV_FOpenFileRead(common, desc_path_c.as_ptr(), &mut desc_handle);
                     let desc_str: String;
                     if n_desc_len > 0 && desc_handle != 0 {
                         let file = FS_FileForHandle(common, desc_handle);

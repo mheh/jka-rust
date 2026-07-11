@@ -174,7 +174,7 @@ pub fn CM_LoadShaderFiles(
     let mut numShaders1: c_int = 0;
     // scan for shader files
     let shaderFiles1 =
-        unsafe { FS_ListFiles(common, cm, rm, host, "shaders", ".shader", &mut numShaders1) };
+        unsafe { FS_ListFiles(common, cm, rm, host, c"shaders".as_ptr(), c".shader".as_ptr(), &mut numShaders1) };
     //TODO: Port FINAL_BUILD
     // Source: oracle/codemp/qcommon/cm_shader.cpp:75
     let mut numShaders2: c_int = 0;
@@ -184,8 +184,8 @@ pub fn CM_LoadShaderFiles(
             cm,
             rm,
             host,
-            "shaders/test",
-            ".shader",
+            c"shaders/test".as_ptr(),
+            c".shader".as_ptr(),
             &mut numShaders2,
         )
     };
@@ -229,8 +229,8 @@ pub fn CM_LoadShaderFiles(
                 cm,
                 rm,
                 host,
-                "filename",
-                buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void,
+                filename.as_ptr(),
+                buffers.as_mut_ptr().add(i as usize) as *mut *mut (),
             )
         };
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
@@ -256,8 +256,8 @@ pub fn CM_LoadShaderFiles(
                 cm,
                 rm,
                 host,
-                "filename",
-                buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void,
+                filename.as_ptr(),
+                buffers.as_mut_ptr().add(i as usize) as *mut *mut (),
             )
         };
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
@@ -291,7 +291,7 @@ pub fn CM_LoadShaderFiles(
             libc::strcat(cm.shaderText, c"\n".as_ptr());
             libc::strcat(cm.shaderText, buffers[j as usize]);
         }
-        unsafe { FS_FreeFile(common, buffers[j as usize]) };
+        unsafe { FS_FreeFile(common, buffers[j as usize] as *mut ()) };
         j -= 1;
     }
 
