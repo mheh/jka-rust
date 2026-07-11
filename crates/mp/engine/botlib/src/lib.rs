@@ -338,7 +338,7 @@ pub struct BotLib {
     // --- be_interface / be_aas_debug / be_ai_char / be_ai_weight globals ---
     /// Raven `botlib_export_t be_botlib_export` — the botlib export fn-ptr table.
     /// Source: `oracle/codemp/botlib/be_interface.cpp:41`
-    pub be_botlib_export: mp_qshared::common::mp::botlib::botlib_export_s::botlib_export_t,
+    pub be_botlib_export: crate::be_interface::botlib_export_s::botlib_export_t,
     /// Raven `bot_character_t *botcharacters[MAX_CLIENTS + 1]`.
     /// Source: `oracle/codemp/botlib/be_ai_char.cpp:60`
     pub botcharacters: [*mut crate::be_ai_char::bot_character_s::bot_character_t; MAX_CLIENTS + 1],

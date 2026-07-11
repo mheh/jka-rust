@@ -1,6 +1,15 @@
 //! MP botlib `be_interface.h` types.
+//!
+//! The botlib export tables (`aas_export_t`/`ea_export_t`/`ai_export_t`/
+//! `botlib_export_t`) also live here: engine-internal per the 2026-07-11
+//! ruling (statically linked in jampDed, no DLL boundary), so they carry
+//! Rust receiver-bearing fn pointers rather than ABI `extern "C"` ones.
 
+pub mod aas_export_s;
+pub mod ai_export_s;
+pub mod botlib_export_s;
 pub mod botlib_globals_s;
+pub mod ea_export_s;
 
 use core::ffi::c_int;
 

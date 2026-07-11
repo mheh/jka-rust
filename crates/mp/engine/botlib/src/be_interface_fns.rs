@@ -16,26 +16,23 @@
 //!
 //! Source: `oracle/codemp/botlib/be_interface.cpp`
 //!
-//! PORT-NOTE(fns-collision): destination is `be_interface_fns.rs`, not
-//! `be_interface.rs` — the oracle stem collides with the existing
-//! `be_interface/` type directory (`botlib_globals_s.rs`); DESTINATION line
-//! from the packet already reflects the `_fns` escape.
+//! Destination `_fns` escape: the `be_interface/` directory holds the types.
 
 use core::ffi::{c_char, c_int, c_void};
 
 use crate::be_interface::botlib_globals_s::botlib_globals_t;
 use crate::BotLib;
 
-use mp_qshared::common::mp::botlib::aas_export_s::aas_export_t;
-use mp_qshared::common::mp::botlib::ai_export_s::ai_export_t;
+use crate::be_interface::aas_export_s::aas_export_t;
+use crate::be_interface::ai_export_s::ai_export_t;
+use crate::be_interface::botlib_export_s::botlib_export_t;
+use crate::be_interface::ea_export_s::ea_export_t;
 use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::common::mp::botlib::botlib_error::{
     BLERR_INVALIDENTITYNUMBER, BLERR_LIBRARYNOTSETUP, BLERR_NOERROR,
 };
-use mp_qshared::common::mp::botlib::botlib_export_s::botlib_export_t;
 use mp_qshared::common::mp::botlib::botlib_import_s::botlib_import_t;
 use mp_qshared::common::mp::botlib::botlib_misc::BOTLIB_API_VERSION;
-use mp_qshared::common::mp::botlib::ea_export_s::ea_export_t;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE};
 use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t};
 use crate::be_ai_weap_fns::{
@@ -133,7 +130,7 @@ pub fn BotLibSetup(bot: &mut BotLib, str: *mut c_char) -> qboolean {
 
 /// Raven `BotExportTest` — debug-only visualization/reachability test hook.
 ///
-/// PORT-NOTE(DEBUG): the entire body is `#ifdef DEBUG`; this workspace builds
+/// Raven's body is entirely `#ifdef DEBUG`; this workspace builds
 /// the WinDed Release macro set (FINAL_BUILD undefined, `DEBUG` undefined —
 /// see decisions.md/porting-rules appendix), so the compiled-out body reduces
 /// to the trailing `return 0;` — transcribed faithfully for that
@@ -162,12 +159,6 @@ pub fn Export_BotLibVarGet(
 }
 
 /// Raven `Init_EA_Export` — populates the elementary-action export table.
-///
-/// PORT-NOTE(dispatch-table): `ea_export_t`'s fields are ABI `unsafe extern
-/// "C" fn` pointers (no receiver), while the ported `EA_*` fns thread a `bot:
-/// &mut BotLib` receiver per the state-threading rule — flagged in
-/// shape_mismatches; assignments transcribed by name, reconciliation is an
-/// integration concern (fn-ID/wrapper shape TBD).
 ///
 /// Source: `oracle/codemp/botlib/be_interface.cpp:694-724`
 pub fn Init_EA_Export(ea: *mut ea_export_t) {
@@ -289,7 +280,7 @@ pub fn Export_BotLibShutdown(bot: &mut BotLib) -> c_int {
     if BotLibSetup(bot, c"BotLibShutdown".as_ptr() as *mut c_char) == qfalse {
         return BLERR_LIBRARYNOTSETUP;
     }
-    // PORT-NOTE(DEMO): `#ifndef DEMO` guards only a commented-out
+    // Raven's `#ifndef DEMO` here guards only a commented-out
     // `DumpFileCRCs()` call — no live code to port either way.
     //
     BotShutdownChatAI(bot); // be_ai_chat.c
@@ -309,7 +300,7 @@ pub fn Export_BotLibShutdown(bot: &mut BotLib) -> c_int {
 
     // dump all allocated memory
     // DumpMemory();
-    // PORT-NOTE(DEBUG): `PrintMemoryLabels()` is `#ifdef DEBUG` — Release
+    // Raven's `PrintMemoryLabels()` is `#ifdef DEBUG` — Release
     // build (DEBUG undefined) drops it, per BotExportTest's note above.
     //
     // shut down library log file
@@ -325,7 +316,7 @@ pub fn Export_BotLibShutdown(bot: &mut BotLib) -> c_int {
 
 /// Raven `Export_BotLibLoadMap`.
 ///
-/// PORT-NOTE(DEBUG): the `Sys_MilliSeconds` timing pair is `#ifdef DEBUG`;
+/// Raven's `Sys_MilliSeconds` timing pair is `#ifdef DEBUG`;
 /// dropped for the Release configuration (see BotExportTest's note).
 ///
 /// Source: `oracle/codemp/botlib/be_interface.cpp:239-262`
@@ -358,9 +349,6 @@ pub fn Export_BotLibLoadMap(bot: &mut BotLib, mapname: *const c_char) -> c_int {
 }
 
 /// Raven `Init_AAS_Export` — populates the AAS export table.
-///
-/// PORT-NOTE(dispatch-table): see `Init_EA_Export`'s note — the receiver
-/// mismatch applies here too.
 ///
 /// Source: `oracle/codemp/botlib/be_interface.cpp:639-686`
 pub fn Init_AAS_Export(aas: *mut aas_export_t) {
@@ -425,9 +413,6 @@ pub fn Export_BotLibStartFrame(bot: &mut BotLib, time: f32) -> c_int {
 }
 
 /// Raven `Init_AI_Export` — populates the AI export table.
-///
-/// PORT-NOTE(dispatch-table): see `Init_EA_Export`'s note — the receiver
-/// mismatch applies here too.
 ///
 /// Source: `oracle/codemp/botlib/be_interface.cpp:732-826`
 pub fn Init_AI_Export(ai: *mut ai_export_t) {

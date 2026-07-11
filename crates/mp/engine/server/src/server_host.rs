@@ -3,7 +3,7 @@
 
 use core::ffi::{c_char, c_int};
 
-use mp_qshared::common::mp::botlib::botlib_export_s::botlib_export_t;
+use mp_engine_botlib::be_interface::botlib_export_s::botlib_export_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::siege_pers::siegePers_t;
 use mp_qshared::shared::limits::MAX_WPARRAY_SIZE as MAX_WPARRAY_SIZE_I32;

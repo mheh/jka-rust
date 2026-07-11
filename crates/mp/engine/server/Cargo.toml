@@ -15,6 +15,7 @@ mp_abi = { path = "../../abi" }
 mp_host_interface = { path = "../../host-interface" }
 native_math = { path = "../../../native/math" }
 native_types = { path = "../../../native/types" }
+mp_engine_botlib = { path = "../botlib" }
 mp_engine_ghoul2 = { path = "../ghoul2" }
 mp_engine_icarus = { path = "../icarus" }
 mp_engine_rmg = { path = "../rmg" }

@@ -12,6 +12,7 @@ use mp_engine_qcommon::qcommon::net_limits::{MAX_RELIABLE_COMMANDS, PACKET_MASK}
 use mp_qshared::shared::{qfalse, qtrue};
 
 use crate::Server;
+use mp_engine_botlib::BotLib;
 use mp_qshared::shared::q_string::Q_strncpyz;
 
 /// Raven `BotImport_DebugPolygonDelete`.
@@ -29,12 +30,12 @@ pub fn BotImport_DebugPolygonDelete(sv: &mut Server, id: c_int) {
 /// Raven `SV_BotLibShutdown`.
 ///
 /// Source: `oracle/codemp/server/sv_bot.cpp:619-626`
-pub fn SV_BotLibShutdown(sv: &mut Server) -> c_int {
+pub fn SV_BotLibShutdown(sv: &mut Server, bot: &mut BotLib) -> c_int {
     if sv.botlib_export.is_null() {
         return -1;
     }
 
-    unsafe { ((*sv.botlib_export).BotLibShutdown.unwrap())() }
+    unsafe { ((*sv.botlib_export).BotLibShutdown.unwrap())(bot) }
 }
 
 /// Raven `SV_BotGetConsoleMessage`.

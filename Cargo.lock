@@ -203,6 +203,7 @@ name = "mp_engine_server"
 version = "0.1.0"
 dependencies = [
  "mp_abi",
+ "mp_engine_botlib",
  "mp_engine_ghoul2",
  "mp_engine_icarus",
  "mp_engine_qcommon",
