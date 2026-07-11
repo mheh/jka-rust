@@ -13,6 +13,7 @@ pub mod be_aas_debug;
 pub mod be_aas_debug_fns;
 pub mod be_aas_def;
 pub mod be_aas_entity;
+pub mod be_aas_file_fns;
 pub mod be_aas_main;
 pub mod be_aas_move;
 pub mod be_aas_optimize;
@@ -79,6 +80,8 @@ use crate::be_ai_goal::bot_goalstate_s::bot_goalstate_t;
 use crate::be_ai_goal::itemconfig_s::itemconfig_t;
 use crate::be_ai_goal::levelitem_s::levelitem_t;
 use crate::be_ai_move::bot_movestate_s::bot_movestate_t;
+use crate::be_ai_weap::bot_weaponstate_s::bot_weaponstate_t;
+use crate::be_ai_weap::weaponconfig_s::weaponconfig_t;
 use crate::be_interface::botlib_globals_s::botlib_globals_t;
 use crate::l_libvar::libvar_s::libvar_t;
 use crate::l_log::consts::MAX_LOGFILENAMESIZE;
@@ -365,6 +368,18 @@ pub struct BotLib {
     /// Source: `oracle/codemp/botlib/be_ai_weight.cpp:34`
     pub weightFileList: [*mut crate::be_ai_weight::weightconfig_s::weightconfig_t;
         crate::be_ai_weight::weightconfig_s::MAX_WEIGHT_FILES],
+
+    // --- be_ai_weap / be_aas_file globals and function-static hoists ---
+    /// Raven `bot_weaponstate_t *botweaponstates[MAX_CLIENTS+1]`.
+    /// Source: `oracle/codemp/botlib/be_ai_weap.cpp:111`
+    pub botweaponstates: [*mut bot_weaponstate_t; MAX_CLIENTS + 1],
+    /// Raven `weaponconfig_t *weaponconfig` — the loaded weapon configuration.
+    /// Source: `oracle/codemp/botlib/be_ai_weap.cpp:112`
+    pub weaponconfig: *mut weaponconfig_t,
+    /// Raven function-static `int AAS_WriteAASLump_offset` — cross-frame write
+    /// cursor hoisted from `AAS_WriteAASLump` (ruling 3 kind 3).
+    /// Source: `oracle/codemp/botlib/be_aas_file.cpp:479`
+    pub AAS_WriteAASLump_offset: c_int,
 }
 
 impl Default for BotLib {
