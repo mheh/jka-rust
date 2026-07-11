@@ -54,6 +54,8 @@ pub struct EngineHooks {
     >,
     /// Source: `oracle/codemp/null/null_client.cpp:66-67`
     pub CL_StartHunkUsers: Option<fn()>,
+    /// Source: `oracle/codemp/null/null_client.cpp:34-35`
+    pub CL_MapLoading: Option<fn()>,
     /// Source: `oracle/codemp/null/null_client.cpp:25-26`
     pub CL_PacketEvent: Option<fn(netadr_t, *mut msg_t)>,
     /// Source: `oracle/codemp/null/null_client.cpp:22-23`
@@ -155,6 +157,7 @@ impl EngineHooks {
             CL_Shutdown: Some(CL_Shutdown_null),
             CL_Init: Some(CL_Init_null),
             CL_StartHunkUsers: Some(CL_StartHunkUsers_null),
+            CL_MapLoading: Some(CL_MapLoading_null),
             CL_PacketEvent: Some(CL_PacketEvent_null),
             CL_Frame: Some(CL_Frame_null),
             CL_InitKeyCommands: Some(CL_InitKeyCommands_null),
@@ -213,6 +216,10 @@ fn CL_Init_null(
 /// Raven null `CL_StartHunkUsers`. Source: `oracle/codemp/null/null_client.cpp:66-67`
 #[allow(non_snake_case)]
 fn CL_StartHunkUsers_null() {}
+
+/// Raven null `CL_MapLoading`. Source: `oracle/codemp/null/null_client.cpp:34-35`
+#[allow(non_snake_case)]
+fn CL_MapLoading_null() {}
 
 /// Raven null `CL_PacketEvent`. Source: `oracle/codemp/null/null_client.cpp:25-26`
 #[allow(non_snake_case)]

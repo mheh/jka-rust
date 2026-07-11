@@ -9,7 +9,7 @@
 
 use core::ffi::{c_int, c_void};
 
-use native_types::{fileHandle_t, qboolean, qfalse};
+use native_types::{fileHandle_t, qboolean, qfalse, qtrue};
 
 /// `Sys_LowPhysicalMemory` (unix): the Win32 `MEMORYSTATUS` probe is stubbed to
 /// `qfalse` in Raven's unix build.
@@ -17,6 +17,13 @@ use native_types::{fileHandle_t, qboolean, qfalse};
 /// Source: `oracle/codemp/unix/unix_main.c:56-61`
 pub fn Sys_LowPhysicalMemory() -> qboolean {
     qfalse
+}
+
+/// `Sys_CheckCD` (unix): always reports the disc present.
+///
+/// Source: `oracle/codemp/unix/unix_main.c:1056-1058`
+pub fn Sys_CheckCD() -> qboolean {
+    qtrue
 }
 
 /// `Sys_UnloadDll` (unix): `dlclose` the handle (no-op on NULL). The verbose

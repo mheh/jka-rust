@@ -250,6 +250,7 @@ dependencies = [
  "mp_qshared",
  "mp_renderer",
  "native_math",
+ "native_platform",
  "native_types",
 ]
 

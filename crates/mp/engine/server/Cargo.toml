@@ -20,6 +20,9 @@ mp_abi = { path = "../../abi" }
 mp_host_interface = { path = "../../host-interface" }
 native_math = { path = "../../../native/math" }
 native_types = { path = "../../../native/types" }
+# Sys_CheckCD and friends — the leaf platform crate (unix_main.c home);
+# acyclic (native_platform sits below the engine tier).
+native_platform = { path = "../../../native/platform" }
 mp_engine_botlib = { path = "../botlib" }
 mp_engine_ghoul2 = { path = "../ghoul2" }
 mp_engine_icarus = { path = "../icarus" }

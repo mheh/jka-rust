@@ -1972,7 +1972,7 @@ pub fn SV_DropClient(
         crate::SV_SendServerCommand(common, sv, drop, &format!("disconnect \"{}\"", reason_str));
 
         if (*drop).netchan.remoteAddress.r#type == netadrtype_t::NA_BOT {
-            SV_BotFreeClient(drop_index as c_int);
+            crate::SV_BotFreeClient(common, sv, drop_index as c_int);
         }
 
         // nuke user info

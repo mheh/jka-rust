@@ -25,13 +25,15 @@ use mp_qshared::shared::qboolean;
 // than stubbed (ZERO-PARK), following the sibling files' precedent exactly.
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::collision_world::CollisionWorld;
-use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::cm_load::RmManager;
 use mp_host_interface::engine_host::EngineHost;
 
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
+use crate::server_host::{ghoul2_slot, server_slot};
+use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use crate::sv_game::{SV_GentityNum, SV_InitGameProgs, SV_ShutdownGameProgs};
 use crate::sv_bot::SV_BotInitBotLib;
 use mp_engine_qcommon::vm::VM_Call;
@@ -44,13 +46,16 @@ use crate::Server;
 // `Q_stricmp`/`va` are the raw-pointer `q_shared.c` primitives in
 // `mp_qshared`, and `FmtArg` is `va`'s typed argument channel.
 use mp_abi::game::exports::MpGameExport;
-use mp_engine_qcommon::common_fns::Com_Milliseconds;
+use mp_engine_qcommon::common_fns::{Com_Memset, Com_Milliseconds};
 use mp_engine_qcommon::cvar_fns::{
     Cvar_Get, Cvar_InfoString, Cvar_InfoString_Big, Cvar_Set, Cvar_VariableValue,
 };
 use mp_engine_qcommon::files_common::FS_FCloseFile;
 use mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr;
-use mp_engine_qcommon::z_memman_pc::Z_Free;
+use mp_engine_qcommon::z_memman_pc::{
+    CopyString, Hunk_AllocateTempMemory, Hunk_Clear, Hunk_FreeTempMemory, Hunk_SetMark, Z_Free,
+    Z_Malloc,
+};
 use mp_qshared::shared::q_format::FmtArg;
 use mp_qshared::shared::q_string::{Info_ValueForKey, Q_stricmp, Q_strncpyz, va};
 
@@ -439,10 +444,11 @@ pub fn SV_Startup(
             cm,
             rm,
             host,
-            core::mem::size_of::<crate::server::client_s::client_t>()
-                * (*common.sv_maxclients).integer as usize,
+            (core::mem::size_of::<crate::server::client_s::client_t>()
+                * (*common.sv_maxclients).integer as usize) as c_int,
             memtag_t::TAG_CLIENTS,
             qboolean::from(1),
+            0,
         ) as *mut _;
         if (*common.com_dedicated).integer != 0 {
             sv.svs.numSnapshotEntities = (*common.sv_maxclients).integer * mp_engine_qcommon::qcommon::net_limits::PACKET_BACKUP as c_int * 64;
@@ -494,13 +500,19 @@ pub fn SV_ChangeMaxClients(
         cm,
         rm,
         host,
-        (count as usize) * core::mem::size_of::<crate::server::client_s::client_t>(),
+        ((count as usize) * core::mem::size_of::<crate::server::client_s::client_t>()) as c_int,
     ) as *mut crate::server::client_s::client_t;
     unsafe {
         // copy the clients to hunk memory
         for i in 0..count {
             if (*sv.svs.clients.offset(i as isize)).state >= clientState_t::CS_CONNECTED {
-                *oldClients.offset(i as isize) = *sv.svs.clients.offset(i as isize);
+                // `*oldClients[i] = clients[i]` — the raw `client_t` struct copy
+                // (POD, no `Drop`); Raven's plain struct assignment.
+                core::ptr::copy_nonoverlapping(
+                    sv.svs.clients.offset(i as isize),
+                    oldClients.offset(i as isize),
+                    1,
+                );
             } else {
                 Com_Memset(
                     oldClients.offset(i as isize) as *mut (),
@@ -519,10 +531,11 @@ pub fn SV_ChangeMaxClients(
             cm,
             rm,
             host,
-            ((*common.sv_maxclients).integer as usize)
-                * core::mem::size_of::<crate::server::client_s::client_t>(),
+            (((*common.sv_maxclients).integer as usize)
+                * core::mem::size_of::<crate::server::client_s::client_t>()) as c_int,
             memtag_t::TAG_CLIENTS,
             qboolean::from(1),
+            0,
         ) as *mut _;
         Com_Memset(
             sv.svs.clients as *mut (),
@@ -534,7 +547,12 @@ pub fn SV_ChangeMaxClients(
         // copy the clients over
         for i in 0..count {
             if (*oldClients.offset(i as isize)).state >= clientState_t::CS_CONNECTED {
-                *sv.svs.clients.offset(i as isize) = *oldClients.offset(i as isize);
+                // `clients[i] = oldClients[i]` — raw `client_t` struct copy.
+                core::ptr::copy_nonoverlapping(
+                    oldClients.offset(i as isize),
+                    sv.svs.clients.offset(i as isize),
+                    1,
+                );
             }
         }
     }
@@ -604,9 +622,9 @@ pub fn SV_SpawnServer(
     // shut down the existing game if it is running
     SV_ShutdownGameProgs(common, sv);
 
-    Com_Printf(common, "------ Server Initialization ------\n");
+    com_printf(common, "------ Server Initialization ------\n");
     unsafe {
-        Com_Printf(
+        com_printf(
             common,
             &format!(
                 "Server: {}\n",
@@ -634,12 +652,18 @@ pub fn SV_SpawnServer(
 
     // if not running a dedicated server CL_MapLoading will connect the client to the server
     // also print some status stuff
-    CL_MapLoading();
+    (common.hooks.CL_MapLoading.expect("CL_MapLoading hook"))();
 
     CM_ClearMap(cm, rmg);
 
     // clear the whole hunk because we're (re)loading the server
-    Hunk_Clear(common, sv, rm, g2, host);
+    Hunk_Clear(
+        common,
+        &mut server_slot(sv),
+        rm,
+        &mut ghoul2_slot(g2),
+        host,
+    );
 
     R_InitSkins(rm, host);
     R_InitShaders(rm, host, qboolean::from(1));
@@ -681,10 +705,19 @@ pub fn SV_SpawnServer(
     sv.svs.nextSnapshotEntities = 0;
 
     // allocate the snapshot entities
-    // PORT-NOTE(entity-state-array): `new entityState_s[svs.numSnapshotEntities]`
-    // — `New_EntityStateArray` is not a real ported symbol; escalated
-    // (missing_symbols) rather than inventing an ad hoc allocator here.
-    sv.svs.snapshotEntities = New_EntityStateArray(sv.svs.numSnapshotEntities as usize);
+    // Raven's `new entityState_s[svs.numSnapshotEntities]` — the PC operator
+    // new is an internal allocator (§A1: internals are free), reproduced here
+    // as the `Z_Malloc` the matching `delete[]`/`Z_Free` deallocation pairs to.
+    sv.svs.snapshotEntities = Z_Malloc(
+        common,
+        cm,
+        rm,
+        host,
+        core::mem::size_of::<entityState_t>() as c_int * sv.svs.numSnapshotEntities,
+        memtag_t::TAG_GENERAL,
+        qboolean::from(1),
+        0,
+    ) as *mut entityState_t;
     // we CAN afford to do this here, since we know the STL vectors in Ghoul2 are empty
     unsafe {
         core::ptr::write_bytes(
@@ -885,7 +918,7 @@ pub fn SV_SpawnServer(
             p = FS_LoadedPakChecksums(common);
             Cvar_Set(common, cm, rm, host, c"sv_paks".as_ptr(), p);
             if libc::strlen(p) == 0 {
-                Com_Printf(common, "WARNING: sv_pure set but no PK3 files loaded\n");
+                com_printf(common, "WARNING: sv_pure set but no PK3 files loaded\n");
             }
             p = FS_LoadedPakNames(common);
             Cvar_Set(common, cm, rm, host, c"sv_pakNames".as_ptr(), p);

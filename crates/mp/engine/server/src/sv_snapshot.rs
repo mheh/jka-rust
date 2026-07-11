@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 use mp_bg::public::entity_flags::EF_PERMANENT;
 use mp_engine_qcommon::cm_load::{RenderModels, CM_LeafArea, CM_LeafCluster};
-use mp_engine_qcommon::cm_test::{CM_ClusterPVS, CM_PointLeafnum, CM_WriteAreaBits};
+use mp_engine_qcommon::cm_test::{CM_AreasConnected, CM_ClusterPVS, CM_PointLeafnum, CM_WriteAreaBits};
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::com_error;
 use mp_engine_qcommon::common::common::{com_printf, Common};

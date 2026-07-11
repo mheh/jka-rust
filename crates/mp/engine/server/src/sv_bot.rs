@@ -1,6 +1,6 @@
 //! `sv_bot.cpp` — the server's botlib interface glue: debug-polygon pool
-//! management, botlib shutdown, and the bot console-message / snapshot-entity
-//! read paths.
+//! management, botlib shutdown, the bot console-message / snapshot-entity
+//! read paths, and bot client-slot allocate/free bookkeeping.
 //!
 //! Source: `oracle/codemp/server/sv_bot.cpp`
 
@@ -11,16 +11,22 @@ use core::ffi::{c_char, c_int};
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::common::common::{com_printf, Common};
+use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::cvar_fns::Cvar_VariableIntegerValue;
 use mp_engine_qcommon::qcommon::net_limits::{MAX_RELIABLE_COMMANDS, PACKET_MASK};
 use mp_engine_qcommon::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::botlib::botlib_import_s::botlib_import_t;
 use mp_qshared::common::mp::botlib::botlib_misc::BOTLIB_API_VERSION;
+use mp_qshared::common::mp::game::g_public::SVF_BOT;
+use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
+use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::{qfalse, qtrue};
 
 use crate::server::bot_debugpoly_t::bot_debugpoly_t;
+use crate::server::client_state_t::clientState_t;
+use crate::sv_game::SV_GentityNum;
 use crate::Server;
 use mp_engine_botlib::be_interface_fns::GetBotLibAPI;
 use mp_engine_botlib::BotLib;
@@ -157,5 +163,56 @@ pub fn SV_BotGetSnapshotEntity(sv: &mut Server, client: c_int, sequence: c_int) 
             .snapshotEntities
             .offset(((frame.first_entity + sequence) % sv.svs.numSnapshotEntities) as isize))
         .number
+    }
+}
+
+/// Raven `SV_BotAllocateClient`.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:178-201`
+pub fn SV_BotAllocateClient(common: &mut Common, sv: &mut Server) -> c_int {
+    unsafe {
+        // find a client slot
+        let mut i: c_int = 0;
+        let mut cl = sv.svs.clients;
+        while i < (*common.sv_maxclients).integer {
+            if (*cl).state == clientState_t::CS_FREE {
+                break;
+            }
+            i += 1;
+            cl = cl.offset(1);
+        }
+
+        if i == (*common.sv_maxclients).integer {
+            return -1;
+        }
+
+        (*cl).gentity = SV_GentityNum(sv, i);
+        (*(*cl).gentity).s.number = i;
+        (*cl).state = clientState_t::CS_ACTIVE;
+        (*cl).lastPacketTime = sv.svs.time;
+        (*cl).netchan.remoteAddress.r#type = netadrtype_t::NA_BOT;
+        (*cl).rate = 16384;
+
+        i
+    }
+}
+
+/// Raven `SV_BotFreeClient`.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:208-221`
+pub fn SV_BotFreeClient(common: &mut Common, sv: &mut Server, clientNum: c_int) {
+    unsafe {
+        if clientNum < 0 || clientNum >= (*common.sv_maxclients).integer {
+            com_error(
+                errorParm_t::ERR_DROP,
+                format!("SV_BotFreeClient: bad clientNum: {}", clientNum),
+            );
+        }
+        let cl = sv.svs.clients.offset(clientNum as isize);
+        (*cl).state = clientState_t::CS_FREE;
+        (*cl).name[0] = 0;
+        if !(*cl).gentity.is_null() {
+            (*(*cl).gentity).r.svFlags &= !SVF_BOT;
+        }
     }
 }

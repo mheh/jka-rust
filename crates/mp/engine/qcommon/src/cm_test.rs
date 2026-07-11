@@ -257,6 +257,34 @@ pub fn CM_BoxBrushes(
     ll.count
 }
 
+/// Raven `CM_AreasConnected`.
+///
+/// Source: `oracle/codemp/qcommon/cm_test.cpp:509-529`
+pub fn CM_AreasConnected(cm: &mut CollisionWorld, area1: c_int, area2: c_int) -> qboolean {
+    if unsafe { (*cm.cm_noAreas).integer } != 0 {
+        return qtrue;
+    }
+
+    if area1 < 0 || area2 < 0 {
+        return qfalse;
+    }
+
+    if area1 >= cm.cmg.numAreas || area2 >= cm.cmg.numAreas {
+        crate::common::error::com_error(
+            errorParm_t::ERR_DROP,
+            "area >= cmg.numAreas".to_string(),
+        );
+    }
+
+    if unsafe {
+        (*cm.cmg.areas.add(area1 as usize)).floodnum
+            == (*cm.cmg.areas.add(area2 as usize)).floodnum
+    } {
+        return qtrue;
+    }
+    qfalse
+}
+
 /// Raven `CM_WriteAreaBits`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_test.cpp:545-572`

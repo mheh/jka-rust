@@ -19,7 +19,9 @@ use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::pc_token_t;
 use mp_qshared::shared::surface_flags::CONTENTS_LIGHTSABER;
+use mp_qshared::shared::q_math::{AngleVectors, MatrixMultiply, PerpendicularVector, Sys_SnapVector};
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
+use native_platform::Sys_CheckCD;
 use native_math::vector::vec3_t;
 use native_types::clipHandle_t;
 
@@ -50,6 +52,7 @@ use mp_engine_qcommon::stringed::SE_GetString;
 use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::cm_load::RmManager;
 use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
+use mp_engine_qcommon::cm_test::CM_AreasConnected;
 use mp_host_interface::engine_host::EngineHost;
 
 use crate::npcnav::Navigator;
@@ -693,23 +696,23 @@ pub fn SV_GameSystemCalls(
             return FloatAsInt(vmf(args, 1).sqrt());
         } else if trap == T::TRAP_MATRIXMULTIPLY as c_int {
             MatrixMultiply(
-                vma(common, args, 1) as *mut vec3_t,
-                vma(common, args, 2) as *mut vec3_t,
-                vma(common, args, 3) as *mut vec3_t,
+                &*(vma(common, args, 1) as *const [[f32; 3]; 3]),
+                &*(vma(common, args, 2) as *const [[f32; 3]; 3]),
+                &mut *(vma(common, args, 3) as *mut [[f32; 3]; 3]),
             );
             return 0;
         } else if trap == T::TRAP_ANGLEVECTORS as c_int {
             AngleVectors(
-                vma(common, args, 1) as *const f32,
-                vma(common, args, 2) as *mut f32,
-                vma(common, args, 3) as *mut f32,
-                vma(common, args, 4) as *mut f32,
+                *(vma(common, args, 1) as *const vec3_t),
+                (vma(common, args, 2) as *mut vec3_t).as_mut(),
+                (vma(common, args, 3) as *mut vec3_t).as_mut(),
+                (vma(common, args, 4) as *mut vec3_t).as_mut(),
             );
             return 0;
         } else if trap == T::TRAP_PERPENDICULARVECTOR as c_int {
             PerpendicularVector(
-                vma(common, args, 1) as *mut f32,
-                vma(common, args, 2) as *const f32,
+                &mut *(vma(common, args, 1) as *mut vec3_t),
+                *(vma(common, args, 2) as *const vec3_t),
             );
             return 0;
         } else if trap == T::TRAP_FLOOR as c_int {
@@ -1072,9 +1075,9 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_AREAS_CONNECTED as c_int {
             return CM_AreasConnected(cm, *args.offset(1), *args.offset(2)) as c_int;
         } else if trap == G::G_BOT_ALLOCATE_CLIENT as c_int {
-            return SV_BotAllocateClient(sv);
+            return SV_BotAllocateClient(common, sv);
         } else if trap == G::G_BOT_FREE_CLIENT as c_int {
-            SV_BotFreeClient(sv, *args.offset(1));
+            SV_BotFreeClient(common, sv, *args.offset(1));
             return 0;
         } else if trap == G::G_GET_USERCMD as c_int {
             SV_GetUsercmd(common, sv, *args.offset(1), vma(common, args, 2) as *mut usercmd_t);
@@ -1610,7 +1613,7 @@ pub fn SV_InitGameProgs(
 
     if Cvar_VariableValue(common, cm, rm, host, c"fs_restrict".as_ptr()) == 0.0
         && unsafe { (*common.com_dedicated).integer } == 0
-        && !Sys_CheckCD()
+        && Sys_CheckCD() == qfalse
     {
         let need_cd = SE_GetString(common, host, "CON_TEXT_NEED_CD");
         mp_engine_qcommon::common::com_error(errorParm_t::ERR_NEED_CD, need_cd);

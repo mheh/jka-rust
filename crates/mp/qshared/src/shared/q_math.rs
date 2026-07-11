@@ -383,3 +383,80 @@ pub fn BoxOnPlaneSide(emins: vec3_t, emaxs: vec3_t, p: *mut cplane_t) -> c_int {
     }
     sides
 }
+
+/// Raven `MatrixMultiply`.
+///
+/// Source: `oracle/codemp/game/q_math.c:1293-1312`
+pub fn MatrixMultiply(in1: &[[f32; 3]; 3], in2: &[[f32; 3]; 3], out: &mut [[f32; 3]; 3]) {
+    out[0][0] = in1[0][0] * in2[0][0] + in1[0][1] * in2[1][0] + in1[0][2] * in2[2][0];
+    out[0][1] = in1[0][0] * in2[0][1] + in1[0][1] * in2[1][1] + in1[0][2] * in2[2][1];
+    out[0][2] = in1[0][0] * in2[0][2] + in1[0][1] * in2[1][2] + in1[0][2] * in2[2][2];
+    out[1][0] = in1[1][0] * in2[0][0] + in1[1][1] * in2[1][0] + in1[1][2] * in2[2][0];
+    out[1][1] = in1[1][0] * in2[0][1] + in1[1][1] * in2[1][1] + in1[1][2] * in2[2][1];
+    out[1][2] = in1[1][0] * in2[0][2] + in1[1][1] * in2[1][2] + in1[1][2] * in2[2][2];
+    out[2][0] = in1[2][0] * in2[0][0] + in1[2][1] * in2[1][0] + in1[2][2] * in2[2][0];
+    out[2][1] = in1[2][0] * in2[0][1] + in1[2][1] * in2[1][1] + in1[2][2] * in2[2][1];
+    out[2][2] = in1[2][0] * in2[0][2] + in1[2][1] * in2[1][2] + in1[2][2] * in2[2][2];
+}
+
+/// Raven `ProjectPointOnPlane`.
+///
+/// Source: `oracle/codemp/game/q_math.c:556-577`
+pub fn ProjectPointOnPlane(dst: &mut vec3_t, p: vec3_t, normal: vec3_t) {
+    let mut inv_denom = _DotProduct(normal, normal);
+    // Raven's debug assert (`Q_fabs(inv_denom) != 0.0f`) catches a zero
+    // normal; that's a caller bug (division by zero), not something to
+    // silently normalize away.
+    debug_assert!(inv_denom.abs() != 0.0);
+    inv_denom = 1.0 / inv_denom;
+
+    let d = _DotProduct(normal, p) * inv_denom;
+
+    let n = [
+        normal[0] * inv_denom,
+        normal[1] * inv_denom,
+        normal[2] * inv_denom,
+    ];
+
+    dst[0] = p[0] - d * n[0];
+    dst[1] = p[1] - d * n[1];
+    dst[2] = p[2] - d * n[2];
+}
+
+/// Raven `PerpendicularVector`.
+///
+/// Assumes "src" is normalized.
+/// Source: `oracle/codemp/game/q_math.c:1353-1383`
+pub fn PerpendicularVector(dst: &mut vec3_t, src: vec3_t) {
+    // find the smallest magnitude axially aligned vector
+    let mut pos = 0usize;
+    let mut minelem = 1.0f32;
+    for (i, comp) in src.iter().enumerate() {
+        if comp.abs() < minelem {
+            pos = i;
+            minelem = comp.abs();
+        }
+    }
+    let mut tempvec: vec3_t = [0.0, 0.0, 0.0];
+    tempvec[pos] = 1.0;
+
+    // project the point onto the plane defined by src
+    ProjectPointOnPlane(dst, tempvec, src);
+
+    // normalize the result
+    VectorNormalize(dst);
+}
+
+/// Raven `Sys_SnapVector`. The unix build's C fallback (`Sys_SnapVector3`)
+/// rounds each component with `rint` (round half-to-even in the default FPU
+/// mode) — matching the win32 `fld`/`fistp` asm path; `round_ties_even`
+/// reproduces that rounding exactly.
+///
+/// Source: `oracle/codemp/unix/unix_shared.cpp:76-81`
+pub fn Sys_SnapVector(v: *mut f32) {
+    unsafe {
+        *v.add(0) = (*v.add(0) as f64).round_ties_even() as f32;
+        *v.add(1) = (*v.add(1) as f64).round_ties_even() as f32;
+        *v.add(2) = (*v.add(2) as f64).round_ties_even() as f32;
+    }
+}
