@@ -1232,7 +1232,7 @@ pub fn Com_Frame(
                 break;
             }
         }
-        crate::cmd_common::Cbuf_Execute(common, cm, sv, rm, host);
+        crate::cmd_common::Cbuf_Execute(common, cm, sv, rm, rmg, host);
 
         common.frame_last_time = common.com_frameTime;
 
@@ -1297,7 +1297,7 @@ pub fn Com_Frame(
                     let _time_before_events = crate::timing::sys_milliseconds(common);
                 }
                 Com_EventLoop(common, cm, sv, rm, rmg, host);
-                crate::cmd_common::Cbuf_Execute(common, cm, sv, rm, host);
+                crate::cmd_common::Cbuf_Execute(common, cm, sv, rm, rmg, host);
 
                 //
                 // client side
@@ -1439,6 +1439,7 @@ pub fn Com_Init(
     cl: &mut Client,
     bot: &mut BotLib,
     rm: &mut RenderModels,
+    rmg: &mut RmManager,
     g2: &mut Ghoul2System,
     host: &mut dyn EngineHost,
     commandLine: *mut c_char,
@@ -1500,7 +1501,7 @@ pub fn Com_Init(
 
         crate::cmd_common::Cbuf_AddText(common, c"exec autoexec.cfg\n".as_ptr() as *mut c_char);
 
-        crate::cmd_common::Cbuf_Execute(common, cm, sv, rm, host);
+        crate::cmd_common::Cbuf_Execute(common, cm, sv, rm, rmg, host);
 
         // override anything from the config files with command line args
         Com_StartupVariable(common, cm, rm, host, core::ptr::null());
@@ -1993,7 +1994,7 @@ pub fn Com_Init(
                     rm,
                     host,
                     c"error".as_ptr(),
-                    Some(|common, _cm, _sv, _rm, _host| Com_Error_f(common)),
+                    Some(|common, _cm, _sv, _rm, _rmg, _host| Com_Error_f(common)),
                 );
                 Cmd_AddCommand(
                     common,
@@ -2001,7 +2002,7 @@ pub fn Com_Init(
                     rm,
                     host,
                     c"crash".as_ptr(),
-                    Some(|_common, _cm, _sv, _rm, _host| Com_Crash_f()),
+                    Some(|_common, _cm, _sv, _rm, _rmg, _host| Com_Crash_f()),
                 );
                 Cmd_AddCommand(
                     common,
@@ -2009,16 +2010,14 @@ pub fn Com_Init(
                     rm,
                     host,
                     c"freeze".as_ptr(),
-                    Some(|common, cm, _sv, rm, host| Com_Freeze_f(common, cm, rm, host)),
+                    Some(|common, cm, _sv, rm, _rmg, host| Com_Freeze_f(common, cm, rm, host)),
                 );
             }
         }
-        // `Com_Quit_f` needs `rmg: &mut RmManager` (SV_Shutdown/Com_Shutdown), a
-        // receiver NOT in scope at the dispatch site (`Cmd_ExecuteString`/
-        // `Cbuf_Execute` thread common/cm/sv/rm/host, and the registration chain
-        // `Com_Init` has no `rmg`): receiver-unavailable per the 2026-07-11
-        // ruling's constraint 5 — the real handler is referenced at its canonical
-        // home with `rmg` the honest missing receiver (E0425), reported.
+        // `Com_Quit_f` needs `rmg: &mut RmManager` (SV_Shutdown/Com_Shutdown): the
+        // dispatch site (`Cmd_ExecuteString`) threads it in the pinned
+        // common/cm/sv/rm/rmg/host order, so the registered handler reaches it as
+        // the slot's fifth receiver.
         unsafe {
             Cmd_AddCommand(
                 common,
@@ -2026,7 +2025,7 @@ pub fn Com_Init(
                 rm,
                 host,
                 c"quit".as_ptr(),
-                Some(|common, cm, sv, rm, host| Com_Quit_f(common, cm, sv, rm, rmg, host)),
+                Some(|common, cm, sv, rm, rmg, host| Com_Quit_f(common, cm, sv, rm, rmg, host)),
             )
         };
         unsafe {
@@ -2036,7 +2035,7 @@ pub fn Com_Init(
                 rm,
                 host,
                 c"changeVectors".as_ptr(),
-                Some(|common, _cm, _sv, _rm, _host| crate::msg::MSG_ReportChangeVectors_f(common)),
+                Some(|common, _cm, _sv, _rm, _rmg, _host| crate::msg::MSG_ReportChangeVectors_f(common)),
             )
         };
         unsafe {
@@ -2046,7 +2045,7 @@ pub fn Com_Init(
                 rm,
                 host,
                 c"writeconfig".as_ptr(),
-                Some(|common, _cm, _sv, _rm, _host| Com_WriteConfig_f(common)),
+                Some(|common, _cm, _sv, _rm, _rmg, _host| Com_WriteConfig_f(common)),
             )
         };
 

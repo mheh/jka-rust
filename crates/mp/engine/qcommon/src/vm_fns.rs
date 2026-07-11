@@ -26,23 +26,11 @@ use crate::vm::vm_s::vm_t;
 use crate::vm::vm_symbol_s::vmSymbol_t;
 use crate::vm::vmptr_t::vmptr_t;
 
-// PORT-NOTE(rm-types): `RenderModels`/`RmManager`/`Server` are state-receiver
-// types pinned by the engine-fork-discovery preamble's receiver order
-// (rmg-terrain.md own their real shape); none has landed in this crate yet.
-// Referenced by their exact resolved-signature names per the no-stub rule
-// (`common_fns.rs`/`vm_x86.rs` precedent); reported as missing symbols for
-// the finisher to replace with the real imports once they land.
 #[allow(dead_code)]
 use crate::cm_load::RenderModels;
-#[allow(dead_code)]
-struct RmManager;
-#[allow(dead_code)]
-use crate::cmd_pc::Server;
 
-// Real in-crate callee imported (sweep: extern forward-declares eliminated).
-use crate::z_memman_pc::Hunk_Alloc;
-// Genuinely-unported callees referenced at their canonical future homes.
 use crate::cmd::Cmd_AddCommand;
+use crate::z_memman_pc::Hunk_Alloc;
 use crate::cvar_fns::Cvar_VariableValue;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::shared::q_string::{COM_Parse, COM_StripExtension};
@@ -582,7 +570,7 @@ pub fn VM_Init(
             rm,
             host,
             c"vmprofile".as_ptr(),
-            Some(|common, cm, _sv, rm, host| VM_VmProfile_f(common, cm, rm, host)),
+            Some(|common, cm, _sv, rm, _rmg, host| VM_VmProfile_f(common, cm, rm, host)),
         );
         Cmd_AddCommand(
             common,
@@ -590,7 +578,7 @@ pub fn VM_Init(
             rm,
             host,
             c"vminfo".as_ptr(),
-            Some(|common, _cm, _sv, _rm, _host| VM_VmInfo_f(common)),
+            Some(|common, _cm, _sv, _rm, _rmg, _host| VM_VmInfo_f(common)),
         );
     }
 

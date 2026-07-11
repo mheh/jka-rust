@@ -1043,7 +1043,7 @@ pub fn Cvar_Init(
         rm,
         host,
         c"toggle".as_ptr(),
-        Some(|common, cm, _sv, rm, host| Cvar_Toggle_f(common, cm, rm, host)),
+        Some(|common, cm, _sv, rm, _rmg, host| Cvar_Toggle_f(common, cm, rm, host)),
     );
     Cmd_AddCommand(
         common,
@@ -1051,7 +1051,7 @@ pub fn Cvar_Init(
         rm,
         host,
         c"set".as_ptr(),
-        Some(|common, cm, _sv, rm, host| Cvar_Set_f(common, cm, rm, host)),
+        Some(|common, cm, _sv, rm, _rmg, host| Cvar_Set_f(common, cm, rm, host)),
     );
     Cmd_AddCommand(
         common,
@@ -1059,7 +1059,7 @@ pub fn Cvar_Init(
         rm,
         host,
         c"sets".as_ptr(),
-        Some(|common, cm, _sv, rm, host| Cvar_SetS_f(common, cm, rm, host)),
+        Some(|common, cm, _sv, rm, _rmg, host| Cvar_SetS_f(common, cm, rm, host)),
     );
     Cmd_AddCommand(
         common,
@@ -1067,7 +1067,7 @@ pub fn Cvar_Init(
         rm,
         host,
         c"setu".as_ptr(),
-        Some(|common, cm, _sv, rm, host| Cvar_SetU_f(common, cm, rm, host)),
+        Some(|common, cm, _sv, rm, _rmg, host| Cvar_SetU_f(common, cm, rm, host)),
     );
     Cmd_AddCommand(
         common,
@@ -1075,7 +1075,7 @@ pub fn Cvar_Init(
         rm,
         host,
         c"seta".as_ptr(),
-        Some(|common, cm, _sv, rm, host| Cvar_SetA_f(common, cm, rm, host)),
+        Some(|common, cm, _sv, rm, _rmg, host| Cvar_SetA_f(common, cm, rm, host)),
     );
     Cmd_AddCommand(
         common,
@@ -1083,7 +1083,7 @@ pub fn Cvar_Init(
         rm,
         host,
         c"reset".as_ptr(),
-        Some(|common, cm, _sv, rm, host| Cvar_Reset_f(common, cm, rm, host)),
+        Some(|common, cm, _sv, rm, _rmg, host| Cvar_Reset_f(common, cm, rm, host)),
     );
     Cmd_AddCommand(
         common,
@@ -1091,7 +1091,7 @@ pub fn Cvar_Init(
         rm,
         host,
         c"cvarlist".as_ptr(),
-        Some(|common, _cm, _sv, _rm, _host| Cvar_List_f(common)),
+        Some(|common, _cm, _sv, _rm, _rmg, _host| Cvar_List_f(common)),
     );
     Cmd_AddCommand(
         common,
@@ -1099,7 +1099,7 @@ pub fn Cvar_Init(
         rm,
         host,
         c"cvar_restart".as_ptr(),
-        Some(|common, cm, _sv, rm, host| Cvar_Restart_f(common, cm, rm, host)),
+        Some(|common, cm, _sv, rm, _rmg, host| Cvar_Restart_f(common, cm, rm, host)),
     );
 }
 

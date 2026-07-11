@@ -16,7 +16,7 @@ use crate::z_memman_pc::{CopyString, S_Malloc, Z_Free};
 
 // `Server` is a pinned-receiver placeholder: the real type lives in
 // mp_engine_server, which depends on this crate (importing it would cycle).
-pub(crate) use crate::cm_load::RenderModels;
+pub(crate) use crate::cm_load::{RenderModels, RmManager};
 pub(crate) struct Server;
 
 use crate::common::com_printf;
@@ -155,6 +155,7 @@ pub fn Cmd_ExecuteString(
     cm: &mut CollisionWorld,
     sv: &mut Server,
     rm: &mut RenderModels,
+    rmg: &mut RmManager,
     host: &mut dyn EngineHost,
     text: *const c_char,
 ) {
@@ -181,7 +182,7 @@ pub fn Cmd_ExecuteString(
 
                 // perform the action
                 if let Some(function) = (*cmd).function {
-                    function(common, cm, sv, rm, host);
+                    function(common, cm, sv, rm, rmg, host);
                 } else {
                     // let the cgame or game handle it
                     break;

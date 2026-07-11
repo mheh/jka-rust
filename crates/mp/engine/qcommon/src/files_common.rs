@@ -1872,7 +1872,7 @@ pub fn FS_Startup(
             rm,
             host,
             c"path".as_ptr(),
-            Some(|common, _cm, _sv, _rm, _host| FS_Path_f(common)),
+            Some(|common, _cm, _sv, _rm, _rmg, _host| FS_Path_f(common)),
         );
         Cmd_AddCommand(
             common,
@@ -1880,7 +1880,7 @@ pub fn FS_Startup(
             rm,
             host,
             c"dir".as_ptr(),
-            Some(|common, cm, _sv, rm, host| FS_Dir_f(common, cm, rm, host)),
+            Some(|common, cm, _sv, rm, _rmg, host| FS_Dir_f(common, cm, rm, host)),
         );
         Cmd_AddCommand(
             common,
@@ -1888,7 +1888,7 @@ pub fn FS_Startup(
             rm,
             host,
             c"fdir".as_ptr(),
-            Some(|common, cm, _sv, rm, host| FS_NewDir_f(common, cm, rm, host)),
+            Some(|common, cm, _sv, rm, _rmg, host| FS_NewDir_f(common, cm, rm, host)),
         );
         Cmd_AddCommand(
             common,
@@ -1896,7 +1896,7 @@ pub fn FS_Startup(
             rm,
             host,
             c"touchFile".as_ptr(),
-            Some(|common, cm, _sv, rm, host| FS_TouchFile_f(common, cm, rm, host)),
+            Some(|common, cm, _sv, rm, _rmg, host| FS_TouchFile_f(common, cm, rm, host)),
         );
 
         // reorder the pure pk3 files according to server order

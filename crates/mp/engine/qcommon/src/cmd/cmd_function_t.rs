@@ -4,6 +4,7 @@ use core::ffi::c_char;
 
 use mp_host_interface::engine_host::EngineHost;
 
+use crate::cm_load::RmManager;
 use crate::cmd_pc::{RenderModels, Server};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
@@ -11,13 +12,14 @@ use crate::common::Common;
 /// Console-command handler slot. Receiver-threaded in place of Raven's
 /// global-reaching `void (*xcommand_t)(void)` (user ruling 2026-07-11): the
 /// dispatch site (`Cmd_ExecuteString`) threads the receivers in scope there
-/// (`common`/`cm`/`sv`/`rm`/`host`, pinned order), so every registered command
-/// reaches real engine state instead of a no-op shim.
+/// (`common`/`cm`/`sv`/`rm`/`rmg`/`host`, pinned order), so every registered
+/// command reaches real engine state instead of a no-op shim.
 pub type CmdFunction = fn(
     &mut Common,
     &mut CollisionWorld,
     &mut Server,
     &mut RenderModels,
+    &mut RmManager,
     &mut dyn EngineHost,
 );
 

@@ -653,7 +653,7 @@ pub fn Com_InitZoneMemory(
             rm,
             host,
             c"zone_stats".as_ptr(),
-            Some(|common, _cm, _sv, _rm, _host| Z_Stats_f(common)),
+            Some(|common, _cm, _sv, _rm, _rmg, _host| Z_Stats_f(common)),
         );
         Cmd_AddCommand(
             common,
@@ -661,7 +661,7 @@ pub fn Com_InitZoneMemory(
             rm,
             host,
             c"zone_details".as_ptr(),
-            Some(|common, _cm, _sv, _rm, _host| Z_Details_f(common)),
+            Some(|common, _cm, _sv, _rm, _rmg, _host| Z_Details_f(common)),
         );
     }
 
