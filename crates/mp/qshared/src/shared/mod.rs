@@ -51,6 +51,7 @@ pub mod shared_ik_move_params;
 pub mod sound_channel;
 pub mod string_id_table;
 pub mod surface_flags;
+pub mod swap;
 pub mod trackchan;
 pub mod trajectory;
 pub mod vec3struct;

@@ -148,6 +148,11 @@ pub struct Common {
     pub msg_huff: crate::qcommon::huffman_t::huffman_t,
     /// Raven `oldsize` (`msg.cpp:37`).
     pub oldsize: i32,
+    /// Raven `g_nOverrideChecked` — one-shot guard so `MSG_Init`/`MSG_InitOOB`
+    /// run the netf/psf override check only once.
+    ///
+    /// Source: `oracle/codemp/qcommon/msg.cpp:39`
+    pub g_nOverrideChecked: bool,
     //TODO: Port cl_shownet
     // Source: oracle/codemp/qcommon/msg.cpp:12
     // PORT-NOTE(cvar): `cl_shownet` is a `cvar_t*` in Raven; `Common`'s
@@ -196,6 +201,12 @@ pub struct Common {
     /// Source: `oracle/codemp/qcommon/common.cpp:34-35`
     pub com_journalFile: fileHandle_t,
     pub com_journalDataFile: fileHandle_t,
+    /// Raven `logfile` — the lazily-opened Com_Printf log file handle. Written
+    /// by the deferred Com_Printf logfile-open path; read here to close it in
+    /// `Com_Shutdown`.
+    ///
+    /// Source: `oracle/codemp/qcommon/common.cpp:33`
+    pub logfile: fileHandle_t,
     /// Raven `com_*` cvar pointers.
     ///
     /// Source: `oracle/codemp/qcommon/common.cpp:37-75`
@@ -241,6 +252,11 @@ pub struct Common {
     pub com_pushedEvents: [sysEvent_t; MAX_PUSHED_EVENTS],
     pub com_pushedEventsHead: c_int,
     pub com_pushedEventsTail: c_int,
+    /// Raven `Com_PushEvent`'s `static int printedWarning` (§B3 fn-static hoist)
+    /// — throttles the overflow warning to once per overflow burst.
+    ///
+    /// Source: `oracle/codemp/qcommon/common.cpp:743`
+    pub com_pushevent_printed_warning: c_int,
     /// Raven `com_numConsoleLines` / `com_consoleLines[MAX_CONSOLE_LINES]`.
     ///
     /// Source: `oracle/codemp/qcommon/common.cpp:387-388`

@@ -13,7 +13,10 @@ use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::shared::{errorParm_t, qboolean, qfalse, qtrue};
 
 use mp_host_interface::engine_host::EngineHost;
+use native_types::byte;
 
+use crate::cm_load::RenderModels;
+use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 
 // Sweep: extern forward-declares eliminated. Real qshared/in-crate callees
@@ -108,6 +111,41 @@ pub const MSG_H_DATA: [i32; 256] = [
     1899, 1872, 976, 841, 1127, 956, 1159, 950, 7791, 954, 1289, 933, 1127, 3207, 1020, 927, 1355,
     768, 1040, 745, 952, 805, 1073, 740, 1013, 805, 1008, 796, 996, 1057, 11457, 13504,
 ];
+
+/// Raven `MSG_Init` — one-time netf/psf override check, lazy Huffman init, then
+/// zero the `msg_t` and wire its buffer. (`_XBOX` is not defined, so the
+/// override-check block is live.)
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:46-68`
+pub fn MSG_Init(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    buf: *mut msg_t,
+    data: *mut byte,
+    length: c_int,
+) {
+    if !common.g_nOverrideChecked {
+        // Check for netf overrides, then for psf overrides. `MSG_CheckNETFPSFOverrides`
+        // is a large file-loading callee not yet ported; called at its canonical
+        // home (honest E0425).
+        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qfalse);
+        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qtrue);
+
+        common.g_nOverrideChecked = true;
+    }
+
+    if common.msg_init == qfalse {
+        MSG_initHuffman(common);
+    }
+
+    unsafe {
+        crate::common_fns::Com_Memset(buf as *mut (), 0, core::mem::size_of::<msg_t>());
+        (*buf).data = data;
+        (*buf).maxsize = length;
+    }
+}
 
 /// Raven `MSG_initHuffman`.
 ///

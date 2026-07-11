@@ -17,6 +17,7 @@ use std::collections::BTreeSet;
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::error_parm::errorParm_t;
 
+use crate::common::Common;
 use super::interface::{se_build_file_list, se_free_file_data_after_load, se_load_file_data};
 use super::package::StringEdPackage;
 use super::{
@@ -374,6 +375,15 @@ pub fn se_get_language_dir(pkg: &StringEdPackage, lang_index: i32) -> String {
         "{}/{}",
         SE_STRINGS_DIR, pkg.languages_available[lang_index as usize]
     )
+}
+
+/// Raven `SE_Init` — the C-ABI-named entrypoint threading `&mut Common` (which
+/// owns the `StringEdPackage`) and the engine host into the idiomatic
+/// [`se_init`].
+///
+/// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:1156-1196`
+pub fn SE_Init(common: &mut Common, mut host: &mut dyn EngineHost) {
+    se_init(&mut common.stringed, &mut host);
 }
 
 /// Raven `SE_Init` — register the three cvars and load the current language.

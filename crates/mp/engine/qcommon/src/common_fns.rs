@@ -29,7 +29,7 @@ use crate::qcommon::sys_event_type_t::sysEventType_t;
 #[allow(dead_code)]
 use crate::cm_load::RenderModels;
 #[allow(dead_code)]
-struct RmManager;
+use crate::cm_load::RmManager;
 #[allow(dead_code)]
 use crate::z_memman_pc::Ghoul2System;
 #[allow(dead_code)]
@@ -45,12 +45,15 @@ struct Client;
 // to their home; the `SV_*`/`CL_*`/`Key_*` engine entrypoints sit across the
 // server/client cycle seam with no importable home — left bare; reported.
 use crate::cmd::Cmd_AddCommand;
-use crate::common_fns::{Com_GetRealEvent, Com_Milliseconds, Com_Shutdown};
 use crate::cvar_fns::{Cvar_Get, Cvar_Init, Cvar_Set, Cvar_WriteVariables};
-use crate::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_FOpenFileWrite, FS_Read, FS_Shutdown};
-use crate::msg::MSG_Init;
+use crate::cm_load::CM_ClearMap;
+use crate::files_common::{
+    FS_FCloseFile, FS_FOpenFileRead, FS_FOpenFileWrite, FS_Read, FS_Shutdown, FS_Write,
+};
+use crate::msg::{MSG_Init, MSG_shutdownHuffman};
 use crate::stringed::api::SE_Init;
-use crate::z_memman_pc::Z_Free;
+use crate::z_memman_pc::{Z_Free, Z_Malloc};
+use mp_qshared::common::mp::qcommon::tags::memtag_t;
 
 /// Raven `Com_DPrintf` — a `Com_Printf` that only shows up if the `developer`
 /// cvar is set. Engine callers pre-render the format through Rust `format!`, so
@@ -578,6 +581,161 @@ pub fn Com_GetEvent(
             [((common.com_pushedEventsTail - 1) & (MAX_PUSHED_EVENTS as i32 - 1)) as usize];
     }
     unsafe { Com_GetRealEvent(common, cm, rm, host) }
+}
+
+/// Raven `Com_GetRealEvent` — either read the next event from the system or
+/// (journal mode 2) replay it from the journal file, writing it out in journal
+/// mode 1.
+///
+/// Source: `oracle/codemp/qcommon/common.cpp:789-825`
+pub fn Com_GetRealEvent(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+) -> sysEvent_t {
+    let mut ev: sysEvent_t = unsafe { core::mem::zeroed() };
+
+    // either get an event from the system or the journal file
+    if unsafe { (*common.com_journal).integer } == 2 {
+        let r = FS_Read(
+            common,
+            &mut ev as *mut sysEvent_t as *mut (),
+            core::mem::size_of::<sysEvent_t>() as c_int,
+            common.com_journalFile,
+        );
+        if r != core::mem::size_of::<sysEvent_t>() as c_int {
+            crate::common::com_error(
+                errorParm_t::ERR_FATAL,
+                "Error reading from journal file".to_string(),
+            );
+        }
+        if ev.evPtrLength != 0 {
+            ev.evPtr = unsafe {
+                Z_Malloc(
+                    common,
+                    cm,
+                    rm,
+                    host,
+                    ev.evPtrLength,
+                    memtag_t::TAG_EVENT,
+                    qtrue,
+                    4,
+                )
+            } as *mut c_void;
+            let r = FS_Read(common, ev.evPtr as *mut (), ev.evPtrLength, common.com_journalFile);
+            if r != ev.evPtrLength {
+                crate::common::com_error(
+                    errorParm_t::ERR_FATAL,
+                    "Error reading from journal file".to_string(),
+                );
+            }
+        }
+    } else {
+        // Raven `Sys_GetEvent()` — a PlatformHost seam with no host receiver in
+        // the resolved signature; called bare by its Raven name (honest E0425).
+        ev = Sys_GetEvent();
+
+        // write the journal value out if needed
+        if unsafe { (*common.com_journal).integer } == 1 {
+            let r = FS_Write(
+                common,
+                &ev as *const sysEvent_t as *const (),
+                core::mem::size_of::<sysEvent_t>() as c_int,
+                common.com_journalFile,
+            );
+            if r != core::mem::size_of::<sysEvent_t>() as c_int {
+                crate::common::com_error(
+                    errorParm_t::ERR_FATAL,
+                    "Error writing to journal file".to_string(),
+                );
+            }
+            if ev.evPtrLength != 0 {
+                let r = FS_Write(common, ev.evPtr as *const (), ev.evPtrLength, common.com_journalFile);
+                if r != ev.evPtrLength {
+                    crate::common::com_error(
+                        errorParm_t::ERR_FATAL,
+                        "Error writing to journal file".to_string(),
+                    );
+                }
+            }
+        }
+    }
+
+    ev
+}
+
+/// Raven `Com_PushEvent` — push an event onto the `com_pushedEvents` ring,
+/// warning (once per burst) and dropping the oldest on overflow.
+///
+/// Source: `oracle/codemp/qcommon/common.cpp:850-874`
+pub fn Com_PushEvent(common: &mut Common, event: *mut sysEvent_t) {
+    let ev_idx = (common.com_pushedEventsHead & (MAX_PUSHED_EVENTS as i32 - 1)) as usize;
+
+    if common.com_pushedEventsHead - common.com_pushedEventsTail >= MAX_PUSHED_EVENTS as i32 {
+        // don't print the warning constantly, or it can give time for more...
+        if common.com_pushevent_printed_warning == 0 {
+            common.com_pushevent_printed_warning = qtrue as c_int;
+            crate::common::com_printf(common, "WARNING: Com_PushEvent overflow\n");
+        }
+
+        if !common.com_pushedEvents[ev_idx].evPtr.is_null() {
+            unsafe { Z_Free(common, common.com_pushedEvents[ev_idx].evPtr as *mut ()) };
+        }
+        common.com_pushedEventsTail += 1;
+    } else {
+        common.com_pushevent_printed_warning = qfalse as c_int;
+    }
+
+    common.com_pushedEvents[ev_idx] = unsafe { *event };
+    common.com_pushedEventsHead += 1;
+}
+
+/// Raven `Com_Milliseconds` — pump events until a null (current-time) event,
+/// returning its timestamp.
+///
+/// Source: `oracle/codemp/qcommon/common.cpp:1028-1041`
+pub fn Com_Milliseconds(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+) -> c_int {
+    let mut ev: sysEvent_t;
+
+    // get events and push them until we get a null event with the current time
+    loop {
+        ev = unsafe { Com_GetRealEvent(common, cm, rm, host) };
+        if !matches!(ev.evType, sysEventType_t::SE_NONE) {
+            Com_PushEvent(common, &mut ev);
+        }
+        if matches!(ev.evType, sysEventType_t::SE_NONE) {
+            break;
+        }
+    }
+
+    ev.evTime
+}
+
+/// Raven `Com_Shutdown` — clear the collision map, close the log/journal files
+/// and shut down the MSG Huffman tables.
+///
+/// Source: `oracle/codemp/qcommon/common.cpp:1785-1810`
+pub fn Com_Shutdown(common: &mut Common, cm: &mut CollisionWorld, rmg: &mut RmManager) {
+    CM_ClearMap(cm, rmg);
+
+    if common.logfile != 0 {
+        unsafe { FS_FCloseFile(common, common.logfile) };
+        common.logfile = 0;
+        unsafe { (*common.com_logfile).integer = 0 }; // don't open up the log file again!!
+    }
+
+    if common.com_journalFile != 0 {
+        unsafe { FS_FCloseFile(common, common.com_journalFile) };
+        common.com_journalFile = 0;
+    }
+
+    MSG_shutdownHuffman();
 }
 
 /// `Com_Error_f`.

@@ -31,6 +31,18 @@ use crate::cm_load::RenderModels;
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 
+/// Raven `CM_ClearLevelPatches` — clears the `debugPatchCollide`/`debugFacet`
+/// debug pointers.
+///
+/// These two globals are renderer-debug-only (written under `r_debugSurfaceUpdate`,
+/// read only by the deferred `CM_DrawDebugSurface`); both write sites were dropped
+/// as dead surface (§20), so this is a faithful no-op in the ported subset.
+///
+/// Source: `oracle/codemp/qcommon/cm_patch.cpp:108-111`
+pub fn CM_ClearLevelPatches(cm: &mut CollisionWorld) {
+    let _ = cm;
+}
+
 /// Raven `CM_PositionTestInPatchCollide` — box-position test against a patch's
 /// facets.
 //TODO: Port CM_PositionTestInPatchCollide — full cm_patch.cpp recovery deferred

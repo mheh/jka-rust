@@ -46,6 +46,7 @@ use crate::cmd::Cmd_AddCommand;
 use crate::cvar_fns::Cvar_VariableValue;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::shared::q_string::{COM_Parse, COM_StripExtension};
+use mp_qshared::shared::swap::LittleLong;
 use native_platform::{Sys_LoadDll, Sys_UnloadDll};
 
 /// `VM_VM2C`.

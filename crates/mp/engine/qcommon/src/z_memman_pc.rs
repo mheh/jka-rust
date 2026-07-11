@@ -828,6 +828,31 @@ pub fn Hunk_Alloc(
     unsafe { Z_Malloc(common, cm, rm, host, size, hunk_tag, native_types::qtrue, 4) }
 }
 
+/// Raven `Hunk_AllocateTempMemory`.
+///
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:806-809`
+pub fn Hunk_AllocateTempMemory(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    size: c_int,
+) -> *mut () {
+    // don't bother clearing, because we are going to load a file over it
+    unsafe {
+        Z_Malloc(
+            common,
+            cm,
+            rm,
+            host,
+            size,
+            memtag_t::TAG_TEMP_HUNKALLOC,
+            native_types::qfalse,
+            4,
+        )
+    }
+}
+
 /// Raven `Hunk_FreeTempMemory`.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:815-818`

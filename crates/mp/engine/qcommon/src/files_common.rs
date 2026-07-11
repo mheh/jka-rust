@@ -37,7 +37,8 @@ const MAX_OSPATH: usize = 1024;
 use crate::common::{com_error, com_printf};
 use crate::common_fns::{Com_FilterPath, Com_StartupVariable};
 use mp_qshared::shared::cvar::{CVAR_INIT, CVAR_SYSTEMINFO};
-use mp_qshared::shared::q_string::{Com_sprintf, Q_stricmp, Q_stricmpn, Q_strncpyz};
+use mp_qshared::shared::q_string::{Com_sprintf, Q_stricmp, Q_stricmpn, Q_strlwr, Q_strncpyz};
+use mp_qshared::shared::swap::LittleLong;
 
 use crate::cmd_common::{Cbuf_AddText, Cmd_Argc, Cmd_Argv, Cmd_TokenizeString};
 use crate::cmd_pc::{Cmd_AddCommand, Cmd_RemoveCommand};
@@ -61,7 +62,7 @@ use crate::qcommon::filesystem_limits::{
     FS_CGAME_REF, FS_GENERAL_REF, FS_QAGAME_REF, FS_UI_REF, MAX_FILE_HANDLES,
 };
 use crate::qcommon::protocol::PROTOCOL_VERSION;
-use crate::z_memman_pc::{CopyString, Z_Free, Z_Malloc};
+use crate::z_memman_pc::{CopyString, Hunk_AllocateTempMemory, Z_Free, Z_Malloc};
 // Genuinely-unported callees referenced at their canonical homes (honest
 // E0425/E0432 escalations): the `unz*` zip seam (open user decision) at
 // `crate::files::unz_file`; `Sys_*` platform I/O at `native_platform`.
@@ -1097,7 +1098,7 @@ pub fn FS_ReadFile(
                     return len;
                 }
 
-                buf = Hunk_AllocateTempMemory(len + 1) as *mut u8;
+                buf = Hunk_AllocateTempMemory(common, cm, rm, host, len + 1) as *mut u8;
                 *buffer = buf as *mut ();
 
                 let r = FS_Read(common, buf as *mut (), len, common.com_journalDataFile);

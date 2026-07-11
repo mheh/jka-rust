@@ -237,3 +237,132 @@ pub trait EngineHost {
     /// Source: `oracle/codemp/win32/win_syscon.cpp:396`
     fn sys_show_console(&mut self, level: i32, quit_on_close: qboolean);
 }
+
+/// Forwarding impl so a `&mut dyn EngineHost` (the consumer-stored form, ruling
+/// 24) satisfies the `&mut impl EngineHost` bounds the §F/stringed subsystems
+/// take: the dyn seam bridges into the generic API without erasing it.
+impl<T: EngineHost + ?Sized> EngineHost for &mut T {
+    #[allow(clippy::too_many_arguments)]
+    fn trace(
+        &mut self,
+        results: &mut trace_t,
+        start: &vec3_t,
+        mins: &vec3_t,
+        maxs: &vec3_t,
+        end: &vec3_t,
+        pass_entity_num: i32,
+        contentmask: i32,
+        capsule: bool,
+        trace_flags: i32,
+        use_lod: i32,
+    ) {
+        (**self).trace(
+            results,
+            start,
+            mins,
+            maxs,
+            end,
+            pass_entity_num,
+            contentmask,
+            capsule,
+            trace_flags,
+            use_lod,
+        )
+    }
+
+    fn fs_read_file(&mut self, qpath: &str) -> Option<Vec<u8>> {
+        (**self).fs_read_file(qpath)
+    }
+
+    fn fs_free_file(&mut self, buffer: Vec<u8>) {
+        (**self).fs_free_file(buffer)
+    }
+
+    fn print(&mut self, msg: &str) {
+        (**self).print(msg)
+    }
+
+    fn error(&mut self, code: errorParm_t, msg: &str) -> ! {
+        (**self).error(code, msg)
+    }
+
+    fn vm_call(&mut self, vm: VmSlot, callnum: i32, args: &[isize]) -> isize {
+        (**self).vm_call(vm, callnum, args)
+    }
+
+    fn shared_memory(&mut self) -> *mut c_char {
+        (**self).shared_memory()
+    }
+
+    fn flrand(&mut self, min: f32, max: f32) -> f32 {
+        (**self).flrand(min, max)
+    }
+
+    fn irand(&mut self, min: i32, max: i32) -> i32 {
+        (**self).irand(min, max)
+    }
+
+    fn gentity(&mut self, ent_num: i32) -> *mut sharedEntity_t {
+        (**self).gentity(ent_num)
+    }
+
+    fn cvar_integer(&mut self, name: &str) -> i32 {
+        (**self).cvar_integer(name)
+    }
+
+    fn sv_time(&mut self) -> i32 {
+        (**self).sv_time()
+    }
+
+    fn fs_write_file(&mut self, qpath: &str, data: &[u8]) -> bool {
+        (**self).fs_write_file(qpath, data)
+    }
+
+    fn model_mdxm(&mut self, model: qhandle_t) -> *mut c_void {
+        (**self).model_mdxm(model)
+    }
+
+    fn model_mdxa(&mut self, model: qhandle_t) -> *mut c_void {
+        (**self).model_mdxa(model)
+    }
+
+    fn cvar_register(&mut self, name: &str, default: &str, flags: i32) {
+        (**self).cvar_register(name, default, flags)
+    }
+
+    fn cvar_string(&mut self, name: &str) -> String {
+        (**self).cvar_string(name)
+    }
+
+    fn cvar_take_modified(&mut self, name: &str) -> bool {
+        (**self).cvar_take_modified(name)
+    }
+
+    fn fs_list_files(&mut self, dir: &str, ext: &str, want_subs: bool) -> Vec<String> {
+        (**self).fs_list_files(dir, ext, want_subs)
+    }
+
+    fn fs_file_is_in_pak(&mut self, qpath: &str) -> Option<i32> {
+        (**self).fs_file_is_in_pak(qpath)
+    }
+
+    fn sv_shownet_entity_classname(&mut self, number: i32) -> Option<String> {
+        (**self).sv_shownet_entity_classname(number)
+    }
+
+    fn sys_init(&mut self) {
+        (**self).sys_init()
+    }
+
+    fn sys_quit(&mut self) -> ! {
+        (**self).sys_quit()
+    }
+
+    fn sys_error(&mut self, msg: &str) -> ! {
+        (**self).sys_error(msg)
+    }
+
+    fn sys_show_console(&mut self, level: i32, quit_on_close: qboolean) {
+        (**self).sys_show_console(level, quit_on_close)
+    }
+}
