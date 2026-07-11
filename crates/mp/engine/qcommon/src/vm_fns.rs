@@ -570,7 +570,7 @@ pub fn VM_Init(
             rm,
             host,
             c"vmprofile".as_ptr(),
-            Some(|common, cm, _sv, rm, _rmg, host| VM_VmProfile_f(common, cm, rm, host)),
+            Some(|common, cm, _sv, rm, _rmg, _g2, host| VM_VmProfile_f(common, cm, rm, host)),
         );
         Cmd_AddCommand(
             common,
@@ -578,7 +578,7 @@ pub fn VM_Init(
             rm,
             host,
             c"vminfo".as_ptr(),
-            Some(|common, _cm, _sv, _rm, _rmg, _host| VM_VmInfo_f(common)),
+            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| VM_VmInfo_f(common)),
         );
     }
 

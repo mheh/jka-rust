@@ -8,12 +8,30 @@
 
 use core::ffi::{c_char, c_int};
 
+use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::qcommon::net_limits::{MAX_RELIABLE_COMMANDS, PACKET_MASK};
 use mp_qshared::shared::{qfalse, qtrue};
 
 use crate::Server;
 use mp_engine_botlib::BotLib;
 use mp_qshared::shared::q_string::Q_strncpyz;
+
+/// Raven `SV_BotLibSetup`.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:595-608`
+pub fn SV_BotLibSetup(common: &mut Common, sv: &mut Server, bot: &mut BotLib) -> c_int {
+    if common.bot_enable == 0 {
+        return 0;
+    }
+
+    if sv.botlib_export.is_null() {
+        // `S_COLOR_RED` (`^1`).
+        com_printf(common, "^1Error: SV_BotLibSetup without SV_BotInitBotLib\n");
+        return -1;
+    }
+
+    unsafe { ((*sv.botlib_export).BotLibSetup.unwrap())(bot) }
+}
 
 /// Raven `BotImport_DebugPolygonDelete`.
 ///

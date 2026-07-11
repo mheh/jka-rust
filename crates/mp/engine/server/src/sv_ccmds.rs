@@ -18,6 +18,7 @@ use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cmd::cmd_function_t::CmdFunction;
 use mp_engine_qcommon::cmd::Cmd_AddCommand;
 use mp_engine_qcommon::cmd_pc::Server as CmdServerSlot;
+use mp_engine_qcommon::common::opaque_slots::Ghoul2System as CmdGhoul2Slot;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::cm_load::RenderModels;
@@ -30,7 +31,7 @@ use mp_qshared::shared::qboolean;
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
-use crate::server_host::server_from_slot;
+use crate::server_host::{ghoul2_from_slot, server_from_slot};
 use crate::sv_world::SV_SectorList_f;
 use crate::Server;
 
@@ -1233,10 +1234,10 @@ pub fn SV_AddOperatorCommands(
     // `CmdFunction`'s pinned receiver order (common/cm/sv/rm/rmg/host); it casts
     // the type-erased `sv` slot back to `&mut Server` (`server_from_slot`, single
     // documented unsafe pair) and calls the real receiver-threaded command body.
-    add(common, cm, rm, host, c"heartbeat".as_ptr(), |_common, _cm, sv, _rm, _rmg, _host| unsafe {
+    add(common, cm, rm, host, c"heartbeat".as_ptr(), |_common, _cm, sv, _rm, _rmg, _g2, _host| unsafe {
         SV_Heartbeat_f(server_from_slot(sv))
     });
-    add(common, cm, rm, host, c"kick".as_ptr(), |common, _cm, sv, _rm, _rmg, _host| unsafe {
+    add(common, cm, rm, host, c"kick".as_ptr(), |common, _cm, sv, _rm, _rmg, _g2, _host| unsafe {
         SV_Kick_f(common, server_from_slot(sv))
     });
     // #ifdef USE_CD_KEY
@@ -1244,23 +1245,23 @@ pub fn SV_AddOperatorCommands(
     //     Cmd_AddCommand ("banClient", SV_BanNum_f);
     // #endif	// USE_CD_KEY
 
-    add(common, cm, rm, host, c"clientkick".as_ptr(), |common, _cm, sv, _rm, _rmg, _host| unsafe {
+    add(common, cm, rm, host, c"clientkick".as_ptr(), |common, _cm, sv, _rm, _rmg, _g2, _host| unsafe {
         SV_KickNum_f(common, server_from_slot(sv))
     });
-    add(common, cm, rm, host, c"status".as_ptr(), |common, _cm, sv, _rm, _rmg, host| unsafe {
+    add(common, cm, rm, host, c"status".as_ptr(), |common, _cm, sv, _rm, _rmg, _g2, host| unsafe {
         SV_Status_f(common, server_from_slot(sv), host)
     });
-    add(common, cm, rm, host, c"serverinfo".as_ptr(), |common, _cm, _sv, _rm, _rmg, _host| {
+    add(common, cm, rm, host, c"serverinfo".as_ptr(), |common, _cm, _sv, _rm, _rmg, _g2, _host| {
         SV_Serverinfo_f(common)
     });
-    add(common, cm, rm, host, c"systeminfo".as_ptr(), |common, _cm, _sv, _rm, _rmg, _host| {
+    add(common, cm, rm, host, c"systeminfo".as_ptr(), |common, _cm, _sv, _rm, _rmg, _g2, _host| {
         SV_Systeminfo_f(common)
     });
-    add(common, cm, rm, host, c"dumpuser".as_ptr(), |common, _cm, sv, _rm, _rmg, _host| unsafe {
+    add(common, cm, rm, host, c"dumpuser".as_ptr(), |common, _cm, sv, _rm, _rmg, _g2, _host| unsafe {
         SV_DumpUser_f(common, server_from_slot(sv))
     });
     add(common, cm, rm, host, c"map_restart".as_ptr(), SV_MapRestart_f_cmd);
-    add(common, cm, rm, host, c"sectorlist".as_ptr(), |common, _cm, sv, _rm, _rmg, _host| unsafe {
+    add(common, cm, rm, host, c"sectorlist".as_ptr(), |common, _cm, sv, _rm, _rmg, _g2, _host| unsafe {
         SV_SectorList_f(common, server_from_slot(sv))
     });
     add(common, cm, rm, host, c"map".as_ptr(), SV_Map_f_cmd);
@@ -1272,36 +1273,36 @@ pub fn SV_AddOperatorCommands(
     add(common, cm, rm, host, c"devmapmdl".as_ptr(), SV_Map_f_cmd);
     add(common, cm, rm, host, c"devmapall".as_ptr(), SV_Map_f_cmd);
     // #endif
-    add(common, cm, rm, host, c"killserver".as_ptr(), |common, cm, sv, rm, rmg, host| unsafe {
+    add(common, cm, rm, host, c"killserver".as_ptr(), |common, cm, sv, rm, rmg, _g2, host| unsafe {
         SV_KillServer_f(common, cm, server_from_slot(sv), rm, rmg, host)
     });
     // if( com_dedicated->integer )
     {
-        add(common, cm, rm, host, c"svsay".as_ptr(), |common, _cm, sv, _rm, _rmg, _host| unsafe {
+        add(common, cm, rm, host, c"svsay".as_ptr(), |common, _cm, sv, _rm, _rmg, _g2, _host| unsafe {
             SV_ConSay_f(common, server_from_slot(sv))
         });
     }
 
-    add(common, cm, rm, host, c"forcetoggle".as_ptr(), |common, cm, sv, rm, _rmg, host| unsafe {
+    add(common, cm, rm, host, c"forcetoggle".as_ptr(), |common, cm, sv, rm, _rmg, _g2, host| unsafe {
         SV_ForceToggle_f(common, cm, server_from_slot(sv), rm, host)
     });
 }
 
-// `SV_Map_f`/`SV_MapRestart_f` need `g2: &mut Ghoul2System`, which `CmdFunction`
-// does not carry — the command-dispatch seam (`Cmd_ExecuteString`) threads only
-// common/cm/sv/rm/rmg/host. These forwarders reach the real bodies for every
-// receiver the slot DOES carry; the missing `g2` receiver is the one open
-// wiring gap (blocked pending a `CmdFunction`-shape ruling, escalated — not
-// invented here). BLOCKED-G2.
+// `SV_Map_f`/`SV_MapRestart_f` need `g2: &mut Ghoul2System`; `CmdFunction` now
+// threads the g2 receiver in its pinned common/cm/sv/rm/rmg/g2/host order (the
+// `EngineHooks::SV_Frame` order), so these forwarders cast both type-erased
+// slots (`server_from_slot`/`ghoul2_from_slot`) back to their real receivers and
+// reach the full command bodies.
 fn SV_Map_f_cmd(
     common: &mut Common,
     cm: &mut CollisionWorld,
     sv: &mut CmdServerSlot,
     rm: &mut RenderModels,
     rmg: &mut RmManager,
+    g2: &mut CmdGhoul2Slot,
     host: &mut dyn EngineHost,
 ) {
-    unsafe { SV_Map_f(common, cm, server_from_slot(sv), rm, rmg, host) }
+    unsafe { SV_Map_f(common, cm, server_from_slot(sv), rm, rmg, ghoul2_from_slot(g2), host) }
 }
 
 fn SV_MapRestart_f_cmd(
@@ -1310,9 +1311,10 @@ fn SV_MapRestart_f_cmd(
     sv: &mut CmdServerSlot,
     rm: &mut RenderModels,
     rmg: &mut RmManager,
+    g2: &mut CmdGhoul2Slot,
     host: &mut dyn EngineHost,
 ) {
-    unsafe { SV_MapRestart_f(common, cm, server_from_slot(sv), rm, rmg, host) }
+    unsafe { SV_MapRestart_f(common, cm, server_from_slot(sv), rm, rmg, ghoul2_from_slot(g2), host) }
 }
 
 /// Raven `SE_GetString` — `docs/subsystems/stringed.md` §F seam (LIVE,

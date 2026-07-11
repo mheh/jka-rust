@@ -24,6 +24,9 @@ pub use server_host::{
 
 // Crate-root re-exports for the SV_* free functions that cross-module call sites
 // reach as `crate::SV_*` (matching Raven's flat global namespace at the seam).
+pub use sv_bot::{
+    SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity, SV_BotLibSetup, SV_BotLibShutdown,
+};
 pub use sv_ccmds::SV_GetStringEdString_str;
 pub use sv_client::{SV_CloseDownload, SV_DropClient};
 pub use sv_init::SV_SetUserinfo;

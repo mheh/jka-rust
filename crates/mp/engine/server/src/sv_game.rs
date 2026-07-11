@@ -15,7 +15,9 @@ use mp_qshared::common::mp::qcommon::parms::parms_t;
 use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
+use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::pc_token_t;
 use mp_qshared::shared::surface_flags::CONTENTS_LIGHTSABER;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use native_math::vector::vec3_t;
@@ -23,9 +25,10 @@ use native_types::clipHandle_t;
 
 use mp_abi::game::imports::MpGameImport as G;
 use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
+use crate::{SV_BotAllocateClient, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity, SV_BotLibSetup, SV_BotLibShutdown, SV_DropClient, SV_SendServerCommand, SV_SetUserinfo};
 use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::svEntity_t;
-use crate::server_host::server_slot;
+use crate::server_host::{ghoul2_slot, server_slot};
 use crate::Server;
 
 // PORT-NOTE(engine-host-state): `CollisionWorld`, `Common`, and `EngineHost`
@@ -35,6 +38,7 @@ use crate::Server;
 // packets were generated ahead of those state structs landing. Imported below
 // by their preamble-table decl-home crate; genuinely missing, escalated in
 // missing_symbols rather than stubbed (ZERO-PARK).
+use mp_engine_botlib::BotLib;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_icarus::Icarus;
 use mp_engine_qcommon::collision_world::CollisionWorld;
@@ -273,13 +277,13 @@ pub fn SV_GameSendServerCommand(
 ) {
     let msg = unsafe { core::ffi::CStr::from_ptr(text) }.to_string_lossy();
     if clientNum == -1 {
-        crate::SV_SendServerCommand(common, sv, core::ptr::null_mut(), &msg);
+        SV_SendServerCommand(common, sv, core::ptr::null_mut(), &msg);
     } else {
         if clientNum < 0 || clientNum >= (unsafe { (*common.sv_maxclients).integer }) {
             return;
         }
         let client = unsafe { sv.svs.clients.offset(clientNum as isize) };
-        crate::SV_SendServerCommand(common, sv, client, &msg);
+        SV_SendServerCommand(common, sv, client, &msg);
     }
 }
 
@@ -296,7 +300,7 @@ pub fn SV_GameDropClient(
         return;
     }
     let client = unsafe { sv.svs.clients.offset(clientNum as isize) };
-    crate::SV_DropClient(common, sv, client, reason);
+    SV_DropClient(common, sv, client, reason);
 }
 
 /// Raven `SV_inPVS`.
@@ -620,10 +624,11 @@ unsafe fn vmf(args: *mut c_int, n: isize) -> f32 {
 /// Raven `SV_GameSystemCalls` — the inbound syscall dispatcher the game VM
 /// calls through `VMA`/`VMF`.
 ///
-/// PORT-NOTE(subsystem-receivers): the resolved signature carries no `bot: &mut
-/// BotLib` receiver despite reading/using `botlib_export` throughout this
-/// function (escalated — shape_mismatches); `botlib_export->...` call sites
-/// below are transcribed with the bare global name (unresolved, ZERO-PARK).
+/// Raven's `botlib_export` is a file-scope `botlib_export_t*` global; it lives
+/// on `Server` (`sv.botlib_export`, set by `SV_BotInitBotLib`). Its ported
+/// function-pointer fields carry the `bot: &mut BotLib` receiver, so the
+/// `BOTLIB_*` arms below thread `bot` through the export table.
+///
 /// The `icarus`/`nav`/`g2`/`roff` §F method names are not given exact Rust
 /// spellings by this packet (only receiver + doc routing) — transcribed as
 /// best-effort snake_case per the `Com_Printf` → `com_printf` precedent
@@ -635,6 +640,7 @@ pub fn SV_GameSystemCalls(
     common: &mut Common,
     cm: &mut CollisionWorld,
     sv: &mut Server,
+    bot: &mut BotLib,
     rm: &mut RenderModels,
     rmg: &mut RmManager,
     icarus: &mut Icarus,
@@ -796,6 +802,7 @@ pub fn SV_GameSystemCalls(
                 &mut server_slot(sv),
                 rm,
                 rmg,
+                &mut ghoul2_slot(g2),
                 host,
                 *args.offset(1),
                 vma(common, args, 2) as *const c_char,
@@ -1033,7 +1040,7 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_SET_USERINFO as c_int {
-            crate::SV_SetUserinfo(
+            SV_SetUserinfo(
                 common,
                 sv,
                 *args.offset(1),
@@ -1063,9 +1070,9 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_AREAS_CONNECTED as c_int {
             return CM_AreasConnected(cm, *args.offset(1), *args.offset(2)) as c_int;
         } else if trap == G::G_BOT_ALLOCATE_CLIENT as c_int {
-            return crate::SV_BotAllocateClient(sv);
+            return SV_BotAllocateClient(sv);
         } else if trap == G::G_BOT_FREE_CLIENT as c_int {
-            crate::SV_BotFreeClient(sv, *args.offset(1));
+            SV_BotFreeClient(sv, *args.offset(1));
             return 0;
         } else if trap == G::G_GET_USERCMD as c_int {
             SV_GetUsercmd(common, sv, *args.offset(1), vma(common, args, 2) as *mut usercmd_t);
@@ -1455,58 +1462,75 @@ pub fn SV_GameSystemCalls(
             sv.sv.mSharedMemory = vma(common, args, 1) as *mut c_char;
             return 0;
         } else if trap == G::BOTLIB_SETUP as c_int {
-            return crate::SV_BotLibSetup(common, sv);
+            return SV_BotLibSetup(common, sv, bot);
         } else if trap == G::BOTLIB_SHUTDOWN as c_int {
-            return crate::SV_BotLibShutdown(sv);
+            return SV_BotLibShutdown(sv, bot);
         }
-        // PORT-NOTE(botlib-export): the resolved signature carries no `bot`
-        // receiver, so every `botlib_export->...` arm below cannot thread
-        // through a receiver; transcribed with the bare Raven global name
-        // (escalated, missing_symbols/shape_mismatches) rather than invented.
+        // Raven's `botlib_export` global is homed on `Server` (`sv.botlib_export`,
+        // set by `SV_BotInitBotLib`); its ported fn-ptr fields carry the `bot:
+        // &mut BotLib` receiver, threaded through each arm.
         else if trap == G::BOTLIB_LIBVAR_SET as c_int {
-            return (*botlib_export).BotLibVarSet(
+            return ((*sv.botlib_export).BotLibVarSet.unwrap())(
+                bot,
                 vma(common, args, 1) as *mut c_char,
                 vma(common, args, 2) as *mut c_char,
             );
         } else if trap == G::BOTLIB_LIBVAR_GET as c_int {
-            return (*botlib_export).BotLibVarGet(
+            return ((*sv.botlib_export).BotLibVarGet.unwrap())(
+                bot,
                 vma(common, args, 1) as *mut c_char,
                 vma(common, args, 2) as *mut c_char,
                 *args.offset(3),
             );
         } else if trap == G::BOTLIB_PC_ADD_GLOBAL_DEFINE as c_int {
-            return (*botlib_export).PC_AddGlobalDefine(vma(common, args, 1) as *mut c_char);
+            return ((*sv.botlib_export).PC_AddGlobalDefine.unwrap())(
+                vma(common, args, 1) as *mut c_char,
+            );
         } else if trap == G::BOTLIB_PC_LOAD_SOURCE as c_int {
-            return (*botlib_export).PC_LoadSourceHandle(vma(common, args, 1) as *const c_char);
+            return ((*sv.botlib_export).PC_LoadSourceHandle.unwrap())(
+                bot,
+                vma(common, args, 1) as *const c_char,
+            );
         } else if trap == G::BOTLIB_PC_FREE_SOURCE as c_int {
-            return (*botlib_export).PC_FreeSourceHandle(*args.offset(1));
+            return ((*sv.botlib_export).PC_FreeSourceHandle.unwrap())(bot, *args.offset(1));
         } else if trap == G::BOTLIB_PC_READ_TOKEN as c_int {
-            return (*botlib_export)
-                .PC_ReadTokenHandle(*args.offset(1), vma(common, args, 2) as *mut c_void);
+            return ((*sv.botlib_export).PC_ReadTokenHandle.unwrap())(
+                bot,
+                *args.offset(1),
+                vma(common, args, 2) as *mut pc_token_t,
+            );
         } else if trap == G::BOTLIB_PC_SOURCE_FILE_AND_LINE as c_int {
-            return (*botlib_export).PC_SourceFileAndLine(
+            return ((*sv.botlib_export).PC_SourceFileAndLine.unwrap())(
+                bot,
                 *args.offset(1),
                 vma(common, args, 2) as *mut c_char,
                 vma(common, args, 3) as *mut c_int,
             );
         } else if trap == G::BOTLIB_START_FRAME as c_int {
-            return (*botlib_export).BotLibStartFrame(vmf(args, 1));
+            return ((*sv.botlib_export).BotLibStartFrame.unwrap())(bot, vmf(args, 1));
         } else if trap == G::BOTLIB_LOAD_MAP as c_int {
-            return (*botlib_export).BotLibLoadMap(vma(common, args, 1) as *const c_char);
+            return ((*sv.botlib_export).BotLibLoadMap.unwrap())(
+                bot,
+                vma(common, args, 1) as *const c_char,
+            );
         } else if trap == G::BOTLIB_UPDATENTITY as c_int {
-            return (*botlib_export)
-                .BotLibUpdateEntity(*args.offset(1), vma(common, args, 2) as *mut c_void);
+            return ((*sv.botlib_export).BotLibUpdateEntity.unwrap())(
+                bot,
+                *args.offset(1),
+                vma(common, args, 2) as *mut bot_entitystate_t,
+            );
         } else if trap == G::BOTLIB_TEST as c_int {
-            return (*botlib_export).Test(
+            // Ported `Test` takes `vec3_t` by value; read Raven's `(float*)VMA(n)` through.
+            return ((*sv.botlib_export).Test.unwrap())(
                 *args.offset(1),
                 vma(common, args, 2) as *mut c_char,
-                vma(common, args, 3) as *mut f32,
-                vma(common, args, 4) as *mut f32,
+                *(vma(common, args, 3) as *const vec3_t),
+                *(vma(common, args, 4) as *const vec3_t),
             );
         } else if trap == G::BOTLIB_GET_SNAPSHOT_ENTITY as c_int {
-            return crate::SV_BotGetSnapshotEntity(sv, *args.offset(1), *args.offset(2));
+            return SV_BotGetSnapshotEntity(sv, *args.offset(1), *args.offset(2));
         } else if trap == G::BOTLIB_GET_CONSOLE_MESSAGE as c_int {
-            return crate::SV_BotGetConsoleMessage(
+            return SV_BotGetConsoleMessage(
                 sv,
                 *args.offset(1),
                 vma(common, args, 2) as *mut c_char,

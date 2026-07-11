@@ -20,6 +20,7 @@ use crate::cm_load::RmManager;
 use crate::cmd_pc::{Cmd_ExecuteString, Cmd_List_f, RenderModels, Server};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
+use crate::z_memman_pc::Ghoul2System;
 use crate::common_fns::Com_Memcpy;
 
 // Sweep: extern forward-declares eliminated. libc byte helpers (rule 3),
@@ -414,6 +415,7 @@ pub fn Cbuf_Execute(
     sv: &mut Server,
     rm: &mut RenderModels,
     rmg: &mut RmManager,
+    g2: &mut Ghoul2System,
     host: &mut dyn EngineHost,
 ) {
     let mut line: [c_char; MAX_CMD_LINE as usize] = [0; MAX_CMD_LINE as usize];
@@ -471,7 +473,7 @@ pub fn Cbuf_Execute(
         }
 
         // execute the command line
-        Cmd_ExecuteString(common, cm, sv, rm, rmg, host, line.as_ptr() as *const c_char);
+        Cmd_ExecuteString(common, cm, sv, rm, rmg, g2, host, line.as_ptr() as *const c_char);
     }
 }
 
@@ -491,7 +493,7 @@ pub fn Cmd_Init(
             rm,
             host,
             b"cmdlist\0".as_ptr() as *const c_char,
-            Some(|common, _cm, _sv, _rm, _rmg, _host| Cmd_List_f(common)),
+            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_List_f(common)),
         );
         Cmd_AddCommand(
             common,
@@ -499,7 +501,7 @@ pub fn Cmd_Init(
             rm,
             host,
             b"exec\0".as_ptr() as *const c_char,
-            Some(|common, cm, _sv, rm, _rmg, host| Cmd_Exec_f(common, cm, rm, host)),
+            Some(|common, cm, _sv, rm, _rmg, _g2, host| Cmd_Exec_f(common, cm, rm, host)),
         );
         Cmd_AddCommand(
             common,
@@ -507,7 +509,7 @@ pub fn Cmd_Init(
             rm,
             host,
             b"vstr\0".as_ptr() as *const c_char,
-            Some(|common, _cm, _sv, _rm, _rmg, _host| Cmd_Vstr_f(common)),
+            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Vstr_f(common)),
         );
         Cmd_AddCommand(
             common,
@@ -515,7 +517,7 @@ pub fn Cmd_Init(
             rm,
             host,
             b"echo\0".as_ptr() as *const c_char,
-            Some(|common, _cm, _sv, _rm, _rmg, _host| Cmd_Echo_f(common)),
+            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Echo_f(common)),
         );
         Cmd_AddCommand(
             common,
@@ -523,7 +525,7 @@ pub fn Cmd_Init(
             rm,
             host,
             b"wait\0".as_ptr() as *const c_char,
-            Some(|common, _cm, _sv, _rm, _rmg, _host| Cmd_Wait_f(common)),
+            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Wait_f(common)),
         );
     }
 }
@@ -537,6 +539,7 @@ pub fn Cbuf_ExecuteText(
     sv: &mut Server,
     rm: &mut RenderModels,
     rmg: &mut RmManager,
+    g2: &mut Ghoul2System,
     host: &mut dyn EngineHost,
     exec_when: c_int,
     text: *const c_char,
@@ -544,9 +547,9 @@ pub fn Cbuf_ExecuteText(
     match exec_when {
         x if x == cbufExec_t::EXEC_NOW as c_int => {
             if !text.is_null() && unsafe { strlen(text) } > 0 {
-                Cmd_ExecuteString(common, cm, sv, rm, rmg, host, text);
+                Cmd_ExecuteString(common, cm, sv, rm, rmg, g2, host, text);
             } else {
-                Cbuf_Execute(common, cm, sv, rm, rmg, host);
+                Cbuf_Execute(common, cm, sv, rm, rmg, g2, host);
             }
         }
         x if x == cbufExec_t::EXEC_INSERT as c_int => {

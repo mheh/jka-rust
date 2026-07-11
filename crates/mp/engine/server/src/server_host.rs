@@ -13,6 +13,9 @@ use mp_qshared::shared::wpobject_t;
 
 use mp_engine_qcommon::vm::vm_s::vm_t;
 use mp_engine_qcommon::cmd_pc::Server as CmdServerSlot;
+use mp_engine_qcommon::common::opaque_slots::Ghoul2System as CmdGhoul2Slot;
+
+use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 
 use crate::server::bot_debugpoly_t::bot_debugpoly_t;
 use crate::server::server_static_t::serverStatic_t;
@@ -185,6 +188,27 @@ pub fn server_slot(sv: &mut Server) -> CmdServerSlot {
 /// borrowable for the returned reference's lifetime.
 pub unsafe fn server_from_slot(slot: &mut CmdServerSlot) -> &mut Server {
     &mut *(slot.as_raw() as *mut Server)
+}
+
+/// Wrap a live `&mut Ghoul2System` into qcommon's type-erased command slot for
+/// passing INTO qcommon's registration/dispatch seam (`Cbuf_ExecuteText`, the
+/// `CmdFunction` receiver chain). qcommon never dereferences the slot — it only
+/// threads it back to our command handlers, where `ghoul2_from_slot` casts it
+/// back. Opaque-slot ruling (user, 2026-07-12, option A).
+pub fn ghoul2_slot(g2: &mut Ghoul2System) -> CmdGhoul2Slot {
+    CmdGhoul2Slot::from_raw(g2 as *mut Ghoul2System as *mut ())
+}
+
+/// Cast a qcommon command slot back into the live `&mut Ghoul2System`, inside a
+/// registered-command or hook handler body.
+///
+/// SAFETY: every slot reaching a handler was constructed by `ghoul2_slot` from
+/// a live, unique `&mut Ghoul2System` that outlives the entire dispatch call
+/// (the engine is single-threaded and holds no other borrow of that
+/// `Ghoul2System` across the seam), so the erased pointer is non-null,
+/// well-aligned, and uniquely borrowable for the returned reference's lifetime.
+pub unsafe fn ghoul2_from_slot(slot: &mut CmdGhoul2Slot) -> &mut Ghoul2System {
+    &mut *(slot.as_raw() as *mut Ghoul2System)
 }
 
 /// engine-seam's name for the game dispatcher's `&mut ServerGame` argument — the

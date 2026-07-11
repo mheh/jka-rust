@@ -8,18 +8,21 @@ use crate::cm_load::RmManager;
 use crate::cmd_pc::{RenderModels, Server};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
+use crate::z_memman_pc::Ghoul2System;
 
 /// Console-command handler slot. Receiver-threaded in place of Raven's
 /// global-reaching `void (*xcommand_t)(void)` (user ruling 2026-07-11): the
 /// dispatch site (`Cmd_ExecuteString`) threads the receivers in scope there
-/// (`common`/`cm`/`sv`/`rm`/`rmg`/`host`, pinned order), so every registered
-/// command reaches real engine state instead of a no-op shim.
+/// (`common`/`cm`/`sv`/`rm`/`rmg`/`g2`/`host`, pinned to match the
+/// `EngineHooks::SV_Frame` order), so every registered command reaches real
+/// engine state instead of a no-op shim.
 pub type CmdFunction = fn(
     &mut Common,
     &mut CollisionWorld,
     &mut Server,
     &mut RenderModels,
     &mut RmManager,
+    &mut Ghoul2System,
     &mut dyn EngineHost,
 );
 

@@ -12,7 +12,7 @@ use crate::cmd::cmd_function_t::{cmd_function_t, CmdFunction};
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use crate::common_fns::Com_Filter;
-use crate::z_memman_pc::{CopyString, S_Malloc, Z_Free};
+use crate::z_memman_pc::{CopyString, Ghoul2System, S_Malloc, Z_Free};
 
 // `Server` is a type-erased receiver slot: the real type lives in
 // mp_engine_server, which depends on this crate (importing it would cycle).
@@ -157,6 +157,7 @@ pub fn Cmd_ExecuteString(
     sv: &mut Server,
     rm: &mut RenderModels,
     rmg: &mut RmManager,
+    g2: &mut Ghoul2System,
     host: &mut dyn EngineHost,
     text: *const c_char,
 ) {
@@ -183,7 +184,7 @@ pub fn Cmd_ExecuteString(
 
                 // perform the action
                 if let Some(function) = (*cmd).function {
-                    function(common, cm, sv, rm, rmg, host);
+                    function(common, cm, sv, rm, rmg, g2, host);
                 } else {
                     // let the cgame or game handle it
                     break;
