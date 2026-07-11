@@ -23,7 +23,6 @@ use core::ffi::{c_char, c_int};
 
 use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL, PRT_MESSAGE};
-use mp_qshared::shared::qboolean;
 use mp_qshared::shared::vec3_t;
 
 use mp_bg::public::configstring::CS_MODELS;
@@ -33,55 +32,28 @@ use crate::be_aas_def::be_aas_def_consts::MAX_PATH;
 use crate::l_libvar::libvar_s::libvar_t;
 use crate::BotLib;
 
-// PORT-NOTE(fwd-decl): these callees are already-ported per their packets but
-// their owning modules are not registered/reachable from this crate slice
-// yet; forward-declared exactly as their resolved signatures, matching the
-// established `be_aas_debug_fns.rs`/`be_ai_goal_fns.rs` precedent for
-// not-yet-wired in-crate callees.
-extern "C" {
-    fn AAS_InvalidateEntities(bot: &mut BotLib);
-    fn AAS_ResetEntityLinks(bot: &mut BotLib);
-    fn AAS_LoadBSPFile(bot: &mut BotLib) -> c_int;
-    fn AAS_LoadAASFile(bot: &mut BotLib, filename: *mut c_char) -> c_int;
-    fn AAS_FreeRoutingCaches(bot: &mut BotLib);
-    fn AAS_InitSettings(bot: &mut BotLib);
-    fn AAS_InitAASLinkHeap(bot: &mut BotLib);
-    fn AAS_InitAASLinkedEntities(bot: &mut BotLib);
-    fn AAS_InitReachability(bot: &mut BotLib);
-    fn AAS_InitAlternativeRouting(bot: &mut BotLib);
-    fn AAS_ContinueInitReachability(bot: &mut BotLib, time: f32) -> c_int;
-    fn AAS_InitClustering(bot: &mut BotLib);
-    fn AAS_Optimize(bot: &mut BotLib);
-    fn AAS_WriteAASFile(bot: &mut BotLib, filename: *mut c_char) -> qboolean;
-    fn AAS_InitRouting(bot: &mut BotLib);
-    fn AAS_UnlinkInvalidEntities(bot: &mut BotLib);
-    fn AAS_RoutingInfo(bot: &mut BotLib);
-    fn AAS_WriteRouteCache(bot: &mut BotLib);
-    fn AAS_DumpAASData(bot: &mut BotLib);
-    fn AAS_DumpBSPData(bot: &mut BotLib);
-    fn AAS_FreeAASLinkHeap(bot: &mut BotLib);
-    fn AAS_FreeAASLinkedEntities(bot: &mut BotLib);
-    fn AAS_ShutdownAlternativeRouting(bot: &mut BotLib);
-    fn Com_Memset(dest: *mut (), val: c_int, count: usize);
-    fn GetMemory(bot: &mut BotLib, size: core::ffi::c_ulong) -> *mut ();
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut ());
-    fn GetClearedHunkMemory(bot: &mut BotLib, size: core::ffi::c_ulong) -> *mut ();
-    fn LibVar(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> *mut libvar_t;
-    fn LibVarValue(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> f32;
-    fn LibVarGetValue(bot: &mut BotLib, var_name: *mut c_char) -> f32;
-    fn LibVarSet(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char);
-    fn PrintMemoryLabels();
-    fn PrintUsedMemorySize();
-    // PORT-NOTE(fwd-decl): `Q_stricmp` is already ported in `mp_game::q_shared`
-    // but not reachable from this crate slice; forward-declared per the
-    // `l_precomp_fns.rs`/`l_libvar_fns.rs`/`cm_shader.rs` precedent.
-    fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int;
-    // PORT-NOTE(variadic): matching the established `l_script_fns.rs`
-    // forward-decl convention for the already-ported qshared `Com_sprintf`
-    // seam — the C printf-format/varargs plumbing is resolved at
-    // integration; this porter passes a pre-formatted `&str`.
-    fn Com_sprintf(dest: *mut c_char, size: c_int, s: &str);
-}
+use crate::be_aas_bspq3_fns::{AAS_DumpBSPData, AAS_LoadBSPFile};
+use crate::be_aas_cluster_fns::AAS_InitClustering;
+use crate::be_aas_entity::{AAS_InvalidateEntities, AAS_ResetEntityLinks, AAS_UnlinkInvalidEntities};
+// UNRESOLVED (rule 5): AAS_LoadAASFile/AAS_WriteAASFile/AAS_DumpAASData are
+// genuinely unported; this is their canonical future home.
+use crate::be_aas_file_fns::{AAS_DumpAASData, AAS_LoadAASFile, AAS_WriteAASFile};
+use crate::be_aas_move::AAS_InitSettings;
+use crate::be_aas_optimize_fns::AAS_Optimize;
+use crate::be_aas_reach_fns::{AAS_ContinueInitReachability, AAS_InitReachability};
+use crate::be_aas_route_fns::{
+    AAS_FreeRoutingCaches, AAS_InitRouting, AAS_RoutingInfo, AAS_WriteRouteCache,
+};
+use crate::be_aas_routealt_fns::{AAS_InitAlternativeRouting, AAS_ShutdownAlternativeRouting};
+use crate::be_aas_sample_fns::{
+    AAS_FreeAASLinkHeap, AAS_FreeAASLinkedEntities, AAS_InitAASLinkHeap, AAS_InitAASLinkedEntities,
+};
+use crate::l_libvar_fns::{LibVar, LibVarGetValue, LibVarSet, LibVarValue};
+use crate::l_memory_fns::{
+    FreeMemory, GetClearedHunkMemory, GetMemory, PrintMemoryLabels, PrintUsedMemorySize,
+};
+use mp_engine_qcommon::common_fns::Com_Memset;
+use mp_qshared::shared::q_string::{Q_stricmp, Q_strncpyz};
 
 /// Raven `AAS_Error`.
 ///
@@ -403,11 +375,8 @@ pub fn AAS_LoadFiles(bot: &mut BotLib, mapname: *const c_char) -> c_int {
 
         // load the aas file
         let mapname_str = core::ffi::CStr::from_ptr(mapname).to_string_lossy();
-        Com_sprintf(
-            aasfile.as_mut_ptr(),
-            MAX_PATH as c_int,
-            &format!("maps/{}.aas", mapname_str),
-        );
+        let __s = std::ffi::CString::new(format!("maps/{}.aas", mapname_str)).unwrap_or_default();
+        Q_strncpyz(aasfile.as_mut_ptr(), __s.as_ptr(), MAX_PATH as c_int);
         let errnum = AAS_LoadAASFile(bot, aasfile.as_mut_ptr());
         if errnum != BLERR_NOERROR {
             return errnum;

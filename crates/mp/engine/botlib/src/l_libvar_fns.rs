@@ -23,23 +23,11 @@ use core::ffi::c_char;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 
 use crate::l_libvar::libvar_s::libvar_t;
+use crate::l_memory_fns::{FreeMemory, GetMemory};
 use crate::BotLib;
 
-// PORT-NOTE(fwd-decl): these callees are already-ported per their packets but
-// their owning modules are not registered/reachable from this crate slice
-// yet; forward-declared exactly as their resolved signatures, matching the
-// established `be_aas_main.rs` precedent for not-yet-wired in-crate callees.
-extern "C" {
-    fn Com_Memset(dest: *mut (), val: core::ffi::c_int, count: usize);
-    fn GetMemory(bot: &mut BotLib, size: core::ffi::c_ulong) -> *mut ();
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut ());
-    // PORT-NOTE(Q_stricmp): the packet's rosetta routes this through the
-    // "already-ported qshared surface", but no `Q_stricmp` exists in the
-    // engine-reachable `mp_qshared` tier yet (only `mp_game`'s copy, a
-    // different crate this engine slice does not depend on) — forward-declared
-    // like the established not-yet-wired extern precedent pending that move.
-    fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> core::ffi::c_int;
-}
+use mp_engine_qcommon::common_fns::Com_Memset;
+use mp_qshared::shared::q_string::Q_stricmp;
 
 /// `LibVarStringValue` — parses a numeric string into a float value.
 ///
@@ -93,14 +81,14 @@ pub fn LibVarGet(bot: &mut BotLib, var_name: *mut c_char) -> *mut libvar_t {
 /// Source: `oracle/codemp/botlib/l_libvar.cpp:66-78`
 pub fn LibVarAlloc(bot: &mut BotLib, var_name: *mut c_char) -> *mut libvar_t {
     unsafe {
-        let name_len = crate::l_libvar_fns::strlen(var_name);
+        let name_len = libc::strlen(var_name);
         let v = GetMemory(
             bot,
             (core::mem::size_of::<libvar_t>() + name_len + 1) as core::ffi::c_ulong,
         ) as *mut libvar_t;
         Com_Memset(v as *mut (), 0, core::mem::size_of::<libvar_t>());
         (*v).name = (v as *mut c_char).add(core::mem::size_of::<libvar_t>());
-        crate::l_libvar_fns::strcpy((*v).name, var_name);
+        libc::strcpy((*v).name, var_name);
         // add the variable in the list
         (*v).next = bot.libvarlist;
         bot.libvarlist = v;
@@ -195,9 +183,9 @@ pub fn LibVar(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> *m
     v = LibVarAlloc(bot, var_name);
     unsafe {
         // variable string
-        let len = crate::l_libvar_fns::strlen(value);
+        let len = libc::strlen(value);
         (*v).string = GetMemory(bot, (len + 1) as core::ffi::c_ulong) as *mut c_char;
-        crate::l_libvar_fns::strcpy((*v).string, value);
+        libc::strcpy((*v).string, value);
         // the value
         (*v).value = LibVarStringValue((*v).string);
         // variable is modified
@@ -218,9 +206,9 @@ pub fn LibVarSet(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) {
             v = LibVarAlloc(bot, var_name);
         }
         // variable string
-        let len = crate::l_libvar_fns::strlen(value);
+        let len = libc::strlen(value);
         (*v).string = GetMemory(bot, (len + 1) as core::ffi::c_ulong) as *mut c_char;
-        crate::l_libvar_fns::strcpy((*v).string, value);
+        libc::strcpy((*v).string, value);
         // the value
         (*v).value = LibVarStringValue((*v).string);
         // variable is modified
@@ -244,11 +232,3 @@ pub fn LibVarValue(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) 
     unsafe { (*v).value }
 }
 
-// PORT-NOTE(strcpy/strlen): externals per the packets; `strlen`/`strcpy`
-// are libc byte-string helpers over raw `c_char` pointers, not yet routed
-// through a shared crate wrapper in this slice — forward-declared like the
-// `be_aas_main.rs` precedent for not-yet-wired externs.
-extern "C" {
-    fn strlen(s: *const c_char) -> usize;
-    fn strcpy(dst: *mut c_char, src: *const c_char) -> *mut c_char;
-}

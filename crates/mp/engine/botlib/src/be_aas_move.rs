@@ -22,7 +22,7 @@
 //! `VectorCompare`/`VectorNormalize`/`VectorLength`/`AngleVectors` are the
 //! genuine q_math functions already ported in `mp_game::q_math`.
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{c_char, c_int};
 
 use mp_engine_qcommon::common::Common;
 use mp_qshared::common::mp::botlib::aas_clientmove_s::{aas_clientmove_s, aas_clientmove_t};
@@ -92,31 +92,11 @@ fn VectorMA(a: vec3_t, scale: f32, b: vec3_t, out: &mut vec3_t) {
     out[2] = a[2] + scale * b[2];
 }
 
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches whose bodies are not linked
-// into this shard yet — forward-declared with the faithful shape inferred
-// from the Raven call sites (receivers per the packets' RESOLVED CALL
-// SURFACE tables), matching the established `extern "Rust"` forward-declare
-// convention used elsewhere in this crate (`be_ai_chat_fns.rs`,
-// `be_ai_goal_fns.rs`).
-// PORT-NOTE(callee-signatures): see module doc comment.
-// ---------------------------------------------------------------------
-extern "Rust" {
-    fn AAS_Trace(
-        bot: &mut BotLib,
-        start: vec3_t,
-        mins: vec3_t,
-        maxs: vec3_t,
-        end: vec3_t,
-        passent: c_int,
-        contentmask: c_int,
-    ) -> bsp_trace_t;
-    fn AAS_PointContents(bot: &mut BotLib, point: vec3_t) -> c_int;
-    fn LibVarValue(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> f32;
-    fn AAS_DebugLine(bot: &mut BotLib, start: vec3_t, end: vec3_t, color: c_int);
-    fn AAS_ClearShownDebugLines(bot: &mut BotLib);
-    fn Com_Memset(dest: *mut c_void, val: c_int, count: usize);
-}
+use crate::be_aas_bspq3_fns::{AAS_PointContents, AAS_Trace};
+use crate::be_aas_debug_fns::{AAS_ClearShownDebugLines, AAS_DebugLine};
+use crate::l_libvar_fns::LibVarValue;
+
+use mp_engine_qcommon::common_fns::Com_Memset;
 
 /// Raven `AAS_SetMovedir`.
 ///
@@ -582,9 +562,9 @@ pub fn AAS_InitSettings(bot: &mut BotLib) {
 
 // PORT-NOTE(cstr-helper): `LibVarValue` takes `char *` in Raven for both the
 // name and default-value string literals; this local shim builds the
-// null-terminated buffers and calls the forward-declared extern so
-// `AAS_InitSettings`'s 36 call sites stay a 1:1 transcription of the Raven
-// source rather than manual `CString` plumbing at every line.
+// null-terminated buffers and calls `LibVarValue` so `AAS_InitSettings`'s
+// 36 call sites stay a 1:1 transcription of the Raven source rather than
+// manual `CString` plumbing at every line.
 fn LibVarValue_str(bot: &mut BotLib, name: &str, default: &str) -> f32 {
     let name_c = std::ffi::CString::new(name).unwrap();
     let default_c = std::ffi::CString::new(default).unwrap();
@@ -679,13 +659,13 @@ pub fn AAS_ClientMovementPrediction(
         let phys_jumpvel = bot.aassettings.phys_jumpvel * frametime;
         //
         Com_Memset(
-            r#move as *mut c_void,
+            r#move as *mut (),
             0,
             core::mem::size_of::<aas_clientmove_t>(),
         );
         let mut trace: aas_trace_t = core::mem::zeroed();
         Com_Memset(
-            &mut trace as *mut aas_trace_t as *mut c_void,
+            &mut trace as *mut aas_trace_t as *mut (),
             0,
             core::mem::size_of::<aas_trace_t>(),
         );

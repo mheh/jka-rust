@@ -42,21 +42,12 @@ use mp_qshared::common::mp::botlib::print_type::PRT_MESSAGE;
 
 use crate::BotLib;
 
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches (signatures per their own
-// resolved-signature packets; ported in sibling packets outside this
-// shard — see `_PREAMBLE.md`'s stub-free / extern "Rust" forward-decl
-// convention already used by `l_script_fns.rs`/`be_ai_goal_fns.rs`).
-// ---------------------------------------------------------------------
-extern "Rust" {
-    fn AAS_Error(bot: &mut BotLib, fmt: *mut c_char, ...);
-    fn Log_Write(bot: &mut BotLib, fmt: *mut c_char, ...);
-    fn Com_Memset(dest: *mut (), val: c_int, count: usize);
-    fn LibVarGetValue(bot: &mut BotLib, var_name: *mut c_char) -> f32;
-    fn GetClearedMemory(bot: &mut BotLib, size: core::ffi::c_ulong) -> *mut ();
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut ());
-    fn AAS_AreaReachability(bot: &mut BotLib, areanum: c_int) -> c_int;
-}
+use crate::be_aas_main::AAS_Error;
+use crate::be_aas_reach_fns::AAS_AreaReachability;
+use crate::l_libvar_fns::LibVarGetValue;
+use crate::l_log_fns::Log_Write;
+use crate::l_memory_fns::{FreeMemory, GetClearedMemory};
+use mp_engine_qcommon::common_fns::Com_Memset;
 
 /// Raven `AAS_RemoveClusterAreas` — clears every area's cluster mark.
 ///
@@ -237,11 +228,9 @@ pub fn AAS_UpdatePortal(bot: &mut BotLib, areanum: c_int, clusternum: c_int) -> 
         } //end for
           //
         if portalnum == bot.aasworld.numportals {
-            AAS_Error(
-                bot,
-                c"no portal of area %d".as_ptr() as *mut c_char,
-                areanum,
-            );
+            let __ae =
+                std::ffi::CString::new(format!("no portal of area {}", areanum)).unwrap_or_default();
+            AAS_Error(bot, __ae.as_ptr() as *mut c_char);
             return qtrue as c_int;
         } //end if
           //
@@ -264,11 +253,12 @@ pub fn AAS_UpdatePortal(bot: &mut BotLib, areanum: c_int, clusternum: c_int) -> 
             //remove the cluster portal flag contents
             (*bot.aasworld.areasettings.add(areanum as usize)).contents &=
                 !AREACONTENTS_CLUSTERPORTAL;
-            Log_Write(
-                bot,
-                c"portal area %d is seperating more than two clusters\r\n".as_ptr() as *mut c_char,
-                areanum,
-            );
+            let __m = std::ffi::CString::new(format!(
+                "portal area {} is seperating more than two clusters\r\n",
+                areanum
+            ))
+            .unwrap_or_default();
+            Log_Write(bot, __m.as_ptr() as *mut c_char);
             return qfalse as c_int;
         } //end else
         if bot.aasworld.portalindexsize >= AAS_MAX_PORTALINDEXSIZE {
@@ -417,21 +407,23 @@ pub fn AAS_TestPortals(bot: &mut BotLib) -> c_int {
             if (*portal).frontcluster == 0 {
                 (*bot.aasworld.areasettings.add((*portal).areanum as usize)).contents &=
                     !AREACONTENTS_CLUSTERPORTAL;
-                Log_Write(
-                    bot,
-                    c"portal area %d has no front cluster\r\n".as_ptr() as *mut c_char,
-                    (*portal).areanum,
-                );
+                let __m = std::ffi::CString::new(format!(
+                    "portal area {} has no front cluster\r\n",
+                    (*portal).areanum
+                ))
+                .unwrap_or_default();
+                Log_Write(bot, __m.as_ptr() as *mut c_char);
                 return qfalse as c_int;
             } //end if
             if (*portal).backcluster == 0 {
                 (*bot.aasworld.areasettings.add((*portal).areanum as usize)).contents &=
                     !AREACONTENTS_CLUSTERPORTAL;
-                Log_Write(
-                    bot,
-                    c"portal area %d has no back cluster\r\n".as_ptr() as *mut c_char,
-                    (*portal).areanum,
-                );
+                let __m = std::ffi::CString::new(format!(
+                    "portal area {} has no back cluster\r\n",
+                    (*portal).areanum
+                ))
+                .unwrap_or_default();
+                Log_Write(bot, __m.as_ptr() as *mut c_char);
                 return qfalse as c_int;
             } //end if
         } //end for
@@ -450,11 +442,12 @@ pub fn AAS_CountForcedClusterPortals(bot: &mut BotLib) {
             if (*bot.aasworld.areasettings.add(i as usize)).contents & AREACONTENTS_CLUSTERPORTAL
                 != 0
             {
-                Log_Write(
-                    bot,
-                    c"area %d is a forced portal area\r\n".as_ptr() as *mut c_char,
-                    i,
-                );
+                let __m = std::ffi::CString::new(format!(
+                    "area {} is a forced portal area\r\n",
+                    i
+                ))
+                .unwrap_or_default();
+                Log_Write(bot, __m.as_ptr() as *mut c_char);
                 num += 1;
             } //end if
         } //end for
@@ -490,13 +483,14 @@ pub fn AAS_FloodClusterAreas_r(bot: &mut BotLib, areanum: c_int, clusternum: c_i
             //
             //there's a reachability going from one cluster to another only in one direction
             //
-            AAS_Error(
-                bot,
-                c"cluster %d touched cluster %d at area %d\r\n".as_ptr() as *mut c_char,
+            let __ae = std::ffi::CString::new(format!(
+                "cluster {} touched cluster {} at area {}\r\n",
                 clusternum,
                 (*settings).cluster,
-                areanum,
-            );
+                areanum
+            ))
+            .unwrap_or_default();
+            AAS_Error(bot, __ae.as_ptr() as *mut c_char);
             return qfalse as c_int;
         } //end if
           //don't add the cluster portal areas to the clusters
@@ -835,11 +829,12 @@ pub fn AAS_CheckAreaForPossiblePortals(bot: &mut BotLib, areanum: c_int) -> c_in
             (*settings).contents |= AREACONTENTS_CLUSTERPORTAL;
             //this area can be used as a route portal
             (*settings).contents |= AREACONTENTS_ROUTEPORTAL;
-            Log_Write(
-                bot,
-                c"possible portal: %d\r\n".as_ptr() as *mut c_char,
-                areanums[i as usize],
-            );
+            let __m = std::ffi::CString::new(format!(
+                "possible portal: {}\r\n",
+                areanums[i as usize]
+            ))
+            .unwrap_or_default();
+            Log_Write(bot, __m.as_ptr() as *mut c_char);
         } //end for
           //
         numareas
@@ -1074,12 +1069,13 @@ pub fn AAS_InitClustering(bot: &mut BotLib) {
         bot.aasworld.savefile = qtrue as c_int;
         //write the portal areas to the log file
         for i in 1..bot.aasworld.numportals {
-            Log_Write(
-                bot,
-                c"portal %d: area %d\r\n".as_ptr() as *mut c_char,
+            let __m = std::ffi::CString::new(format!(
+                "portal {}: area {}\r\n",
                 i,
-                (*bot.aasworld.portals.add(i as usize)).areanum,
-            );
+                (*bot.aasworld.portals.add(i as usize)).areanum
+            ))
+            .unwrap_or_default();
+            Log_Write(bot, __m.as_ptr() as *mut c_char);
         } //end for
           // report cluster info
         bot.botimport.Print.unwrap()(

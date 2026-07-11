@@ -37,6 +37,9 @@ use crate::be_ai_char::bot_characteristic_s::bot_characteristic_t;
 use crate::be_ai_char::consts::{
     CT_FLOAT, CT_INTEGER, CT_STRING, DEFAULT_CHARACTER, MAX_CHARACTERISTICS,
 };
+use crate::l_libvar_fns::LibVarGetValue;
+use crate::l_log_fns::Log_Write;
+use crate::l_memory_fns::{FreeMemory, GetClearedMemory, GetMemory};
 use crate::l_precomp::source_s::source_t;
 use crate::l_precomp_fns::{
     FreeSource, LoadSourceFile, PC_ExpectAnyToken, PC_ExpectTokenString, PC_ExpectTokenType,
@@ -46,22 +49,6 @@ use crate::l_script::consts::{TT_FLOAT, TT_INTEGER, TT_NUMBER, TT_STRING};
 use crate::l_script::token_s::token_t;
 use crate::l_script_fns::StripDoubleQuotes;
 use crate::BotLib;
-
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches whose own packets/files
-// haven't landed in this shard yet (signatures per their own
-// resolved-signature packets; forward-decl convention already used by
-// `be_aas_cluster_fns.rs`/`be_ai_goal_fns.rs`).
-// ---------------------------------------------------------------------
-extern "C" {
-    fn Log_Write(bot: &mut BotLib, fmt: *mut c_char, ...);
-}
-extern "Rust" {
-    fn LibVarGetValue(bot: &mut BotLib, var_name: *mut c_char) -> f32;
-    fn GetMemory(bot: &mut BotLib, size: c_ulong) -> *mut ();
-    fn GetClearedMemory(bot: &mut BotLib, size: c_ulong) -> *mut ();
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut ());
-}
 
 /// Raven `BotCharacterFromHandle`.
 ///
@@ -113,35 +100,38 @@ pub fn BotFindCachedCharacter(bot: &mut BotLib, charfile: *mut c_char, skill: f3
 /// Source: `oracle/codemp/botlib/be_ai_char.cpp:88-105`
 pub fn BotDumpCharacter(bot: &mut BotLib, ch: *mut bot_character_t) {
     unsafe {
-        Log_Write(bot, c"%s".as_ptr() as *mut c_char, (*ch).filename.as_ptr());
+        let __m = std::ffi::CString::new(format!(
+            "{}",
+            std::ffi::CStr::from_ptr((*ch).filename.as_ptr()).to_string_lossy()
+        ))
+        .unwrap_or_default();
+        Log_Write(bot, __m.as_ptr() as *mut c_char);
         // Raven's own format string uses `%d` for the (float) `skill` field —
         // an oracle bug, kept faithful.
-        Log_Write(bot, c"skill %d\n".as_ptr() as *mut c_char, (*ch).skill);
+        let __m = std::ffi::CString::new(format!("skill {}\n", (*ch).skill as c_int))
+            .unwrap_or_default();
+        Log_Write(bot, __m.as_ptr() as *mut c_char);
         Log_Write(bot, c"{\n".as_ptr() as *mut c_char);
         for i in 0..MAX_CHARACTERISTICS {
             let c = (*ch).c.as_mut_ptr().add(i as usize);
             let t = (*c).r#type as c_int;
             if t == CT_INTEGER as c_int {
-                Log_Write(
-                    bot,
-                    c" %4d %d\n".as_ptr() as *mut c_char,
-                    i,
-                    (*c).value.integer,
-                );
+                let __m = std::ffi::CString::new(format!(" {:4} {}\n", i, (*c).value.integer))
+                    .unwrap_or_default();
+                Log_Write(bot, __m.as_ptr() as *mut c_char);
             } else if t == CT_FLOAT as c_int {
-                Log_Write(
-                    bot,
-                    c" %4d %f\n".as_ptr() as *mut c_char,
-                    i,
-                    (*c).value._float,
-                );
+                let __m =
+                    std::ffi::CString::new(format!(" {:4} {}\n", i, (*c).value._float as f64))
+                        .unwrap_or_default();
+                Log_Write(bot, __m.as_ptr() as *mut c_char);
             } else if t == CT_STRING as c_int {
-                Log_Write(
-                    bot,
-                    c" %4d %s\n".as_ptr() as *mut c_char,
+                let __m = std::ffi::CString::new(format!(
+                    " {:4} {}\n",
                     i,
-                    (*c).value.string,
-                );
+                    std::ffi::CStr::from_ptr((*c).value.string).to_string_lossy()
+                ))
+                .unwrap_or_default();
+                Log_Write(bot, __m.as_ptr() as *mut c_char);
             } //end case
         } //end for
         Log_Write(bot, c"}\n".as_ptr() as *mut c_char);
@@ -447,8 +437,8 @@ pub fn Characteristic_BFloat(
                 PRT_ERROR,
                 c"cannot bound characteristic %d between %f and %f\n".as_ptr() as *mut c_char,
                 index,
-                min,
-                max,
+                min as core::ffi::c_double,
+                max as core::ffi::c_double,
             );
             return 0.0;
         } //end if
@@ -567,12 +557,12 @@ pub fn BotLoadCharacterFromFile(
                             break;
                         } //end if
                         if token.r#type != TT_NUMBER || (token.subtype & TT_INTEGER) == 0 {
-                            SourceError(
-                                bot,
-                                source,
-                                c"expected integer index, found %s\n".as_ptr() as *mut c_char,
-                                token.string.as_ptr(),
-                            );
+                            let __m = std::ffi::CString::new(format!(
+                                "expected integer index, found {}\n",
+                                core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
+                            ))
+                            .unwrap_or_default();
+                            SourceError(bot, source, __m.as_ptr());
                             FreeSource(bot, source);
                             BotFreeCharacterStrings(bot, ch);
                             FreeMemory(bot, ch as *mut ());
@@ -580,13 +570,12 @@ pub fn BotLoadCharacterFromFile(
                         } //end if
                         index = token.intvalue as c_int;
                         if index < 0 || index > MAX_CHARACTERISTICS {
-                            SourceError(
-                                bot,
-                                source,
-                                c"characteristic index out of range [0, %d]\n".as_ptr()
-                                    as *mut c_char,
-                                MAX_CHARACTERISTICS,
-                            );
+                            let __m = std::ffi::CString::new(format!(
+                                "characteristic index out of range [0, {}]\n",
+                                MAX_CHARACTERISTICS
+                            ))
+                            .unwrap_or_default();
+                            SourceError(bot, source, __m.as_ptr());
                             FreeSource(bot, source);
                             BotFreeCharacterStrings(bot, ch);
                             FreeMemory(bot, ch as *mut ());
@@ -594,12 +583,12 @@ pub fn BotLoadCharacterFromFile(
                         } //end if
                         let c = (*ch).c.as_mut_ptr().add(index as usize);
                         if (*c).r#type != 0 {
-                            SourceError(
-                                bot,
-                                source,
-                                c"characteristic %d already initialized\n".as_ptr() as *mut c_char,
-                                index,
-                            );
+                            let __m = std::ffi::CString::new(format!(
+                                "characteristic {} already initialized\n",
+                                index
+                            ))
+                            .unwrap_or_default();
+                            SourceError(bot, source, __m.as_ptr());
                             FreeSource(bot, source);
                             BotFreeCharacterStrings(bot, ch);
                             FreeMemory(bot, ch as *mut ());
@@ -626,13 +615,12 @@ pub fn BotLoadCharacterFromFile(
                             strcpy((*c).value.string, token.string.as_ptr());
                             (*c).r#type = CT_STRING;
                         } else {
-                            SourceError(
-                                bot,
-                                source,
-                                c"expected integer, float or string, found %s\n".as_ptr()
-                                    as *mut c_char,
-                                token.string.as_ptr(),
-                            );
+                            let __m = std::ffi::CString::new(format!(
+                                "expected integer, float or string, found {}\n",
+                                core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
+                            ))
+                            .unwrap_or_default();
+                            SourceError(bot, source, __m.as_ptr());
                             FreeSource(bot, source);
                             BotFreeCharacterStrings(bot, ch);
                             FreeMemory(bot, ch as *mut ());
@@ -661,12 +649,12 @@ pub fn BotLoadCharacterFromFile(
             }
             //end if
             else {
-                SourceError(
-                    bot,
-                    source,
-                    c"unknown definition %s\n".as_ptr() as *mut c_char,
-                    token.string.as_ptr(),
-                );
+                let __m = std::ffi::CString::new(format!(
+                    "unknown definition {}\n",
+                    core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
+                ))
+                .unwrap_or_default();
+                SourceError(bot, source, __m.as_ptr());
                 FreeSource(bot, source);
                 BotFreeCharacterStrings(bot, ch);
                 FreeMemory(bot, ch as *mut ());
@@ -716,7 +704,7 @@ pub fn BotLoadCachedCharacter(
                 bot.botimport.Print.unwrap()(
                     PRT_MESSAGE,
                     c"loaded cached skill %f from %s\n".as_ptr() as *mut c_char,
-                    skill,
+                    skill as core::ffi::c_double,
                     charfile,
                 );
                 return cachedhandle;
@@ -779,7 +767,7 @@ pub fn BotLoadCachedCharacter(
                 bot.botimport.Print.unwrap()(
                     PRT_MESSAGE,
                     c"loaded cached skill %f from %s\n".as_ptr() as *mut c_char,
-                    (*bot.botcharacters[cachedhandle as usize]).skill,
+                    (*bot.botcharacters[cachedhandle as usize]).skill as core::ffi::c_double,
                     charfile,
                 );
                 return cachedhandle;
@@ -792,7 +780,7 @@ pub fn BotLoadCachedCharacter(
             bot.botimport.Print.unwrap()(
                 PRT_MESSAGE,
                 c"loaded skill %f from %s\n".as_ptr() as *mut c_char,
-                (*ch).skill,
+                (*ch).skill as core::ffi::c_double,
                 charfile,
             );
             return handle;
@@ -806,7 +794,7 @@ pub fn BotLoadCachedCharacter(
                 bot.botimport.Print.unwrap()(
                     PRT_MESSAGE,
                     c"loaded cached default skill %f from %s\n".as_ptr() as *mut c_char,
-                    (*bot.botcharacters[cachedhandle as usize]).skill,
+                    (*bot.botcharacters[cachedhandle as usize]).skill as core::ffi::c_double,
                     charfile,
                 );
                 return cachedhandle;
@@ -819,7 +807,7 @@ pub fn BotLoadCachedCharacter(
             bot.botimport.Print.unwrap()(
                 PRT_MESSAGE,
                 c"loaded default skill %f from %s\n".as_ptr() as *mut c_char,
-                (*ch).skill,
+                (*ch).skill as core::ffi::c_double,
                 charfile,
             );
             return handle;
@@ -846,12 +834,9 @@ pub fn BotLoadCharacterSkill(bot: &mut BotLib, charfile: *mut c_char, skill: f32
             skill,
             qfalse as c_int,
         );
-        let ch = BotLoadCachedCharacter(
-            bot,
-            charfile,
-            skill,
-            LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) as c_int,
-        );
+        let reload =
+            LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) as c_int;
+        let ch = BotLoadCachedCharacter(bot, charfile, skill, reload);
 
         if defaultch != 0 && ch != 0 {
             BotDefaultCharacteristics(
@@ -887,7 +872,7 @@ pub fn BotLoadCharacter(bot: &mut BotLib, charfile: *mut c_char, skill: f32) -> 
             bot.botimport.Print.unwrap()(
                 PRT_MESSAGE,
                 c"loaded cached skill %f from %s\n".as_ptr() as *mut c_char,
-                skill,
+                skill as core::ffi::c_double,
                 charfile,
             );
             return handle;

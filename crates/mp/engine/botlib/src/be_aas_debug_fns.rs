@@ -68,17 +68,8 @@ use crate::be_aas_debug::be_aas_debug_cpp_consts::{MAX_DEBUGLINES, MAX_DEBUGPOLY
 use crate::be_aas_sample_fns::{AAS_AreaCluster, AAS_PointAreaNum};
 use crate::BotLib;
 
-// PORT-NOTE(fwd-decl): `AAS_Time` (be_aas_main.cpp) and `GetClearedMemory`
-// (l_memory.c) are already-ported callees per their packets
-// (`botlib__0442_AAS_Time.md`, `botlib__1170_GetClearedMemory.md`) but their
-// owning modules are not registered/reachable from this crate slice yet;
-// forward-declared exactly as their resolved signatures, matching the
-// established `be_ai_chat_fns.rs`/`be_ai_goal_fns.rs`/`l_script_fns.rs`
-// precedent for not-yet-wired in-crate callees.
-extern "C" {
-    fn AAS_Time(bot: &mut BotLib) -> f32;
-    fn GetClearedMemory(bot: &mut BotLib, size: usize) -> *mut core::ffi::c_void;
-}
+use crate::be_aas_main::AAS_Time;
+use crate::l_memory_fns::GetClearedMemory;
 
 /// Raven `AAS_ClearShownPolygons`.
 ///
@@ -753,7 +744,7 @@ pub fn AAS_FloodAreas(bot: &mut BotLib, origin: vec3_t) {
     unsafe {
         let done = GetClearedMemory(
             bot,
-            bot.aasworld.numareas as usize * core::mem::size_of::<c_int>(),
+            bot.aasworld.numareas as u64 * core::mem::size_of::<c_int>() as u64,
         ) as *mut c_int;
         let areanum = AAS_PointAreaNum(bot, origin);
         let cluster = AAS_AreaCluster(bot, areanum);

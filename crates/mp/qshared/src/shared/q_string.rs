@@ -246,3 +246,137 @@ pub fn Info_SetValueForKey_Big(s: *mut c_char, key: *const c_char, value: *const
         c_strcpy(s, cstr.as_ptr());
     }
 }
+
+/// Raven `Q_stricmpn`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:855-879`
+pub fn Q_stricmpn(s1: *const c_char, s2: *const c_char, n: c_int) -> c_int {
+    unsafe {
+        if s1.is_null() {
+            return if s2.is_null() { 0 } else { -1 };
+        } else if s2.is_null() {
+            return 1;
+        }
+
+        let mut n = n;
+        let mut p1 = s1;
+        let mut p2 = s2;
+        loop {
+            let mut c1 = *p1 as c_int;
+            let mut c2 = *p2 as c_int;
+            p1 = p1.offset(1);
+            p2 = p2.offset(1);
+
+            if n == 0 {
+                return 0;
+            }
+            n -= 1;
+
+            if c1 != c2 {
+                if c1 >= b'a' as c_int && c1 <= b'z' as c_int {
+                    c1 -= b'a' as c_int - b'A' as c_int;
+                }
+                if c2 >= b'a' as c_int && c2 <= b'z' as c_int {
+                    c2 -= b'a' as c_int - b'A' as c_int;
+                }
+                if c1 != c2 {
+                    return if c1 < c2 { -1 } else { 1 };
+                }
+            }
+            if c1 == 0 {
+                return 0;
+            }
+        }
+    }
+}
+
+/// Raven `Q_stricmp`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:900-902`
+pub fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int {
+    if !s1.is_null() && !s2.is_null() {
+        Q_stricmpn(s1, s2, 99999)
+    } else {
+        -1
+    }
+}
+
+/// Raven `COM_Compress`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:353-419`
+pub fn COM_Compress(data_p: *mut c_char) -> c_int {
+    unsafe {
+        if data_p.is_null() {
+            return 0;
+        }
+        let mut newline = false;
+        let mut whitespace = false;
+        let mut r#in = data_p;
+        let mut out = data_p;
+
+        loop {
+            let c = *r#in;
+            if c == 0 {
+                break;
+            }
+            if c == b'/' as c_char && *r#in.offset(1) == b'/' as c_char {
+                while *r#in != 0 && *r#in != b'\n' as c_char {
+                    r#in = r#in.offset(1);
+                }
+            } else if c == b'/' as c_char && *r#in.offset(1) == b'*' as c_char {
+                while *r#in != 0 && !(*r#in == b'*' as c_char && *r#in.offset(1) == b'/' as c_char)
+                {
+                    r#in = r#in.offset(1);
+                }
+                if *r#in != 0 {
+                    r#in = r#in.offset(2);
+                }
+            } else if c == b'\n' as c_char || c == b'\r' as c_char {
+                newline = true;
+                r#in = r#in.offset(1);
+            } else if c == b' ' as c_char || c == b'\t' as c_char {
+                whitespace = true;
+                r#in = r#in.offset(1);
+            } else {
+                if newline {
+                    *out = b'\n' as c_char;
+                    out = out.offset(1);
+                    newline = false;
+                    whitespace = false;
+                }
+                if whitespace {
+                    *out = b' ' as c_char;
+                    out = out.offset(1);
+                    whitespace = false;
+                }
+
+                if c == b'"' as c_char {
+                    *out = c;
+                    out = out.offset(1);
+                    r#in = r#in.offset(1);
+                    loop {
+                        let cc = *r#in;
+                        if cc != 0 && cc != b'"' as c_char {
+                            *out = cc;
+                            out = out.offset(1);
+                            r#in = r#in.offset(1);
+                        } else {
+                            break;
+                        }
+                    }
+                    if *r#in == b'"' as c_char {
+                        *out = *r#in;
+                        out = out.offset(1);
+                        r#in = r#in.offset(1);
+                    }
+                } else {
+                    *out = c;
+                    out = out.offset(1);
+                    r#in = r#in.offset(1);
+                }
+            }
+        }
+        *out = 0;
+        out.offset_from(data_p) as c_int
+    }
+}

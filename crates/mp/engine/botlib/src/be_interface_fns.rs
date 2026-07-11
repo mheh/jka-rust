@@ -38,7 +38,10 @@ use mp_qshared::common::mp::botlib::botlib_misc::BOTLIB_API_VERSION;
 use mp_qshared::common::mp::botlib::ea_export_s::ea_export_t;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE};
 use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t};
-use libc::{CLOCKS_PER_SEC, clock};
+use crate::be_ai_weap_fns::{
+    BotAllocWeaponState, BotChooseBestFightWeapon, BotFreeWeaponState, BotGetWeaponInfo,
+    BotLoadWeaponWeights, BotResetWeaponState, BotShutdownWeaponAI,
+};
 use crate::be_aas_bspq3_fns::{AAS_FloatForBSPEpairKey, AAS_IntForBSPEpairKey, AAS_NextBSPEntity, AAS_PointContents, AAS_ValueForBSPEpairKey, AAS_VectorForBSPEpairKey};
 use crate::be_aas_entity::{AAS_EntityInfo, AAS_UpdateEntity};
 use crate::be_aas_main::{AAS_Initialized, AAS_LoadMap, AAS_Setup, AAS_Shutdown, AAS_StartFrame, AAS_Time};
@@ -62,10 +65,13 @@ use crate::l_precomp_fns::{PC_AddGlobalDefine, PC_CheckOpenSourceHandles, PC_Fre
 ///
 /// Source: `oracle/codemp/botlib/be_interface.cpp:60-63`
 pub fn Sys_MilliSeconds() -> c_int {
-    // PORT-NOTE(CLOCKS_PER_SEC): the packet flags `CLOCKS_PER_SEC` as an
-    // unresolved const (no rosetta row — it is a libc macro, not a Raven
-    // symbol); referenced verbatim rather than guessed, escalated below.
-    unsafe { (libc::clock() as c_int) * 1000 / CLOCKS_PER_SEC }
+    // `clock() * 1000 / CLOCKS_PER_SEC` (process CPU time in ms) via the libc
+    // house-rule equivalent `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)`.
+    unsafe {
+        let mut ts: libc::timespec = core::mem::zeroed();
+        libc::clock_gettime(libc::CLOCK_PROCESS_CPUTIME_ID, &mut ts);
+        (ts.tv_sec * 1000 + ts.tv_nsec / 1_000_000) as c_int
+    }
 }
 
 /// Raven `ValidClientNumber`.

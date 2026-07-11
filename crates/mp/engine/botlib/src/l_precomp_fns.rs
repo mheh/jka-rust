@@ -62,12 +62,7 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::pc_token_t;
 use mp_qshared::shared::{qfalse, qtrue};
 
-// PORT-NOTE(Q_stricmp): forward-declared per the l_libvar_fns.rs precedent
-// (no Q_stricmp in the engine-reachable mp_qshared tier yet; only mp_game's
-// copy, a different crate this engine slice does not depend on).
-extern "C" {
-    fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int;
-}
+use mp_qshared::shared::q_string::Q_stricmp;
 
 /// Raven `SourceError` — print a preprocessor error tagged with the current
 /// script file and line.

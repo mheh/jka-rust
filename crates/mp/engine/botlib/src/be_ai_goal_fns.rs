@@ -10,22 +10,11 @@
 //! the `_fns` escape per `_PREAMBLE.md`'s destination rule.
 //!
 //! Source: `oracle/codemp/botlib/be_ai_goal.cpp`
-//!
-//! PORT-NOTE(callee-signatures): the in-engine callees this file reaches
-//! that are ported in sibling packets outside this shard (`FreeMemory`,
-//! `GetClearedMemory`, `GetClearedHunkMemory`, `Com_Memset`, `Com_Memcpy`,
-//! `Log_Write`, `LibVar`/`LibVarValue`/`LibVarString`/`LibVarSet`,
-//! `LoadSourceFile`/`FreeSource`/`PC_*`/`ReadStructure`/`SourceError`/
-//! `StripDoubleQuotes`, the `AAS_*` family, `BotReachabilityArea`,
-//! `FreeWeightConfig`/`ReadWeightConfig`/`InterbreedWeightConfigs`/
-//! `EvolveWeightConfig`/`FindFuzzyWeight`/`FuzzyWeightUndecided`) are
-//! forward-declared below with the faithful shape inferred from the Raven
-//! call sites (receivers per each packet's RESOLVED CALL SURFACE table).
-//! Flagged in shape_mismatches if integration finds a difference.
 
 use core::ffi::{c_char, c_int, c_ulong};
 
 use mp_engine_qcommon::common::Common;
+use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
 use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_t;
 use mp_qshared::common::mp::botlib::botlib_error::{
     BLERR_CANNOTLOADITEMCONFIG, BLERR_CANNOTLOADITEMWEIGHTS, BLERR_NOERROR,
@@ -61,138 +50,32 @@ use crate::l_struct::structdef_s::structdef_t;
 use crate::BotLib;
 use crate::{campspot_t, maplocation_t};
 
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches (signatures inferred from
-// the Raven call sites; ported in sibling packets outside this shard).
-// PORT-NOTE(callee-signatures): see module doc comment.
-// ---------------------------------------------------------------------
-extern "C" {
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut ());
-    fn GetClearedMemory(bot: &mut BotLib, size: c_ulong) -> *mut ();
-    fn GetClearedHunkMemory(bot: &mut BotLib, size: c_ulong) -> *mut ();
-    fn Com_Memset(dest: *mut (), val: c_int, count: usize);
-    fn Com_Memcpy(dest: *mut (), src: *const (), count: usize);
-    fn Log_Write(bot: &mut BotLib, fmt: *mut c_char, ...);
-    fn LibVar(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> *mut libvar_t;
-    fn LibVarValue(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> f32;
-    fn LibVarString(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> *mut c_char;
-    fn LibVarSet(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char);
-    fn LoadSourceFile(bot: &mut BotLib, filename: *const c_char) -> *mut source_t;
-    fn FreeSource(bot: &mut BotLib, source: *mut source_t);
-    fn PC_SetBaseFolder(bot: &mut BotLib, path: *mut c_char);
-    fn PC_ReadToken(bot: &mut BotLib, source: *mut source_t, token: *mut token_t) -> c_int;
-    fn PC_ExpectTokenType(
-        bot: &mut BotLib,
-        source: *mut source_t,
-        r#type: c_int,
-        subtype: c_int,
-        token: *mut token_t,
-    ) -> c_int;
-    fn ReadStructure(
-        bot: &mut BotLib,
-        source: *mut source_t,
-        def: *mut structdef_t,
-        structure: *mut c_char,
-    ) -> c_int;
-    fn SourceError(bot: &mut BotLib, source: *mut source_t, str: *mut c_char, ...);
-    fn StripDoubleQuotes(string: *mut c_char);
-
-    fn AAS_Time(bot: &mut BotLib) -> f32;
-    fn AAS_PresenceTypeBoundingBox(
-        bot: &mut BotLib,
-        presencetype: c_int,
-        mins: vec3_t,
-        maxs: vec3_t,
-    );
-    fn AAS_Trace(
-        bot: &mut BotLib,
-        start: vec3_t,
-        mins: vec3_t,
-        maxs: vec3_t,
-        end: vec3_t,
-        passent: c_int,
-        contentmask: c_int,
-    ) -> bsp_trace_t;
-    fn AAS_EntityInfo(bot: &mut BotLib, entnum: c_int, info: *mut aas_entityinfo_t);
-    fn AAS_EntityModelindex(bot: &mut BotLib, entnum: c_int) -> c_int;
-    fn AAS_NextEntity(bot: &mut BotLib, entnum: c_int) -> c_int;
-    fn AAS_EntityType(bot: &mut BotLib, entnum: c_int) -> c_int;
-    fn AAS_BestReachableArea(
-        bot: &mut BotLib,
-        origin: vec3_t,
-        mins: vec3_t,
-        maxs: vec3_t,
-        goalorigin: *mut f32,
-    ) -> c_int;
-    fn AAS_BestReachableFromJumpPadArea(
-        bot: &mut BotLib,
-        origin: vec3_t,
-        mins: vec3_t,
-        maxs: vec3_t,
-    ) -> c_int;
-    fn AAS_AreaReachability(bot: &mut BotLib, areanum: c_int) -> c_int;
-    fn AAS_AreaTravelTimeToGoalArea(
-        bot: &mut BotLib,
-        areanum: c_int,
-        origin: vec3_t,
-        goalareanum: c_int,
-        travelflags: c_int,
-    ) -> c_int;
-    fn AAS_DropToFloor(bot: &mut BotLib, origin: *mut f32, mins: vec3_t, maxs: vec3_t) -> c_int;
-    fn AAS_FloatForBSPEpairKey(
-        bot: &mut BotLib,
-        ent: c_int,
-        key: *mut c_char,
-        value: *mut f32,
-    ) -> c_int;
-    fn AAS_IntForBSPEpairKey(
-        bot: &mut BotLib,
-        ent: c_int,
-        key: *mut c_char,
-        value: *mut c_int,
-    ) -> c_int;
-    fn AAS_Loaded(bot: &mut BotLib) -> c_int;
-    fn AAS_NextBSPEntity(bot: &mut BotLib, ent: c_int) -> c_int;
-    fn AAS_PointContents(bot: &mut BotLib, point: vec3_t) -> c_int;
-    fn AAS_ValueForBSPEpairKey(
-        bot: &mut BotLib,
-        ent: c_int,
-        key: *mut c_char,
-        value: *mut c_char,
-        size: c_int,
-    ) -> c_int;
-    fn AAS_VectorForBSPEpairKey(
-        bot: &mut BotLib,
-        ent: c_int,
-        key: *mut c_char,
-        v: *mut f32,
-    ) -> c_int;
-    fn AAS_PointAreaNum(bot: &mut BotLib, point: vec3_t) -> c_int;
-    fn AAS_AreaJumpPad(bot: &mut BotLib, areanum: c_int) -> c_int;
-
-    fn BotReachabilityArea(bot: &mut BotLib, origin: vec3_t, client: c_int) -> c_int;
-    fn FreeWeightConfig(bot: &mut BotLib, config: *mut weightconfig_t);
-    fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightconfig_t;
-    fn InterbreedWeightConfigs(
-        bot: &mut BotLib,
-        config1: *mut weightconfig_t,
-        config2: *mut weightconfig_t,
-        configout: *mut weightconfig_t,
-    );
-    fn EvolveWeightConfig(common: &mut Common, config: *mut weightconfig_t);
-    fn FindFuzzyWeight(wc: *mut weightconfig_t, name: *mut c_char) -> c_int;
-    fn FuzzyWeightUndecided(
-        common: &mut Common,
-        inventory: *mut c_int,
-        wc: *mut weightconfig_t,
-        weightnum: c_int,
-    ) -> f32;
-}
-
-/// `VectorLength` — supplied by the already-ported qshared `q_math` surface.
-extern "Rust" {
-    fn VectorLength(v: vec3_t) -> f32;
-}
+use crate::be_aas_bspq3_fns::{
+    AAS_FloatForBSPEpairKey, AAS_IntForBSPEpairKey, AAS_NextBSPEntity, AAS_PointContents,
+    AAS_Trace, AAS_ValueForBSPEpairKey, AAS_VectorForBSPEpairKey,
+};
+use crate::be_aas_entity::{AAS_EntityInfo, AAS_EntityModelindex, AAS_EntityType, AAS_NextEntity};
+use crate::be_aas_main::{AAS_Loaded, AAS_Time};
+use crate::be_aas_move::AAS_DropToFloor;
+use crate::be_aas_reach_fns::{
+    AAS_AreaJumpPad, AAS_AreaReachability, AAS_BestReachableArea, AAS_BestReachableFromJumpPadArea,
+};
+use crate::be_aas_route_fns::AAS_AreaTravelTimeToGoalArea;
+use crate::be_aas_sample_fns::{AAS_PointAreaNum, AAS_PresenceTypeBoundingBox};
+use crate::be_ai_move_fns::BotReachabilityArea;
+use crate::be_ai_weight_fns::{
+    EvolveWeightConfig, FindFuzzyWeight, FreeWeightConfig, FuzzyWeightUndecided,
+    InterbreedWeightConfigs, ReadWeightConfig,
+};
+use crate::l_libvar_fns::{LibVar, LibVarSet, LibVarString, LibVarValue};
+use crate::l_log_fns::Log_Write;
+use crate::l_memory_fns::{FreeMemory, GetClearedHunkMemory, GetClearedMemory};
+use crate::l_precomp_fns::{
+    FreeSource, LoadSourceFile, PC_ExpectTokenType, PC_ReadToken, PC_SetBaseFolder, SourceError,
+};
+use crate::l_script_fns::StripDoubleQuotes;
+use crate::l_struct_fns::ReadStructure;
+use mp_qshared::shared::q_math::VectorLength;
 
 // helper: vector arithmetic used inline below (mirrors the qshared q_math
 // primitives; ported bodies transcribed inline to avoid a spurious edge for
@@ -508,13 +391,14 @@ pub fn BotDumpAvoidGoals(bot: &mut BotLib, goalstate: c_int) {
             if (*gs).avoidgoaltimes[i] >= AAS_Time(bot) {
                 BotGoalName(bot, (*gs).avoidgoals[i], name.as_mut_ptr(), 32);
                 let remaining = (*gs).avoidgoaltimes[i] - AAS_Time(bot);
-                Log_Write(
-                    bot,
-                    c"avoid goal %s, number %d for %f seconds".as_ptr() as *mut c_char,
-                    name.as_ptr(),
+                let __m = std::ffi::CString::new(format!(
+                    "avoid goal {}, number {} for {} seconds",
+                    std::ffi::CStr::from_ptr(name.as_ptr()).to_string_lossy(),
                     (*gs).avoidgoals[i],
-                    remaining as core::ffi::c_double,
-                );
+                    remaining as f64,
+                ))
+                .unwrap_or_default();
+                Log_Write(bot, __m.as_ptr() as *mut c_char);
             }
         }
     }
@@ -601,7 +485,13 @@ pub fn BotDumpGoalStack(bot: &mut BotLib, goalstate: c_int) {
                 name.as_mut_ptr(),
                 32,
             );
-            Log_Write(bot, c"%d: %s".as_ptr() as *mut c_char, i, name.as_ptr());
+            let __m = std::ffi::CString::new(format!(
+                "{}: {}",
+                i,
+                std::ffi::CStr::from_ptr(name.as_ptr()).to_string_lossy(),
+            ))
+            .unwrap_or_default();
+            Log_Write(bot, __m.as_ptr() as *mut c_char);
         }
     }
 }
@@ -759,12 +649,13 @@ pub fn ItemWeightIndex(
             let w = FindFuzzyWeight(iwc, classname);
             *index.add(i as usize) = w;
             if w < 0 {
-                Log_Write(
-                    bot,
-                    c"item info %d \"%s\" has no fuzzy weight\r\n".as_ptr() as *mut c_char,
+                let __m = std::ffi::CString::new(format!(
+                    "item info {} \"{}\" has no fuzzy weight\r\n",
                     i,
-                    classname,
-                );
+                    std::ffi::CStr::from_ptr(classname).to_string_lossy(),
+                ))
+                .unwrap_or_default();
+                Log_Write(bot, __m.as_ptr() as *mut c_char);
             }
         }
         index
@@ -989,7 +880,7 @@ pub fn BotInitInfoEntities(bot: &mut BotLib) {
                         bot,
                         ent,
                         c"origin".as_ptr() as *mut c_char,
-                        (*ml).origin.as_mut_ptr(),
+                        (*ml).origin,
                     );
                     AAS_ValueForBSPEpairKey(
                         bot,
@@ -1011,7 +902,7 @@ pub fn BotInitInfoEntities(bot: &mut BotLib) {
                         bot,
                         ent,
                         c"origin".as_ptr() as *mut c_char,
-                        (*cs).origin.as_mut_ptr(),
+                        (*cs).origin,
                     );
                     //cs->origin[2] += 16;
                     AAS_ValueForBSPEpairKey(
@@ -1195,7 +1086,7 @@ pub fn BotUpdateEntityItems(bot: &mut BotLib) {
                                             (*li).origin,
                                             (*ii).mins,
                                             (*ii).maxs,
-                                            (*li).goalorigin.as_mut_ptr(),
+                                            (*li).goalorigin,
                                         );
                                     }
                                 }
@@ -1242,7 +1133,7 @@ pub fn BotUpdateEntityItems(bot: &mut BotLib) {
                                                         (*li2).origin,
                                                         (*ii).mins,
                                                         (*ii).maxs,
-                                                        (*li2).goalorigin.as_mut_ptr(),
+                                                        (*li2).goalorigin,
                                                     );
                                                 }
                                                 linked = true;
@@ -1283,7 +1174,7 @@ pub fn BotUpdateEntityItems(bot: &mut BotLib) {
                                             (*newli).origin,
                                             (*ii).mins,
                                             (*ii).maxs,
-                                            (*newli).goalorigin.as_mut_ptr(),
+                                            (*newli).goalorigin,
                                         );
                                         //never go for items dropped into jumppads
                                         if AAS_AreaJumpPad(bot, (*newli).goalareanum) != 0 {
@@ -1393,11 +1284,12 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
         for i in 0..numiteminfo {
             let ii = (*ic).iteminfo.add(i as usize);
             if (*ii).modelindex == 0 {
-                Log_Write(
-                    bot,
-                    c"item %s has modelindex 0".as_ptr() as *mut c_char,
-                    (*ii).classname.as_ptr(),
-                );
+                let __m = std::ffi::CString::new(format!(
+                    "item {} has modelindex 0",
+                    std::ffi::CStr::from_ptr((*ii).classname.as_ptr()).to_string_lossy(),
+                ))
+                .unwrap_or_default();
+                Log_Write(bot, __m.as_ptr() as *mut c_char);
             }
         }
 
@@ -1438,11 +1330,12 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                     i += 1;
                 }
                 if i >= numiteminfo {
-                    Log_Write(
-                        bot,
-                        c"entity %s unknown item\r\n".as_ptr() as *mut c_char,
-                        classname.as_ptr(),
-                    );
+                    let __m = std::ffi::CString::new(format!(
+                        "entity {} unknown item\r\n",
+                        std::ffi::CStr::from_ptr(classname.as_ptr()).to_string_lossy(),
+                    ))
+                    .unwrap_or_default();
+                    Log_Write(bot, __m.as_ptr() as *mut c_char);
                     ent = AAS_NextBSPEntity(bot, ent);
                     continue;
                 }
@@ -1452,7 +1345,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                     bot,
                     ent,
                     c"origin".as_ptr() as *mut c_char,
-                    origin.as_mut_ptr(),
+                    origin,
                 ) == 0
                 {
                     bot.botimport.Print.unwrap()(
@@ -1490,13 +1383,14 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                                 (*ii).mins,
                                 (*ii).maxs,
                             );
-                            Log_Write(
-                                bot,
-                                c"item %s reachable from jumppad area %d\r\n".as_ptr()
-                                    as *mut c_char,
-                                (*ii).classname.as_ptr(),
+                            let __m = std::ffi::CString::new(format!(
+                                "item {} reachable from jumppad area {}\r\n",
+                                std::ffi::CStr::from_ptr((*ii).classname.as_ptr())
+                                    .to_string_lossy(),
                                 goalareanum,
-                            );
+                            ))
+                            .unwrap_or_default();
+                            Log_Write(bot, __m.as_ptr() as *mut c_char);
                             if goalareanum == 0 {
                                 ent = AAS_NextBSPEntity(bot, ent);
                                 continue;
@@ -1543,7 +1437,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                 }
                 //if not a stationary item
                 if spawnflags & 1 == 0 {
-                    if AAS_DropToFloor(bot, origin.as_mut_ptr(), (*ii).mins, (*ii).maxs) == 0 {
+                    if AAS_DropToFloor(bot, origin, (*ii).mins, (*ii).maxs) == 0 {
                         bot.botimport.Print.unwrap()(
                             PRT_MESSAGE,
                             c"%s in solid at (%1.1f %1.1f %1.1f)\n".as_ptr() as *mut c_char,
@@ -1569,7 +1463,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                         origin,
                         (*ii).mins,
                         (*ii).maxs,
-                        (*li).goalorigin.as_mut_ptr(),
+                        (*li).goalorigin,
                     );
                     if (*li).goalareanum == 0 {
                         bot.botimport.Print.unwrap()(
@@ -1959,12 +1853,12 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
         while PC_ReadToken(bot, source, &mut token) != 0 {
             if libc::strcmp(token.string.as_ptr(), c"iteminfo".as_ptr()) == 0 {
                 if (*ic).numiteminfo >= max_iteminfo {
-                    SourceError(
-                        bot,
-                        source,
-                        c"more than %d item info defined\n".as_ptr() as *mut c_char,
-                        max_iteminfo,
-                    );
+                    let __m = std::ffi::CString::new(format!(
+                        "more than {} item info defined\n",
+                        max_iteminfo
+                    ))
+                    .unwrap_or_default();
+                    SourceError(bot, source, __m.as_ptr());
                     FreeMemory(bot, ic as *mut ());
                     FreeSource(bot, source);
                     return core::ptr::null_mut();
@@ -1991,12 +1885,12 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
                 (*ii).number = (*ic).numiteminfo;
                 (*ic).numiteminfo += 1;
             } else {
-                SourceError(
-                    bot,
-                    source,
-                    c"unknown definition %s\n".as_ptr() as *mut c_char,
-                    token.string.as_ptr(),
-                );
+                let __m = std::ffi::CString::new(format!(
+                    "unknown definition {}\n",
+                    std::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy(),
+                ))
+                .unwrap_or_default();
+                SourceError(bot, source, __m.as_ptr());
                 FreeMemory(bot, ic as *mut ());
                 FreeSource(bot, source);
                 return core::ptr::null_mut();

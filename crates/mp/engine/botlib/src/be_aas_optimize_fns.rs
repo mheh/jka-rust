@@ -35,17 +35,8 @@ use mp_qshared::common::mp::botlib::print_type::PRT_MESSAGE;
 
 use crate::BotLib;
 
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches (signatures per their own
-// resolved-signature packets; ported in sibling packets outside this
-// shard — see `_PREAMBLE.md`'s stub-free / extern "Rust" forward-decl
-// convention already used by `be_aas_cluster_fns.rs`).
-// ---------------------------------------------------------------------
-extern "Rust" {
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut ());
-    fn GetClearedMemory(bot: &mut BotLib, size: core::ffi::c_ulong) -> *mut ();
-    fn Com_Memcpy(dest: *mut (), src: *const (), count: usize);
-}
+use crate::l_memory_fns::{FreeMemory, GetClearedMemory};
+use mp_engine_qcommon::common_fns::Com_Memcpy;
 
 /// Raven `AAS_KeepEdge` — always keeps an edge (no dead-edge removal).
 ///

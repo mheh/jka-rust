@@ -6,15 +6,8 @@
 //! consume.
 //!
 //! Source: `oracle/codemp/botlib/be_ea.cpp`
-//!
-//! PORT-NOTE(callee-signatures): the in-engine callees this file reaches
-//! (`FreeMemory`/`GetClearedHunkMemory`/`Com_Memcpy`) land in sibling
-//! packets outside this shard; their signatures here are the faithful shape
-//! inferred from the Raven call sites (receivers per the packets'
-//! RESOLVED CALL SURFACE tables). Flagged in shape_mismatches if
-//! integration finds a difference.
 
-use core::ffi::{c_char, c_int, c_ulong, c_void};
+use core::ffi::{c_char, c_int, c_ulong};
 
 use mp_game::c_format::FmtArg;
 use mp_game::q_shared::va;
@@ -29,18 +22,10 @@ use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
 use mp_qshared::shared::vec3_t;
 
 use crate::be_ea::ea_consts::{ACTION_JUMPEDLASTFRAME, MAX_USERMOVE};
+use crate::l_memory_fns::{FreeMemory, GetClearedHunkMemory};
 use crate::BotLib;
 
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches (signatures inferred from
-// the Raven call sites; ported in sibling packets outside this shard).
-// PORT-NOTE(callee-signatures): see module doc comment.
-// ---------------------------------------------------------------------
-extern "Rust" {
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut c_void);
-    fn GetClearedHunkMemory(bot: &mut BotLib, size: c_ulong) -> *mut c_void;
-    fn Com_Memcpy(dest: *mut c_void, src: *const c_void, count: usize);
-}
+use mp_engine_qcommon::common_fns::Com_Memcpy;
 
 // PORT-NOTE(macros): Raven's `VectorCopy`/`VectorClear` are `#define`s;
 // ported as local private helpers (matches `be_aas_move.rs`'s precedent).
@@ -377,8 +362,8 @@ pub fn EA_GetInput(bot: &mut BotLib, client: c_int, thinktime: f32, input: *mut 
         let bi = &mut *bot.botinputs.add(client as usize);
         bi.thinktime = thinktime;
         Com_Memcpy(
-            input as *mut c_void,
-            bi as *const bot_input_t as *const c_void,
+            input as *mut (),
+            bi as *const bot_input_t as *const (),
             core::mem::size_of::<bot_input_t>(),
         );
     }
@@ -423,7 +408,7 @@ pub fn EA_Setup(bot: &mut BotLib) -> c_int {
 /// Source: `oracle/codemp/botlib/be_ea.cpp:515-519`
 pub fn EA_Shutdown(bot: &mut BotLib) {
     unsafe {
-        FreeMemory(bot, bot.botinputs as *mut c_void);
+        FreeMemory(bot, bot.botinputs as *mut ());
         bot.botinputs = core::ptr::null_mut();
     }
 }

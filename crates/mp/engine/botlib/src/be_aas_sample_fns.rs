@@ -10,16 +10,7 @@
 //! constants-only) — so this file lands at the `_fns` escape per
 //! `_PREAMBLE.md`'s destination rule.
 //!
-//! PORT-NOTE(callee-signatures): several in-engine callees this file
-//! reaches (`FreeMemory`/`GetClearedHunkMemory`/`GetHunkMemory`/
-//! `LibVarValue`/`AAS_AreaReachability`/`AAS_EntityCollision`/
-//! `Com_Memset`) are ported in sibling files/packets not linked here yet;
-//! their signatures are the faithful shape inferred from the Raven call
-//! sites (receivers per the packets' RESOLVED CALL SURFACE tables),
-//! matching the established `extern "Rust"` forward-declare convention
-//! used elsewhere in this crate (e.g. `be_ai_chat_fns.rs`).
-
-use core::ffi::{c_int, c_void};
+use core::ffi::{c_char, c_int};
 
 use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
@@ -42,49 +33,23 @@ use crate::be_aas_def::aas_link_s::aas_link_t;
 use crate::be_aas_sample::be_aas_sample_cpp_consts::{BBOX_NORMAL_EPSILON, TRACEPLANE_EPSILON};
 use crate::BotLib;
 
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches (signatures inferred from
-// the Raven call sites; ported in sibling packets outside this shard).
-// PORT-NOTE(callee-signatures): see module doc comment.
-// ---------------------------------------------------------------------
 // PORT-NOTE(macros): Raven's `DotProduct`/`VectorCopy`/`VectorSubtract`/
 // `VectorClear`/`VectorMA`/`AAS_OrthogonalToVectors` are `#define`s; they
 // expand inline here, faithful to the preprocessor (matching the
-// `be_aas_reach_fns.rs` convention). `CrossProduct`/`VectorLength`/
-// `VectorNormalize`/`VectorInverse` are genuine q_math functions the packets
-// flag as externals, called through the not-yet-wired q_math surface — see
-// missing_symbols.
+// `be_aas_reach_fns.rs` convention).
 #[inline]
 fn DotProduct(a: vec3_t, b: vec3_t) -> f32 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
-extern "Rust" {
-    fn CrossProduct(v1: vec3_t, v2: vec3_t, cross: &mut vec3_t);
-    fn VectorLength(v: vec3_t) -> f32;
-    fn VectorNormalize(v: &mut vec3_t) -> f32;
-    fn VectorInverse(v: &mut vec3_t);
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut c_void);
-    fn GetClearedHunkMemory(bot: &mut BotLib, size: usize) -> *mut c_void;
-    fn GetHunkMemory(bot: &mut BotLib, size: usize) -> *mut c_void;
-    fn LibVarValue(
-        bot: &mut BotLib,
-        name: *const core::ffi::c_char,
-        default: *const core::ffi::c_char,
-    ) -> f32;
-    fn AAS_AreaReachability(bot: &mut BotLib, areanum: c_int) -> c_int;
-    fn AAS_EntityCollision(
-        bot: &mut BotLib,
-        entnum: c_int,
-        start: vec3_t,
-        boxmins: vec3_t,
-        boxmaxs: vec3_t,
-        end: vec3_t,
-        contentmask: c_int,
-        trace: *mut bsp_trace_t,
-    ) -> qboolean;
-    fn Com_Memset(dst: *mut c_void, val: c_int, n: usize);
-}
+use mp_qshared::shared::q_math::{CrossProduct, VectorInverse, VectorLength, VectorNormalize};
+
+use crate::be_aas_bspq3_fns::AAS_EntityCollision;
+use crate::be_aas_reach_fns::AAS_AreaReachability;
+use crate::l_libvar_fns::LibVarValue;
+use crate::l_memory_fns::{FreeMemory, GetClearedHunkMemory, GetHunkMemory};
+
+use mp_engine_qcommon::common_fns::Com_Memset;
 
 /// A stack entry used while walking the AAS BSP tree during a line trace.
 ///
@@ -654,7 +619,7 @@ pub fn AAS_PlaneFromNum(bot: &mut BotLib, planenum: c_int) -> *mut aas_plane_t {
 pub fn AAS_FreeAASLinkHeap(bot: &mut BotLib) {
     unsafe {
         if !bot.aasworld.linkheap.is_null() {
-            FreeMemory(bot, bot.aasworld.linkheap as *mut c_void);
+            FreeMemory(bot, bot.aasworld.linkheap as *mut ());
         }
         bot.aasworld.linkheap = core::ptr::null_mut();
         bot.aasworld.linkheapsize = 0;
@@ -667,7 +632,7 @@ pub fn AAS_FreeAASLinkHeap(bot: &mut BotLib) {
 pub fn AAS_FreeAASLinkedEntities(bot: &mut BotLib) {
     unsafe {
         if !bot.aasworld.arealinkedentities.is_null() {
-            FreeMemory(bot, bot.aasworld.arealinkedentities as *mut c_void);
+            FreeMemory(bot, bot.aasworld.arealinkedentities as *mut ());
         }
         bot.aasworld.arealinkedentities = core::ptr::null_mut();
     }
@@ -917,11 +882,11 @@ pub fn AAS_InitAASLinkedEntities(bot: &mut BotLib) {
             return;
         }
         if !bot.aasworld.arealinkedentities.is_null() {
-            FreeMemory(bot, bot.aasworld.arealinkedentities as *mut c_void);
+            FreeMemory(bot, bot.aasworld.arealinkedentities as *mut ());
         }
         bot.aasworld.arealinkedentities = GetClearedHunkMemory(
             bot,
-            bot.aasworld.numareas as usize * core::mem::size_of::<*mut aas_link_t>(),
+            (bot.aasworld.numareas as usize * core::mem::size_of::<*mut aas_link_t>()) as u64,
         ) as *mut *mut aas_link_t;
     }
 }
@@ -978,7 +943,7 @@ pub fn AAS_AreaEntityCollision(
 
         let mut bsptrace = core::mem::zeroed::<bsp_trace_t>();
         Com_Memset(
-            &mut bsptrace as *mut bsp_trace_t as *mut c_void,
+            &mut bsptrace as *mut bsp_trace_t as *mut (),
             0,
             core::mem::size_of::<bsp_trace_t>(),
         ); //make compiler happy
@@ -1085,7 +1050,7 @@ pub fn AAS_TraceClientBBox(
         //clear the trace structure
         let mut trace = core::mem::zeroed::<aas_trace_t>();
         Com_Memset(
-            &mut trace as *mut aas_trace_t as *mut c_void,
+            &mut trace as *mut aas_trace_t as *mut (),
             0,
             core::mem::size_of::<aas_trace_t>(),
         );
@@ -1359,8 +1324,11 @@ pub fn AAS_InitAASLinkHeap(bot: &mut BotLib) {
             }
             #[cfg(not(feature = "bspc"))]
             {
-                max_aaslinks =
-                    LibVarValue(bot, c"max_aaslinks".as_ptr(), c"6144".as_ptr()) as c_int;
+                max_aaslinks = LibVarValue(
+                    bot,
+                    c"max_aaslinks".as_ptr() as *mut c_char,
+                    c"6144".as_ptr() as *mut c_char,
+                ) as c_int;
             }
             if max_aaslinks < 0 {
                 max_aaslinks = 0;
@@ -1368,7 +1336,7 @@ pub fn AAS_InitAASLinkHeap(bot: &mut BotLib) {
             bot.aasworld.linkheapsize = max_aaslinks;
             bot.aasworld.linkheap = GetHunkMemory(
                 bot,
-                max_aaslinks as usize * core::mem::size_of::<aas_link_t>(),
+                (max_aaslinks as usize * core::mem::size_of::<aas_link_t>()) as u64,
             ) as *mut aas_link_t;
         }
         //link the links on the heap

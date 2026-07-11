@@ -28,7 +28,7 @@
 //! site) — the `#ifdef ENABLE_ALTROUTING` bodies below therefore always
 //! execute, matching the shipped build.
 
-use core::ffi::{c_int, c_void};
+use core::ffi::c_int;
 
 use mp_qshared::shared::{qfalse, qtrue, vec3_t};
 
@@ -41,27 +41,11 @@ use mp_qshared::common::mp::botlib::aas_altroutegoal_flags::{
 };
 use mp_qshared::common::mp::botlib::aas_altroutegoal_s::aas_altroutegoal_t;
 
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches (signatures per their own
-// resolved-signature packets; ported in sibling packets outside this
-// shard — see `_PREAMBLE.md`'s stub-free / extern "Rust" forward-decl
-// convention already used by `l_script_fns.rs`/`be_ai_goal_fns.rs`/
-// `be_aas_cluster_fns.rs`).
-// ---------------------------------------------------------------------
-extern "C" {
-    fn Log_Write(bot: &mut BotLib, fmt: *mut core::ffi::c_char, ...);
-    fn GetMemory(bot: &mut BotLib, size: c_int) -> *mut c_void;
-    fn FreeMemory(bot: &mut BotLib, ptr: *mut c_void);
-    fn Com_Memset(dest: *mut (), val: c_int, count: usize);
-    fn AAS_AreaReachability(bot: &mut BotLib, areanum: c_int) -> c_int;
-    fn AAS_AreaTravelTimeToGoalArea(
-        bot: &mut BotLib,
-        areanum: c_int,
-        origin: vec3_t,
-        goalareanum: c_int,
-        travelflags: c_int,
-    ) -> c_int;
-}
+use crate::be_aas_reach_fns::AAS_AreaReachability;
+use crate::be_aas_route_fns::AAS_AreaTravelTimeToGoalArea;
+use crate::l_log_fns::Log_Write;
+use crate::l_memory_fns::{FreeMemory, GetMemory};
+use mp_engine_qcommon::common_fns::Com_Memset;
 
 /// Raven `AAS_AltRoutingFloodCluster_r`.
 ///
@@ -184,11 +168,9 @@ pub fn AAS_AlternativeRouteGoals(
             (*mra).valid = qtrue;
             (*mra).starttime = starttime as u16;
             (*mra).goaltime = goaltime as u16;
-            Log_Write(
-                bot,
-                format!("{} midrange area {}", nummidrangeareas, i).as_ptr()
-                    as *mut core::ffi::c_char,
-            );
+            let __m = std::ffi::CString::new(format!("{} midrange area {}", nummidrangeareas, i))
+                .unwrap_or_default();
+            Log_Write(bot, __m.as_ptr() as *mut core::ffi::c_char);
             nummidrangeareas += 1;
         }
 
@@ -253,19 +235,20 @@ pub fn AAS_InitAlternativeRouting(bot: &mut BotLib) {
     }
     unsafe {
         if !bot.midrangeareas.is_null() {
-            FreeMemory(bot, bot.midrangeareas as *mut c_void);
+            FreeMemory(bot, bot.midrangeareas as *mut ());
         }
         bot.midrangeareas = GetMemory(
             bot,
-            bot.aasworld.numareas
-                * core::mem::size_of::<crate::be_aas_routealt::midrangearea_t>() as c_int,
+            (bot.aasworld.numareas
+                * core::mem::size_of::<crate::be_aas_routealt::midrangearea_t>() as c_int)
+                as u64,
         ) as *mut crate::be_aas_routealt::midrangearea_t;
         if !bot.clusterareas.is_null() {
-            FreeMemory(bot, bot.clusterareas as *mut c_void);
+            FreeMemory(bot, bot.clusterareas as *mut ());
         }
         bot.clusterareas = GetMemory(
             bot,
-            bot.aasworld.numareas * core::mem::size_of::<c_int>() as c_int,
+            (bot.aasworld.numareas * core::mem::size_of::<c_int>() as c_int) as u64,
         ) as *mut c_int;
     }
 }
@@ -279,11 +262,11 @@ pub fn AAS_ShutdownAlternativeRouting(bot: &mut BotLib) {
     }
     unsafe {
         if !bot.midrangeareas.is_null() {
-            FreeMemory(bot, bot.midrangeareas as *mut c_void);
+            FreeMemory(bot, bot.midrangeareas as *mut ());
         }
         bot.midrangeareas = core::ptr::null_mut();
         if !bot.clusterareas.is_null() {
-            FreeMemory(bot, bot.clusterareas as *mut c_void);
+            FreeMemory(bot, bot.clusterareas as *mut ());
         }
         bot.clusterareas = core::ptr::null_mut();
         bot.numclusterareas = 0;

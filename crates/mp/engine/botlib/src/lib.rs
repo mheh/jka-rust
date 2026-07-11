@@ -9,6 +9,7 @@ pub mod be_aas_bsp;
 pub mod be_aas_bspq3;
 pub mod be_aas_bspq3_fns;
 pub mod be_aas_cluster;
+pub mod be_aas_cluster_fns;
 pub mod be_aas_debug;
 pub mod be_aas_debug_fns;
 pub mod be_aas_def;
@@ -27,6 +28,7 @@ pub mod be_aas_routealt_fns;
 pub mod be_aas_sample;
 pub mod be_aas_sample_fns;
 pub mod be_ai_char;
+pub mod be_ai_char_fns;
 pub mod be_ai_chat;
 pub mod be_ai_chat_fns;
 pub mod be_ai_gen;
@@ -37,9 +39,11 @@ pub mod be_ai_move_fns;
 pub mod be_ai_weap;
 pub mod be_ai_weap_fns;
 pub mod be_ai_weight;
+pub mod be_ai_weight_fns;
 pub mod be_ea;
 pub mod be_ea_fns;
 pub mod be_interface;
+pub mod be_interface_fns;
 pub mod l_crc;
 pub mod l_crc_fns;
 pub mod l_libvar;
@@ -284,6 +288,10 @@ pub struct BotLib {
     /// Raven `aas_lreachability_t *nextreachability` — next free reachability from the heap.
     /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:84`
     pub nextreachability: *mut aas_lreachability_t,
+    /// Raven `int nofaceflood = qtrue` — statically initialized to true (the one
+    /// non-zero-initialized `BotLib` global); set in `Default::default`.
+    /// Source: `oracle/codemp/botlib/be_aas_cluster.cpp:38`
+    pub nofaceflood: c_int,
     /// Raven `int numareacacheupdates`.
     /// Source: `oracle/codemp/botlib/be_aas_route.cpp:63`
     pub numareacacheupdates: c_int,
@@ -393,7 +401,10 @@ impl Default for BotLib {
     fn default() -> Self {
         // SAFETY: all fields are zero-valid (raw pointers → null, `Option<fn>`
         // → `None`, ints/floats/arrays → 0); no field type reserves a niche.
-        unsafe { core::mem::zeroed() }
+        let mut bot: Self = unsafe { core::mem::zeroed() };
+        // Raven `int nofaceflood = qtrue` — the one non-zero static initializer.
+        bot.nofaceflood = 1;
+        bot
     }
 }
 

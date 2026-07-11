@@ -93,16 +93,7 @@ use crate::be_aas_sample_fns::{
     AAS_AreaPresenceType, AAS_LinkEntityClientBBox, AAS_PointAreaNum, AAS_PointInsideFace,
     AAS_TraceAreas, AAS_TraceClientBBox, AAS_UnlinkFromAreas,
 };
-// `Sys_MilliSeconds` lives in `be_interface_fns` (the botlib export seam),
-// which is not yet integrated (its C export fn-ptr table cannot bind the
-// `&mut BotLib`-threaded fns without an ABI-bridge ruling, and it pulls the
-// unported `be_ai_weap` subsystem + the escalated `CLOCKS_PER_SEC` libc macro).
-// Forward-declared here per the crate's not-yet-integrated-callee convention
-// (mirrors the `extern "Rust"` decls in `be_ai_char_fns.rs`, `be_ea_fns.rs`, …).
-// Source: `oracle/codemp/botlib/be_interface.cpp` (`Sys_MilliSeconds`)
-extern "Rust" {
-    fn Sys_MilliSeconds() -> c_int;
-}
+use crate::be_interface_fns::Sys_MilliSeconds;
 use crate::l_libvar_fns::{LibVarGetValue, LibVarValue};
 use crate::l_log_fns::Log_Write;
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory};

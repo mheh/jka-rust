@@ -16,19 +16,6 @@
 //! (`aasworld.*`); bodies deref explicitly inside `unsafe` per
 //! porting-rules §D11, matching the sibling `be_aas_cluster_fns.rs`/
 //! `be_aas_sample_fns.rs`/`be_aas_reach_fns.rs` convention.
-//!
-//! PORT-NOTE(BotLib): `BotLib` is the synthesized botlib aggregate (per
-//! `_PREAMBLE.md`'s state-receiver table) — not yet defined anywhere in the
-//! tree, matching every sibling `*_fns.rs` file in this crate that already
-//! references `bot: &mut BotLib` ahead of its landing. Reported in
-//! missing_symbols.
-//!
-//! PORT-NOTE(callee-signatures): `AAS_UnlinkFromBSPLeaves`,
-//! `AAS_BSPLinkEntity`, and `AAS_BSPModelMinsMaxsOrigin` are not yet ported
-//! anywhere in this crate (their packets are outside this shard); forward-
-//! declared below with the faithful shape from their resolved-signature
-//! packets, matching the `l_script_fns.rs`/`be_aas_cluster_fns.rs` forward-
-//! decl convention. Reported in missing_symbols.
 
 use core::ffi::c_char;
 use core::ffi::c_int;
@@ -49,41 +36,14 @@ use crate::be_aas_def::aas_link_s::aas_link_t;
 use crate::be_aas_def::bsp_entdata_s::bsp_entdata_t;
 use crate::BotLib;
 
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches (signatures per their own
-// resolved-signature packets; ported in sibling packets outside this
-// shard — see `_PREAMBLE.md`'s stub-free / extern "Rust" forward-decl
-// convention already used by `l_script_fns.rs`/`be_aas_cluster_fns.rs`).
-// ---------------------------------------------------------------------
-extern "Rust" {
-    fn Com_Memcpy(dest: *mut (), src: *const (), count: usize);
-    fn Com_Memset(dest: *mut (), val: c_int, count: usize);
-    fn AAS_Time(bot: &mut BotLib) -> f32;
-    fn AAS_UnlinkFromAreas(bot: &mut BotLib, areas: *mut aas_link_t);
-    fn AAS_UnlinkFromBSPLeaves(leaves: *mut ());
-    fn AAS_LinkEntityClientBBox(
-        bot: &mut BotLib,
-        absmins: vec3_t,
-        absmaxs: vec3_t,
-        entnum: c_int,
-        presencetype: c_int,
-    ) -> *mut aas_link_t;
-    fn AAS_BSPLinkEntity(
-        absmins: vec3_t,
-        absmaxs: vec3_t,
-        entnum: c_int,
-        modelnum: c_int,
-    ) -> *mut ();
-    fn AAS_BSPModelMinsMaxsOrigin(
-        bot: &mut BotLib,
-        modelnum: c_int,
-        angles: vec3_t,
-        mins: vec3_t,
-        maxs: vec3_t,
-        origin: *mut f32,
-    );
-    fn AAS_BestReachableLinkArea(bot: &mut BotLib, areas: *mut aas_link_t) -> c_int;
-}
+use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
+
+use crate::be_aas_bspq3_fns::{
+    AAS_BSPLinkEntity, AAS_BSPModelMinsMaxsOrigin, AAS_UnlinkFromBSPLeaves,
+};
+use crate::be_aas_main::AAS_Time;
+use crate::be_aas_reach_fns::AAS_BestReachableLinkArea;
+use crate::be_aas_sample_fns::{AAS_LinkEntityClientBBox, AAS_UnlinkFromAreas};
 
 /// Raven `AAS_EntityOrigin`.
 ///
@@ -365,7 +325,7 @@ pub fn AAS_UnlinkInvalidEntities(bot: &mut BotLib) {
                 AAS_UnlinkFromAreas(bot, ent.areas);
                 let ent = &mut *bot.aasworld.entities.add(i as usize);
                 ent.areas = core::ptr::null_mut();
-                AAS_UnlinkFromBSPLeaves(ent.leaves as *mut ());
+                AAS_UnlinkFromBSPLeaves(ent.leaves);
                 let ent = &mut *bot.aasworld.entities.add(i as usize);
                 ent.leaves = core::ptr::null_mut();
             } //end for
@@ -392,7 +352,7 @@ pub fn AAS_UpdateEntity(bot: &mut BotLib, entnum: c_int, state: *mut bot_entitys
             AAS_UnlinkFromAreas(bot, ent.areas);
             //unlink the entity from the BSP leaves
             let ent = &mut *bot.aasworld.entities.add(entnum as usize);
-            AAS_UnlinkFromBSPLeaves(ent.leaves as *mut ());
+            AAS_UnlinkFromBSPLeaves(ent.leaves);
             //
             let ent = &mut *bot.aasworld.entities.add(entnum as usize);
             ent.areas = core::ptr::null_mut();
@@ -447,7 +407,7 @@ pub fn AAS_UpdateEntity(bot: &mut BotLib, entnum: c_int, state: *mut bot_entitys
                 ent.i.angles,
                 ent.i.mins,
                 ent.i.maxs,
-                core::ptr::null_mut(),
+                [0.0; 3],
             );
         //end if
         } else if ent.i.solid == solid_t::SOLID_BBOX as c_int {
@@ -492,7 +452,7 @@ pub fn AAS_UpdateEntity(bot: &mut BotLib, entnum: c_int, state: *mut bot_entitys
                 );
                 //unlink the entity from the BSP leaves
                 let ent = &mut *bot.aasworld.entities.add(entnum as usize);
-                AAS_UnlinkFromBSPLeaves(ent.leaves as *mut ());
+                AAS_UnlinkFromBSPLeaves(ent.leaves);
                 //link the entity to the world BSP tree
                 let ent = &mut *bot.aasworld.entities.add(entnum as usize);
                 ent.leaves = AAS_BSPLinkEntity(absmins, absmaxs, entnum, 0) as *mut _;

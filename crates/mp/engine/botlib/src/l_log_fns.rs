@@ -26,13 +26,7 @@ use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE};
 use crate::l_log::consts::MAX_LOGFILENAMESIZE;
 use crate::BotLib;
 
-// PORT-NOTE(fwd-decl): already-ported per its packet but not yet wired/
-// reachable from this crate slice; forward-declared exactly as its resolved
-// signature, matching the established `be_aas_main.rs` precedent for
-// not-yet-wired in-crate callees.
-extern "C" {
-    fn LibVarValue(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> f32;
-}
+use crate::l_libvar_fns::LibVarValue;
 
 /// Raven `Log_Close`.
 ///

@@ -8,12 +8,6 @@
 //! `be_ai_weight.rs` — the oracle stem collides with the existing
 //! `be_ai_weight/` type directory; DESTINATION line from the packet already
 //! reflects the `_fns` escape.
-//!
-//! PORT-NOTE(callee-signatures): `FreeMemory`/`GetClearedMemory`/
-//! `LibVarGetValue`/`Q_strncpyz` land in sibling packets/crates not included
-//! in this shard; they are called bare (unimported), matching the existing
-//! convention in `l_precomp_fns.rs`/`be_ai_chat_fns.rs` for not-yet-landed
-//! callees — resolved at integration.
 
 use core::ffi::{c_char, c_int};
 
@@ -30,15 +24,9 @@ use crate::l_script::consts::{TT_INTEGER, TT_NUMBER, TT_STRING};
 use crate::l_script::token_s::token_t;
 use crate::BotLib;
 
-// `Q_strncpyz` lands in `mp_qshared`'s q_shared TU, not wired into this crate;
-// forward-declared here per the engine-crate convention (mirrors the same
-// `extern "Rust"` decl in `server/sv_client.rs`, `qcommon/cm_load.rs`, …).
-// Source: `oracle/codemp/qcommon/q_shared.c` (`Q_strncpyz`)
-extern "Rust" {
-    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
-}
-use crate::l_libvar_fns::{LibVarGetValue};
+use crate::l_libvar_fns::LibVarGetValue;
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory};
+use mp_qshared::shared::q_string::Q_strncpyz;
 
 /// Raven `FindFuzzyWeight` — index of the named weight in `wc`, or `-1`.
 ///
@@ -467,7 +455,7 @@ pub fn FuzzyWeightUndecided(
 /// Source: `oracle/codemp/botlib/be_ai_weight.cpp:125-129`
 pub fn FreeWeightConfig(bot: &mut BotLib, config: *mut weightconfig_t) {
     unsafe {
-        if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr()) == 0.0 {
+        if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
             return;
         }
         FreeWeightConfig2(bot, config);
@@ -509,12 +497,12 @@ pub fn ReadValue(bot: &mut BotLib, source: *mut source_t, value: *mut f32) -> c_
             }
         }
         if token.r#type != TT_NUMBER {
-            crate::l_precomp_fns::SourceError(
-                bot,
-                source,
-                c"invalid return value %s\n".as_ptr() as *mut c_char,
-                token.string.as_ptr(),
-            );
+            let __m = std::ffi::CString::new(format!(
+                "invalid return value {}\n",
+                core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
+            ))
+            .unwrap_or_default();
+            crate::l_precomp_fns::SourceError(bot, source, __m.as_ptr());
             return qfalse;
         }
         *value = token.floatvalue as f32;
@@ -627,7 +615,7 @@ pub fn ReadFuzzySeperators_r(bot: &mut BotLib, source: *mut source_t) -> *mut fu
         loop {
             def = (libc::strcmp(token.string.as_ptr(), c"default".as_ptr()) == 0) as c_int;
             if def != 0 || libc::strcmp(token.string.as_ptr(), c"case".as_ptr()) == 0 {
-                fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>())
+                fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>() as u64)
                     as *mut fuzzyseperator_t;
                 (*fs).index = index;
                 if !lastfs.is_null() {
@@ -688,12 +676,12 @@ pub fn ReadFuzzySeperators_r(bot: &mut BotLib, source: *mut source_t) -> *mut fu
                         return core::ptr::null_mut();
                     }
                 } else {
-                    crate::l_precomp_fns::SourceError(
-                        bot,
-                        source,
-                        c"invalid name %s\n".as_ptr() as *mut c_char,
-                        token.string.as_ptr(),
-                    );
+                    let __m = std::ffi::CString::new(format!(
+                        "invalid name {}\n",
+                        core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
+                    ))
+                    .unwrap_or_default();
+                    crate::l_precomp_fns::SourceError(bot, source, __m.as_ptr());
                     return core::ptr::null_mut();
                 }
                 if newindent != 0 {
@@ -709,12 +697,12 @@ pub fn ReadFuzzySeperators_r(bot: &mut BotLib, source: *mut source_t) -> *mut fu
                 }
             } else {
                 FreeFuzzySeperators_r(bot, firstfs);
-                crate::l_precomp_fns::SourceError(
-                    bot,
-                    source,
-                    c"invalid name %s\n".as_ptr() as *mut c_char,
-                    token.string.as_ptr(),
-                );
+                let __m = std::ffi::CString::new(format!(
+                    "invalid name {}\n",
+                    core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
+                ))
+                .unwrap_or_default();
+                crate::l_precomp_fns::SourceError(bot, source, __m.as_ptr());
                 return core::ptr::null_mut();
             }
             if crate::l_precomp_fns::PC_ExpectAnyToken(bot, source, &mut token) == 0 {
@@ -732,7 +720,7 @@ pub fn ReadFuzzySeperators_r(bot: &mut BotLib, source: *mut source_t) -> *mut fu
                 source,
                 c"switch without default\n".as_ptr() as *mut c_char,
             );
-            fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>())
+            fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>() as u64)
                 as *mut fuzzyseperator_t;
             (*fs).index = index;
             (*fs).value = MAX_INVENTORYVALUE;
@@ -769,7 +757,7 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
         let mut fs: *mut fuzzyseperator_t;
         let mut config: *mut weightconfig_t = core::ptr::null_mut();
 
-        if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr()) == 0.0 {
+        if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
             avail = -1;
             n = 0;
             while n < MAX_WEIGHT_FILES as c_int {
@@ -813,7 +801,8 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
         }
         //
         config =
-            GetClearedMemory(bot, core::mem::size_of::<weightconfig_t>()) as *mut weightconfig_t;
+            GetClearedMemory(bot, core::mem::size_of::<weightconfig_t>() as u64)
+                as *mut weightconfig_t;
         (*config).numweights = 0;
         Q_strncpyz(
             (*config).filename.as_mut_ptr(),
@@ -840,7 +829,8 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
                 }
                 crate::l_script_fns::StripDoubleQuotes(token.string.as_mut_ptr());
                 (*config).weights[(*config).numweights as usize].name =
-                    GetClearedMemory(bot, libc::strlen(token.string.as_ptr()) + 1) as *mut c_char;
+                    GetClearedMemory(bot, libc::strlen(token.string.as_ptr()) as u64 + 1)
+                        as *mut c_char;
                 libc::strcpy(
                     (*config).weights[(*config).numweights as usize].name,
                     token.string.as_ptr(),
@@ -868,7 +858,7 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
                     }
                     (*config).weights[(*config).numweights as usize].firstseperator = fs;
                 } else if libc::strcmp(token.string.as_ptr(), c"return".as_ptr()) == 0 {
-                    fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>())
+                    fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>() as u64)
                         as *mut fuzzyseperator_t;
                     (*fs).index = 0;
                     (*fs).value = MAX_INVENTORYVALUE;
@@ -882,12 +872,12 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
                     }
                     (*config).weights[(*config).numweights as usize].firstseperator = fs;
                 } else {
-                    crate::l_precomp_fns::SourceError(
-                        bot,
-                        source,
-                        c"invalid name %s\n".as_ptr() as *mut c_char,
-                        token.string.as_ptr(),
-                    );
+                    let __m = std::ffi::CString::new(format!(
+                        "invalid name {}\n",
+                        core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
+                    ))
+                    .unwrap_or_default();
+                    crate::l_precomp_fns::SourceError(bot, source, __m.as_ptr());
                     FreeWeightConfig(bot, config);
                     crate::l_precomp_fns::FreeSource(bot, source);
                     return core::ptr::null_mut();
@@ -906,12 +896,12 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
                 }
                 (*config).numweights += 1;
             } else {
-                crate::l_precomp_fns::SourceError(
-                    bot,
-                    source,
-                    c"invalid name %s\n".as_ptr() as *mut c_char,
-                    token.string.as_ptr(),
-                );
+                let __m = std::ffi::CString::new(format!(
+                    "invalid name {}\n",
+                    core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
+                ))
+                .unwrap_or_default();
+                crate::l_precomp_fns::SourceError(bot, source, __m.as_ptr());
                 FreeWeightConfig(bot, config);
                 crate::l_precomp_fns::FreeSource(bot, source);
                 return core::ptr::null_mut();
@@ -927,7 +917,7 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
         );
         // #ifdef DEBUG (dropped — not defined by the oracle build, §C10)
         //
-        if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr()) == 0.0 {
+        if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
             bot.weightFileList[avail as usize] = config;
         }
         //

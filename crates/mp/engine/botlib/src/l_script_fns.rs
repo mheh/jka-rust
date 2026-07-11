@@ -11,14 +11,6 @@
 //!
 //! Source: `oracle/codemp/botlib/l_script.cpp`
 //!
-//! PORT-NOTE(callee-signatures): the in-engine callees this file reaches
-//! that are ported in sibling files/packets not linked into this crate yet
-//! (`GetMemory`/`FreeMemory`/`GetClearedMemory` — `l_memory.cpp`;
-//! `Com_Memcpy`/`Com_Memset` — `qcommon/common.cpp`) are forward-declared
-//! below with the faithful shape inferred from the Raven call sites, matching
-//! the convention already used in `be_ai_goal_fns.rs`/`be_aas_sample_fns.rs`.
-//! Flagged in shape_mismatches if integration finds a difference.
-//!
 //! PORT-NOTE(BotLib): `BotLib` is the synthesized botlib aggregate (per
 //! `_PREAMBLE.md`'s state-receiver table) — not yet defined anywhere in the
 //! tree, matching every sibling `*_fns.rs` file in this crate that already
@@ -47,18 +39,9 @@ use crate::BotLib;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_WARNING};
 use mp_qshared::shared::{fileHandle_t, qfalse, qtrue, FS_READ, MAX_QPATH};
 
-// ---------------------------------------------------------------------
-// Externally-ported callees this file reaches (signatures inferred from
-// the Raven call sites; ported in sibling packets outside this shard).
-// PORT-NOTE(callee-signatures): see module doc comment.
-// ---------------------------------------------------------------------
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory, GetMemory};
 use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
-
-extern "Rust" {
-    fn Com_sprintf(dest: *mut c_char, size: c_int, s: &str);
-    fn COM_Compress(data_p: *mut c_char) -> c_int;
-}
+use mp_qshared::shared::q_string::{COM_Compress, Q_strncpyz};
 
 // Raven's `long double` has no Rust equivalent; `f64` matches every existing
 // use here (parsed/stored as a plain float, never relying on 80-bit extended
@@ -445,7 +428,8 @@ pub fn NumLinesCrossed(script: *mut script_t) -> c_int {
 pub fn PS_SetBaseFolder(bot: &mut BotLib, path: *mut c_char) {
     unsafe {
         let path_str = core::ffi::CStr::from_ptr(path).to_string_lossy();
-        Com_sprintf(bot.basefolder.as_mut_ptr(), MAX_QPATH as c_int, &path_str);
+        let __s = std::ffi::CString::new(path_str.to_string()).unwrap_or_default();
+        Q_strncpyz(bot.basefolder.as_mut_ptr(), __s.as_ptr(), MAX_QPATH as c_int);
     }
 }
 
@@ -1178,13 +1162,12 @@ pub fn LoadScriptFile(bot: &mut BotLib, filename: *const c_char) -> *mut script_
         if libc::strlen(bot.basefolder.as_ptr()) != 0 {
             let basefolder_str =
                 core::ffi::CStr::from_ptr(bot.basefolder.as_ptr()).to_string_lossy();
-            Com_sprintf(
-                pathname.as_mut_ptr(),
-                MAX_QPATH as c_int,
-                &format!("{}/{}", basefolder_str, filename_str),
-            );
+            let __s =
+                std::ffi::CString::new(format!("{}/{}", basefolder_str, filename_str)).unwrap_or_default();
+            Q_strncpyz(pathname.as_mut_ptr(), __s.as_ptr(), MAX_QPATH as c_int);
         } else {
-            Com_sprintf(pathname.as_mut_ptr(), MAX_QPATH as c_int, &filename_str);
+            let __s = std::ffi::CString::new(filename_str.to_string()).unwrap_or_default();
+            Q_strncpyz(pathname.as_mut_ptr(), __s.as_ptr(), MAX_QPATH as c_int);
         }
         length = (bot.botimport.FS_FOpenFile.unwrap())(pathname.as_ptr(), &mut fp, FS_READ);
         if fp == 0 {
