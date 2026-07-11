@@ -17,25 +17,42 @@ use core::ffi::{c_char, c_int};
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cmd::cmd_function_t::CmdFunction;
 use mp_engine_qcommon::cmd::Cmd_AddCommand;
+use mp_engine_qcommon::cmd_common::{Cmd_Argc, Cmd_Args, Cmd_Argv};
 use mp_engine_qcommon::cmd_pc::Server as CmdServerSlot;
 use mp_engine_qcommon::common::opaque_slots::Ghoul2System as CmdGhoul2Slot;
 use mp_engine_qcommon::collision_world::CollisionWorld;
-use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::common::common::{com_printf, Common};
+use mp_engine_qcommon::common_fns::Info_Print;
+use mp_engine_qcommon::cvar_fns::{
+    Cvar_Get, Cvar_InfoString, Cvar_Set, Cvar_SetLatched, Cvar_SetValue, Cvar_VariableString,
+    Cvar_VariableValue,
+};
+use mp_engine_qcommon::files_common::FS_ReadFile;
+use mp_engine_qcommon::net_chan::NET_AdrToString;
+use mp_engine_qcommon::stringed::SE_GetString;
 use mp_engine_qcommon::vm::VM_Call;
+use mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr;
 use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::cm_load::RmManager;
 use mp_host_interface::engine_host::EngineHost;
+use mp_qshared::common::mp::playerstate::PERS_SCORE;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
+use mp_qshared::shared::cvar::{CVAR_LATCH, CVAR_SERVERINFO, CVAR_SYSTEMINFO};
+use mp_qshared::shared::force_powers::NUM_FORCE_POWERS;
+use mp_qshared::shared::force_reload::ForceReload_e;
 use mp_qshared::shared::q_string::Q_CleanStr;
-use mp_qshared::shared::qboolean;
+use mp_qshared::shared::q_string::{Q_stricmp, Q_stricmpn, Q_strncpyz};
+use mp_qshared::shared::{qfalse, qtrue, MAX_QPATH, SNAPFLAG_SERVERCOUNT};
 
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
 use crate::server_host::{ghoul2_from_slot, server_from_slot};
-use crate::sv_init::SV_Shutdown;
+use crate::sv_client::SV_ClientEnterWorld;
+use crate::sv_game::{SV_GameClientNum, SV_RestartGameProgs};
+use crate::sv_init::{SV_SetConfigstring, SV_Shutdown, SV_SpawnServer};
 use crate::sv_world::SV_SectorList_f;
-use crate::Server;
+use crate::{Server, SV_AddServerCommand, SV_DropClient, SV_SendServerCommand};
 
 /// Raven `SV_GetStringEdString`.
 ///
@@ -97,20 +114,20 @@ pub fn SV_GetPlayerByFedName(
         if unsafe { (*cl).state as i32 } == 0 {
             continue;
         }
-        if unsafe { mp_qshared::shared::q_string::Q_stricmp((*cl).name.as_ptr(), name) } == 0 {
+        if unsafe { Q_stricmp((*cl).name.as_ptr(), name) } == 0 {
             return cl;
         }
 
         let mut cleanName = [0 as c_char; 64];
         unsafe {
-            mp_qshared::shared::q_string::Q_strncpyz(
+            Q_strncpyz(
                 cleanName.as_mut_ptr(),
                 (*cl).name.as_ptr(),
                 cleanName.len() as c_int,
             );
             Q_CleanStr(cleanName.as_mut_ptr());
         }
-        if unsafe { mp_qshared::shared::q_string::Q_stricmp(cleanName.as_ptr(), name) } == 0 {
+        if unsafe { Q_stricmp(cleanName.as_ptr(), name) } == 0 {
             return cl;
         }
     }
@@ -144,12 +161,12 @@ pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t
         return core::ptr::null_mut();
     }
 
-    if mp_engine_qcommon::cmd_common::Cmd_Argc(common) < 2 {
-        mp_engine_qcommon::common::common::com_printf(common, "No player specified.\n");
+    if Cmd_Argc(common) < 2 {
+        com_printf(common, "No player specified.\n");
         return core::ptr::null_mut();
     }
 
-    let s = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1);
+    let s = Cmd_Argv(common, 1);
 
     // check for a name match
     let n = sv.svs.clients;
@@ -158,26 +175,26 @@ pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t
         if unsafe { (*cl).state as i32 } == 0 {
             continue;
         }
-        if unsafe { mp_qshared::shared::q_string::Q_stricmp((*cl).name.as_ptr(), s) } == 0 {
+        if unsafe { Q_stricmp((*cl).name.as_ptr(), s) } == 0 {
             return cl;
         }
 
         let mut cleanName = [0 as c_char; 64];
         unsafe {
-            mp_qshared::shared::q_string::Q_strncpyz(
+            Q_strncpyz(
                 cleanName.as_mut_ptr(),
                 (*cl).name.as_ptr(),
                 cleanName.len() as c_int,
             );
             Q_CleanStr(cleanName.as_mut_ptr());
         }
-        if unsafe { mp_qshared::shared::q_string::Q_stricmp(cleanName.as_ptr(), s) } == 0 {
+        if unsafe { Q_stricmp(cleanName.as_ptr(), s) } == 0 {
             return cl;
         }
     }
 
     unsafe {
-        mp_engine_qcommon::common::common::com_printf(
+        com_printf(
             common,
             &format!(
                 "Player {} is not on the server\n",
@@ -198,19 +215,19 @@ pub fn SV_GetPlayerByNum(common: &mut Common, sv: &mut Server) -> *mut client_t 
         return core::ptr::null_mut();
     }
 
-    if mp_engine_qcommon::cmd_common::Cmd_Argc(common) < 2 {
-        mp_engine_qcommon::common::common::com_printf(common, "No player specified.\n");
+    if Cmd_Argc(common) < 2 {
+        com_printf(common, "No player specified.\n");
         return core::ptr::null_mut();
     }
 
-    let s = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1);
+    let s = Cmd_Argv(common, 1);
     let s_str = unsafe { core::ffi::CStr::from_ptr(s) }
         .to_string_lossy()
         .into_owned();
 
     for c in s_str.bytes() {
         if !c.is_ascii_digit() {
-            mp_engine_qcommon::common::common::com_printf(
+            com_printf(
                 common,
                 &format!("Bad slot number: {}\n", s_str),
             );
@@ -219,7 +236,7 @@ pub fn SV_GetPlayerByNum(common: &mut Common, sv: &mut Server) -> *mut client_t 
     }
     let idnum = unsafe { libc::atoi(s) };
     if idnum < 0 || idnum >= unsafe { (*common.sv_maxclients).integer } {
-        mp_engine_qcommon::common::common::com_printf(
+        com_printf(
             common,
             &format!("Bad client slot: {}\n", idnum),
         );
@@ -228,7 +245,7 @@ pub fn SV_GetPlayerByNum(common: &mut Common, sv: &mut Server) -> *mut client_t 
 
     let cl = unsafe { sv.svs.clients.offset(idnum as isize) };
     if unsafe { (*cl).state as i32 } == 0 {
-        mp_engine_qcommon::common::common::com_printf(
+        com_printf(
             common,
             &format!("Client {} is not active\n", idnum),
         );
@@ -248,7 +265,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
 
     let cl = SV_GetPlayerByFedName(common, sv, name);
     if cl.is_null() {
-        if unsafe { mp_qshared::shared::q_string::Q_stricmp(name, c"all".as_ptr()) } == 0 {
+        if unsafe { Q_stricmp(name, c"all".as_ptr()) } == 0 {
             let n = sv.svs.clients;
             for i in 0..unsafe { (*common.sv_maxclients).integer } {
                 let cl = unsafe { n.offset(i as isize) };
@@ -263,12 +280,12 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
                     c"MP_SVGAME".as_ptr() as *mut c_char,
                     c"WAS_KICKED".as_ptr() as *mut c_char,
                 );
-                crate::SV_DropClient(common, sv, cl, reason); // "was kicked"
+                SV_DropClient(common, sv, cl, reason); // "was kicked"
                 unsafe {
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
             }
-        } else if unsafe { mp_qshared::shared::q_string::Q_stricmp(name, c"allbots".as_ptr()) } == 0
+        } else if unsafe { Q_stricmp(name, c"allbots".as_ptr()) } == 0
         {
             let n = sv.svs.clients;
             for i in 0..unsafe { (*common.sv_maxclients).integer } {
@@ -284,7 +301,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
                     c"MP_SVGAME".as_ptr() as *mut c_char,
                     c"WAS_KICKED".as_ptr() as *mut c_char,
                 );
-                crate::SV_DropClient(common, sv, cl, reason); // "was kicked"
+                SV_DropClient(common, sv, cl, reason); // "was kicked"
                 unsafe {
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
@@ -299,7 +316,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
             c"MP_SVGAME".as_ptr() as *mut c_char,
             c"CANNOT_KICK_HOST".as_ptr() as *mut c_char,
         );
-        crate::SV_SendServerCommand(
+        SV_SendServerCommand(
             common,
             sv,
             core::ptr::null_mut(),
@@ -316,7 +333,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
         c"MP_SVGAME".as_ptr() as *mut c_char,
         c"WAS_KICKED".as_ptr() as *mut c_char,
     );
-    crate::SV_DropClient(common, sv, cl, reason); // "was kicked"
+    SV_DropClient(common, sv, cl, reason); // "was kicked"
     unsafe {
         (*cl).lastPacketTime = sv.svs.time;
     } // in case there is a funny zombie
@@ -326,45 +343,39 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:669-750`
 pub fn SV_Status_f(common: &mut Common, sv: &mut Server, host: &mut dyn EngineHost) {
-    let mut avoidTruncation = qboolean::qfalse;
+    let mut avoidTruncation = qfalse;
 
     // make sure server is running
     if unsafe { (*common.com_sv_running).integer } == 0 {
-        mp_engine_qcommon::common::common::com_printf(common, unsafe {
-            &core::ffi::CStr::from_ptr(SE_GetString(
-                common,
-                host,
-                c"STR_SERVER_SERVER_NOT_RUNNING".as_ptr(),
-            ))
-            .to_string_lossy()
-        });
+        let msg = SE_GetString(common, host, "STR_SERVER_SERVER_NOT_RUNNING");
+        com_printf(common, &msg);
         return;
     }
 
-    if mp_engine_qcommon::cmd_common::Cmd_Argc(common) > 1 {
+    if Cmd_Argc(common) > 1 {
         if unsafe {
-            mp_qshared::shared::q_string::Q_stricmp(
+            Q_stricmp(
                 c"notrunc".as_ptr(),
-                mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
+                Cmd_Argv(common, 1),
             )
         } == 0
         {
-            avoidTruncation = qboolean::qtrue;
+            avoidTruncation = qtrue;
         }
     }
 
-    mp_engine_qcommon::common::common::com_printf(
+    com_printf(
         common,
         &format!("map: {}\n", unsafe {
             core::ffi::CStr::from_ptr((*common.sv_mapname).string).to_string_lossy()
         }),
     );
 
-    mp_engine_qcommon::common::common::com_printf(
+    com_printf(
         common,
         "num score ping name            lastmsg address               qport rate\n",
     );
-    mp_engine_qcommon::common::common::com_printf(
+    com_printf(
         common,
         "--- ----- ---- --------------- ------- --------------------- ----- -----\n",
     );
@@ -387,9 +398,9 @@ pub fn SV_Status_f(common: &mut Common, sv: &mut Server, host: &mut dyn EngineHo
             format!("{:4}", ping)
         };
 
-        let ps = crate::sv_game::SV_GameClientNum(sv, i);
+        let ps = SV_GameClientNum(sv, i);
         let s = unsafe {
-            core::ffi::CStr::from_ptr(mp_engine_qcommon::net_chan::NET_AdrToString(
+            core::ffi::CStr::from_ptr(NET_AdrToString(
                 common,
                 (*cl).netchan.remoteAddress,
             ))
@@ -398,14 +409,14 @@ pub fn SV_Status_f(common: &mut Common, sv: &mut Server, host: &mut dyn EngineHo
         };
 
         let name = unsafe { core::ffi::CStr::from_ptr((*cl).name.as_ptr()) }.to_string_lossy();
-        if avoidTruncation == qboolean::qfalse {
-            mp_engine_qcommon::common::common::com_printf(
+        if avoidTruncation == qfalse {
+            com_printf(
                 common,
                 &format!(
                     "{:3} {:5} {} {:<15.15} {:7} {:>21} {:5} {:5}\n",
                     i,
                     unsafe {
-                        (*ps).persistant[mp_qshared::common::mp::playerstate::PERS_SCORE as usize]
+                        (*ps).persistant[PERS_SCORE as usize]
                     },
                     state,
                     name,
@@ -416,13 +427,13 @@ pub fn SV_Status_f(common: &mut Common, sv: &mut Server, host: &mut dyn EngineHo
                 ),
             );
         } else {
-            mp_engine_qcommon::common::common::com_printf(
+            com_printf(
                 common,
                 &format!(
                     "{:3} {:5} {} {} {:7} {:>21} {:5} {:5}\n",
                     i,
                     unsafe {
-                        (*ps).persistant[mp_qshared::common::mp::playerstate::PERS_SCORE as usize]
+                        (*ps).persistant[PERS_SCORE as usize]
                     },
                     state,
                     name,
@@ -434,7 +445,7 @@ pub fn SV_Status_f(common: &mut Common, sv: &mut Server, host: &mut dyn EngineHo
             );
         }
     }
-    mp_engine_qcommon::common::common::com_printf(common, "\n");
+    com_printf(common, "\n");
 }
 
 /// Raven `SV_ConSay_f`.
@@ -442,23 +453,23 @@ pub fn SV_Status_f(common: &mut Common, sv: &mut Server, host: &mut dyn EngineHo
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:757-787`
 pub fn SV_ConSay_f(common: &mut Common, sv: &mut Server) {
     if unsafe { (*common.com_dedicated).integer } == 0 {
-        mp_engine_qcommon::common::common::com_printf(common, "Server is not dedicated.\n");
+        com_printf(common, "Server is not dedicated.\n");
         return;
     }
 
     // make sure server is running
     if unsafe { (*common.com_sv_running).integer } == 0 {
-        mp_engine_qcommon::common::common::com_printf(common, "Server is not running.\n");
+        com_printf(common, "Server is not running.\n");
         return;
     }
 
-    if mp_engine_qcommon::cmd_common::Cmd_Argc(common) < 2 {
+    if Cmd_Argc(common) < 2 {
         return;
     }
 
     let mut text = "Server: ".to_string();
     let mut p = unsafe {
-        core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Args(common))
+        core::ffi::CStr::from_ptr(Cmd_Args(common))
     }
         .to_string_lossy()
         .into_owned();
@@ -472,7 +483,7 @@ pub fn SV_ConSay_f(common: &mut Common, sv: &mut Server) {
 
     text.push_str(&p);
 
-    crate::SV_SendServerCommand(
+    SV_SendServerCommand(
         common,
         sv,
         core::ptr::null_mut(),
@@ -491,7 +502,7 @@ pub fn SV_ForceToggle_f(
     host: &mut dyn EngineHost,
 ) {
     let _ = sv;
-    let mut fpDisabled = mp_engine_qcommon::cvar_fns::Cvar_VariableValue(
+    let mut fpDisabled = Cvar_VariableValue(
         common,
         cm,
         rm,
@@ -501,17 +512,17 @@ pub fn SV_ForceToggle_f(
     let mut targetPower: c_int = 0;
     let mut powerDisabled = "Enabled";
 
-    if mp_engine_qcommon::cmd_common::Cmd_Argc(common) < 2 {
+    if Cmd_Argc(common) < 2 {
         // no argument supplied, spit out a list of force powers and their numbers
         let mut i: c_int = 0;
-        while i < mp_qshared::shared::force_powers::NUM_FORCE_POWERS {
+        while i < NUM_FORCE_POWERS {
             powerDisabled = if fpDisabled & (1 << i) != 0 {
                 "Disabled"
             } else {
                 "Enabled"
             };
 
-            mp_engine_qcommon::common::common::com_printf(
+            com_printf(
                 common,
                 &format!(
                     "{} - {} - Status: {}\n",
@@ -521,7 +532,7 @@ pub fn SV_ForceToggle_f(
             i += 1;
         }
 
-        mp_engine_qcommon::common::common::com_printf(
+        com_printf(
             common,
             "Example usage: forcetoggle 3\n(toggles PUSH)\n",
         );
@@ -529,10 +540,10 @@ pub fn SV_ForceToggle_f(
     }
 
     targetPower =
-        unsafe { libc::atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1)) };
+        unsafe { libc::atoi(Cmd_Argv(common, 1)) };
 
-    if targetPower < 0 || targetPower >= mp_qshared::shared::force_powers::NUM_FORCE_POWERS {
-        mp_engine_qcommon::common::common::com_printf(
+    if targetPower < 0 || targetPower >= NUM_FORCE_POWERS {
+        com_printf(
             common,
             "Specified a power that does not exist.\nExample usage: forcetoggle 3\n(toggles PUSH)\n",
         );
@@ -547,7 +558,7 @@ pub fn SV_ForceToggle_f(
         fpDisabled |= 1 << targetPower;
     }
 
-    mp_engine_qcommon::cvar_fns::Cvar_Set(
+    Cvar_Set(
         common,
         cm,
         rm,
@@ -556,7 +567,7 @@ pub fn SV_ForceToggle_f(
         format!("{}\0", fpDisabled).as_ptr() as *mut c_char,
     );
 
-    mp_engine_qcommon::common::common::com_printf(
+    com_printf(
         common,
         &format!(
             "{} has been {}.\n",
@@ -573,7 +584,7 @@ pub fn SV_ForceToggle_f(
 // transcribed against `NUM_FORCE_POWERS`'s FP_* order as best-effort. Escalate
 // if this drifts from the oracle's full array at review.
 const FORCE_TOGGLE_NAME_PRINTS: [&str;
-    mp_qshared::shared::force_powers::NUM_FORCE_POWERS as usize] = [
+    NUM_FORCE_POWERS as usize] = [
     "HEAL",
     "JUMP",
     "SPEED",
@@ -614,12 +625,12 @@ pub fn SV_KillServer_f(
 pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
     // make sure server is running
     if unsafe { (*common.com_sv_running).integer } == 0 {
-        mp_engine_qcommon::common::common::com_printf(common, "Server is not running.\n");
+        com_printf(common, "Server is not running.\n");
         return;
     }
 
-    if mp_engine_qcommon::cmd_common::Cmd_Argc(common) != 2 {
-        mp_engine_qcommon::common::common::com_printf(
+    if Cmd_Argc(common) != 2 {
+        com_printf(
             common,
             "Usage: kick <player name>\nkick all = kick everyone\nkick allbots = kick all bots\n",
         );
@@ -627,8 +638,8 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
     }
 
     if unsafe {
-        mp_qshared::shared::q_string::Q_stricmp(
-            mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
+        Q_stricmp(
+            Cmd_Argv(common, 1),
             c"Padawan".as_ptr(),
         )
     } == 0
@@ -640,8 +651,8 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
     let cl = SV_GetPlayerByName(common, sv);
     if cl.is_null() {
         if unsafe {
-            mp_qshared::shared::q_string::Q_stricmp(
-                mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
+            Q_stricmp(
+                Cmd_Argv(common, 1),
                 c"all".as_ptr(),
             )
         } == 0
@@ -660,14 +671,14 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
                     c"MP_SVGAME".as_ptr() as *mut c_char,
                     c"WAS_KICKED".as_ptr() as *mut c_char,
                 );
-                crate::SV_DropClient(common, sv, cl, reason); // "was kicked"
+                SV_DropClient(common, sv, cl, reason); // "was kicked"
                 unsafe {
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
             }
         } else if unsafe {
-            mp_qshared::shared::q_string::Q_stricmp(
-                mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
+            Q_stricmp(
+                Cmd_Argv(common, 1),
                 c"allbots".as_ptr(),
             )
         } == 0
@@ -686,7 +697,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
                     c"MP_SVGAME".as_ptr() as *mut c_char,
                     c"WAS_KICKED".as_ptr() as *mut c_char,
                 );
-                crate::SV_DropClient(common, sv, cl, reason); // "was kicked"
+                SV_DropClient(common, sv, cl, reason); // "was kicked"
                 unsafe {
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
@@ -701,7 +712,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
             c"MP_SVGAME".as_ptr() as *mut c_char,
             c"CANNOT_KICK_HOST".as_ptr() as *mut c_char,
         );
-        crate::SV_SendServerCommand(
+        SV_SendServerCommand(
             common,
             sv,
             core::ptr::null_mut(),
@@ -718,7 +729,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
         c"MP_SVGAME".as_ptr() as *mut c_char,
         c"WAS_KICKED".as_ptr() as *mut c_char,
     );
-    crate::SV_DropClient(common, sv, cl, reason); // "was kicked"
+    SV_DropClient(common, sv, cl, reason); // "was kicked"
     unsafe {
         (*cl).lastPacketTime = sv.svs.time;
     } // in case there is a funny zombie
@@ -730,12 +741,12 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
 pub fn SV_KickNum_f(common: &mut Common, sv: &mut Server) {
     // make sure server is running
     if unsafe { (*common.com_sv_running).integer } == 0 {
-        mp_engine_qcommon::common::common::com_printf(common, "Server is not running.\n");
+        com_printf(common, "Server is not running.\n");
         return;
     }
 
-    if mp_engine_qcommon::cmd_common::Cmd_Argc(common) != 2 {
-        mp_engine_qcommon::common::common::com_printf(common, "Usage: kicknum <client number>\n");
+    if Cmd_Argc(common) != 2 {
+        com_printf(common, "Usage: kicknum <client number>\n");
         return;
     }
 
@@ -750,7 +761,7 @@ pub fn SV_KickNum_f(common: &mut Common, sv: &mut Server) {
             c"MP_SVGAME".as_ptr() as *mut c_char,
             c"CANNOT_KICK_HOST".as_ptr() as *mut c_char,
         );
-        crate::SV_SendServerCommand(
+        SV_SendServerCommand(
             common,
             sv,
             core::ptr::null_mut(),
@@ -767,7 +778,7 @@ pub fn SV_KickNum_f(common: &mut Common, sv: &mut Server) {
         c"MP_SVGAME".as_ptr() as *mut c_char,
         c"WAS_KICKED".as_ptr() as *mut c_char,
     );
-    crate::SV_DropClient(common, sv, cl, reason); // "was kicked"
+    SV_DropClient(common, sv, cl, reason); // "was kicked"
     unsafe {
         (*cl).lastPacketTime = sv.svs.time;
     } // in case there is a funny zombie
@@ -777,17 +788,17 @@ pub fn SV_KickNum_f(common: &mut Common, sv: &mut Server) {
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:888-894`
 pub fn SV_Serverinfo_f(common: &mut Common) {
-    mp_engine_qcommon::common::common::com_printf(common, "Server info settings:\n");
-    let info = mp_engine_qcommon::cvar_fns::Cvar_InfoString(
+    com_printf(common, "Server info settings:\n");
+    let info = Cvar_InfoString(
         common,
-        mp_qshared::shared::cvar::CVAR_SERVERINFO,
+        CVAR_SERVERINFO,
     );
-    mp_engine_qcommon::common_fns::Info_Print(common, info as *const c_char);
+    Info_Print(common, info as *const c_char);
     // NOTE: com_sv_running is threaded through `Common` per the Cvar_Get
     // registration precedent elsewhere in this crate, not `Server`, since
     // this fn takes no `sv` receiver (LAW per resolved signature).
     if unsafe { (*common.com_sv_running).integer } == 0 {
-        mp_engine_qcommon::common::common::com_printf(common, "Server is not running.\n");
+        com_printf(common, "Server is not running.\n");
     }
 }
 
@@ -795,12 +806,12 @@ pub fn SV_Serverinfo_f(common: &mut Common) {
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:904-907`
 pub fn SV_Systeminfo_f(common: &mut Common) {
-    mp_engine_qcommon::common::common::com_printf(common, "System info settings:\n");
-    let info = mp_engine_qcommon::cvar_fns::Cvar_InfoString(
+    com_printf(common, "System info settings:\n");
+    let info = Cvar_InfoString(
         common,
-        mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
+        CVAR_SYSTEMINFO,
     );
-    mp_engine_qcommon::common_fns::Info_Print(common, info as *const c_char);
+    Info_Print(common, info as *const c_char);
 }
 
 /// Raven `SV_DumpUser_f`.
@@ -809,12 +820,12 @@ pub fn SV_Systeminfo_f(common: &mut Common) {
 pub fn SV_DumpUser_f(common: &mut Common, sv: &mut Server) {
     // make sure server is running
     if unsafe { (*common.com_sv_running).integer } == 0 {
-        mp_engine_qcommon::common::common::com_printf(common, "Server is not running.\n");
+        com_printf(common, "Server is not running.\n");
         return;
     }
 
-    if mp_engine_qcommon::cmd_common::Cmd_Argc(common) != 2 {
-        mp_engine_qcommon::common::common::com_printf(common, "Usage: info <userid>\n");
+    if Cmd_Argc(common) != 2 {
+        com_printf(common, "Usage: info <userid>\n");
         return;
     }
 
@@ -823,9 +834,9 @@ pub fn SV_DumpUser_f(common: &mut Common, sv: &mut Server) {
         return;
     }
 
-    mp_engine_qcommon::common::common::com_printf(common, "userinfo\n");
-    mp_engine_qcommon::common::common::com_printf(common, "--------\n");
-    mp_engine_qcommon::common_fns::Info_Print(common, unsafe { (*cl).userinfo.as_ptr() });
+    com_printf(common, "userinfo\n");
+    com_printf(common, "--------\n");
+    Info_Print(common, unsafe { (*cl).userinfo.as_ptr() });
 }
 
 /// Raven `SV_Map_f`.
@@ -840,7 +851,7 @@ pub fn SV_Map_f(
     g2: &mut Ghoul2System,
     host: &mut dyn EngineHost,
 ) {
-    let map = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1);
+    let map = Cmd_Argv(common, 1);
     if map.is_null() {
         return;
     }
@@ -851,12 +862,12 @@ pub fn SV_Map_f(
         .to_string_lossy()
         .into_owned();
     if map_str.contains('\\') {
-        mp_engine_qcommon::common::common::com_printf(common, "Can't have mapnames with a \\\n");
+        com_printf(common, "Can't have mapnames with a \\\n");
         return;
     }
 
     let expanded = format!("maps/{}.bsp\0", map_str);
-    if mp_engine_qcommon::files_common::FS_ReadFile(
+    if FS_ReadFile(
         common,
         cm,
         rm,
@@ -865,7 +876,7 @@ pub fn SV_Map_f(
         core::ptr::null_mut(),
     ) == -1
     {
-        mp_engine_qcommon::common::common::com_printf(
+        com_printf(
             common,
             &format!("Can't find map {}\n", expanded.trim_end_matches('\0')),
         );
@@ -873,31 +884,31 @@ pub fn SV_Map_f(
     }
 
     // force latched values to get set
-    mp_engine_qcommon::cvar_fns::Cvar_Get(
+    Cvar_Get(
         common,
         cm,
         rm,
         host,
         c"g_gametype".as_ptr() as *mut c_char,
         c"0".as_ptr() as *mut c_char,
-        mp_qshared::shared::cvar::CVAR_SERVERINFO | mp_qshared::shared::cvar::CVAR_LATCH,
+        CVAR_SERVERINFO | CVAR_LATCH,
     );
 
     let mut cmd = unsafe {
-        core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 0))
+        core::ffi::CStr::from_ptr(Cmd_Argv(common, 0))
     }
         .to_string_lossy()
         .into_owned();
     let (cheat, killBots);
     if unsafe {
-        mp_qshared::shared::q_string::Q_stricmpn(
+        Q_stricmpn(
             format!("{}\0", cmd).as_ptr() as *const c_char,
             c"sp".as_ptr(),
             2,
         )
     } == 0
     {
-        mp_engine_qcommon::cvar_fns::Cvar_SetValue(
+        Cvar_SetValue(
             common,
             cm,
             rm,
@@ -905,7 +916,7 @@ pub fn SV_Map_f(
             c"g_gametype".as_ptr() as *const c_char,
             mp_bg::public::gametype::GT_SINGLE_PLAYER as c_int as f32,
         );
-        mp_engine_qcommon::cvar_fns::Cvar_SetValue(
+        Cvar_SetValue(
             common,
             cm,
             rm,
@@ -914,7 +925,7 @@ pub fn SV_Map_f(
             0.0,
         );
         // may not set sv_maxclients directly, always set latched
-        mp_engine_qcommon::cvar_fns::Cvar_SetLatched(
+        Cvar_SetLatched(
             common,
             cm,
             rm,
@@ -923,29 +934,29 @@ pub fn SV_Map_f(
             c"8".as_ptr() as *mut c_char,
         );
         cmd = cmd[2..].to_string();
-        cheat = qboolean::qfalse;
-        killBots = qboolean::qtrue;
+        cheat = qfalse;
+        killBots = qtrue;
     } else {
         let cmd_c = format!("{}\0", cmd);
         if unsafe {
-            mp_qshared::shared::q_string::Q_stricmpn(
+            Q_stricmpn(
                 cmd_c.as_ptr() as *const c_char,
                 c"devmap".as_ptr(),
                 6,
             )
         } == 0
             || unsafe {
-                mp_qshared::shared::q_string::Q_stricmp(
+                Q_stricmp(
                     cmd_c.as_ptr() as *const c_char,
                     c"spdevmap".as_ptr(),
                 )
             } == 0
         {
-            cheat = qboolean::qtrue;
-            killBots = qboolean::qtrue;
+            cheat = qtrue;
+            killBots = qtrue;
         } else {
-            cheat = qboolean::qfalse;
-            killBots = qboolean::qfalse;
+            cheat = qfalse;
+            killBots = qfalse;
         }
         // if( sv_gametype->integer == GT_SINGLE_PLAYER ) {
         //     Cvar_SetValue( "g_gametype", GT_FFA );
@@ -954,12 +965,12 @@ pub fn SV_Map_f(
 
     // save the map name here cause on a map restart we reload the jampconfig.cfg
     // and thus nuke the arguments of the map command
-    let mut mapname = [0 as c_char; mp_qshared::shared::MAX_QPATH as usize];
+    let mut mapname = [0 as c_char; MAX_QPATH as usize];
     unsafe {
-        mp_qshared::shared::q_string::Q_strncpyz(mapname.as_mut_ptr(), map, mapname.len() as c_int);
+        Q_strncpyz(mapname.as_mut_ptr(), map, mapname.len() as c_int);
     }
 
-    let mut eForceReload = mp_qshared::shared::force_reload::ForceReload_e::eForceReload_NOTHING;
+    let mut eForceReload = ForceReload_e::eForceReload_NOTHING;
 
     // if ( !Q_stricmp( cmd, "devmapbsp") ) {	// not relevant in MP codebase
     //     eForceReload = eForceReload_BSP;
@@ -967,25 +978,25 @@ pub fn SV_Map_f(
     // else
     let cmd_c = format!("{}\0", cmd);
     if unsafe {
-        mp_qshared::shared::q_string::Q_stricmp(
+        Q_stricmp(
             cmd_c.as_ptr() as *const c_char,
             c"devmapmdl".as_ptr(),
         )
     } == 0
     {
-        eForceReload = mp_qshared::shared::force_reload::ForceReload_e::eForceReload_MODELS;
+        eForceReload = ForceReload_e::eForceReload_MODELS;
     } else if unsafe {
-        mp_qshared::shared::q_string::Q_stricmp(
+        Q_stricmp(
             cmd_c.as_ptr() as *const c_char,
             c"devmapall".as_ptr(),
         )
     } == 0
     {
-        eForceReload = mp_qshared::shared::force_reload::ForceReload_e::eForceReload_ALL;
+        eForceReload = ForceReload_e::eForceReload_ALL;
     }
 
     // start up the map
-    crate::sv_init::SV_SpawnServer(
+    SV_SpawnServer(
         common,
         cm,
         sv,
@@ -1002,8 +1013,8 @@ pub fn SV_Map_f(
     // if the level was started with "map <levelname>", then
     // cheats will not be allowed.  If started with "devmap <levelname>"
     // then cheats will be allowed
-    if cheat == qboolean::qtrue {
-        mp_engine_qcommon::cvar_fns::Cvar_Set(
+    if cheat == qtrue {
+        Cvar_Set(
             common,
             cm,
             rm,
@@ -1012,7 +1023,7 @@ pub fn SV_Map_f(
             c"1".as_ptr() as *mut c_char,
         );
     } else {
-        mp_engine_qcommon::cvar_fns::Cvar_Set(
+        Cvar_Set(
             common,
             cm,
             rm,
@@ -1042,7 +1053,7 @@ pub fn SV_MapRestart_f(
 
     // make sure server is running
     if unsafe { (*common.com_sv_running).integer } == 0 {
-        mp_engine_qcommon::common::common::com_printf(common, "Server is not running.\n");
+        com_printf(common, "Server is not running.\n");
         return;
     }
 
@@ -1050,14 +1061,14 @@ pub fn SV_MapRestart_f(
         return;
     }
 
-    let delay = if mp_engine_qcommon::cmd_common::Cmd_Argc(common) > 1 {
-        unsafe { libc::atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1)) }
+    let delay = if Cmd_Argc(common) > 1 {
+        unsafe { libc::atoi(Cmd_Argv(common, 1)) }
     } else {
         5
     };
     if delay != 0 {
         sv.sv.restartTime = sv.svs.time + delay * 1000;
-        crate::sv_init::SV_SetConfigstring(
+        SV_SetConfigstring(
             common,
             cm,
             sv,
@@ -1073,18 +1084,18 @@ pub fn SV_MapRestart_f(
     // check for maxclients change
     if unsafe { (*common.sv_maxclients).modified != 0 || (*common.sv_gametype).modified != 0 } {
         // restart the map the slow way
-        let mut mapname = [0 as c_char; mp_qshared::shared::MAX_QPATH as usize];
+        let mut mapname = [0 as c_char; MAX_QPATH as usize];
         unsafe {
-            mp_qshared::shared::q_string::Q_strncpyz(
+            Q_strncpyz(
                 mapname.as_mut_ptr(),
-                mp_engine_qcommon::cvar_fns::Cvar_VariableString(common, c"mapname".as_ptr()),
+                Cvar_VariableString(common, c"mapname".as_ptr()),
                 mapname.len() as c_int,
             );
         }
 
-        mp_engine_qcommon::common::common::com_printf(common, "variable change -- restarting.\n");
+        com_printf(common, "variable change -- restarting.\n");
 
-        crate::sv_init::SV_SpawnServer(
+        SV_SpawnServer(
             common,
             cm,
             sv,
@@ -1093,20 +1104,20 @@ pub fn SV_MapRestart_f(
             g2,
             host,
             mapname.as_mut_ptr(),
-            qboolean::qfalse,
-            mp_qshared::shared::force_reload::ForceReload_e::eForceReload_NOTHING,
+            qfalse,
+            ForceReload_e::eForceReload_NOTHING,
         );
         return;
     }
 
     // toggle the server bit so clients can detect that a
     // map_restart has happened
-    sv.svs.snapFlagServerBit ^= mp_qshared::shared::SNAPFLAG_SERVERCOUNT;
+    sv.svs.snapFlagServerBit ^= SNAPFLAG_SERVERCOUNT;
 
     // generate a new serverid
     sv.sv.restartedServerId = sv.sv.serverId;
     sv.sv.serverId = common.com_frameTime;
-    mp_engine_qcommon::cvar_fns::Cvar_Set(
+    Cvar_Set(
         common,
         cm,
         rm,
@@ -1119,9 +1130,9 @@ pub fn SV_MapRestart_f(
     // note that we do NOT set sv.state = SS_LOADING, so configstrings that
     // had been changed from their default values will generate broadcast updates
     sv.sv.state = serverState_t::SS_LOADING;
-    sv.sv.restarting = qboolean::qtrue;
+    sv.sv.restarting = qtrue;
 
-    crate::sv_game::SV_RestartGameProgs(common, cm, sv, rm, host);
+    SV_RestartGameProgs(common, cm, sv, rm, host);
 
     // run a few frames to allow everything to settle
     for _ in 0..3 {
@@ -1135,7 +1146,7 @@ pub fn SV_MapRestart_f(
     }
 
     sv.sv.state = serverState_t::SS_GAME;
-    sv.sv.restarting = qboolean::qfalse;
+    sv.sv.restarting = qfalse;
 
     // connect and begin all the clients
     for i in 0..unsafe { (*common.sv_maxclients).integer } {
@@ -1147,30 +1158,28 @@ pub fn SV_MapRestart_f(
         }
 
         let isBot = if unsafe { (*client).netchan.remoteAddress.r#type } == netadrtype_t::NA_BOT {
-            qboolean::qtrue
+            qtrue
         } else {
-            qboolean::qfalse
+            qfalse
         };
 
         // add the map_restart command
-        crate::SV_AddServerCommand(common, sv, client, "map_restart\n");
+        SV_AddServerCommand(common, sv, client, "map_restart\n");
 
         // connect the client again, without the firstTime flag
-        let denied = mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr(
+        let connect_ret = VM_Call(
             common,
             sv.gvm,
-            VM_Call(
-                common,
-                sv.gvm,
-                mp_abi::game::exports::MpGameExport::GAME_CLIENT_CONNECT as c_int,
-                &[i, qboolean::qfalse as c_int, isBot as c_int],
-            ),
-        ) as *mut c_char;
+            mp_abi::game::exports::MpGameExport::GAME_CLIENT_CONNECT as c_int,
+            &[i, qfalse as c_int, isBot as c_int],
+        );
+        let denied =
+            VM_ExplicitArgPtr(common, sv.gvm, connect_ret) as *mut c_char;
         if !denied.is_null() {
             // this generally shouldn't happen, because the client
             // was connected before the level change
-            crate::SV_DropClient(common, sv, client, denied);
-            mp_engine_qcommon::common::common::com_printf(
+            SV_DropClient(common, sv, client, denied);
+            com_printf(
                 common,
                 &format!(
                     "SV_MapRestart_f({}): dropped client {} - denied!\n",
@@ -1184,7 +1193,7 @@ pub fn SV_MapRestart_f(
             (*client).state = clientState_t::CS_ACTIVE;
         }
 
-        crate::sv_client::SV_ClientEnterWorld(common, sv, client, unsafe {
+        SV_ClientEnterWorld(common, sv, client, unsafe {
             &mut (*client).lastUsercmd
         });
     }
@@ -1227,10 +1236,10 @@ pub fn SV_AddOperatorCommands(
     // state) belongs on the owning host struct; `Common` is the only threaded
     // receiver here, so it homes there pending the campaign's receiver-cleanup
     // pass (STATE-D4-style deferral, matches this crate's existing precedent).
-    if common.sv_ccmds_operator_commands_initialized == qboolean::qtrue {
+    if common.sv_ccmds_operator_commands_initialized == qtrue {
         return;
     }
-    common.sv_ccmds_operator_commands_initialized = qboolean::qtrue;
+    common.sv_ccmds_operator_commands_initialized = qtrue;
 
     // Each registered handler is a non-capturing forwarding closure matching
     // `CmdFunction`'s pinned receiver order (common/cm/sv/rm/rmg/host); it casts
@@ -1319,15 +1328,3 @@ fn SV_MapRestart_f_cmd(
     unsafe { SV_MapRestart_f(common, cm, server_from_slot(sv), rm, rmg, ghoul2_from_slot(g2), host) }
 }
 
-/// Raven `SE_GetString` — `docs/subsystems/stringed.md` §F seam (LIVE,
-/// game-module trap at sv_game.cpp:699); not yet landed in this tree.
-///
-/// Source: `docs/subsystems/stringed.md`
-// PORT-NOTE(stringed-seam): genuinely missing — escalated (missing_symbols).
-fn SE_GetString(
-    _common: &mut Common,
-    _host: &mut dyn EngineHost,
-    key: *const c_char,
-) -> *const c_char {
-    key
-}
