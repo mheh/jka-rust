@@ -61,13 +61,14 @@
 //! the *whole* `Ghoul2System`, while its second parameter is a live reference
 //! borrowed out of that same `Ghoul2System`'s `info_array` field — an
 //! unsatisfiable Rust borrow (E0502) at any real call site, not a call-site
-//! mistake. `G2API_GetBoltMatrix`'s bone-attached arm also needs
-//! `mdxaSkelOffsets_t`/`mdxaSkel_t` byte-offset reads this crate has no typed
-//! access to (`G2SV-D5`), and the surface-attached arm needs
-//! `G2_ProcessSurfaceBolt2`, which has no Rust home anywhere in this crate.
-//! `g2api_get_bolt_matrix` below falls back to Raven's own "bolt has neither a
-//! bone nor a surface" identity-matrix arm (`tr_ghoul2.cpp:3328-3330`)
-//! unconditionally rather than inventing the missing bone/surface arms.
+//! mistake. `render::skeleton`'s alias-free core `resolve_bolt_matrix_low` now
+//! implements both the bone-attached (`mdxaSkel` basepose read) and
+//! surface-attached (`g2_process_surface_bolt2`) arms in full; wiring
+//! `g2api_get_bolt_matrix` through it via disjoint-field projection (as this
+//! file's `G2_NeedsRecalc` inline already does for `bone_caches`) is deferred
+//! to that function's own pass. Until then `g2api_get_bolt_matrix` below falls
+//! back to Raven's own "bolt has neither a bone nor a surface" identity-matrix
+//! arm (`tr_ghoul2.cpp:3328-3330`).
 //!
 //! **Fourth, minor gap (reported under `problems`).** `VectorNormalize`
 //! (`q_math.c:1172-1186`) and `Create_Matrix` (`G2_misc.cpp:1630-1653`) are

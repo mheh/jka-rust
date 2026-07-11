@@ -49,9 +49,11 @@
 //! `ragdoll.rs`/`api_bolts.rs` porters to call) — the doc should assign it a
 //! permanent home; this is a transcription stopgap, not that decision.
 //! `G2_GetBoltMatrixLow`'s own further private helpers
-//! (`G2_ProcessSurfaceBolt2`, `G2_FindSurface_BC`) are out of scope for this
-//! stub pass (its own body, not a dependency of this file's rostered class)
-//! and are left for whoever lands its real implementation.
+//! (`G2_ProcessSurfaceBolt2`, `G2_FindSurface_BC`) are ported below as this
+//! function's private helpers: surface-attached bolts are a server-reachable
+//! path (`G2_ConstructGhoulSkeleton`/`RootMatrix` drive them), so the surface
+//! arm computes the real bolt matrix off the hit triangle's verts through the
+//! bone cache rather than a no-op.
 //!
 //! **Aliasing finding (reported upstream under `problems`, same class as
 //! `api_bolts.rs`'s own module-doc gap #3).** `g2_get_bolt_matrix_low`'s and
@@ -65,14 +67,6 @@
 //! needs (`bone_caches`) instead of the whole struct — that both the pinned
 //! public entry points and this file's own internal callers route through, so
 //! no borrow conflict and no behavior change.
-//!
-//! **Missing dependency (reported upstream under `problems`).**
-//! `G2_ProcessSurfaceBolt2` (`tr_ghoul2.cpp:2983-3251`), the surface-attached
-//! bolt transform `G2_GetBoltMatrixLow`'s surface arm needs, has no Rust home
-//! anywhere in this crate (grep: no `process_surface_bolt` function exists).
-//! `resolve_bolt_matrix_low` falls back to Raven's own "no bone or surface"
-//! identity-matrix arm (`:3328-3330`) for the surface-attached case too,
-//! matching `api_bolts.rs`'s own precedent for the same missing dependency.
 
 use core::ffi::c_void;
 
@@ -86,6 +80,7 @@ use crate::shared::bolt_info_t::boltInfo_t;
 use crate::shared::bone_info_t::boneInfo_t;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
+use crate::shared::surface_info_t::surfaceInfo_t;
 
 // ---------------------------------------------------------------------------
 // `mModelBoltLink` bit-packing constants (`G2.h:30-40`). Duplicated locally
@@ -179,6 +174,436 @@ fn vector_normalize_row(row: &mut [f32; 4]) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// mdxm mesh byte-offset table — the surface-bolt path (`G2_FindSurface_BC` /
+// `G2_ProcessSurfaceBolt2`) walks `mod->mdxm`'s LOD/surface/vertex arrays.
+// Per `G2SV-D5` this crate never names `mdxmHeader_t`/`mdxmSurface_t`/
+// `mdxmVertex_t` — only byte arithmetic off the raw `EngineHost::model_mdxm`
+// pointer, exactly as the oracle does off `model_t::mdxm`. Offsets derive from
+// the field order in `oracle/codemp/renderer/mdx_format.h`; duplicated locally
+// per this crate's own convention (`surfaces.rs`'s identical header table).
+// ---------------------------------------------------------------------------
+
+/// `mdxmHeader_t::ofsLODs` (`mdx_format.h:166`) — `animIndex`(136) + `numBones`
+/// (4) + `numLODs`(4) precede it.
+const MDXM_OFS_OFS_LODS: usize = 148;
+/// `sizeof(mdxmLOD_t)` — a single `int ofsEnd` (`mdx_format.h:203-207`), whose
+/// value is read at offset 0 while walking to the requested LOD.
+const MDXM_LOD_SIZE: usize = 4;
+
+/// `mdxmSurface_t::ofsVerts` (`mdx_format.h:227`) — `ident`(0) + `thisSurface
+/// Index`(4) + `ofsHeader`(8) + `numVerts`(12) precede it.
+const SURF_OFS_VERTS: usize = 16;
+/// `mdxmSurface_t::ofsTriangles` (`mdx_format.h:230`) — `numTriangles`(20)
+/// precedes it.
+const SURF_OFS_TRIANGLES: usize = 24;
+/// `mdxmSurface_t::ofsBoneReferences` (`mdx_format.h:240`) — `numBone
+/// References`(28) precedes it.
+const SURF_OFS_BONE_REFERENCES: usize = 32;
+
+/// `sizeof(mdxmVertex_t)` (non-`_XBOX`): `normal`(12) + `vertCoords`(12) +
+/// `uiNmWeightsAndBoneIndexes`(4) + `BoneWeightings[4]`(4) — "kept at 32 bytes
+/// for cache-aligning" (`mdx_format.h:263-280`).
+const MDXM_VERTEX_SIZE: usize = 32;
+/// `sizeof(mdxmTriangle_t)` — `int indexes[3]` (`mdx_format.h:250-253`).
+const MDXM_TRIANGLE_SIZE: usize = 12;
+/// `mdxmVertex_t::vertCoords` (`mdx_format.h:272`) — `normal`(12) precedes it.
+const VERT_OFS_VERT_COORDS: usize = 12;
+/// `mdxmVertex_t::uiNmWeightsAndBoneIndexes` (`mdx_format.h:281`).
+const VERT_OFS_WEIGHTS_AND_INDEXES: usize = 24;
+/// `mdxmVertex_t::BoneWeightings[0]` (`mdx_format.h:288`).
+const VERT_OFS_BONE_WEIGHTINGS: usize = 28;
+
+/// `#define iG2_BITS_PER_BONEREF 5` (`mdx_format.h:61`).
+const IG2_BITS_PER_BONEREF: u32 = 5;
+/// `#define iG2_BONEWEIGHT_TOPBITS_SHIFT ((5 * 4) - 8)` (`mdx_format.h:65`).
+const IG2_BONEWEIGHT_TOPBITS_SHIFT: u32 = 12;
+/// `#define iG2_BONEWEIGHT_TOPBITS_AND 0x300` (`mdx_format.h:66`).
+const IG2_BONEWEIGHT_TOPBITS_AND: u32 = 0x300;
+/// `#define fG2_BONEWEIGHT_RECIPROCAL_MULT ((float)(1.0f/1023.0f))`
+/// (`mdx_format.h:60`).
+const FG2_BONEWEIGHT_RECIPROCAL_MULT: f32 = 1.0 / 1023.0;
+/// `#define iG2_TRISIDE_LONGEST 0` (`mdx_format.h:57`).
+const IG2_TRISIDE_LONGEST: usize = 0;
+/// `#define iG2_TRISIDE_SHORTEST 2` (`mdx_format.h:58`).
+const IG2_TRISIDE_SHORTEST: usize = 2;
+/// `#define MDX_TAG_ORIGIN 2` (`tr_ghoul2.cpp:2238`).
+const MDX_TAG_ORIGIN: usize = 2;
+/// `#define G2SURFACEFLAG_GENERATED 0x00000200` (`mdx_format.h:50`) — the
+/// procedurally-generated tag-surface marker. Duplicated locally, matching
+/// `surfaces.rs`'s identical copy.
+const G2SURFACEFLAG_GENERATED: i32 = 0x00000200;
+
+/// Read an `i32` at `offset` bytes into a raw block (the block is a
+/// `EngineHost::model_mdxm` pointer, or an interior surface/vertex pointer —
+/// `G2SV-D5`, the header types are never named). `read_unaligned` because
+/// nothing here proves 4-byte alignment; native byte order, no cross-endian
+/// concern at this layer (mirrors `surfaces.rs`'s `read_i32_at`).
+///
+/// # Safety
+/// `base` non-null and `offset..offset+4` inside the block.
+unsafe fn read_i32(base: *const u8, offset: usize) -> i32 {
+    unsafe { base.add(offset).cast::<i32>().read_unaligned() }
+}
+
+/// Read an `f32` at `offset` bytes into a raw block. See [`read_i32`].
+///
+/// # Safety
+/// `base` non-null and `offset..offset+4` inside the block.
+unsafe fn read_f32(base: *const u8, offset: usize) -> f32 {
+    unsafe { base.add(offset).cast::<f32>().read_unaligned() }
+}
+
+/// `DotProduct(x,y)` (`q_shared.h:1358`) over the first three components — the
+/// bone-matrix rows are 4-wide, the vert coords 3-wide, and Raven's macro only
+/// touches `[0..3]`. Left-associative, matching the macro's expansion.
+fn dot3(x: &[f32], y: &[f32]) -> f32 {
+    x[0] * y[0] + x[1] * y[1] + x[2] * y[2]
+}
+
+/// `CrossProduct(v1,v2,cross)` (`q_shared.h:1553-1557`).
+fn cross_product(v1: &[f32; 3], v2: &[f32; 3]) -> [f32; 3] {
+    [
+        v1[1] * v2[2] - v1[2] * v2[1],
+        v1[2] * v2[0] - v1[0] * v2[2],
+        v1[0] * v2[1] - v1[1] * v2[0],
+    ]
+}
+
+/// `VectorSubtract(a,b,c)` (`q_shared.h:1359`) — `c = a - b`.
+fn vector_subtract(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+/// `VectorMA(v,s,b,o)` (`q_shared.h:1365`) — `o = v + b*s`.
+fn vector_ma(veca: &[f32; 3], scale: f32, vecb: &[f32; 3]) -> [f32; 3] {
+    [
+        veca[0] + vecb[0] * scale,
+        veca[1] + vecb[1] * scale,
+        veca[2] + vecb[2] * scale,
+    ]
+}
+
+/// Raven `vec_t VectorNormalize( vec3_t v )` (`q_math.c` — normalize in place;
+/// leaves `v` untouched on zero length). Uses `f32::sqrt`, matching this file's
+/// established `vector_normalize_row` idiom.
+fn vector_normalize(v: &mut [f32; 3]) {
+    let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if length != 0.0 {
+        let ilength = 1.0 / length;
+        v[0] *= ilength;
+        v[1] *= ilength;
+        v[2] *= ilength;
+    }
+}
+
+/// Raven `vec_t VectorNormalize2( const vec3_t v, vec3_t out )` (`q_math.c`) —
+/// `out = normalize(v)`, or `VectorClear(out)` on zero length.
+fn vector_normalize2(v: &[f32; 3]) -> [f32; 3] {
+    let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if length != 0.0 {
+        let ilength = 1.0 / length;
+        [v[0] * ilength, v[1] * ilength, v[2] * ilength]
+    } else {
+        [0.0, 0.0, 0.0]
+    }
+}
+
+/// `G2_GetVertWeights` (`mdx_format.h:290-295`) — the packed weight count (1..4).
+///
+/// # Safety
+/// `vert` must point at a valid `mdxmVertex_t`.
+unsafe fn vert_weights(vert: *const u8) -> i32 {
+    let packed = unsafe { read_i32(vert, VERT_OFS_WEIGHTS_AND_INDEXES) } as u32;
+    ((packed >> 30) + 1) as i32
+}
+
+/// `G2_GetVertBoneIndex` (`mdx_format.h:297-302`) — the `iWeightNum`-th 5-bit
+/// bone reference.
+///
+/// # Safety
+/// `vert` must point at a valid `mdxmVertex_t`.
+unsafe fn vert_bone_index(vert: *const u8, weight_num: i32) -> i32 {
+    let packed = unsafe { read_i32(vert, VERT_OFS_WEIGHTS_AND_INDEXES) } as u32;
+    ((packed >> (IG2_BITS_PER_BONEREF * weight_num as u32)) & ((1 << IG2_BITS_PER_BONEREF) - 1))
+        as i32
+}
+
+/// `G2_GetVertBoneWeight` (`mdx_format.h:304-323`) — the `iWeightNum`-th bone
+/// weight; the last weight closes to `1.0 - fTotalWeight`, the rest decode from
+/// the 8-bit `BoneWeightings[]` entry plus its 2-bit overflow in the packed int
+/// and accumulate into `total_weight`.
+///
+/// # Safety
+/// `vert` must point at a valid `mdxmVertex_t`.
+unsafe fn vert_bone_weight(
+    vert: *const u8,
+    weight_num: i32,
+    total_weight: &mut f32,
+    num_weights: i32,
+) -> f32 {
+    if weight_num == num_weights - 1 {
+        1.0 - *total_weight
+    } else {
+        let packed = unsafe { read_i32(vert, VERT_OFS_WEIGHTS_AND_INDEXES) } as u32;
+        let mut temp = unsafe { *vert.add(VERT_OFS_BONE_WEIGHTINGS + weight_num as usize) } as i32;
+        temp |= ((packed >> (IG2_BONEWEIGHT_TOPBITS_SHIFT + (weight_num as u32 * 2)))
+            & IG2_BONEWEIGHT_TOPBITS_AND) as i32;
+        let bone_weight = FG2_BONEWEIGHT_RECIPROCAL_MULT * temp as f32;
+        *total_weight += bone_weight;
+        bone_weight
+    }
+}
+
+/// Transform one `mdxmVertex_t` into model space by its weighted bones — the
+/// inner accumulation loop `G2_ProcessSurfaceBolt2` runs per triangle vertex
+/// (`tr_ghoul2.cpp:2288-2302` and its three siblings). `bone_refs` is the
+/// surface's `int` bone-reference array; each vert bone index selects into it,
+/// and the referenced bone is evaluated through the cache (`Eval`, not
+/// `EvalRender` — `G2EVALRENDER` is undefined).
+///
+/// # Safety
+/// `vert` a valid `mdxmVertex_t`, `bone_refs` the surface's bone-reference
+/// array, and `cache` the surface's model's live bone cache.
+unsafe fn transform_vertex(cache: &mut CBoneCache, vert: *const u8, bone_refs: *const u8) -> [f32; 3] {
+    // VectorClear( pTri[j] );
+    let mut p = [0.0f32; 3];
+    let vert_coords = unsafe {
+        [
+            read_f32(vert, VERT_OFS_VERT_COORDS),
+            read_f32(vert, VERT_OFS_VERT_COORDS + 4),
+            read_f32(vert, VERT_OFS_VERT_COORDS + 8),
+        ]
+    };
+    let num_weights = unsafe { vert_weights(vert) };
+    let mut total_weight = 0.0f32;
+    for k in 0..num_weights {
+        let bone_index = unsafe { vert_bone_index(vert, k) };
+        let bone_weight = unsafe { vert_bone_weight(vert, k, &mut total_weight, num_weights) };
+        let bone_ref = unsafe { read_i32(bone_refs, 4 * bone_index as usize) };
+        let bone = cache.eval(bone_ref);
+        p[0] += bone_weight * (dot3(&bone.matrix[0], &vert_coords) + bone.matrix[0][3]);
+        p[1] += bone_weight * (dot3(&bone.matrix[1], &vert_coords) + bone.matrix[1][3]);
+        p[2] += bone_weight * (dot3(&bone.matrix[2], &vert_coords) + bone.matrix[2][3]);
+    }
+    p
+}
+
+/// Raven `void *G2_FindSurface_BC(const model_s *mod, int index, int lod)` —
+/// the by-index surface lookup the surface-bolt path uses: walk `mod->mdxm`'s
+/// LOD list to `lod`, step over the `mdxmLOD_t` header to the
+/// `mdxmLODSurfOffset_t` offset array, and return the pointer to surface
+/// `index`. Takes the raw `mdxm` block directly (this crate never names
+/// `model_s`/`mdxmHeader_t`, `G2SV-D5`); the caller resolves it once via
+/// `EngineHost::model_mdxm`.
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:2952-2977`
+///
+/// # Safety
+/// `mdxm` a valid, non-null `EngineHost::model_mdxm` block; `lod` in
+/// `0..numLODs`; `index` in `0..numSurfaces` (matching the oracle's own
+/// unchecked-under-`NDEBUG` asserts).
+unsafe fn find_surface_bc(mdxm: *const c_void, index: i32, lod: i32) -> *const c_void {
+    unsafe {
+        let mdxm = mdxm as *const u8;
+        // point at first lod list
+        let mut current = mdxm.add(read_i32(mdxm, MDXM_OFS_OFS_LODS) as usize);
+        // walk the lods (mdxmLOD_t::ofsEnd is its only, first, field)
+        for _ in 0..lod {
+            let ofs_end = read_i32(current, 0);
+            current = current.add(ofs_end as usize);
+        }
+        // avoid the lod pointer data structure
+        current = current.add(MDXM_LOD_SIZE);
+        // we are now looking at the offset array (mdxmLODSurfOffset_t)
+        let offset = read_i32(current, 4 * index as usize);
+        current.add(offset as usize) as *const c_void
+    }
+}
+
+/// Raven `void G2_ProcessSurfaceBolt2(CBoneCache &boneCache, const
+/// mdxmSurface_t *surface, int boltNum, boltInfo_v &boltList, const
+/// surfaceInfo_t *surfInfo, const model_t *mod, mdxaBone_t &retMatrix)` —
+/// computes a surface-attached bolt's matrix. Two surface kinds: a
+/// procedurally-generated tag (`surfInfo->offFlags == G2SURFACEFLAG_GENERATED`)
+/// re-finds the hit poly's original three verts, transforms them through the
+/// bone cache, weights them by the stored barycentric coordinates to get the
+/// origin, and builds an orthonormal basis from the poly normal + towards-point-0
+/// up; else a normal model tag transforms the surface's first triangle and
+/// derives the basis from its longest/shortest sides. Always writes all twelve
+/// matrix entries, so returned by value per §C7. `boltNum`/`boltList` are unread
+/// by the body (kept out of this port's parameter list; the caller already holds
+/// them). `mod` collapses to the raw `mdxm` block (the generated path's own
+/// `G2_FindSurface_BC` call needs it; `G2SV-D5`).
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:2983-3251`
+fn g2_process_surface_bolt2(
+    cache: &mut CBoneCache,
+    surface: *const c_void,
+    surf_info: Option<&surfaceInfo_t>,
+    mdxm: *const c_void,
+) -> mdxaBone_t {
+    let mut ret_matrix = IDENTITY_MATRIX;
+
+    // now there are two types of tag surface - model ones and procedural
+    // generated types - lets decide which one we have here.
+    if let Some(surf_info) = surf_info.filter(|s| s.offFlags == G2SURFACEFLAG_GENERATED) {
+        let surf_number = surf_info.genPolySurfaceIndex & 0x0ffff;
+        let poly_number = (surf_info.genPolySurfaceIndex >> 16) & 0x0ffff;
+
+        // SAFETY: `mdxm` is the surface's model block; `surf_number`/`gen_lod`
+        // index the poly's original surface, matching the oracle's own
+        // unchecked reads off `mod->mdxm`.
+        unsafe {
+            // find original surface our original poly was in.
+            let original_surf = find_surface_bc(mdxm, surf_number, surf_info.genLod) as *const u8;
+            let tri_base = original_surf.add(read_i32(original_surf, SURF_OFS_TRIANGLES) as usize);
+            let poly = tri_base.add(poly_number as usize * MDXM_TRIANGLE_SIZE);
+
+            // get the original polys indexes
+            let index0 = read_i32(poly, 0);
+            let index1 = read_i32(poly, 4);
+            let index2 = read_i32(poly, 8);
+
+            // decide where the original verts are
+            let vert_base = original_surf.add(read_i32(original_surf, SURF_OFS_VERTS) as usize);
+            let vert0 = vert_base.add(index0 as usize * MDXM_VERTEX_SIZE);
+            let vert1 = vert_base.add(index1 as usize * MDXM_VERTEX_SIZE);
+            let vert2 = vert_base.add(index2 as usize * MDXM_VERTEX_SIZE);
+
+            let bone_refs = original_surf.add(read_i32(original_surf, SURF_OFS_BONE_REFERENCES) as usize);
+
+            // now go and transform just the points we need from the surface
+            // that was hit originally.
+            let p_tri = [
+                transform_vertex(cache, vert0, bone_refs),
+                transform_vertex(cache, vert1, bone_refs),
+                transform_vertex(cache, vert2, bone_refs),
+            ];
+
+            // work out baryCentricK (Raven's `float baryCentricK = 1.0 - (...)`
+            // — the `1.0` double literal makes this one subtraction a double
+            // intermediate before the store to `float`; preserved).
+            let bary_centric_k =
+                (1.0_f64 - (surf_info.genBarycentricI + surf_info.genBarycentricJ) as f64) as f32;
+
+            // now we have the model transformed into model space, now generate
+            // an origin.
+            ret_matrix.matrix[0][3] = (p_tri[0][0] * surf_info.genBarycentricI)
+                + (p_tri[1][0] * surf_info.genBarycentricJ)
+                + (p_tri[2][0] * bary_centric_k);
+            ret_matrix.matrix[1][3] = (p_tri[0][1] * surf_info.genBarycentricI)
+                + (p_tri[1][1] * surf_info.genBarycentricJ)
+                + (p_tri[2][1] * bary_centric_k);
+            ret_matrix.matrix[2][3] = (p_tri[0][2] * surf_info.genBarycentricI)
+                + (p_tri[1][2] * surf_info.genBarycentricJ)
+                + (p_tri[2][2] * bary_centric_k);
+
+            // generate a normal to this new triangle
+            let vec0 = vector_subtract(&p_tri[0], &p_tri[1]);
+            let vec1 = vector_subtract(&p_tri[2], &p_tri[1]);
+            let mut normal = cross_product(&vec0, &vec1);
+            vector_normalize(&mut normal);
+
+            // forward vector
+            ret_matrix.matrix[0][0] = normal[0];
+            ret_matrix.matrix[1][0] = normal[1];
+            ret_matrix.matrix[2][0] = normal[2];
+
+            // up will be towards point 0 of the original triangle. so lets work
+            // it out. Vector is hit point - point 0
+            let mut up = [
+                ret_matrix.matrix[0][3] - p_tri[0][0],
+                ret_matrix.matrix[1][3] - p_tri[0][1],
+                ret_matrix.matrix[2][3] - p_tri[0][2],
+            ];
+            // normalise it
+            vector_normalize(&mut up);
+
+            // that's the up vector
+            ret_matrix.matrix[0][1] = up[0];
+            ret_matrix.matrix[1][1] = up[1];
+            ret_matrix.matrix[2][1] = up[2];
+
+            // right is always straight
+            let right = cross_product(&normal, &up);
+            ret_matrix.matrix[0][2] = right[0];
+            ret_matrix.matrix[1][2] = right[1];
+            ret_matrix.matrix[2][2] = right[2];
+        }
+    } else {
+        // no, we are looking at a normal model tag.
+        //
+        // Divergence (§19): oracle derefs `surface` unconditionally; null here is an
+        // unreachable oracle null-deref (UB) — pick the defined identity fallback.
+        if surface.is_null() {
+            return ret_matrix;
+        }
+        let surface = surface as *const u8;
+
+        // SAFETY: `surface` is a valid `mdxmSurface_t` (`G2_FindSurface_BC` or
+        // the slist `surfInfo`); its `ofsVerts`/`ofsBoneReferences` interior
+        // reads match the oracle's own.
+        unsafe {
+            // whip through and actually transform each vertex
+            let mut v = surface.add(read_i32(surface, SURF_OFS_VERTS) as usize);
+            let bone_refs = surface.add(read_i32(surface, SURF_OFS_BONE_REFERENCES) as usize);
+
+            let mut p_tri = [[0.0f32; 3]; 3];
+            for slot in p_tri.iter_mut() {
+                *slot = transform_vertex(cache, v, bone_refs);
+                // v++ (advance by sizeof(mdxmVertex_t))
+                v = v.add(MDXM_VERTEX_SIZE);
+            }
+
+            // work out actual sides of the tag triangle
+            let mut sides = [[0.0f32; 3]; 3];
+            for j in 0..3 {
+                sides[j][0] = p_tri[(j + 1) % 3][0] - p_tri[j][0];
+                sides[j][1] = p_tri[(j + 1) % 3][1] - p_tri[j][1];
+                sides[j][2] = p_tri[(j + 1) % 3][2] - p_tri[j][2];
+            }
+
+            // do math trig to work out what the matrix will be from this
+            // triangle's translated position
+            let mut axes = [[0.0f32; 3]; 3];
+            axes[0] = vector_normalize2(&sides[IG2_TRISIDE_LONGEST]);
+            axes[1] = vector_normalize2(&sides[IG2_TRISIDE_SHORTEST]);
+
+            // project shortest side so that it is exactly 90 degrees to the
+            // longer side
+            let d = dot3(&axes[0], &axes[1]);
+            axes[0] = vector_ma(&axes[0], -d, &axes[1]);
+            axes[0] = vector_normalize2(&axes[0]);
+
+            axes[2] = cross_product(&sides[IG2_TRISIDE_LONGEST], &sides[IG2_TRISIDE_SHORTEST]);
+            axes[2] = vector_normalize2(&axes[2]);
+
+            // set up location in world space of the origin point in out going
+            // matrix
+            ret_matrix.matrix[0][3] = p_tri[MDX_TAG_ORIGIN][0];
+            ret_matrix.matrix[1][3] = p_tri[MDX_TAG_ORIGIN][1];
+            ret_matrix.matrix[2][3] = p_tri[MDX_TAG_ORIGIN][2];
+
+            // copy axis to matrix - do some magic to orient minus Y to positive
+            // X and so on so bolt on stuff is oriented correctly
+            ret_matrix.matrix[0][0] = axes[1][0];
+            ret_matrix.matrix[0][1] = axes[0][0];
+            ret_matrix.matrix[0][2] = -axes[2][0];
+
+            ret_matrix.matrix[1][0] = axes[1][1];
+            ret_matrix.matrix[1][1] = axes[0][1];
+            ret_matrix.matrix[1][2] = -axes[2][1];
+
+            ret_matrix.matrix[2][0] = axes[1][2];
+            ret_matrix.matrix[2][1] = axes[0][2];
+            ret_matrix.matrix[2][2] = -axes[2][2];
+        }
+    }
+
+    ret_matrix
+}
+
 /// Shared, alias-free core of `G2_GetBoltMatrixLow` (`tr_ghoul2.cpp:3253-3331`):
 /// resolves one bolt's matrix from an already-built `CBoneCache` alone. Both
 /// the pinned [`g2_get_bolt_matrix_low`] entry point and this file's own
@@ -187,13 +612,15 @@ fn vector_normalize_row(row: &mut [f32; 4]) {
 /// elsewhere in the same call) route through this instead of hitting the
 /// E0502 documented in the module doc above.
 ///
-/// The surface-attached arm (`:3301-3324`) needs `G2_ProcessSurfaceBolt2`,
-/// which has no Rust home anywhere in this crate (reported under `problems`);
-/// it falls back to Raven's own "no bone/surface" identity arm (`:3328-3330`)
-/// exactly like the unattached case, matching `api_bolts.rs`'s own precedent.
+/// The surface-attached arm (`:3301-3324`) locates the bolt's surface — an
+/// override entry in `slist` matching `surfaceNumber`, else the mesh surface by
+/// index (`G2_FindSurface_BC`) — then computes the bolt matrix from its verts
+/// (`g2_process_surface_bolt2`). `host` resolves the surface's `mdxm` block.
 fn resolve_bolt_matrix_low(
     bone_caches: &mut BoneCacheArena,
+    host: &mut impl EngineHost,
     bone_cache: Option<BoneCacheId>,
+    slist: &[surfaceInfo_t],
     bltlist: &[boltInfo_t],
     bolt_num: i32,
     scale: vec3_t,
@@ -226,10 +653,32 @@ fn resolve_bolt_matrix_low(
         bone_transform::multiply_3x4_matrix(&mut ret_matrix, &evaluated, &base_pose_mat);
         ret_matrix
     } else if bolt.surfaceNumber >= 0 {
-        // G2_ProcessSurfaceBolt2 gap (module doc + `problems`): identity
-        // fallback in place of the missing surface-bolt transform.
+        // find the override surfaceInfo for this bolt's surface, if any. The
+        // oracle loop has no `break`, so the LAST match wins.
+        let mut surf_info: Option<&surfaceInfo_t> = None;
+        for t in slist {
+            if t.surface == bolt.surfaceNumber {
+                surf_info = Some(t);
+            }
+        }
+
+        let mdxm = host.model_mdxm(cache.model) as *const c_void;
+        let mut surface: *const c_void = core::ptr::null();
+        // SAFETY: `mdxm` is `cache.model`'s loader block — non-null on the live
+        // bolt path (a built cache implies a valid model), matching the oracle's
+        // own unchecked `boneCache.mod->mdxm`.
+        if surf_info.is_none() {
+            surface = unsafe { find_surface_bc(mdxm, bolt.surfaceNumber, 0) };
+        }
+        if surface.is_null() {
+            if let Some(si) = surf_info {
+                if si.surface < 10000 {
+                    surface = unsafe { find_surface_bc(mdxm, si.surface, 0) };
+                }
+            }
+        }
         let _ = scale;
-        IDENTITY_MATRIX
+        g2_process_surface_bolt2(cache, surface, surf_info, mdxm)
     } else {
         // Raven: "we have a bolt without a bone or surface, not a huge
         // problem but we ought to at least clear the bolt matrix."
@@ -392,7 +841,9 @@ pub fn g2_construct_ghoul_skeleton(
                 let parent = &models[bolt_mod];
                 resolve_bolt_matrix_low(
                     bone_caches,
+                    host,
                     parent.bone_cache,
+                    &parent.slist,
                     &parent.bltlist,
                     bolt_num,
                     scale,
@@ -703,7 +1154,9 @@ fn root_matrix(
                 let parent = &info_array.get(item)[i];
                 resolve_bolt_matrix_low(
                     bone_caches,
+                    host,
                     parent.bone_cache,
+                    &parent.slist,
                     &parent.bltlist,
                     new_origin,
                     scale,
@@ -739,21 +1192,23 @@ fn root_matrix(
 /// by this stub) — resolves bolt `bolt_num`'s matrix: bone-attached bolts
 /// evaluate the bone unsmoothed (`CBoneCache::EvalUnsmooth`) premultiplied by
 /// its basepose; surface-attached bolts delegate to the surface-bolt
-/// transform (`G2_ProcessSurfaceBolt2`, out of scope for this stub — a
-/// further private helper of this function's own body, not of this file's
-/// rostered class); an unattached bolt (neither bone nor surface) falls back
-/// to the identity matrix. Always writes, so returned by value per §C7.
+/// transform (`g2_process_surface_bolt2`, this file's private helper); an
+/// unattached bolt (neither bone nor surface) falls back to the identity
+/// matrix. Always writes, so returned by value per §C7.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:3253-3331`
 pub fn g2_get_bolt_matrix_low(
     g2: &mut Ghoul2System,
+    host: &mut impl EngineHost,
     ghoul2: &CGhoul2Info,
     bolt_num: i32,
     scale: vec3_t,
 ) -> mdxaBone_t {
     resolve_bolt_matrix_low(
         &mut g2.bone_caches,
+        host,
         ghoul2.bone_cache,
+        &ghoul2.slist,
         &ghoul2.bltlist,
         bolt_num,
         scale,
@@ -764,6 +1219,7 @@ pub fn g2_get_bolt_matrix_low(
 mod tests {
     use super::*;
     use crate::shared::cghoul2_info_v::CGhoul2Info_v;
+    use mp_host_interface::mock::MockHost;
 
     /// Builds a synthetic `mdxaHeader_t` + `mdxaSkelOffsets_t` + `mdxaSkel_t`
     /// byte blob (one bone) matching the layout `MDXA_*`/`SKEL_OFS_*` above
@@ -833,11 +1289,12 @@ mod tests {
     #[test]
     fn resolve_bolt_matrix_low_falls_back_to_identity() {
         let mut bone_caches = BoneCacheArena::default();
+        let mut host = MockHost::new();
         let scale = [1.0, 1.0, 1.0];
 
         // No bone cache at all.
         assert_eq!(
-            resolve_bolt_matrix_low(&mut bone_caches, None, &[], 0, scale),
+            resolve_bolt_matrix_low(&mut bone_caches, &mut host, None, &[], &[], 0, scale),
             IDENTITY_MATRIX
         );
 
@@ -846,7 +1303,7 @@ mod tests {
         // out-of-range bolt index.
         let id = bone_caches.insert(test_bone_cache());
         assert_eq!(
-            resolve_bolt_matrix_low(&mut bone_caches, Some(id), &[], 0, scale),
+            resolve_bolt_matrix_low(&mut bone_caches, &mut host, Some(id), &[], &[], 0, scale),
             IDENTITY_MATRIX
         );
 
@@ -860,7 +1317,7 @@ mod tests {
             position: IDENTITY_MATRIX,
         }];
         assert_eq!(
-            resolve_bolt_matrix_low(&mut bone_caches, Some(id), &bltlist, 0, scale),
+            resolve_bolt_matrix_low(&mut bone_caches, &mut host, Some(id), &[], &bltlist, 0, scale),
             IDENTITY_MATRIX
         );
     }
