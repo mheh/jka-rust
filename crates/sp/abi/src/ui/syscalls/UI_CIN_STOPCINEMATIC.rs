@@ -1,6 +1,8 @@
 use super::super::types::e_status;
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use core::ffi::c_int;
 
 /// `UI_CIN_STOPCINEMATIC` SP UI imports syscall ABI token.

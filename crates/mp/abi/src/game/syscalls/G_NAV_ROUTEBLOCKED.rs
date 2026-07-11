@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use super::super::MpGameImport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_ROUTEBLOCKED` outbound game-to-engine syscall.
 #[derive(Debug)]

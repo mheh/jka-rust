@@ -9,10 +9,10 @@ use super::bot_synonym_s::bot_synonym_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:100-106`
 #[repr(C)]
 pub struct bot_synonymlist_t {
-	pub context: c_ulong,
-	pub totalweight: f32,
-	pub firstsynonym: *mut bot_synonym_t,
-	pub next: *mut bot_synonymlist_t,
+    pub context: c_ulong,
+    pub totalweight: f32,
+    pub firstsynonym: *mut bot_synonym_t,
+    pub next: *mut bot_synonymlist_t,
 }
 
 pub type bot_synonymlist_s = bot_synonymlist_t;

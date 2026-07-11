@@ -1,0 +1,1404 @@
+=== qcommon__0237_unzlocal_getShort.md ===
+# ENGINE PORT PACKET — `unzlocal_getShort`
+
+- seq **237**  ·  wave **0**  ·  unit **236**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **9**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzlocal_getShort(fin: *mut FILE, pX: *mut uLong) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzlocal_getShort` — oracle/codemp/qcommon/unzip.cpp:255-263 (9 LOC)
+```c
+  255 | static int unzlocal_getShort (ZIP_FILE* fin, uLong *pX)
+  256 | {
+  257 | 	short	v;
+  258 | 
+  259 | 	ZIP_fread( &v, sizeof(v), 1, fin );
+  260 | 
+  261 | 	*pX = LittleShort( v);
+  262 | 	return UNZ_OK;
+  263 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 1 external(s)
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`fread`
+
+## TYPE ROSETTA — import these, never redeclare
+
+**Not in the rosetta (escalation, NOT a stub — a real port needs these landed/renamed first; the finisher triages):** `FILE`, `uLong`
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+**Seam-supplied (vendored zlib/png → Rust crate seam, plan §1):** `ZIP_FILE` — no rosetta row by design; obtain from the seam wrapper module at port time (escalate if the seam lacks one).
+
+=== qcommon__0238_unzlocal_getLong.md ===
+# ENGINE PORT PACKET — `unzlocal_getLong`
+
+- seq **238**  ·  wave **0**  ·  unit **237**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **9**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzlocal_getLong(fin: *mut FILE, pX: *mut uLong) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzlocal_getLong` — oracle/codemp/qcommon/unzip.cpp:265-273 (9 LOC)
+```c
+  265 | static int unzlocal_getLong (ZIP_FILE *fin, uLong *pX)
+  266 | {
+  267 | 	int		v;
+  268 | 
+  269 | 	ZIP_fread( &v, sizeof(v), 1, fin );
+  270 | 
+  271 | 	*pX = LittleLong( v);
+  272 | 	return UNZ_OK;
+  273 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 1 external(s)
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`fread`
+
+## TYPE ROSETTA — import these, never redeclare
+
+**Not in the rosetta (escalation, NOT a stub — a real port needs these landed/renamed first; the finisher triages):** `FILE`, `uLong`
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+**Seam-supplied (vendored zlib/png → Rust crate seam, plan §1):** `ZIP_FILE` — no rosetta row by design; obtain from the seam wrapper module at port time (escalate if the seam lacks one).
+
+=== qcommon__0239_strcmpcasenosensitive_internal.md ===
+# ENGINE PORT PACKET — `strcmpcasenosensitive_internal`
+
+- seq **239**  ·  wave **0**  ·  unit **238**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **20**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn strcmpcasenosensitive_internal(fileName1: *const c_char, fileName2: *const c_char) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `strcmpcasenosensitive_internal` — oracle/codemp/qcommon/unzip.cpp:277-296 (20 LOC)
+```c
+  277 | static int strcmpcasenosensitive_internal (const char* fileName1,const char* fileName2)
+  278 | {
+  279 | 	for (;;)
+  280 | 	{
+  281 | 		char c1=*(fileName1++);
+  282 | 		char c2=*(fileName2++);
+  283 | 		if ((c1>='a') && (c1<='z'))
+  284 | 			c1 -= 0x20;
+  285 | 		if ((c2>='a') && (c2<='z'))
+  286 | 			c2 -= 0x20;
+  287 | 		if (c1=='\0')
+  288 | 			return ((c2=='\0') ? 0 : -1);
+  289 | 		if (c2=='\0')
+  290 | 			return 1;
+  291 | 		if (c1<c2)
+  292 | 			return -1;
+  293 | 		if (c1>c2)
+  294 | 			return 1;
+  295 | 	}
+  296 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+=== qcommon__0240_unzGetGlobalInfo.md ===
+# ENGINE PORT PACKET — `unzGetGlobalInfo`
+
+- seq **240**  ·  wave **0**  ·  unit **239**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **9**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzGetGlobalInfo(file: unzFile, pglobal_info: *mut unz_global_info) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzGetGlobalInfo` — oracle/codemp/qcommon/unzip.cpp:528-536 (9 LOC)
+```c
+  528 | extern int unzGetGlobalInfo (unzFile file,unz_global_info *pglobal_info)
+  529 | {
+  530 | 	unz_s* s;
+  531 | 	if (file==NULL)
+  532 | 		return UNZ_PARAMERROR;
+  533 | 	s=(unz_s*)file;
+  534 | 	*pglobal_info=s->gi;
+  535 | 	return UNZ_OK;
+  536 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+**Not in the rosetta (escalation, NOT a stub — a real port needs these landed/renamed first; the finisher triages):** `unz_global_info`
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+=== qcommon__0241_unzlocal_DosDateToTmuDate.md ===
+# ENGINE PORT PACKET — `unzlocal_DosDateToTmuDate`
+
+- seq **241**  ·  wave **0**  ·  unit **240**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **12**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzlocal_DosDateToTmuDate(ulDosDate: uLong, ptm: *mut tm_unz) { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzlocal_DosDateToTmuDate` — oracle/codemp/qcommon/unzip.cpp:542-553 (12 LOC)
+```c
+  542 | static void unzlocal_DosDateToTmuDate (uLong ulDosDate, tm_unz* ptm)
+  543 | {
+  544 |     uLong uDate;
+  545 |     uDate = (uLong)(ulDosDate>>16);
+  546 |     ptm->tm_mday = (uInt)(uDate&0x1f) ;
+  547 |     ptm->tm_mon =  (uInt)((((uDate)&0x1E0)/0x20)-1) ;
+  548 |     ptm->tm_year = (uInt)(((uDate&0x0FE00)/0x0200)+1980) ;
+  549 | 
+  550 |     ptm->tm_hour = (uInt) ((ulDosDate &0xF800)/0x800);
+  551 |     ptm->tm_min =  (uInt) ((ulDosDate&0x7E0)/0x20) ;
+  552 |     ptm->tm_sec =  (uInt) (2*(ulDosDate&0x1f)) ;
+  553 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+**Not in the rosetta (escalation, NOT a stub — a real port needs these landed/renamed first; the finisher triages):** `tm_unz`, `uLong`
+
+=== qcommon__0242_unzGetCurrentFileInfoPosition.md ===
+# ENGINE PORT PACKET — `unzGetCurrentFileInfoPosition`
+
+- seq **242**  ·  wave **0**  ·  unit **241**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **11**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzGetCurrentFileInfoPosition(file: unzFile, pos: *mut c_ulong) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzGetCurrentFileInfoPosition` — oracle/codemp/qcommon/unzip.cpp:786-796 (11 LOC)
+```c
+  786 | extern int unzGetCurrentFileInfoPosition (unzFile file, unsigned long *pos )
+  787 | {
+  788 | 	unz_s* s;	
+  789 | 
+  790 | 	if (file==NULL)
+  791 | 		return UNZ_PARAMERROR;
+  792 | 	s=(unz_s*)file;
+  793 | 
+  794 | 	*pos = s->pos_in_central_dir;
+  795 | 	return UNZ_OK;
+  796 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+=== qcommon__0243_unzReadCurrentFile.md ===
+# ENGINE PORT PACKET — `unzReadCurrentFile`
+
+- seq **243**  ·  wave **0**  ·  unit **242**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **119**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzReadCurrentFile(file: unzFile, buf: *mut (), len: c_uint) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzReadCurrentFile` — oracle/codemp/qcommon/unzip.cpp:1050-1168 (119 LOC)
+```c
+ 1050 | extern int unzReadCurrentFile  (unzFile file, void *buf, unsigned len)
+ 1051 | {
+ 1052 | 	int err=UNZ_OK;
+ 1053 | 	uInt iRead = 0;
+ 1054 | 	unz_s* s;
+ 1055 | 	file_in_zip_read_info_s* pfile_in_zip_read_info;
+ 1056 | 	if (file==NULL)
+ 1057 | 		return UNZ_PARAMERROR;
+ 1058 | 	s=(unz_s*)file;
+ 1059 |     pfile_in_zip_read_info=s->pfile_in_zip_read;
+ 1060 | 
+ 1061 | 	if (pfile_in_zip_read_info==NULL)
+ 1062 | 		return UNZ_PARAMERROR;
+ 1063 | 
+ 1064 | 
+ 1065 | 	if ((pfile_in_zip_read_info->read_buffer == NULL))
+ 1066 | 		return UNZ_END_OF_LIST_OF_FILE;
+ 1067 | 	if (len==0)
+ 1068 | 		return 0;
+ 1069 | 
+ 1070 | 	pfile_in_zip_read_info->stream.next_out = (Byte*)buf;
+ 1071 | 
+ 1072 | 	pfile_in_zip_read_info->stream.avail_out = (uInt)len;
+ 1073 | 	
+ 1074 | 	if (len>pfile_in_zip_read_info->rest_read_uncompressed)
+ 1075 | 		pfile_in_zip_read_info->stream.avail_out = 
+ 1076 | 		  (uInt)pfile_in_zip_read_info->rest_read_uncompressed;
+ 1077 | 
+ 1078 | 	while (pfile_in_zip_read_info->stream.avail_out>0)
+ 1079 | 	{
+ 1080 | 		if ((pfile_in_zip_read_info->stream.avail_in==0) &&
+ 1081 |             (pfile_in_zip_read_info->rest_read_compressed>0))
+ 1082 | 		{
+ 1083 | 			uInt uReadThis = UNZ_BUFSIZE;
+ 1084 | 			if (pfile_in_zip_read_info->rest_read_compressed<uReadThis)
+ 1085 | 				uReadThis = (uInt)pfile_in_zip_read_info->rest_read_compressed;
+ 1086 | 			if (uReadThis == 0)
+ 1087 | 				return UNZ_EOF;
+ 1088 | 			if (s->cur_file_info.compressed_size == pfile_in_zip_read_info->rest_read_compressed)
+ 1089 | 				if (ZIP_fseek(pfile_in_zip_read_info->file,
+ 1090 | 						  pfile_in_zip_read_info->pos_in_zipfile + 
+ 1091 | 							 pfile_in_zip_read_info->byte_before_the_zipfile,SEEK_SET)!=0)
+ 1092 | 					return UNZ_ERRNO;
+ 1093 | 			if (ZIP_fread(pfile_in_zip_read_info->read_buffer,uReadThis,1,
+ 1094 |                          pfile_in_zip_read_info->file)!=1)
+ 1095 | 				return UNZ_ERRNO;
+ 1096 | 			pfile_in_zip_read_info->pos_in_zipfile += uReadThis;
+ 1097 | 
+ 1098 | 			pfile_in_zip_read_info->rest_read_compressed-=uReadThis;
+ 1099 | 			
+ 1100 | 			pfile_in_zip_read_info->stream.next_in = 
+ 1101 |                 (Byte*)pfile_in_zip_read_info->read_buffer;
+ 1102 | 			pfile_in_zip_read_info->stream.avail_in = (uInt)uReadThis;
+ 1103 | 		}
+ 1104 | 
+ 1105 | 		if (pfile_in_zip_read_info->compression_method==0)
+ 1106 | 		{
+ 1107 | 			uInt uDoCopy,i ;
+ 1108 | 			if (pfile_in_zip_read_info->stream.avail_out < 
+ 1109 |                             pfile_in_zip_read_info->stream.avail_in)
+ 1110 | 				uDoCopy = pfile_in_zip_read_info->stream.avail_out ;
+ 1111 | 			else
+ 1112 | 				uDoCopy = pfile_in_zip_read_info->stream.avail_in ;
+ 1113 | 				
+ 1114 | 			for (i=0;i<uDoCopy;i++)
+ 1115 | 				*(pfile_in_zip_read_info->stream.next_out+i) =
+ 1116 |                         *(pfile_in_zip_read_info->stream.next_in+i);
+ 1117 | 					
+ 1118 | //			pfile_in_zip_read_info->crc32 = crc32(pfile_in_zip_read_info->crc32,
+ 1119 | //								pfile_in_zip_read_info->stream.next_out,
+ 1120 | //								uDoCopy);
+ 1121 | 			pfile_in_zip_read_info->rest_read_uncompressed-=uDoCopy;
+ 1122 | 			pfile_in_zip_read_info->stream.avail_in -= uDoCopy;
+ 1123 | 			pfile_in_zip_read_info->stream.avail_out -= uDoCopy;
+ 1124 | 			pfile_in_zip_read_info->stream.next_out += uDoCopy;
+ 1125 | 			pfile_in_zip_read_info->stream.next_in += uDoCopy;
+ 1126 |             pfile_in_zip_read_info->stream.total_out += uDoCopy;
+ 1127 | 			iRead += uDoCopy;
+ 1128 | 		}
+ 1129 | 		else
+ 1130 | 		{
+ 1131 | 			uLong uTotalOutBefore,uTotalOutAfter;
+ 1132 | 			const Byte *bufBefore;
+ 1133 | 			uLong uOutThis;
+ 1134 | 
+ 1135 | 			uTotalOutBefore = pfile_in_zip_read_info->stream.total_out;
+ 1136 | 			bufBefore = pfile_in_zip_read_info->stream.next_out;
+ 1137 | 
+ 1138 | 			/*
+ 1139 | 			if ((pfile_in_zip_read_info->rest_read_uncompressed ==
+ 1140 | 			         pfile_in_zip_read_info->stream.avail_out) &&
+ 1141 | 				(pfile_in_zip_read_info->rest_read_compressed == 0))
+ 1142 | 				flush = Z_FINISH;
+ 1143 | 			*/
+ 1144 | 			err=inflate(&pfile_in_zip_read_info->stream);
+ 1145 | 
+ 1146 | 			uTotalOutAfter = pfile_in_zip_read_info->stream.total_out;
+ 1147 | 			uOutThis = uTotalOutAfter-uTotalOutBefore;
+ 1148 | 			
+ 1149 | //			pfile_in_zip_read_info->crc32 = 
+ 1150 | //                crc32(pfile_in_zip_read_info->crc32,bufBefore,
+ 1151 | //                        (uInt)(uOutThis));
+ 1152 | 
+ 1153 | 			pfile_in_zip_read_info->rest_read_uncompressed -=
+ 1154 |                 uOutThis;
+ 1155 | 
+ 1156 | 			iRead += (uInt)(uTotalOutAfter - uTotalOutBefore);
+ 1157 |             
+ 1158 | 			if (err==Z_STREAM_END)
+ 1159 | 				return (iRead==0) ? UNZ_EOF : iRead;
+ 1160 | 			if (err!=Z_OK) 
+ 1161 | 				break;
+ 1162 | 		}
+ 1163 | 	}
+ 1164 | 
+ 1165 | 	if (err==Z_OK)
+ 1166 | 		return iRead;
+ 1167 | 	return err;
+ 1168 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 3 external(s)
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`fread`, `fseek`, `inflate`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_BUFSIZE` | `UNZ_BUFSIZE` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_END_OF_LIST_OF_FILE` | `UNZ_END_OF_LIST_OF_FILE` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_EOF` | `UNZ_EOF` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_ERRNO` | `UNZ_ERRNO` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+**Seam-supplied (vendored zlib/png → Rust crate seam, plan §1):** `SEEK_SET`, `Z_FINISH`, `Z_OK`, `Z_STREAM_END` — no rosetta row by design; obtain from the seam wrapper module at port time (escalate if the seam lacks one).
+
+=== qcommon__0244_unztell.md ===
+# ENGINE PORT PACKET — `unztell`
+
+- seq **244**  ·  wave **0**  ·  unit **243**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **14**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unztell(file: unzFile) -> c_long { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unztell` — oracle/codemp/qcommon/unzip.cpp:1174-1187 (14 LOC)
+```c
+ 1174 | extern long unztell (unzFile file)
+ 1175 | {
+ 1176 | 	unz_s* s;
+ 1177 | 	file_in_zip_read_info_s* pfile_in_zip_read_info;
+ 1178 | 	if (file==NULL)
+ 1179 | 		return UNZ_PARAMERROR;
+ 1180 | 	s=(unz_s*)file;
+ 1181 |     pfile_in_zip_read_info=s->pfile_in_zip_read;
+ 1182 | 
+ 1183 | 	if (pfile_in_zip_read_info==NULL)
+ 1184 | 		return UNZ_PARAMERROR;
+ 1185 | 
+ 1186 | 	return (long)pfile_in_zip_read_info->stream.total_out;
+ 1187 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+=== qcommon__0245_unzeof.md ===
+# ENGINE PORT PACKET — `unzeof`
+
+- seq **245**  ·  wave **0**  ·  unit **244**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **17**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzeof(file: unzFile) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzeof` — oracle/codemp/qcommon/unzip.cpp:1193-1209 (17 LOC)
+```c
+ 1193 | extern int unzeof (unzFile file)
+ 1194 | {
+ 1195 | 	unz_s* s;
+ 1196 | 	file_in_zip_read_info_s* pfile_in_zip_read_info;
+ 1197 | 	if (file==NULL)
+ 1198 | 		return UNZ_PARAMERROR;
+ 1199 | 	s=(unz_s*)file;
+ 1200 |     pfile_in_zip_read_info=s->pfile_in_zip_read;
+ 1201 | 
+ 1202 | 	if (pfile_in_zip_read_info==NULL)
+ 1203 | 		return UNZ_PARAMERROR;
+ 1204 | 	
+ 1205 | 	if (pfile_in_zip_read_info->rest_read_uncompressed == 0)
+ 1206 | 		return 1;
+ 1207 | 	else
+ 1208 | 		return 0;
+ 1209 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+=== qcommon__0246_unzGetLocalExtrafield.md ===
+# ENGINE PORT PACKET — `unzGetLocalExtrafield`
+
+- seq **246**  ·  wave **0**  ·  unit **245**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **39**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzGetLocalExtrafield(file: unzFile, buf: *mut (), len: c_uint) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzGetLocalExtrafield` — oracle/codemp/qcommon/unzip.cpp:1225-1263 (39 LOC)
+```c
+ 1225 | extern int unzGetLocalExtrafield (unzFile file,void *buf,unsigned len)
+ 1226 | {
+ 1227 | 	unz_s* s;
+ 1228 | 	file_in_zip_read_info_s* pfile_in_zip_read_info;
+ 1229 | 	uInt read_now;
+ 1230 | 	uLong size_to_read;
+ 1231 | 
+ 1232 | 	if (file==NULL)
+ 1233 | 		return UNZ_PARAMERROR;
+ 1234 | 	s=(unz_s*)file;
+ 1235 |     pfile_in_zip_read_info=s->pfile_in_zip_read;
+ 1236 | 
+ 1237 | 	if (pfile_in_zip_read_info==NULL)
+ 1238 | 		return UNZ_PARAMERROR;
+ 1239 | 
+ 1240 | 	size_to_read = (pfile_in_zip_read_info->size_local_extrafield - 
+ 1241 | 				pfile_in_zip_read_info->pos_local_extrafield);
+ 1242 | 
+ 1243 | 	if (buf==NULL)
+ 1244 | 		return (int)size_to_read;
+ 1245 | 	
+ 1246 | 	if (len>size_to_read)
+ 1247 | 		read_now = (uInt)size_to_read;
+ 1248 | 	else
+ 1249 | 		read_now = (uInt)len ;
+ 1250 | 
+ 1251 | 	if (read_now==0)
+ 1252 | 		return 0;
+ 1253 | 	
+ 1254 | 	if (ZIP_fseek(pfile_in_zip_read_info->file,
+ 1255 |               pfile_in_zip_read_info->offset_local_extrafield + 
+ 1256 | 			  pfile_in_zip_read_info->pos_local_extrafield,SEEK_SET)!=0)
+ 1257 | 		return UNZ_ERRNO;
+ 1258 | 
+ 1259 | 	if (ZIP_fread(buf,(uInt)size_to_read,1,pfile_in_zip_read_info->file)!=1)
+ 1260 | 		return UNZ_ERRNO;
+ 1261 | 
+ 1262 | 	return (int)read_now;
+ 1263 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 2 external(s)
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`fread`, `fseek`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_ERRNO` | `UNZ_ERRNO` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+**Seam-supplied (vendored zlib/png → Rust crate seam, plan §1):** `SEEK_SET` — no rosetta row by design; obtain from the seam wrapper module at port time (escalate if the seam lacks one).
+
+=== qcommon__0247_unzGetGlobalComment.md ===
+# ENGINE PORT PACKET — `unzGetGlobalComment`
+
+- seq **247**  ·  wave **0**  ·  unit **246**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **26**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzGetGlobalComment(file: unzFile, szComment: *mut c_char, uSizeBuf: uLong) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzGetGlobalComment` — oracle/codemp/qcommon/unzip.cpp:1310-1335 (26 LOC)
+```c
+ 1310 | extern int unzGetGlobalComment (unzFile file, char *szComment, uLong uSizeBuf)
+ 1311 | {
+ 1312 | 	unz_s* s;
+ 1313 | 	uLong uReadThis ;
+ 1314 | 	if (file==NULL)
+ 1315 | 		return UNZ_PARAMERROR;
+ 1316 | 	s=(unz_s*)file;
+ 1317 | 
+ 1318 | 	uReadThis = uSizeBuf;
+ 1319 | 	if (uReadThis>s->gi.size_comment)
+ 1320 | 		uReadThis = s->gi.size_comment;
+ 1321 | 
+ 1322 | 	if (ZIP_fseek(s->file,s->central_pos+22,SEEK_SET)!=0)
+ 1323 | 		return UNZ_ERRNO;
+ 1324 | 
+ 1325 | 	if (uReadThis>0)
+ 1326 |     {
+ 1327 |       *szComment='\0';
+ 1328 | 	  if (ZIP_fread(szComment,(uInt)uReadThis,1,s->file)!=1)
+ 1329 | 		return UNZ_ERRNO;
+ 1330 |     }
+ 1331 | 
+ 1332 | 	if ((szComment != NULL) && (uSizeBuf > s->gi.size_comment))
+ 1333 | 		*(szComment+s->gi.size_comment)='\0';
+ 1334 | 	return (int)uReadThis;
+ 1335 | }
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 2 external(s)
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`fread`, `fseek`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+**Not in the rosetta (escalation, NOT a stub — a real port needs these landed/renamed first; the finisher triages):** `uLong`
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_ERRNO` | `UNZ_ERRNO` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+**Seam-supplied (vendored zlib/png → Rust crate seam, plan §1):** `SEEK_SET` — no rosetta row by design; obtain from the seam wrapper module at port time (escalate if the seam lacks one).
+
+=== qcommon__0958_unzStringFileNameCompare.md ===
+# ENGINE PORT PACKET — `unzStringFileNameCompare`
+
+- seq **958**  ·  wave **1**  ·  unit **957**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **10**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzStringFileNameCompare(fileName1: *const c_char, fileName2: *const c_char, iCaseSensitivity: c_int) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzStringFileNameCompare` — oracle/codemp/qcommon/unzip.cpp:318-327 (10 LOC)
+```c
+  318 | extern int unzStringFileNameCompare (const char* fileName1,const char* fileName2,int iCaseSensitivity)
+  319 | {
+  320 | 	if (iCaseSensitivity==0)
+  321 | 		iCaseSensitivity=CASESENSITIVITYDEFAULTVALUE;
+  322 | 
+  323 | 	if (iCaseSensitivity==1)
+  324 | 		return strcmp(fileName1,fileName2);
+  325 | 
+  326 | 	return STRCMPCASENOSENTIVEFUNCTION(fileName1,fileName2);
+  327 | } 
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `strcmpcasenosensitive_internal` | — | packet `qcommon__0239_strcmpcasenosensitive_internal.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`strcmp`
+
+## TYPE ROSETTA — import these, never redeclare
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `CASESENSITIVITYDEFAULTVALUE` | `CASESENSITIVITYDEFAULTVALUE` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+**Function-like macros (reported, NOT consts — `NAME(...)` in the source; port the macro's expansion, not a const):** `STRCMPCASENOSENTIVEFUNCTION`
+
+=== qcommon__0959_unzlocal_GetCurrentFileInfoInternal.md ===
+# ENGINE PORT PACKET — `unzlocal_GetCurrentFileInfoInternal`
+
+- seq **959**  ·  wave **1**  ·  unit **958**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **156**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzlocal_GetCurrentFileInfoInternal(file: unzFile, pfile_info: *mut unz_file_info, pfile_info_internal: *mut unz_file_info_internal, szFileName: *mut c_char, fileNameBufferSize: uLong, extraField: *mut (), extraFieldBufferSize: uLong, szComment: *mut c_char, commentBufferSize: uLong) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzlocal_GetCurrentFileInfoInternal` — oracle/codemp/qcommon/unzip.cpp:558-713 (156 LOC)
+```c
+  558 | static int unzlocal_GetCurrentFileInfoInternal (unzFile file,
+  559 |                                                   unz_file_info *pfile_info,
+  560 |                                                   unz_file_info_internal 
+  561 |                                                   *pfile_info_internal,
+  562 |                                                   char *szFileName,
+  563 | 												  uLong fileNameBufferSize,
+  564 |                                                   void *extraField,
+  565 | 												  uLong extraFieldBufferSize,
+  566 |                                                   char *szComment,
+  567 | 												  uLong commentBufferSize)
+  568 | {
+  569 | 	unz_s* s;
+  570 | 	unz_file_info file_info;
+  571 | 	unz_file_info_internal file_info_internal;
+  572 | 	int err=UNZ_OK;
+  573 | 	uLong uMagic;
+  574 | 	long lSeek=0;
+  575 | 
+  576 | 	if (file==NULL)
+  577 | 		return UNZ_PARAMERROR;
+  578 | 	s=(unz_s*)file;
+  579 | 	if (ZIP_fseek(s->file,s->pos_in_central_dir+s->byte_before_the_zipfile,SEEK_SET)!=0)
+  580 | 		err=UNZ_ERRNO;
+  581 | 
+  582 | 
+  583 | 	/* we check the magic */
+  584 | 	if (err==UNZ_OK) {
+  585 | 		if (unzlocal_getLong(s->file,&uMagic) != UNZ_OK)
+  586 | 			err=UNZ_ERRNO;
+  587 | 		else if (uMagic!=0x02014b50)
+  588 | 			err=UNZ_BADZIPFILE;
+  589 | 	}
+  590 | 	if (unzlocal_getShort(s->file,&file_info.version) != UNZ_OK)
+  591 | 		err=UNZ_ERRNO;
+  592 | 
+  593 | 	if (unzlocal_getShort(s->file,&file_info.version_needed) != UNZ_OK)
+  594 | 		err=UNZ_ERRNO;
+  595 | 
+  596 | 	if (unzlocal_getShort(s->file,&file_info.flag) != UNZ_OK)
+  597 | 		err=UNZ_ERRNO;
+  598 | 
+  599 | 	if (unzlocal_getShort(s->file,&file_info.compression_method) != UNZ_OK)
+  600 | 		err=UNZ_ERRNO;
+  601 | 
+  602 | 	if (unzlocal_getLong(s->file,&file_info.dosDate) != UNZ_OK)
+  603 | 		err=UNZ_ERRNO;
+  604 | 
+  605 |     unzlocal_DosDateToTmuDate(file_info.dosDate,&file_info.tmu_date);
+  606 | 
+  607 | 	if (unzlocal_getLong(s->file,&file_info.crc) != UNZ_OK)
+  608 | 		err=UNZ_ERRNO;
+  609 | 
+  610 | 	if (unzlocal_getLong(s->file,&file_info.compressed_size) != UNZ_OK)
+  611 | 		err=UNZ_ERRNO;
+  612 | 
+  613 | 	if (unzlocal_getLong(s->file,&file_info.uncompressed_size) != UNZ_OK)
+  614 | 		err=UNZ_ERRNO;
+  615 | 
+  616 | 	if (unzlocal_getShort(s->file,&file_info.size_filename) != UNZ_OK)
+  617 | 		err=UNZ_ERRNO;
+  618 | 
+  619 | 	if (unzlocal_getShort(s->file,&file_info.size_file_extra) != UNZ_OK)
+  620 | 		err=UNZ_ERRNO;
+  621 | 
+  622 | 	if (unzlocal_getShort(s->file,&file_info.size_file_comment) != UNZ_OK)
+  623 | 		err=UNZ_ERRNO;
+  624 | 
+  625 | 	if (unzlocal_getShort(s->file,&file_info.disk_num_start) != UNZ_OK)
+  626 | 		err=UNZ_ERRNO;
+  627 | 
+  628 | 	if (unzlocal_getShort(s->file,&file_info.internal_fa) != UNZ_OK)
+  629 | 		err=UNZ_ERRNO;
+  630 | 
+  631 | 	if (unzlocal_getLong(s->file,&file_info.external_fa) != UNZ_OK)
+  632 | 		err=UNZ_ERRNO;
+  633 | 
+  634 | 	if (unzlocal_getLong(s->file,&file_info_internal.offset_curfile) != UNZ_OK)
+  635 | 		err=UNZ_ERRNO;
+  636 | 
+  637 | 	lSeek+=file_info.size_filename;
+  638 | 	if ((err==UNZ_OK) && (szFileName!=NULL))
+  639 | 	{
+  640 | 		uLong uSizeRead ;
+  641 | 		if (file_info.size_filename<fileNameBufferSize)
+  642 | 		{
+  643 | 			*(szFileName+file_info.size_filename)='\0';
+  644 | 			uSizeRead = file_info.size_filename;
+  645 | 		}
+  646 | 		else
+  647 | 			uSizeRead = fileNameBufferSize;
+  648 | 
+  649 | 		if ((file_info.size_filename>0) && (fileNameBufferSize>0))
+  650 | 			if (ZIP_fread(szFileName,(uInt)uSizeRead,1,s->file)!=1)
+  651 | 				err=UNZ_ERRNO;
+  652 | 		lSeek -= uSizeRead;
+  653 | 	}
+  654 | 
+  655 | 	
+  656 | 	if ((err==UNZ_OK) && (extraField!=NULL))
+  657 | 	{
+  658 | 		uLong uSizeRead ;
+  659 | 		if (file_info.size_file_extra<extraFieldBufferSize)
+  660 | 			uSizeRead = file_info.size_file_extra;
+  661 | 		else
+  662 | 			uSizeRead = extraFieldBufferSize;
+  663 | 
+  664 | 		if (lSeek!=0) {
+  665 | 			if (ZIP_fseek(s->file,lSeek,SEEK_CUR)==0)
+  666 | 				lSeek=0;
+  667 | 			else
+  668 | 				err=UNZ_ERRNO;
+  669 | 		}
+  670 | 		if ((file_info.size_file_extra>0) && (extraFieldBufferSize>0)) {
+  671 | 			if (ZIP_fread(extraField,(uInt)uSizeRead,1,s->file)!=1)
+  672 | 				err=UNZ_ERRNO;
+  673 | 		}
+  674 | 		lSeek += file_info.size_file_extra - uSizeRead;
+  675 | 	}
+  676 | 	else
+  677 | 		lSeek+=file_info.size_file_extra; 
+  678 | 
+  679 | 	
+  680 | 	if ((err==UNZ_OK) && (szComment!=NULL))
+  681 | 	{
+  682 | 		uLong uSizeRead ;
+  683 | 		if (file_info.size_file_comment<commentBufferSize)
+  684 | 		{
+  685 | 			*(szComment+file_info.size_file_comment)='\0';
+  686 | 			uSizeRead = file_info.size_file_comment;
+  687 | 		}
+  688 | 		else
+  689 | 			uSizeRead = commentBufferSize;
+  690 | 
+  691 | 		if (lSeek!=0) {
+  692 | 			if (ZIP_fseek(s->file,lSeek,SEEK_CUR)==0)
+  693 | 				lSeek=0;
+  694 | 			else
+  695 | 				err=UNZ_ERRNO;
+  696 | 		}
+  697 | 		if ((file_info.size_file_comment>0) && (commentBufferSize>0)) {
+  698 | 			if (ZIP_fread(szComment,(uInt)uSizeRead,1,s->file)!=1)
+  699 | 				err=UNZ_ERRNO;
+  700 | 		}
+  701 | 		lSeek+=file_info.size_file_comment - uSizeRead;
+  702 | 	}
+  703 | 	else
+  704 | 		lSeek+=file_info.size_file_comment;
+  705 | 
+  706 | 	if ((err==UNZ_OK) && (pfile_info!=NULL))
+  707 | 		*pfile_info=file_info;
+  708 | 
+  709 | 	if ((err==UNZ_OK) && (pfile_info_internal!=NULL))
+  710 | 		*pfile_info_internal=file_info_internal;
+  711 | 
+  712 | 	return err;
+  713 | }
+```
+
+## RESOLVED CALL SURFACE — 3 in-engine callee(s), 4 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `unzlocal_DosDateToTmuDate` | — | packet `qcommon__0241_unzlocal_DosDateToTmuDate.md` |
+| `unzlocal_getLong` | — | packet `qcommon__0238_unzlocal_getLong.md` |
+| `unzlocal_getShort` | — | packet `qcommon__0237_unzlocal_getShort.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`fread`, `fseek`, `unz_file_info_internal_s`, `unz_file_info_s`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+**Not in the rosetta (escalation, NOT a stub — a real port needs these landed/renamed first; the finisher triages):** `uLong`, `unz_file_info`, `unz_file_info_internal`
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_BADZIPFILE` | `UNZ_BADZIPFILE` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_ERRNO` | `UNZ_ERRNO` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+**Seam-supplied (vendored zlib/png → Rust crate seam, plan §1):** `SEEK_CUR`, `SEEK_SET` — no rosetta row by design; obtain from the seam wrapper module at port time (escalate if the seam lacks one).
+
+=== qcommon__0960_unzlocal_CheckCurrentFileCoherencyHeader.md ===
+# ENGINE PORT PACKET — `unzlocal_CheckCurrentFileCoherencyHeader`
+
+- seq **960**  ·  wave **1**  ·  unit **959**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **81**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzlocal_CheckCurrentFileCoherencyHeader(s: *mut unz_s, piSizeVar: *mut uInt, poffset_local_extrafield: *mut uLong, psize_local_extrafield: *mut uInt) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzlocal_CheckCurrentFileCoherencyHeader` — oracle/codemp/qcommon/unzip.cpp:877-957 (81 LOC)
+```c
+  877 | static int unzlocal_CheckCurrentFileCoherencyHeader (unz_s* s, uInt* piSizeVar,
+  878 | 													uLong *poffset_local_extrafield,
+  879 | 													uInt *psize_local_extrafield)
+  880 | {
+  881 | 	uLong uMagic,uData,uFlags;
+  882 | 	uLong size_filename;
+  883 | 	uLong size_extra_field;
+  884 | 	int err=UNZ_OK;
+  885 | 
+  886 | 	*piSizeVar = 0;
+  887 | 	*poffset_local_extrafield = 0;
+  888 | 	*psize_local_extrafield = 0;
+  889 | 
+  890 | 	if (ZIP_fseek(s->file,s->cur_file_info_internal.offset_curfile +
+  891 | 								s->byte_before_the_zipfile,SEEK_SET)!=0)
+  892 | 		return UNZ_ERRNO;
+  893 | 
+  894 | 
+  895 | 	if (err==UNZ_OK) {
+  896 | 		if (unzlocal_getLong(s->file,&uMagic) != UNZ_OK)
+  897 | 			err=UNZ_ERRNO;
+  898 | 		else if (uMagic!=0x04034b50)
+  899 | 			err=UNZ_BADZIPFILE;
+  900 | 	}
+  901 | 	if (unzlocal_getShort(s->file,&uData) != UNZ_OK)
+  902 | 		err=UNZ_ERRNO;
+  903 | /*
+  904 | 	else if ((err==UNZ_OK) && (uData!=s->cur_file_info.wVersion))
+  905 | 		err=UNZ_BADZIPFILE;
+  906 | */
+  907 | 	if (unzlocal_getShort(s->file,&uFlags) != UNZ_OK)
+  908 | 		err=UNZ_ERRNO;
+  909 | 
+  910 | 	if (unzlocal_getShort(s->file,&uData) != UNZ_OK)
+  911 | 		err=UNZ_ERRNO;
+  912 | 	else if ((err==UNZ_OK) && (uData!=s->cur_file_info.compression_method))
+  913 | 		err=UNZ_BADZIPFILE;
+  914 | 
+  915 |     if ((err==UNZ_OK) && (s->cur_file_info.compression_method!=0) &&
+  916 |                          (s->cur_file_info.compression_method!=ZF_DEFLATED))
+  917 |         err=UNZ_BADZIPFILE;
+  918 | 
+  919 | 	if (unzlocal_getLong(s->file,&uData) != UNZ_OK) /* date/time */
+  920 | 		err=UNZ_ERRNO;
+  921 | 
+  922 | 	if (unzlocal_getLong(s->file,&uData) != UNZ_OK) /* crc */
+  923 | 		err=UNZ_ERRNO;
+  924 | 	else if ((err==UNZ_OK) && (uData!=s->cur_file_info.crc) &&
+  925 | 		                      ((uFlags & 8)==0))
+  926 | 		err=UNZ_BADZIPFILE;
+  927 | 
+  928 | 	if (unzlocal_getLong(s->file,&uData) != UNZ_OK) /* size compr */
+  929 | 		err=UNZ_ERRNO;
+  930 | 	else if ((err==UNZ_OK) && (uData!=s->cur_file_info.compressed_size) &&
+  931 | 							  ((uFlags & 8)==0))
+  932 | 		err=UNZ_BADZIPFILE;
+  933 | 
+  934 | 	if (unzlocal_getLong(s->file,&uData) != UNZ_OK) /* size uncompr */
+  935 | 		err=UNZ_ERRNO;
+  936 | 	else if ((err==UNZ_OK) && (uData!=s->cur_file_info.uncompressed_size) && 
+  937 | 							  ((uFlags & 8)==0))
+  938 | 		err=UNZ_BADZIPFILE;
+  939 | 
+  940 | 
+  941 | 	if (unzlocal_getShort(s->file,&size_filename) != UNZ_OK)
+  942 | 		err=UNZ_ERRNO;
+  943 | 	else if ((err==UNZ_OK) && (size_filename!=s->cur_file_info.size_filename))
+  944 | 		err=UNZ_BADZIPFILE;
+  945 | 
+  946 | 	*piSizeVar += (uInt)size_filename;
+  947 | 
+  948 | 	if (unzlocal_getShort(s->file,&size_extra_field) != UNZ_OK)
+  949 | 		err=UNZ_ERRNO;
+  950 | 	*poffset_local_extrafield= s->cur_file_info_internal.offset_curfile +
+  951 | 									SIZEZIPLOCALHEADER + size_filename;
+  952 | 	*psize_local_extrafield = (uInt)size_extra_field;
+  953 | 
+  954 | 	*piSizeVar += (uInt)size_extra_field;
+  955 | 
+  956 | 	return err;
+  957 | }
+```
+
+## RESOLVED CALL SURFACE — 2 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `unzlocal_getLong` | — | packet `qcommon__0238_unzlocal_getLong.md` |
+| `unzlocal_getShort` | — | packet `qcommon__0237_unzlocal_getShort.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`fseek`
+
+## TYPE ROSETTA — import these, never redeclare
+
+**Not in the rosetta (escalation, NOT a stub — a real port needs these landed/renamed first; the finisher triages):** `uInt`, `uLong`, `unz_s`
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `SIZEZIPLOCALHEADER` | `SIZEZIPLOCALHEADER` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_BADZIPFILE` | `UNZ_BADZIPFILE` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_ERRNO` | `UNZ_ERRNO` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+**Seam-supplied (vendored zlib/png → Rust crate seam, plan §1):** `SEEK_SET`, `ZF_DEFLATED` — no rosetta row by design; obtain from the seam wrapper module at port time (escalate if the seam lacks one).
+
+=== qcommon__1289_unzGetCurrentFileInfo.md ===
+# ENGINE PORT PACKET — `unzGetCurrentFileInfo`
+
+- seq **1289**  ·  wave **2**  ·  unit **1288**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **10**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzGetCurrentFileInfo(file: unzFile, pfile_info: *mut unz_file_info, szFileName: *mut c_char, fileNameBufferSize: uLong, extraField: *mut (), extraFieldBufferSize: uLong, szComment: *mut c_char, commentBufferSize: uLong) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzGetCurrentFileInfo` — oracle/codemp/qcommon/unzip.cpp:722-731 (10 LOC)
+```c
+  722 | extern int unzGetCurrentFileInfo (	unzFile file, unz_file_info *pfile_info,
+  723 | 									char *szFileName, uLong fileNameBufferSize,
+  724 | 									void *extraField, uLong extraFieldBufferSize,
+  725 | 									char *szComment, uLong commentBufferSize)
+  726 | {
+  727 | 	return unzlocal_GetCurrentFileInfoInternal(file,pfile_info,NULL,
+  728 | 												szFileName,fileNameBufferSize,
+  729 | 												extraField,extraFieldBufferSize,
+  730 | 												szComment,commentBufferSize);
+  731 | }
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 0 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `unzlocal_GetCurrentFileInfoInternal` | — | packet `qcommon__0959_unzlocal_GetCurrentFileInfoInternal.md` |
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+**Not in the rosetta (escalation, NOT a stub — a real port needs these landed/renamed first; the finisher triages):** `uLong`, `unz_file_info`
+
+=== qcommon__1290_unzGoToFirstFile.md ===
+# ENGINE PORT PACKET — `unzGoToFirstFile`
+
+- seq **1290**  ·  wave **2**  ·  unit **1289**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **15**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzGoToFirstFile(file: unzFile) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzGoToFirstFile` — oracle/codemp/qcommon/unzip.cpp:737-751 (15 LOC)
+```c
+  737 | extern int unzGoToFirstFile (unzFile file)
+  738 | {
+  739 | 	int err=UNZ_OK;
+  740 | 	unz_s* s;
+  741 | 	if (file==NULL)
+  742 | 		return UNZ_PARAMERROR;
+  743 | 	s=(unz_s*)file;
+  744 | 	s->pos_in_central_dir=s->offset_central_dir;
+  745 | 	s->num_file=0;
+  746 | 	err=unzlocal_GetCurrentFileInfoInternal(file,&s->cur_file_info,
+  747 | 											 &s->cur_file_info_internal,
+  748 | 											 NULL,0,NULL,0,NULL,0);
+  749 | 	s->current_file_ok = (err == UNZ_OK);
+  750 | 	return err;
+  751 | }
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 0 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `unzlocal_GetCurrentFileInfoInternal` | — | packet `qcommon__0959_unzlocal_GetCurrentFileInfoInternal.md` |
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+=== qcommon__1291_unzGoToNextFile.md ===
+# ENGINE PORT PACKET — `unzGoToNextFile`
+
+- seq **1291**  ·  wave **2**  ·  unit **1290**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **22**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzGoToNextFile(file: unzFile) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzGoToNextFile` — oracle/codemp/qcommon/unzip.cpp:759-780 (22 LOC)
+```c
+  759 | extern int unzGoToNextFile (unzFile file)
+  760 | {
+  761 | 	unz_s* s;	
+  762 | 	int err;
+  763 | 
+  764 | 	if (file==NULL)
+  765 | 		return UNZ_PARAMERROR;
+  766 | 	s=(unz_s*)file;
+  767 | 	if (!s->current_file_ok)
+  768 | 		return UNZ_END_OF_LIST_OF_FILE;
+  769 | 	if (s->num_file+1==s->gi.number_entry)
+  770 | 		return UNZ_END_OF_LIST_OF_FILE;
+  771 | 
+  772 | 	s->pos_in_central_dir += SIZECENTRALDIRITEM + s->cur_file_info.size_filename +
+  773 | 			s->cur_file_info.size_file_extra + s->cur_file_info.size_file_comment ;
+  774 | 	s->num_file++;
+  775 | 	err = unzlocal_GetCurrentFileInfoInternal(file,&s->cur_file_info,
+  776 | 											   &s->cur_file_info_internal,
+  777 | 											   NULL,0,NULL,0,NULL,0);
+  778 | 	s->current_file_ok = (err == UNZ_OK);
+  779 | 	return err;
+  780 | }
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 0 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `unzlocal_GetCurrentFileInfoInternal` | — | packet `qcommon__0959_unzlocal_GetCurrentFileInfoInternal.md` |
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `SIZECENTRALDIRITEM` | `SIZECENTRALDIRITEM` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_END_OF_LIST_OF_FILE` | `UNZ_END_OF_LIST_OF_FILE` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+=== qcommon__1292_unzSetCurrentFileInfoPosition.md ===
+# ENGINE PORT PACKET — `unzSetCurrentFileInfoPosition`
+
+- seq **1292**  ·  wave **2**  ·  unit **1291**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **16**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzSetCurrentFileInfoPosition(file: unzFile, pos: c_ulong) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzSetCurrentFileInfoPosition` — oracle/codemp/qcommon/unzip.cpp:802-817 (16 LOC)
+```c
+  802 | extern int unzSetCurrentFileInfoPosition (unzFile file, unsigned long pos )
+  803 | {
+  804 | 	unz_s* s;	
+  805 | 	int err;
+  806 | 
+  807 | 	if (file==NULL)
+  808 | 		return UNZ_PARAMERROR;
+  809 | 	s=(unz_s*)file;
+  810 | 
+  811 | 	s->pos_in_central_dir = pos;
+  812 | 	err = unzlocal_GetCurrentFileInfoInternal(file,&s->cur_file_info,
+  813 | 											   &s->cur_file_info_internal,
+  814 | 											   NULL,0,NULL,0,NULL,0);
+  815 | 	s->current_file_ok = (err == UNZ_OK);
+  816 | 	return UNZ_OK;
+  817 | }
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 0 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `unzlocal_GetCurrentFileInfoInternal` | — | packet `qcommon__0959_unzlocal_GetCurrentFileInfoInternal.md` |
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+
+=== qcommon__1453_unzLocateFile.md ===
+# ENGINE PORT PACKET — `unzLocateFile`
+
+- seq **1453**  ·  wave **3**  ·  unit **1452**  ·  subsystem **qcommon**  ·  file `unzip.cpp`  ·  oracle LOC **41**
+- DESTINATION: `crates/mp/engine/qcommon/src/unzip.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn unzLocateFile(file: unzFile, szFileName: *const c_char, iCaseSensitivity: c_int) -> c_int { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `unzLocateFile` — oracle/codemp/qcommon/unzip.cpp:827-867 (41 LOC)
+```c
+  827 | extern int unzLocateFile (unzFile file, const char *szFileName, int iCaseSensitivity)
+  828 | {
+  829 | 	unz_s* s;	
+  830 | 	int err;
+  831 | 
+  832 | 	
+  833 | 	uLong num_fileSaved;
+  834 | 	uLong pos_in_central_dirSaved;
+  835 | 
+  836 | 
+  837 | 	if (file==NULL)
+  838 | 		return UNZ_PARAMERROR;
+  839 | 
+  840 |     if (strlen(szFileName)>=UNZ_MAXFILENAMEINZIP)
+  841 |         return UNZ_PARAMERROR;
+  842 | 
+  843 | 	s=(unz_s*)file;
+  844 | 	if (!s->current_file_ok)
+  845 | 		return UNZ_END_OF_LIST_OF_FILE;
+  846 | 
+  847 | 	num_fileSaved = s->num_file;
+  848 | 	pos_in_central_dirSaved = s->pos_in_central_dir;
+  849 | 
+  850 | 	err = unzGoToFirstFile(file);
+  851 | 
+  852 | 	while (err == UNZ_OK)
+  853 | 	{
+  854 | 		char szCurrentFileName[UNZ_MAXFILENAMEINZIP+1];
+  855 | 		unzGetCurrentFileInfo(file,NULL,
+  856 | 								szCurrentFileName,sizeof(szCurrentFileName)-1,
+  857 | 								NULL,0,NULL,0);
+  858 | 		if (unzStringFileNameCompare(szCurrentFileName,
+  859 | 										szFileName,iCaseSensitivity)==0)
+  860 | 			return UNZ_OK;
+  861 | 		err = unzGoToNextFile(file);
+  862 | 	}
+  863 | 
+  864 | 	s->num_file = num_fileSaved ;
+  865 | 	s->pos_in_central_dir = pos_in_central_dirSaved ;
+  866 | 	return err;
+  867 | }
+```
+
+## RESOLVED CALL SURFACE — 4 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `unzGetCurrentFileInfo` | — | packet `qcommon__1289_unzGetCurrentFileInfo.md` |
+| `unzGoToFirstFile` | — | packet `qcommon__1290_unzGoToFirstFile.md` |
+| `unzGoToNextFile` | — | packet `qcommon__1291_unzGoToNextFile.md` |
+| `unzStringFileNameCompare` | — | packet `qcommon__0958_unzStringFileNameCompare.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`strlen`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `unzFile` | `unzFile` | type | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unz_file.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `UNZ_END_OF_LIST_OF_FILE` | `UNZ_END_OF_LIST_OF_FILE` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_MAXFILENAMEINZIP` | `UNZ_MAXFILENAMEINZIP` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_OK` | `UNZ_OK` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+| `UNZ_PARAMERROR` | `UNZ_PARAMERROR` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/files/unzip_consts.rs` |
+

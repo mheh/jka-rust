@@ -5,8 +5,8 @@
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:279-285`
 #[repr(i32)]
 pub enum EGLFogOverride {
-	GLFOGOVERRIDE_NONE = 0,
-	GLFOGOVERRIDE_BLACK,
-	GLFOGOVERRIDE_WHITE,
-	GLFOGOVERRIDE_MAX,
+    GLFOGOVERRIDE_NONE = 0,
+    GLFOGOVERRIDE_BLACK,
+    GLFOGOVERRIDE_WHITE,
+    GLFOGOVERRIDE_MAX,
 }

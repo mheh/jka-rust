@@ -9,19 +9,18 @@ use super::lerp_frame_t::lerpFrame_t;
 /// Type definition source: `oracle/code/cgame/cg_local.h:112-124`
 #[repr(C)]
 pub struct playerEntity_t {
-	pub legs: lerpFrame_t,
-	pub torso: lerpFrame_t,
-	pub painTime: i32,
-	/// flip from 0 to 1
-	pub painDirection: i32,
+    pub legs: lerpFrame_t,
+    pub torso: lerpFrame_t,
+    pub painTime: i32,
+    /// flip from 0 to 1
+    pub painDirection: i32,
 
-	/// For persistent beam weapons, so they don't play their start sound more than once
-	pub lightningFiring: qboolean,
-
-	// machinegun spinning
-	//	float			barrelAngle;
-	//	int				barrelTime;
-	//	qboolean		barrelSpinning;
+    /// For persistent beam weapons, so they don't play their start sound more than once
+    pub lightningFiring: qboolean,
+    // machinegun spinning
+    //	float			barrelAngle;
+    //	int				barrelTime;
+    //	qboolean		barrelSpinning;
 }
 
 #[cfg(target_pointer_width = "64")]

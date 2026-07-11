@@ -13,10 +13,10 @@ pub const MAPS_PER_TIER: usize = 3;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:642-647`
 #[repr(C)]
 pub struct tierInfo {
-	pub tierName: *const c_char,
-	pub maps: [*const c_char; MAPS_PER_TIER],
-	pub gameTypes: [i32; MAPS_PER_TIER],
-	pub mapHandles: [qhandle_t; MAPS_PER_TIER],
+    pub tierName: *const c_char,
+    pub maps: [*const c_char; MAPS_PER_TIER],
+    pub gameTypes: [i32; MAPS_PER_TIER],
+    pub mapHandles: [qhandle_t; MAPS_PER_TIER],
 }
 
 const _: () = assert!(core::mem::size_of::<tierInfo>() == 56);

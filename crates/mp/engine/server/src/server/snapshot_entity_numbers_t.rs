@@ -11,8 +11,8 @@ pub const MAX_SNAPSHOT_ENTITIES: usize = 1024;
 /// Type definition source: `oracle/codemp/server/sv_snapshot.cpp:246-249`
 #[repr(C)]
 pub struct snapshotEntityNumbers_t {
-	pub numSnapshotEntities: i32,
-	pub snapshotEntities: [i32; MAX_SNAPSHOT_ENTITIES],
+    pub numSnapshotEntities: i32,
+    pub snapshotEntities: [i32; MAX_SNAPSHOT_ENTITIES],
 }
 
 const _: () = assert!(core::mem::size_of::<snapshotEntityNumbers_t>() == 4100);

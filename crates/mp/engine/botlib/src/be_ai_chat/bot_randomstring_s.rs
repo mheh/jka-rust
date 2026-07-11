@@ -7,8 +7,8 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:78-82`
 #[repr(C)]
 pub struct bot_randomstring_t {
-	pub string: *mut c_char,
-	pub next: *mut bot_randomstring_t,
+    pub string: *mut c_char,
+    pub next: *mut bot_randomstring_t,
 }
 
 pub type bot_randomstring_s = bot_randomstring_t;

@@ -12,7 +12,7 @@ use crate::bg_panimate::PM_InKnockDown;
 use crate::g_nav::{NAV_AvoidCollision, NAV_MoveToGoal};
 use crate::g_navnew::{NAVNEW_AvoidCollision, NAVNEW_MoveToGoal};
 use crate::prelude::*;
-use crate::q_math::{AngleNormalize360, AngleVectors, VectorNormalize, _VectorCopy, vectoangles};
+use crate::q_math::{_VectorCopy, vectoangles, AngleNormalize360, AngleVectors, VectorNormalize};
 use crate::trap;
 use std::ffi::c_int;
 
@@ -174,7 +174,11 @@ pub fn NAV_GetLastMove(ctx: GameContext<'_>, info: *mut navInfo_t) {
 /// Raven `NPC_GetMoveDirection`.
 ///
 /// Source: `oracle/codemp/game/NPC_move.c:160-230`
-pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, out: &mut vec3_t, distance: *mut f32) -> qboolean {
+pub fn NPC_GetMoveDirection(
+    ctx: GameContext<'_>,
+    out: &mut vec3_t,
+    distance: *mut f32,
+) -> qboolean {
     unsafe {
         let world = &mut *ctx.world;
         let npc = (*ctx.world).globals.NPC;
@@ -215,8 +219,11 @@ pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, out: &mut vec3_t, distance: *m
             if NPC_ClearPathToGoal(ctx, world.globals.frameNavInfo.0.direction, goal_ptr) == qfalse
             {
                 // See if we're just stuck
-                if NAV_MoveToGoal(ctx, npc, &mut world.globals.frameNavInfo.0 as *mut navInfo_t)
-                    == WAYPOINT_NONE
+                if NAV_MoveToGoal(
+                    ctx,
+                    npc,
+                    &mut world.globals.frameNavInfo.0 as *mut navInfo_t,
+                ) == WAYPOINT_NONE
                 {
                     // Can't reach goal, just face
                     vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
@@ -237,8 +244,11 @@ pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, out: &mut vec3_t, distance: *m
                 if (world.globals.frameNavInfo.0.flags & NIF_MACRO_NAV) == 0 {
                     // we had a clear path to goal and didn't try macro nav, but can't avoid collision so try macro nav here
                     // See if we're just stuck
-                    if NAV_MoveToGoal(ctx, npc, &mut world.globals.frameNavInfo.0 as *mut navInfo_t)
-                        == WAYPOINT_NONE
+                    if NAV_MoveToGoal(
+                        ctx,
+                        npc,
+                        &mut world.globals.frameNavInfo.0 as *mut navInfo_t,
+                    ) == WAYPOINT_NONE
                     {
                         // Can't reach goal, just face
                         vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);

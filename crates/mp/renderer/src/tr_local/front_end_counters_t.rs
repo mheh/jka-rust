@@ -5,22 +5,22 @@
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:1235-1244`
 #[repr(C)]
 pub struct frontEndCounters_t {
-	pub c_sphere_cull_patch_in: i32,
-	pub c_sphere_cull_patch_clip: i32,
-	pub c_sphere_cull_patch_out: i32,
-	pub c_box_cull_patch_in: i32,
-	pub c_box_cull_patch_clip: i32,
-	pub c_box_cull_patch_out: i32,
-	pub c_sphere_cull_md3_in: i32,
-	pub c_sphere_cull_md3_clip: i32,
-	pub c_sphere_cull_md3_out: i32,
-	pub c_box_cull_md3_in: i32,
-	pub c_box_cull_md3_clip: i32,
-	pub c_box_cull_md3_out: i32,
+    pub c_sphere_cull_patch_in: i32,
+    pub c_sphere_cull_patch_clip: i32,
+    pub c_sphere_cull_patch_out: i32,
+    pub c_box_cull_patch_in: i32,
+    pub c_box_cull_patch_clip: i32,
+    pub c_box_cull_patch_out: i32,
+    pub c_sphere_cull_md3_in: i32,
+    pub c_sphere_cull_md3_clip: i32,
+    pub c_sphere_cull_md3_out: i32,
+    pub c_box_cull_md3_in: i32,
+    pub c_box_cull_md3_clip: i32,
+    pub c_box_cull_md3_out: i32,
 
-	pub c_leafs: i32,
-	pub c_dlightSurfaces: i32,
-	pub c_dlightSurfacesCulled: i32,
+    pub c_leafs: i32,
+    pub c_dlightSurfaces: i32,
+    pub c_dlightSurfacesCulled: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<frontEndCounters_t>() == 60);

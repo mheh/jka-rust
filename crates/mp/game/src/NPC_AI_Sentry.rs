@@ -227,11 +227,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
             ),
         );
 
-        BG_GiveMeVectorFromMatrix(
-            &boltMatrix,
-            Eorientations::ORIGIN as c_int,
-            &mut muzzle,
-        );
+        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle);
 
         crate::q_math::AngleVectors(
             (*NPC).r.currentAngles,

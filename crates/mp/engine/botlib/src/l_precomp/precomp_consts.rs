@@ -6,6 +6,11 @@
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:81`
 pub const MAX_DEFINEPARMS: usize = 128;
 
+/// Raven `MAX_PATH` — botlib redefines the Win32 macro to `MAX_QPATH` for the
+/// preprocessor path buffers.
+/// Source: `oracle/codemp/botlib/l_precomp.h:16` (`#define MAX_PATH MAX_QPATH`).
+pub const MAX_PATH: usize = mp_qshared::shared::MAX_QPATH;
+
 /// Raven `DEFINEHASHSIZE` — size of the `define_t` hash chain table.
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:92`
 pub const DEFINEHASHSIZE: usize = 1024;

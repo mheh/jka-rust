@@ -1,5 +1,7 @@
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 use mp_qshared::shared::qboolean;
 

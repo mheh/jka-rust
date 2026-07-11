@@ -14,7 +14,5 @@ use mp_qshared::shared::force_powers::NUM_FORCE_POWER_LEVELS;
 /// Source: `oracle/codemp/game/bg_saber.c:2777-2783`
 pub static bg_parryDebounce: [c_int; NUM_FORCE_POWER_LEVELS as usize] = [
     500, //if don't even have defense, can't use defense!
-    300,
-    150,
-    50,
+    300, 150, 50,
 ];

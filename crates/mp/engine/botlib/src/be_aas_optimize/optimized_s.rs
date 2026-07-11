@@ -12,21 +12,21 @@ use crate::aasfile::aas_vertex_t::aas_vertex_t;
 /// Type definition source: `oracle/codemp/botlib/be_aas_optimize.cpp:29-53`
 #[repr(C)]
 pub struct optimized_t {
-	pub numvertexes: i32,
-	pub vertexes: *mut aas_vertex_t,
-	pub numedges: i32,
-	pub edges: *mut aas_edge_t,
-	pub edgeindexsize: i32,
-	pub edgeindex: *mut aas_edgeindex_t,
-	pub numfaces: i32,
-	pub faces: *mut aas_face_t,
-	pub faceindexsize: i32,
-	pub faceindex: *mut aas_faceindex_t,
-	pub numareas: i32,
-	pub areas: *mut aas_area_t,
-	pub vertexoptimizeindex: *mut i32,
-	pub edgeoptimizeindex: *mut i32,
-	pub faceoptimizeindex: *mut i32,
+    pub numvertexes: i32,
+    pub vertexes: *mut aas_vertex_t,
+    pub numedges: i32,
+    pub edges: *mut aas_edge_t,
+    pub edgeindexsize: i32,
+    pub edgeindex: *mut aas_edgeindex_t,
+    pub numfaces: i32,
+    pub faces: *mut aas_face_t,
+    pub faceindexsize: i32,
+    pub faceindex: *mut aas_faceindex_t,
+    pub numareas: i32,
+    pub areas: *mut aas_area_t,
+    pub vertexoptimizeindex: *mut i32,
+    pub edgeoptimizeindex: *mut i32,
+    pub faceoptimizeindex: *mut i32,
 }
 
 pub type optimized_s = optimized_t;

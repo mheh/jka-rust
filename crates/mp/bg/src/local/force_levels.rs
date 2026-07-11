@@ -11,9 +11,7 @@ use crate::public::JUMP_VELOCITY;
 /// Definition source: `oracle/codemp/game/bg_pmove.c:59-65`
 pub static forceSpeedLevels: [f32; 4] = [
     1.0, //rank 0?
-    1.25,
-    1.5,
-    1.75,
+    1.25, 1.5, 1.75,
 ];
 
 /// Raven `forceJumpHeight[NUM_FORCE_POWER_LEVELS]` — force-jump max height

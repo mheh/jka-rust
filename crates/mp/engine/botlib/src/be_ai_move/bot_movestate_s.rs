@@ -18,53 +18,53 @@ pub const MAX_AVOIDSPOTS: usize = 32;
 /// Type definition source: `oracle/codemp/botlib/be_ai_move.cpp:42-71`
 #[repr(C)]
 pub struct bot_movestate_t {
-	/// origin of the bot
-	pub origin: vec3_t,
-	/// velocity of the bot
-	pub velocity: vec3_t,
-	/// view offset
-	pub viewoffset: vec3_t,
-	/// entity number of the bot
-	pub entitynum: i32,
-	/// client number of the bot
-	pub client: i32,
-	/// time the bot thinks
-	pub thinktime: f32,
-	/// presencetype of the bot
-	pub presencetype: i32,
-	/// view angles of the bot
-	pub viewangles: vec3_t,
-	/// area the bot is in
-	pub areanum: i32,
-	/// last area the bot was in
-	pub lastareanum: i32,
-	/// last goal area number
-	pub lastgoalareanum: i32,
-	/// last reachability number
-	pub lastreachnum: i32,
-	/// origin previous cycle
-	pub lastorigin: vec3_t,
-	/// area number of the reachabilty
-	pub reachareanum: i32,
-	/// movement flags
-	pub moveflags: i32,
-	/// set when jumped
-	pub jumpreach: i32,
-	/// last time the grapple was visible
-	pub grapplevisible_time: f32,
-	/// last distance to the grapple end
-	pub lastgrappledist: f32,
-	/// time to use current reachability
-	pub reachability_time: f32,
-	/// reachabilities to avoid
-	pub avoidreach: [i32; MAX_AVOIDREACH],
-	/// times to avoid the reachabilities
-	pub avoidreachtimes: [f32; MAX_AVOIDREACH],
-	/// number of tries before avoiding
-	pub avoidreachtries: [i32; MAX_AVOIDREACH],
-	/// spots to avoid
-	pub avoidspots: [bot_avoidspot_t; MAX_AVOIDSPOTS],
-	pub numavoidspots: i32,
+    /// origin of the bot
+    pub origin: vec3_t,
+    /// velocity of the bot
+    pub velocity: vec3_t,
+    /// view offset
+    pub viewoffset: vec3_t,
+    /// entity number of the bot
+    pub entitynum: i32,
+    /// client number of the bot
+    pub client: i32,
+    /// time the bot thinks
+    pub thinktime: f32,
+    /// presencetype of the bot
+    pub presencetype: i32,
+    /// view angles of the bot
+    pub viewangles: vec3_t,
+    /// area the bot is in
+    pub areanum: i32,
+    /// last area the bot was in
+    pub lastareanum: i32,
+    /// last goal area number
+    pub lastgoalareanum: i32,
+    /// last reachability number
+    pub lastreachnum: i32,
+    /// origin previous cycle
+    pub lastorigin: vec3_t,
+    /// area number of the reachabilty
+    pub reachareanum: i32,
+    /// movement flags
+    pub moveflags: i32,
+    /// set when jumped
+    pub jumpreach: i32,
+    /// last time the grapple was visible
+    pub grapplevisible_time: f32,
+    /// last distance to the grapple end
+    pub lastgrappledist: f32,
+    /// time to use current reachability
+    pub reachability_time: f32,
+    /// reachabilities to avoid
+    pub avoidreach: [i32; MAX_AVOIDREACH],
+    /// times to avoid the reachabilities
+    pub avoidreachtimes: [f32; MAX_AVOIDREACH],
+    /// number of tries before avoiding
+    pub avoidreachtries: [i32; MAX_AVOIDREACH],
+    /// spots to avoid
+    pub avoidspots: [bot_avoidspot_t; MAX_AVOIDSPOTS],
+    pub numavoidspots: i32,
 }
 
 pub type bot_movestate_s = bot_movestate_t;

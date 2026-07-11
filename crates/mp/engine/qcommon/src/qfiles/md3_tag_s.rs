@@ -9,10 +9,10 @@ use mp_qshared::shared::{vec3_t, MAX_QPATH};
 /// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:114-118`
 #[repr(C)]
 pub struct md3Tag_t {
-	/// tag name
-	pub name: [c_char; MAX_QPATH],
-	pub origin: vec3_t,
-	pub axis: [vec3_t; 3],
+    /// tag name
+    pub name: [c_char; MAX_QPATH],
+    pub origin: vec3_t,
+    pub axis: [vec3_t; 3],
 }
 
 /// C tag name for `md3Tag_t`.

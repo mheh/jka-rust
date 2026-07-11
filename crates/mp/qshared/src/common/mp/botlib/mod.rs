@@ -3,11 +3,11 @@
 pub mod aas_altroutegoal_flags;
 pub mod aas_altroutegoal_s;
 pub mod aas_clientmove_s;
-pub mod aas_route_stop_event;
-pub mod aas_stop_event;
 pub mod aas_entityinfo_s;
 pub mod aas_export_s;
 pub mod aas_predictroute_s;
+pub mod aas_route_stop_event;
+pub mod aas_stop_event;
 pub mod aas_trace_s;
 pub mod action;
 pub mod ai_export_s;

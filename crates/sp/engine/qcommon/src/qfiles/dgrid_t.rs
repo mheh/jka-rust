@@ -5,10 +5,10 @@
 /// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:532-538`
 #[repr(C)]
 pub struct dgrid_t {
-	pub ambientLight: [[u8; 3]; 4],
-	pub directLight: [[u8; 3]; 4],
-	pub styles: [u8; 4],
-	pub latLong: [u8; 2],
+    pub ambientLight: [[u8; 3]; 4],
+    pub directLight: [[u8; 3]; 4],
+    pub styles: [u8; 4],
+    pub latLong: [u8; 2],
 }
 
 const _: () = assert!(core::mem::size_of::<dgrid_t>() == 30);

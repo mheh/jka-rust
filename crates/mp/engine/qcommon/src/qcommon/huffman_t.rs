@@ -8,8 +8,8 @@ use super::huff_t::huff_t;
 /// Type definition source: `oracle/codemp/qcommon/qcommon.h:1071-1074`
 #[repr(C)]
 pub struct huffman_t {
-	pub compressor: huff_t,
-	pub decompressor: huff_t,
+    pub compressor: huff_t,
+    pub decompressor: huff_t,
 }
 
 const _: () = assert!(core::mem::size_of::<huffman_t>() == 102496);

@@ -132,7 +132,10 @@ fn build_and_save(lay: &Layout, name: &str) -> (Navigator, MockHost, String, Vec
         nav.hard_connect(&mut host, a, b);
     }
     nav.calculate_paths(&mut host, qfalse);
-    assert!(nav.save(&mut host, name, lay.checksum), "Save failed for {name}");
+    assert!(
+        nav.save(&mut host, name, lay.checksum),
+        "Save failed for {name}"
+    );
 
     let (key, bytes) = host
         .written_files
@@ -187,7 +190,11 @@ fn dump_graph(nav: &Navigator, out: &mut String) {
 /// `edge_t[numEdges]` (12 bytes each), read `numRanks`, then the rank `int32`s.
 fn dump_ranks_from_bytes(nav: &Navigator, bytes: &[u8], out: &mut String) {
     let n = nav.get_num_nodes();
-    writeln!(out, "== rank tables (per node, pop-order; the heap-sift gate) ==").unwrap();
+    writeln!(
+        out,
+        "== rank tables (per node, pop-order; the heap-sift gate) =="
+    )
+    .unwrap();
     let mut off = 12usize; // navID + checksum + numNodes
     for i in 0..n {
         off += 4 + 12 + 4 + 4 + 4; // NODE id, pos, flags, ID, radius
@@ -223,11 +230,20 @@ fn dump_queries(nav: &mut Navigator, host: &mut MockHost, out: &mut String) {
     writeln!(out, "== GetBestNode (s,e,reject=NONE) ==").unwrap();
     for s in 0..n {
         for e in 0..n {
-            writeln!(out, "bestnode {s} {e} = {}", nav.get_best_node(s, e, NODE_NONE)).unwrap();
+            writeln!(
+                out,
+                "bestnode {s} {e} = {}",
+                nav.get_best_node(s, e, NODE_NONE)
+            )
+            .unwrap();
         }
     }
 
-    writeln!(out, "== GetBestNodeAltRoute (d_altRoutes=0; s,e,reject=NONE) ==").unwrap();
+    writeln!(
+        out,
+        "== GetBestNodeAltRoute (d_altRoutes=0; s,e,reject=NONE) =="
+    )
+    .unwrap();
     for s in 0..n {
         for e in 0..n {
             let mut pc = 0i32;
@@ -249,7 +265,11 @@ fn dump_queries(nav: &mut Navigator, host: &mut MockHost, out: &mut String) {
         }
     }
 
-    writeln!(out, "== GetProjectedNode (origin = each node pos, from each node) ==").unwrap();
+    writeln!(
+        out,
+        "== GetProjectedNode (origin = each node pos, from each node) =="
+    )
+    .unwrap();
     for from in 0..n {
         for o in 0..n {
             let mut origin = [0.0f32; 3];

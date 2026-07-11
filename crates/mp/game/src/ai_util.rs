@@ -996,4 +996,3 @@ unsafe fn c_strstr(haystack: *const u8, needle: *const u8) -> Option<*const u8> 
         None
     }
 }
-

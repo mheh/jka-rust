@@ -8,11 +8,11 @@ use super::bot_replychatkey_s::bot_replychatkey_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:142-149`
 #[repr(C)]
 pub struct bot_replychat_t {
-	pub keys: *mut bot_replychatkey_t,
-	pub priority: f32,
-	pub numchatmessages: i32,
-	pub firstchatmessage: *mut bot_chatmessage_t,
-	pub next: *mut bot_replychat_t,
+    pub keys: *mut bot_replychatkey_t,
+    pub priority: f32,
+    pub numchatmessages: i32,
+    pub firstchatmessage: *mut bot_chatmessage_t,
+    pub next: *mut bot_replychat_t,
 }
 
 pub type bot_replychat_s = bot_replychat_t;

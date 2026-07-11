@@ -24,9 +24,8 @@ pub struct aas_export_s {
     // be_aas_main.h
     //-----------------------------------
     pub AAS_Initialized: Option<unsafe extern "C" fn() -> c_int>,
-    pub AAS_PresenceTypeBoundingBox: Option<
-        unsafe extern "C" fn(presencetype: c_int, mins: *mut vec3_t, maxs: *mut vec3_t),
-    >,
+    pub AAS_PresenceTypeBoundingBox:
+        Option<unsafe extern "C" fn(presencetype: c_int, mins: *mut vec3_t, maxs: *mut vec3_t)>,
     pub AAS_Time: Option<unsafe extern "C" fn() -> c_float>,
     //--------------------------------------------
     // be_aas_sample.c
@@ -86,8 +85,7 @@ pub struct aas_export_s {
             travelflags: c_int,
         ) -> c_int,
     >,
-    pub AAS_EnableRoutingArea:
-        Option<unsafe extern "C" fn(areanum: c_int, enable: c_int) -> c_int>,
+    pub AAS_EnableRoutingArea: Option<unsafe extern "C" fn(areanum: c_int, enable: c_int) -> c_int>,
     pub AAS_PredictRoute: Option<
         unsafe extern "C" fn(
             route: *mut aas_predictroute_t,
@@ -178,8 +176,7 @@ const _: () = assert!(core::mem::offset_of!(aas_export_t, AAS_IntForBSPEpairKey)
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(aas_export_t, AAS_AreaReachability) == 120);
 #[cfg(target_pointer_width = "64")]
-const _: () =
-    assert!(core::mem::offset_of!(aas_export_t, AAS_AreaTravelTimeToGoalArea) == 128);
+const _: () = assert!(core::mem::offset_of!(aas_export_t, AAS_AreaTravelTimeToGoalArea) == 128);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(aas_export_t, AAS_EnableRoutingArea) == 136);
 #[cfg(target_pointer_width = "64")]

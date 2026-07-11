@@ -126,10 +126,10 @@ unsafe fn VALIDSTRING(a: *const c_char) -> bool {
 /// Source: `oracle/codemp/game/bg_public.h:138`
 pub const BG_NUM_TOGGLEABLE_SURFACES: c_int = 31;
 
+use crate::npc::script_flags::SCF_DONT_FIRE;
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
 use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
 use mp_qshared::shared::{MASK_PLAYERSOLID, MAX_CLIENTS};
-use crate::npc::script_flags::SCF_DONT_FIRE;
 
 use mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs;
 use mp_abi::game::syscalls::G_G2_SETSURFACEONOFF::GG2SetsurfaceonoffArgs;
@@ -450,18 +450,16 @@ pub fn NPC_AimWiggle(ctx: GameContext<'_>, enemy_org: &mut vec3_t) {
                 &mut (*ctx.world).g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
             // C's `0.3` is a double literal: `0.3*flrand(...)` evaluates in f64,
             // narrowing to the float `aimOfs` only at the assignment.
-            (*npc_info).aimOfs[0] = (0.3
-                * (*ctx.world)
+            (*npc_info).aimOfs[0] =
+                (0.3 * (*ctx.world)
                     .bg_state
                     .rng
-                    .flrand((*enemy).r.mins[0], (*enemy).r.maxs[0]) as f64)
-                as f32;
-            (*npc_info).aimOfs[1] = (0.3
-                * (*ctx.world)
+                    .flrand((*enemy).r.mins[0], (*enemy).r.maxs[0]) as f64) as f32;
+            (*npc_info).aimOfs[1] =
+                (0.3 * (*ctx.world)
                     .bg_state
                     .rng
-                    .flrand((*enemy).r.mins[1], (*enemy).r.maxs[1]) as f64)
-                as f32;
+                    .flrand((*enemy).r.mins[1], (*enemy).r.maxs[1]) as f64) as f32;
             if (*enemy).r.maxs[2] > 0.0 {
                 (*npc_info).aimOfs[2] =
                     (*enemy).r.maxs[2] * (*ctx.world).bg_state.rng.flrand(0.0, -1.0);

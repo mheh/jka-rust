@@ -2,8 +2,8 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::shared::qboolean;
 use core::ffi::c_int;
+use mp_qshared::shared::qboolean;
 use std::ffi::CString;
 
 /// `G_G2_DOESBONEEXIST` outbound game-to-engine syscall.

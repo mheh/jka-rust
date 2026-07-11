@@ -7,10 +7,10 @@ use super::bot_matchstring_s::bot_matchstring_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:116-122`
 #[repr(C)]
 pub struct bot_matchpiece_t {
-	pub r#type: i32,
-	pub firststring: *mut bot_matchstring_t,
-	pub variable: i32,
-	pub next: *mut bot_matchpiece_t,
+    pub r#type: i32,
+    pub firststring: *mut bot_matchstring_t,
+    pub variable: i32,
+    pub next: *mut bot_matchpiece_t,
 }
 
 pub type bot_matchpiece_s = bot_matchpiece_t;

@@ -57,7 +57,7 @@ use common::reflog::{self, Scenario};
 use common::{
     referee_arm, referee_begin_frame, referee_error, referee_frame_syscall_digest,
     referee_frame_syscalls, referee_import_name, referee_load, referee_locate, referee_reset,
-    referee_set_cvar, referee_set_map, referee_set_userinfo, referee_set_usercmd, referee_vm_call,
+    referee_set_cvar, referee_set_map, referee_set_usercmd, referee_set_userinfo, referee_vm_call,
     run_on_engine_thread_fn, LocateData,
 };
 
@@ -287,10 +287,34 @@ fn snapshot(locate: &LocateData, num_clients: i32, level_time: i32) -> FrameSnap
 /// roulette.
 fn map_tokens(_map: &str) -> Vec<&'static str> {
     vec![
-        "{", "classname", "worldspawn", "}", //
-        "{", "classname", "info_player_deathmatch", "origin", "0 0 50", "angle", "0", "}", //
-        "{", "classname", "info_player_deathmatch", "origin", "384 0 50", "angle", "180", "}", //
-        "{", "classname", "info_player_deathmatch", "origin", "0 384 50", "angle", "90", "}",
+        "{",
+        "classname",
+        "worldspawn",
+        "}", //
+        "{",
+        "classname",
+        "info_player_deathmatch",
+        "origin",
+        "0 0 50",
+        "angle",
+        "0",
+        "}", //
+        "{",
+        "classname",
+        "info_player_deathmatch",
+        "origin",
+        "384 0 50",
+        "angle",
+        "180",
+        "}", //
+        "{",
+        "classname",
+        "info_player_deathmatch",
+        "origin",
+        "0 384 50",
+        "angle",
+        "90",
+        "}",
     ]
 }
 
@@ -309,9 +333,17 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
     let module = referee_load(dylib);
     let vm = module.entry();
 
-    let init = referee_vm_call(vm, MpGameExport::GAME_INIT, &[sc.starttime as isize, sc.seed as isize, 0]);
+    let init = referee_vm_call(
+        vm,
+        MpGameExport::GAME_INIT,
+        &[sc.starttime as isize, sc.seed as isize, 0],
+    );
     assert_eq!(init, 0, "GAME_INIT returned {init}");
-    assert!(referee_error().is_none(), "GAME_INIT G_ERROR: {:?}", referee_error());
+    assert!(
+        referee_error().is_none(),
+        "GAME_INIT G_ERROR: {:?}",
+        referee_error()
+    );
     let locate = referee_locate().expect("GAME_INIT must call G_LOCATE_GAME_DATA");
 
     // Warm-up frames before wiring clients (mirrors g_main.c:2949 "3 game frames
@@ -328,7 +360,11 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
         assert_eq!(cr, 0, "GAME_CLIENT_CONNECT({c}) rejected (ret {cr})");
         let br = referee_vm_call(vm, MpGameExport::GAME_CLIENT_BEGIN, &[c as isize]);
         assert_eq!(br, 0, "GAME_CLIENT_BEGIN({c}) returned {br}");
-        assert!(referee_error().is_none(), "client {c} begin G_ERROR: {:?}", referee_error());
+        assert!(
+            referee_error().is_none(),
+            "client {c} begin G_ERROR: {:?}",
+            referee_error()
+        );
     }
 
     let mut snaps = Vec::with_capacity(sc.frames as usize);
@@ -347,7 +383,11 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
         }
         let r = referee_vm_call(vm, MpGameExport::GAME_RUN_FRAME, &[t as isize]);
         assert_eq!(r, 0, "GAME_RUN_FRAME frame {f} returned {r}");
-        assert!(referee_error().is_none(), "frame {f} G_ERROR: {:?}", referee_error());
+        assert!(
+            referee_error().is_none(),
+            "frame {f} G_ERROR: {:?}",
+            referee_error()
+        );
         snaps.push(snapshot(&locate, sc.clients, t));
     }
 
@@ -363,13 +403,9 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
 /// First differing byte index of two equal-length slices.
 fn first_diff(a: &[u8], b: &[u8]) -> Option<usize> {
     let n = a.len().min(b.len());
-    (0..n).find(|&i| a[i] != b[i]).or_else(|| {
-        if a.len() != b.len() {
-            Some(n)
-        } else {
-            None
-        }
-    })
+    (0..n)
+        .find(|&i| a[i] != b[i])
+        .or_else(|| if a.len() != b.len() { Some(n) } else { None })
 }
 
 /// The 4-byte word containing `off`, decoded as hex / i32 / f32.
@@ -401,7 +437,13 @@ fn report_state_diff(kind: &str, tbl: &FieldTable, a: &[u8], b: &[u8], out: &mut
 /// Compare the two runs; on the first divergent frame, build the structured
 /// report and return it (Err); on full match return the pass summary (Ok).
 fn diff_runs(sc: &Scenario, a: &[FrameSnap], b: &[FrameSnap]) -> Result<String, String> {
-    assert_eq!(a.len(), b.len(), "frame counts differ ({} vs {})", a.len(), b.len());
+    assert_eq!(
+        a.len(),
+        b.len(),
+        "frame counts differ ({} vs {})",
+        a.len(),
+        b.len()
+    );
 
     let mut total_ents = 0usize;
     let mut total_sc = 0usize;
@@ -429,8 +471,18 @@ fn diff_runs(sc: &Scenario, a: &[FrameSnap], b: &[FrameSnap]) -> Result<String, 
         // (2) active-entity set.
         if sa.inuse != sb.inuse {
             diverged = true;
-            let only_a: Vec<u32> = sa.inuse.iter().copied().filter(|s| !sb.inuse.contains(s)).collect();
-            let only_b: Vec<u32> = sb.inuse.iter().copied().filter(|s| !sa.inuse.contains(s)).collect();
+            let only_a: Vec<u32> = sa
+                .inuse
+                .iter()
+                .copied()
+                .filter(|s| !sb.inuse.contains(s))
+                .collect();
+            let only_b: Vec<u32> = sb
+                .inuse
+                .iter()
+                .copied()
+                .filter(|s| !sa.inuse.contains(s))
+                .collect();
             r.push_str(&format!(
                 "  active-entity set differs: only-oracle={only_a:?} only-rust={only_b:?}\n"
             ));
@@ -439,13 +491,7 @@ fn diff_runs(sc: &Scenario, a: &[FrameSnap], b: &[FrameSnap]) -> Result<String, 
         // (3) entityState for slots active in BOTH.
         for &slot in &sa.inuse {
             if let (Some(ea), Some(eb)) = (sa.ent(slot), sb.ent(slot)) {
-                if report_state_diff(
-                    &format!("entity {slot} entityState"),
-                    &ES,
-                    ea,
-                    eb,
-                    &mut r,
-                ) {
+                if report_state_diff(&format!("entity {slot} entityState"), &ES, ea, eb, &mut r) {
                     diverged = true;
                 }
             }
@@ -499,11 +545,17 @@ fn diff_runs(sc: &Scenario, a: &[FrameSnap], b: &[FrameSnap]) -> Result<String, 
                     let lo = common.saturating_sub(6);
                     r.push_str("    --- oracle stream tail ---\n");
                     for j in lo..sa.sc_imports.len() {
-                        r.push_str(&format!("      #{j}: {}\n", referee_import_name(sa.sc_imports[j])));
+                        r.push_str(&format!(
+                            "      #{j}: {}\n",
+                            referee_import_name(sa.sc_imports[j])
+                        ));
                     }
                     r.push_str("    --- rust   stream tail ---\n");
                     for j in lo..sb.sc_imports.len() {
-                        r.push_str(&format!("      #{j}: {}\n", referee_import_name(sb.sc_imports[j])));
+                        r.push_str(&format!(
+                            "      #{j}: {}\n",
+                            referee_import_name(sb.sc_imports[j])
+                        ));
                     }
                 }
             }
@@ -612,7 +664,10 @@ fn run_referee(test_name: &str, sc: Scenario) {
         oracle.display()
     );
     let rust = rust_cdylib();
-    assert!(rust.exists(), "rust cdylib missing; run `cargo build --workspace`");
+    assert!(
+        rust.exists(),
+        "rust cdylib missing; run `cargo build --workspace`"
+    );
 
     let a = spawn_child(test_name, "oracle");
     let b = spawn_child(test_name, "rust");
@@ -650,7 +705,13 @@ fn spawn_child(test_name: &str, role: &str) -> Vec<FrameSnap> {
     let _ = std::fs::remove_file(&out);
     let exe = std::env::current_exe().expect("current_exe");
     let status = std::process::Command::new(exe)
-        .args([test_name, "--exact", "--ignored", "--nocapture", "--test-threads=1"])
+        .args([
+            test_name,
+            "--exact",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
         .env(CHILD_ENV, role)
         .env(OUT_ENV, &out)
         .status()
@@ -815,16 +876,29 @@ fn decode_snaps(bytes: &[u8]) -> Vec<FrameSnap> {
 /// generators — guards against silent fixture drift. NOT ignored: no toolchain.
 #[test]
 fn reflog_roundtrip() {
-    for sc in [reflog::gen_idle(), reflog::gen_solo(), reflog::gen_melee_brawl()] {
+    for sc in [
+        reflog::gen_idle(),
+        reflog::gen_solo(),
+        reflog::gen_melee_brawl(),
+    ] {
         let text = reflog::to_text(&sc);
         let reparsed = reflog::parse(&text);
-        assert_eq!(sc, reparsed, "reflog parse/serialize round-trip failed for '{}'", sc.name);
+        assert_eq!(
+            sc, reparsed,
+            "reflog parse/serialize round-trip failed for '{}'",
+            sc.name
+        );
 
         let path = logs_dir().join(format!("{}.reflog", sc.name));
-        let committed = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("committed log {} missing ({e}); regenerate via `regenerate_logs`", path.display()));
+        let committed = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!(
+                "committed log {} missing ({e}); regenerate via `regenerate_logs`",
+                path.display()
+            )
+        });
         assert_eq!(
-            committed, text,
+            committed,
+            text,
             "committed {} has drifted from its generator; regenerate deliberately via the \
              `regenerate_logs` ignored test",
             path.display()
@@ -840,7 +914,11 @@ fn reflog_roundtrip() {
 fn regenerate_logs() {
     let dir = logs_dir();
     std::fs::create_dir_all(&dir).unwrap();
-    for sc in [reflog::gen_idle(), reflog::gen_solo(), reflog::gen_melee_brawl()] {
+    for sc in [
+        reflog::gen_idle(),
+        reflog::gen_solo(),
+        reflog::gen_melee_brawl(),
+    ] {
         let path = dir.join(format!("{}.reflog", sc.name));
         std::fs::write(&path, reflog::to_text(&sc)).unwrap();
         eprintln!("[referee] wrote {}", path.display());

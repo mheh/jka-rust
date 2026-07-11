@@ -24,17 +24,18 @@ pub struct ai_export_s {
     pub BotLoadCharacter:
         Option<unsafe extern "C" fn(charfile: *mut c_char, skill: c_float) -> c_int>,
     pub BotFreeCharacter: Option<unsafe extern "C" fn(character: c_int)>,
-    pub Characteristic_Float: Option<unsafe extern "C" fn(character: c_int, index: c_int) -> c_float>,
+    pub Characteristic_Float:
+        Option<unsafe extern "C" fn(character: c_int, index: c_int) -> c_float>,
     pub Characteristic_BFloat: Option<
         unsafe extern "C" fn(character: c_int, index: c_int, min: c_float, max: c_float) -> c_float,
     >,
-    pub Characteristic_Integer: Option<unsafe extern "C" fn(character: c_int, index: c_int) -> c_int>,
+    pub Characteristic_Integer:
+        Option<unsafe extern "C" fn(character: c_int, index: c_int) -> c_int>,
     pub Characteristic_BInteger: Option<
         unsafe extern "C" fn(character: c_int, index: c_int, min: c_int, max: c_int) -> c_int,
     >,
-    pub Characteristic_String: Option<
-        unsafe extern "C" fn(character: c_int, index: c_int, buf: *mut c_char, size: c_int),
-    >,
+    pub Characteristic_String:
+        Option<unsafe extern "C" fn(character: c_int, index: c_int, buf: *mut c_char, size: c_int)>,
     //-----------------------------------
     // be_ai_chat.h
     //-----------------------------------
@@ -43,9 +44,8 @@ pub struct ai_export_s {
     pub BotQueueConsoleMessage:
         Option<unsafe extern "C" fn(chatstate: c_int, r#type: c_int, message: *mut c_char)>,
     pub BotRemoveConsoleMessage: Option<unsafe extern "C" fn(chatstate: c_int, handle: c_int)>,
-    pub BotNextConsoleMessage: Option<
-        unsafe extern "C" fn(chatstate: c_int, cm: *mut bot_consolemessage_s) -> c_int,
-    >,
+    pub BotNextConsoleMessage:
+        Option<unsafe extern "C" fn(chatstate: c_int, cm: *mut bot_consolemessage_s) -> c_int>,
     pub BotNumConsoleMessages: Option<unsafe extern "C" fn(chatstate: c_int) -> c_int>,
     pub BotInitialChat: Option<
         unsafe extern "C" fn(
@@ -62,7 +62,8 @@ pub struct ai_export_s {
             var7: *mut c_char,
         ),
     >,
-    pub BotNumInitialChats: Option<unsafe extern "C" fn(chatstate: c_int, r#type: *mut c_char) -> c_int>,
+    pub BotNumInitialChats:
+        Option<unsafe extern "C" fn(chatstate: c_int, r#type: *mut c_char) -> c_int>,
     pub BotReplyChat: Option<
         unsafe extern "C" fn(
             chatstate: c_int,
@@ -81,23 +82,38 @@ pub struct ai_export_s {
     >,
     pub BotChatLength: Option<unsafe extern "C" fn(chatstate: c_int) -> c_int>,
     pub BotEnterChat: Option<unsafe extern "C" fn(chatstate: c_int, client: c_int, sendto: c_int)>,
-    pub BotGetChatMessage: Option<unsafe extern "C" fn(chatstate: c_int, buf: *mut c_char, size: c_int)>,
+    pub BotGetChatMessage:
+        Option<unsafe extern "C" fn(chatstate: c_int, buf: *mut c_char, size: c_int)>,
     pub StringContains: Option<
         unsafe extern "C" fn(str1: *mut c_char, str2: *mut c_char, casesensitive: c_int) -> c_int,
     >,
     pub BotFindMatch: Option<
-        unsafe extern "C" fn(str: *mut c_char, r#match: *mut bot_match_s, context: c_ulong) -> c_int,
+        unsafe extern "C" fn(
+            str: *mut c_char,
+            r#match: *mut bot_match_s,
+            context: c_ulong,
+        ) -> c_int,
     >,
     pub BotMatchVariable: Option<
-        unsafe extern "C" fn(r#match: *mut bot_match_s, variable: c_int, buf: *mut c_char, size: c_int),
+        unsafe extern "C" fn(
+            r#match: *mut bot_match_s,
+            variable: c_int,
+            buf: *mut c_char,
+            size: c_int,
+        ),
     >,
     pub UnifyWhiteSpaces: Option<unsafe extern "C" fn(string: *mut c_char)>,
     pub BotReplaceSynonyms: Option<unsafe extern "C" fn(string: *mut c_char, context: c_ulong)>,
     pub BotLoadChatFile: Option<
-        unsafe extern "C" fn(chatstate: c_int, chatfile: *mut c_char, chatname: *mut c_char) -> c_int,
+        unsafe extern "C" fn(
+            chatstate: c_int,
+            chatfile: *mut c_char,
+            chatname: *mut c_char,
+        ) -> c_int,
     >,
     pub BotSetChatGender: Option<unsafe extern "C" fn(chatstate: c_int, gender: c_int)>,
-    pub BotSetChatName: Option<unsafe extern "C" fn(chatstate: c_int, name: *mut c_char, client: c_int)>,
+    pub BotSetChatName:
+        Option<unsafe extern "C" fn(chatstate: c_int, name: *mut c_char, client: c_int)>,
     //-----------------------------------
     // be_ai_goal.h
     //-----------------------------------
@@ -110,8 +126,10 @@ pub struct ai_export_s {
     pub BotDumpAvoidGoals: Option<unsafe extern "C" fn(goalstate: c_int)>,
     pub BotDumpGoalStack: Option<unsafe extern "C" fn(goalstate: c_int)>,
     pub BotGoalName: Option<unsafe extern "C" fn(number: c_int, name: *mut c_char, size: c_int)>,
-    pub BotGetTopGoal: Option<unsafe extern "C" fn(goalstate: c_int, goal: *mut bot_goal_t) -> c_int>,
-    pub BotGetSecondGoal: Option<unsafe extern "C" fn(goalstate: c_int, goal: *mut bot_goal_t) -> c_int>,
+    pub BotGetTopGoal:
+        Option<unsafe extern "C" fn(goalstate: c_int, goal: *mut bot_goal_t) -> c_int>,
+    pub BotGetSecondGoal:
+        Option<unsafe extern "C" fn(goalstate: c_int, goal: *mut bot_goal_t) -> c_int>,
     pub BotChooseLTGItem: Option<
         unsafe extern "C" fn(
             goalstate: c_int,
@@ -152,11 +170,13 @@ pub struct ai_export_s {
         Option<unsafe extern "C" fn(goalstate: c_int, number: c_int, avoidtime: c_float)>,
     pub BotInitLevelItems: Option<unsafe extern "C" fn()>,
     pub BotUpdateEntityItems: Option<unsafe extern "C" fn()>,
-    pub BotLoadItemWeights: Option<unsafe extern "C" fn(goalstate: c_int, filename: *mut c_char) -> c_int>,
+    pub BotLoadItemWeights:
+        Option<unsafe extern "C" fn(goalstate: c_int, filename: *mut c_char) -> c_int>,
     pub BotFreeItemWeights: Option<unsafe extern "C" fn(goalstate: c_int)>,
     pub BotInterbreedGoalFuzzyLogic:
         Option<unsafe extern "C" fn(parent1: c_int, parent2: c_int, child: c_int)>,
-    pub BotSaveGoalFuzzyLogic: Option<unsafe extern "C" fn(goalstate: c_int, filename: *mut c_char)>,
+    pub BotSaveGoalFuzzyLogic:
+        Option<unsafe extern "C" fn(goalstate: c_int, filename: *mut c_char)>,
     pub BotMutateGoalFuzzyLogic: Option<unsafe extern "C" fn(goalstate: c_int, range: c_float)>,
     pub BotAllocGoalState: Option<unsafe extern "C" fn(client: c_int) -> c_int>,
     pub BotFreeGoalState: Option<unsafe extern "C" fn(handle: c_int)>,
@@ -182,7 +202,8 @@ pub struct ai_export_s {
     >,
     pub BotResetAvoidReach: Option<unsafe extern "C" fn(movestate: c_int)>,
     pub BotResetLastAvoidReach: Option<unsafe extern "C" fn(movestate: c_int)>,
-    pub BotReachabilityArea: Option<unsafe extern "C" fn(origin: *const vec3_t, testground: c_int) -> c_int>,
+    pub BotReachabilityArea:
+        Option<unsafe extern "C" fn(origin: *const vec3_t, testground: c_int) -> c_int>,
     pub BotMovementViewTarget: Option<
         unsafe extern "C" fn(
             movestate: c_int,
@@ -203,9 +224,15 @@ pub struct ai_export_s {
     >,
     pub BotAllocMoveState: Option<unsafe extern "C" fn() -> c_int>,
     pub BotFreeMoveState: Option<unsafe extern "C" fn(handle: c_int)>,
-    pub BotInitMoveState: Option<unsafe extern "C" fn(handle: c_int, initmove: *mut bot_initmove_t)>,
+    pub BotInitMoveState:
+        Option<unsafe extern "C" fn(handle: c_int, initmove: *mut bot_initmove_t)>,
     pub BotAddAvoidSpot: Option<
-        unsafe extern "C" fn(movestate: c_int, origin: *const vec3_t, radius: c_float, r#type: c_int),
+        unsafe extern "C" fn(
+            movestate: c_int,
+            origin: *const vec3_t,
+            radius: c_float,
+            r#type: c_int,
+        ),
     >,
     //-----------------------------------
     // be_ai_weap.h

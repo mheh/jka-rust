@@ -7,8 +7,8 @@ use super::surface_type_t::surfaceType_t;
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:700-703`
 #[repr(C)]
 pub struct srfDisplayList_t {
-	pub surfaceType: surfaceType_t,
-	pub listNum: i32,
+    pub surfaceType: surfaceType_t,
+    pub listNum: i32,
 }
 
 /// Raven `srfDisplayList_s` is the C tag; `srfDisplayList_t` is the typedef used everywhere.

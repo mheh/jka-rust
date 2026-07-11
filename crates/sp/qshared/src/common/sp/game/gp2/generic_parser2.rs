@@ -85,7 +85,12 @@ impl GenericParser2 {
     /// Raven `CGPGroup::AddPair(name, value, textPool)` — appends a pair,
     /// with one initial value if given. Returns the pair's index within the
     /// group, in insertion order.
-    pub fn add_pair(&mut self, group: GpGroupId, name: impl Into<String>, value: Option<&str>) -> usize {
+    pub fn add_pair(
+        &mut self,
+        group: GpGroupId,
+        name: impl Into<String>,
+        value: Option<&str>,
+    ) -> usize {
         let mut pair = GpValue::new(name);
         if let Some(value) = value {
             pair.add_value(value);
@@ -108,7 +113,11 @@ impl GenericParser2 {
     }
 
     /// Raven `CGPGroup::Parse`.
-    fn parse_group(&mut self, group: GpGroupId, tokenizer: &mut Tokenizer) -> Result<(), Gp2ParseError> {
+    fn parse_group(
+        &mut self,
+        group: GpGroupId,
+        tokenizer: &mut Tokenizer,
+    ) -> Result<(), Gp2ParseError> {
         loop {
             let token = tokenizer.get_token(true, false);
 
@@ -282,7 +291,11 @@ outer\n\
         let parser = parsed(SAMPLE);
         let outer = parser.top_level().find_sub_group("OUTER").expect("outer");
         assert_eq!(outer.find_pair_value("name"), Some("value one"));
-        let list = outer.find_sub_group("inner").unwrap().find_pair("list").unwrap();
+        let list = outer
+            .find_sub_group("inner")
+            .unwrap()
+            .find_pair("list")
+            .unwrap();
         assert_eq!(list.values().collect::<Vec<_>>(), ["first value", "second"]);
     }
 

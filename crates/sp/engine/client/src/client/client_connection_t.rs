@@ -19,25 +19,25 @@ const MAX_RELIABLE_COMMANDS: usize = 64;
 /// Type definition source: `oracle/code/client/client.h:127-147`
 #[repr(C)]
 pub struct clientConnection_t {
-	pub lastPacketSentTime: i32, // for retransmits
-	pub lastPacketTime: i32,
-	pub servername: [c_char; MAX_OSPATH], // name of server from original connect
-	pub serverAddress: netadr_t,
-	pub connectTime: i32,        // for connection retransmits
-	pub connectPacketCount: i32, // for display on connection dialog
+    pub lastPacketSentTime: i32, // for retransmits
+    pub lastPacketTime: i32,
+    pub servername: [c_char; MAX_OSPATH], // name of server from original connect
+    pub serverAddress: netadr_t,
+    pub connectTime: i32,        // for connection retransmits
+    pub connectPacketCount: i32, // for display on connection dialog
 
-	pub challenge: i32, // from the server to use for connecting
+    pub challenge: i32, // from the server to use for connecting
 
-	pub reliableSequence: i32,
-	pub reliableAcknowledge: i32,
-	pub reliableCommands: [*mut c_char; MAX_RELIABLE_COMMANDS],
+    pub reliableSequence: i32,
+    pub reliableAcknowledge: i32,
+    pub reliableCommands: [*mut c_char; MAX_RELIABLE_COMMANDS],
 
-	// reliable messages received from server
-	pub serverCommandSequence: i32,
-	pub serverCommands: [*mut c_char; MAX_RELIABLE_COMMANDS],
+    // reliable messages received from server
+    pub serverCommandSequence: i32,
+    pub serverCommands: [*mut c_char; MAX_RELIABLE_COMMANDS],
 
-	// big stuff at end of structure so most offsets are 15 bits or less
-	pub netchan: netchan_t,
+    // big stuff at end of structure so most offsets are 15 bits or less
+    pub netchan: netchan_t,
 }
 
 const _: () = assert!(core::mem::size_of::<clientConnection_t>() == 18776);

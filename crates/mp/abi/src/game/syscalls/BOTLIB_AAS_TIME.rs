@@ -1,6 +1,8 @@
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AAS_TIME` outbound game-to-engine syscall.
 #[derive(Debug)]

@@ -5,8 +5,8 @@
 /// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:465-468`
 #[repr(C)]
 pub struct dplane_t {
-	pub normal: [f32; 3],
-	pub dist: f32,
+    pub normal: [f32; 3],
+    pub dist: f32,
 }
 
 const _: () = assert!(core::mem::size_of::<dplane_t>() == 16);

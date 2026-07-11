@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ARGC` outbound game-to-engine syscall.
 ///

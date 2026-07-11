@@ -102,7 +102,9 @@ pub fn g_shutdown_game(ctx: GameContext<'_>, args: GameShutdownArgs) {
         {
             trap::G2API_CleanGhoul2Models(
                 ctx.engine,
-                GG2CleanmodelsArgs::new(&mut (*ctx.world).globals.precachedKyle as *mut *mut c_void),
+                GG2CleanmodelsArgs::new(
+                    &mut (*ctx.world).globals.precachedKyle as *mut *mut c_void,
+                ),
             );
             (*ctx.world).globals.precachedKyle = core::ptr::null_mut();
         }

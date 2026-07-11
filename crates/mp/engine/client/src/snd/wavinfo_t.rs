@@ -5,12 +5,12 @@
 /// Type definition source: `oracle/codemp/client/snd_local.h:137-144`
 #[repr(C)]
 pub struct wavinfo_t {
-	pub format: i32,
-	pub rate: i32,
-	pub width: i32,
-	pub channels: i32,
-	pub samples: i32,
-	pub dataofs: i32, // chunk starts this many bytes from file start
+    pub format: i32,
+    pub rate: i32,
+    pub width: i32,
+    pub channels: i32,
+    pub samples: i32,
+    pub dataofs: i32, // chunk starts this many bytes from file start
 }
 
 const _: () = assert!(core::mem::size_of::<wavinfo_t>() == 24);

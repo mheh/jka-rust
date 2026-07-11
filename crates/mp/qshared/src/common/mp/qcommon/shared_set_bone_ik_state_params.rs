@@ -42,4 +42,5 @@ const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, origin
 const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, scale) == 48);
 const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, radius) == 60);
 const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, start_frame) == 72);
-const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, force_anim_on_bone) == 80);
+const _: () =
+    assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, force_anim_on_bone) == 80);

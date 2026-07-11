@@ -5,10 +5,10 @@
 /// Type definition source: `oracle/codemp/botlib/aasfile.h:200-205`
 #[repr(C)]
 pub struct aas_node_t {
-	pub planenum: i32,
-	/// child nodes of this node, or areas as leaves when negative
-	/// when a child is zero it's a solid leaf
-	pub children: [i32; 2],
+    pub planenum: i32,
+    /// child nodes of this node, or areas as leaves when negative
+    /// when a child is zero it's a solid leaf
+    pub children: [i32; 2],
 }
 
 pub type aas_node_s = aas_node_t;

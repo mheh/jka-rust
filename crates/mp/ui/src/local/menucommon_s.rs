@@ -9,22 +9,22 @@ use super::menuframework_s::menuframework_s;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:160-177`
 #[repr(C)]
 pub struct menucommon_s {
-	pub r#type: c_int,
-	pub name: *const c_char,
-	pub id: c_int,
-	pub x: c_int,
-	pub y: c_int,
-	pub left: c_int,
-	pub top: c_int,
-	pub right: c_int,
-	pub bottom: c_int,
-	pub parent: *mut menuframework_s,
-	pub menuPosition: c_int,
-	pub flags: u32,
+    pub r#type: c_int,
+    pub name: *const c_char,
+    pub id: c_int,
+    pub x: c_int,
+    pub y: c_int,
+    pub left: c_int,
+    pub top: c_int,
+    pub right: c_int,
+    pub bottom: c_int,
+    pub parent: *mut menuframework_s,
+    pub menuPosition: c_int,
+    pub flags: u32,
 
-	pub callback: Option<unsafe extern "C" fn(self_: *mut c_void, event: c_int)>,
-	pub statusbar: Option<unsafe extern "C" fn(self_: *mut c_void)>,
-	pub ownerdraw: Option<unsafe extern "C" fn(self_: *mut c_void)>,
+    pub callback: Option<unsafe extern "C" fn(self_: *mut c_void, event: c_int)>,
+    pub statusbar: Option<unsafe extern "C" fn(self_: *mut c_void)>,
+    pub ownerdraw: Option<unsafe extern "C" fn(self_: *mut c_void)>,
 }
 
 #[cfg(target_pointer_width = "64")]

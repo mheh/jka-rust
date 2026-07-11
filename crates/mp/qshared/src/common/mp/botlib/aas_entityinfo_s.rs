@@ -7,52 +7,52 @@ use crate::shared::vec3_t;
 /// Type definition source: `oracle/codemp/game/be_aas.h:107-132`
 #[repr(C)]
 pub struct aas_entityinfo_t {
-	/// true if updated this frame
-	pub valid: i32,
-	/// entity type
-	pub r#type: i32,
-	/// entity flags
-	pub flags: i32,
-	/// local time
-	pub ltime: f32,
-	/// time between last and current update
-	pub update_time: f32,
-	/// number of the entity
-	pub number: i32,
-	/// origin of the entity
-	pub origin: vec3_t,
-	/// angles of the model
-	pub angles: vec3_t,
-	/// for lerping
-	pub old_origin: vec3_t,
-	/// last visible origin
-	pub lastvisorigin: vec3_t,
-	/// bounding box minimums
-	pub mins: vec3_t,
-	/// bounding box maximums
-	pub maxs: vec3_t,
-	/// ground entity
-	pub groundent: i32,
-	/// solid type
-	pub solid: i32,
-	/// model used
-	pub modelindex: i32,
-	/// weapons, CTF flags, etc
-	pub modelindex2: i32,
-	/// model frame number
-	pub frame: i32,
-	/// impulse events -- muzzle flashes, footsteps, etc
-	pub event: i32,
-	/// even parameter
-	pub eventParm: i32,
-	/// bit flags
-	pub powerups: i32,
-	/// determines weapon and flash model, etc
-	pub weapon: i32,
-	/// current legs anim
-	pub legsAnim: i32,
-	/// current torso anim
-	pub torsoAnim: i32,
+    /// true if updated this frame
+    pub valid: i32,
+    /// entity type
+    pub r#type: i32,
+    /// entity flags
+    pub flags: i32,
+    /// local time
+    pub ltime: f32,
+    /// time between last and current update
+    pub update_time: f32,
+    /// number of the entity
+    pub number: i32,
+    /// origin of the entity
+    pub origin: vec3_t,
+    /// angles of the model
+    pub angles: vec3_t,
+    /// for lerping
+    pub old_origin: vec3_t,
+    /// last visible origin
+    pub lastvisorigin: vec3_t,
+    /// bounding box minimums
+    pub mins: vec3_t,
+    /// bounding box maximums
+    pub maxs: vec3_t,
+    /// ground entity
+    pub groundent: i32,
+    /// solid type
+    pub solid: i32,
+    /// model used
+    pub modelindex: i32,
+    /// weapons, CTF flags, etc
+    pub modelindex2: i32,
+    /// model frame number
+    pub frame: i32,
+    /// impulse events -- muzzle flashes, footsteps, etc
+    pub event: i32,
+    /// even parameter
+    pub eventParm: i32,
+    /// bit flags
+    pub powerups: i32,
+    /// determines weapon and flash model, etc
+    pub weapon: i32,
+    /// current legs anim
+    pub legsAnim: i32,
+    /// current torso anim
+    pub torsoAnim: i32,
 }
 
 pub type aas_entityinfo_s = aas_entityinfo_t;

@@ -7,10 +7,10 @@
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum serverState_t {
-	/// no map loaded
-	SS_DEAD = 0,
-	/// spawning level entities
-	SS_LOADING = 1,
-	/// actively running
-	SS_GAME = 2,
+    /// no map loaded
+    SS_DEAD = 0,
+    /// spawning level entities
+    SS_LOADING = 1,
+    /// actively running
+    SS_GAME = 2,
 }

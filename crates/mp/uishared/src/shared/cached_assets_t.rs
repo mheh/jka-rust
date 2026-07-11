@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use mp_qshared::shared::{qhandle_t, qboolean, sfxHandle_t, vec4_t};
+use mp_qshared::shared::{qboolean, qhandle_t, sfxHandle_t, vec4_t};
 
 /// Number of crosshair shaders cached in `cachedAssets_t::crosshairShader`.
 ///

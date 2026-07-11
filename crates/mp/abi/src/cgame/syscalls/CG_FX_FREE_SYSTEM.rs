@@ -1,5 +1,7 @@
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use mp_qshared::shared::qboolean;
 
 /// Arguments for `CG_FX_FREE_SYSTEM`.

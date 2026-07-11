@@ -27,7 +27,6 @@ use crate::cgame::types::CGhoul2Info_v;
 #[repr(C)]
 pub struct game_import_t {
     //============== general Quake services ==================
-
     /// print message on the local console
     //TODO: Port Printf variadic args
     // Source: oracle/code/game/g_public.h:172
@@ -49,20 +48,27 @@ pub struct game_import_t {
 
     // console variable interaction
     pub cvar: Option<
-        unsafe extern "C" fn(var_name: *const c_char, value: *const c_char, flags: c_int) -> *mut cvar_t,
+        unsafe extern "C" fn(
+            var_name: *const c_char,
+            value: *const c_char,
+            flags: c_int,
+        ) -> *mut cvar_t,
     >,
     pub cvar_set: Option<unsafe extern "C" fn(var_name: *const c_char, value: *const c_char)>,
     pub Cvar_VariableIntegerValue: Option<unsafe extern "C" fn(var_name: *const c_char) -> c_int>,
-    pub Cvar_VariableStringBuffer: Option<
-        unsafe extern "C" fn(var_name: *const c_char, buffer: *mut c_char, bufsize: c_int),
-    >,
+    pub Cvar_VariableStringBuffer:
+        Option<unsafe extern "C" fn(var_name: *const c_char, buffer: *mut c_char, bufsize: c_int)>,
 
     // ClientCommand and ServerCommand parameter access
     pub argc: Option<unsafe extern "C" fn() -> c_int>,
     pub argv: Option<unsafe extern "C" fn(n: c_int) -> *mut c_char>,
 
     pub FS_FOpenFile: Option<
-        unsafe extern "C" fn(qpath: *const c_char, file: *mut fileHandle_t, mode: fsMode_t) -> c_int,
+        unsafe extern "C" fn(
+            qpath: *const c_char,
+            file: *mut fileHandle_t,
+            mode: fsMode_t,
+        ) -> c_int,
     >,
     pub FS_Read:
         Option<unsafe extern "C" fn(buffer: *mut c_void, len: c_int, f: fileHandle_t) -> c_int>,
@@ -83,9 +89,8 @@ pub struct game_import_t {
 
     // Savegame handling
     //
-    pub AppendToSaveGame: Option<
-        unsafe extern "C" fn(chid: c_ulong, data: *const c_void, length: c_int) -> qboolean,
-    >,
+    pub AppendToSaveGame:
+        Option<unsafe extern "C" fn(chid: c_ulong, data: *const c_void, length: c_int) -> qboolean>,
     // Raven's `#ifdef _XBOX` branch inlines these two as default-argument member
     // functions; dead on the shipping PC engine. Only the `#else` function-pointer
     // branch (with the C++ default `ppvAddressPtr = NULL` dropped, since Rust fn
@@ -111,7 +116,6 @@ pub struct game_import_t {
     pub SendConsoleCommand: Option<unsafe extern "C" fn(text: *const c_char)>,
 
     //=========== server specific functionality =============
-
     /// kick a client off the server with a message
     pub DropClient: Option<unsafe extern "C" fn(clientNum: c_int, reason: *const c_char)>,
 
@@ -159,7 +163,8 @@ pub struct game_import_t {
     >,
 
     /// point contents against all linked entities
-    pub pointcontents: Option<unsafe extern "C" fn(point: *const vec3_t, passEntityNum: c_int) -> c_int>,
+    pub pointcontents:
+        Option<unsafe extern "C" fn(point: *const vec3_t, passEntityNum: c_int) -> c_int>,
     /// what contents are on the map?
     pub totalMapContents: Option<unsafe extern "C" fn() -> c_int>,
 
@@ -189,7 +194,11 @@ pub struct game_import_t {
 
     /// perform an exact check against inline brush models of non-square shape
     pub EntityContact: Option<
-        unsafe extern "C" fn(mins: *const vec3_t, maxs: *const vec3_t, ent: *const gentity_t) -> qboolean,
+        unsafe extern "C" fn(
+            mins: *const vec3_t,
+            maxs: *const vec3_t,
+            ent: *const gentity_t,
+        ) -> qboolean,
     >,
 
     /// sound volume values
@@ -197,7 +206,9 @@ pub struct game_import_t {
 
     /// dynamic memory allocator for things that need to be freed
     // see qcommon/tags.h for choices
-    pub Malloc: Option<unsafe extern "C" fn(iSize: c_int, eTag: memtag_t, bZeroIt: qboolean) -> *mut c_void>,
+    pub Malloc: Option<
+        unsafe extern "C" fn(iSize: c_int, eTag: memtag_t, bZeroIt: qboolean) -> *mut c_void,
+    >,
     pub Free: Option<unsafe extern "C" fn(buf: *mut c_void) -> c_int>,
     // see qcommon/tags.h for choices
     pub bIsFromZone: Option<unsafe extern "C" fn(buf: *mut c_void, eTag: memtag_t) -> qboolean>,
@@ -205,7 +216,8 @@ pub struct game_import_t {
     /*
     Ghoul2 Insert Start
     */
-    pub G2API_PrecacheGhoul2Model: Option<unsafe extern "C" fn(fileName: *const c_char) -> qhandle_t>,
+    pub G2API_PrecacheGhoul2Model:
+        Option<unsafe extern "C" fn(fileName: *const c_char) -> qhandle_t>,
 
     // Raven's `#ifdef _XBOX` branch inlines the Ghoul2 API as default-argument member
     // functions; dead on the shipping PC engine. Only the `#else` function-pointer
@@ -227,7 +239,11 @@ pub struct game_import_t {
     // `CGhoul2Info` is a distinct (non-vector) Ghoul2 C++ class from `CGhoul2Info_v`;
     // pointer-only dep kept opaque per house rules.
     pub G2API_SetSkin: Option<
-        unsafe extern "C" fn(ghlInfo: *mut c_void, customSkin: qhandle_t, renderSkin: qhandle_t) -> qboolean,
+        unsafe extern "C" fn(
+            ghlInfo: *mut c_void,
+            customSkin: qhandle_t,
+            renderSkin: qhandle_t,
+        ) -> qboolean,
     >,
     pub G2API_SetBoneAnim: Option<
         unsafe extern "C" fn(
@@ -282,7 +298,11 @@ pub struct game_import_t {
         ) -> qboolean,
     >,
     pub G2API_CopyGhoul2Instance: Option<
-        unsafe extern "C" fn(ghoul2From: *mut CGhoul2Info_v, ghoul2To: *mut CGhoul2Info_v, modelIndex: c_int),
+        unsafe extern "C" fn(
+            ghoul2From: *mut CGhoul2Info_v,
+            ghoul2To: *mut CGhoul2Info_v,
+            modelIndex: c_int,
+        ),
     >,
     pub G2API_SetBoneAnimIndex: Option<
         unsafe extern "C" fn(
@@ -298,13 +318,18 @@ pub struct game_import_t {
         ) -> qboolean,
     >,
 
-    pub G2API_SetLodBias: Option<unsafe extern "C" fn(ghlInfo: *mut c_void, lodBias: c_int) -> qboolean>,
+    pub G2API_SetLodBias:
+        Option<unsafe extern "C" fn(ghlInfo: *mut c_void, lodBias: c_int) -> qboolean>,
     pub G2API_SetShader:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, customShader: qhandle_t) -> qboolean>,
     pub G2API_RemoveGhoul2Model:
         Option<unsafe extern "C" fn(ghlInfo: *mut CGhoul2Info_v, modelIndex: c_int) -> qboolean>,
     pub G2API_SetSurfaceOnOff: Option<
-        unsafe extern "C" fn(ghlInfo: *mut c_void, surfaceName: *const c_char, flags: c_int) -> qboolean,
+        unsafe extern "C" fn(
+            ghlInfo: *mut c_void,
+            surfaceName: *const c_char,
+            flags: c_int,
+        ) -> qboolean,
     >,
     pub G2API_SetRootSurface: Option<
         unsafe extern "C" fn(
@@ -313,7 +338,8 @@ pub struct game_import_t {
             surfaceName: *const c_char,
         ) -> qboolean,
     >,
-    pub G2API_RemoveSurface: Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> qboolean>,
+    pub G2API_RemoveSurface:
+        Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> qboolean>,
     pub G2API_AddSurface: Option<
         unsafe extern "C" fn(
             ghlInfo: *mut c_void,
@@ -368,10 +394,18 @@ pub struct game_import_t {
     >,
 
     pub G2API_PauseBoneAnim: Option<
-        unsafe extern "C" fn(ghlInfo: *mut c_void, boneName: *const c_char, currentTime: c_int) -> qboolean,
+        unsafe extern "C" fn(
+            ghlInfo: *mut c_void,
+            boneName: *const c_char,
+            currentTime: c_int,
+        ) -> qboolean,
     >,
     pub G2API_PauseBoneAnimIndex: Option<
-        unsafe extern "C" fn(ghlInfo: *mut c_void, boneIndex: c_int, currentTime: c_int) -> qboolean,
+        unsafe extern "C" fn(
+            ghlInfo: *mut c_void,
+            boneIndex: c_int,
+            currentTime: c_int,
+        ) -> qboolean,
     >,
     pub G2API_IsPaused:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, boneName: *const c_char) -> qboolean>,
@@ -381,10 +415,12 @@ pub struct game_import_t {
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, boneName: *const c_char) -> qboolean>,
     pub G2API_RemoveBone:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, boneName: *const c_char) -> qboolean>,
-    pub G2API_RemoveBolt: Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> qboolean>,
+    pub G2API_RemoveBolt:
+        Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> qboolean>,
     pub G2API_AddBolt:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, boneName: *const c_char) -> c_int>,
-    pub G2API_AddBoltSurfNum: Option<unsafe extern "C" fn(ghlInfo: *mut c_void, surfIndex: c_int) -> c_int>,
+    pub G2API_AddBoltSurfNum:
+        Option<unsafe extern "C" fn(ghlInfo: *mut c_void, surfIndex: c_int) -> c_int>,
     pub G2API_AttachG2Model: Option<
         unsafe extern "C" fn(
             ghlInfo: *mut c_void,
@@ -421,7 +457,8 @@ pub struct game_import_t {
 
     pub G2API_ListSurfaces: Option<unsafe extern "C" fn(ghlInfo: *mut c_void)>,
     pub G2API_ListBones: Option<unsafe extern "C" fn(ghlInfo: *mut c_void, frame: c_int)>,
-    pub G2API_HaveWeGhoul2Models: Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v) -> qboolean>,
+    pub G2API_HaveWeGhoul2Models:
+        Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v) -> qboolean>,
     pub G2API_SetGhoul2ModelFlags:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, flags: c_int) -> qboolean>,
     pub G2API_GetGhoul2ModelFlags: Option<unsafe extern "C" fn(ghlInfo: *mut c_void) -> c_int>,
@@ -447,28 +484,34 @@ pub struct game_import_t {
             fRadius: f32,
         ),
     >,
-    pub G2API_GiveMeVectorFromMatrix: Option<
-        unsafe extern "C" fn(boltMatrix: *mut mdxaBone_t, flags: c_int, vec: *mut vec3_t),
-    >,
+    pub G2API_GiveMeVectorFromMatrix:
+        Option<unsafe extern "C" fn(boltMatrix: *mut mdxaBone_t, flags: c_int, vec: *mut vec3_t)>,
     pub G2API_CleanGhoul2Models: Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v)>,
     //TODO: Port IGhoul2InfoArray
     // Source: oracle/code/game/ghoul2_shared.h:313
     // Returns a C++ reference (`&`), which crosses the ABI as a bare pointer; kept
     // opaque since `IGhoul2InfoArray` itself is unported.
     pub TheGhoul2InfoArray: Option<unsafe extern "C" fn() -> *mut c_void>,
-    pub G2API_GetParentSurface: Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> c_int>,
+    pub G2API_GetParentSurface:
+        Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> c_int>,
     pub G2API_GetSurfaceIndex:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, surfaceName: *const c_char) -> c_int>,
     pub G2API_GetSurfaceName:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, surfNumber: c_int) -> *mut c_char>,
     pub G2API_GetGLAName: Option<unsafe extern "C" fn(ghlInfo: *mut c_void) -> *mut c_char>,
-    pub G2API_SetNewOrigin: Option<unsafe extern "C" fn(ghlInfo: *mut c_void, boltIndex: c_int) -> qboolean>,
+    pub G2API_SetNewOrigin:
+        Option<unsafe extern "C" fn(ghlInfo: *mut c_void, boltIndex: c_int) -> qboolean>,
     pub G2API_GetBoneIndex: Option<
-        unsafe extern "C" fn(ghlInfo: *mut c_void, boneName: *const c_char, bAddIfNotFound: qboolean) -> c_int,
+        unsafe extern "C" fn(
+            ghlInfo: *mut c_void,
+            boneName: *const c_char,
+            bAddIfNotFound: qboolean,
+        ) -> c_int,
     >,
     pub G2API_StopBoneAnglesIndex:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> qboolean>,
-    pub G2API_StopBoneAnimIndex: Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> qboolean>,
+    pub G2API_StopBoneAnimIndex:
+        Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> qboolean>,
     pub G2API_SetBoneAnglesMatrixIndex: Option<
         unsafe extern "C" fn(
             ghlInfo: *mut c_void,
@@ -480,12 +523,16 @@ pub struct game_import_t {
             currentTime: c_int,
         ) -> qboolean,
     >,
-    pub G2API_SetAnimIndex: Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> qboolean>,
+    pub G2API_SetAnimIndex:
+        Option<unsafe extern "C" fn(ghlInfo: *mut c_void, index: c_int) -> qboolean>,
     pub G2API_GetAnimIndex: Option<unsafe extern "C" fn(ghlInfo: *mut c_void) -> c_int>,
     pub G2API_SaveGhoul2Models: Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v)>,
-    pub G2API_LoadGhoul2Models: Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, buffer: *mut c_char)>,
-    pub G2API_LoadSaveCodeDestructGhoul2Info: Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v)>,
-    pub G2API_GetAnimFileNameIndex: Option<unsafe extern "C" fn(modelIndex: qhandle_t) -> *mut c_char>,
+    pub G2API_LoadGhoul2Models:
+        Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, buffer: *mut c_char)>,
+    pub G2API_LoadSaveCodeDestructGhoul2Info:
+        Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v)>,
+    pub G2API_GetAnimFileNameIndex:
+        Option<unsafe extern "C" fn(modelIndex: qhandle_t) -> *mut c_char>,
     pub G2API_GetAnimFileInternalNameIndex:
         Option<unsafe extern "C" fn(modelIndex: qhandle_t) -> *mut c_char>,
     pub G2API_GetSurfaceRenderStatus:
@@ -511,10 +558,18 @@ pub struct game_import_t {
         ) -> qboolean,
     >,
     pub G2API_RagPCJGradientSpeed: Option<
-        unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, boneName: *const c_char, speed: f32) -> qboolean,
+        unsafe extern "C" fn(
+            ghoul2: *mut CGhoul2Info_v,
+            boneName: *const c_char,
+            speed: f32,
+        ) -> qboolean,
     >,
     pub G2API_RagEffectorGoal: Option<
-        unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, boneName: *const c_char, pos: *mut vec3_t) -> qboolean,
+        unsafe extern "C" fn(
+            ghoul2: *mut CGhoul2Info_v,
+            boneName: *const c_char,
+            pos: *mut vec3_t,
+        ) -> qboolean,
     >,
     pub G2API_GetRagBonePos: Option<
         unsafe extern "C" fn(
@@ -567,7 +622,11 @@ pub struct game_import_t {
 
     pub RE_RegisterSkin: Option<unsafe extern "C" fn(name: *const c_char) -> c_int>,
     pub RE_GetAnimationCFG: Option<
-        unsafe extern "C" fn(psCFGFilename: *const c_char, psDest: *mut c_char, iDestSize: c_int) -> c_int,
+        unsafe extern "C" fn(
+            psCFGFilename: *const c_char,
+            psDest: *mut c_char,
+            iDestSize: c_int,
+        ) -> c_int,
     >,
 
     // Raven writes these as C++ `bool`/`float`, not `qboolean`; `bool` matches the
@@ -793,11 +852,13 @@ const _: () = assert!(core::mem::offset_of!(game_import_t, G2API_SaveGhoul2Model
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(game_import_t, G2API_LoadGhoul2Models) == 808);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(game_import_t, G2API_LoadSaveCodeDestructGhoul2Info) == 816);
+const _: () =
+    assert!(core::mem::offset_of!(game_import_t, G2API_LoadSaveCodeDestructGhoul2Info) == 816);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(game_import_t, G2API_GetAnimFileNameIndex) == 824);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(game_import_t, G2API_GetAnimFileInternalNameIndex) == 832);
+const _: () =
+    assert!(core::mem::offset_of!(game_import_t, G2API_GetAnimFileInternalNameIndex) == 832);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(game_import_t, G2API_GetSurfaceRenderStatus) == 840);
 #[cfg(target_pointer_width = "64")]

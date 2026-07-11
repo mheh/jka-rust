@@ -19,7 +19,7 @@ pub struct glconfig_t {
     pub version_string: *const c_char,
     pub extensions_string: *const c_char,
 
-    pub maxTextureSize: i32,   // queried from GL
+    pub maxTextureSize: i32,    // queried from GL
     pub maxActiveTextures: i32, // multitexture ability
     pub maxTextureFilterAnisotropy: f32,
 

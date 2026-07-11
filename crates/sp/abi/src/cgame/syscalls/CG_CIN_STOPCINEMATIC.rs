@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::cgame::types::e_status;
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_CIN_STOPCINEMATIC`.
 ///

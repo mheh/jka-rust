@@ -7,7 +7,7 @@
 use core::ffi::{c_char, c_int, c_void};
 
 use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
-use mp_qshared::shared::{vec3_t, entityShared_t};
+use mp_qshared::shared::{entityShared_t, vec3_t};
 
 use crate::vehicles::vehicle_s::Vehicle_t;
 

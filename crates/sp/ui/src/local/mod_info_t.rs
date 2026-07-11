@@ -7,8 +7,8 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/code/ui/ui_local.h:98-101`
 #[repr(C)]
 pub struct modInfo_t {
-	pub modName: *const c_char,
-	pub modDescr: *const c_char,
+    pub modName: *const c_char,
+    pub modDescr: *const c_char,
 }
 
 #[cfg(target_pointer_width = "64")]

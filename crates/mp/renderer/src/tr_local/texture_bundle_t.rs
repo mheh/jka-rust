@@ -13,22 +13,22 @@ use super::tex_mod_info_t::texModInfo_t;
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:372-389`
 #[repr(C)]
 pub struct textureBundle_t {
-	pub image: *mut image_t,
+    pub image: *mut image_t,
 
-	pub tcGen: texCoordGen_t,
-	pub tcGenVectors: *mut vec3_t,
+    pub tcGen: texCoordGen_t,
+    pub tcGenVectors: *mut vec3_t,
 
-	pub texMods: *mut texModInfo_t,
-	pub numTexMods: i16,
-	pub numImageAnimations: i16,
-	pub imageAnimationSpeed: c_float,
+    pub texMods: *mut texModInfo_t,
+    pub numTexMods: i16,
+    pub numImageAnimations: i16,
+    pub imageAnimationSpeed: c_float,
 
-	pub isLightmap: bool,
-	pub oneShotAnimMap: bool,
-	pub vertexLightmap: bool,
-	pub isVideoMap: bool,
+    pub isLightmap: bool,
+    pub oneShotAnimMap: bool,
+    pub vertexLightmap: bool,
+    pub isVideoMap: bool,
 
-	pub videoMapHandle: i32,
+    pub videoMapHandle: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<textureBundle_t>() == 48);

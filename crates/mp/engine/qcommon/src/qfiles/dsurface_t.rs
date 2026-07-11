@@ -11,31 +11,31 @@ use super::draw_vert_t::MAXLIGHTMAPS;
 /// Type definition source: `oracle/codemp/qcommon/qfiles.h:538-559`
 #[repr(C)]
 pub struct dsurface_t {
-	pub shaderNum: i32,
-	pub fogNum: i32,
-	/// Values come from `mapSurfaceType_t`, stored as raw `int` on disk.
-	pub surfaceType: i32,
+    pub shaderNum: i32,
+    pub fogNum: i32,
+    /// Values come from `mapSurfaceType_t`, stored as raw `int` on disk.
+    pub surfaceType: i32,
 
-	pub firstVert: i32,
-	pub numVerts: i32,
+    pub firstVert: i32,
+    pub numVerts: i32,
 
-	pub firstIndex: i32,
-	pub numIndexes: i32,
+    pub firstIndex: i32,
+    pub numIndexes: i32,
 
-	pub lightmapStyles: [u8; MAXLIGHTMAPS],
-	pub vertexStyles: [u8; MAXLIGHTMAPS],
-	pub lightmapNum: [i32; MAXLIGHTMAPS],
-	pub lightmapX: [i32; MAXLIGHTMAPS],
-	pub lightmapY: [i32; MAXLIGHTMAPS],
-	pub lightmapWidth: i32,
-	pub lightmapHeight: i32,
+    pub lightmapStyles: [u8; MAXLIGHTMAPS],
+    pub vertexStyles: [u8; MAXLIGHTMAPS],
+    pub lightmapNum: [i32; MAXLIGHTMAPS],
+    pub lightmapX: [i32; MAXLIGHTMAPS],
+    pub lightmapY: [i32; MAXLIGHTMAPS],
+    pub lightmapWidth: i32,
+    pub lightmapHeight: i32,
 
-	pub lightmapOrigin: vec3_t,
-	/// for patches, [0] and [1] are lodbounds
-	pub lightmapVecs: [vec3_t; 3],
+    pub lightmapOrigin: vec3_t,
+    /// for patches, [0] and [1] are lodbounds
+    pub lightmapVecs: [vec3_t; 3],
 
-	pub patchWidth: i32,
-	pub patchHeight: i32,
+    pub patchWidth: i32,
+    pub patchHeight: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<dsurface_t>() == 148);

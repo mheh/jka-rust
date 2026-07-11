@@ -7,8 +7,8 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:649-652`
 #[repr(C)]
 pub struct serverFilter_t {
-	pub description: *const c_char,
-	pub basedir: *const c_char,
+    pub description: *const c_char,
+    pub basedir: *const c_char,
 }
 
 #[cfg(target_pointer_width = "64")]

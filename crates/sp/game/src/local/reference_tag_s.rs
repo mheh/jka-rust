@@ -12,13 +12,13 @@ pub const MAX_REFNAME: usize = 32;
 /// Type definition source: `oracle/code/game/g_local.h:573-580`
 #[repr(C)]
 pub struct reference_tag_t {
-	pub name: [c_char; MAX_REFNAME],
-	pub origin: vec3_t,
-	pub angles: vec3_t,
-	/// Just in case
-	pub flags: i32,
-	/// For nav goals
-	pub radius: i32,
+    pub name: [c_char; MAX_REFNAME],
+    pub origin: vec3_t,
+    pub angles: vec3_t,
+    /// Just in case
+    pub flags: i32,
+    /// For nav goals
+    pub radius: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<reference_tag_t>() == 64);

@@ -8,13 +8,13 @@ use mp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/codemp/cgame/cg_public.h:582-591`
 #[repr(C)]
 pub struct ragCallbackTraceLine_t {
-	pub tr: trace_t,
-	pub start: vec3_t,
-	pub end: vec3_t,
-	pub mins: vec3_t,
-	pub maxs: vec3_t,
-	pub ignore: i32,
-	pub mask: i32,
+    pub tr: trace_t,
+    pub start: vec3_t,
+    pub end: vec3_t,
+    pub mins: vec3_t,
+    pub maxs: vec3_t,
+    pub ignore: i32,
+    pub mask: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<ragCallbackTraceLine_t>() == 104);

@@ -1,10 +1,15 @@
 //! `Server` (the `Engine.sv` island host) + `ServerGame` (the game dispatcher's
 //! reborrowed host state) + `sv_game_system_calls` (the MP game dispatcher).
 
-use core::ffi::c_int;
+use core::ffi::{c_char, c_int};
 
+use mp_qshared::common::mp::botlib::botlib_export_s::botlib_export_t;
+use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
+use mp_qshared::common::mp::qcommon::siege_pers::siegePers_t;
 use mp_qshared::shared::limits::MAX_WPARRAY_SIZE as MAX_WPARRAY_SIZE_I32;
 use mp_qshared::shared::wpobject_t;
+
+use mp_engine_qcommon::vm::vm_s::vm_t;
 
 use crate::server::bot_debugpoly_t::bot_debugpoly_t;
 use crate::server::server_static_t::serverStatic_t;
@@ -122,6 +127,39 @@ pub struct Server {
     ///
     /// Source: `oracle/codemp/server/sv_main.cpp:192`
     pub master_heartbeat: [c_int; MAX_MASTER_SERVERS],
+    /// Raven `gLocalModifier` (`sv_game.cpp` file-scope static) — the
+    /// `ConvertedEntity` shifted-pointer scratch buffer.
+    ///
+    /// Source: `oracle/codemp/server/sv_game.cpp:420`
+    pub g_local_modifier: sharedEntity_t,
+    /// Raven `g_svCullDist` (`sv_snapshot.cpp` file-scope global) — per-entity
+    /// snapshot cull-distance override, `-1.0f` (disabled) unless set by the
+    /// `G_SET_SNAPSHOT_CALLBACK`-family trap.
+    ///
+    /// Source: `oracle/codemp/server/sv_snapshot.cpp:300`
+    pub g_svCullDist: f32,
+    /// Raven `gvm` — the game virtual machine.
+    ///
+    /// Source: `oracle/codemp/server/server.h:234`
+    pub gvm: *mut vm_t,
+    /// Raven `sv_siegePersData` (`sv_game.cpp` file-scope static) — siege
+    /// persistent-data mirror for `G_GET_SIEGE_PERS_DATA`/`G_SET_SIEGE_PERS_DATA`.
+    ///
+    /// Source: `oracle/codemp/server/sv_game.cpp:454`
+    pub sv_siegePersData: siegePers_t,
+    /// Raven `botlib_export` (`extern botlib_export_t *`, defined by the botlib
+    /// interface `be_interface.cpp`, referenced from `sv_bot.cpp`). Null until
+    /// `SV_BotInitBotLib` assigns it.
+    // Mirrored here per the packet's `sv` threading; real owner is `Engine.bot` (ruling 43).
+    /// Source: `oracle/codemp/server/sv_bot.cpp:19`
+    pub botlib_export: *mut botlib_export_t,
+    /// Raven `SV_ExpandNewlines::string` (`static char string[1024]`) — the
+    /// newline-expansion return buffer; a function-scope static whose pointer is
+    /// returned to the caller, so it lives as cross-call `Server` state (fork-3
+    /// kind 3).
+    ///
+    /// Source: `oracle/codemp/server/sv_main.cpp:60`
+    pub sv_expand_newlines_string: [c_char; 1024],
 }
 
 /// engine-seam's name for the game dispatcher's `&mut ServerGame` argument — the

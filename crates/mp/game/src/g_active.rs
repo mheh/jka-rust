@@ -32,8 +32,6 @@ use mp_qshared::shared::trajectory::trType_t::*; // TR_GRAVITY
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites
 // (same convention as `g_combat.rs`).
 
-
-
 // `PITCH`/`YAW`/`ROLL` (`crate::q_math`), `PMF_FOLLOW`
 // (`mp_qshared::…::pm_flags`) and `MASK_PLAYERSOLID`
 // (`mp_qshared::shared::surface_flags`) resolve via the crate prelude glob
@@ -2458,7 +2456,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     // `double fabs`, so the subtract and divide run in f64 before
                     // narrowing to the f32 `turndelta`.
                     turndelta = ((180.0
-                        - (AngleDelta((*ent).r.currentAngles[YAW], (*npc).desiredYaw) as f64).abs())
+                        - (AngleDelta((*ent).r.currentAngles[YAW], (*npc).desiredYaw) as f64)
+                            .abs())
                         / 180.0) as f32;
 
                     if turndelta < 0.75 {

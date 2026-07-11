@@ -1,5 +1,7 @@
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `UI_LAN_LOADCACHEDSERVERS` MP UI imports syscall ABI token.
 ///

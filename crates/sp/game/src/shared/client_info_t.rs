@@ -30,8 +30,10 @@ pub const MAX_CUSTOM_JEDI_SOUNDS: usize = 22;
 ///
 /// Raven: `#define MAX_CUSTOM_SOUNDS (MAX_CUSTOM_JEDI_SOUNDS + MAX_CUSTOM_EXTRA_SOUNDS + MAX_CUSTOM_COMBAT_SOUNDS + MAX_CUSTOM_BASIC_SOUNDS)`.
 /// Source: `oracle/code/game/g_shared.h:74`
-pub const MAX_CUSTOM_SOUNDS: usize =
-    MAX_CUSTOM_JEDI_SOUNDS + MAX_CUSTOM_EXTRA_SOUNDS + MAX_CUSTOM_COMBAT_SOUNDS + MAX_CUSTOM_BASIC_SOUNDS;
+pub const MAX_CUSTOM_SOUNDS: usize = MAX_CUSTOM_JEDI_SOUNDS
+    + MAX_CUSTOM_EXTRA_SOUNDS
+    + MAX_CUSTOM_COMBAT_SOUNDS
+    + MAX_CUSTOM_BASIC_SOUNDS;
 
 /// Raven `clientInfo_t` — per-client rendering info shared between game and cgame.
 ///

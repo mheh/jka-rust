@@ -8,14 +8,14 @@
 /// Type definition source: `oracle/codemp/qcommon/qcommon.h:1047-1053`
 #[repr(C)]
 pub struct node_t {
-	pub left: *mut node_t,
-	pub right: *mut node_t,
-	pub parent: *mut node_t, /* tree structure */
-	pub next: *mut node_t,
-	pub prev: *mut node_t, /* doubly-linked list */
-	pub head: *mut *mut node_t, /* highest ranked node in block */
-	pub weight: i32,
-	pub symbol: i32,
+    pub left: *mut node_t,
+    pub right: *mut node_t,
+    pub parent: *mut node_t, /* tree structure */
+    pub next: *mut node_t,
+    pub prev: *mut node_t,      /* doubly-linked list */
+    pub head: *mut *mut node_t, /* highest ranked node in block */
+    pub weight: i32,
+    pub symbol: i32,
 }
 
 pub type nodetype = node_t;

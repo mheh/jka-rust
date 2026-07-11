@@ -11,11 +11,11 @@ use super::draw_vert_t::MAXLIGHTMAPS;
 /// Type definition source: `oracle/codemp/qcommon/qfiles.h:506-512`
 #[repr(C)]
 pub struct mapVert_t {
-	pub xyz: vec3_t,
-	pub st: [f32; 2],
-	pub lightmap: [[f32; 2]; MAXLIGHTMAPS],
-	pub normal: vec3_t,
-	pub color: [[u8; 4]; MAXLIGHTMAPS],
+    pub xyz: vec3_t,
+    pub st: [f32; 2],
+    pub lightmap: [[f32; 2]; MAXLIGHTMAPS],
+    pub normal: vec3_t,
+    pub color: [[u8; 4]; MAXLIGHTMAPS],
 }
 
 const _: () = assert!(core::mem::size_of::<mapVert_t>() == 80);

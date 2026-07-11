@@ -13,3 +13,12 @@ mp_abi = { path = "../../abi" }
 # EngineHost trait seam consumed by the npcnav host-taking methods (NAV-D3 /
 # RULING 11/24/36; path dep authorized by ruling 56c).
 mp_host_interface = { path = "../../host-interface" }
+native_math = { path = "../../../native/math" }
+native_types = { path = "../../../native/types" }
+mp_engine_ghoul2 = { path = "../ghoul2" }
+mp_engine_icarus = { path = "../icarus" }
+mp_engine_rmg = { path = "../rmg" }
+# Renderer package is `mp_renderer`; call sites across sv_*.rs were
+# transcribed against a `mp_engine_renderer` path — alias rather than touch
+# every call site.
+mp_engine_renderer = { package = "mp_renderer", path = "../../renderer" }

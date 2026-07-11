@@ -72,8 +72,6 @@ use mp_qshared::shared::mdxaBone_t;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 // Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2. Canonical
 // in `crate::q_math`. Source: `oracle/codemp/game/q_shared.h:374-376`
 use crate::q_math::{PITCH, ROLL, YAW};
@@ -1215,9 +1213,9 @@ pub fn pas_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
             // no enemy, so make us slowly sweep back and forth as if searching for a new one
             // `sin` is the double libm function: the float argument is widened to f64,
             // evaluated in f64, then narrowed back to the f32 result.
-            diffYaw =
-                ((((*ctx.world).level.time as f32 * 0.0001 + (*ent).count as f32) as f64).sin()
-                    * 2.0) as f32;
+            diffYaw = ((((*ctx.world).level.time as f32 * 0.0001 + (*ent).count as f32) as f64)
+                .sin()
+                * 2.0) as f32;
         }
 
         if diffYaw.abs() > 0.25 {
@@ -1949,22 +1947,19 @@ pub fn EWebDie(
                 (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
                     !(1 << HI_EWEB);
 
-                if (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEM as usize]
-                    > 0
+                if (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEM as usize] > 0
                     && bg_itemlist[(*((*owner).client as *mut gclient_t)).ps.stats
-                        [STAT_HOLDABLE_ITEM as usize]
-                        as usize]
+                        [STAT_HOLDABLE_ITEM as usize] as usize]
                         .giType
                         == IT_HOLDABLE
                     && bg_itemlist[(*((*owner).client as *mut gclient_t)).ps.stats
-                        [STAT_HOLDABLE_ITEM as usize]
-                        as usize]
+                        [STAT_HOLDABLE_ITEM as usize] as usize]
                         .giTag
                         == HI_EWEB
                 {
                     //he has it selected so deselect it and select the first thing available
-                    (*((*owner).client as *mut gclient_t)).ps.stats
-                        [STAT_HOLDABLE_ITEM as usize] = 0;
+                    (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEM as usize] =
+                        0;
                     BG_CycleInven(
                         &mut (*((*owner).client as *mut gclient_t)).ps as *mut playerState_t,
                         1,

@@ -12,7 +12,7 @@ use core::ffi::{c_char, c_void};
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::{qhandle_t, vec3_t};
+use mp_qshared::shared::{qboolean, qhandle_t, vec3_t};
 
 use crate::vm_slot::VmSlot;
 
@@ -207,4 +207,33 @@ pub trait EngineHost {
     /// Source: `oracle/codemp/qcommon/files.cpp:1602-1659` (decl:
     /// `qcommon.h:551`)
     fn fs_file_is_in_pak(&mut self, qpath: &str) -> Option<i32>;
+
+    /// Raven `MSG_ReadDeltaEntity`'s `cl_shownet` debug probe (msg.cpp:1268-1270):
+    /// returns `None` when `sv.state == SS_DEAD` (Raven's `if (sv.state)`),
+    /// else the classname of `SV_GentityNum(number)`. Collapses the `sv`/
+    /// `SV_GentityNum` reach `msg.cpp` cannot make from `mp_engine_qcommon`
+    /// (server depends on qcommon — the sanctioned host edge, ruling 56c).
+    /// The real body lands with the server-spine wave.
+    /// Source: `oracle/codemp/qcommon/msg.cpp:1268-1270`
+    /// (`SV_GentityNum`: `oracle/codemp/server/sv_game.cpp:58`)
+    fn sv_shownet_entity_classname(&mut self, number: i32) -> Option<String>;
+
+    /// Raven `Sys_Init` — one-time platform-layer init (`Com_Init` calls it late,
+    /// `common.cpp:1287`). No-op in a test mock.
+    /// Source: `oracle/codemp/win32/win_main.cpp:834`
+    fn sys_init(&mut self);
+
+    /// Raven `Sys_Quit` — orderly process exit; never returns.
+    /// Source: `oracle/codemp/win32/win_main.cpp:333`
+    fn sys_quit(&mut self) -> !;
+
+    /// Raven `Sys_Error` — fatal platform error print + exit; never returns.
+    /// Source: `oracle/codemp/win32/win_main.cpp:350`
+    fn sys_error(&mut self, msg: &str) -> !;
+
+    /// Raven `Sys_ShowConsole( visLevel, quitOnClose )` — show/hide the dedicated
+    /// console window (`quit_on_close` kept as Raven's `qboolean` to transcribe
+    /// the `Com_Init`/`Com_Frame` call sites 1:1).
+    /// Source: `oracle/codemp/win32/win_syscon.cpp:396`
+    fn sys_show_console(&mut self, level: i32, quit_on_close: qboolean);
 }

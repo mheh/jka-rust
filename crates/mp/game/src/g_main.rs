@@ -23,11 +23,9 @@ use crate::prelude::*;
 use std::ffi::CString;
 
 use crate::bg_lib::qsort;
-use crate::com_boundary::{com_error_sink, com_print_sink};
-use crate::world::GameWorld;
-use crate::game_cvars::{GameCvars, GAME_CVAR_TABLE};
 use crate::client::client_connected::{CON_CONNECTED, CON_CONNECTING};
 use crate::client::spectator_state::spectatorState_t::{SPECTATOR_FOLLOW, SPECTATOR_SCOREBOARD};
+use crate::com_boundary::{com_error_sink, com_print_sink};
 use crate::g_active::{ClientEndFrame, G_CheckClientTimeouts, G_RunClient};
 use crate::g_cmds::{DeathmatchScoreboardMessage, SetTeam, StopFollowing};
 use crate::g_items::{G_RunItem, Jetpack_Off};
@@ -41,11 +39,13 @@ use crate::g_utils::{
     G_EntitySound, G_Find, G_FreeEntity, G_PickTarget, G_PointInBounds, G_SendG2KillQueue,
     G_SoundIndex, G_TempEntity, G_UseTargets2,
 };
+use crate::game_cvars::{GameCvars, GAME_CVAR_TABLE};
 use crate::npc_c::ClearNPCGlobals;
 use crate::q_math::VectorLength;
 use crate::q_shared::Q_stricmp;
 use crate::w_force::WP_ForcePowersUpdate;
 use crate::w_saber::{WP_SaberPositionUpdate, WP_SaberStartMissileBlockCheck};
+use crate::world::GameWorld;
 use crate::NPC_AI_Jedi::Jedi_Decloak;
 use crate::NPC_AI_Utils::AI_UpdateGroups;
 use crate::NPC_senses::ClearPlayerAlertEvents;

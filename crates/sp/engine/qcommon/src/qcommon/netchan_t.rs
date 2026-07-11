@@ -13,25 +13,25 @@ const MAX_MSGLEN: usize = 1 * 17408;
 /// Type definition source: `oracle/code/qcommon/qcommon.h:164-182`
 #[repr(C)]
 pub struct netchan_t {
-	pub sock: netsrc_t,
+    pub sock: netsrc_t,
 
-	// between last packet and previous
-	pub dropped: i32,
+    // between last packet and previous
+    pub dropped: i32,
 
-	pub remoteAddress: netadr_t,
-	// qport value to write when transmitting
-	pub qport: i32,
+    pub remoteAddress: netadr_t,
+    // qport value to write when transmitting
+    pub qport: i32,
 
-	// sequencing variables
-	pub incomingSequence: i32,
-	pub incomingAcknowledged: i32,
+    // sequencing variables
+    pub incomingSequence: i32,
+    pub incomingAcknowledged: i32,
 
-	pub outgoingSequence: i32,
+    pub outgoingSequence: i32,
 
-	// incoming fragment assembly buffer
-	pub fragmentSequence: i32,
-	pub fragmentLength: i32,
-	pub fragmentBuffer: [u8; MAX_MSGLEN],
+    // incoming fragment assembly buffer
+    pub fragmentSequence: i32,
+    pub fragmentLength: i32,
+    pub fragmentBuffer: [u8; MAX_MSGLEN],
 }
 
 const _: () = assert!(core::mem::size_of::<netchan_t>() == 17448);

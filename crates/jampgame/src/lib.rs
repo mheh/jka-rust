@@ -59,9 +59,7 @@ pub extern "C-unwind" fn dllEntry(syscall: RawSyscall) {
     }));
     if armed.is_err() {
         let msg = panic_guard::take().unwrap_or_else(|| "panic in dllEntry".to_string());
-        eprintln!(
-            "jampgame: fatal panic during dllEntry (engine error path not yet armed): {msg}"
-        );
+        eprintln!("jampgame: fatal panic during dllEntry (engine error path not yet armed): {msg}");
         std::process::abort();
     }
 }

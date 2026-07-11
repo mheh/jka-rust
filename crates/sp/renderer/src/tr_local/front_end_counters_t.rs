@@ -24,12 +24,9 @@ pub struct frontEndCounters_t {
 }
 
 const _: () = assert!(core::mem::size_of::<frontEndCounters_t>() == 60);
-const _: () =
-    assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_in) == 0);
-const _: () =
-    assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_clip) == 4);
-const _: () =
-    assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_out) == 8);
+const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_in) == 0);
+const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_clip) == 4);
+const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_out) == 8);
 const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_box_cull_patch_in) == 12);
 const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_box_cull_patch_clip) == 16);
 const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_box_cull_patch_out) == 20);

@@ -3,10 +3,11 @@
 /// Raven `aas_reachabilityareas_t` — first/count of areas reachable via a reachability.
 ///
 /// Type definition source: `oracle/codemp/botlib/be_aas_def.h:178-181`
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct aas_reachabilityareas_t {
-	pub firstarea: i32,
-	pub numareas: i32,
+    pub firstarea: i32,
+    pub numareas: i32,
 }
 
 pub type aas_reachabilityareas_s = aas_reachabilityareas_t;

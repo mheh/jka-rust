@@ -164,7 +164,12 @@ impl Sequencer {
 // ===========================================================================
 
 fn seq_ref(icarus: &Icarus, id: SequenceId) -> Option<&Sequence> {
-    icarus.instance.as_ref()?.sequences.iter().find(|s| s.m_id == id.0)
+    icarus
+        .instance
+        .as_ref()?
+        .sequences
+        .iter()
+        .find(|s| s.m_id == id.0)
 }
 
 fn seq_mut(icarus: &mut Icarus, id: SequenceId) -> Option<&mut Sequence> {
@@ -269,7 +274,9 @@ fn seq_remove_flag(icarus: &mut Icarus, id: SequenceId, flag: i32, children: boo
         s.m_flags &= !flag;
     }
     if children {
-        let kids = seq_ref(icarus, id).map(|s| s.m_children.clone()).unwrap_or_default();
+        let kids = seq_ref(icarus, id)
+            .map(|s| s.m_children.clone())
+            .unwrap_or_default();
         for c in kids {
             seq_remove_flag(icarus, c, flag, true);
         }
@@ -627,7 +634,9 @@ fn route(
             m_id: 0,
             m_flags: 0,
         };
-        seqr.m_streams_created[bstream].stream.read_block(&mut block);
+        seqr.m_streams_created[bstream]
+            .stream
+            .read_block(&mut block);
 
         // TEMP: HACK! (Raven)
         if seqr.m_else_valid != 0 {
@@ -646,9 +655,11 @@ fn route(
 
                 if seq_flags(icarus, cur, SQ_TASK) != 0 {
                     seqr.m_cur_stream = seqr.m_streams_created[bstream].last;
-                    seqr.m_cur_group = seqr
-                        .m_cur_group
-                        .and_then(|g| tm.m_task_groups.get(g.0 as usize).and_then(|grp| grp.m_parent));
+                    seqr.m_cur_group = seqr.m_cur_group.and_then(|g| {
+                        tm.m_task_groups
+                            .get(g.0 as usize)
+                            .and_then(|grp| grp.m_parent)
+                    });
                 }
 
                 seqr.m_cur_sequence = seq_return(icarus, cur);
@@ -989,12 +1000,22 @@ fn parse_affect(
                         None => return SEQ_FAILED, // Raven `return false`
                     }
                 } else {
-                    i_dprintf(icarus, host, WL_ERROR, "Invalid parameter type on affect _1");
+                    i_dprintf(
+                        icarus,
+                        host,
+                        WL_ERROR,
+                        "Invalid parameter type on affect _1",
+                    );
                     return SEQ_FAILED;
                 }
             }
             _ => {
-                i_dprintf(icarus, host, WL_ERROR, "Invalid parameter type on affect _2");
+                i_dprintf(
+                    icarus,
+                    host,
+                    WL_ERROR,
+                    "Invalid parameter type on affect _2",
+                );
                 return SEQ_FAILED;
             }
         };
@@ -1327,7 +1348,12 @@ fn check_affect(
         let mut ent = ge(icarus, host, &entname);
 
         if ent.is_null() {
-            let bm0_id = command.as_ref().unwrap().get_member(0).map(|m| m.m_id).unwrap_or(-1);
+            let bm0_id = command
+                .as_ref()
+                .unwrap()
+                .get_member(0)
+                .map(|m| m.m_id)
+                .unwrap_or(-1);
             let p1: String = match bm0_id {
                 TK_STRING | TK_IDENTIFIER | TK_CHAR => {
                     peek_member_c_string(command.as_ref().unwrap(), 0)
@@ -1343,12 +1369,22 @@ fn check_affect(
                             None => return,
                         }
                     } else {
-                        i_dprintf(icarus, host, WL_ERROR, "Invalid parameter type on affect _1");
+                        i_dprintf(
+                            icarus,
+                            host,
+                            WL_ERROR,
+                            "Invalid parameter type on affect _1",
+                        );
                         return;
                     }
                 }
                 _ => {
-                    i_dprintf(icarus, host, WL_ERROR, "Invalid parameter type on affect _2");
+                    i_dprintf(
+                        icarus,
+                        host,
+                        WL_ERROR,
+                        "Invalid parameter type on affect _2",
+                    );
                     return;
                 }
             };
@@ -1543,7 +1579,12 @@ fn check_if(
             let success_seq = match get_sequence(seqr, success_id) {
                 Some(s) => s,
                 None => {
-                    i_dprintf(icarus, host, WL_ERROR, "Unable to find conditional success sequence!\n");
+                    i_dprintf(
+                        icarus,
+                        host,
+                        WL_ERROR,
+                        "Unable to find conditional success sequence!\n",
+                    );
                     *command = None;
                     return;
                 }
@@ -1560,7 +1601,12 @@ fn check_if(
             let failure_seq = match get_sequence(seqr, failure_id) {
                 Some(s) => s,
                 None => {
-                    i_dprintf(icarus, host, WL_ERROR, "Unable to find conditional failure sequence!\n");
+                    i_dprintf(
+                        icarus,
+                        host,
+                        WL_ERROR,
+                        "Unable to find conditional failure sequence!\n",
+                    );
                     *command = None;
                     return;
                 }
@@ -1644,7 +1690,12 @@ fn evaluate_conditional(
     let oper = match oper_id {
         TK_EQUALS | TK_GREATER_THAN | TK_LESS_THAN | TK_NOT => oper_id,
         _ => {
-            i_dprintf(icarus, host, WL_ERROR, "Invalid operator type found on conditional!\n");
+            i_dprintf(
+                icarus,
+                host,
+                WL_ERROR,
+                "Invalid operator type found on conditional!\n",
+            );
             return 0;
         }
     };
@@ -1681,7 +1732,10 @@ fn eval_operand(
             for v in vec.iter_mut() {
                 *v = member_float(block, member_num);
             }
-            Some((TK_VECTOR, format!("{:.3} {:.3} {:.3}", vec[0], vec[1], vec[2])))
+            Some((
+                TK_VECTOR,
+                format!("{:.3} {:.3} {:.3}", vec[0], vec[1], vec[2]),
+            ))
         }
         TK_STRING | TK_IDENTIFIER | TK_CHAR => {
             Some((id, peek_member_c_string(block, *member_num - 1)))
@@ -1717,7 +1771,10 @@ fn eval_operand(
                     if g(icarus, host, owner_id, type_, &name, &mut vval) == 0 {
                         return None;
                     }
-                    Some((type_, format!("{:.3} {:.3} {:.3}", vval[0], vval[1], vval[2])))
+                    Some((
+                        type_,
+                        format!("{:.3} {:.3} {:.3}", vval[0], vval[1], vval[2]),
+                    ))
                 }
                 _ => Some((type_, String::new())),
             }
@@ -1735,13 +1792,26 @@ fn eval_operand(
             let mut vec = [0.0f32; 3];
             let g = icarus.interface_export.i_get_tag;
             if g(icarus, host, owner_id, &name, type_ as i32, &mut vec) == 0 {
-                i_dprintf(icarus, host, WL_ERROR, &format!("Unable to find tag \"{}\"!\n", name));
+                i_dprintf(
+                    icarus,
+                    host,
+                    WL_ERROR,
+                    &format!("Unable to find tag \"{}\"!\n", name),
+                );
                 return None;
             }
-            Some((TK_VECTOR, format!("{:.3} {:.3} {:.3}", vec[0], vec[1], vec[2])))
+            Some((
+                TK_VECTOR,
+                format!("{:.3} {:.3} {:.3}", vec[0], vec[1], vec[2]),
+            ))
         }
         _ => {
-            i_dprintf(icarus, host, WL_ERROR, "Invalid parameter type on conditional");
+            i_dprintf(
+                icarus,
+                host,
+                WL_ERROR,
+                "Invalid parameter type on conditional",
+            );
             None
         }
     }

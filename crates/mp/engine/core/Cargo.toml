@@ -10,6 +10,7 @@ name = "mp_engine_core"
 mp_qshared = { path = "../../qshared" }
 mp_engine_qcommon = { path = "../qcommon" }
 mp_engine_server = { path = "../server" }
+mp_engine_botlib = { path = "../botlib" }
 mp_engine_icarus = { path = "../icarus" }
 mp_engine_ghoul2 = { path = "../ghoul2" }
 mp_engine_rmg = { path = "../rmg" }

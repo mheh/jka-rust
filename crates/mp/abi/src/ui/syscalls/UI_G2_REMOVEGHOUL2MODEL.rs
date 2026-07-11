@@ -2,9 +2,9 @@ use super::super::MpUiImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::shared::qboolean;
 use core::ffi::c_int;
 use core::ffi::c_void;
+use mp_qshared::shared::qboolean;
 
 /// `UI_G2_REMOVEGHOUL2MODEL` outbound game-to-engine syscall.
 ///

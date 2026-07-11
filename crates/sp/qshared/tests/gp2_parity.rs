@@ -74,12 +74,20 @@ fn matches_oracle_goldens() {
         let name = fixture.file_stem().unwrap().to_str().unwrap().to_string();
         let text = std::fs::read_to_string(&fixture).expect("read fixture");
         let golden_path = root.join("golden").join(format!("{name}.sp.txt"));
-        let golden = std::fs::read_to_string(&golden_path)
-            .unwrap_or_else(|_| panic!("missing golden {golden_path:?} — run tools/gp2-oracle/run.sh --regen"));
+        let golden = std::fs::read_to_string(&golden_path).unwrap_or_else(|_| {
+            panic!("missing golden {golden_path:?} — run tools/gp2-oracle/run.sh --regen")
+        });
 
-        assert_eq!(dump(&text), golden, "fixture {name} diverges from the SP C++ oracle");
+        assert_eq!(
+            dump(&text),
+            golden,
+            "fixture {name} diverges from the SP C++ oracle"
+        );
         checked += 1;
     }
 
-    assert!(checked >= 8, "expected the full fixture set, found {checked}");
+    assert!(
+        checked >= 8,
+        "expected the full fixture set, found {checked}"
+    );
 }

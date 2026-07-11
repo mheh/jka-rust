@@ -8,15 +8,15 @@ use mp_qshared::shared::qboolean;
 /// Type definition source: `oracle/codemp/qcommon/../server/server.h:194-201`
 #[repr(C)]
 pub struct challenge_t {
-	pub adr: netadr_t,
-	pub challenge: i32,
-	/// time the last packet was sent to the autherize server
-	pub time: i32,
-	/// time the challenge response was sent to client
-	pub pingTime: i32,
-	/// time the adr was first used, for authorize timeout checks
-	pub firstTime: i32,
-	pub connected: qboolean,
+    pub adr: netadr_t,
+    pub challenge: i32,
+    /// time the last packet was sent to the autherize server
+    pub time: i32,
+    /// time the challenge response was sent to client
+    pub pingTime: i32,
+    /// time the adr was first used, for authorize timeout checks
+    pub firstTime: i32,
+    pub connected: qboolean,
 }
 
 const _: () = assert!(core::mem::size_of::<challenge_t>() == 40);

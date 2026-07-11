@@ -5,6 +5,6 @@
 /// Type definition source: `oracle/code/game/g_local.h:109-113`
 #[repr(i32)]
 pub enum alertEventType_e {
-	AET_SIGHT,
-	AET_SOUND,
+    AET_SIGHT,
+    AET_SOUND,
 }

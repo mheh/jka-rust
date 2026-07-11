@@ -13,11 +13,11 @@
 //! established `vec3-outparam-seam` park reason).
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_public_consts::SVF_GLASS_BRUSH;
 use crate::level::alert_event::{
     alertEventLevel_e, alertEventLevel_e::AEL_DANGER, alertEventType_e, alertEvent_t,
     MAX_ALERT_EVENTS,
 };
-use crate::g_public_consts::SVF_GLASS_BRUSH;
 use crate::level::interest_point::MAX_INTEREST_POINTS;
 use crate::npc::check_flags::{CHECK_360, CHECK_FOV, CHECK_PVS, CHECK_SHOOT, CHECK_VISRANGE};
 use crate::npc::script_flags::SCF_DONT_FLEE;

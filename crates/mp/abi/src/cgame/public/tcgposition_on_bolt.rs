@@ -10,13 +10,13 @@ use mp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/codemp/cgame/cg_public.h:528-537`
 #[repr(C)]
 pub struct TCGPositionOnBolt {
-    pub ent: refEntity_t,      // output
-    pub ghoul2: *mut c_void,   // input
-    pub modelIndex: c_int,     // input
-    pub boltIndex: c_int,      // input
-    pub origin: vec3_t,        // input
-    pub angles: vec3_t,        // input
-    pub modelScale: vec3_t,    // input
+    pub ent: refEntity_t,    // output
+    pub ghoul2: *mut c_void, // input
+    pub modelIndex: c_int,   // input
+    pub boltIndex: c_int,    // input
+    pub origin: vec3_t,      // input
+    pub angles: vec3_t,      // input
+    pub modelScale: vec3_t,  // input
 }
 
 const _: () = assert!(core::mem::size_of::<TCGPositionOnBolt>() == 272);

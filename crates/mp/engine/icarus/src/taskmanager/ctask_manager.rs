@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use mp_host_interface::EngineHost;
-use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::limits::MAX_GENTITIES;
+use mp_qshared::shared::vec3_t;
 
 use crate::blockstream::cblock::Block;
 use crate::sequencer::csequencer::{self, Sequencer};
@@ -363,7 +363,9 @@ fn bytes_to_c_string(data: &[u8]) -> String {
 /// Raven `CTaskManager::Check` — does the member at `memberNum` have id `targetID`?
 /// Source: `oracle/codemp/icarus/TaskManager.cpp:356-362`
 fn check(block: &Block, member_num: i32, target_id: i32) -> bool {
-    block.get_member(member_num).is_some_and(|m| m.m_id == target_id)
+    block
+        .get_member(member_num)
+        .is_some_and(|m| m.m_id == target_id)
 }
 
 /// The per-frame heartbeat gate re-index of the disjoint `Icarus` field borrows.
@@ -526,7 +528,15 @@ pub fn go(
     }
 
     // Pump the sequencer for another task; the owned block moves out of the task.
-    callback_command(seqr, tm, icarus, host, owner_id, task.m_block, TASK_RETURN_COMPLETE)
+    callback_command(
+        seqr,
+        tm,
+        icarus,
+        host,
+        owner_id,
+        task.m_block,
+        TASK_RETURN_COMPLETE,
+    )
 }
 
 /// Raven `CTaskManager::CallbackCommand` — hand the finished block back to the
@@ -628,7 +638,12 @@ fn get_float(
     } else if bm_id == TK_FLOAT {
         Some(member_float(block, member_num))
     } else {
-        i_dprintf(icarus, host, WL_WARNING, "Unexpected value; expected type FLOAT\n");
+        i_dprintf(
+            icarus,
+            host,
+            WL_WARNING,
+            "Unexpected value; expected type FLOAT\n",
+        );
         None
     }
 }
@@ -684,7 +699,15 @@ fn get_vector(
 
         let mut value = [0.0f32; 3];
         let f = icarus.interface_export.i_get_tag;
-        if f(icarus, host, ent_id, &tag_name, tag_lookup as i32, &mut value) == 0 {
+        if f(
+            icarus,
+            host,
+            ent_id,
+            &tag_name,
+            tag_lookup as i32,
+            &mut value,
+        ) == 0
+        {
             i_dprintf(
                 icarus,
                 host,
@@ -798,7 +821,15 @@ fn get(
 
         let mut vector = [0.0f32; 3];
         let f = icarus.interface_export.i_get_tag;
-        if f(icarus, host, ent_id, &tag_name, tag_lookup as i32, &mut vector) == 0 {
+        if f(
+            icarus,
+            host,
+            ent_id,
+            &tag_name,
+            tag_lookup as i32,
+            &mut vector,
+        ) == 0
+        {
             i_dprintf(
                 icarus,
                 host,
@@ -807,7 +838,10 @@ fn get(
             );
             return None;
         }
-        Some(format!("{:.6} {:.6} {:.6}", vector[0], vector[1], vector[2]))
+        Some(format!(
+            "{:.6} {:.6} {:.6}",
+            vector[0], vector[1], vector[2]
+        ))
     } else {
         // Get an actual piece of data.
         let bm_id = block.get_member(*member_num).map(|m| m.m_id).unwrap_or(-1);
@@ -829,7 +863,12 @@ fn get(
         } else if bm_id == TK_STRING || bm_id == TK_IDENTIFIER {
             Some(member_c_string(block, member_num))
         } else {
-            i_dprintf(icarus, host, WL_WARNING, "Unexpected value; expected type STRING\n");
+            i_dprintf(
+                icarus,
+                host,
+                WL_WARNING,
+                "Unexpected value; expected type STRING\n",
+            );
             None
         }
     }
@@ -932,7 +971,13 @@ fn wait_signal(icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, ta
 
 /// Raven `CTaskManager::Print`.
 /// Source: `oracle/codemp/icarus/TaskManager.cpp:1177-1192`
-fn print(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &Task) {
+fn print(
+    tm: &mut TaskManager,
+    icarus: &mut Icarus,
+    host: &mut dyn EngineHost,
+    owner_id: i32,
+    task: &Task,
+) {
     let mut member_num = 0;
     let s_val = match get(icarus, host, owner_id, &task.m_block, &mut member_num) {
         Some(s) => s,
@@ -945,7 +990,13 @@ fn print(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, o
 
 /// Raven `CTaskManager::Sound`.
 /// Source: `oracle/codemp/icarus/TaskManager.cpp:1200-1216`
-fn sound(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &Task) {
+fn sound(
+    tm: &mut TaskManager,
+    icarus: &mut Icarus,
+    host: &mut dyn EngineHost,
+    owner_id: i32,
+    task: &Task,
+) {
     let mut member_num = 0;
     let s_val = match get(icarus, host, owner_id, &task.m_block, &mut member_num) {
         Some(s) => s,
@@ -1008,7 +1059,13 @@ fn rotate(icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &
 
 /// Raven `CTaskManager::Remove`.
 /// Source: `oracle/codemp/icarus/TaskManager.cpp:1269-1283`
-fn remove(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &Task) {
+fn remove(
+    tm: &mut TaskManager,
+    icarus: &mut Icarus,
+    host: &mut dyn EngineHost,
+    owner_id: i32,
+    task: &Task,
+) {
     let mut member_num = 0;
     let s_val = match get(icarus, host, owner_id, &task.m_block, &mut member_num) {
         Some(s) => s,
@@ -1022,7 +1079,13 @@ fn remove(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, 
 /// Raven `CTaskManager::Camera` — all camera targets are the "NOT SUPPORTED IN
 /// MP" `CGCam_*` no-ops (`Q3_Interface.cpp`), but the arg parse + dispatch port.
 /// Source: `oracle/codemp/icarus/TaskManager.cpp:1291-1417`
-fn camera(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &Task) {
+fn camera(
+    tm: &mut TaskManager,
+    icarus: &mut Icarus,
+    host: &mut dyn EngineHost,
+    owner_id: i32,
+    task: &Task,
+) {
     let block = &task.m_block;
     let mut member_num = 0;
 
@@ -1109,7 +1172,9 @@ fn camera(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, 
             let f2 = gf!();
             let f3 = gf!();
             let fp = icarus.interface_export.i_camera_fade;
-            fp(icarus, host, v[0], v[1], v[2], f, v2[0], v2[1], v2[2], f2, f3);
+            fp(
+                icarus, host, v[0], v[1], v[2], f, v2[0], v2[1], v2[2], f2, f3,
+            );
         }
         TYPE_PATH => {
             let s = gs!();
@@ -1158,7 +1223,9 @@ fn move_(icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &T
             let f = icarus.interface_export.i_lerp2_pos;
             // Raven passes `NULL` angles; the frozen `I_Lerp2Pos` is always
             // present, so the zero-vector stands (Q3_Lerp2Pos drops it).
-            f(icarus, host, task.m_id, owner_id, vector, [0.0; 3], duration);
+            f(
+                icarus, host, task.m_id, owner_id, vector, [0.0; 3], duration,
+            );
         }
         Some(vector2) => {
             let duration = match get_float(icarus, host, owner_id, block, &mut member_num) {
@@ -1173,7 +1240,13 @@ fn move_(icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &T
 
 /// Raven `CTaskManager::Kill`.
 /// Source: `oracle/codemp/icarus/TaskManager.cpp:1462-1476`
-fn kill(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &Task) {
+fn kill(
+    tm: &mut TaskManager,
+    icarus: &mut Icarus,
+    host: &mut dyn EngineHost,
+    owner_id: i32,
+    task: &Task,
+) {
     let mut member_num = 0;
     let s_val = match get(icarus, host, owner_id, &task.m_block, &mut member_num) {
         Some(s) => s,
@@ -1202,7 +1275,13 @@ fn set(icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &Tas
 
 /// Raven `CTaskManager::Use`.
 /// Source: `oracle/codemp/icarus/TaskManager.cpp:1505-1519`
-fn use_(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &Task) {
+fn use_(
+    tm: &mut TaskManager,
+    icarus: &mut Icarus,
+    host: &mut dyn EngineHost,
+    owner_id: i32,
+    task: &Task,
+) {
     let mut member_num = 0;
     let s_val = match get(icarus, host, owner_id, &task.m_block, &mut member_num) {
         Some(s) => s,
@@ -1215,7 +1294,13 @@ fn use_(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, ow
 
 /// Raven `CTaskManager::DeclareVariable`.
 /// Source: `oracle/codemp/icarus/TaskManager.cpp:1527-1544`
-fn declare_variable(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &Task) {
+fn declare_variable(
+    tm: &mut TaskManager,
+    icarus: &mut Icarus,
+    host: &mut dyn EngineHost,
+    owner_id: i32,
+    task: &Task,
+) {
     let block = &task.m_block;
     let mut member_num = 0;
     let f_val = match get_float(icarus, host, owner_id, block, &mut member_num) {
@@ -1233,7 +1318,13 @@ fn declare_variable(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn En
 
 /// Raven `CTaskManager::FreeVariable`.
 /// Source: `oracle/codemp/icarus/TaskManager.cpp:1552-1567`
-fn free_variable(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &Task) {
+fn free_variable(
+    tm: &mut TaskManager,
+    icarus: &mut Icarus,
+    host: &mut dyn EngineHost,
+    owner_id: i32,
+    task: &Task,
+) {
     let mut member_num = 0;
     let s_val = match get(icarus, host, owner_id, &task.m_block, &mut member_num) {
         Some(s) => s,
@@ -1246,7 +1337,13 @@ fn free_variable(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn Engin
 
 /// Raven `CTaskManager::Signal` — raises a signal on the owning instance.
 /// Source: `oracle/codemp/icarus/TaskManager.cpp:1575-1589`
-fn signal(tm: &mut TaskManager, icarus: &mut Icarus, host: &mut dyn EngineHost, owner_id: i32, task: &Task) {
+fn signal(
+    tm: &mut TaskManager,
+    icarus: &mut Icarus,
+    host: &mut dyn EngineHost,
+    owner_id: i32,
+    task: &Task,
+) {
     let mut member_num = 0;
     let s_val = match get(icarus, host, owner_id, &task.m_block, &mut member_num) {
         Some(s) => s,
@@ -1335,7 +1432,9 @@ mod tests {
         let a = tm.add_task_group("alpha");
 
         // Dirty the existing group's completion state.
-        tm.m_task_groups[a.0 as usize].m_completed_tasks.insert(7, true);
+        tm.m_task_groups[a.0 as usize]
+            .m_completed_tasks
+            .insert(7, true);
         tm.m_task_groups[a.0 as usize].m_num_completed = 3;
 
         // Re-adding the same name returns the same handle and reruns `Init`

@@ -13,13 +13,13 @@ pub const TEAM_MEMBERS: usize = 8;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:614-622`
 #[repr(C)]
 pub struct teamInfo {
-	pub teamName: *const c_char,
-	pub imageName: *const c_char,
-	pub teamMembers: [*const c_char; TEAM_MEMBERS],
-	pub teamIcon: qhandle_t,
-	pub teamIcon_Metal: qhandle_t,
-	pub teamIcon_Name: qhandle_t,
-	pub cinematic: i32,
+    pub teamName: *const c_char,
+    pub imageName: *const c_char,
+    pub teamMembers: [*const c_char; TEAM_MEMBERS],
+    pub teamIcon: qhandle_t,
+    pub teamIcon_Metal: qhandle_t,
+    pub teamIcon_Name: qhandle_t,
+    pub cinematic: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<teamInfo>() == 96);

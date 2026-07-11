@@ -9,9 +9,9 @@ use mp_qshared::shared::limits::MAX_SAY_TEXT;
 /// Type definition source: `oracle/codemp/cgame/cg_local.h:748-753`
 #[repr(C)]
 pub struct chatBoxItem_t {
-	pub string: [c_char; MAX_SAY_TEXT],
-	pub time: i32,
-	pub lines: i32,
+    pub string: [c_char; MAX_SAY_TEXT],
+    pub time: i32,
+    pub lines: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<chatBoxItem_t>() == 160);

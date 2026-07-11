@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// `G_CEIL` outbound game-to-engine syscall.

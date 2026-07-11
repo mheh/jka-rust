@@ -123,7 +123,10 @@ fn blockstream_matches_oracle_goldens() {
         checked += 1;
     }
 
-    assert!(checked >= 4, "expected the full .IBI fixture set, found {checked}");
+    assert!(
+        checked >= 4,
+        "expected the full .IBI fixture set, found {checked}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +205,12 @@ fn q3_registers_matches_oracle_golden() {
     Q3_SetFloatVariable(&mut icarus, "health", 42.5);
     Q3_SetStringVariable(&mut icarus, "name", "kyle");
     Q3_SetVectorVariable(&mut icarus, "spot", "1.0 2.0 3.0");
-    writeln!(out, "set ghost={}", Q3_SetStringVariable(&mut icarus, "ghost", "x")).unwrap();
+    writeln!(
+        out,
+        "set ghost={}",
+        Q3_SetStringVariable(&mut icarus, "ghost", "x")
+    )
+    .unwrap();
     dump_state(&icarus, "set", &mut out);
 
     // Gets (out-param → Option, §C7). The C++ seeds fv=-1.0 before the call.

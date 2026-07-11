@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use sp_qshared::shared::MAX_QPATH;
 use core::ffi::c_char;
+use sp_qshared::shared::MAX_QPATH;
 
 /// Raven `CCMShader` — a collision-model shader entry (name + surface/content flags),
 /// linked into a hash-bucket chain via `mNext`.

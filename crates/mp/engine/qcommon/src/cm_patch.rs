@@ -821,6 +821,24 @@ impl CmPatch {
         // SAFETY: see `get_adjacent_brush_x`.
         unsafe { &mut *brush_ptr(ls.patch_brush_data.as_mut_ptr(), brush_offset, index) }
     }
+
+    /// Raven `CCMPatch::GetCollisionData` — the `cbrush_s *mPatchBrushData` base
+    /// of this patch's slice. Bridges the C-track `CM_HandlePatchCollision`
+    /// brush walk to the RMG-D7 shared arena (ruling 46): `mPatchBrushData`
+    /// becomes `ls.patch_brush_data + brush_offset`, mirroring [`brush_ptr`].
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:117`
+    pub fn get_collision_data(&self, ls: &mut CmLandScape) -> *mut cbrush_t {
+        // SAFETY: `brush_offset` is this patch's arena slice start (§ Init);
+        // the arena outlives the returned base for the collision walk.
+        unsafe { brush_ptr(ls.patch_brush_data.as_mut_ptr(), self.brush_offset, 0) }
+    }
+
+    /// Raven `CCMPatch::GetNumBrushes` — `mNumBrushes` (= `terxels*terxels*2`,
+    /// set in `create_patch_plane_data`).
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:116`
+    pub const fn get_num_brushes(&self) -> i32 {
+        self.num_brushes
+    }
 }
 
 #[cfg(test)]

@@ -61,34 +61,18 @@ pub static bgToggleableSurfaces: [Option<&CStr>; 31] = [
 /// Extern decl source: `oracle/codemp/game/bg_public.h:146`
 pub static bgToggleableSurfaceDebris: [c_int; 31] = [
     0, //0
-    0,
-    0,
-    0,
-    0,
-    0, //5
-    0,
-    0,
-    0,
-    0,
-    0, //10
-    0,
-    0,
-    0,
-    0, //>= 2 means it should create a flame trail when destroyed (for vehicles)
+    0, 0, 0, 0, 0, //5
+    0, 0, 0, 0, 0, //10
+    0, 0, 0, 0, //>= 2 means it should create a flame trail when destroyed (for vehicles)
     3, //15
     5, //rwing2
-    4,
-    6, //lwing2
+    4, 6, //lwing2
     0, //rgear
     0, //lgear //20
     7, //nose
     0, //blah
     0, //blah
-    0,
-    0, //25
-    0,
-    0,
-    0,
-    0, //29
+    0, 0, //25
+    0, 0, 0, 0, //29
     -1,
 ];

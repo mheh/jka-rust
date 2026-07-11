@@ -137,11 +137,7 @@ pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: *mut gentity_t, bolt:
             );
 
             BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut org);
-            BG_GiveMeVectorFromMatrix(
-                &boltMatrix,
-                NEGATIVE_Y as c_int,
-                &mut dir,
-            );
+            BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut dir);
 
             crate::g_utils::G_PlayEffectID(
                 crate::g_utils::G_EffectIndex(c"env/med_explode2".as_ptr()),
@@ -222,11 +218,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
         );
 
         BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
-        BG_GiveMeVectorFromMatrix(
-            &boltMatrix,
-            NEGATIVE_Y as c_int,
-            &mut muzzle_dir,
-        );
+        BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut muzzle_dir);
 
         crate::g_utils::G_PlayEffectID(
             crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
@@ -316,11 +308,7 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
         );
 
         BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
-        BG_GiveMeVectorFromMatrix(
-            &boltMatrix,
-            NEGATIVE_Y as c_int,
-            &mut muzzle_dir,
-        );
+        BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut muzzle_dir);
 
         crate::g_utils::G_PlayEffectID(
             crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),

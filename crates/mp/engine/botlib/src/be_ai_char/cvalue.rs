@@ -7,9 +7,9 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/codemp/botlib/be_ai_char.cpp:39-44`
 #[repr(C)]
 pub union cvalue {
-	pub integer: i32,
-	pub _float: f32,
-	pub string: *mut c_char,
+    pub integer: i32,
+    pub _float: f32,
+    pub string: *mut c_char,
 }
 
 const _: () = assert!(core::mem::size_of::<cvalue>() == 8);

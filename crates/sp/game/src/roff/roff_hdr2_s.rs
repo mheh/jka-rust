@@ -12,11 +12,11 @@ use core::ffi::{c_char, c_long};
 /// Type definition source: `oracle/code/game/g_roff.h:38-47`
 #[repr(C)]
 pub struct roff_hdr2_t {
-	pub mHeader: [c_char; 4],
-	pub mVersion: c_long,
-	pub mCount: i32,
-	pub mFrameRate: i32,
-	pub mNumNotes: i32,
+    pub mHeader: [c_char; 4],
+    pub mVersion: c_long,
+    pub mCount: i32,
+    pub mFrameRate: i32,
+    pub mNumNotes: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<roff_hdr2_t>() == 32);

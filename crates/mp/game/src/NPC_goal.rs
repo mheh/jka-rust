@@ -14,8 +14,6 @@ use crate::prelude::*;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 /// Raven `SetGoal`.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:10-24`

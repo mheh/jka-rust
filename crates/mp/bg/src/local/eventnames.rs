@@ -22,16 +22,16 @@ pub static eventnames: [&str; 116] = [
     "EV_STEP_12",
     "EV_STEP_16",
     "EV_FALL",
-    "EV_JUMP_PAD", // boing sound at origin, jump sound on player
+    "EV_JUMP_PAD",    // boing sound at origin, jump sound on player
     "EV_GHOUL2_MARK", // create a projectile impact mark on something with a client-side g2 instance.
     "EV_GLOBAL_DUEL",
     "EV_PRIVATE_DUEL",
     "EV_JUMP",
     "EV_ROLL",
-    "EV_WATER_TOUCH", // foot touches
-    "EV_WATER_LEAVE", // foot leaves
-    "EV_WATER_UNDER", // head touches
-    "EV_WATER_CLEAR", // head leaves
+    "EV_WATER_TOUCH",        // foot touches
+    "EV_WATER_LEAVE",        // foot leaves
+    "EV_WATER_UNDER",        // head touches
+    "EV_WATER_CLEAR",        // head leaves
     "EV_ITEM_PICKUP",        // normal item pickups are predictable
     "EV_GLOBAL_ITEM_PICKUP", // powerup / team sounds are broadcast to everyone
     "EV_VEH_FIRE",
@@ -87,7 +87,7 @@ pub static eventnames: [&str; 116] = [
     "EV_MUTE_SOUND",
     "EV_VOICECMD_SOUND",
     "EV_GENERAL_SOUND",
-    "EV_GLOBAL_SOUND",      // no attenuation
+    "EV_GLOBAL_SOUND", // no attenuation
     "EV_GLOBAL_TEAM_SOUND",
     "EV_ENTITY_SOUND",
     "EV_PLAY_ROFF",

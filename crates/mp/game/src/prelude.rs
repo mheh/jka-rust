@@ -289,17 +289,18 @@ pub use mp_qshared::shared::trajectory::{trType_t, trajectory_t};
 pub use mp_qshared::shared::wpobject::wpobject_t;
 pub use mp_qshared::shared::Eorientations::*;
 pub use mp_qshared::shared::{
-    fileHandle_t, mdxaBone_t, qboolean, qtrue, qfalse, qhandle_t, vec3_t, vec4_t, vec_t, Eorientations, MAX_QPATH
+    fileHandle_t, mdxaBone_t, qboolean, qfalse, qhandle_t, qtrue, vec3_t, vec4_t, vec_t,
+    Eorientations, MAX_QPATH,
 };
 
 // Pass-3 prep C1 (agenda B6/B10): batch re-export of game-crate-local fns
 // spelled bare in pass-2 porter bodies but never wired into the prelude.
 // Each resolves to a single `pub fn`/`const` definition (scripted).
 pub use crate::bg_lib::atof;
-pub use crate::cstr_util::atoi;
 pub use crate::bg_misc::{BG_EmplacedView, BG_FindItemForWeapon};
 pub use crate::bg_panimate::{BG_InKnockDownOnly, BG_InReboundHold, BG_InReboundJump};
 pub use crate::bg_pmove::BG_SabersOff;
+pub use crate::cstr_util::atoi;
 pub use crate::g_client::SpotWouldTelefrag2;
 pub use crate::g_combat::{G_CheckVehicleNPCTeamDamage, G_Damage, G_RadiusDamage};
 pub use crate::g_items::{RegisterItem, Touch_Item};

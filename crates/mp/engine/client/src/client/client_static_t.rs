@@ -37,66 +37,65 @@ const MAX_GLOBAL_SERVERS: usize = 2048;
 /// Type definition source: `oracle/codemp/client/client.h:295-349`
 #[repr(C)]
 pub struct clientStatic_t {
-	/// Raven: connection status
-	pub state: connstate_t,
-	/// Raven: bit flags
-	pub keyCatchers: c_int,
+    /// Raven: connection status
+    pub state: connstate_t,
+    /// Raven: bit flags
+    pub keyCatchers: c_int,
 
-	/// Raven: name of server from original connect (used by reconnect)
-	pub servername: [c_char; MAX_OSPATH],
+    /// Raven: name of server from original connect (used by reconnect)
+    pub servername: [c_char; MAX_OSPATH],
 
-	// Raven: when the server clears the hunk, all of these must be restarted
-	pub rendererStarted: qboolean,
-	pub soundStarted: qboolean,
-	pub soundRegistered: qboolean,
-	pub uiStarted: qboolean,
-	pub cgameStarted: qboolean,
+    // Raven: when the server clears the hunk, all of these must be restarted
+    pub rendererStarted: qboolean,
+    pub soundStarted: qboolean,
+    pub soundRegistered: qboolean,
+    pub uiStarted: qboolean,
+    pub cgameStarted: qboolean,
 
-	pub framecount: c_int,
-	/// Raven: msec since last frame
-	pub frametime: c_int,
+    pub framecount: c_int,
+    /// Raven: msec since last frame
+    pub frametime: c_int,
 
-	/// Raven: ignores pause
-	pub realtime: c_int,
-	/// Raven: ignoring pause, so console always works
-	pub realFrametime: c_int,
+    /// Raven: ignores pause
+    pub realtime: c_int,
+    /// Raven: ignoring pause, so console always works
+    pub realFrametime: c_int,
 
-	pub numlocalservers: c_int,
-	pub localServers: [serverInfo_t; MAX_OTHER_SERVERS],
+    pub numlocalservers: c_int,
+    pub localServers: [serverInfo_t; MAX_OTHER_SERVERS],
 
-	pub numglobalservers: c_int,
-	pub globalServers: [serverInfo_t; MAX_GLOBAL_SERVERS],
-	// Raven: additional global servers
-	pub numGlobalServerAddresses: c_int,
-	pub globalServerAddresses: [serverAddress_t; MAX_GLOBAL_SERVERS],
+    pub numglobalservers: c_int,
+    pub globalServers: [serverInfo_t; MAX_GLOBAL_SERVERS],
+    // Raven: additional global servers
+    pub numGlobalServerAddresses: c_int,
+    pub globalServerAddresses: [serverAddress_t; MAX_GLOBAL_SERVERS],
 
-	pub numfavoriteservers: c_int,
-	pub favoriteServers: [serverInfo_t; MAX_OTHER_SERVERS],
+    pub numfavoriteservers: c_int,
+    pub favoriteServers: [serverInfo_t; MAX_OTHER_SERVERS],
 
-	pub nummplayerservers: c_int,
-	pub mplayerServers: [serverInfo_t; MAX_OTHER_SERVERS],
+    pub nummplayerservers: c_int,
+    pub mplayerServers: [serverInfo_t; MAX_OTHER_SERVERS],
 
-	/// Raven: source currently pinging or updating
-	pub pingUpdateSource: c_int,
+    /// Raven: source currently pinging or updating
+    pub pingUpdateSource: c_int,
 
-	pub masterNum: c_int,
+    pub masterNum: c_int,
 
-	// Raven: update server info
-	pub updateServer: netadr_t,
-	pub updateChallenge: [c_char; MAX_TOKEN_CHARS],
-	pub updateInfoString: [c_char; MAX_INFO_STRING],
+    // Raven: update server info
+    pub updateServer: netadr_t,
+    pub updateChallenge: [c_char; MAX_TOKEN_CHARS],
+    pub updateInfoString: [c_char; MAX_INFO_STRING],
 
-	pub authorizeServer: netadr_t,
+    pub authorizeServer: netadr_t,
 
-	// Raven: rendering info
-	pub glconfig: glconfig_t,
-	pub charSetShader: qhandle_t,
-	pub whiteShader: qhandle_t,
-	pub consoleShader: qhandle_t,
-
-	// Raven: #ifdef _XBOX
-	// 	short		mainGamepad;
-	// #endif
+    // Raven: rendering info
+    pub glconfig: glconfig_t,
+    pub charSetShader: qhandle_t,
+    pub whiteShader: qhandle_t,
+    pub consoleShader: qhandle_t,
+    // Raven: #ifdef _XBOX
+    // 	short		mainGamepad;
+    // #endif
 }
 
 #[cfg(target_pointer_width = "64")]

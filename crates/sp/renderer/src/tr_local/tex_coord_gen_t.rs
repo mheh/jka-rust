@@ -7,7 +7,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum texCoordGen_t {
     TCGEN_BAD = 0,
-    TCGEN_IDENTITY = 1,            // clear to 0,0
+    TCGEN_IDENTITY = 1, // clear to 0,0
     TCGEN_LIGHTMAP = 2,
     TCGEN_LIGHTMAP1 = 3,
     TCGEN_LIGHTMAP2 = 4,
@@ -15,5 +15,5 @@ pub enum texCoordGen_t {
     TCGEN_TEXTURE = 6,
     TCGEN_ENVIRONMENT_MAPPED = 7,
     TCGEN_FOG = 8,
-    TCGEN_VECTOR = 9,              // S and T from world coordinates
+    TCGEN_VECTOR = 9, // S and T from world coordinates
 }

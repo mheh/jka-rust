@@ -14,44 +14,44 @@ pub const MAX_VEHICLE_TURRET_MUZZLES: usize = 2;
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct turretStats_t {
-	/// what vehWeaponInfo index to use
-	pub iWeapon: i32,
-	/// delay between turret muzzle shots
-	pub iDelay: i32,
-	/// how much ammo it has
-	pub iAmmoMax: i32,
-	/// how many MS between every point of recharged ammo
-	pub iAmmoRechargeMS: i32,
-	/// bone on ship that this turret uses to yaw
-	pub yawBone: *mut c_char,
-	/// bone on ship that this turret uses to pitch
-	pub pitchBone: *mut c_char,
-	/// axis on yawBone to which we should to apply the yaw angles
-	pub yawAxis: i32,
-	/// axis on pitchBone to which we should to apply the pitch angles
-	pub pitchAxis: i32,
-	/// how far the turret is allowed to turn left
-	pub yawClampLeft: f32,
-	/// how far the turret is allowed to turn right
-	pub yawClampRight: f32,
-	/// how far the turret is allowed to title up
-	pub pitchClampUp: f32,
-	/// how far the turret is allowed to tilt down
-	pub pitchClampDown: f32,
-	/// iMuzzle-1 = index of ship's muzzle to fire this turret's 1st and 2nd shots from
-	pub iMuzzle: [i32; MAX_VEHICLE_TURRET_MUZZLES],
-	/// Where to put the view origin of the gunner (name)
-	pub gunnerViewTag: *mut c_char,
-	/// how quickly the turret can turn
-	pub fTurnSpeed: f32,
-	/// whether or not the turret auto-targets enemies when it's not manned
-	pub bAI: qboolean,
-	/// whether
-	pub bAILead: qboolean,
-	/// how far away the AI will look for enemies
-	pub fAIRange: f32,
-	/// which passenger, if any, has control of this turret (overrides AI)
-	pub passengerNum: i32,
+    /// what vehWeaponInfo index to use
+    pub iWeapon: i32,
+    /// delay between turret muzzle shots
+    pub iDelay: i32,
+    /// how much ammo it has
+    pub iAmmoMax: i32,
+    /// how many MS between every point of recharged ammo
+    pub iAmmoRechargeMS: i32,
+    /// bone on ship that this turret uses to yaw
+    pub yawBone: *mut c_char,
+    /// bone on ship that this turret uses to pitch
+    pub pitchBone: *mut c_char,
+    /// axis on yawBone to which we should to apply the yaw angles
+    pub yawAxis: i32,
+    /// axis on pitchBone to which we should to apply the pitch angles
+    pub pitchAxis: i32,
+    /// how far the turret is allowed to turn left
+    pub yawClampLeft: f32,
+    /// how far the turret is allowed to turn right
+    pub yawClampRight: f32,
+    /// how far the turret is allowed to title up
+    pub pitchClampUp: f32,
+    /// how far the turret is allowed to tilt down
+    pub pitchClampDown: f32,
+    /// iMuzzle-1 = index of ship's muzzle to fire this turret's 1st and 2nd shots from
+    pub iMuzzle: [i32; MAX_VEHICLE_TURRET_MUZZLES],
+    /// Where to put the view origin of the gunner (name)
+    pub gunnerViewTag: *mut c_char,
+    /// how quickly the turret can turn
+    pub fTurnSpeed: f32,
+    /// whether or not the turret auto-targets enemies when it's not manned
+    pub bAI: qboolean,
+    /// whether
+    pub bAILead: qboolean,
+    /// how far away the AI will look for enemies
+    pub fAIRange: f32,
+    /// which passenger, if any, has control of this turret (overrides AI)
+    pub passengerNum: i32,
 }
 
 #[cfg(target_pointer_width = "64")]

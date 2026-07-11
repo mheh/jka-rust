@@ -36,106 +36,106 @@ pub const MAX_TRAVELTYPES: usize = 32;
 /// Type definition source: `oracle/codemp/botlib/be_aas_def.h:183-276`
 #[repr(C)]
 pub struct aas_t {
-	/// true when an AAS file is loaded
-	pub loaded: c_int,
-	/// true when AAS has been initialized
-	pub initialized: c_int,
-	/// set true when file should be saved
-	pub savefile: c_int,
-	pub bspchecksum: c_int,
-	//current time
-	pub time: f32,
-	pub numframes: c_int,
-	//name of the aas file
-	pub filename: [c_char; MAX_QPATH as usize],
-	pub mapname: [c_char; MAX_QPATH as usize],
-	//bounding boxes
-	pub numbboxes: c_int,
-	pub bboxes: *mut aas_bbox_t,
-	//vertexes
-	pub numvertexes: c_int,
-	pub vertexes: *mut aas_vertex_t,
-	//planes
-	pub numplanes: c_int,
-	pub planes: *mut aas_plane_t,
-	//edges
-	pub numedges: c_int,
-	pub edges: *mut aas_edge_t,
-	//edge index
-	pub edgeindexsize: c_int,
-	pub edgeindex: *mut aas_edgeindex_t,
-	//faces
-	pub numfaces: c_int,
-	pub faces: *mut aas_face_t,
-	//face index
-	pub faceindexsize: c_int,
-	pub faceindex: *mut aas_faceindex_t,
-	//convex areas
-	pub numareas: c_int,
-	pub areas: *mut aas_area_t,
-	//convex area settings
-	pub numareasettings: c_int,
-	pub areasettings: *mut aas_areasettings_t,
-	//reachablity list
-	pub reachabilitysize: c_int,
-	pub reachability: *mut aas_reachability_t,
-	//nodes of the bsp tree
-	pub numnodes: c_int,
-	pub nodes: *mut aas_node_t,
-	//cluster portals
-	pub numportals: c_int,
-	pub portals: *mut aas_portal_t,
-	//cluster portal index
-	pub portalindexsize: c_int,
-	pub portalindex: *mut aas_portalindex_t,
-	//clusters
-	pub numclusters: c_int,
-	pub clusters: *mut aas_cluster_t,
-	//
-	pub numreachabilityareas: c_int,
-	pub reachabilitytime: f32,
-	//enities linked in the areas
-	/// heap with link structures
-	pub linkheap: *mut aas_link_t,
-	/// size of the link heap
-	pub linkheapsize: c_int,
-	/// first free link
-	pub freelinks: *mut aas_link_t,
-	/// entities linked into areas
-	pub arealinkedentities: *mut *mut aas_link_t,
-	//entities
-	pub maxentities: c_int,
-	pub maxclients: c_int,
-	pub entities: *mut aas_entity_t,
-	//string indexes
-	pub configstrings: [*mut c_char; MAX_CONFIGSTRINGS],
-	pub indexessetup: c_int,
-	//index to retrieve travel flag for a travel type
-	pub travelflagfortype: [c_int; MAX_TRAVELTYPES],
-	//travel flags for each area based on contents
-	pub areacontentstravelflags: *mut c_int,
-	//routing update
-	pub areaupdate: *mut aas_routingupdate_t,
-	pub portalupdate: *mut aas_routingupdate_t,
-	//number of routing updates during a frame (reset every frame)
-	pub frameroutingupdates: c_int,
-	//reversed reachability links
-	pub reversedreachability: *mut aas_reversedreachability_t,
-	//travel times within the areas
-	pub areatraveltimes: *mut *mut *mut u16,
-	//array of size numclusters with cluster cache
-	pub clusterareacache: *mut *mut *mut aas_routingcache_t,
-	pub portalcache: *mut *mut aas_routingcache_t,
-	//cache list sorted on time
-	/// start of cache list sorted on time
-	pub oldestcache: *mut aas_routingcache_t,
-	/// end of cache list sorted on time
-	pub newestcache: *mut aas_routingcache_t,
-	//maximum travel time through portal areas
-	pub portalmaxtraveltimes: *mut c_int,
-	//areas the reachabilities go through
-	pub reachabilityareaindex: *mut c_int,
-	pub reachabilityareas: *mut aas_reachabilityareas_t,
+    /// true when an AAS file is loaded
+    pub loaded: c_int,
+    /// true when AAS has been initialized
+    pub initialized: c_int,
+    /// set true when file should be saved
+    pub savefile: c_int,
+    pub bspchecksum: c_int,
+    //current time
+    pub time: f32,
+    pub numframes: c_int,
+    //name of the aas file
+    pub filename: [c_char; MAX_QPATH as usize],
+    pub mapname: [c_char; MAX_QPATH as usize],
+    //bounding boxes
+    pub numbboxes: c_int,
+    pub bboxes: *mut aas_bbox_t,
+    //vertexes
+    pub numvertexes: c_int,
+    pub vertexes: *mut aas_vertex_t,
+    //planes
+    pub numplanes: c_int,
+    pub planes: *mut aas_plane_t,
+    //edges
+    pub numedges: c_int,
+    pub edges: *mut aas_edge_t,
+    //edge index
+    pub edgeindexsize: c_int,
+    pub edgeindex: *mut aas_edgeindex_t,
+    //faces
+    pub numfaces: c_int,
+    pub faces: *mut aas_face_t,
+    //face index
+    pub faceindexsize: c_int,
+    pub faceindex: *mut aas_faceindex_t,
+    //convex areas
+    pub numareas: c_int,
+    pub areas: *mut aas_area_t,
+    //convex area settings
+    pub numareasettings: c_int,
+    pub areasettings: *mut aas_areasettings_t,
+    //reachablity list
+    pub reachabilitysize: c_int,
+    pub reachability: *mut aas_reachability_t,
+    //nodes of the bsp tree
+    pub numnodes: c_int,
+    pub nodes: *mut aas_node_t,
+    //cluster portals
+    pub numportals: c_int,
+    pub portals: *mut aas_portal_t,
+    //cluster portal index
+    pub portalindexsize: c_int,
+    pub portalindex: *mut aas_portalindex_t,
+    //clusters
+    pub numclusters: c_int,
+    pub clusters: *mut aas_cluster_t,
+    //
+    pub numreachabilityareas: c_int,
+    pub reachabilitytime: f32,
+    //enities linked in the areas
+    /// heap with link structures
+    pub linkheap: *mut aas_link_t,
+    /// size of the link heap
+    pub linkheapsize: c_int,
+    /// first free link
+    pub freelinks: *mut aas_link_t,
+    /// entities linked into areas
+    pub arealinkedentities: *mut *mut aas_link_t,
+    //entities
+    pub maxentities: c_int,
+    pub maxclients: c_int,
+    pub entities: *mut aas_entity_t,
+    //string indexes
+    pub configstrings: [*mut c_char; MAX_CONFIGSTRINGS],
+    pub indexessetup: c_int,
+    //index to retrieve travel flag for a travel type
+    pub travelflagfortype: [c_int; MAX_TRAVELTYPES],
+    //travel flags for each area based on contents
+    pub areacontentstravelflags: *mut c_int,
+    //routing update
+    pub areaupdate: *mut aas_routingupdate_t,
+    pub portalupdate: *mut aas_routingupdate_t,
+    //number of routing updates during a frame (reset every frame)
+    pub frameroutingupdates: c_int,
+    //reversed reachability links
+    pub reversedreachability: *mut aas_reversedreachability_t,
+    //travel times within the areas
+    pub areatraveltimes: *mut *mut *mut u16,
+    //array of size numclusters with cluster cache
+    pub clusterareacache: *mut *mut *mut aas_routingcache_t,
+    pub portalcache: *mut *mut aas_routingcache_t,
+    //cache list sorted on time
+    /// start of cache list sorted on time
+    pub oldestcache: *mut aas_routingcache_t,
+    /// end of cache list sorted on time
+    pub newestcache: *mut aas_routingcache_t,
+    //maximum travel time through portal areas
+    pub portalmaxtraveltimes: *mut c_int,
+    //areas the reachabilities go through
+    pub reachabilityareaindex: *mut c_int,
+    pub reachabilityareas: *mut aas_reachabilityareas_t,
 }
 
 /// Raven's C tag is `aas_s`; the typedef name `aas_t` is house style for the

@@ -33,9 +33,9 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 pub mod engine_host;
+pub mod mock;
 pub mod platform_host;
 pub mod vm_slot;
-pub mod mock;
 
 pub use engine_host::EngineHost;
 pub use platform_host::PlatformHost;

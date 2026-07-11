@@ -9,7 +9,7 @@ use sp_qshared::shared::MAX_QPATH;
 /// Type definition source: `oracle/code/game/../game/../renderer/mdx_format.h:153-172`
 #[repr(C)]
 pub struct mdxmHeader_t {
-    pub ident: i32,   // "IDP3" = MD3, "RDM5" = MDR, "2LGM"(GL2 Mesh) = MDX   (cruddy char order I know, but I'm following what was there in other versions)
+    pub ident: i32, // "IDP3" = MD3, "RDM5" = MDR, "2LGM"(GL2 Mesh) = MDX   (cruddy char order I know, but I'm following what was there in other versions)
     pub version: i32, // 1,2,3 etc as per format revision
     pub name: [c_char; MAX_QPATH], // model name (eg "models/players/marine.glm") // note: extension supplied
     pub animName: [c_char; MAX_QPATH], // name of animation file this mesh requires // note: extension missing

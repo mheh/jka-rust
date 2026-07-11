@@ -7,8 +7,8 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/codemp/botlib/be_aas_def.h:43-47`
 #[repr(C)]
 pub struct aas_stringindex_t {
-	pub numindexes: i32,
-	pub index: *mut *mut c_char,
+    pub numindexes: i32,
+    pub index: *mut *mut c_char,
 }
 
 /// Raven's C tag is `aas_stringindex_s`; the typedef name `aas_stringindex_t`

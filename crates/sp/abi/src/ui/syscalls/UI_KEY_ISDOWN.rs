@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use sp_qshared::shared::qboolean;
 
 /// Arguments for `UI_KEY_ISDOWN`.

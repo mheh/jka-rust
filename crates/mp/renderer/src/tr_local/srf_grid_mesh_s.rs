@@ -10,30 +10,30 @@ use super::surface_type_t::surfaceType_t;
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:750-774`
 #[repr(C)]
 pub struct srfGridMesh_t {
-	pub surfaceType: surfaceType_t,
+    pub surfaceType: surfaceType_t,
 
-	// dynamic lighting information
-	pub dlightBits: i32,
+    // dynamic lighting information
+    pub dlightBits: i32,
 
-	// culling information
-	pub meshBounds: [vec3_t; 2],
-	pub localOrigin: vec3_t,
-	pub meshRadius: f32,
+    // culling information
+    pub meshBounds: [vec3_t; 2],
+    pub localOrigin: vec3_t,
+    pub meshRadius: f32,
 
-	// lod information, which may be different
-	// than the culling information to allow for
-	// groups of curves that LOD as a unit
-	pub lodOrigin: vec3_t,
-	pub lodRadius: f32,
-	pub lodFixed: i32,
-	pub lodStitched: i32,
+    // lod information, which may be different
+    // than the culling information to allow for
+    // groups of curves that LOD as a unit
+    pub lodOrigin: vec3_t,
+    pub lodRadius: f32,
+    pub lodFixed: i32,
+    pub lodStitched: i32,
 
-	// vertexes
-	pub width: i32,
-	pub height: i32,
-	pub widthLodError: *mut f32,
-	pub heightLodError: *mut f32,
-	pub verts: [drawVert_t; 1], // variable sized
+    // vertexes
+    pub width: i32,
+    pub height: i32,
+    pub widthLodError: *mut f32,
+    pub heightLodError: *mut f32,
+    pub verts: [drawVert_t; 1], // variable sized
 }
 
 /// C tag name; Raven typedefs `srfGridMesh_s` to `srfGridMesh_t`.

@@ -123,12 +123,12 @@ use mp_qshared::common::mp::qcommon::t_g_icarus_soundindex::T_G_ICARUS_SOUNDINDE
 use mp_qshared::common::mp::qcommon::t_g_icarus_use::T_G_ICARUS_USE;
 use mp_qshared::shared::string_id_table::stringID_table_t;
 
-use crate::g_icarus_set_type::setTable;
-use crate::g_utils::G_SoundIndex;
 use crate::g_ICARUScb::{
     Q3_GetFloat, Q3_GetString, Q3_GetTag, Q3_GetVector, Q3_Kill, Q3_Lerp2Angles, Q3_Lerp2End,
     Q3_Lerp2Origin, Q3_Lerp2Pos, Q3_Lerp2Start, Q3_Play, Q3_PlaySound, Q3_Remove, Q3_Set, Q3_Use,
 };
+use crate::g_icarus_set_type::setTable;
+use crate::g_utils::G_SoundIndex;
 use crate::q_shared::GetIDForString;
 
 /// `GAME_INIT` → `G_InitGame( arg0, arg1, arg2 )` (`g_main.c:517-519`).
@@ -402,8 +402,9 @@ impl Dispatch<GameIcarusPlaysound> for GameContext<'_> {
 impl Dispatch<GameIcarusSet> for GameContext<'_> {
     fn dispatch(&self, _args: ()) -> qboolean {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
-        let m =
-            unsafe { &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_SET) };
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_SET)
+        };
         Q3_Set(
             *self,
             m.taskID,
@@ -509,8 +510,9 @@ impl Dispatch<GameIcarusLerp2End> for GameContext<'_> {
 impl Dispatch<GameIcarusUse> for GameContext<'_> {
     fn dispatch(&self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
-        let m =
-            unsafe { &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_USE) };
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_USE)
+        };
         Q3_Use(*self, m.entID, m.target.as_ptr() as *const c_char);
     }
 }

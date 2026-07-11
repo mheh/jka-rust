@@ -9,12 +9,12 @@ use sp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/code/game/b_local.h:340-348`
 #[repr(C)]
 pub struct navInfo_t {
-	pub blocker: *mut gentity_t,
-	pub direction: vec3_t,
-	pub pathDirection: vec3_t,
-	pub distance: f32,
-	pub trace: trace_t,
-	pub flags: i32,
+    pub blocker: *mut gentity_t,
+    pub direction: vec3_t,
+    pub pathDirection: vec3_t,
+    pub distance: f32,
+    pub trace: trace_t,
+    pub flags: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<navInfo_t>() == 1120);

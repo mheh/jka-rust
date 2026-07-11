@@ -7,8 +7,8 @@ use super::fielddef_s::fielddef_t;
 /// Type definition source: `oracle/codemp/botlib/l_struct.h:43-47`
 #[repr(C)]
 pub struct structdef_t {
-	pub size: i32,
-	pub fields: *mut fielddef_t,
+    pub size: i32,
+    pub fields: *mut fielddef_t,
 }
 
 pub type structdef_s = structdef_t;

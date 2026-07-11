@@ -52,8 +52,9 @@ fn oracle_root() -> PathBuf {
 
 fn golden(name: &str) -> String {
     let path = oracle_root().join("goldens").join(name);
-    fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("missing golden {path:?} — run tools/trmodel-oracle/build.sh --regen"))
+    fs::read_to_string(&path).unwrap_or_else(|_| {
+        panic!("missing golden {path:?} — run tools/trmodel-oracle/build.sh --regen")
+    })
 }
 
 /// A `MockHost` seeded with every committed fixture under `fixtures/`, keyed by
@@ -99,7 +100,11 @@ fn type_name(t: &modtype_t) -> &'static str {
 /// Render a NUL-terminated Raven `char[]` field (`model_t.name`,
 /// `mdxmHeader_t.animName`, `mdxaHeader_t.name`) as the C `%s` would print it.
 fn cstr(bytes: &[c_char]) -> String {
-    let raw: Vec<u8> = bytes.iter().take_while(|&&c| c != 0).map(|&c| c as u8).collect();
+    let raw: Vec<u8> = bytes
+        .iter()
+        .take_while(|&&c| c != 0)
+        .map(|&c| c as u8)
+        .collect();
     String::from_utf8_lossy(&raw).into_owned()
 }
 
@@ -177,9 +182,19 @@ fn load_matches_oracle_golden() {
     )
     .unwrap();
 
-    writeln!(out, "\n=== register models/test.glm (recurses skeletons/test.gla) ===").unwrap();
+    writeln!(
+        out,
+        "\n=== register models/test.glm (recurses skeletons/test.gla) ==="
+    )
+    .unwrap();
     let hglm = rm.register_server_model(&mut host, "models/test.glm");
-    writeln!(out, "register returned handle={}, numModels={}", hglm, num_models(&rm)).unwrap();
+    writeln!(
+        out,
+        "register returned handle={}, numModels={}",
+        hglm,
+        num_models(&rm)
+    )
+    .unwrap();
     dump_model(&mut out, &rm, "glm", hglm);
 
     // mdxmHeader read-back: the loader parsed/wrote these fields in place; the
@@ -255,7 +270,11 @@ fn load_matches_oracle_golden() {
         .unwrap();
     }
 
-    writeln!(out, "\n=== re-register (hash hit -> same handle, no new model) ===").unwrap();
+    writeln!(
+        out,
+        "\n=== re-register (hash hit -> same handle, no new model) ==="
+    )
+    .unwrap();
     let hglm2 = rm.register_server_model(&mut host, "models/test.glm");
     writeln!(
         out,
@@ -268,7 +287,13 @@ fn load_matches_oracle_golden() {
 
     writeln!(out, "\n=== version reject (badversion.glm) ===").unwrap();
     let hbadver = rm.register_server_model(&mut host, "badversion.glm");
-    writeln!(out, "first register returned={}, numModels={}", hbadver, num_models(&rm)).unwrap();
+    writeln!(
+        out,
+        "first register returned={}, numModels={}",
+        hbadver,
+        num_models(&rm)
+    )
+    .unwrap();
     let hbadver2 = rm.register_server_model(&mut host, "badversion.glm");
     writeln!(
         out,
@@ -279,11 +304,21 @@ fn load_matches_oracle_golden() {
 
     writeln!(out, "\n=== unknown ident (badident.glm) ===").unwrap();
     let hbadid = rm.register_server_model(&mut host, "badident.glm");
-    writeln!(out, "first register returned={}, numModels={}", hbadid, num_models(&rm)).unwrap();
+    writeln!(
+        out,
+        "first register returned={}, numModels={}",
+        hbadid,
+        num_models(&rm)
+    )
+    .unwrap();
     let hbadid2 = rm.register_server_model(&mut host, "badident.glm");
     writeln!(out, "re-register returned={}", hbadid2).unwrap();
 
-    writeln!(out, "\n=== R_GetModelByHandle out-of-range -> models[0] (MOD_BAD) ===").unwrap();
+    writeln!(
+        out,
+        "\n=== R_GetModelByHandle out-of-range -> models[0] (MOD_BAD) ==="
+    )
+    .unwrap();
     writeln!(
         out,
         "get(0)={}  get(99999)={}  get(-5)={}",
@@ -293,7 +328,10 @@ fn load_matches_oracle_golden() {
     )
     .unwrap();
 
-    assert_eq!(out, golden, "load/seam/handle dump diverges from the C++ oracle");
+    assert_eq!(
+        out, golden,
+        "load/seam/handle dump diverges from the C++ oracle"
+    );
 }
 
 #[test]
@@ -319,7 +357,11 @@ fn cache_hitmiss_matches_oracle_golden() {
 
     host.fs_reads = 0;
     let h2 = rm.register_server_model(&mut host, "models/test.glm");
-    writeln!(out, "\n=== re-register after HunkClear+ModelInit (cache hit) ===").unwrap();
+    writeln!(
+        out,
+        "\n=== re-register after HunkClear+ModelInit (cache hit) ==="
+    )
+    .unwrap();
     writeln!(
         out,
         "handle={}  FS disk reads={} (0 == served from CachedModels)",
@@ -329,7 +371,10 @@ fn cache_hitmiss_matches_oracle_golden() {
     writeln!(out, "cache after re-register:").unwrap();
     out.push_str(&info_block(&rm, &mut host));
 
-    assert_eq!(out, golden, "cache hit/miss dump diverges from the C++ oracle");
+    assert_eq!(
+        out, golden,
+        "cache hit/miss dump diverges from the C++ oracle"
+    );
 }
 
 #[test]
@@ -345,21 +390,38 @@ fn cache_evict_matches_oracle_golden() {
 
     rm.media_level_load_begin(&mut host, "map1", ForceReload_e::eForceReload_NOTHING); // level -> 1
     rm.register_server_model(&mut host, "models/test.glm"); // stamped lvl 1
-    writeln!(out, "=== after level 1 register (GetLevel={}) ===", rm.media_get_level()).unwrap();
+    writeln!(
+        out,
+        "=== after level 1 register (GetLevel={}) ===",
+        rm.media_get_level()
+    )
+    .unwrap();
     out.push_str(&info_block(&rm, &mut host));
 
     rm.media_level_load_begin(&mut host, "map2", ForceReload_e::eForceReload_NOTHING); // level -> 2
     rm.register_server_model(&mut host, "models/modelb.glm"); // stamped lvl 2
-    writeln!(out, "\n=== after level 2 register (GetLevel={}) ===", rm.media_get_level()).unwrap();
+    writeln!(
+        out,
+        "\n=== after level 2 register (GetLevel={}) ===",
+        rm.media_get_level()
+    )
+    .unwrap();
     out.push_str(&info_block(&rm, &mut host));
 
     let freed = rm.models_level_load_end(&mut host, false);
-    writeln!(out, "\n=== LevelLoadEnd(qfalse), r_modelpoolmegs=0 -> evict stale ===").unwrap();
+    writeln!(
+        out,
+        "\n=== LevelLoadEnd(qfalse), r_modelpoolmegs=0 -> evict stale ==="
+    )
+    .unwrap();
     writeln!(out, "freed at least one={}", freed as i32).unwrap();
     writeln!(out, "survivors (sorted):").unwrap();
     out.push_str(&info_block(&rm, &mut host));
 
-    assert_eq!(out, golden, "cache eviction dump diverges from the C++ oracle");
+    assert_eq!(
+        out, golden,
+        "cache eviction dump diverges from the C++ oracle"
+    );
 }
 
 #[test]
@@ -384,7 +446,11 @@ fn cache_dumpnonpure_matches_oracle_golden() {
 
     host.set_cvar("sv_pure", "1");
     rm.media_level_load_begin(&mut host, "map2", ForceReload_e::eForceReload_NOTHING); // -> DumpNonPure
-    writeln!(out, "\n=== after LevelLoadBegin(sv_pure=1) -> DumpNonPure ===").unwrap();
+    writeln!(
+        out,
+        "\n=== after LevelLoadBegin(sv_pure=1) -> DumpNonPure ==="
+    )
+    .unwrap();
     writeln!(out, "survivors (pure pak matches + *default.gla, sorted):").unwrap();
     out.push_str(&info_block(&rm, &mut host));
 

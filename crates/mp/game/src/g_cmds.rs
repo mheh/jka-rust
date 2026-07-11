@@ -84,8 +84,6 @@ unsafe fn cstr_eq(mut a: *const c_char, mut b: *const c_char) -> bool {
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 /// `ent - g_entities` — the entity's slot index (client number for players).
 #[inline]
 unsafe fn ent_index(ctx: GameContext<'_>, ent: *const gentity_t) -> c_int {
@@ -561,8 +559,7 @@ pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: *mut gentity_t, baseArg: c_int) 
                         MAX_TOKEN_CHARS as c_int,
                     ),
                 );
-                (*client).ps.stats[STAT_ARMOR as usize] =
-                    atoi_str(&cstr_to_str(arg.as_ptr()));
+                (*client).ps.stats[STAT_ARMOR as usize] = atoi_str(&cstr_to_str(arg.as_ptr()));
             } else {
                 (*client).ps.stats[STAT_ARMOR as usize] =
                     (*client).ps.stats[STAT_MAX_HEALTH as usize];
@@ -5076,7 +5073,8 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
             {
                 crate::w_saber::saberKnockOutOfHand(
                     ctx,
-                    &mut (*world).g_entities[(*client).ps.saberEntityNum as usize] as *mut gentity_t,
+                    &mut (*world).g_entities[(*client).ps.saberEntityNum as usize]
+                        as *mut gentity_t,
                     ent,
                     vec3_origin,
                 );

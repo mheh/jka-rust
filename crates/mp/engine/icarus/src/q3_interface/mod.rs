@@ -42,12 +42,12 @@ use mp_qshared::shared::wl_e::WL_e;
 
 use crate::game_interface::{icarus_get_script, ICARUS_LinkEntity};
 use crate::interface::interface_export_s::InterfaceExport;
-use crate::taskmanager::ctask_manager::TaskManager;
 use crate::q3_registers::{
     q3_declare_variable, q3_free_variable, q3_get_float_variable, q3_variable_declared,
     Q3_SetFloatVariable, Q3_SetStringVariable, Q3_SetVectorVariable, VTYPE_FLOAT, VTYPE_NONE,
     VTYPE_STRING, VTYPE_VECTOR,
 };
+use crate::taskmanager::ctask_manager::TaskManager;
 use crate::Icarus;
 
 pub mod play_type_t;
@@ -309,7 +309,11 @@ pub fn Interface_Init(pe: &mut InterfaceExport) {
 /// signature drops the buffer pointer), so on success the bytes are re-fetched
 /// from the buffer list.
 /// Source: `oracle/codemp/icarus/Q3_Interface.cpp:45-48`
-pub fn Q3_ReadScript(icarus: &mut Icarus, host: &mut dyn EngineHost, name: &str) -> Option<Vec<u8>> {
+pub fn Q3_ReadScript(
+    icarus: &mut Icarus,
+    host: &mut dyn EngineHost,
+    name: &str,
+) -> Option<Vec<u8>> {
     let path = format!("{}/{}", Q3_SCRIPT_DIR, name);
     if icarus_get_script(icarus, host, &path) {
         icarus.buffer_list.get(&path).map(|p| p.buffer.clone())
@@ -484,7 +488,11 @@ pub fn Q3_Lerp2Origin(
         (*sm).origin = origin;
         (*sm).duration = duration;
     }
-    host.vm_call(VmSlot::Gvm, gameExport_t::GAME_ICARUS_LERP2ORIGIN as i32, &[]);
+    host.vm_call(
+        VmSlot::Gvm,
+        gameExport_t::GAME_ICARUS_LERP2ORIGIN as i32,
+        &[],
+    );
     // Copy-back to `origin` dropped — by-value param (Divergences).
 }
 
@@ -505,7 +513,11 @@ pub fn Q3_Lerp2Angles(
         (*sm).angles = angles;
         (*sm).duration = duration;
     }
-    host.vm_call(VmSlot::Gvm, gameExport_t::GAME_ICARUS_LERP2ANGLES as i32, &[]);
+    host.vm_call(
+        VmSlot::Gvm,
+        gameExport_t::GAME_ICARUS_LERP2ANGLES as i32,
+        &[],
+    );
     // Copy-back to `angles` dropped — by-value param (Divergences).
 }
 
@@ -548,7 +560,11 @@ pub fn Q3_Lerp2Start(
         (*sm).entID = ent_id;
         (*sm).duration = duration;
     }
-    host.vm_call(VmSlot::Gvm, gameExport_t::GAME_ICARUS_LERP2START as i32, &[]);
+    host.vm_call(
+        VmSlot::Gvm,
+        gameExport_t::GAME_ICARUS_LERP2START as i32,
+        &[],
+    );
 }
 
 /// Raven `Q3_Lerp2End` — the `I_Lerp2End` target.
@@ -764,13 +780,23 @@ pub fn Q3_CameraFade(
     da: f32,
     duration: f32,
 ) {
-    Q3_DebugPrint(icarus, host, WL_WARNING, "Q3_CameraFade: NOT SUPPORTED IN MP\n");
+    Q3_DebugPrint(
+        icarus,
+        host,
+        WL_WARNING,
+        "Q3_CameraFade: NOT SUPPORTED IN MP\n",
+    );
 }
 
 /// Raven `Q3_CameraPath` — the `I_CameraPath` target (unsupported in MP).
 /// Source: `oracle/codemp/icarus/Q3_Interface.cpp:628-631`
 pub fn Q3_CameraPath(icarus: &mut Icarus, host: &mut dyn EngineHost, name: &str) {
-    Q3_DebugPrint(icarus, host, WL_WARNING, "Q3_CameraPath: NOT SUPPORTED IN MP\n");
+    Q3_DebugPrint(
+        icarus,
+        host,
+        WL_WARNING,
+        "Q3_CameraPath: NOT SUPPORTED IN MP\n",
+    );
 }
 
 /// Raven `Q3_GetFloat` — the `I_GetFloat` target (out `value` folded to `&mut`).
@@ -986,7 +1012,12 @@ pub fn Q3_Evaluate(
             }
         },
         _ => {
-            Q3_DebugPrint(icarus, host, WL_ERROR, "Q3_Evaluate unknown operator used!\n");
+            Q3_DebugPrint(
+                icarus,
+                host,
+                WL_ERROR,
+                "Q3_Evaluate unknown operator used!\n",
+            );
             0
         }
     }

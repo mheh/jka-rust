@@ -7,8 +7,8 @@ use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 use mp_qshared::common::mp::qcommon::usercmd_t;
 use mp_qshared::shared::{qboolean, vec3_t};
 
-use crate::ai::AIGroupInfo_t;
 use crate::ai::rank_t;
+use crate::ai::AIGroupInfo_t;
 
 use super::g_npcstats_e::gNPCstats_t;
 use super::jump_state_t::jumpState_t;

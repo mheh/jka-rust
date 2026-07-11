@@ -12,8 +12,8 @@ const MAX_OSPATH: usize = 1024;
 /// Type definition source: `oracle/codemp/qcommon/files.h:58-61`
 #[repr(C)]
 pub struct directory_t {
-	pub path: [c_char; MAX_OSPATH],    // c:\jk2
-	pub gamedir: [c_char; MAX_OSPATH], // base
+    pub path: [c_char; MAX_OSPATH],    // c:\jk2
+    pub gamedir: [c_char; MAX_OSPATH], // base
 }
 
 const _: () = assert!(core::mem::size_of::<directory_t>() == 2048);

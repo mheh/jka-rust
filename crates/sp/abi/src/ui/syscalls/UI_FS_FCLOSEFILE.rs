@@ -1,5 +1,7 @@
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use sp_qshared::shared::fileHandle_t;
 
 /// `UI_FS_FCLOSEFILE` SP UI imports syscall ABI token.

@@ -8,3 +8,8 @@ name = "mp_engine_botlib"
 
 [dependencies]
 mp_qshared = { path = "../../qshared" }
+mp_bg = { path = "../../bg" }
+mp_engine_qcommon = { path = "../qcommon" }
+native_types = { path = "../../../native/types" }
+mp_game = { path = "../../game" }
+libc = "0.2"

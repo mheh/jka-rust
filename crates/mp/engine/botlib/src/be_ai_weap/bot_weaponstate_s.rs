@@ -7,10 +7,10 @@ use crate::be_ai_weight::weightconfig_s::weightconfig_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_weap.cpp:105-109`
 #[repr(C)]
 pub struct bot_weaponstate_t {
-	/// weapon weight configuration
-	pub weaponweightconfig: *mut weightconfig_t,
-	/// weapon weight index
-	pub weaponweightindex: *mut i32,
+    /// weapon weight configuration
+    pub weaponweightconfig: *mut weightconfig_t,
+    /// weapon weight index
+    pub weaponweightindex: *mut i32,
 }
 
 pub type bot_weaponstate_s = bot_weaponstate_t;

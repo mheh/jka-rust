@@ -8,10 +8,10 @@ use crate::shared::vec3_t;
 /// Type definition source: `oracle/codemp/game/g_public.h:900-906`
 #[repr(C)]
 pub struct T_G_ICARUS_GETVECTOR {
-	pub entID: i32,
-	pub r#type: i32,
-	pub name: [u8; 2048],
-	pub value: vec3_t,
+    pub entID: i32,
+    pub r#type: i32,
+    pub name: [u8; 2048],
+    pub value: vec3_t,
 }
 
 const _: () = assert!(core::mem::size_of::<T_G_ICARUS_GETVECTOR>() == 2068);

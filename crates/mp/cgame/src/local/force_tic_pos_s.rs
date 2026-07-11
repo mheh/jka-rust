@@ -8,12 +8,12 @@ use mp_qshared::shared::qhandle_t;
 /// Type definition source: `oracle/codemp/cgame/cg_local.h:1018-1026`
 #[repr(C)]
 pub struct forceTicPos_t {
-	pub x: i32,
-	pub y: i32,
-	pub width: i32,
-	pub height: i32,
-	pub file: *mut c_char,
-	pub tic: qhandle_t,
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    pub file: *mut c_char,
+    pub tic: qhandle_t,
 }
 
 #[cfg(target_pointer_width = "64")]

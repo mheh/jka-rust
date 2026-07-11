@@ -19,10 +19,10 @@ pub struct mdxaHeader_t {
     // frames and bones are shared by all levels of detail
     //
     pub numFrames: i32,
-    pub ofsFrames: i32, // points at mdxaFrame_t array
-    pub numBones: i32,  // (no offset to these since they're inside the frames array)
+    pub ofsFrames: i32,       // points at mdxaFrame_t array
+    pub numBones: i32,        // (no offset to these since they're inside the frames array)
     pub ofsCompBonePool: i32, // offset to global compressed-bone pool that all frames use
-    pub ofsSkel: i32,   // offset to mdxaSkel_t info
+    pub ofsSkel: i32,         // offset to mdxaSkel_t info
 
     pub ofsEnd: i32, // EOF, which of course gives overall file size
 }

@@ -9,9 +9,9 @@ use mp_qshared::shared::MAX_QPATH;
 /// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:151-154`
 #[repr(C)]
 pub struct md3Shader_t {
-	pub name: [c_char; MAX_QPATH],
-	/// for in-game use
-	pub shaderIndex: i32,
+    pub name: [c_char; MAX_QPATH],
+    /// for in-game use
+    pub shaderIndex: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<md3Shader_t>() == 68);

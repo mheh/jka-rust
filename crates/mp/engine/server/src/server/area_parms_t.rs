@@ -6,11 +6,11 @@
 /// Type definition source: `oracle/codemp/server/sv_world.cpp:359-364`
 #[repr(C)]
 pub struct areaParms_t {
-	pub mins: *const f32,
-	pub maxs: *const f32,
-	pub list: *mut i32,
-	pub count: i32,
-	pub maxcount: i32,
+    pub mins: *const f32,
+    pub maxs: *const f32,
+    pub list: *mut i32,
+    pub count: i32,
+    pub maxcount: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<areaParms_t>() == 32);

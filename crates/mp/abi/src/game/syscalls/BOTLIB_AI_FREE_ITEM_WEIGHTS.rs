@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use core::ffi::c_int;
 
 /// `BOTLIB_AI_FREE_ITEM_WEIGHTS` outbound game-to-engine syscall.

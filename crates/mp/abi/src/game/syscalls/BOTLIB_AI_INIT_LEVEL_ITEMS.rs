@@ -1,6 +1,8 @@
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_INIT_LEVEL_ITEMS` outbound game-to-engine syscall.
 ///

@@ -129,12 +129,7 @@ impl ModuleRegistry {
     /// PROVISIONAL SIGNATURE (checkpoint-7 finding): no frozen doc pins a
     /// `VM_Call` dual; minimal faithful shape pending its doc home.
     /// Source: `oracle/codemp/qcommon/vm.cpp:787-819`
-    pub fn vm_call(
-        &self,
-        slot: &SlotId,
-        command: core::ffi::c_int,
-        args: [isize; 12],
-    ) -> isize {
+    pub fn vm_call(&self, slot: &SlotId, command: core::ffi::c_int, args: [isize; 12]) -> isize {
         let s = self.slots[slot.0 as usize]
             .as_ref()
             .expect("vm_call on an empty slot");

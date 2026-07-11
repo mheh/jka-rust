@@ -17,8 +17,8 @@
 //! entry point itself is not invoked).
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::c_format::{c_vsprintf, FmtArg};
+use crate::prelude::*;
 use mp_qshared::shared::{BIG_INFO_STRING, MAX_INFO_STRING};
 
 // Parse-session state (cross-frame state -> GameWorld fields, pending full threading).
@@ -229,8 +229,7 @@ pub fn COM_DefaultExtension(path: *mut c_char, maxSize: c_int, extension: *const
         let path_bytes = std::ffi::CStr::from_ptr(path).to_bytes();
         let ext_bytes = std::ffi::CStr::from_ptr(extension).to_bytes();
         let old_len = path_bytes.len().min(MAX_QPATH as usize - 1);
-        let mut combined: Vec<c_char> =
-            Vec::with_capacity(old_len + ext_bytes.len() + 1);
+        let mut combined: Vec<c_char> = Vec::with_capacity(old_len + ext_bytes.len() + 1);
         combined.extend(path_bytes[..old_len].iter().map(|&b| b as c_char));
         combined.extend(ext_bytes.iter().map(|&b| b as c_char));
         combined.push(0);
@@ -1195,11 +1194,7 @@ pub fn va(format: *const c_char, args: &[FmtArg]) -> *mut c_char {
         let fmt_bytes = std::ffi::CStr::from_ptr(format).to_bytes();
         let formatted = c_vsprintf(fmt_bytes, args);
         let copy_len = formatted.len().min(32000 - 1);
-        std::ptr::copy_nonoverlapping(
-            formatted.as_ptr() as *const c_char,
-            buf,
-            copy_len,
-        );
+        std::ptr::copy_nonoverlapping(formatted.as_ptr() as *const c_char, buf, copy_len);
         *buf.offset(copy_len as isize) = 0;
 
         buf

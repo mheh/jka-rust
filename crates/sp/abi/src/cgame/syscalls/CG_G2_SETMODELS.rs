@@ -1,8 +1,8 @@
 use super::super::SpCgameImport;
+use crate::cgame::types::CGhoul2Info_v;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::cgame::types::CGhoul2Info_v;
 use sp_qshared::shared::qhandle_t;
 
 /// Arguments for `CG_G2_SETMODELS`.

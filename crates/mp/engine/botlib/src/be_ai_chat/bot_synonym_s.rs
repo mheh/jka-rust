@@ -7,9 +7,9 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:93-98`
 #[repr(C)]
 pub struct bot_synonym_t {
-	pub string: *mut c_char,
-	pub weight: f32,
-	pub next: *mut bot_synonym_t,
+    pub string: *mut c_char,
+    pub weight: f32,
+    pub next: *mut bot_synonym_t,
 }
 
 pub type bot_synonym_s = bot_synonym_t;

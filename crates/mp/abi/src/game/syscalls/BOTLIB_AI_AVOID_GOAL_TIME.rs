@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_AVOID_GOAL_TIME` outbound game-to-engine syscall.
 #[derive(Debug)]

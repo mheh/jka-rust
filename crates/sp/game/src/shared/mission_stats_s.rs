@@ -9,17 +9,17 @@ use crate::weapons::weapon_t::weapon_t;
 /// Type definition source: `oracle/code/game/g_shared.h:302-318`
 #[repr(C)]
 pub struct missionStats_t {
-    pub secretsFound: i32,   // # of secret areas found
-    pub totalSecrets: i32,   // # of secret areas that could have been found
-    pub shotsFired: i32,     // total number of shots fired
-    pub hits: i32,           // Shots that did damage
-    pub enemiesSpawned: i32, // # of enemies spawned
-    pub enemiesKilled: i32,  // # of enemies killed
-    pub saberThrownCnt: i32, // # of times saber was thrown
-    pub saberBlocksCnt: i32, // # of times saber was used to block
-    pub legAttacksCnt: i32,  // # of times legs were hit with saber
-    pub armAttacksCnt: i32,  // # of times arm were hit with saber
-    pub torsoAttacksCnt: i32, // # of times torso was hit with saber
+    pub secretsFound: i32,                           // # of secret areas found
+    pub totalSecrets: i32,                           // # of secret areas that could have been found
+    pub shotsFired: i32,                             // total number of shots fired
+    pub hits: i32,                                   // Shots that did damage
+    pub enemiesSpawned: i32,                         // # of enemies spawned
+    pub enemiesKilled: i32,                          // # of enemies killed
+    pub saberThrownCnt: i32,                         // # of times saber was thrown
+    pub saberBlocksCnt: i32,                         // # of times saber was used to block
+    pub legAttacksCnt: i32,                          // # of times legs were hit with saber
+    pub armAttacksCnt: i32,                          // # of times arm were hit with saber
+    pub torsoAttacksCnt: i32,                        // # of times torso was hit with saber
     pub otherAttacksCnt: i32, // # of times anything else on a monster was hit with saber
     pub forceUsed: [i32; NUM_FORCE_POWERS as usize], // # of times each force power was used
     pub weaponUsed: [i32; weapon_t::WP_NUM_WEAPONS as usize], // # of times each weapon was used

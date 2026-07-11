@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `UI_LAN_GETPINGQUEUECOUNT` MP UI imports syscall ABI token.
 ///

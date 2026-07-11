@@ -7,8 +7,8 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/codemp/game/be_ai_chat.h:39-43`
 #[repr(C)]
 pub struct bot_matchvariable_t {
-	pub offset: c_char,
-	pub length: i32,
+    pub offset: c_char,
+    pub length: i32,
 }
 
 pub type bot_matchvariable_s = bot_matchvariable_t;

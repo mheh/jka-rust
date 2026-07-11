@@ -9,31 +9,31 @@ use mp_qshared::shared::MAX_QPATH;
 /// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:130-149`
 #[repr(C)]
 pub struct md3Surface_t {
-	pub ident: i32,
+    pub ident: i32,
 
-	/// polyset name
-	pub name: [c_char; MAX_QPATH],
+    /// polyset name
+    pub name: [c_char; MAX_QPATH],
 
-	pub flags: i32,
-	/// all surfaces in a model should have the same
-	pub numFrames: i32,
+    pub flags: i32,
+    /// all surfaces in a model should have the same
+    pub numFrames: i32,
 
-	/// all surfaces in a model should have the same
-	pub numShaders: i32,
-	pub numVerts: i32,
+    /// all surfaces in a model should have the same
+    pub numShaders: i32,
+    pub numVerts: i32,
 
-	pub numTriangles: i32,
-	pub ofsTriangles: i32,
+    pub numTriangles: i32,
+    pub ofsTriangles: i32,
 
-	/// offset from start of md3Surface_t
-	pub ofsShaders: i32,
-	/// texture coords are common for all frames
-	pub ofsSt: i32,
-	/// numVerts * numFrames
-	pub ofsXyzNormals: i32,
+    /// offset from start of md3Surface_t
+    pub ofsShaders: i32,
+    /// texture coords are common for all frames
+    pub ofsSt: i32,
+    /// numVerts * numFrames
+    pub ofsXyzNormals: i32,
 
-	/// next surface follows
-	pub ofsEnd: i32,
+    /// next surface follows
+    pub ofsEnd: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<md3Surface_t>() == 108);

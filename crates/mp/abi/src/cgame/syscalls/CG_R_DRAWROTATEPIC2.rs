@@ -1,7 +1,9 @@
 use mp_qshared::shared::qhandle_t;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `CG_R_DRAWROTATEPIC2`.

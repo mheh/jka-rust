@@ -8,12 +8,12 @@ use core::ffi::c_void;
 /// Type definition source: `oracle/code/icarus/blockstream.h:15-89`
 #[repr(C)]
 pub struct CBlockMember {
-	/// ID of the value contained in data
-	pub m_id: i32,
-	/// Size of the data member variable
-	pub m_size: i32,
-	/// Data for this member
-	pub m_data: *mut c_void,
+    /// ID of the value contained in data
+    pub m_id: i32,
+    /// Size of the data member variable
+    pub m_size: i32,
+    /// Data for this member
+    pub m_data: *mut c_void,
 }
 
 const _: () = assert!(core::mem::size_of::<CBlockMember>() == 16);

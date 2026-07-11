@@ -14,9 +14,9 @@ const MAX_INFO_STRING: usize = 1024;
 /// Type definition source: `oracle/code/client/client.h:183-186`
 #[repr(C)]
 pub struct serverInfoResponse_t {
-	pub netadr: netadr_t,
+    pub netadr: netadr_t,
 
-	pub info: [c_char; MAX_INFO_STRING],
+    pub info: [c_char; MAX_INFO_STRING],
 }
 
 const _: () = assert!(core::mem::size_of::<serverInfoResponse_t>() == 1032);

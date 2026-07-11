@@ -16,20 +16,20 @@ const MAX_KEYS: usize = 320;
 /// Type definition source: `oracle/codemp/client/keys.h:19-33`
 #[repr(C)]
 pub struct keyGlobals_s {
-	pub historyEditLines: [field_t; COMMAND_HISTORY],
+    pub historyEditLines: [field_t; COMMAND_HISTORY],
 
-	/// the last line in the history buffer, not masked
-	pub nextHistoryLine: c_int,
-	/// the line being displayed from history buffer
-	/// will be <= nextHistoryLine
-	pub historyLine: c_int,
-	pub g_consoleField: field_t,
+    /// the last line in the history buffer, not masked
+    pub nextHistoryLine: c_int,
+    /// the line being displayed from history buffer
+    /// will be <= nextHistoryLine
+    pub historyLine: c_int,
+    pub g_consoleField: field_t,
 
-	pub anykeydown: qboolean,
-	pub key_overstrikeMode: qboolean,
-	pub keyDownCount: c_int,
+    pub anykeydown: qboolean,
+    pub key_overstrikeMode: qboolean,
+    pub keyDownCount: c_int,
 
-	pub keys: [qkey_t; MAX_KEYS],
+    pub keys: [qkey_t; MAX_KEYS],
 }
 
 /// Raven `keyGlobals_t`.

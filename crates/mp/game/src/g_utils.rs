@@ -60,8 +60,6 @@ use std::ffi::{CStr, CString};
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 // Raven `#define PMF_TIME_KNOCKBACK 64` (`bg_public.h:409`) and
 // `#define SVF_BROADCAST 0x00000020` (`g_local.h`) both resolve through the
 // prelude glob now — `PMF_TIME_KNOCKBACK` from
@@ -1781,8 +1779,7 @@ pub fn TryHeal(ctx: GameContext<'_>, ent: *mut gentity_t, target: *mut gentity_t
             }
 
             // keep them in the healing anim even when the healing debounce is not yet expired
-            if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD
-                || (*client).ps.torsoAnim == BOTH_CONSOLE1
+            if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD || (*client).ps.torsoAnim == BOTH_CONSOLE1
             {
                 // extend the time
                 (*client).ps.torsoTimer = 500;
@@ -1826,9 +1823,7 @@ pub fn TryUse(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let world = &mut *ctx.world;
 
-        if world.globals.gSiegeRoundBegun == qfalse
-            && world.cvars.g_gametype.integer == GT_SIEGE
-        {
+        if world.globals.gSiegeRoundBegun == qfalse && world.cvars.g_gametype.integer == GT_SIEGE {
             return;
         }
 

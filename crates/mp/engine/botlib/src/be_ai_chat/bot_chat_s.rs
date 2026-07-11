@@ -7,7 +7,7 @@ use super::bot_chattype_s::bot_chattype_t;
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:72-75`
 #[repr(C)]
 pub struct bot_chat_t {
-	pub types: *mut bot_chattype_t,
+    pub types: *mut bot_chattype_t,
 }
 
 pub type bot_chat_s = bot_chat_t;

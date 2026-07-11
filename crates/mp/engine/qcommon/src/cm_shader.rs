@@ -1,0 +1,701 @@
+#![allow(non_snake_case, non_camel_case_types, dead_code, unused_variables)]
+
+//! MP `cm_shader.cpp` — the collision-model shader table: parses
+//! `scripts/*.shader` text into `CCMShader` surface/content-flag records
+//! (`svInfoParms`/`svMaterialNames` keyword tables, vector/material parse
+//! helpers), caches per-name shader text in `shaderTextTable`, and resolves
+//! `CCMShader` lookups (by BSP index or by name) through `cmShaderTable`.
+//!
+//! Source: `oracle/codemp/qcommon/cm_shader.cpp`
+//!
+//! PORT-NOTE(rm-types): `RenderModels`/`RmManager` are the state-receiver
+//! types pinned by the engine-fork-discovery preamble's receiver order
+//! (rmg-terrain.md owns their shape); neither has landed in the tree yet.
+//! Referenced by their exact resolved-signature names per the no-stub rule
+//! (`common_fns.rs` precedent); reported as missing symbols/shape mismatches
+//! for the finisher.
+#[allow(dead_code)]
+use crate::cm_load::RenderModels;
+#[allow(dead_code)]
+struct RmManager;
+
+use core::ffi::{c_char, c_int};
+
+use mp_host_interface::engine_host::EngineHost;
+use mp_qshared::common::mp::qcommon::tags::memtag_t;
+use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::surface_flags::{CONTENTS_OPAQUE, CONTENTS_SOLID, MATERIAL_LAST, SURF_SKY};
+use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t, MAX_QPATH};
+
+use crate::cm::ccmshader::CCMShader;
+use crate::cm::cm_shader_consts::MAX_SHADER_FILES;
+use crate::collision_world::CollisionWorld;
+use crate::common::Common;
+
+// Raven `S_COLOR_YELLOW` — not reachable from this crate (icarus/game keep
+// their own private copies of this same literal; qshared has no public
+// home for it yet), so this file keeps its own copy per that precedent.
+// Source: `oracle/codemp/game/q_shared.h:1163`
+const S_COLOR_YELLOW: &str = "^3";
+
+// PORT-NOTE(q_math-reach): `COM_ParseExt`/`SkipWhitespace`/`SkipBracedSection`/
+// `SkipRestOfLine`/`Q_stricmp`/`Q_strncpyz`/`Com_sprintf` (q_shared/q_math
+// primitives) are ported in `mp_game`, a tier above this crate's dependency
+// graph (cm_load.rs/files_common.rs precedent) — not reachable here.
+// Referenced by their exact Raven names; `Com_sprintf` narrowed to a
+// pre-formatted `&str` (Rust has no safe C-variadic fn definitions) matching
+// the net_chan.rs/files_common.rs `Com_sprintf` call precedent; `Com_Error`
+// narrowed to `(common, code, msg)` matching the files_common.rs precedent
+// (ruling 1: receiverless panic).
+extern "Rust" {
+    fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *mut c_char;
+    fn SkipWhitespace(data: *const c_char, hasNewLines: *mut qboolean) -> *const c_char;
+    fn SkipBracedSection(program: *mut *const c_char);
+    fn SkipRestOfLine(data: *mut *const c_char);
+    fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int;
+    fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int);
+    fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: &str);
+    fn Com_Error(common: &mut Common, code: c_int, msg: &str);
+
+    // `FS_ListFiles`/`FS_ReadFile`/`FS_FreeFile`/`FS_FreeFileList` (files.cpp)
+    // and `Z_Malloc`/`Z_Free`/`Hunk_Alloc` (z_memman_pc.cpp) have no ported
+    // body reachable from this file yet (`crate::files`/`crate::z_memman`
+    // modules exist but don't export these under this crate's current
+    // landing state — vm_fns.rs precedent for the same reachability gap).
+    // Narrowed to each call site's own shape; escalated as missing symbols
+    // for the finisher.
+    fn FS_ListFiles(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        path: &str,
+        extension: &str,
+        numfiles: *mut c_int,
+    ) -> *mut *const c_char;
+    fn FS_ReadFile(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        qpath: &str,
+        buffer: *mut *mut core::ffi::c_void,
+    ) -> c_int;
+    fn FS_FreeFile(common: &mut Common, f: *mut c_char);
+    fn FS_FreeFileList(common: &mut Common, filelist: *mut *const c_char);
+    fn Z_Malloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        iSize: usize,
+        eTag: memtag_t,
+        bZeroit: bool,
+    ) -> *mut ();
+    fn Z_Free(common: &mut Common, pvAddress: *mut c_char);
+    fn Hunk_Alloc(
+        common: &mut Common,
+        cm: &mut CollisionWorld,
+        rm: &mut RenderModels,
+        host: &mut dyn EngineHost,
+        size: usize,
+        preference: &str,
+    ) -> *mut ();
+}
+
+/// Raven `SV_ParseSurfaceParm` — match the next token against `svInfoParms`,
+/// OR/AND-ing the shader's surface/content flags from the matching row.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:261-278`
+pub fn SV_ParseSurfaceParm(
+    cm: &mut CollisionWorld,
+    shader: *mut CCMShader,
+    text: *mut *const c_char,
+) {
+    //TODO: Port svInfoParms
+    // Source: oracle/codemp/qcommon/cm_shader.cpp:226-259
+    let numsvInfoParms: c_int = cm.svInfoParms.len() as c_int;
+
+    let token = unsafe { COM_ParseExt(text, qfalse) };
+    for i in 0..numsvInfoParms {
+        let row = &cm.svInfoParms[i as usize];
+        if unsafe { Q_stricmp(token, row.name) } == 0 {
+            unsafe {
+                (*shader).surfaceFlags |= row.surfaceFlags;
+                (*shader).contentFlags |= row.contents;
+                (*shader).contentFlags &= row.clearSolid;
+            }
+            break;
+        }
+    }
+}
+
+/// Raven `CM_ShutdownShaderProperties` — clear the per-name shader table.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:489-496`
+pub fn CM_ShutdownShaderProperties(cm: &mut CollisionWorld) {
+    //TODO: Port cmShaderTable
+    // Source: oracle/codemp/qcommon/cm_shader.cpp:30
+    if cm.cmShaderTable.count() != 0 {
+        //		Com_Printf("Shutting down cmShaderTable .....\n");
+        cm.cmShaderTable.clear();
+    }
+}
+
+/// Raven `CM_GetShaderInfo( int shaderNum )` — the BSP-index overload:
+/// bounds-checked pointer into `cmg.shaders`.
+///
+/// PORT-NOTE(overload): Raven overloads `CM_GetShaderInfo` by parameter type
+/// (`int` vs `const char *`); Rust has no overloading, so the by-name form
+/// below is `CM_GetShaderInfo_ByName` (packet `qcommon__2130_CM_GetShaderInfo.md`).
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:526-536`
+pub fn CM_GetShaderInfo(cm: &mut CollisionWorld, shaderNum: c_int) -> *mut CCMShader {
+    //TODO: Port cmg
+    // Source: oracle/codemp/qcommon/cm_local.h:220
+    if shaderNum < 0 || shaderNum >= cm.cmg.numShaders {
+        return core::ptr::null_mut();
+    }
+    unsafe { cm.cmg.shaders.add(shaderNum as usize) }
+}
+
+/// Raven `CM_CreateShaderTextHash` — walk the loaded `shaderText` buffer,
+/// building one `CCMShaderText` per labeled block and inserting it into
+/// `shaderTextTable`.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:37-59`
+pub fn CM_CreateShaderTextHash(
+    cm: &mut CollisionWorld,
+    rmg: &mut RmManager,
+    host: &mut dyn EngineHost,
+) {
+    //TODO: Port shaderText
+    // Source: oracle/codemp/qcommon/cm_shader.cpp:28
+    let mut p: *const c_char = cm.shaderText;
+    // look for label
+    while !p.is_null() {
+        let mut hasNewLines: qboolean = qfalse;
+        p = unsafe { SkipWhitespace(p, &mut hasNewLines) };
+        let token = unsafe { COM_ParseExt(&mut p, qtrue) };
+        if unsafe { *token } == 0 {
+            break;
+        }
+        // Raven `new CCMShaderText(token, p)` captures name=token, mData=p (a
+        // pointer into `shaderText`); the idiomatic map stores name → byte
+        // offset of `p` within the `shaderText` buffer (§17).
+        // Source: `oracle/codemp/qcommon/cm_shader.cpp:16,55-56`
+        let name = unsafe { core::ffi::CStr::from_ptr(token) }
+            .to_string_lossy()
+            .into_owned();
+        let offset = (p as usize) - (cm.shaderText as usize);
+        cm.shaderTextTable.insert(name, offset);
+
+        unsafe { SkipBracedSection(&mut p) };
+    }
+}
+
+/// Raven `CM_GetShaderText` — look up the raw shader-text block for `key`.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:158-168`
+pub fn CM_GetShaderText(
+    cm: &mut CollisionWorld,
+    rmg: &mut RmManager,
+    host: &mut dyn EngineHost,
+    key: *const c_char,
+) -> *const c_char {
+    // Raven `st = shaderTextTable[key]; return st ? st->GetData() : NULL`.
+    // The map yields the stored byte offset; `GetData` (the captured `mData`)
+    // is `shaderText + offset`.
+    // Source: `oracle/codemp/qcommon/cm_shader.cpp:158-168`
+    let key_str = unsafe { core::ffi::CStr::from_ptr(key) }.to_string_lossy();
+    if let Some(&offset) = cm.shaderTextTable.get(key_str.as_ref()) {
+        return unsafe { cm.shaderText.add(offset) } as *const c_char;
+    }
+    core::ptr::null()
+}
+
+/// Raven `CM_LoadShaderFiles` — scan `shaders/*.shader` (+ `shaders/test/*`
+/// outside `FINAL_BUILD`), read and concatenate them into one `shaderText`
+/// buffer.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:71-150`
+pub fn CM_LoadShaderFiles(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+) {
+    let mut numShaders1: c_int = 0;
+    // scan for shader files
+    let shaderFiles1 =
+        unsafe { FS_ListFiles(common, cm, rm, host, "shaders", ".shader", &mut numShaders1) };
+    //TODO: Port FINAL_BUILD
+    // Source: oracle/codemp/qcommon/cm_shader.cpp:75
+    let mut numShaders2: c_int = 0;
+    let shaderFiles2 = unsafe {
+        FS_ListFiles(
+            common,
+            cm,
+            rm,
+            host,
+            "shaders/test",
+            ".shader",
+            &mut numShaders2,
+        )
+    };
+
+    if shaderFiles1.is_null() || numShaders1 == 0 {
+        //TODO: Port WARNING
+        // Source: oracle/codemp/qcommon/cm_shader.cpp:92
+        crate::common::com_printf(
+            common,
+            &format!("{}WARNING: no shader files found\n", S_COLOR_YELLOW),
+        );
+        return;
+    }
+
+    let mut numShaders = numShaders1 + numShaders2;
+    if numShaders > MAX_SHADER_FILES as c_int {
+        numShaders = MAX_SHADER_FILES as c_int;
+    }
+
+    let mut buffers: [*mut c_char; MAX_SHADER_FILES] = [core::ptr::null_mut(); MAX_SHADER_FILES];
+    let mut sum: c_int = 0;
+    let mut i: c_int = 0;
+
+    // load and parse shader files
+    while i < numShaders1 {
+        let mut filename: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
+        unsafe {
+            Com_sprintf(
+                filename.as_mut_ptr(),
+                core::mem::size_of_val(&filename) as c_int,
+                &format!(
+                    "shaders/{}",
+                    core::ffi::CStr::from_ptr(*shaderFiles1.add(i as usize)).to_string_lossy()
+                ),
+            )
+        };
+        crate::common::com_printf(common, &format!("...loading '{}'\n", "filename"));
+        sum += unsafe {
+            FS_ReadFile(
+                common,
+                cm,
+                rm,
+                host,
+                "filename",
+                buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void,
+            )
+        };
+        if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
+            unsafe {
+                Com_Error(
+                    common,
+                    errorParm_t::ERR_FATAL as c_int,
+                    &format!("Couldn't load {}", "filename"),
+                )
+            };
+        }
+        i += 1;
+    }
+    while i < numShaders {
+        let mut filename: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
+        unsafe {
+            Com_sprintf(
+                filename.as_mut_ptr(),
+                core::mem::size_of_val(&filename) as c_int,
+                &format!("shaders/test/{}", "shaderFiles2[i - numShaders1]"),
+            )
+        };
+        crate::common::com_printf(common, &format!("...loading '{}'\n", "filename"));
+        sum += unsafe {
+            FS_ReadFile(
+                common,
+                cm,
+                rm,
+                host,
+                "filename",
+                buffers.as_mut_ptr().add(i as usize) as *mut *mut core::ffi::c_void,
+            )
+        };
+        if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
+            unsafe {
+                Com_Error(
+                    common,
+                    errorParm_t::ERR_DROP as c_int,
+                    &format!("Couldn't load {}", "filename"),
+                )
+            };
+        }
+        i += 1;
+    }
+
+    // build single large buffer
+    //TODO: Port shaderText
+    // Source: oracle/codemp/qcommon/cm_shader.cpp:28
+    cm.shaderText = unsafe {
+        Z_Malloc(
+            common,
+            cm,
+            rm,
+            host,
+            (sum + numShaders * 2) as usize,
+            memtag_t::TAG_SHADERTEXT,
+            true,
+        )
+    } as *mut c_char;
+
+    // free in reverse order, so the temp files are all dumped
+    let mut j = numShaders - 1;
+    while j >= 0 {
+        unsafe {
+            libc::strcat(cm.shaderText, c"\n".as_ptr());
+            libc::strcat(cm.shaderText, buffers[j as usize]);
+        }
+        unsafe { FS_FreeFile(common, buffers[j as usize]) };
+        j -= 1;
+    }
+
+    // free up memory
+    unsafe {
+        FS_FreeFileList(common, shaderFiles1);
+        FS_FreeFileList(common, shaderFiles2);
+    }
+}
+
+/// Raven `CM_FreeShaderText` — release the cached shader-text buffer and
+/// per-name hash.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:176-184`
+pub fn CM_FreeShaderText(common: &mut Common, cm: &mut CollisionWorld) {
+    cm.shaderTextTable.clear();
+    //TODO: Port shaderText
+    // Source: oracle/codemp/qcommon/cm_shader.cpp:28
+    if !cm.shaderText.is_null() {
+        unsafe { Z_Free(common, cm.shaderText) };
+        cm.shaderText = core::ptr::null_mut();
+    }
+}
+
+/// Raven `SV_ParseMaterial` — match the next token against `svMaterialNames`,
+/// OR-ing its index into the shader's surface flags.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:290-309`
+pub fn SV_ParseMaterial(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    shader: *mut CCMShader,
+    text: *mut *const c_char,
+) {
+    let token = unsafe { COM_ParseExt(text, qfalse) };
+    if unsafe { *token } == 0 {
+        crate::common::com_printf(
+            common,
+            &format!(
+                "{}WARNING: missing material in shader '{}'\n",
+                S_COLOR_YELLOW,
+                unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
+            ),
+        );
+        return;
+    }
+    for i in 0..MATERIAL_LAST {
+        //TODO: Port svMaterialNames
+        // Source: oracle/codemp/qcommon/cm_shader.cpp:285-288
+        if unsafe { Q_stricmp(token, cm.svMaterialNames[i as usize]) } == 0 {
+            unsafe {
+                (*shader).surfaceFlags |= i;
+            }
+            break;
+        }
+    }
+}
+
+/// Raven `CM_ParseVector` — parse a parenthesized `count`-float vector.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:316-347`
+// FIXME: spaces are currently required after parens, should change parseext...
+pub fn CM_ParseVector(
+    common: &mut Common,
+    shader: *mut CCMShader,
+    text: *mut *const c_char,
+    count: c_int,
+    v: *mut f32,
+) -> qboolean {
+    let mut token = unsafe { COM_ParseExt(text, qfalse) };
+    if unsafe { libc::strcmp(token, c"(".as_ptr()) } != 0 {
+        crate::common::com_printf(
+            common,
+            &format!(
+                "{}WARNING: missing parenthesis in shader '{}'\n",
+                S_COLOR_YELLOW,
+                unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
+            ),
+        );
+        return qfalse;
+    }
+
+    for i in 0..count {
+        token = unsafe { COM_ParseExt(text, qfalse) };
+        if unsafe { *token } == 0 {
+            crate::common::com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing vector element in shader '{}'\n",
+                    S_COLOR_YELLOW,
+                    unsafe {
+                        core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy()
+                    }
+                ),
+            );
+            return qfalse;
+        }
+        unsafe {
+            *v.add(i as usize) = libc::atof(token) as f32;
+        }
+    }
+
+    token = unsafe { COM_ParseExt(text, qfalse) };
+    if unsafe { libc::strcmp(token, c")".as_ptr()) } != 0 {
+        crate::common::com_printf(
+            common,
+            &format!(
+                "{}WARNING: missing parenthesis in shader '{}'\n",
+                S_COLOR_YELLOW,
+                unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
+            ),
+        );
+        return qfalse;
+    }
+    qtrue
+}
+
+/// Raven `CM_LoadShaderText` — (re)build the cached shader-text buffer if
+/// missing (or forced).
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:195-210`
+pub fn CM_LoadShaderText(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    rmg: &mut RmManager,
+    host: &mut dyn EngineHost,
+    forceReload: qboolean,
+) {
+    if forceReload != 0 {
+        CM_FreeShaderText(common, cm);
+    }
+    //TODO: Port shaderText
+    // Source: oracle/codemp/qcommon/cm_shader.cpp:28
+    if !cm.shaderText.is_null() {
+        return;
+    }
+    //	Com_Printf("Loading shader text .....\n");
+    CM_LoadShaderFiles(common, cm, rm, host);
+    CM_CreateShaderTextHash(cm, rmg, host);
+
+    //Com_Printf("..... %d shader definitions loaded\n", shaderTextTable.count());
+}
+
+/// Raven `CM_ParseShader` — parse one `{ ... }` shader body: `surfaceParm`,
+/// `material`/`q3map_material`, `sun`/`q3map_sun` (values discarded — dead
+/// per Raven's own comments), and `fogParms` keywords.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:361-454`
+pub fn CM_ParseShader(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    shader: *mut CCMShader,
+    text: *mut *const c_char,
+) {
+    let mut token = unsafe { COM_ParseExt(text, qtrue) };
+    if unsafe { *token } != b'{' as c_char {
+        crate::common::com_printf(
+            common,
+            &format!(
+                "{}WARNING: expecting '{{', found '{}' instead in shader '{}'\n",
+                S_COLOR_YELLOW,
+                unsafe { core::ffi::CStr::from_ptr(token).to_string_lossy() },
+                unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
+            ),
+        );
+        return;
+    }
+
+    loop {
+        token = unsafe { COM_ParseExt(text, qtrue) };
+        if unsafe { *token } == 0 {
+            crate::common::com_printf(
+                common,
+                &format!(
+                    "{}WARNING: no concluding '}}' in shader {}\n",
+                    S_COLOR_YELLOW,
+                    unsafe {
+                        core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy()
+                    }
+                ),
+            );
+            return;
+        }
+
+        let c0 = unsafe { *token };
+        // end of shader definition
+        if c0 == b'}' as c_char {
+            break;
+        }
+        // stage definition
+        else if c0 == b'{' as c_char {
+            unsafe { SkipBracedSection(text) };
+            continue;
+        }
+        // material deprecated as of 11 Jan 01
+        // material undeprecated as of 7 May 01 - q3map_material deprecated
+        else if unsafe {
+            (Q_stricmp(token, c"material".as_ptr()) == 0)
+                || (Q_stricmp(token, c"q3map_material".as_ptr()) == 0)
+        } {
+            SV_ParseMaterial(common, cm, shader, text);
+        }
+        // sun parms
+        // q3map_sun deprecated as of 11 Jan 01
+        else if unsafe {
+            (Q_stricmp(token, c"sun".as_ptr()) == 0)
+                || (Q_stricmp(token, c"q3map_sun".as_ptr()) == 0)
+        } {
+            //			float	a, b;
+
+            token = unsafe { COM_ParseExt(text, qfalse) };
+            //			shader->sunLight[0] = atof( token );
+            token = unsafe { COM_ParseExt(text, qfalse) };
+            //			shader->sunLight[1] = atof( token );
+            token = unsafe { COM_ParseExt(text, qfalse) };
+            //			shader->sunLight[2] = atof( token );
+
+            //			VectorNormalize( shader->sunLight );
+
+            token = unsafe { COM_ParseExt(text, qfalse) };
+            //			a = atof( token );
+            //			VectorScale( shader->sunLight, a, shader->sunLight);
+
+            token = unsafe { COM_ParseExt(text, qfalse) };
+            //			a = DEG2RAD(atof( token ));
+
+            token = unsafe { COM_ParseExt(text, qfalse) };
+            //			b = DEG2RAD(atof( token ));
+
+            //			shader->sunDirection[0] = cos( a ) * cos( b );
+            //			shader->sunDirection[1] = sin( a ) * cos( b );
+            //			shader->sunDirection[2] = sin( b );
+        } else if unsafe { Q_stricmp(token, c"surfaceParm".as_ptr()) == 0 } {
+            SV_ParseSurfaceParm(cm, shader, text);
+            continue;
+        } else if unsafe { Q_stricmp(token, c"fogParms".as_ptr()) } == 0 {
+            let mut fogColor: vec3_t = vec3_t::default();
+            if CM_ParseVector(common, shader, text, 3, fogColor.as_mut_ptr()) == 0 {
+                return;
+            }
+
+            token = unsafe { COM_ParseExt(text, qfalse) };
+            if unsafe { *token } == 0 {
+                crate::common::com_printf(
+                    common,
+                    &format!(
+                        "{}WARNING: missing parm for 'fogParms' keyword in shader '{}'\n",
+                        S_COLOR_YELLOW,
+                        unsafe {
+                            core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy()
+                        }
+                    ),
+                );
+                continue;
+            }
+            //			shader->depthForOpaque = atof( token );
+
+            // skip any old gradient directions
+            unsafe { SkipRestOfLine(text) };
+            continue;
+        }
+    }
+}
+
+/// Raven `CM_SetupShaderProperties` — populate `cmShaderTable` from every
+/// loaded BSP shader, then parse each one's shader-script text.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:466-487`
+pub fn CM_SetupShaderProperties(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rmg: &mut RmManager,
+    host: &mut dyn EngineHost,
+) {
+    //TODO: Port cmg
+    // Source: oracle/codemp/qcommon/cm_local.h:220
+    // Add all basic shaders to the cmShaderTable
+    let numShaders = cm.cmg.numShaders;
+    for i in 0..numShaders {
+        let s = CM_GetShaderInfo(cm, i);
+        //TODO: Port cmShaderTable
+        // Source: oracle/codemp/qcommon/cm_shader.cpp:30
+        cm.cmShaderTable.insert(s);
+    }
+    // Go through and parse evaluate shader names to shadernums
+    for i in 0..numShaders {
+        let shader = CM_GetShaderInfo(cm, i);
+        let def = CM_GetShaderText(cm, rmg, host, unsafe { (*shader).shader.as_ptr() });
+        if !def.is_null() {
+            CM_ParseShader(common, cm, shader, &mut { def } as *mut *const c_char);
+        }
+    }
+}
+
+/// Raven `CM_GetShaderInfo( const char *name )` — the by-name overload:
+/// looks up (or lazily allocates + parses) the `CCMShader` for `name`.
+///
+/// PORT-NOTE(overload): disambiguated from the by-index overload
+/// (`CM_GetShaderInfo` above, packet `qcommon__0110_CM_GetShaderInfo.md` /
+/// `qcommon__2130_CM_GetShaderInfo.md`) since Rust has no overloading.
+///
+/// Source: `oracle/codemp/qcommon/cm_shader.cpp:498-524`
+pub fn CM_GetShaderInfo_ByName(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    rmg: &mut RmManager,
+    host: &mut dyn EngineHost,
+    name: *const c_char,
+) -> *mut CCMShader {
+    //TODO: Port cmShaderTable
+    // Source: oracle/codemp/qcommon/cm_shader.cpp:30
+    let mut out = cm.cmShaderTable[name];
+    if !out.is_null() {
+        return out;
+    }
+
+    // Create a new CCMShader class
+    //TODO: Port h_high
+    // Source: oracle/codemp/qcommon/cm_shader.cpp:510
+    out = unsafe {
+        Hunk_Alloc(
+            common,
+            cm,
+            rm,
+            host,
+            core::mem::size_of::<CCMShader>(),
+            "h_high",
+        )
+    } as *mut CCMShader;
+    // Set defaults
+    unsafe {
+        Q_strncpyz((*out).shader.as_mut_ptr(), name, MAX_QPATH as c_int);
+        (*out).contentFlags = CONTENTS_SOLID | CONTENTS_OPAQUE;
+    }
+
+    // Parse in any text if it exists
+    let def = CM_GetShaderText(cm, rmg, host, name);
+    if !def.is_null() {
+        CM_ParseShader(common, cm, out, &mut { def } as *mut *const c_char);
+    }
+
+    cm.cmShaderTable.insert(out);
+    out
+}

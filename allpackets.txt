@@ -1,0 +1,1073 @@
+=====qcommon__0108_SV_ParseSurfaceParm=====
+# ENGINE PORT PACKET — `SV_ParseSurfaceParm`
+
+- seq **108**  ·  wave **0**  ·  unit **107**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **18**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn SV_ParseSurfaceParm(cm: &mut CollisionWorld, shader: *mut CCMShader, text: *mut *const c_char) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `SV_ParseSurfaceParm` | `svInfoParms` | read | `oracle/codemp/qcommon/cm_shader.cpp:226-259` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `SV_ParseSurfaceParm` — oracle/codemp/qcommon/cm_shader.cpp:261-278 (18 LOC)
+```c
+  261 | void SV_ParseSurfaceParm( CCMShader * shader, const char **text ) 
+  262 | {
+  263 | 	char	*token;
+  264 | 	int		numsvInfoParms = sizeof(svInfoParms) / sizeof(svInfoParms[0]);
+  265 | 	int		i;
+  266 | 
+  267 | 	token = COM_ParseExt( text, qfalse );
+  268 | 	for ( i = 0 ; i < numsvInfoParms ; i++ ) 
+  269 | 	{
+  270 | 		if ( !Q_stricmp( token, svInfoParms[i].name ) ) 
+  271 | 		{
+  272 | 			shader->surfaceFlags |= svInfoParms[i].surfaceFlags;
+  273 | 			shader->contentFlags |= svInfoParms[i].contents;
+  274 | 			shader->contentFlags &= svInfoParms[i].clearSolid;
+  275 | 			break;
+  276 | 		}
+  277 | 	}
+  278 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_shader.cpp:226-259
+  226 | infoParm_t	svInfoParms[] =
+  227 | {
+  228 | 	// Game surface flags
+  229 | 	{"sky",					-1,					SURF_SKY,			0 },						// emit light from an environment map
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 2 external(s)
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`COM_ParseExt`, `Q_stricmp`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `CCMShader` | `CCMShader` | struct | mp_engine_qcommon | `crates/mp/engine/qcommon/src/cm/ccmshader.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `SURF_SKY` | `SURF_SKY` | mp_qshared | `crates/mp/qshared/src/shared/surface_flags.rs` |
+
+=====qcommon__0109_CM_ShutdownShaderProperties=====
+# ENGINE PORT PACKET — `CM_ShutdownShaderProperties`
+
+- seq **109**  ·  wave **0**  ·  unit **108**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **8**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_ShutdownShaderProperties(cm: &mut CollisionWorld) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `CM_ShutdownShaderProperties` | `cmShaderTable` | read | `oracle/codemp/qcommon/cm_shader.cpp:30` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_ShutdownShaderProperties` — oracle/codemp/qcommon/cm_shader.cpp:489-496 (8 LOC)
+```c
+  489 | void CM_ShutdownShaderProperties(void)
+  490 | {
+  491 | 	if(cmShaderTable.count())
+  492 | 	{
+  493 | //		Com_Printf("Shutting down cmShaderTable .....\n");
+  494 | 		cmShaderTable.clear();
+  495 | 	}
+  496 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_shader.cpp:30
+   30 | CHash<CCMShader>		cmShaderTable;
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 2 external(s)
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`clear`, `count`
+
+## TYPE ROSETTA — import these, never redeclare
+
+=====qcommon__0110_CM_GetShaderInfo=====
+# ENGINE PORT PACKET — `CM_GetShaderInfo`
+
+- seq **110**  ·  wave **0**  ·  unit **109**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **11**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_GetShaderInfo(cm: &mut CollisionWorld, shaderNum: c_int) -> *mut CCMShader { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `CM_GetShaderInfo` | `cmg` | read | `oracle/codemp/qcommon/cm_local.h:220` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_GetShaderInfo` — oracle/codemp/qcommon/cm_shader.cpp:526-536 (11 LOC)
+```c
+  526 | CCMShader *CM_GetShaderInfo( int shaderNum )
+  527 | {
+  528 | 	CCMShader	*out;
+  529 | 
+  530 | 	if((shaderNum < 0) || (shaderNum >= cmg.numShaders))
+  531 | 	{
+  532 | 		return(NULL);
+  533 | 	}
+  534 | 	out = cmg.shaders + shaderNum;
+  535 | 	return(out);
+  536 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_local.h:220
+  220 | extern	clipMap_t	cmg; //rwwRMG - changed from cm
+```
+
+## RESOLVED CALL SURFACE — 0 in-engine callee(s), 0 external(s)
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `CCMShader` | `CCMShader` | struct | mp_engine_qcommon | `crates/mp/engine/qcommon/src/cm/ccmshader.rs` |
+
+=====qcommon__0902_CM_CreateShaderTextHash=====
+# ENGINE PORT PACKET — `CM_CreateShaderTextHash`
+
+- seq **902**  ·  wave **1**  ·  unit **901**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **23**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_CreateShaderTextHash(cm: &mut CollisionWorld, rmg: &mut RmManager, host: &mut dyn EngineHost) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `CM_CreateShaderTextHash` | `shaderText` | read | `oracle/codemp/qcommon/cm_shader.cpp:28` |
+| `CM_CreateShaderTextHash` | `shaderTextTable` | read | `oracle/codemp/qcommon/cm_shader.cpp:29` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_CreateShaderTextHash` — oracle/codemp/qcommon/cm_shader.cpp:37-59 (23 LOC)
+```c
+   37 | void CM_CreateShaderTextHash(void)
+   38 | {
+   39 | 	const char			*p;
+   40 | 	qboolean			hasNewLines;
+   41 | 	char				*token;
+   42 | 	CCMShaderText		*shader;
+   43 | 
+   44 | 	p = shaderText;
+   45 | 	// look for label
+   46 | 	while (p) 
+   47 | 	{
+   48 | 		p = SkipWhitespace(p, &hasNewLines);
+   49 | 		token = COM_ParseExt( &p, qtrue );
+   50 | 		if ( !token[0] ) 
+   51 | 		{
+   52 | 			break;
+   53 | 		}
+   54 | 		shader = new CCMShaderText(token, p);
+   55 | 		shaderTextTable.insert(shader);
+   56 | 
+   57 | 		SkipBracedSection(&p);
+   58 | 	}
+   59 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_shader.cpp:28
+   28 | char			   		*shaderText = NULL;
+// oracle/codemp/qcommon/cm_shader.cpp:29
+   29 | CHash<CCMShaderText>	shaderTextTable;
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 4 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `CCMShaderText::CCMShaderText` | `rmg`, `host` | §F doc `docs/subsystems/rmg-terrain.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`COM_ParseExt`, `SkipBracedSection`, `SkipWhitespace`, `insert`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `qboolean` | `qboolean` | type | native_types | `crates/native/types/src/lib.rs` |
+
+=====qcommon__0903_CM_GetShaderText=====
+# ENGINE PORT PACKET — `CM_GetShaderText`
+
+- seq **903**  ·  wave **1**  ·  unit **902**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **11**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_GetShaderText(cm: &mut CollisionWorld, rmg: &mut RmManager, host: &mut dyn EngineHost, key: *const c_char) -> *const c_char { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `CM_GetShaderText` | `shaderTextTable` | read | `oracle/codemp/qcommon/cm_shader.cpp:29` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_GetShaderText` — oracle/codemp/qcommon/cm_shader.cpp:158-168 (11 LOC)
+```c
+  158 | const char *CM_GetShaderText(const char *key)
+  159 | {
+  160 | 	CCMShaderText	*st;
+  161 | 
+  162 | 	st = shaderTextTable[key];
+  163 | 	if(st)
+  164 | 	{
+  165 | 		return(st->GetData());
+  166 | 	}
+  167 | 	return(NULL);
+  168 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_shader.cpp:29
+   29 | CHash<CCMShaderText>	shaderTextTable;
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 0 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `CCMShaderText::GetData` | `rmg`, `host` | §F doc `docs/subsystems/rmg-terrain.md` |
+
+## TYPE ROSETTA — import these, never redeclare
+
+=====qcommon__1750_CM_LoadShaderFiles=====
+# ENGINE PORT PACKET — `CM_LoadShaderFiles`
+
+- seq **1750**  ·  wave **6**  ·  unit **1640**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **80**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_LoadShaderFiles(common: &mut Common, cm: &mut CollisionWorld, rm: &mut RenderModels, host: &mut dyn EngineHost) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `CM_LoadShaderFiles` | `shaderText` | write | `oracle/codemp/qcommon/cm_shader.cpp:28` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_LoadShaderFiles` — oracle/codemp/qcommon/cm_shader.cpp:71-150 (80 LOC)
+```c
+   71 | void CM_LoadShaderFiles( void )
+   72 | {
+   73 | 	char	**shaderFiles1;
+   74 | 	int		numShaders1;
+   75 | #ifndef FINAL_BUILD
+   76 | 	char	**shaderFiles2;
+   77 | 	int		numShaders2;
+   78 | #endif
+   79 | 	char	*buffers[MAX_SHADER_FILES];
+   80 | 	int		numShaders;
+   81 | 	int		i;
+   82 | 	int		sum = 0;
+   83 | 
+   84 | 	// scan for shader files
+   85 | 	shaderFiles1 = FS_ListFiles( "shaders", ".shader", &numShaders1 );
+   86 | #ifndef FINAL_BUILD
+   87 | 	shaderFiles2 = FS_ListFiles( "shaders/test", ".shader", &numShaders2 );
+   88 | #endif
+   89 | 
+   90 | 	if ( !shaderFiles1 || !numShaders1 )
+   91 | 	{
+   92 | 		Com_Printf( S_COLOR_YELLOW "WARNING: no shader files found\n" );
+   93 | 		return;
+   94 | 	}
+   95 | 
+   96 | #ifndef FINAL_BUILD
+   97 | 	numShaders = numShaders1 + numShaders2;
+   98 | #else
+   99 | 	numShaders = numShaders1;
+  100 | #endif
+  101 | 	if ( numShaders > MAX_SHADER_FILES ) 
+  102 | 	{
+  103 | 		numShaders = MAX_SHADER_FILES;
+  104 | 	}
+  105 | 
+  106 | 	// load and parse shader files
+  107 | 	for ( i = 0; i < numShaders1; i++ )
+  108 | 	{
+  109 | 		char filename[MAX_QPATH];
+  110 | 
+  111 | 		Com_sprintf( filename, sizeof( filename ), "shaders/%s", shaderFiles1[i] );
+  112 | 		Com_DPrintf( "...loading '%s'\n", filename );
+  113 | 		sum += FS_ReadFile( filename, (void **)&buffers[i] );
+  114 | 		if ( !buffers[i] ) 
+  115 | 		{
+  116 | 			Com_Error( ERR_FATAL, "Couldn't load %s", filename );
+  117 | 		}
+  118 | 	}
+  119 | #ifndef FINAL_BUILD
+  120 | 	for ( ; i < numShaders; i++ )
+  121 | 	{
+  122 | 		char filename[MAX_QPATH];
+  123 | 
+  124 | 		Com_sprintf( filename, sizeof( filename ), "shaders/test/%s", shaderFiles2[i - numShaders1] );
+  125 | 		Com_DPrintf( "...loading '%s'\n", filename );
+  126 | 		sum += FS_ReadFile( filename, (void **)&buffers[i] );
+  127 | 		if ( !buffers[i] ) 
+  128 | 		{
+  129 | 			Com_Error( ERR_DROP, "Couldn't load %s", filename );
+  130 | 		}
+  131 | 	}
+  132 | #endif
+  133 | 
+  134 | 	// build single large buffer
+  135 | 	shaderText = (char *)Z_Malloc( sum + numShaders * 2, TAG_SHADERTEXT, qtrue);
+  136 | 
+  137 | 	// free in reverse order, so the temp files are all dumped
+  138 | 	for ( i = numShaders - 1; i >= 0 ; i-- ) 
+  139 | 	{
+  140 | 		strcat( shaderText, "\n" );
+  141 | 		strcat( shaderText, buffers[i] );
+  142 | 		FS_FreeFile( buffers[i] );
+  143 | 	}
+  144 | 
+  145 | 	// free up memory
+  146 | 	FS_FreeFileList( shaderFiles1 );
+  147 | #ifndef FINAL_BUILD
+  148 | 	FS_FreeFileList( shaderFiles2 );
+  149 | #endif
+  150 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_shader.cpp:28
+   28 | char			   		*shaderText = NULL;
+```
+
+## RESOLVED CALL SURFACE — 8 in-engine callee(s), 2 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Com_DPrintf` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `Com_Error` | `common`, `cm`, `sv`, `rm`, `rmg`, `host` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `Com_Printf` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `FS_FreeFile` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `FS_FreeFileList` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `FS_ListFiles` | `common`, `cm`, `rm`, `host` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `FS_ReadFile` | `common`, `cm`, `rm`, `host` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `Z_Malloc` | `common`, `cm`, `rm`, `host` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`Com_sprintf`, `strcat`
+
+## TYPE ROSETTA — import these, never redeclare
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `ERR_DROP` | `errorParm_t::ERR_DROP` | mp_qshared | `crates/mp/qshared/src/shared/error_parm.rs` |
+| `ERR_FATAL` | `errorParm_t::ERR_FATAL` | mp_qshared | `crates/mp/qshared/src/shared/error_parm.rs` |
+| `MAX_QPATH` | `MAX_QPATH` | native_types | `crates/native/types/src/lib.rs` |
+| `MAX_SHADER_FILES` | `MAX_SHADER_FILES` | mp_engine_qcommon | `crates/mp/engine/qcommon/src/cm/cm_shader_consts.rs` |
+| `S_COLOR_YELLOW` | `S_COLOR_YELLOW` | mp_engine_icarus | `crates/mp/engine/icarus/src/q3_interface/mod.rs` |
+| `TAG_SHADERTEXT` | `memtag_t::TAG_SHADERTEXT` | mp_qshared | `crates/mp/qshared/src/common/mp/qcommon/tags.rs` |
+
+**UNRESOLVED CONSTS (escalation, not a guess — surfaced for the referee; may be an enum variant / flag / macro pending its rosetta row):** `FINAL_BUILD`, `WARNING`
+
+=====qcommon__1751_CM_FreeShaderText=====
+# ENGINE PORT PACKET — `CM_FreeShaderText`
+
+- seq **1751**  ·  wave **6**  ·  unit **1641**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **9**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_FreeShaderText(common: &mut Common, cm: &mut CollisionWorld) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `CM_FreeShaderText` | `shaderText` | write | `oracle/codemp/qcommon/cm_shader.cpp:28` |
+| `CM_FreeShaderText` | `shaderTextTable` | read | `oracle/codemp/qcommon/cm_shader.cpp:29` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_FreeShaderText` — oracle/codemp/qcommon/cm_shader.cpp:176-184 (9 LOC)
+```c
+  176 | void CM_FreeShaderText(void)
+  177 | {
+  178 | 	shaderTextTable.clear();
+  179 | 	if(shaderText)
+  180 | 	{
+  181 | 		Z_Free(shaderText);
+  182 | 		shaderText = NULL;
+  183 | 	}
+  184 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_shader.cpp:28
+   28 | char			   		*shaderText = NULL;
+// oracle/codemp/qcommon/cm_shader.cpp:29
+   29 | CHash<CCMShaderText>	shaderTextTable;
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Z_Free` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`clear`
+
+## TYPE ROSETTA — import these, never redeclare
+
+=====qcommon__1752_SV_ParseMaterial=====
+# ENGINE PORT PACKET — `SV_ParseMaterial`
+
+- seq **1752**  ·  wave **6**  ·  unit **1642**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **20**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn SV_ParseMaterial(common: &mut Common, cm: &mut CollisionWorld, shader: *mut CCMShader, text: *mut *const c_char) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `SV_ParseMaterial` | `svMaterialNames` | read | `oracle/codemp/qcommon/cm_shader.cpp:285-288` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `SV_ParseMaterial` — oracle/codemp/qcommon/cm_shader.cpp:290-309 (20 LOC)
+```c
+  290 | void SV_ParseMaterial( CCMShader *shader, const char **text ) 
+  291 | {
+  292 | 	char	*token;
+  293 | 	int		i;
+  294 | 
+  295 | 	token = COM_ParseExt( text, qfalse );
+  296 | 	if ( !token[0] ) 
+  297 | 	{
+  298 | 		Com_Printf( S_COLOR_YELLOW "WARNING: missing material in shader '%s'\n", shader->shader );
+  299 | 		return;
+  300 | 	}
+  301 | 	for(i = 0; i < MATERIAL_LAST; i++)
+  302 | 	{
+  303 | 		if ( !Q_stricmp( token, svMaterialNames[i] ) ) 
+  304 | 		{
+  305 | 			shader->surfaceFlags |= i;
+  306 | 			break;
+  307 | 		}
+  308 | 	}
+  309 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_shader.cpp:285-288
+  285 | const char *svMaterialNames[MATERIAL_LAST] =
+  286 | {
+  287 | 	MATERIALS
+  288 | };
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 2 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Com_Printf` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`COM_ParseExt`, `Q_stricmp`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `CCMShader` | `CCMShader` | struct | mp_engine_qcommon | `crates/mp/engine/qcommon/src/cm/ccmshader.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `MATERIAL_LAST` | `MATERIAL_LAST` | mp_qshared | `crates/mp/qshared/src/shared/surface_flags.rs` |
+| `S_COLOR_YELLOW` | `S_COLOR_YELLOW` | mp_engine_icarus | `crates/mp/engine/icarus/src/q3_interface/mod.rs` |
+
+**UNRESOLVED CONSTS (escalation, not a guess — surfaced for the referee; may be an enum variant / flag / macro pending its rosetta row):** `MATERIALS`, `WARNING`
+
+=====qcommon__1753_CM_ParseVector=====
+# ENGINE PORT PACKET — `CM_ParseVector`
+
+- seq **1753**  ·  wave **6**  ·  unit **1643**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **32**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_ParseVector(common: &mut Common, shader: *mut CCMShader, text: *mut *const c_char, count: c_int, v: *mut f32) -> qboolean { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_ParseVector` — oracle/codemp/qcommon/cm_shader.cpp:316-347 (32 LOC)
+```c
+  316 | static qboolean CM_ParseVector( CCMShader *shader, const char **text, int count, float *v ) 
+  317 | {
+  318 | 	char	*token;
+  319 | 	int		i;
+  320 | 
+  321 | 	// FIXME: spaces are currently required after parens, should change parseext...
+  322 | 	token = COM_ParseExt( text, qfalse );
+  323 | 	if ( strcmp( token, "(" ) ) 
+  324 | 	{
+  325 | 		Com_Printf( S_COLOR_YELLOW "WARNING: missing parenthesis in shader '%s'\n", shader->shader );
+  326 | 		return qfalse;
+  327 | 	}
+  328 | 
+  329 | 	for ( i = 0 ; i < count ; i++ ) 
+  330 | 	{
+  331 | 		token = COM_ParseExt( text, qfalse );
+  332 | 		if ( !token[0] ) 
+  333 | 		{
+  334 | 			Com_Printf( S_COLOR_YELLOW "WARNING: missing vector element in shader '%s'\n", shader->shader );
+  335 | 			return qfalse;
+  336 | 		}
+  337 | 		v[i] = atof( token );
+  338 | 	}
+  339 | 
+  340 | 	token = COM_ParseExt( text, qfalse );
+  341 | 	if ( strcmp( token, ")" ) ) 
+  342 | 	{
+  343 | 		Com_Printf( S_COLOR_YELLOW "WARNING: missing parenthesis in shader '%s'\n", shader->shader );
+  344 | 		return qfalse;
+  345 | 	}
+  346 | 	return qtrue;
+  347 | }
+```
+
+## RESOLVED CALL SURFACE — 1 in-engine callee(s), 3 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `Com_Printf` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`COM_ParseExt`, `atof`, `strcmp`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `CCMShader` | `CCMShader` | struct | mp_engine_qcommon | `crates/mp/engine/qcommon/src/cm/ccmshader.rs` |
+| `qboolean` | `qboolean` | type | native_types | `crates/native/types/src/lib.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `S_COLOR_YELLOW` | `S_COLOR_YELLOW` | mp_engine_icarus | `crates/mp/engine/icarus/src/q3_interface/mod.rs` |
+
+**UNRESOLVED CONSTS (escalation, not a guess — surfaced for the referee; may be an enum variant / flag / macro pending its rosetta row):** `FIXME`, `WARNING`
+
+=====qcommon__1996_CM_LoadShaderText=====
+# ENGINE PORT PACKET — `CM_LoadShaderText`
+
+- seq **1996**  ·  wave **7**  ·  unit **1884**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **16**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_LoadShaderText(common: &mut Common, cm: &mut CollisionWorld, rm: &mut RenderModels, rmg: &mut RmManager, host: &mut dyn EngineHost, forceReload: qboolean) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `CM_LoadShaderText` | `shaderText` | read | `oracle/codemp/qcommon/cm_shader.cpp:28` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_LoadShaderText` — oracle/codemp/qcommon/cm_shader.cpp:195-210 (16 LOC)
+```c
+  195 | void CM_LoadShaderText(qboolean forceReload)
+  196 | {
+  197 | 	if(forceReload)
+  198 | 	{
+  199 | 		CM_FreeShaderText();
+  200 | 	}
+  201 | 	if(shaderText)
+  202 | 	{
+  203 | 		return;
+  204 | 	}
+  205 | //	Com_Printf("Loading shader text .....\n");
+  206 | 	CM_LoadShaderFiles();
+  207 | 	CM_CreateShaderTextHash();
+  208 | 
+  209 | 	//Com_Printf("..... %d shader definitions loaded\n", shaderTextTable.count());
+  210 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_shader.cpp:28
+   28 | char			   		*shaderText = NULL;
+```
+
+## RESOLVED CALL SURFACE — 3 in-engine callee(s), 0 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `CM_CreateShaderTextHash` | `cm`, `rmg`, `host` | packet `qcommon__0902_CM_CreateShaderTextHash.md` |
+| `CM_FreeShaderText` | `common`, `cm` | packet `qcommon__1751_CM_FreeShaderText.md` |
+| `CM_LoadShaderFiles` | `common`, `cm`, `rm`, `host` | packet `qcommon__1750_CM_LoadShaderFiles.md` |
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `qboolean` | `qboolean` | type | native_types | `crates/native/types/src/lib.rs` |
+
+=====qcommon__1997_CM_ParseShader=====
+# ENGINE PORT PACKET — `CM_ParseShader`
+
+- seq **1997**  ·  wave **7**  ·  unit **1885**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **94**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_ParseShader(common: &mut Common, cm: &mut CollisionWorld, shader: *mut CCMShader, text: *mut *const c_char) { /* PORT-NOTE if needed; port here */ }
+```
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_ParseShader` — oracle/codemp/qcommon/cm_shader.cpp:361-454 (94 LOC)
+```c
+  361 | static void CM_ParseShader( CCMShader *shader, const char **text )
+  362 | {
+  363 | 	char	*token;
+  364 | 
+  365 | 	token = COM_ParseExt( text, qtrue );
+  366 | 	if ( token[0] != '{' )
+  367 | 	{
+  368 | 		Com_Printf( S_COLOR_YELLOW "WARNING: expecting '{', found '%s' instead in shader '%s'\n", token, shader->shader );
+  369 | 		return;
+  370 | 	}
+  371 | 
+  372 | 	while ( true )
+  373 | 	{
+  374 | 		token = COM_ParseExt( text, qtrue );
+  375 | 		if ( !token[0] )
+  376 | 		{
+  377 | 			Com_Printf( S_COLOR_YELLOW "WARNING: no concluding '}' in shader %s\n", shader->shader );
+  378 | 			return;
+  379 | 		}
+  380 | 
+  381 | 		// end of shader definition
+  382 | 		if ( token[0] == '}' )
+  383 | 		{
+  384 | 			break;
+  385 | 		}
+  386 | 		// stage definition
+  387 | 		else if ( token[0] == '{' )
+  388 | 		{
+  389 | 			SkipBracedSection( text );
+  390 | 			continue;
+  391 | 		}
+  392 | 		// material deprecated as of 11 Jan 01
+  393 | 		// material undeprecated as of 7 May 01 - q3map_material deprecated
+  394 | 		else if ( !Q_stricmp( token, "material" ) || !Q_stricmp( token, "q3map_material" ) )
+  395 | 		{
+  396 | 			SV_ParseMaterial( shader, text );
+  397 | 		}
+  398 | 		// sun parms
+  399 | 		// q3map_sun deprecated as of 11 Jan 01
+  400 | 		else if ( !Q_stricmp( token, "sun" ) || !Q_stricmp( token, "q3map_sun" ) ) 
+  401 | 		{
+  402 | //			float	a, b;
+  403 | 
+  404 | 			token = COM_ParseExt( text, qfalse );
+  405 | //			shader->sunLight[0] = atof( token );
+  406 | 			token = COM_ParseExt( text, qfalse );
+  407 | //			shader->sunLight[1] = atof( token );
+  408 | 			token = COM_ParseExt( text, qfalse );
+  409 | //			shader->sunLight[2] = atof( token );
+  410 | 			
+  411 | //			VectorNormalize( shader->sunLight );
+  412 | 
+  413 | 			token = COM_ParseExt( text, qfalse );
+  414 | //			a = atof( token );
+  415 | //			VectorScale( shader->sunLight, a, shader->sunLight);
+  416 | 
+  417 | 			token = COM_ParseExt( text, qfalse );
+  418 | //			a = DEG2RAD(atof( token ));
+  419 | 
+  420 | 			token = COM_ParseExt( text, qfalse );
+  421 | //			b = DEG2RAD(atof( token ));
+  422 | 
+  423 | //			shader->sunDirection[0] = cos( a ) * cos( b );
+  424 | //			shader->sunDirection[1] = sin( a ) * cos( b );
+  425 | //			shader->sunDirection[2] = sin( b );
+  426 | 		}
+  427 | 		else if ( !Q_stricmp( token, "surfaceParm" ) ) 
+  428 | 		{
+  429 | 			SV_ParseSurfaceParm( shader, text );
+  430 | 			continue;
+  431 | 		}
+  432 | 		else if ( !Q_stricmp( token, "fogParms" ) ) 
+  433 | 		{
+  434 | 			vec3_t				fogColor;
+  435 | 			if ( !CM_ParseVector( shader, text, 3, fogColor ) ) 
+  436 | 			{
+  437 | 				return;
+  438 | 			}
+  439 | 
+  440 | 			token = COM_ParseExt( text, qfalse );
+  441 | 			if ( !token[0] ) 
+  442 | 			{
+  443 | 				Com_Printf( S_COLOR_YELLOW "WARNING: missing parm for 'fogParms' keyword in shader '%s'\n", shader->shader );
+  444 | 				continue;
+  445 | 			}
+  446 | //			shader->depthForOpaque = atof( token );
+  447 | 
+  448 | 			// skip any old gradient directions
+  449 | 			SkipRestOfLine( (const char **)text );
+  450 | 			continue;
+  451 | 		}
+  452 | 	}
+  453 | 	return;
+  454 | }
+```
+
+## RESOLVED CALL SURFACE — 4 in-engine callee(s), 4 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `CM_ParseVector` | `common` | packet `qcommon__1753_CM_ParseVector.md` |
+| `Com_Printf` | `common` | packet `qcommon__1592_CM_DeleteCachedMap.md` |
+| `SV_ParseMaterial` | `common`, `cm` | packet `qcommon__1752_SV_ParseMaterial.md` |
+| `SV_ParseSurfaceParm` | `cm` | packet `qcommon__0108_SV_ParseSurfaceParm.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`COM_ParseExt`, `Q_stricmp`, `SkipBracedSection`, `SkipRestOfLine`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `CCMShader` | `CCMShader` | struct | mp_engine_qcommon | `crates/mp/engine/qcommon/src/cm/ccmshader.rs` |
+| `vec3_t` | `vec3_t` | type | native_math | `crates/native/math/src/vector.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `S_COLOR_YELLOW` | `S_COLOR_YELLOW` | mp_engine_icarus | `crates/mp/engine/icarus/src/q3_interface/mod.rs` |
+
+**UNRESOLVED CONSTS (escalation, not a guess — surfaced for the referee; may be an enum variant / flag / macro pending its rosetta row):** `WARNING`
+
+**Function-like macros (reported, NOT consts — `NAME(...)` in the source; port the macro's expansion, not a const):** `DEG2RAD`
+
+=====qcommon__2129_CM_SetupShaderProperties=====
+# ENGINE PORT PACKET — `CM_SetupShaderProperties`
+
+- seq **2129**  ·  wave **8**  ·  unit **2016**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **22**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_SetupShaderProperties(common: &mut Common, cm: &mut CollisionWorld, rmg: &mut RmManager, host: &mut dyn EngineHost) { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `CM_SetupShaderProperties` | `cmShaderTable` | read | `oracle/codemp/qcommon/cm_shader.cpp:30` |
+| `CM_SetupShaderProperties` | `cmg` | read | `oracle/codemp/qcommon/cm_local.h:220` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_SetupShaderProperties` — oracle/codemp/qcommon/cm_shader.cpp:466-487 (22 LOC)
+```c
+  466 | void CM_SetupShaderProperties(void)
+  467 | {
+  468 | 	int			i;
+  469 | 	const char	*def;
+  470 | 	CCMShader	*shader;
+  471 | 
+  472 | 	// Add all basic shaders to the cmShaderTable
+  473 | 	for(i = 0; i < cmg.numShaders; i++)
+  474 | 	{
+  475 | 		cmShaderTable.insert(CM_GetShaderInfo(i));
+  476 | 	}
+  477 | 	// Go through and parse evaluate shader names to shadernums
+  478 | 	for(i = 0; i < cmg.numShaders; i++)
+  479 | 	{
+  480 | 		shader = CM_GetShaderInfo(i);
+  481 | 		def = CM_GetShaderText(shader->shader);
+  482 | 		if(def)
+  483 | 		{
+  484 | 			CM_ParseShader(shader, &def);
+  485 | 		}
+  486 | 	}
+  487 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_local.h:220
+  220 | extern	clipMap_t	cmg; //rwwRMG - changed from cm
+// oracle/codemp/qcommon/cm_shader.cpp:30
+   30 | CHash<CCMShader>		cmShaderTable;
+```
+
+## RESOLVED CALL SURFACE — 3 in-engine callee(s), 1 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `CM_GetShaderInfo` | `cm` | packet `qcommon__0110_CM_GetShaderInfo.md` |
+| `CM_GetShaderText` | `cm`, `rmg`, `host` | packet `qcommon__0903_CM_GetShaderText.md` |
+| `CM_ParseShader` | `common`, `cm` | packet `qcommon__1997_CM_ParseShader.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`insert`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `CCMShader` | `CCMShader` | struct | mp_engine_qcommon | `crates/mp/engine/qcommon/src/cm/ccmshader.rs` |
+
+=====qcommon__2130_CM_GetShaderInfo=====
+# ENGINE PORT PACKET — `CM_GetShaderInfo`
+
+- seq **2130**  ·  wave **8**  ·  unit **2017**  ·  subsystem **qcommon**  ·  file `cm_shader.cpp`  ·  oracle LOC **27**
+- DESTINATION: `crates/mp/engine/qcommon/src/cm_shader.rs`
+- track: **C** (mechanical resolved signature). Read `_PREAMBLE.md` first — it holds the §C contract, the three-kind static rule, the state-receiver order, the rand/const rules, the no-stub discipline, and doc routing.
+
+## RESOLVED SIGNATURES (§C mechanical + threaded state receivers)
+
+Leading `&mut` params are the threaded state receivers (ruling 2/3, pinned order); transcribe the body into what follows them:
+
+```rust
+pub fn CM_GetShaderInfo(common: &mut Common, cm: &mut CollisionWorld, rm: &mut RenderModels, rmg: &mut RmManager, host: &mut dyn EngineHost, name: *const c_char) -> *mut CCMShader { /* PORT-NOTE if needed; port here */ }
+```
+
+## STATE THREADED (globals ruling 2 · statics ruling 3)
+
+File-scope globals this unit touches → `Engine` sub-struct fields (ruling 2), grouped by owning file; no `static mut`:
+
+| fn | global | access | decl |
+| --- | --- | --- | --- |
+| `CM_GetShaderInfo` | `cmShaderTable` | read | `oracle/codemp/qcommon/cm_shader.cpp:30` |
+
+## ORACLE SOURCE (verbatim — transcribe these bodies)
+
+### `CM_GetShaderInfo` — oracle/codemp/qcommon/cm_shader.cpp:498-524 (27 LOC)
+```c
+  498 | CCMShader *CM_GetShaderInfo( const char *name )
+  499 | {
+  500 | 	CCMShader	*out;
+  501 | 	const char	*def;
+  502 | 
+  503 | 	out = cmShaderTable[name];
+  504 | 	if(out)
+  505 | 	{
+  506 | 		return(out);
+  507 | 	}
+  508 | 
+  509 | 	// Create a new CCMShader class
+  510 | 	out = (CCMShader *)Hunk_Alloc( sizeof( CCMShader ), h_high );
+  511 | 	// Set defaults
+  512 | 	Q_strncpyz(out->shader, name, MAX_QPATH);
+  513 | 	out->contentFlags = CONTENTS_SOLID | CONTENTS_OPAQUE;
+  514 | 
+  515 | 	// Parse in any text if it exists
+  516 | 	def = CM_GetShaderText(name);
+  517 | 	if(def)
+  518 | 	{
+  519 | 		CM_ParseShader(out, &def);
+  520 | 	}
+  521 | 
+  522 | 	cmShaderTable.insert(out);
+  523 | 	return(out);
+  524 | }
+```
+
+### File-scope global declarations (state to thread)
+```c
+// oracle/codemp/qcommon/cm_shader.cpp:30
+   30 | CHash<CCMShader>		cmShaderTable;
+```
+
+## RESOLVED CALL SURFACE — 3 in-engine callee(s), 2 external(s)
+
+Each in-engine callee is ALREADY PORTED at this point in the order (stub-free) — call it, PASSING YOUR MATCHING RECEIVER PARAMS THROUGH (its receivers are a subset of yours). §F callees additionally take `host`; GP2 callees take none:
+
+| callee | receivers to pass | resolution |
+| --- | --- | --- |
+| `CM_GetShaderText` | `cm`, `rmg`, `host` | packet `qcommon__0903_CM_GetShaderText.md` |
+| `CM_ParseShader` | `common`, `cm` | packet `qcommon__1997_CM_ParseShader.md` |
+| `Hunk_Alloc` | `common`, `cm`, `rm`, `host` | packet `qcommon__1831_Hunk_Alloc.md` |
+
+**Externals** (supplied by Rust std/libc or the already-ported qshared `q_shared`/`q_math` surface — do NOT port here, call through the existing crate):
+
+`Q_strncpyz`, `insert`
+
+## TYPE ROSETTA — import these, never redeclare
+
+| Raven type | Rust | kind | crate | path |
+| --- | --- | --- | --- | --- |
+| `CCMShader` | `CCMShader` | struct | mp_engine_qcommon | `crates/mp/engine/qcommon/src/cm/ccmshader.rs` |
+
+## CONSTS — import these, never redefine (exact array sizes)
+
+| const | Rust | crate | path |
+| --- | --- | --- | --- |
+| `CONTENTS_OPAQUE` | `CONTENTS_OPAQUE` | mp_qshared | `crates/mp/qshared/src/shared/surface_flags.rs` |
+| `CONTENTS_SOLID` | `CONTENTS_SOLID` | mp_qshared | `crates/mp/qshared/src/shared/surface_flags.rs` |
+| `MAX_QPATH` | `MAX_QPATH` | native_types | `crates/native/types/src/lib.rs` |
+

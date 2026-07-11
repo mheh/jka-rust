@@ -7,10 +7,10 @@ use mp_qshared::shared::{sfxHandle_t, vec3_t};
 /// Type definition source: `oracle/codemp/cgame/cg_local.h:324-329`
 #[repr(C)]
 pub struct cgLoopSound_t {
-	pub entityNum: i32,
-	pub origin: vec3_t,
-	pub velocity: vec3_t,
-	pub sfx: sfxHandle_t,
+    pub entityNum: i32,
+    pub origin: vec3_t,
+    pub velocity: vec3_t,
+    pub sfx: sfxHandle_t,
 }
 
 const _: () = assert!(core::mem::size_of::<cgLoopSound_t>() == 32);

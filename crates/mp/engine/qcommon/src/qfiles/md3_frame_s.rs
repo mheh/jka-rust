@@ -9,10 +9,10 @@ use mp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:107-112`
 #[repr(C)]
 pub struct md3Frame_t {
-	pub bounds: [vec3_t; 2],
-	pub localOrigin: vec3_t,
-	pub radius: f32,
-	pub name: [c_char; 16],
+    pub bounds: [vec3_t; 2],
+    pub localOrigin: vec3_t,
+    pub radius: f32,
+    pub name: [c_char; 16],
 }
 
 pub type md3Frame_s = md3Frame_t;

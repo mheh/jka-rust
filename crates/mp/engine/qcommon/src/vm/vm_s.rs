@@ -9,42 +9,41 @@ use mp_qshared::shared::{qboolean, MAX_QPATH};
 /// Type definition source: `oracle/codemp/qcommon/vm_local.h:111-146`
 #[repr(C)]
 pub struct vm_t {
-	// the vm may be recursively entered
-	pub programStack: i32,
-	pub systemCall: Option<extern "C" fn(parms: *mut i32) -> i32>,
+    // the vm may be recursively entered
+    pub programStack: i32,
+    pub systemCall: Option<extern "C" fn(parms: *mut i32) -> i32>,
 
-	//------------------------------------
+    //------------------------------------
+    pub name: [core::ffi::c_char; MAX_QPATH as usize],
 
-	pub name: [core::ffi::c_char; MAX_QPATH as usize],
+    // for dynamic linked modules
+    pub dllHandle: *mut core::ffi::c_void,
+    pub entryPoint: Option<unsafe extern "C" fn(callNum: i32, ...) -> i32>,
 
-	// for dynamic linked modules
-	pub dllHandle: *mut core::ffi::c_void,
-	pub entryPoint: Option<unsafe extern "C" fn(callNum: i32, ...) -> i32>,
+    // for interpreted modules
+    pub currentlyInterpreting: qboolean,
 
-	// for interpreted modules
-	pub currentlyInterpreting: qboolean,
+    pub compiled: qboolean,
+    pub codeBase: *mut u8,
+    pub codeLength: i32,
 
-	pub compiled: qboolean,
-	pub codeBase: *mut u8,
-	pub codeLength: i32,
+    pub instructionPointers: *mut i32,
+    pub instructionPointersLength: i32,
 
-	pub instructionPointers: *mut i32,
-	pub instructionPointersLength: i32,
+    pub dataBase: *mut u8,
+    pub dataMask: i32,
 
-	pub dataBase: *mut u8,
-	pub dataMask: i32,
+    // if programStack < stackBottom, error
+    pub stackBottom: i32,
 
-	// if programStack < stackBottom, error
-	pub stackBottom: i32,
+    pub numSymbols: i32,
+    pub symbols: *mut super::vm_symbol_s::vmSymbol_t,
 
-	pub numSymbols: i32,
-	pub symbols: *mut super::vm_symbol_s::vmSymbol_t,
-
-	// for debug indenting
-	pub callLevel: i32,
-	// increment breakCount on function entry to this
-	pub breakFunction: i32,
-	pub breakCount: i32,
+    // for debug indenting
+    pub callLevel: i32,
+    // increment breakCount on function entry to this
+    pub breakFunction: i32,
+    pub breakCount: i32,
 }
 
 /// Raven C tag `vm_s` for the same type.

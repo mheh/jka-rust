@@ -103,8 +103,6 @@ const TURN_OFF: c_int = 0x0000_0100;
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-
-
 // `PITCH`/`YAW`/`ROLL` resolve via the crate prelude glob (`crate::q_math`);
 // the shadowing local copies were removed by the placeholder-const sweep.
 
@@ -933,16 +931,15 @@ pub fn Initialize(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
             let iFlags = SETANIM_FLAG_NORMAL;
             let iBlend = 300;
             (*pVeh).m_ulFlags |= (VEH_GEARSOPEN as u64); // MP
-            // MP `_JK2MP` path:
-            //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
-            //              bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
-            //              SETANIM_BOTH, BOTH_VS_IDLE, iFlags, iBlend)
-            // `BG_SetAnim` is a `PmoveContext<'_>` method (bgAllAnims off BgState +
-            // receiver); build a pm-null per-call context from `ctx`, matching the
-            // `Vehicle_SetAnim` precedent above.
+                                                         // MP `_JK2MP` path:
+                                                         //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
+                                                         //              bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
+                                                         //              SETANIM_BOTH, BOTH_VS_IDLE, iFlags, iBlend)
+                                                         // `BG_SetAnim` is a `PmoveContext<'_>` method (bgAllAnims off BgState +
+                                                         // receiver); build a pm-null per-call context from `ctx`, matching the
+                                                         // `Vehicle_SetAnim` precedent above.
             let ps = &mut (*pc).ps as *mut playerState_t;
-            let anims =
-                (*ctx.world).bg_state.bgAllAnims[(*parent).localAnimIndex as usize].anims;
+            let anims = (*ctx.world).bg_state.bgAllAnims[(*parent).localAnimIndex as usize].anims;
             let traps = GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
                 world: ctx.world,
@@ -953,7 +950,14 @@ pub fn Initialize(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
                 &traps,
                 &mut callbacks,
             );
-            pmc.BG_SetAnim(ps, anims, SETANIM_BOTH, BOTH_VS_IDLE as c_int, iFlags, iBlend);
+            pmc.BG_SetAnim(
+                ps,
+                anims,
+                SETANIM_BOTH,
+                BOTH_VS_IDLE as c_int,
+                iFlags,
+                iBlend,
+            );
         }
 
         qtrue

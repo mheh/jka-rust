@@ -12,16 +12,16 @@ const MAX_PLAYERMODELS: usize = 32;
 /// Type definition source: `oracle/code/ui/ui_local.h:103-117`
 #[repr(C)]
 pub struct playerSpeciesInfo_t {
-	pub Name: [c_char; 64],
-	pub SkinHeadCount: i32,
-	pub SkinHeadNames: [[c_char; 16]; MAX_PLAYERMODELS],
-	pub SkinTorsoCount: i32,
-	pub SkinTorsoNames: [[c_char; 16]; MAX_PLAYERMODELS],
-	pub SkinLegCount: i32,
-	pub SkinLegNames: [[c_char; 16]; MAX_PLAYERMODELS],
-	pub ColorShader: [[c_char; 64]; MAX_PLAYERMODELS],
-	pub ColorCount: i32,
-	pub ColorActionText: [[c_char; 128]; MAX_PLAYERMODELS],
+    pub Name: [c_char; 64],
+    pub SkinHeadCount: i32,
+    pub SkinHeadNames: [[c_char; 16]; MAX_PLAYERMODELS],
+    pub SkinTorsoCount: i32,
+    pub SkinTorsoNames: [[c_char; 16]; MAX_PLAYERMODELS],
+    pub SkinLegCount: i32,
+    pub SkinLegNames: [[c_char; 16]; MAX_PLAYERMODELS],
+    pub ColorShader: [[c_char; 64]; MAX_PLAYERMODELS],
+    pub ColorCount: i32,
+    pub ColorActionText: [[c_char; 128]; MAX_PLAYERMODELS],
 }
 
 const _: () = assert!(core::mem::size_of::<playerSpeciesInfo_t>() == 7760);

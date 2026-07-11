@@ -15,23 +15,23 @@ pub const MAX_SET_NAME_LENGTH: usize = 64;
 /// Type definition source: `oracle/codemp/client/snd_ambient.h:60-73`
 #[repr(C)]
 pub struct ambientSet_t {
-	pub name: [u8; MAX_SET_NAME_LENGTH],
-	pub loopedVolume: u8,
-	pub time_start: u32,
-	pub time_end: u32,
-	pub volRange_start: u32,
-	pub volRange_end: u32,
-	pub numSubWaves: u8,
-	pub subWaves: [i32; MAX_WAVES_PER_GROUP as usize],
-	pub loopedWave: i32,
-	// NOTENOTE: -1 is global
-	pub radius: i32,
-	// Used for fading ambient sets (not a byte to prevent wrapping)
-	pub masterVolume: i32,
-	// Used for easier referencing of sets
-	pub id: i32,
-	// When the fade was started on this set
-	pub fadeTime: i32,
+    pub name: [u8; MAX_SET_NAME_LENGTH],
+    pub loopedVolume: u8,
+    pub time_start: u32,
+    pub time_end: u32,
+    pub volRange_start: u32,
+    pub volRange_end: u32,
+    pub numSubWaves: u8,
+    pub subWaves: [i32; MAX_WAVES_PER_GROUP as usize],
+    pub loopedWave: i32,
+    // NOTENOTE: -1 is global
+    pub radius: i32,
+    // Used for fading ambient sets (not a byte to prevent wrapping)
+    pub masterVolume: i32,
+    // Used for easier referencing of sets
+    pub id: i32,
+    // When the fade was started on this set
+    pub fadeTime: i32,
 }
 
 /// Manifest name `ambientSet_s` for the Raven typedef `ambientSet_t`.

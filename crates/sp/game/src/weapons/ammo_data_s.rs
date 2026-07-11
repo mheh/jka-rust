@@ -7,8 +7,8 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/code/game/weapons.h:142-146`
 #[repr(C)]
 pub struct ammoData_t {
-	pub icon: [c_char; 32], // Name of ammo icon file
-	pub max: i32,           // Max amount player can hold of ammo
+    pub icon: [c_char; 32], // Name of ammo icon file
+    pub max: i32,           // Max amount player can hold of ammo
 }
 
 const _: () = assert!(core::mem::size_of::<ammoData_t>() == 36);

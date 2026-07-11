@@ -7,8 +7,8 @@ use core::ffi::c_char;
 /// Type definition source: `oracle/codemp/ui/ui_local.h:654-657`
 #[repr(C)]
 pub struct pinglist_t {
-	pub adrstr: [c_char; 64],
-	pub start: i32,
+    pub adrstr: [c_char; 64],
+    pub start: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<pinglist_t>() == 68);

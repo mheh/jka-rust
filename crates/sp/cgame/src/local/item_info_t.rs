@@ -7,9 +7,9 @@ use sp_qshared::shared::{qboolean, qhandle_t};
 /// Type definition source: `oracle/code/cgame/cg_local.h:256-260`
 #[repr(C)]
 pub struct itemInfo_t {
-	pub registered: qboolean,
-	pub models: qhandle_t,
-	pub icon: qhandle_t,
+    pub registered: qboolean,
+    pub models: qhandle_t,
+    pub icon: qhandle_t,
 }
 
 const _: () = assert!(core::mem::size_of::<itemInfo_t>() == 12);

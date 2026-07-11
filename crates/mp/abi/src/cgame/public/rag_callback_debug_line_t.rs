@@ -7,11 +7,11 @@ use mp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/codemp/cgame/cg_public.h:550-557`
 #[repr(C)]
 pub struct ragCallbackDebugLine_t {
-	pub start: vec3_t,
-	pub end: vec3_t,
-	pub time: i32,
-	pub color: i32,
-	pub radius: i32,
+    pub start: vec3_t,
+    pub end: vec3_t,
+    pub time: i32,
+    pub color: i32,
+    pub radius: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<ragCallbackDebugLine_t>() == 36);

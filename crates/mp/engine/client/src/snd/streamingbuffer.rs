@@ -5,9 +5,9 @@
 /// Type definition source: `oracle/codemp/client/snd_local.h:80-85`
 #[repr(C)]
 pub struct STREAMINGBUFFER {
-	pub BufferID: u32, // ALuint
-	pub Status: u32,   // ALuint
-	pub Data: *mut i8,
+    pub BufferID: u32, // ALuint
+    pub Status: u32,   // ALuint
+    pub Data: *mut i8,
 }
 
 #[cfg(target_pointer_width = "64")]

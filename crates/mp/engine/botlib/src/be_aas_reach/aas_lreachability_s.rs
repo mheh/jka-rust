@@ -7,14 +7,14 @@ use mp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/codemp/botlib/be_aas_reach.cpp:70-81`
 #[repr(C)]
 pub struct aas_lreachability_t {
-	pub areanum: i32,
-	pub facenum: i32,
-	pub edgenum: i32,
-	pub start: vec3_t,
-	pub end: vec3_t,
-	pub traveltype: i32,
-	pub traveltime: u16,
-	pub next: *mut aas_lreachability_t,
+    pub areanum: i32,
+    pub facenum: i32,
+    pub edgenum: i32,
+    pub start: vec3_t,
+    pub end: vec3_t,
+    pub traveltype: i32,
+    pub traveltime: u16,
+    pub next: *mut aas_lreachability_t,
 }
 
 pub type aas_lreachability_s = aas_lreachability_t;

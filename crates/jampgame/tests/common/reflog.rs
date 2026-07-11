@@ -171,9 +171,12 @@ pub fn parse(text: &str) -> Scenario {
                 userinfos.insert(num, rest);
             }
             "cmd" => {
-                let nums: Vec<i32> = it.map(|t| t.parse().unwrap_or_else(|_| panic!(
-                    "bad cmd field {t:?} at line {ln}"
-                ))).collect();
+                let nums: Vec<i32> = it
+                    .map(|t| {
+                        t.parse()
+                            .unwrap_or_else(|_| panic!("bad cmd field {t:?} at line {ln}"))
+                    })
+                    .collect();
                 assert_eq!(nums.len(), 11, "cmd needs 11 fields at line {ln}");
                 let frame = nums[0];
                 let client = nums[1];

@@ -49,8 +49,21 @@ impl CEngine {
             core::mem::transmute(self.syscall);
         f(
             import as isize,
-            w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8], w[9], w[10], w[11], w[12],
-            w[13], w[14],
+            w[0],
+            w[1],
+            w[2],
+            w[3],
+            w[4],
+            w[5],
+            w[6],
+            w[7],
+            w[8],
+            w[9],
+            w[10],
+            w[11],
+            w[12],
+            w[13],
+            w[14],
         )
     }
 }

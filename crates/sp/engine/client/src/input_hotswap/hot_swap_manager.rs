@@ -7,20 +7,20 @@
 /// Type definition source: `oracle/code/client/cl_input_hotswap.h:13-56`
 #[repr(C)]
 pub struct HotSwapManager {
-	/// Is the button down?
-	down: bool,
-	/// Don't execute the button's bind.
-	noExec: bool,
-	/// Don't bind the button.
-	noBind: bool,
-	/// Is a force power currently bound?
-	forceBound: bool,
-	/// How long the button has been held down.
-	downTime: i32,
-	/// How long the button has been down with the selection up.
-	bindTime: i32,
-	/// Unique ID for this button.
-	uniqueID: i32,
+    /// Is the button down?
+    down: bool,
+    /// Don't execute the button's bind.
+    noExec: bool,
+    /// Don't bind the button.
+    noBind: bool,
+    /// Is a force power currently bound?
+    forceBound: bool,
+    /// How long the button has been held down.
+    downTime: i32,
+    /// How long the button has been down with the selection up.
+    bindTime: i32,
+    /// Unique ID for this button.
+    uniqueID: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<HotSwapManager>() == 16);

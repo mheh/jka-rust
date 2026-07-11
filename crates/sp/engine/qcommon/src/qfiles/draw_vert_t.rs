@@ -12,11 +12,11 @@ const MAXLIGHTMAPS: usize = 4;
 /// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:524-530`
 #[repr(C)]
 pub struct drawVert_t {
-	pub xyz: vec3_t,
-	pub st: [f32; 2],
-	pub lightmap: [[f32; 2]; MAXLIGHTMAPS],
-	pub normal: vec3_t,
-	pub color: [[u8; 4]; MAXLIGHTMAPS],
+    pub xyz: vec3_t,
+    pub st: [f32; 2],
+    pub lightmap: [[f32; 2]; MAXLIGHTMAPS],
+    pub normal: vec3_t,
+    pub color: [[u8; 4]; MAXLIGHTMAPS],
 }
 
 const _: () = assert!(core::mem::size_of::<drawVert_t>() == 80);

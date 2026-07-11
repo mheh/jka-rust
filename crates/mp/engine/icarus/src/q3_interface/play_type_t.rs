@@ -5,8 +5,8 @@
 /// Type definition source: `oracle/codemp/icarus/Q3_Interface.h:261-269`
 #[repr(i32)]
 pub enum playType_t {
-	/// Play a ROFF file
-	PLAY_ROFF = 0,
+    /// Play a ROFF file
+    PLAY_ROFF = 0,
 
-	PLAY_NUMBEROF,
+    PLAY_NUMBEROF,
 }

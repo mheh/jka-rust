@@ -1,5 +1,7 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use sp_qshared::shared::qboolean;
 
 /// `CG_LANGUAGE_USESSPACES` SP cgame imports syscall ABI token.

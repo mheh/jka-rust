@@ -1,8 +1,10 @@
 use core::ffi::{c_int, c_void};
 
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::cgame::types::memtag_t;
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_Z_MALLOC`.
 ///

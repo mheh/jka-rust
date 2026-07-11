@@ -8,14 +8,14 @@ use crate::shared::qboolean;
 /// Type definition source: `oracle/codemp/qcommon/qcommon.h:17-26`
 #[repr(C)]
 pub struct msg_t {
-	pub allowoverflow: qboolean, // if false, do a Com_Error
-	pub overflowed: qboolean,    // set to true if the buffer size failed (with allowoverflow set)
-	pub oob: qboolean,           // set to true if the buffer size failed (with allowoverflow set)
-	pub data: *mut u8,
-	pub maxsize: i32,
-	pub cursize: i32,
-	pub readcount: i32,
-	pub bit: i32, // for bitwise reads and writes
+    pub allowoverflow: qboolean, // if false, do a Com_Error
+    pub overflowed: qboolean,    // set to true if the buffer size failed (with allowoverflow set)
+    pub oob: qboolean,           // set to true if the buffer size failed (with allowoverflow set)
+    pub data: *mut u8,
+    pub maxsize: i32,
+    pub cursize: i32,
+    pub readcount: i32,
+    pub bit: i32, // for bitwise reads and writes
 }
 
 const _: () = assert!(core::mem::size_of::<msg_t>() == 40);

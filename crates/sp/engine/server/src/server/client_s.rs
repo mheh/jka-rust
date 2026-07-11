@@ -36,58 +36,58 @@ const PACKET_BACKUP: usize = 16;
 /// Type definition source: `oracle/code/server/server.h:99-130`
 #[repr(C)]
 pub struct client_t {
-	pub state: clientState_t,
-	/// name, etc
-	pub userinfo: [c_char; MAX_INFO_STRING],
+    pub state: clientState_t,
+    /// name, etc
+    pub userinfo: [c_char; MAX_INFO_STRING],
 
-	pub reliableCommands: [*mut c_char; MAX_RELIABLE_COMMANDS],
-	/// last added reliable message, not necesarily sent or acknowledged yet
-	pub reliableSequence: i32,
-	/// last acknowledged reliable message
-	pub reliableAcknowledge: i32,
+    pub reliableCommands: [*mut c_char; MAX_RELIABLE_COMMANDS],
+    /// last added reliable message, not necesarily sent or acknowledged yet
+    pub reliableSequence: i32,
+    /// last acknowledged reliable message
+    pub reliableAcknowledge: i32,
 
-	/// netchan->outgoingSequence of gamestate
-	pub gamestateMessageNum: i32,
+    /// netchan->outgoingSequence of gamestate
+    pub gamestateMessageNum: i32,
 
-	pub lastUsercmd: usercmd_t,
-	/// for delta compression
-	pub lastMessageNum: i32,
-	/// command number last executed
-	pub cmdNum: i32,
-	/// reliable client message sequence
-	pub lastClientCommand: i32,
-	/// SV_GentityNum(clientnum)
-	pub gentity: *mut gentity_t,
-	/// extracted from userinfo, high bits masked
-	pub name: [c_char; MAX_NAME_LENGTH],
-	/// file being downloaded
-	pub download: *mut u8,
-	/// total bytes (can't use EOF because of paks)
-	pub downloadsize: i32,
-	/// bytes sent
-	pub downloadcount: i32,
-	/// frame last client usercmd message
-	pub deltaMessage: i32,
-	/// sv.time when packet was last received
-	pub lastPacketTime: i32,
-	/// sv.time when connection started
-	pub lastConnectTime: i32,
-	/// send another snapshot when sv.time >= nextSnapshotTime
-	pub nextSnapshotTime: i32,
-	/// true if nextSnapshotTime was set based on rate instead of snapshotMsec
-	pub rateDelayed: qboolean,
-	/// true if enough pakets to pass the cl_packetdup were dropped
-	pub droppedCommands: qboolean,
-	/// must timeout a few frames in a row so debugging doesn't break
-	pub timeoutCount: i32,
-	/// updates can be delta'd from here
-	pub frames: [clientSnapshot_t; PACKET_BACKUP],
-	pub ping: i32,
-	/// bytes / second
-	pub rate: i32,
-	/// requests a snapshot every snapshotMsec unless rate choked
-	pub snapshotMsec: i32,
-	pub netchan: netchan_t,
+    pub lastUsercmd: usercmd_t,
+    /// for delta compression
+    pub lastMessageNum: i32,
+    /// command number last executed
+    pub cmdNum: i32,
+    /// reliable client message sequence
+    pub lastClientCommand: i32,
+    /// SV_GentityNum(clientnum)
+    pub gentity: *mut gentity_t,
+    /// extracted from userinfo, high bits masked
+    pub name: [c_char; MAX_NAME_LENGTH],
+    /// file being downloaded
+    pub download: *mut u8,
+    /// total bytes (can't use EOF because of paks)
+    pub downloadsize: i32,
+    /// bytes sent
+    pub downloadcount: i32,
+    /// frame last client usercmd message
+    pub deltaMessage: i32,
+    /// sv.time when packet was last received
+    pub lastPacketTime: i32,
+    /// sv.time when connection started
+    pub lastConnectTime: i32,
+    /// send another snapshot when sv.time >= nextSnapshotTime
+    pub nextSnapshotTime: i32,
+    /// true if nextSnapshotTime was set based on rate instead of snapshotMsec
+    pub rateDelayed: qboolean,
+    /// true if enough pakets to pass the cl_packetdup were dropped
+    pub droppedCommands: qboolean,
+    /// must timeout a few frames in a row so debugging doesn't break
+    pub timeoutCount: i32,
+    /// updates can be delta'd from here
+    pub frames: [clientSnapshot_t; PACKET_BACKUP],
+    pub ping: i32,
+    /// bytes / second
+    pub rate: i32,
+    /// requests a snapshot every snapshotMsec unless rate choked
+    pub snapshotMsec: i32,
+    pub netchan: netchan_t,
 }
 
 /// Manifest alias: siblings importing the oracle tag name `client_s` resolve

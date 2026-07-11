@@ -5,22 +5,22 @@
 /// Type definition source: `oracle/codemp/ui/ui_local.h:1125-1142`
 #[repr(C)]
 pub struct postGameInfo_t {
-	pub score: i32,
-	pub redScore: i32,
-	pub blueScore: i32,
-	pub perfects: i32,
-	pub accuracy: i32,
-	pub impressives: i32,
-	pub excellents: i32,
-	pub defends: i32,
-	pub assists: i32,
-	pub gauntlets: i32,
-	pub captures: i32,
-	pub time: i32,
-	pub timeBonus: i32,
-	pub shutoutBonus: i32,
-	pub skillBonus: i32,
-	pub baseScore: i32,
+    pub score: i32,
+    pub redScore: i32,
+    pub blueScore: i32,
+    pub perfects: i32,
+    pub accuracy: i32,
+    pub impressives: i32,
+    pub excellents: i32,
+    pub defends: i32,
+    pub assists: i32,
+    pub gauntlets: i32,
+    pub captures: i32,
+    pub time: i32,
+    pub timeBonus: i32,
+    pub shutoutBonus: i32,
+    pub skillBonus: i32,
+    pub baseScore: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<postGameInfo_t>() == 64);

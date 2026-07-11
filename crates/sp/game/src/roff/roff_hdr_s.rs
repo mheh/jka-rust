@@ -10,9 +10,9 @@ use core::ffi::{c_char, c_long};
 /// Type definition source: `oracle/code/game/g_roff.h:18-26`
 #[repr(C)]
 pub struct roff_hdr_t {
-	pub mHeader: [c_char; 4],
-	pub mVersion: c_long,
-	pub mCount: f32,
+    pub mHeader: [c_char; 4],
+    pub mVersion: c_long,
+    pub mCount: f32,
 }
 
 const _: () = assert!(core::mem::size_of::<roff_hdr_t>() == 24);
