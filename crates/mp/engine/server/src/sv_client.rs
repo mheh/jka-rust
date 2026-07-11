@@ -835,7 +835,7 @@ pub fn SV_DirectConnect(
             let ping = sv.svs.time - sv.svs.challenges[i].pingTime;
             mp_engine_qcommon::common::common::com_printf(
                 common,
-                &mp_engine_qcommon::stringed::SE_GetString(
+                &mp_engine_qcommon::stringed::SE_GetString2(
                     common,
                     host,
                     "MP_SVGAME",
@@ -857,7 +857,7 @@ pub fn SV_DirectConnect(
                         from,
                         format!(
                             "print\n{}\n",
-                            mp_engine_qcommon::stringed::SE_GetString(
+                            mp_engine_qcommon::stringed::SE_GetString2(
                                 common,
                                 host,
                                 "MP_SVGAME",
@@ -867,7 +867,7 @@ pub fn SV_DirectConnect(
                     );
                     mp_engine_qcommon::common::common::com_printf(
                         common,
-                        &mp_engine_qcommon::stringed::SE_GetString(
+                        &mp_engine_qcommon::stringed::SE_GetString2(
                             common,
                             host,
                             "MP_SVGAME",
@@ -888,7 +888,7 @@ pub fn SV_DirectConnect(
                         from,
                         format!(
                             "print\n{}\n",
-                            mp_engine_qcommon::stringed::SE_GetString(
+                            mp_engine_qcommon::stringed::SE_GetString2(
                                 common,
                                 host,
                                 "MP_SVGAME",
@@ -898,7 +898,7 @@ pub fn SV_DirectConnect(
                     );
                     mp_engine_qcommon::common::common::com_printf(
                         common,
-                        &mp_engine_qcommon::stringed::SE_GetString(
+                        &mp_engine_qcommon::stringed::SE_GetString2(
                             common,
                             host,
                             "MP_SVGAME",

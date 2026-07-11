@@ -367,6 +367,85 @@ pub fn NET_CompareBaseAdr(common: &mut Common, a: netadr_t, b: netadr_t) -> qboo
     qfalse
 }
 
+/// Raven `NET_CompareAdr` — full-address (base + port) equality.
+///
+/// Source: `oracle/codemp/qcommon/net_chan.cpp:429-455`
+pub fn NET_CompareAdr(common: &mut Common, a: netadr_t, b: netadr_t) -> qboolean {
+    if a.r#type as i32 != b.r#type as i32 {
+        return qfalse;
+    }
+
+    if matches!(a.r#type, netadrtype_t::NA_LOOPBACK) {
+        return qtrue;
+    }
+
+    if matches!(a.r#type, netadrtype_t::NA_IP) {
+        if a.ip[0] == b.ip[0]
+            && a.ip[1] == b.ip[1]
+            && a.ip[2] == b.ip[2]
+            && a.ip[3] == b.ip[3]
+            && a.port == b.port
+        {
+            return qtrue;
+        }
+        return qfalse;
+    }
+
+    // #ifndef _XBOX // No IPX
+    if matches!(a.r#type, netadrtype_t::NA_IPX) {
+        let eq = unsafe {
+            libc::memcmp(
+                a.ipx.as_ptr() as *const libc::c_void,
+                b.ipx.as_ptr() as *const libc::c_void,
+                10,
+            ) == 0
+        };
+        if eq && a.port == b.port {
+            return qtrue;
+        }
+        return qfalse;
+    }
+
+    crate::common::common::com_printf(common, "NET_CompareAdr: bad address type\n");
+    qfalse
+}
+
+/// Raven `NET_OutOfBandPrint` — send a text message in an out-of-band datagram.
+///
+/// Raven's variadic `format, ...` is pre-rendered by callers into `s` (the
+/// established `&str`/`String` reshape); Raven's `QDECL` (`__cdecl`) macro has
+/// no Rust equivalent and is dropped.
+///
+/// Source: `oracle/codemp/qcommon/net_chan.cpp:559-576`
+pub fn NET_OutOfBandPrint(common: &mut Common, sock: netsrc_t, adr: netadr_t, s: String) {
+    // §19: Raven's `char string[MAX_MSGLEN]` local is written header-first then
+    // filled by `vsprintf(string+4,...)` before the `strlen` read; zero-init
+    // here satisfies definite-init for the same reachable-before-read shape.
+    let mut string = [0u8; MAX_MSGLEN as usize];
+
+    // set the header
+    string[0] = 0xff;
+    string[1] = 0xff;
+    string[2] = 0xff;
+    string[3] = 0xff;
+
+    // vsprintf(string+4, format, argptr): the rendered text lands after the
+    // 4-byte header. Faithful to the fixed scratch, an over-long render runs
+    // past MAX_MSGLEN and panics on the Rust bounds check where C reads/writes
+    // adjacent stack (UB); OOB prints are short ("challengeResponse ...").
+    let bytes = s.as_bytes();
+    for (i, &b) in bytes.iter().enumerate() {
+        string[4 + i] = b;
+    }
+
+    // strlen(string): the 0xff header is non-NUL, so this is 4 + the rendered
+    // length (vsprintf output carries no interior NUL).
+    let len = 4 + bytes.len();
+
+    // send the datagram
+    NET_SendPacket(common, sock, len as c_int, string.as_ptr() as *const (), adr);
+}
+
 /// Raven `NET_OutOfBandData`.
 ///
 /// Note: Raven's `QDECL` is a calling-convention macro (`__cdecl`); it has no

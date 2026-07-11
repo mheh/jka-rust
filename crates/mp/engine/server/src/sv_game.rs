@@ -39,6 +39,7 @@ use mp_engine_icarus::Icarus;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::roff::RoffSystem;
+use mp_engine_qcommon::stringed::SE_GetString;
 use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::cm_load::RmManager;
 use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};

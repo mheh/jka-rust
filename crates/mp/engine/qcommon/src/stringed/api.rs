@@ -419,6 +419,35 @@ pub fn se_init(pkg: &mut StringEdPackage, host: &mut impl EngineHost) {
     }
 }
 
+/// Raven `SE_GetString(psPackageAndStringReference)` — the C-ABI-named single-
+/// reference lookup, threading `&mut Common` (owner of the `StringEdPackage`)
+/// and the host. Returns an owned `String` (twin of the internal `&str`
+/// getter, mirroring `SV_GetStringEdString_str`) so no package borrow crosses
+/// the seam.
+///
+/// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:981-1007`
+pub fn SE_GetString(common: &mut Common, mut host: &mut dyn EngineHost, reference: &str) -> String {
+    common.stringed.get_string(reference, &mut host).to_owned()
+}
+
+/// Raven `SE_GetString(psPackageReference, psStringReference)` — the C-ABI-
+/// named two-reference lookup (builds `"PKG_REF"`, delegates). Named
+/// `SE_GetString2` since Rust has no overloading, matching the internal
+/// `get_string`/`get_string2` pair.
+///
+/// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:971-978`
+pub fn SE_GetString2(
+    common: &mut Common,
+    mut host: &mut dyn EngineHost,
+    package: &str,
+    string_ref: &str,
+) -> String {
+    common
+        .stringed
+        .get_string2(package, string_ref, &mut host)
+        .to_owned()
+}
+
 /// Raven `SE_ShutDown` — `Clear(SE_FALSE)`.
 ///
 /// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:1198-1201`

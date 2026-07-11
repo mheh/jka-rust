@@ -410,6 +410,17 @@ pub fn FS_FileForHandle(common: &mut Common, f: fileHandle_t) -> *mut libc::FILE
     }
 }
 
+/// Raven `FS_ForceFlush` — disable stdio buffering on the handle's `FILE` so
+/// crash-time log data stays valid.
+///
+/// Source: `oracle/codemp/qcommon/files.cpp:407-412`
+pub fn FS_ForceFlush(common: &mut Common, f: fileHandle_t) {
+    let file = FS_FileForHandle(common, f);
+    unsafe {
+        libc::setvbuf(file, core::ptr::null_mut(), libc::_IONBF, 0);
+    }
+}
+
 /// Raven `FS_filelength`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:117-129`

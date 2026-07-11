@@ -41,6 +41,7 @@ pub mod entry;
 pub mod interface;
 pub mod package;
 
+pub use api::{SE_GetString, SE_GetString2};
 pub use entry::SeEntry;
 pub use package::StringEdPackage;
 

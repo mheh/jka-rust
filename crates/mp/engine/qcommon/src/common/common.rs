@@ -9,7 +9,10 @@ use mp_qshared::shared::fileHandle_t;
 use mp_qshared::shared::limits::{
     BIG_INFO_STRING, MAX_INFO_STRING, MAX_STRING_CHARS, MAX_STRING_TOKENS, MAX_TOKEN_CHARS,
 };
-use mp_qshared::shared::qboolean;
+use mp_qshared::shared::{qboolean, qtrue};
+
+use crate::files_common::{FS_FOpenFileWrite, FS_ForceFlush, FS_Initialized, FS_Write};
+use mp_qshared::shared::q_string::Q_strncpyz;
 
 use crate::qcommon::net_chan_cpp_consts::MAX_LOOPBACK;
 use crate::qcommon::net_limits::MAX_MSGLEN;
@@ -623,11 +626,91 @@ const MAX_OSPATH: usize = 1024;
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:128`
 pub fn com_printf(common: &mut Common, msg: &str) {
-    let _ = common;
-    //TODO: Port Com_Printf rd_buffer redirect + logfile + console routing
-    // Source: oracle/codemp/qcommon/common.cpp:137-181
-    // Slice-0 minimal sink: the local-console write only (Sys_Print tail,
-    // common.cpp:168); redirect/logfile land with their Common fields.
+    // Raven's `vsprintf(msg, fmt, argptr)` is pre-rendered by callers into
+    // `msg` (the &str reshape); the `MAXPRINTMSG` scratch cap is not modeled.
+    unsafe {
+        // redirect: flush-and-append into the redirect buffer, then return.
+        if !common.rd_buffer.is_null() {
+            let msg_c = com_printf_cstr(msg);
+            let msg_len = libc::strlen(msg_c.as_ptr());
+            let rd_len = libc::strlen(common.rd_buffer);
+            if msg_len + rd_len > (common.rd_buffersize as usize - 1) {
+                (*common.rd_flush)(common.rd_buffer);
+                *common.rd_buffer = 0;
+            }
+            // Q_strcat(rd_buffer, rd_buffersize, msg): append bounded by size.
+            let l1 = libc::strlen(common.rd_buffer) as c_int;
+            if l1 >= common.rd_buffersize {
+                crate::common::com_error(
+                    mp_qshared::shared::error_parm::errorParm_t::ERR_FATAL,
+                    "Q_strcat: already overflowed".to_string(),
+                );
+            }
+            Q_strncpyz(
+                common.rd_buffer.add(l1 as usize),
+                msg_c.as_ptr(),
+                common.rd_buffersize - l1,
+            );
+            (*common.rd_flush)(common.rd_buffer);
+            *common.rd_buffer = 0;
+            return;
+        }
+    }
+
+    // * means don't draw this console message on the player screen but put it
+    // on the console: strip the leading '*'. Raven's `silent` flag only gates
+    // the `CL_ConsolePrint` client echo, a client symbol with no engine-hook
+    // here; the DEDICATED build's `com_dedicated->integer` keeps that branch
+    // dead, so it is not wired.
+    let msg: String = match msg.strip_prefix('*') {
+        Some(stripped) => stripped.to_string(),
+        None => msg.to_string(),
+    };
+
+    // echo to dedicated console and early console (Sys_Print → stdout).
     print!("{msg}");
     let _ = std::io::Write::flush(&mut std::io::stdout());
+
+    // logfile
+    unsafe {
+        if !common.com_logfile.is_null() && (*common.com_logfile).integer != 0 {
+            if common.logfile == 0 && FS_Initialized(common) == qtrue {
+                let mut aclock: libc::time_t = 0;
+                libc::time(&mut aclock);
+                let newtime = libc::localtime(&aclock);
+                let asc = if newtime.is_null() {
+                    String::new()
+                } else {
+                    core::ffi::CStr::from_ptr(libc::asctime(newtime))
+                        .to_string_lossy()
+                        .into_owned()
+                };
+
+                let lf = FS_FOpenFileWrite(common, c"qconsole.log".as_ptr());
+                common.logfile = lf;
+                com_printf(common, &format!("logfile opened on {asc}\n"));
+                if (*common.com_logfile).integer > 1 {
+                    // force it to not buffer so we get valid data even if we
+                    // are crashing
+                    let h = common.logfile;
+                    FS_ForceFlush(common, h);
+                }
+            }
+            if common.logfile != 0 && FS_Initialized(common) == qtrue {
+                let msg_c = com_printf_cstr(&msg);
+                let len = libc::strlen(msg_c.as_ptr()) as c_int;
+                let h = common.logfile;
+                FS_Write(common, msg_c.as_ptr() as *const (), len, h);
+            }
+        }
+    }
+}
+
+/// `&str` → owned NUL-terminated C buffer for the raw `char*` FS/redirect
+/// writes, truncating at any interior NUL to match C string semantics
+/// (`vsprintf` output never contains one).
+fn com_printf_cstr(msg: &str) -> std::ffi::CString {
+    let bytes = msg.as_bytes();
+    let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+    std::ffi::CString::new(&bytes[..end]).unwrap()
 }

@@ -37,15 +37,6 @@ use native_types::fileHandle_t;
 // The `sv`/`SV_GentityNum` cross-crate reach (server depends on qcommon) is
 // resolved through the sanctioned host edge `EngineHost::
 // sv_shownet_entity_classname` (ruling 56c); see `MSG_ReadDeltaEntity`.
-//
-// PORT-NOTE(same-file callees): `MSG_WriteBits`/`MSG_ReadBits`/`MSG_WriteByte`/
-// `MSG_WriteShort`/`MSG_WriteData`/`MSG_ReadLong` land in this SAME
-// destination module (`msg.rs`) via sibling packets not in this shard;
-// called unqualified, no import needed once they land.
-//
-// PORT-NOTE(cross-crate): `Com_Error` (ruling 1, receiverless panic) is
-// referenced unqualified; its landing module is common's error path, not yet
-// present at transcription time.
 
 /// Raven `MSG_Clear`.
 ///
@@ -94,10 +85,7 @@ pub fn MSG_BeginReadingOOB(msg: *mut msg_t) {
 /// `#ifdef` gate is faithfully dead under our build (no `_NEWHUFFTABLE_`).
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:3274-3282`
-pub fn MSG_shutdownHuffman() {
-    // PORT-NOTE(_NEWHUFFTABLE_): the `fp`/`fclose` debug body is compiled out
-    // (no `_NEWHUFFTABLE_` define); nothing to port.
-}
+pub fn MSG_shutdownHuffman() {}
 
 /// Raven `msg_hData` — static Huffman frequency table for `MSG_initHuffman`.
 ///
@@ -402,8 +390,7 @@ pub fn MSG_CheckNETFPSFOverrides(
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:3219-3234`
 pub fn MSG_initHuffman(common: &mut Common) {
-    // PORT-NOTE(_NEWHUFFTABLE_): `fp=fopen(...)` debug-log open is compiled
-    // out (no `_NEWHUFFTABLE_` define).
+    // Raven's `_NEWHUFFTABLE_` debug-log fopen is compiled out (undefined).
     common.msg_init = qtrue;
     unsafe {
         crate::qcommon::huff::Huff_Init(&mut common.msg_huff);
@@ -570,6 +557,35 @@ pub fn MSG_WriteData(common: &mut Common, buf: *mut msg_t, data: *const (), leng
 /// Source: `oracle/codemp/qcommon/msg.cpp:305-312`
 pub fn MSG_WriteShort(common: &mut Common, sb: *mut msg_t, c: c_int) {
     MSG_WriteBits(common, sb, c, 16);
+}
+
+/// Raven `MSG_WriteLong`.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:314-316`
+pub fn MSG_WriteLong(common: &mut Common, sb: *mut msg_t, c: c_int) {
+    MSG_WriteBits(common, sb, c, 32);
+}
+
+/// Raven `MSG_WriteString`. The eurofix 0xff-strip loop is left commented in
+/// the oracle and not ported.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:328-354`
+pub fn MSG_WriteString(common: &mut Common, sb: *mut msg_t, s: *const c_char) {
+    unsafe {
+        if s.is_null() {
+            MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
+        } else {
+            let l = strlen(s);
+            if l >= mp_qshared::shared::limits::MAX_STRING_CHARS {
+                com_printf(common, "MSG_WriteString: MAX_STRING_CHARS");
+                MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
+                return;
+            }
+            let mut string = [0u8; mp_qshared::shared::limits::MAX_STRING_CHARS];
+            Q_strncpyz(string.as_mut_ptr() as *mut c_char, s, string.len() as c_int);
+            MSG_WriteData(common, sb, string.as_ptr() as *const (), l as c_int + 1);
+        }
+    }
 }
 
 /// Raven `MSG_ReadLong`.
