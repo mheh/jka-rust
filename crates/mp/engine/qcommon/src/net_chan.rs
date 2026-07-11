@@ -12,11 +12,15 @@ use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::netsrc_t::netsrc_t;
 use mp_qshared::shared::limits::MAX_STRING_CHARS;
-use mp_qshared::shared::{qboolean, qfalse, qtrue};
+use mp_qshared::shared::{errorParm_t, qboolean, qfalse, qtrue};
 
 use crate::collision_world::CollisionWorld;
+use crate::common::com_error;
 use crate::common::common::Common;
-use crate::qcommon::net_chan_cpp_consts::{FRAGMENT_BIT, FRAGMENT_SIZE, MAX_LOOPBACK};
+use crate::msg::{MSG_InitOOB, MSG_WriteData, MSG_WriteLong, MSG_WriteShort};
+use crate::qcommon::net_chan_cpp_consts::{
+    FRAGMENT_BIT, FRAGMENT_SIZE, MAX_LOOPBACK, MAX_PACKETLEN,
+};
 use crate::qcommon::net_limits::MAX_MSGLEN;
 use crate::qcommon::netchan_t::netchan_t;
 use crate::qcommon::protocol::PORT_SERVER;
@@ -488,6 +492,168 @@ pub fn NET_OutOfBandData(
         crate::qcommon::huff::Huff_Compress(&mut mbuf, 12);
         // send the datagram
         NET_SendPacket(common, sock, mbuf.cursize, mbuf.data as *const (), adr);
+    }
+}
+
+/// Raven `Netchan_TransmitNextFragment` — send one fragment of the current
+/// message. Only builds the OOB header here (`MSG_InitOOB`). `qport->integer`
+/// is cached on `Common` (`net_qport`); `showpackets->integer` likewise.
+///
+/// Source: `oracle/codemp/qcommon/net_chan.cpp:80-134`
+pub fn Netchan_TransmitNextFragment(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    chan: *mut netchan_t,
+) {
+    unsafe {
+        let mut send_buf = [0u8; MAX_PACKETLEN as usize];
+        let mut send: msg_t = core::mem::zeroed();
+
+        // write the packet header
+        MSG_InitOOB(common, cm, rm, host, &mut send, send_buf.as_mut_ptr(), send_buf.len() as c_int); // <-- only do the oob here
+
+        MSG_WriteLong(common, &mut send, (*chan).outgoingSequence | FRAGMENT_BIT);
+
+        // send the qport if we are a client
+        if matches!((*chan).sock, netsrc_t::NS_CLIENT) {
+            let qport = common.net_qport;
+            MSG_WriteShort(common, &mut send, qport);
+        }
+
+        // copy the reliable message to the packet first
+        let mut fragmentLength = FRAGMENT_SIZE;
+        if (*chan).unsentFragmentStart + fragmentLength > (*chan).unsentLength {
+            fragmentLength = (*chan).unsentLength - (*chan).unsentFragmentStart;
+        }
+
+        MSG_WriteShort(common, &mut send, (*chan).unsentFragmentStart);
+        MSG_WriteShort(common, &mut send, fragmentLength);
+        MSG_WriteData(
+            common,
+            &mut send,
+            (*chan).unsentBuffer.as_ptr().add((*chan).unsentFragmentStart as usize) as *const (),
+            fragmentLength,
+        );
+
+        // send the datagram
+        NET_SendPacket(
+            common,
+            (*chan).sock,
+            send.cursize,
+            send.data as *const (),
+            (*chan).remoteAddress,
+        );
+
+        if common.showpackets != 0 {
+            crate::common::common::com_printf(
+                common,
+                &format!(
+                    "{} send {:4} : s={} fragment={},{}\n",
+                    NETSRC_STRING[(*chan).sock as usize],
+                    send.cursize,
+                    (*chan).outgoingSequence - 1,
+                    (*chan).unsentFragmentStart,
+                    fragmentLength
+                ),
+            );
+        }
+
+        (*chan).unsentFragmentStart += fragmentLength;
+
+        // this exit condition is a little tricky, because a packet
+        // that is exactly the fragment length still needs to send
+        // a second packet of zero length so that the other side
+        // can tell there aren't more to follow
+        if (*chan).unsentFragmentStart == (*chan).unsentLength && fragmentLength != FRAGMENT_SIZE {
+            (*chan).outgoingSequence += 1;
+            (*chan).unsentFragments = qfalse;
+        }
+    }
+}
+
+/// Raven `Netchan_Transmit` — send a message to a connection, fragmenting if
+/// necessary. A 0 length still generates a packet. Raven's variadic-free
+/// `(chan, length, data)` signature is preserved.
+///
+/// Source: `oracle/codemp/qcommon/net_chan.cpp:143-191`
+pub fn Netchan_Transmit(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    chan: *mut netchan_t,
+    length: c_int,
+    data: *const native_types::byte,
+) {
+    unsafe {
+        let mut send_buf = [0u8; MAX_PACKETLEN as usize];
+        let mut send: msg_t = core::mem::zeroed();
+
+        if length > MAX_MSGLEN as c_int {
+            com_error(errorParm_t::ERR_DROP, format!("Netchan_Transmit: length = {length}"));
+        }
+        (*chan).unsentFragmentStart = 0;
+
+        if (*chan).unsentFragments != qfalse {
+            crate::common::common::com_printf(
+                common,
+                &format!("[ISM] Stomping Unsent Fragments {}\n", NETSRC_STRING[(*chan).sock as usize]),
+            );
+        }
+
+        // fragment large reliable messages
+        if length >= FRAGMENT_SIZE {
+            (*chan).unsentFragments = qtrue;
+            (*chan).unsentLength = length;
+            crate::common_fns::Com_Memcpy(
+                (*chan).unsentBuffer.as_mut_ptr() as *mut (),
+                data as *const (),
+                length as usize,
+            );
+
+            // only send the first fragment now
+            Netchan_TransmitNextFragment(common, cm, rm, host, chan);
+
+            return;
+        }
+
+        // write the packet header
+        MSG_InitOOB(common, cm, rm, host, &mut send, send_buf.as_mut_ptr(), send_buf.len() as c_int);
+
+        MSG_WriteLong(common, &mut send, (*chan).outgoingSequence);
+        (*chan).outgoingSequence += 1;
+
+        // send the qport if we are a client
+        if matches!((*chan).sock, netsrc_t::NS_CLIENT) {
+            let qport = common.net_qport;
+            MSG_WriteShort(common, &mut send, qport);
+        }
+
+        MSG_WriteData(common, &mut send, data as *const (), length);
+
+        // send the datagram
+        NET_SendPacket(
+            common,
+            (*chan).sock,
+            send.cursize,
+            send.data as *const (),
+            (*chan).remoteAddress,
+        );
+
+        if common.showpackets != 0 {
+            crate::common::common::com_printf(
+                common,
+                &format!(
+                    "{} send {:4} : s={} ack={}\n",
+                    NETSRC_STRING[(*chan).sock as usize],
+                    send.cursize,
+                    (*chan).outgoingSequence - 1,
+                    (*chan).incomingSequence
+                ),
+            );
+        }
     }
 }
 

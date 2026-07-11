@@ -20,7 +20,7 @@ use core::ffi::{c_char, c_int};
 
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
-use mp_engine_qcommon::qcommon::net_limits::MAX_DOWNLOAD_WINDOW;
+use mp_engine_qcommon::qcommon::net_limits::{MAX_DOWNLOAD_BLKSIZE, MAX_DOWNLOAD_WINDOW};
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_host_interface::engine_host::EngineHost;
 // PORT-NOTE(engine-host-state, matches sv_game.rs's identical note): `RmManager`
@@ -349,7 +349,7 @@ pub fn SV_NextDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
             / core::mem::size_of::<client_t>() as isize) as c_int;
 
         if block == (*cl).downloadClientBlock {
-            mp_engine_qcommon::common::common::com_printf(
+            mp_engine_qcommon::common_fns::Com_DPrintf(
                 common,
                 &format!(
                     "clientDownload: {} : client acknowledge of block {}\n",
@@ -2011,6 +2011,308 @@ pub fn SV_CloseDownload(common: &mut Common, cl: *mut client_t) {
                 mp_engine_qcommon::z_memman_pc::Z_Free(common, (*cl).downloadBlocks[i] as *mut ());
                 (*cl).downloadBlocks[i] = core::ptr::null_mut();
             }
+        }
+    }
+}
+
+/// Raven `SV_WriteDownloadToClient` — check whether the client wants a file,
+/// open it if needed, and pump download blocks into `msg` (the download-window
+/// protocol). `#ifndef _XBOX`; this build does not compress downloads.
+///
+/// Source: `oracle/codemp/server/sv_client.cpp:1090-1253`
+pub fn SV_WriteDownloadToClient(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    sv: &mut Server,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    cl: *mut client_t,
+    msg: *mut msg_t,
+) {
+    unsafe {
+        if (*cl).downloadName[0] == 0 {
+            return; // Nothing being downloaded
+        }
+
+        let client_index = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+            / core::mem::size_of::<client_t>() as isize) as c_int;
+
+        if (*cl).download == 0 {
+            // We open the file here
+            mp_engine_qcommon::common::common::com_printf(
+                common,
+                &format!(
+                    "clientDownload: {} : begining \"{}\"\n",
+                    client_index,
+                    core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                ),
+            );
+
+            let missionPack = mp_engine_qcommon::files_pc::FS_idPak(
+                (*cl).downloadName.as_mut_ptr(),
+                c"missionpack".as_ptr() as *mut c_char,
+            );
+            let idPack = missionPack != qfalse
+                || mp_engine_qcommon::files_pc::FS_idPak(
+                    (*cl).downloadName.as_mut_ptr(),
+                    c"base".as_ptr() as *mut c_char,
+                ) != qfalse;
+
+            let mut downloadOpenFailed = false;
+            if (*common.sv_allowDownload).integer == 0 || idPack {
+                downloadOpenFailed = true;
+            } else {
+                (*cl).downloadSize = mp_engine_qcommon::files_common::FS_SV_FOpenFileRead(
+                    common,
+                    (*cl).downloadName.as_ptr(),
+                    &mut (*cl).download,
+                );
+                if (*cl).downloadSize <= 0 {
+                    downloadOpenFailed = true;
+                }
+            }
+
+            if downloadOpenFailed {
+                // cannot auto-download file
+                let mut errorMessage: [c_char; 1024] = [0; 1024];
+                if idPack {
+                    mp_engine_qcommon::common::common::com_printf(
+                        common,
+                        &format!(
+                            "clientDownload: {} : \"{}\" cannot download id pk3 files\n",
+                            client_index,
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                        ),
+                    );
+                    if missionPack != qfalse {
+                        Com_sprintf(
+                            errorMessage.as_mut_ptr(),
+                            errorMessage.len() as c_int,
+                            &format!(
+                                "Cannot autodownload Team Arena file \"{}\"\nThe Team Arena mission pack can be found in your local game store.",
+                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            ),
+                        );
+                    } else {
+                        Com_sprintf(
+                            errorMessage.as_mut_ptr(),
+                            errorMessage.len() as c_int,
+                            &format!(
+                                "Cannot autodownload id pk3 file \"{}\"",
+                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            ),
+                        );
+                    }
+                } else if (*common.sv_allowDownload).integer == 0 {
+                    mp_engine_qcommon::common::common::com_printf(
+                        common,
+                        &format!(
+                            "clientDownload: {} : \"{}\" download disabled",
+                            client_index,
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                        ),
+                    );
+                    if (*common.sv_pure).integer != 0 {
+                        Com_sprintf(
+                            errorMessage.as_mut_ptr(),
+                            errorMessage.len() as c_int,
+                            &format!(
+                                "Could not download \"{}\" because autodownloading is disabled on the server.\n\nYou will need to get this file elsewhere before you can connect to this pure server.\n",
+                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            ),
+                        );
+                    } else {
+                        Com_sprintf(
+                            errorMessage.as_mut_ptr(),
+                            errorMessage.len() as c_int,
+                            &format!(
+                                "Could not download \"{}\" because autodownloading is disabled on the server.\n\nSet autodownload to No in your settings and you might be able to connect if you do have the file.\n",
+                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            ),
+                        );
+                    }
+                } else {
+                    mp_engine_qcommon::common::common::com_printf(
+                        common,
+                        &format!(
+                            "clientDownload: {} : \"{}\" file not found on server\n",
+                            client_index,
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                        ),
+                    );
+                    Com_sprintf(
+                        errorMessage.as_mut_ptr(),
+                        errorMessage.len() as c_int,
+                        &format!(
+                            "File \"{}\" not found on server for autodownloading.\n",
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                        ),
+                    );
+                }
+                mp_engine_qcommon::msg::MSG_WriteByte(
+                    common,
+                    msg,
+                    mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_download as c_int,
+                );
+                mp_engine_qcommon::msg::MSG_WriteShort(common, msg, 0); // client is expecting block zero
+                mp_engine_qcommon::msg::MSG_WriteLong(common, msg, -1); // illegal file size
+                mp_engine_qcommon::msg::MSG_WriteString(common, msg, errorMessage.as_ptr());
+
+                (*cl).downloadName[0] = 0;
+                return;
+            }
+
+            // Init
+            (*cl).downloadCurrentBlock = 0;
+            (*cl).downloadClientBlock = 0;
+            (*cl).downloadXmitBlock = 0;
+            (*cl).downloadCount = 0;
+            (*cl).downloadEOF = qfalse;
+        }
+
+        // Perform any reads that we need to
+        while (*cl).downloadCurrentBlock - (*cl).downloadClientBlock < MAX_DOWNLOAD_WINDOW as c_int
+            && (*cl).downloadSize != (*cl).downloadCount
+        {
+            let curindex = ((*cl).downloadCurrentBlock % MAX_DOWNLOAD_WINDOW as c_int) as usize;
+
+            if (*cl).downloadBlocks[curindex].is_null() {
+                (*cl).downloadBlocks[curindex] = mp_engine_qcommon::z_memman_pc::Z_Malloc(
+                    common,
+                    cm,
+                    rm,
+                    host,
+                    MAX_DOWNLOAD_BLKSIZE as c_int,
+                    mp_qshared::common::mp::qcommon::tags::memtag_t::TAG_DOWNLOAD,
+                    qtrue,
+                    0,
+                ) as *mut u8;
+            }
+
+            (*cl).downloadBlockSize[curindex] = mp_engine_qcommon::files_common::FS_Read(
+                common,
+                (*cl).downloadBlocks[curindex] as *mut (),
+                MAX_DOWNLOAD_BLKSIZE as c_int,
+                (*cl).download,
+            );
+
+            if (*cl).downloadBlockSize[curindex] < 0 {
+                // EOF right now
+                (*cl).downloadCount = (*cl).downloadSize;
+                break;
+            }
+
+            (*cl).downloadCount += (*cl).downloadBlockSize[curindex];
+
+            // Load in next block
+            (*cl).downloadCurrentBlock += 1;
+        }
+
+        // Check to see if we have eof condition and add the EOF block
+        if (*cl).downloadCount == (*cl).downloadSize
+            && (*cl).downloadEOF == qfalse
+            && (*cl).downloadCurrentBlock - (*cl).downloadClientBlock < MAX_DOWNLOAD_WINDOW as c_int
+        {
+            (*cl).downloadBlockSize
+                [((*cl).downloadCurrentBlock % MAX_DOWNLOAD_WINDOW as c_int) as usize] = 0;
+            (*cl).downloadCurrentBlock += 1;
+
+            (*cl).downloadEOF = qtrue; // We have added the EOF block
+        }
+
+        // Loop up to window size times based on how many blocks we can fit in the
+        // client snapMsec and rate
+
+        // based on the rate, how many bytes can we fit in the snapMsec time of the client
+        // normal rate / snapshotMsec calculation
+        let mut rate = (*cl).rate;
+        if (*common.sv_maxRate).integer != 0 {
+            if (*common.sv_maxRate).integer < 1000 {
+                mp_engine_qcommon::cvar_fns::Cvar_Set(
+                    common,
+                    cm,
+                    rm,
+                    host,
+                    c"sv_MaxRate".as_ptr(),
+                    c"1000".as_ptr(),
+                );
+            }
+            if (*common.sv_maxRate).integer < rate {
+                rate = (*common.sv_maxRate).integer;
+            }
+        }
+
+        let mut blockspersnap = if rate == 0 {
+            1
+        } else {
+            (rate * (*cl).snapshotMsec / 1000 + MAX_DOWNLOAD_BLKSIZE as c_int)
+                / MAX_DOWNLOAD_BLKSIZE as c_int
+        };
+
+        if blockspersnap < 0 {
+            blockspersnap = 1;
+        }
+
+        while blockspersnap > 0 {
+            blockspersnap -= 1;
+
+            // Write out the next section of the file, if we have already reached
+            // our window, automatically start retransmitting
+            if (*cl).downloadClientBlock == (*cl).downloadCurrentBlock {
+                return; // Nothing to transmit
+            }
+
+            if (*cl).downloadXmitBlock == (*cl).downloadCurrentBlock {
+                // We have transmitted the complete window, should we start resending?
+                // FIXME: This uses a hardcoded one second timeout for lost blocks
+                if sv.svs.time - (*cl).downloadSendTime > 1000 {
+                    (*cl).downloadXmitBlock = (*cl).downloadClientBlock;
+                } else {
+                    return;
+                }
+            }
+
+            // Send current block
+            let curindex = ((*cl).downloadXmitBlock % MAX_DOWNLOAD_WINDOW as c_int) as usize;
+
+            mp_engine_qcommon::msg::MSG_WriteByte(
+                common,
+                msg,
+                mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_download as c_int,
+            );
+            mp_engine_qcommon::msg::MSG_WriteShort(common, msg, (*cl).downloadXmitBlock);
+
+            // block zero is special, contains file size
+            if (*cl).downloadXmitBlock == 0 {
+                mp_engine_qcommon::msg::MSG_WriteLong(common, msg, (*cl).downloadSize);
+            }
+
+            mp_engine_qcommon::msg::MSG_WriteShort(common, msg, (*cl).downloadBlockSize[curindex]);
+
+            // Write the block
+            if (*cl).downloadBlockSize[curindex] != 0 {
+                mp_engine_qcommon::msg::MSG_WriteData(
+                    common,
+                    msg,
+                    (*cl).downloadBlocks[curindex] as *const (),
+                    (*cl).downloadBlockSize[curindex],
+                );
+            }
+
+            mp_engine_qcommon::common_fns::Com_DPrintf(
+                common,
+                &format!(
+                    "clientDownload: {} : writing block {}\n",
+                    client_index,
+                    (*cl).downloadXmitBlock
+                ),
+            );
+
+            // Move on to the next block
+            // It will get sent with next snap shot.  The rate will keep us in line.
+            (*cl).downloadXmitBlock += 1;
+
+            (*cl).downloadSendTime = sv.svs.time;
         }
     }
 }

@@ -5,12 +5,17 @@
 //! Source: `oracle/codemp/qcommon/msg.cpp`
 
 use core::ffi::{c_char, c_int};
+use core::mem::offset_of;
 
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
+use mp_qshared::shared::force_powers::{FP_LEVITATION, FP_SEE};
 use mp_qshared::shared::{errorParm_t, qboolean, qfalse, qtrue};
+
+use crate::qcommon::msg_consts::{FLOAT_INT_BIAS, FLOAT_INT_BITS};
+use crate::qcommon::net_field_t::netField_t;
 
 use mp_host_interface::engine_host::EngineHost;
 use native_types::byte;
@@ -109,6 +114,628 @@ pub const MSG_H_DATA: [i32; 256] = [
     768, 1040, 745, 952, 805, 1073, 740, 1013, 805, 1008, 796, 996, 1057, 11457, 13504,
 ];
 
+/// One `entityStateFields[]`/`playerStateFields[]` row. Raven's `NETF(x)`/
+/// `PSF(x)` macros stringize the field expression (`name`) and take its
+/// `offsetof` (`offset`); array subscripts add `index * 4` (every indexed field
+/// is a 4-byte `int`/`float`).
+fn nf(name: &'static str, offset: usize, bits: c_int) -> netField_t {
+    netField_t { name, offset: offset as c_int, bits, mCount: 0 }
+}
+
+/// Raven `entityStateFields[]` — the entity-state delta-coder field table
+/// (`!_XBOX` branch, including the mod-author `userInt/userFloat/userVec` tail).
+/// Order is wire-critical: a field's list index is its network position.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:858-1051`
+fn build_entity_state_fields() -> Vec<netField_t> {
+    vec![
+        nf("pos.trTime", offset_of!(entityState_t, pos.trTime), 32),
+        nf("pos.trBase[1]", offset_of!(entityState_t, pos.trBase) + 1 * 4, 0),
+        nf("pos.trBase[0]", offset_of!(entityState_t, pos.trBase) + 0 * 4, 0),
+        nf("apos.trBase[1]", offset_of!(entityState_t, apos.trBase) + 1 * 4, 0),
+        nf("pos.trBase[2]", offset_of!(entityState_t, pos.trBase) + 2 * 4, 0),
+        nf("apos.trBase[0]", offset_of!(entityState_t, apos.trBase) + 0 * 4, 0),
+        nf("pos.trDelta[0]", offset_of!(entityState_t, pos.trDelta) + 0 * 4, 0),
+        nf("pos.trDelta[1]", offset_of!(entityState_t, pos.trDelta) + 1 * 4, 0),
+        nf("eType", offset_of!(entityState_t, eType), 8),
+        nf("angles[1]", offset_of!(entityState_t, angles) + 1 * 4, 0),
+        nf("pos.trDelta[2]", offset_of!(entityState_t, pos.trDelta) + 2 * 4, 0),
+        nf("origin[0]", offset_of!(entityState_t, origin) + 0 * 4, 0),
+        nf("origin[1]", offset_of!(entityState_t, origin) + 1 * 4, 0),
+        nf("origin[2]", offset_of!(entityState_t, origin) + 2 * 4, 0),
+        nf("weapon", offset_of!(entityState_t, weapon), 8),
+        nf("apos.trType", offset_of!(entityState_t, apos.trType), 8),
+        nf("legsAnim", offset_of!(entityState_t, legsAnim), 16),
+        nf("torsoAnim", offset_of!(entityState_t, torsoAnim), 16),
+        nf("genericenemyindex", offset_of!(entityState_t, genericenemyindex), 32),
+        nf("eFlags", offset_of!(entityState_t, eFlags), 32),
+        nf("pos.trDuration", offset_of!(entityState_t, pos.trDuration), 32),
+        nf("teamowner", offset_of!(entityState_t, teamowner), 8),
+        nf("groundEntityNum", offset_of!(entityState_t, groundEntityNum), GENTITYNUM_BITS),
+        nf("pos.trType", offset_of!(entityState_t, pos.trType), 8),
+        nf("angles[2]", offset_of!(entityState_t, angles) + 2 * 4, 0),
+        nf("angles[0]", offset_of!(entityState_t, angles) + 0 * 4, 0),
+        nf("solid", offset_of!(entityState_t, solid), 24),
+        nf("fireflag", offset_of!(entityState_t, fireflag), 2),
+        nf("event", offset_of!(entityState_t, event), 10),
+        nf("customRGBA[3]", offset_of!(entityState_t, customRGBA) + 3 * 4, 8),
+        nf("customRGBA[0]", offset_of!(entityState_t, customRGBA) + 0 * 4, 8),
+        nf("speed", offset_of!(entityState_t, speed), 0),
+        nf("clientNum", offset_of!(entityState_t, clientNum), GENTITYNUM_BITS),
+        nf("apos.trBase[2]", offset_of!(entityState_t, apos.trBase) + 2 * 4, 0),
+        nf("apos.trTime", offset_of!(entityState_t, apos.trTime), 32),
+        nf("customRGBA[1]", offset_of!(entityState_t, customRGBA) + 1 * 4, 8),
+        nf("customRGBA[2]", offset_of!(entityState_t, customRGBA) + 2 * 4, 8),
+        nf("saberEntityNum", offset_of!(entityState_t, saberEntityNum), GENTITYNUM_BITS),
+        nf("g2radius", offset_of!(entityState_t, g2radius), 8),
+        nf("otherEntityNum2", offset_of!(entityState_t, otherEntityNum2), GENTITYNUM_BITS),
+        nf("owner", offset_of!(entityState_t, owner), GENTITYNUM_BITS),
+        nf("modelindex2", offset_of!(entityState_t, modelindex2), 8),
+        nf("eventParm", offset_of!(entityState_t, eventParm), 8),
+        nf("saberMove", offset_of!(entityState_t, saberMove), 8),
+        nf("apos.trDelta[1]", offset_of!(entityState_t, apos.trDelta) + 1 * 4, 0),
+        nf("boneAngles1[1]", offset_of!(entityState_t, boneAngles1) + 1 * 4, 0),
+        nf("modelindex", offset_of!(entityState_t, modelindex), -16),
+        nf("emplacedOwner", offset_of!(entityState_t, emplacedOwner), 32),
+        nf("apos.trDelta[0]", offset_of!(entityState_t, apos.trDelta) + 0 * 4, 0),
+        nf("apos.trDelta[2]", offset_of!(entityState_t, apos.trDelta) + 2 * 4, 0),
+        nf("torsoFlip", offset_of!(entityState_t, torsoFlip), 1),
+        nf("angles2[1]", offset_of!(entityState_t, angles2) + 1 * 4, 0),
+        nf("lookTarget", offset_of!(entityState_t, lookTarget), GENTITYNUM_BITS),
+        nf("origin2[2]", offset_of!(entityState_t, origin2) + 2 * 4, 0),
+        nf("modelGhoul2", offset_of!(entityState_t, modelGhoul2), 8),
+        nf("loopSound", offset_of!(entityState_t, loopSound), 8),
+        nf("origin2[0]", offset_of!(entityState_t, origin2) + 0 * 4, 0),
+        nf("shouldtarget", offset_of!(entityState_t, shouldtarget), 1),
+        nf("trickedentindex", offset_of!(entityState_t, trickedentindex), 16),
+        nf("otherEntityNum", offset_of!(entityState_t, otherEntityNum), GENTITYNUM_BITS),
+        nf("origin2[1]", offset_of!(entityState_t, origin2) + 1 * 4, 0),
+        nf("time2", offset_of!(entityState_t, time2), 32),
+        nf("legsFlip", offset_of!(entityState_t, legsFlip), 1),
+        nf("bolt2", offset_of!(entityState_t, bolt2), GENTITYNUM_BITS),
+        nf("constantLight", offset_of!(entityState_t, constantLight), 32),
+        nf("time", offset_of!(entityState_t, time), 32),
+        nf("hasLookTarget", offset_of!(entityState_t, hasLookTarget), 1),
+        nf("boneAngles1[2]", offset_of!(entityState_t, boneAngles1) + 2 * 4, 0),
+        nf("activeForcePass", offset_of!(entityState_t, activeForcePass), 6),
+        nf("health", offset_of!(entityState_t, health), 10),
+        nf("loopIsSoundset", offset_of!(entityState_t, loopIsSoundset), 1),
+        nf("saberHolstered", offset_of!(entityState_t, saberHolstered), 2),
+        nf("npcSaber1", offset_of!(entityState_t, npcSaber1), 9),
+        nf("maxhealth", offset_of!(entityState_t, maxhealth), 10),
+        nf("trickedentindex2", offset_of!(entityState_t, trickedentindex2), 16),
+        nf("forcePowersActive", offset_of!(entityState_t, forcePowersActive), 32),
+        nf("iModelScale", offset_of!(entityState_t, iModelScale), 10),
+        nf("powerups", offset_of!(entityState_t, powerups), 16),
+        nf("soundSetIndex", offset_of!(entityState_t, soundSetIndex), 8),
+        nf("brokenLimbs", offset_of!(entityState_t, brokenLimbs), 8),
+        nf("csSounds_Std", offset_of!(entityState_t, csSounds_Std), 8),
+        nf("saberInFlight", offset_of!(entityState_t, saberInFlight), 1),
+        nf("angles2[0]", offset_of!(entityState_t, angles2) + 0 * 4, 0),
+        nf("frame", offset_of!(entityState_t, frame), 16),
+        nf("angles2[2]", offset_of!(entityState_t, angles2) + 2 * 4, 0),
+        nf("forceFrame", offset_of!(entityState_t, forceFrame), 16),
+        nf("generic1", offset_of!(entityState_t, generic1), 8),
+        nf("boneIndex1", offset_of!(entityState_t, boneIndex1), 6),
+        nf("NPC_class", offset_of!(entityState_t, NPC_class), 8),
+        nf("apos.trDuration", offset_of!(entityState_t, apos.trDuration), 32),
+        nf("boneOrient", offset_of!(entityState_t, boneOrient), 9),
+        nf("bolt1", offset_of!(entityState_t, bolt1), 8),
+        nf("trickedentindex3", offset_of!(entityState_t, trickedentindex3), 16),
+        nf("m_iVehicleNum", offset_of!(entityState_t, m_iVehicleNum), GENTITYNUM_BITS),
+        nf("trickedentindex4", offset_of!(entityState_t, trickedentindex4), 16),
+        nf("surfacesOff", offset_of!(entityState_t, surfacesOff), 32),
+        nf("eFlags2", offset_of!(entityState_t, eFlags2), 10),
+        nf("isJediMaster", offset_of!(entityState_t, isJediMaster), 1),
+        nf("isPortalEnt", offset_of!(entityState_t, isPortalEnt), 1),
+        nf("heldByClient", offset_of!(entityState_t, heldByClient), 6),
+        nf("ragAttach", offset_of!(entityState_t, ragAttach), GENTITYNUM_BITS),
+        nf("boltToPlayer", offset_of!(entityState_t, boltToPlayer), 6),
+        nf("npcSaber2", offset_of!(entityState_t, npcSaber2), 9),
+        nf("csSounds_Combat", offset_of!(entityState_t, csSounds_Combat), 8),
+        nf("csSounds_Extra", offset_of!(entityState_t, csSounds_Extra), 8),
+        nf("csSounds_Jedi", offset_of!(entityState_t, csSounds_Jedi), 8),
+        nf("surfacesOn", offset_of!(entityState_t, surfacesOn), 32),
+        nf("boneIndex2", offset_of!(entityState_t, boneIndex2), 6),
+        nf("boneIndex3", offset_of!(entityState_t, boneIndex3), 6),
+        nf("boneIndex4", offset_of!(entityState_t, boneIndex4), 6),
+        nf("boneAngles1[0]", offset_of!(entityState_t, boneAngles1) + 0 * 4, 0),
+        nf("boneAngles2[0]", offset_of!(entityState_t, boneAngles2) + 0 * 4, 0),
+        nf("boneAngles2[1]", offset_of!(entityState_t, boneAngles2) + 1 * 4, 0),
+        nf("boneAngles2[2]", offset_of!(entityState_t, boneAngles2) + 2 * 4, 0),
+        nf("boneAngles3[0]", offset_of!(entityState_t, boneAngles3) + 0 * 4, 0),
+        nf("boneAngles3[1]", offset_of!(entityState_t, boneAngles3) + 1 * 4, 0),
+        nf("boneAngles3[2]", offset_of!(entityState_t, boneAngles3) + 2 * 4, 0),
+        nf("boneAngles4[0]", offset_of!(entityState_t, boneAngles4) + 0 * 4, 0),
+        nf("boneAngles4[1]", offset_of!(entityState_t, boneAngles4) + 1 * 4, 0),
+        nf("boneAngles4[2]", offset_of!(entityState_t, boneAngles4) + 2 * 4, 0),
+        nf("userInt1", offset_of!(entityState_t, userInt1), 1),
+        nf("userInt2", offset_of!(entityState_t, userInt2), 1),
+        nf("userInt3", offset_of!(entityState_t, userInt3), 1),
+        nf("userFloat1", offset_of!(entityState_t, userFloat1), 1),
+        nf("userFloat2", offset_of!(entityState_t, userFloat2), 1),
+        nf("userFloat3", offset_of!(entityState_t, userFloat3), 1),
+        nf("userVec1[0]", offset_of!(entityState_t, userVec1) + 0 * 4, 1),
+        nf("userVec1[1]", offset_of!(entityState_t, userVec1) + 1 * 4, 1),
+        nf("userVec1[2]", offset_of!(entityState_t, userVec1) + 2 * 4, 1),
+        nf("userVec2[0]", offset_of!(entityState_t, userVec2) + 0 * 4, 1),
+        nf("userVec2[1]", offset_of!(entityState_t, userVec2) + 1 * 4, 1),
+        nf("userVec2[2]", offset_of!(entityState_t, userVec2) + 2 * 4, 1),
+    ]
+}
+
+/// Raven `playerStateFields[]` — the normal-client playerstate delta table.
+/// `_OPTIMIZED_VEHICLE_NETWORKING` is unconditionally defined
+/// (`q_shared.h:2154`), so this is the `#ifdef` branch's table (the `#else`
+/// variant at msg.cpp:1827-1989 is dead); `!_XBOX` mod-author tail included.
+/// Order is wire-critical. `fd.forcePowerLevel[FP_LEVITATION/FP_SEE]` and
+/// `fd.forcePowerDebounce[FP_LEVITATION]` index the nested `forcedata_t`.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:1410-1568`
+fn build_player_state_fields() -> Vec<netField_t> {
+    vec![
+        nf("commandTime", offset_of!(playerState_t, commandTime), 32),
+        nf("origin[1]", offset_of!(playerState_t, origin) + 1 * 4, 0),
+        nf("origin[0]", offset_of!(playerState_t, origin) + 0 * 4, 0),
+        nf("viewangles[1]", offset_of!(playerState_t, viewangles) + 1 * 4, 0),
+        nf("viewangles[0]", offset_of!(playerState_t, viewangles) + 0 * 4, 0),
+        nf("origin[2]", offset_of!(playerState_t, origin) + 2 * 4, 0),
+        nf("velocity[0]", offset_of!(playerState_t, velocity) + 0 * 4, 0),
+        nf("velocity[1]", offset_of!(playerState_t, velocity) + 1 * 4, 0),
+        nf("velocity[2]", offset_of!(playerState_t, velocity) + 2 * 4, 0),
+        nf("bobCycle", offset_of!(playerState_t, bobCycle), 8),
+        nf("weaponTime", offset_of!(playerState_t, weaponTime), -16),
+        nf("delta_angles[1]", offset_of!(playerState_t, delta_angles) + 1 * 4, 16),
+        nf("speed", offset_of!(playerState_t, speed), 0),
+        nf("legsAnim", offset_of!(playerState_t, legsAnim), 16),
+        nf("delta_angles[0]", offset_of!(playerState_t, delta_angles) + 0 * 4, 16),
+        nf("torsoAnim", offset_of!(playerState_t, torsoAnim), 16),
+        nf("groundEntityNum", offset_of!(playerState_t, groundEntityNum), GENTITYNUM_BITS),
+        nf("eFlags", offset_of!(playerState_t, eFlags), 32),
+        nf("fd.forcePower", offset_of!(playerState_t, fd.forcePower), 8),
+        nf("eventSequence", offset_of!(playerState_t, eventSequence), 16),
+        nf("torsoTimer", offset_of!(playerState_t, torsoTimer), 16),
+        nf("legsTimer", offset_of!(playerState_t, legsTimer), 16),
+        nf("viewheight", offset_of!(playerState_t, viewheight), -8),
+        nf("fd.saberAnimLevel", offset_of!(playerState_t, fd.saberAnimLevel), 4),
+        nf("rocketLockIndex", offset_of!(playerState_t, rocketLockIndex), GENTITYNUM_BITS),
+        nf("fd.saberDrawAnimLevel", offset_of!(playerState_t, fd.saberDrawAnimLevel), 4),
+        nf("genericEnemyIndex", offset_of!(playerState_t, genericEnemyIndex), 32),
+        nf("events[0]", offset_of!(playerState_t, events) + 0 * 4, 10),
+        nf("events[1]", offset_of!(playerState_t, events) + 1 * 4, 10),
+        nf("customRGBA[0]", offset_of!(playerState_t, customRGBA) + 0 * 4, 8),
+        nf("movementDir", offset_of!(playerState_t, movementDir), 4),
+        nf("saberEntityNum", offset_of!(playerState_t, saberEntityNum), GENTITYNUM_BITS),
+        nf("customRGBA[3]", offset_of!(playerState_t, customRGBA) + 3 * 4, 8),
+        nf("weaponstate", offset_of!(playerState_t, weaponstate), 4),
+        nf("saberMove", offset_of!(playerState_t, saberMove), 32),
+        nf("standheight", offset_of!(playerState_t, standheight), 10),
+        nf("crouchheight", offset_of!(playerState_t, crouchheight), 10),
+        nf("basespeed", offset_of!(playerState_t, basespeed), -16),
+        nf("pm_flags", offset_of!(playerState_t, pm_flags), 16),
+        nf("jetpackFuel", offset_of!(playerState_t, jetpackFuel), 8),
+        nf("cloakFuel", offset_of!(playerState_t, cloakFuel), 8),
+        nf("pm_time", offset_of!(playerState_t, pm_time), -16),
+        nf("customRGBA[1]", offset_of!(playerState_t, customRGBA) + 1 * 4, 8),
+        nf("clientNum", offset_of!(playerState_t, clientNum), GENTITYNUM_BITS),
+        nf("duelIndex", offset_of!(playerState_t, duelIndex), GENTITYNUM_BITS),
+        nf("customRGBA[2]", offset_of!(playerState_t, customRGBA) + 2 * 4, 8),
+        nf("gravity", offset_of!(playerState_t, gravity), 16),
+        nf("weapon", offset_of!(playerState_t, weapon), 8),
+        nf("delta_angles[2]", offset_of!(playerState_t, delta_angles) + 2 * 4, 16),
+        nf("saberCanThrow", offset_of!(playerState_t, saberCanThrow), 1),
+        nf("viewangles[2]", offset_of!(playerState_t, viewangles) + 2 * 4, 0),
+        nf("fd.forcePowersKnown", offset_of!(playerState_t, fd.forcePowersKnown), 32),
+        nf(
+            "fd.forcePowerLevel[FP_LEVITATION]",
+            offset_of!(playerState_t, fd.forcePowerLevel) + FP_LEVITATION as usize * 4,
+            2,
+        ),
+        nf(
+            "fd.forcePowerDebounce[FP_LEVITATION]",
+            offset_of!(playerState_t, fd.forcePowerDebounce) + FP_LEVITATION as usize * 4,
+            32,
+        ),
+        nf("fd.forcePowerSelected", offset_of!(playerState_t, fd.forcePowerSelected), 8),
+        nf("torsoFlip", offset_of!(playerState_t, torsoFlip), 1),
+        nf("externalEvent", offset_of!(playerState_t, externalEvent), 10),
+        nf("damageYaw", offset_of!(playerState_t, damageYaw), 8),
+        nf("damageCount", offset_of!(playerState_t, damageCount), 8),
+        nf("inAirAnim", offset_of!(playerState_t, inAirAnim), 1),
+        nf("eventParms[1]", offset_of!(playerState_t, eventParms) + 1 * 4, 8),
+        nf("fd.forceSide", offset_of!(playerState_t, fd.forceSide), 2),
+        nf("saberAttackChainCount", offset_of!(playerState_t, saberAttackChainCount), 4),
+        nf("pm_type", offset_of!(playerState_t, pm_type), 8),
+        nf("externalEventParm", offset_of!(playerState_t, externalEventParm), 8),
+        nf("eventParms[0]", offset_of!(playerState_t, eventParms) + 0 * 4, -16),
+        nf("lookTarget", offset_of!(playerState_t, lookTarget), GENTITYNUM_BITS),
+        nf("weaponChargeSubtractTime", offset_of!(playerState_t, weaponChargeSubtractTime), 32),
+        nf("weaponChargeTime", offset_of!(playerState_t, weaponChargeTime), 32),
+        nf("legsFlip", offset_of!(playerState_t, legsFlip), 1),
+        nf("damageEvent", offset_of!(playerState_t, damageEvent), 8),
+        nf("rocketTargetTime", offset_of!(playerState_t, rocketTargetTime), 32),
+        nf("activeForcePass", offset_of!(playerState_t, activeForcePass), 6),
+        nf("electrifyTime", offset_of!(playerState_t, electrifyTime), 32),
+        nf("fd.forceJumpZStart", offset_of!(playerState_t, fd.forceJumpZStart), 0),
+        nf("loopSound", offset_of!(playerState_t, loopSound), 16),
+        nf("hasLookTarget", offset_of!(playerState_t, hasLookTarget), 1),
+        nf("saberBlocked", offset_of!(playerState_t, saberBlocked), 8),
+        nf("damageType", offset_of!(playerState_t, damageType), 2),
+        nf("rocketLockTime", offset_of!(playerState_t, rocketLockTime), 32),
+        nf("forceHandExtend", offset_of!(playerState_t, forceHandExtend), 8),
+        nf("saberHolstered", offset_of!(playerState_t, saberHolstered), 2),
+        nf("fd.forcePowersActive", offset_of!(playerState_t, fd.forcePowersActive), 32),
+        nf("damagePitch", offset_of!(playerState_t, damagePitch), 8),
+        nf("m_iVehicleNum", offset_of!(playerState_t, m_iVehicleNum), GENTITYNUM_BITS),
+        nf("generic1", offset_of!(playerState_t, generic1), 8),
+        nf("jumppad_ent", offset_of!(playerState_t, jumppad_ent), 10),
+        nf("hasDetPackPlanted", offset_of!(playerState_t, hasDetPackPlanted), 1),
+        nf("saberInFlight", offset_of!(playerState_t, saberInFlight), 1),
+        nf("forceDodgeAnim", offset_of!(playerState_t, forceDodgeAnim), 16),
+        nf("zoomMode", offset_of!(playerState_t, zoomMode), 2),
+        nf("hackingTime", offset_of!(playerState_t, hackingTime), 32),
+        nf("zoomTime", offset_of!(playerState_t, zoomTime), 32),
+        nf("brokenLimbs", offset_of!(playerState_t, brokenLimbs), 8),
+        nf("zoomLocked", offset_of!(playerState_t, zoomLocked), 1),
+        nf("zoomFov", offset_of!(playerState_t, zoomFov), 0),
+        nf("fd.forceRageRecoveryTime", offset_of!(playerState_t, fd.forceRageRecoveryTime), 32),
+        nf("fallingToDeath", offset_of!(playerState_t, fallingToDeath), 32),
+        nf(
+            "fd.forceMindtrickTargetIndex",
+            offset_of!(playerState_t, fd.forceMindtrickTargetIndex),
+            16,
+        ),
+        nf(
+            "fd.forceMindtrickTargetIndex2",
+            offset_of!(playerState_t, fd.forceMindtrickTargetIndex2),
+            16,
+        ),
+        nf("lastHitLoc[2]", offset_of!(playerState_t, lastHitLoc) + 2 * 4, 0),
+        nf(
+            "fd.forceMindtrickTargetIndex3",
+            offset_of!(playerState_t, fd.forceMindtrickTargetIndex3),
+            16,
+        ),
+        nf("lastHitLoc[0]", offset_of!(playerState_t, lastHitLoc) + 0 * 4, 0),
+        nf("eFlags2", offset_of!(playerState_t, eFlags2), 10),
+        nf(
+            "fd.forceMindtrickTargetIndex4",
+            offset_of!(playerState_t, fd.forceMindtrickTargetIndex4),
+            16,
+        ),
+        nf("lastHitLoc[1]", offset_of!(playerState_t, lastHitLoc) + 1 * 4, 0),
+        nf("fd.sentryDeployed", offset_of!(playerState_t, fd.sentryDeployed), 1),
+        nf("saberLockTime", offset_of!(playerState_t, saberLockTime), 32),
+        nf("saberLockFrame", offset_of!(playerState_t, saberLockFrame), 16),
+        nf(
+            "fd.forcePowerLevel[FP_SEE]",
+            offset_of!(playerState_t, fd.forcePowerLevel) + FP_SEE as usize * 4,
+            2,
+        ),
+        nf("saberLockEnemy", offset_of!(playerState_t, saberLockEnemy), GENTITYNUM_BITS),
+        nf("fd.forceGripCripple", offset_of!(playerState_t, fd.forceGripCripple), 1),
+        nf("emplacedIndex", offset_of!(playerState_t, emplacedIndex), GENTITYNUM_BITS),
+        nf("holocronBits", offset_of!(playerState_t, holocronBits), 32),
+        nf("isJediMaster", offset_of!(playerState_t, isJediMaster), 1),
+        nf("forceRestricted", offset_of!(playerState_t, forceRestricted), 1),
+        nf("trueJedi", offset_of!(playerState_t, trueJedi), 1),
+        nf("trueNonJedi", offset_of!(playerState_t, trueNonJedi), 1),
+        nf("duelTime", offset_of!(playerState_t, duelTime), 32),
+        nf("duelInProgress", offset_of!(playerState_t, duelInProgress), 1),
+        nf("saberLockAdvance", offset_of!(playerState_t, saberLockAdvance), 1),
+        nf("heldByClient", offset_of!(playerState_t, heldByClient), 6),
+        nf("ragAttach", offset_of!(playerState_t, ragAttach), GENTITYNUM_BITS),
+        nf("iModelScale", offset_of!(playerState_t, iModelScale), 10),
+        nf("hackingBaseTime", offset_of!(playerState_t, hackingBaseTime), 16),
+        nf("userInt1", offset_of!(playerState_t, userInt1), 1),
+        nf("userInt2", offset_of!(playerState_t, userInt2), 1),
+        nf("userInt3", offset_of!(playerState_t, userInt3), 1),
+        nf("userFloat1", offset_of!(playerState_t, userFloat1), 1),
+        nf("userFloat2", offset_of!(playerState_t, userFloat2), 1),
+        nf("userFloat3", offset_of!(playerState_t, userFloat3), 1),
+        nf("userVec1[0]", offset_of!(playerState_t, userVec1) + 0 * 4, 1),
+        nf("userVec1[1]", offset_of!(playerState_t, userVec1) + 1 * 4, 1),
+        nf("userVec1[2]", offset_of!(playerState_t, userVec1) + 2 * 4, 1),
+        nf("userVec2[0]", offset_of!(playerState_t, userVec2) + 0 * 4, 1),
+        nf("userVec2[1]", offset_of!(playerState_t, userVec2) + 1 * 4, 1),
+        nf("userVec2[2]", offset_of!(playerState_t, userVec2) + 2 * 4, 1),
+    ]
+}
+
+/// Raven `pilotPlayerStateFields[]` — the pilot-riding-inside-a-vehicle delta
+/// table (live: `_OPTIMIZED_VEHICLE_NETWORKING` is unconditionally defined,
+/// `q_shared.h:2154`). Order is wire-critical. Only the first
+/// `len - 82` (= 58) entries are ever coded — Raven's
+/// `sizeof(pilotPlayerStateFields)/sizeof([0]) - 82` — but the full 140-entry
+/// table is transcribed faithfully.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:1570-1734`
+fn build_pilot_player_state_fields() -> Vec<netField_t> {
+    vec![
+        nf("commandTime", offset_of!(playerState_t, commandTime), 32),
+        nf("origin[1]", offset_of!(playerState_t, origin) + 1 * 4, 0),
+        nf("origin[0]", offset_of!(playerState_t, origin) + 0 * 4, 0),
+        nf("viewangles[1]", offset_of!(playerState_t, viewangles) + 1 * 4, 0),
+        nf("viewangles[0]", offset_of!(playerState_t, viewangles) + 0 * 4, 0),
+        nf("origin[2]", offset_of!(playerState_t, origin) + 2 * 4, 0),
+        nf("weaponTime", offset_of!(playerState_t, weaponTime), -16),
+        nf("delta_angles[1]", offset_of!(playerState_t, delta_angles) + 1 * 4, 16),
+        nf("delta_angles[0]", offset_of!(playerState_t, delta_angles) + 0 * 4, 16),
+        nf("eFlags", offset_of!(playerState_t, eFlags), 32),
+        nf("eventSequence", offset_of!(playerState_t, eventSequence), 16),
+        nf("rocketLockIndex", offset_of!(playerState_t, rocketLockIndex), GENTITYNUM_BITS),
+        nf("events[0]", offset_of!(playerState_t, events) + 0 * 4, 10),
+        nf("events[1]", offset_of!(playerState_t, events) + 1 * 4, 10),
+        nf("weaponstate", offset_of!(playerState_t, weaponstate), 4),
+        nf("pm_flags", offset_of!(playerState_t, pm_flags), 16),
+        nf("pm_time", offset_of!(playerState_t, pm_time), -16),
+        nf("clientNum", offset_of!(playerState_t, clientNum), GENTITYNUM_BITS),
+        nf("weapon", offset_of!(playerState_t, weapon), 8),
+        nf("delta_angles[2]", offset_of!(playerState_t, delta_angles) + 2 * 4, 16),
+        nf("viewangles[2]", offset_of!(playerState_t, viewangles) + 2 * 4, 0),
+        nf("externalEvent", offset_of!(playerState_t, externalEvent), 10),
+        nf("eventParms[1]", offset_of!(playerState_t, eventParms) + 1 * 4, 8),
+        nf("pm_type", offset_of!(playerState_t, pm_type), 8),
+        nf("externalEventParm", offset_of!(playerState_t, externalEventParm), 8),
+        nf("eventParms[0]", offset_of!(playerState_t, eventParms) + 0 * 4, -16),
+        nf("weaponChargeSubtractTime", offset_of!(playerState_t, weaponChargeSubtractTime), 32),
+        nf("weaponChargeTime", offset_of!(playerState_t, weaponChargeTime), 32),
+        nf("rocketTargetTime", offset_of!(playerState_t, rocketTargetTime), 32),
+        nf("fd.forceJumpZStart", offset_of!(playerState_t, fd.forceJumpZStart), 0),
+        nf("rocketLockTime", offset_of!(playerState_t, rocketLockTime), 32),
+        nf("m_iVehicleNum", offset_of!(playerState_t, m_iVehicleNum), GENTITYNUM_BITS),
+        nf("generic1", offset_of!(playerState_t, generic1), 8),
+        nf("eFlags2", offset_of!(playerState_t, eFlags2), 10),
+        //===THESE SHOULD NOT BE CHANGING OFTEN====================================================================
+        nf("legsAnim", offset_of!(playerState_t, legsAnim), 16),
+        nf("torsoAnim", offset_of!(playerState_t, torsoAnim), 16),
+        nf("torsoTimer", offset_of!(playerState_t, torsoTimer), 16),
+        nf("legsTimer", offset_of!(playerState_t, legsTimer), 16),
+        nf("jetpackFuel", offset_of!(playerState_t, jetpackFuel), 8),
+        nf("cloakFuel", offset_of!(playerState_t, cloakFuel), 8),
+        nf("saberCanThrow", offset_of!(playerState_t, saberCanThrow), 1),
+        nf(
+            "fd.forcePowerDebounce[FP_LEVITATION]",
+            offset_of!(playerState_t, fd.forcePowerDebounce) + FP_LEVITATION as usize * 4,
+            32,
+        ),
+        nf("torsoFlip", offset_of!(playerState_t, torsoFlip), 1),
+        nf("legsFlip", offset_of!(playerState_t, legsFlip), 1),
+        nf("fd.forcePowersActive", offset_of!(playerState_t, fd.forcePowersActive), 32),
+        nf("hasDetPackPlanted", offset_of!(playerState_t, hasDetPackPlanted), 1),
+        nf("fd.forceRageRecoveryTime", offset_of!(playerState_t, fd.forceRageRecoveryTime), 32),
+        nf("saberInFlight", offset_of!(playerState_t, saberInFlight), 1),
+        nf(
+            "fd.forceMindtrickTargetIndex",
+            offset_of!(playerState_t, fd.forceMindtrickTargetIndex),
+            16,
+        ),
+        nf(
+            "fd.forceMindtrickTargetIndex2",
+            offset_of!(playerState_t, fd.forceMindtrickTargetIndex2),
+            16,
+        ),
+        nf(
+            "fd.forceMindtrickTargetIndex3",
+            offset_of!(playerState_t, fd.forceMindtrickTargetIndex3),
+            16,
+        ),
+        nf(
+            "fd.forceMindtrickTargetIndex4",
+            offset_of!(playerState_t, fd.forceMindtrickTargetIndex4),
+            16,
+        ),
+        nf("fd.sentryDeployed", offset_of!(playerState_t, fd.sentryDeployed), 1),
+        nf(
+            "fd.forcePowerLevel[FP_SEE]",
+            offset_of!(playerState_t, fd.forcePowerLevel) + FP_SEE as usize * 4,
+            2,
+        ),
+        nf("holocronBits", offset_of!(playerState_t, holocronBits), 32),
+        nf("fd.forcePower", offset_of!(playerState_t, fd.forcePower), 8),
+        //===THE REST OF THESE SHOULD NOT BE RELEVANT, BUT, FOR SAFETY, INCLUDE THEM ANYWAY, JUST AT THE BOTTOM===============================================================
+        nf("velocity[0]", offset_of!(playerState_t, velocity) + 0 * 4, 0),
+        nf("velocity[1]", offset_of!(playerState_t, velocity) + 1 * 4, 0),
+        nf("velocity[2]", offset_of!(playerState_t, velocity) + 2 * 4, 0),
+        nf("bobCycle", offset_of!(playerState_t, bobCycle), 8),
+        nf("speed", offset_of!(playerState_t, speed), 0),
+        nf("groundEntityNum", offset_of!(playerState_t, groundEntityNum), GENTITYNUM_BITS),
+        nf("viewheight", offset_of!(playerState_t, viewheight), -8),
+        nf("fd.saberAnimLevel", offset_of!(playerState_t, fd.saberAnimLevel), 4),
+        nf("fd.saberDrawAnimLevel", offset_of!(playerState_t, fd.saberDrawAnimLevel), 4),
+        nf("genericEnemyIndex", offset_of!(playerState_t, genericEnemyIndex), 32),
+        nf("customRGBA[0]", offset_of!(playerState_t, customRGBA) + 0 * 4, 8),
+        nf("movementDir", offset_of!(playerState_t, movementDir), 4),
+        nf("saberEntityNum", offset_of!(playerState_t, saberEntityNum), GENTITYNUM_BITS),
+        nf("customRGBA[3]", offset_of!(playerState_t, customRGBA) + 3 * 4, 8),
+        nf("saberMove", offset_of!(playerState_t, saberMove), 32),
+        nf("standheight", offset_of!(playerState_t, standheight), 10),
+        nf("crouchheight", offset_of!(playerState_t, crouchheight), 10),
+        nf("basespeed", offset_of!(playerState_t, basespeed), -16),
+        nf("customRGBA[1]", offset_of!(playerState_t, customRGBA) + 1 * 4, 8),
+        nf("duelIndex", offset_of!(playerState_t, duelIndex), GENTITYNUM_BITS),
+        nf("customRGBA[2]", offset_of!(playerState_t, customRGBA) + 2 * 4, 8),
+        nf("gravity", offset_of!(playerState_t, gravity), 16),
+        nf("fd.forcePowersKnown", offset_of!(playerState_t, fd.forcePowersKnown), 32),
+        nf(
+            "fd.forcePowerLevel[FP_LEVITATION]",
+            offset_of!(playerState_t, fd.forcePowerLevel) + FP_LEVITATION as usize * 4,
+            2,
+        ),
+        nf("fd.forcePowerSelected", offset_of!(playerState_t, fd.forcePowerSelected), 8),
+        nf("damageYaw", offset_of!(playerState_t, damageYaw), 8),
+        nf("damageCount", offset_of!(playerState_t, damageCount), 8),
+        nf("inAirAnim", offset_of!(playerState_t, inAirAnim), 1),
+        nf("fd.forceSide", offset_of!(playerState_t, fd.forceSide), 2),
+        nf("saberAttackChainCount", offset_of!(playerState_t, saberAttackChainCount), 4),
+        nf("lookTarget", offset_of!(playerState_t, lookTarget), GENTITYNUM_BITS),
+        nf("moveDir[1]", offset_of!(playerState_t, moveDir) + 1 * 4, 0),
+        nf("moveDir[0]", offset_of!(playerState_t, moveDir) + 0 * 4, 0),
+        nf("damageEvent", offset_of!(playerState_t, damageEvent), 8),
+        nf("moveDir[2]", offset_of!(playerState_t, moveDir) + 2 * 4, 0),
+        nf("activeForcePass", offset_of!(playerState_t, activeForcePass), 6),
+        nf("electrifyTime", offset_of!(playerState_t, electrifyTime), 32),
+        nf("damageType", offset_of!(playerState_t, damageType), 2),
+        nf("loopSound", offset_of!(playerState_t, loopSound), 16),
+        nf("hasLookTarget", offset_of!(playerState_t, hasLookTarget), 1),
+        nf("saberBlocked", offset_of!(playerState_t, saberBlocked), 8),
+        nf("forceHandExtend", offset_of!(playerState_t, forceHandExtend), 8),
+        nf("saberHolstered", offset_of!(playerState_t, saberHolstered), 2),
+        nf("damagePitch", offset_of!(playerState_t, damagePitch), 8),
+        nf("jumppad_ent", offset_of!(playerState_t, jumppad_ent), 10),
+        nf("forceDodgeAnim", offset_of!(playerState_t, forceDodgeAnim), 16),
+        nf("zoomMode", offset_of!(playerState_t, zoomMode), 2),
+        nf("hackingTime", offset_of!(playerState_t, hackingTime), 32),
+        nf("zoomTime", offset_of!(playerState_t, zoomTime), 32),
+        nf("brokenLimbs", offset_of!(playerState_t, brokenLimbs), 8),
+        nf("zoomLocked", offset_of!(playerState_t, zoomLocked), 1),
+        nf("zoomFov", offset_of!(playerState_t, zoomFov), 0),
+        nf("fallingToDeath", offset_of!(playerState_t, fallingToDeath), 32),
+        nf("lastHitLoc[2]", offset_of!(playerState_t, lastHitLoc) + 2 * 4, 0),
+        nf("lastHitLoc[0]", offset_of!(playerState_t, lastHitLoc) + 0 * 4, 0),
+        nf("lastHitLoc[1]", offset_of!(playerState_t, lastHitLoc) + 1 * 4, 0),
+        nf("saberLockTime", offset_of!(playerState_t, saberLockTime), 32),
+        nf("saberLockFrame", offset_of!(playerState_t, saberLockFrame), 16),
+        nf("saberLockEnemy", offset_of!(playerState_t, saberLockEnemy), GENTITYNUM_BITS),
+        nf("fd.forceGripCripple", offset_of!(playerState_t, fd.forceGripCripple), 1),
+        nf("emplacedIndex", offset_of!(playerState_t, emplacedIndex), GENTITYNUM_BITS),
+        nf("isJediMaster", offset_of!(playerState_t, isJediMaster), 1),
+        nf("forceRestricted", offset_of!(playerState_t, forceRestricted), 1),
+        nf("trueJedi", offset_of!(playerState_t, trueJedi), 1),
+        nf("trueNonJedi", offset_of!(playerState_t, trueNonJedi), 1),
+        nf("duelTime", offset_of!(playerState_t, duelTime), 32),
+        nf("duelInProgress", offset_of!(playerState_t, duelInProgress), 1),
+        nf("saberLockAdvance", offset_of!(playerState_t, saberLockAdvance), 1),
+        nf("heldByClient", offset_of!(playerState_t, heldByClient), 6),
+        nf("ragAttach", offset_of!(playerState_t, ragAttach), GENTITYNUM_BITS),
+        nf("iModelScale", offset_of!(playerState_t, iModelScale), 10),
+        nf("hackingBaseTime", offset_of!(playerState_t, hackingBaseTime), 16),
+        //===NEVER SEND THESE, ONLY USED BY VEHICLES============================
+        // (Raven's veh* entries here are commented out in the oracle.)
+        nf("userInt1", offset_of!(playerState_t, userInt1), 1),
+        nf("userInt2", offset_of!(playerState_t, userInt2), 1),
+        nf("userInt3", offset_of!(playerState_t, userInt3), 1),
+        nf("userFloat1", offset_of!(playerState_t, userFloat1), 1),
+        nf("userFloat2", offset_of!(playerState_t, userFloat2), 1),
+        nf("userFloat3", offset_of!(playerState_t, userFloat3), 1),
+        nf("userVec1[0]", offset_of!(playerState_t, userVec1) + 0 * 4, 1),
+        nf("userVec1[1]", offset_of!(playerState_t, userVec1) + 1 * 4, 1),
+        nf("userVec1[2]", offset_of!(playerState_t, userVec1) + 2 * 4, 1),
+        nf("userVec2[0]", offset_of!(playerState_t, userVec2) + 0 * 4, 1),
+        nf("userVec2[1]", offset_of!(playerState_t, userVec2) + 1 * 4, 1),
+        nf("userVec2[2]", offset_of!(playerState_t, userVec2) + 2 * 4, 1),
+    ]
+}
+
+/// Raven `vehPlayerStateFields[]` — the vehicle playerstate delta table (live:
+/// `_OPTIMIZED_VEHICLE_NETWORKING` is unconditionally defined,
+/// `q_shared.h:2154`). Order is wire-critical; all 69 entries are coded.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:1736-1822`
+fn build_veh_player_state_fields() -> Vec<netField_t> {
+    vec![
+        nf("commandTime", offset_of!(playerState_t, commandTime), 32),
+        nf("origin[1]", offset_of!(playerState_t, origin) + 1 * 4, 0),
+        nf("origin[0]", offset_of!(playerState_t, origin) + 0 * 4, 0),
+        nf("viewangles[1]", offset_of!(playerState_t, viewangles) + 1 * 4, 0),
+        nf("viewangles[0]", offset_of!(playerState_t, viewangles) + 0 * 4, 0),
+        nf("origin[2]", offset_of!(playerState_t, origin) + 2 * 4, 0),
+        nf("velocity[0]", offset_of!(playerState_t, velocity) + 0 * 4, 0),
+        nf("velocity[1]", offset_of!(playerState_t, velocity) + 1 * 4, 0),
+        nf("velocity[2]", offset_of!(playerState_t, velocity) + 2 * 4, 0),
+        nf("weaponTime", offset_of!(playerState_t, weaponTime), -16),
+        nf("delta_angles[1]", offset_of!(playerState_t, delta_angles) + 1 * 4, 16),
+        nf("speed", offset_of!(playerState_t, speed), 0),
+        nf("legsAnim", offset_of!(playerState_t, legsAnim), 16),
+        nf("delta_angles[0]", offset_of!(playerState_t, delta_angles) + 0 * 4, 16),
+        nf("groundEntityNum", offset_of!(playerState_t, groundEntityNum), GENTITYNUM_BITS),
+        nf("eFlags", offset_of!(playerState_t, eFlags), 32),
+        nf("eventSequence", offset_of!(playerState_t, eventSequence), 16),
+        nf("legsTimer", offset_of!(playerState_t, legsTimer), 16),
+        nf("rocketLockIndex", offset_of!(playerState_t, rocketLockIndex), GENTITYNUM_BITS),
+        nf("events[0]", offset_of!(playerState_t, events) + 0 * 4, 10),
+        nf("events[1]", offset_of!(playerState_t, events) + 1 * 4, 10),
+        nf("weaponstate", offset_of!(playerState_t, weaponstate), 4),
+        nf("pm_flags", offset_of!(playerState_t, pm_flags), 16),
+        nf("pm_time", offset_of!(playerState_t, pm_time), -16),
+        nf("clientNum", offset_of!(playerState_t, clientNum), GENTITYNUM_BITS),
+        nf("gravity", offset_of!(playerState_t, gravity), 16),
+        nf("weapon", offset_of!(playerState_t, weapon), 8),
+        nf("delta_angles[2]", offset_of!(playerState_t, delta_angles) + 2 * 4, 16),
+        nf("viewangles[2]", offset_of!(playerState_t, viewangles) + 2 * 4, 0),
+        nf("externalEvent", offset_of!(playerState_t, externalEvent), 10),
+        nf("eventParms[1]", offset_of!(playerState_t, eventParms) + 1 * 4, 8),
+        nf("pm_type", offset_of!(playerState_t, pm_type), 8),
+        nf("externalEventParm", offset_of!(playerState_t, externalEventParm), 8),
+        nf("eventParms[0]", offset_of!(playerState_t, eventParms) + 0 * 4, -16),
+        nf("vehOrientation[0]", offset_of!(playerState_t, vehOrientation) + 0 * 4, 0),
+        nf("vehOrientation[1]", offset_of!(playerState_t, vehOrientation) + 1 * 4, 0),
+        nf("moveDir[1]", offset_of!(playerState_t, moveDir) + 1 * 4, 0),
+        nf("moveDir[0]", offset_of!(playerState_t, moveDir) + 0 * 4, 0),
+        nf("vehOrientation[2]", offset_of!(playerState_t, vehOrientation) + 2 * 4, 0),
+        nf("moveDir[2]", offset_of!(playerState_t, moveDir) + 2 * 4, 0),
+        nf("rocketTargetTime", offset_of!(playerState_t, rocketTargetTime), 32),
+        nf("electrifyTime", offset_of!(playerState_t, electrifyTime), 32),
+        nf("loopSound", offset_of!(playerState_t, loopSound), 16),
+        nf("rocketLockTime", offset_of!(playerState_t, rocketLockTime), 32),
+        nf("m_iVehicleNum", offset_of!(playerState_t, m_iVehicleNum), GENTITYNUM_BITS),
+        nf("vehTurnaroundTime", offset_of!(playerState_t, vehTurnaroundTime), 32),
+        nf("hackingTime", offset_of!(playerState_t, hackingTime), 32),
+        nf("brokenLimbs", offset_of!(playerState_t, brokenLimbs), 8),
+        nf("vehWeaponsLinked", offset_of!(playerState_t, vehWeaponsLinked), 1),
+        nf("hyperSpaceTime", offset_of!(playerState_t, hyperSpaceTime), 32),
+        nf("eFlags2", offset_of!(playerState_t, eFlags2), 10),
+        nf("hyperSpaceAngles[1]", offset_of!(playerState_t, hyperSpaceAngles) + 1 * 4, 0),
+        nf("vehBoarding", offset_of!(playerState_t, vehBoarding), 1),
+        nf("vehTurnaroundIndex", offset_of!(playerState_t, vehTurnaroundIndex), GENTITYNUM_BITS),
+        nf("vehSurfaces", offset_of!(playerState_t, vehSurfaces), 16),
+        nf("hyperSpaceAngles[0]", offset_of!(playerState_t, hyperSpaceAngles) + 0 * 4, 0),
+        nf("hyperSpaceAngles[2]", offset_of!(playerState_t, hyperSpaceAngles) + 2 * 4, 0),
+        nf("userInt1", offset_of!(playerState_t, userInt1), 1),
+        nf("userInt2", offset_of!(playerState_t, userInt2), 1),
+        nf("userInt3", offset_of!(playerState_t, userInt3), 1),
+        nf("userFloat1", offset_of!(playerState_t, userFloat1), 1),
+        nf("userFloat2", offset_of!(playerState_t, userFloat2), 1),
+        nf("userFloat3", offset_of!(playerState_t, userFloat3), 1),
+        nf("userVec1[0]", offset_of!(playerState_t, userVec1) + 0 * 4, 1),
+        nf("userVec1[1]", offset_of!(playerState_t, userVec1) + 1 * 4, 1),
+        nf("userVec1[2]", offset_of!(playerState_t, userVec1) + 2 * 4, 1),
+        nf("userVec2[0]", offset_of!(playerState_t, userVec2) + 0 * 4, 1),
+        nf("userVec2[1]", offset_of!(playerState_t, userVec2) + 1 * 4, 1),
+        nf("userVec2[2]", offset_of!(playerState_t, userVec2) + 2 * 4, 1),
+    ]
+}
+
+/// Raven's `netField_t *PSFields` cursor — which playerstate delta table
+/// `MSG_{Write,Read}DeltaPlayerstate` selected under the always-on
+/// `_OPTIMIZED_VEHICLE_NETWORKING` build (`q_shared.h:2154`).
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:2225,2241-2261,2492-2511`
+#[derive(Clone, Copy)]
+enum PsfTable {
+    Normal,
+    Pilot,
+    Veh,
+}
+
+/// The selected table's fields (Raven's `PSFields[i]` reads).
+fn psf_fields(common: &Common, table: PsfTable) -> &[netField_t] {
+    match table {
+        PsfTable::Normal => &common.player_state_fields,
+        PsfTable::Pilot => &common.pilot_player_state_fields,
+        PsfTable::Veh => &common.veh_player_state_fields,
+    }
+}
+
+/// Mutable view for the write path's `field->mCount++` profiling bump.
+fn psf_fields_mut(common: &mut Common, table: PsfTable) -> &mut [netField_t] {
+    match table {
+        PsfTable::Normal => &mut common.player_state_fields,
+        PsfTable::Pilot => &mut common.pilot_player_state_fields,
+        PsfTable::Veh => &mut common.veh_player_state_fields,
+    }
+}
+
 /// Raven `MSG_Init` — one-time netf/psf override check, lazy Huffman init, then
 /// zero the `msg_t` and wire its buffer. (`_XBOX` is not defined, so the
 /// override-check block is live.)
@@ -123,6 +750,22 @@ pub fn MSG_Init(
     data: *mut byte,
     length: c_int,
 ) {
+    // The delta-coder field tables are file-scope statics in Raven; here they
+    // live on `Common` and are populated lazily so the override check below sees
+    // them filled.
+    if common.entity_state_fields.is_empty() {
+        common.entity_state_fields = build_entity_state_fields();
+    }
+    if common.player_state_fields.is_empty() {
+        common.player_state_fields = build_player_state_fields();
+    }
+    if common.pilot_player_state_fields.is_empty() {
+        common.pilot_player_state_fields = build_pilot_player_state_fields();
+    }
+    if common.veh_player_state_fields.is_empty() {
+        common.veh_player_state_fields = build_veh_player_state_fields();
+    }
+
     if !common.g_nOverrideChecked {
         // Check for netf overrides, then for psf overrides.
         MSG_CheckNETFPSFOverrides(common, cm, rm, host, qfalse);
@@ -139,6 +782,54 @@ pub fn MSG_Init(
         crate::common_fns::Com_Memset(buf as *mut (), 0, core::mem::size_of::<msg_t>());
         (*buf).data = data;
         (*buf).maxsize = length;
+    }
+}
+
+/// Raven `MSG_InitOOB` — like [`MSG_Init`] but flags the buffer out-of-band
+/// (`oob = qtrue`) for raw byte framing (netchan headers, connectionless
+/// datagrams). Runs the same one-time override check and lazy Huffman init.
+/// (`_XBOX` is not defined, so the override-check block is live.)
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:70-92`
+pub fn MSG_InitOOB(
+    common: &mut Common,
+    cm: &mut CollisionWorld,
+    rm: &mut RenderModels,
+    host: &mut dyn EngineHost,
+    buf: *mut msg_t,
+    data: *mut byte,
+    length: c_int,
+) {
+    if common.entity_state_fields.is_empty() {
+        common.entity_state_fields = build_entity_state_fields();
+    }
+    if common.player_state_fields.is_empty() {
+        common.player_state_fields = build_player_state_fields();
+    }
+    if common.pilot_player_state_fields.is_empty() {
+        common.pilot_player_state_fields = build_pilot_player_state_fields();
+    }
+    if common.veh_player_state_fields.is_empty() {
+        common.veh_player_state_fields = build_veh_player_state_fields();
+    }
+
+    if !common.g_nOverrideChecked {
+        // Check for netf overrides, then for psf overrides.
+        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qfalse);
+        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qtrue);
+
+        common.g_nOverrideChecked = true;
+    }
+
+    if common.msg_init == qfalse {
+        MSG_initHuffman(common);
+    }
+
+    unsafe {
+        crate::common_fns::Com_Memset(buf as *mut (), 0, core::mem::size_of::<msg_t>());
+        (*buf).data = data;
+        (*buf).maxsize = length;
+        (*buf).oob = qtrue;
     }
 }
 
@@ -836,8 +1527,6 @@ pub fn MSG_ReadDeltaKeyFloat(common: &mut Common, msg: *mut msg_t, key: c_int, o
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:3291-3316`
 pub fn MSG_ReportChangeVectors_f(common: &mut Common) {
-    //TODO: Port entityStateFields
-    // Source: oracle/codemp/qcommon/msg.cpp:859-1051
     let num_entity_fields = common.entity_state_fields.len();
     crate::common::com_printf(common, "Entity State Fields:\n");
     for i in 0..common.entity_state_fields.len() {
@@ -848,8 +1537,6 @@ pub fn MSG_ReportChangeVectors_f(common: &mut Common) {
     }
     let _ = num_entity_fields;
 
-    //TODO: Port playerStateFields
-    // Source: oracle/codemp/qcommon/msg.cpp:1410-1568
     crate::common::com_printf(common, "\nPlayer State Fields:\n");
     for i in 0..common.player_state_fields.len() {
         let name = common.player_state_fields[i].name;
@@ -1223,6 +1910,120 @@ pub fn MSG_ReadDeltaUsercmdKey(
     }
 }
 
+/// Raven `MSG_WriteDeltaEntity` — writes part of a packetentities message,
+/// including the entity number. Deltas from a baseline or a previous packet;
+/// a NULL `to` emits a remove update. With `force` clear, an identical entity
+/// emits nothing (the in-order delta code catches it). The `_XBOX` `realSize`
+/// paths and the compiled-out `assert(numFields + 1 == sizeof(*from)/4)` are
+/// not present in this build.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:1069-1211`
+pub fn MSG_WriteDeltaEntity(
+    common: &mut Common,
+    msg: *mut msg_t,
+    from: *mut entityState_t,
+    to: *mut entityState_t,
+    force: qboolean,
+) {
+    unsafe {
+        let num_fields = common.entity_state_fields.len();
+
+        // a NULL to is a delta remove message
+        if to.is_null() {
+            if from.is_null() {
+                return;
+            }
+            MSG_WriteBits(common, msg, (*from).number, GENTITYNUM_BITS);
+            MSG_WriteBits(common, msg, 1, 1);
+            return;
+        }
+
+        if (*to).number < 0 || (*to).number >= mp_qshared::shared::limits::MAX_GENTITIES as c_int {
+            com_error(
+                errorParm_t::ERR_FATAL,
+                format!("MSG_WriteDeltaEntity: Bad entity number: {}", (*to).number),
+            );
+        }
+
+        // build the change vector as bytes so it is endian independent
+        let mut lc = 0usize;
+        for i in 0..num_fields {
+            let offset = common.entity_state_fields[i].offset;
+            let fromF = (from as *const u8).add(offset as usize) as *const c_int;
+            let toF = (to as *const u8).add(offset as usize) as *const c_int;
+            if *fromF != *toF {
+                lc = i + 1;
+                common.entity_state_fields[i].mCount += 1;
+            }
+        }
+
+        if lc == 0 {
+            // nothing at all changed
+            if force == qfalse {
+                return; // nothing at all
+            }
+            // write two bits for no change
+            MSG_WriteBits(common, msg, (*to).number, GENTITYNUM_BITS);
+            MSG_WriteBits(common, msg, 0, 1); // not removed
+            MSG_WriteBits(common, msg, 0, 1); // no delta
+            return;
+        }
+
+        MSG_WriteBits(common, msg, (*to).number, GENTITYNUM_BITS);
+        MSG_WriteBits(common, msg, 0, 1); // not removed
+        MSG_WriteBits(common, msg, 1, 1); // we have a delta
+
+        MSG_WriteByte(common, msg, lc as c_int); // # of changes
+
+        common.oldsize += num_fields as i32;
+
+        for i in 0..lc {
+            let offset = common.entity_state_fields[i].offset;
+            let bits = common.entity_state_fields[i].bits;
+            let fromF = (from as *const u8).add(offset as usize) as *const c_int;
+            let toF = (to as *const u8).add(offset as usize) as *const c_int;
+
+            if *fromF == *toF {
+                MSG_WriteBits(common, msg, 0, 1); // no change
+                continue;
+            }
+
+            MSG_WriteBits(common, msg, 1, 1); // changed
+
+            if bits == 0 {
+                // float
+                let fullFloat = *(toF as *const f32);
+                let trunc = fullFloat as c_int;
+
+                if fullFloat == 0.0f32 {
+                    MSG_WriteBits(common, msg, 0, 1);
+                    common.oldsize += FLOAT_INT_BITS;
+                } else {
+                    MSG_WriteBits(common, msg, 1, 1);
+                    if trunc as f32 == fullFloat
+                        && trunc + FLOAT_INT_BIAS >= 0
+                        && trunc + FLOAT_INT_BIAS < (1 << FLOAT_INT_BITS)
+                    {
+                        // send as small integer
+                        MSG_WriteBits(common, msg, 0, 1);
+                        MSG_WriteBits(common, msg, trunc + FLOAT_INT_BIAS, FLOAT_INT_BITS);
+                    } else {
+                        // send as full floating point value
+                        MSG_WriteBits(common, msg, 1, 1);
+                        MSG_WriteBits(common, msg, *toF, 32);
+                    }
+                }
+            } else if *toF == 0 {
+                MSG_WriteBits(common, msg, 0, 1);
+            } else {
+                MSG_WriteBits(common, msg, 1, 1);
+                // integer
+                MSG_WriteBits(common, msg, *toF, bits);
+            }
+        }
+    }
+}
+
 /// Raven `MSG_ReadDeltaEntity`.
 ///
 /// STATE: `cl_shownet` (cvar read), `entityStateFields`. The `sv`/
@@ -1270,8 +2071,6 @@ pub fn MSG_ReadDeltaEntity(
             return;
         }
 
-        //TODO: Port entityStateFields
-        // Source: oracle/codemp/qcommon/msg.cpp:859-1051
         let num_fields = common.entity_state_fields.len();
         let lc = MSG_ReadByte(common, msg);
 
@@ -1358,7 +2157,220 @@ pub fn MSG_ReadDeltaEntity(
     }
 }
 
-/// Raven `MSG_ReadDeltaPlayerstate`.
+/// Raven `MSG_WriteDeltaPlayerstate`. `_OPTIMIZED_VEHICLE_NETWORKING` is
+/// unconditionally defined (`q_shared.h:2154`), so the table-selection branch
+/// is live: a vehicle ps uses `vehPlayerStateFields` with no selector bit;
+/// otherwise a mandatory 1-bit selector distinguishes a pilot ps
+/// (`m_iVehicleNum && (eFlags & EF_NODRAW)`, `pilotPlayerStateFields`
+/// truncated to `len - 82`) from a normal ps (`playerStateFields`).
+/// `_ONEBIT_COMBO` is undefined; its bit-combo-mask tail is dead. Raven's
+/// write-only `c = msg->cursize` / `gLastBitIndex = lc` diagnostics are
+/// dropped as dead surface.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:2211-2444`
+pub fn MSG_WriteDeltaPlayerstate(
+    common: &mut Common,
+    msg: *mut msg_t,
+    from: *mut playerState_t,
+    to: *mut playerState_t,
+    isVehiclePS: qboolean,
+) {
+    unsafe {
+        let mut dummy: playerState_t;
+        let from = if from.is_null() {
+            dummy = core::mem::zeroed();
+            crate::common_fns::Com_Memset(
+                &mut dummy as *mut playerState_t as *mut (),
+                0,
+                core::mem::size_of::<playerState_t>(),
+            );
+            &mut dummy as *mut playerState_t
+        } else {
+            from
+        };
+
+        // `EF_NODRAW` — bg_public.h entity flag; mirrored here since mp_bg
+        // (game tier) is above this crate's dependency graph.
+        // Source: oracle/codemp/game/bg_public.h:581
+        const EF_NODRAW: c_int = 1 << 8;
+
+        let table: PsfTable;
+        let num_fields: usize;
+        if isVehiclePS != qfalse {
+            //a vehicle playerstate
+            table = PsfTable::Veh;
+            num_fields = common.veh_player_state_fields.len();
+        } else {
+            //regular client playerstate
+            if (*to).m_iVehicleNum != 0 && ((*to).eFlags & EF_NODRAW) != 0 {
+                //pilot riding *inside* a vehicle!
+                MSG_WriteBits(common, msg, 1, 1); // Pilot player state
+                table = PsfTable::Pilot;
+                num_fields = common.pilot_player_state_fields.len() - 82;
+            } else {
+                //normal client
+                MSG_WriteBits(common, msg, 0, 1); // Normal player state
+                table = PsfTable::Normal;
+                num_fields = common.player_state_fields.len();
+            }
+        }
+
+        let mut lc = 0usize;
+        for i in 0..num_fields {
+            let offset = psf_fields(common, table)[i].offset;
+            let fromF = (from as *const u8).add(offset as usize) as *const c_int;
+            let toF = (to as *const u8).add(offset as usize) as *const c_int;
+            if *fromF != *toF {
+                lc = i + 1;
+                psf_fields_mut(common, table)[i].mCount += 1;
+            }
+        }
+
+        MSG_WriteByte(common, msg, lc as c_int); // # of changes
+
+        common.oldsize += (num_fields - lc) as i32;
+
+        for i in 0..lc {
+            let offset = psf_fields(common, table)[i].offset;
+            let bits = psf_fields(common, table)[i].bits;
+            let fromF = (from as *const u8).add(offset as usize) as *const c_int;
+            let toF = (to as *const u8).add(offset as usize) as *const c_int;
+
+            if *fromF == *toF {
+                MSG_WriteBits(common, msg, 0, 1); // no change
+                continue;
+            }
+
+            MSG_WriteBits(common, msg, 1, 1); // changed
+
+            if bits == 0 {
+                // float
+                let fullFloat = *(toF as *const f32);
+                let trunc = fullFloat as c_int;
+
+                if trunc as f32 == fullFloat
+                    && trunc + FLOAT_INT_BIAS >= 0
+                    && trunc + FLOAT_INT_BIAS < (1 << FLOAT_INT_BITS)
+                {
+                    // send as small integer
+                    MSG_WriteBits(common, msg, 0, 1);
+                    MSG_WriteBits(common, msg, trunc + FLOAT_INT_BIAS, FLOAT_INT_BITS);
+                } else {
+                    // send as full floating point value
+                    MSG_WriteBits(common, msg, 1, 1);
+                    MSG_WriteBits(common, msg, *toF, 32);
+                }
+            } else {
+                // integer
+                MSG_WriteBits(common, msg, *toF, bits);
+            }
+        }
+
+        //
+        // send the arrays
+        //
+        let mut statsbits = 0;
+        for i in 0..16 {
+            if (*to).stats[i] != (*from).stats[i] {
+                statsbits |= 1 << i;
+            }
+        }
+        let mut persistantbits = 0;
+        for i in 0..16 {
+            if (*to).persistant[i] != (*from).persistant[i] {
+                persistantbits |= 1 << i;
+            }
+        }
+        let mut ammobits = 0;
+        for i in 0..16 {
+            if (*to).ammo[i] != (*from).ammo[i] {
+                ammobits |= 1 << i;
+            }
+        }
+        let mut powerupbits = 0;
+        for i in 0..16 {
+            if (*to).powerups[i] != (*from).powerups[i] {
+                powerupbits |= 1 << i;
+            }
+        }
+
+        if statsbits == 0 && persistantbits == 0 && ammobits == 0 && powerupbits == 0 {
+            MSG_WriteBits(common, msg, 0, 1); // no change
+            common.oldsize += 4;
+            return;
+        }
+        MSG_WriteBits(common, msg, 1, 1); // changed
+
+        if statsbits != 0 {
+            // `STAT_WEAPONS` — bg_public.h statIndex_t; mirrored here since mp_bg
+            // (game tier) is above this crate's dependency graph.
+            // Source: oracle/codemp/game/bg_public.h:520-532
+            const STAT_WEAPONS: usize = 4;
+            MSG_WriteBits(common, msg, 1, 1); // changed
+            MSG_WriteShort(common, msg, statsbits);
+            for i in 0..16usize {
+                if statsbits & (1 << i) != 0 {
+                    if i == STAT_WEAPONS {
+                        // just send this one in MAX_WEAPONS bits, so we can add up
+                        // to MAX_WEAPONS weaps without hassle -rww
+                        MSG_WriteBits(
+                            common,
+                            msg,
+                            (*to).stats[i],
+                            mp_qshared::common::mp::qcommon::player_state::MAX_WEAPONS as c_int,
+                        );
+                    } else {
+                        MSG_WriteShort(common, msg, (*to).stats[i]);
+                    }
+                }
+            }
+        } else {
+            MSG_WriteBits(common, msg, 0, 1); // no change
+        }
+
+        if persistantbits != 0 {
+            MSG_WriteBits(common, msg, 1, 1); // changed
+            MSG_WriteShort(common, msg, persistantbits);
+            for i in 0..16usize {
+                if persistantbits & (1 << i) != 0 {
+                    MSG_WriteShort(common, msg, (*to).persistant[i]);
+                }
+            }
+        } else {
+            MSG_WriteBits(common, msg, 0, 1); // no change
+        }
+
+        if ammobits != 0 {
+            MSG_WriteBits(common, msg, 1, 1); // changed
+            MSG_WriteShort(common, msg, ammobits);
+            for i in 0..16usize {
+                if ammobits & (1 << i) != 0 {
+                    MSG_WriteShort(common, msg, (*to).ammo[i]);
+                }
+            }
+        } else {
+            MSG_WriteBits(common, msg, 0, 1); // no change
+        }
+
+        if powerupbits != 0 {
+            MSG_WriteBits(common, msg, 1, 1); // changed
+            MSG_WriteShort(common, msg, powerupbits);
+            for i in 0..16usize {
+                if powerupbits & (1 << i) != 0 {
+                    MSG_WriteLong(common, msg, (*to).powerups[i]);
+                }
+            }
+        } else {
+            MSG_WriteBits(common, msg, 0, 1); // no change
+        }
+    }
+}
+
+/// Raven `MSG_ReadDeltaPlayerstate`. Mirrors the write side's live
+/// `_OPTIMIZED_VEHICLE_NETWORKING` table selection (`q_shared.h:2154`): a
+/// vehicle ps reads `vehPlayerStateFields` with no selector bit; otherwise a
+/// mandatory 1-bit selector picks `pilotPlayerStateFields` truncated to
+/// `len - 82` (bit 1) or `playerStateFields` (bit 0).
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:2455-2692`
 pub fn MSG_ReadDeltaPlayerstate(
@@ -1368,7 +2380,6 @@ pub fn MSG_ReadDeltaPlayerstate(
     to: *mut playerState_t,
     isVehiclePS: qboolean,
 ) {
-    let _ = isVehiclePS; // _OPTIMIZED_VEHICLE_NETWORKING gate below is not defined for this build
     unsafe {
         let mut dummy: playerState_t;
         let from = if from.is_null() {
@@ -1399,17 +2410,31 @@ pub fn MSG_ReadDeltaPlayerstate(
             false
         };
 
-        //=====_OPTIMIZED_VEHICLE_NETWORKING not defined for this build=====
-        //TODO: Port playerStateFields
-        // Source: oracle/codemp/qcommon/msg.cpp:1410-1568
-        let num_fields = common.player_state_fields.len();
+        let table: PsfTable;
+        let num_fields: usize;
+        if isVehiclePS != qfalse {
+            //a vehicle playerstate
+            table = PsfTable::Veh;
+            num_fields = common.veh_player_state_fields.len();
+        } else {
+            let isPilot = MSG_ReadBits(common, msg, 1);
+            if isPilot != 0 {
+                //pilot riding *inside* a vehicle!
+                table = PsfTable::Pilot;
+                num_fields = common.pilot_player_state_fields.len() - 82;
+            } else {
+                //normal client
+                table = PsfTable::Normal;
+                num_fields = common.player_state_fields.len();
+            }
+        }
 
         let lc = MSG_ReadByte(common, msg);
 
         for i in 0..lc {
-            let offset = common.player_state_fields[i as usize].offset;
-            let bits = common.player_state_fields[i as usize].bits;
-            let name = common.player_state_fields[i as usize].name;
+            let offset = psf_fields(common, table)[i as usize].offset;
+            let bits = psf_fields(common, table)[i as usize].bits;
+            let name = psf_fields(common, table)[i as usize].name;
             let fromF = (from as *const u8).add(offset as usize) as *const c_int;
             let toF = (to as *mut u8).add(offset as usize) as *mut c_int;
 
@@ -1447,7 +2472,7 @@ pub fn MSG_ReadDeltaPlayerstate(
             }
         }
         for i in lc..(num_fields as c_int) {
-            let field = &common.player_state_fields[i as usize];
+            let field = &psf_fields(common, table)[i as usize];
             let fromF = (from as *const u8).add(field.offset as usize) as *const c_int;
             let toF = (to as *mut u8).add(field.offset as usize) as *mut c_int;
             // no change

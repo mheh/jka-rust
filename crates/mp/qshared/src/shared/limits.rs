@@ -121,6 +121,17 @@ pub const VEH_WEAPON_NONE: c_int = -1;
 /// Source: `oracle/codemp/game/q_shared.h:1992-1994`
 pub const GENTITYNUM_BITS: c_int = 10;
 
+/// Raven `SNAPFLAG_RATE_DELAYED`.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1975`
+pub const SNAPFLAG_RATE_DELAYED: c_int = 1;
+
+/// Raven `SNAPFLAG_NOT_ACTIVE` — snapshot used during connection and for
+/// zombies.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1976`
+pub const SNAPFLAG_NOT_ACTIVE: c_int = 2;
+
 /// Raven `SNAPFLAG_SERVERCOUNT` — toggled every `map_restart` so transitions
 /// can be detected.
 ///

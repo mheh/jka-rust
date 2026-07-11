@@ -184,9 +184,6 @@ pub struct Common {
     ///
     /// Source: `oracle/codemp/qcommon/msg.cpp:522`
     pub msg_read_string_line_buf: [u8; mp_qshared::shared::limits::MAX_STRING_CHARS],
-    //TODO: Port netField_t
-    // Source: oracle/codemp/qcommon/qcommon.h (netField_t has no rosetta row
-    // at time of transcription — escalated as a missing symbol).
     /// Raven `entityStateFields[]`.
     ///
     /// Source: `oracle/codemp/qcommon/msg.cpp:859-1051`
@@ -195,6 +192,17 @@ pub struct Common {
     ///
     /// Source: `oracle/codemp/qcommon/msg.cpp:1410-1568`
     pub player_state_fields: Vec<crate::qcommon::net_field_t::netField_t>,
+    /// Raven `pilotPlayerStateFields[]` — pilot-riding-inside-a-vehicle delta
+    /// table, live because `_OPTIMIZED_VEHICLE_NETWORKING` is unconditionally
+    /// defined (`oracle/codemp/game/q_shared.h:2154`).
+    ///
+    /// Source: `oracle/codemp/qcommon/msg.cpp:1570-1734`
+    pub pilot_player_state_fields: Vec<crate::qcommon::net_field_t::netField_t>,
+    /// Raven `vehPlayerStateFields[]` — vehicle playerstate delta table (live
+    /// under the same always-on `_OPTIMIZED_VEHICLE_NETWORKING`).
+    ///
+    /// Source: `oracle/codemp/qcommon/msg.cpp:1736-1822`
+    pub veh_player_state_fields: Vec<crate::qcommon::net_field_t::netField_t>,
     /// Raven `g_netfBitStorage` / `g_psfBitStorage` — heads of the linked lists
     /// that stash the default `bits` of each netf/psf field so
     /// `MSG_CheckNETFPSFOverrides` can restore them before re-applying an
