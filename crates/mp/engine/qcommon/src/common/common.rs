@@ -629,6 +629,5 @@ pub fn com_printf(common: &mut Common, msg: &str) {
     // Slice-0 minimal sink: the local-console write only (Sys_Print tail,
     // common.cpp:168); redirect/logfile land with their Common fields.
     print!("{msg}");
-    use std::io::Write as _;
-    let _ = std::io::stdout().flush();
+    let _ = std::io::Write::flush(&mut std::io::stdout());
 }

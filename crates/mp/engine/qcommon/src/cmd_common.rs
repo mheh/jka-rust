@@ -12,6 +12,7 @@ use mp_host_interface::engine_host::EngineHost;
 
 use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 
+use mp_qshared::shared::cbuf_exec::cbufExec_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 
 use crate::cmd::cmd_consts::{MAX_CMD_BUFFER, MAX_CMD_LINE};
@@ -540,9 +541,6 @@ pub fn Cbuf_ExecuteText(
     exec_when: c_int,
     text: *const c_char,
 ) {
-    use mp_qshared::shared::cbuf_exec::cbufExec_t;
-    use mp_qshared::shared::error_parm::errorParm_t;
-
     match exec_when {
         x if x == cbufExec_t::EXEC_NOW as c_int => {
             if !text.is_null() && unsafe { strlen(text) } > 0 {

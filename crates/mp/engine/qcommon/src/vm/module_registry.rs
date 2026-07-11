@@ -1,5 +1,6 @@
 //! `ModuleRegistry` — the `vmTable[MAX_VM]` slot registry (LOAD-D8).
 
+use crate::common::error::{com_error, ErrorLevel};
 use core::ffi::c_void;
 
 use native_platform::entrypoints::RawSyscall;
@@ -72,8 +73,6 @@ impl ModuleRegistry {
         system_calls: SlotSyscall,
         ctx: *mut c_void,
     ) -> Option<SlotId> {
-        use crate::common::error::{com_error, ErrorLevel};
-
         // Bad-parms guard (vm.cpp:480-482); `name.is_empty()` only — the
         // `!module`/`!systemCalls` disjuncts are structurally unreachable
         // (round-5 resolution).

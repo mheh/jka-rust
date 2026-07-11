@@ -7,6 +7,7 @@
 
 use core::ffi::{c_char, c_int};
 
+use mp_engine_qcommon::common::common::com_printf;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::qcommon::net_limits::MAX_RELIABLE_COMMANDS;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
@@ -97,7 +98,6 @@ pub fn SV_ReplacePendingServerCommands(client: *mut client_t, cmd: *const c_char
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:116-141`
 pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut client_t, cmd: &str) {
-    use mp_engine_qcommon::common::common::com_printf;
 
     unsafe {
         // this is very ugly but it's also a waste to for instance send multiple
@@ -156,7 +156,6 @@ pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut cl
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:153-180`
 pub fn SV_SendServerCommand(common: &mut Common, sv: &mut Server, cl: *mut client_t, fmt: &str) {
-    use mp_engine_qcommon::common::common::com_printf;
 
     if !cl.is_null() {
         SV_AddServerCommand(common, sv, cl, fmt);

@@ -3,6 +3,14 @@
 use core::ffi::{c_char, c_int, c_uint};
 
 use mp_qshared::shared::collision::cplane_t;
+use mp_qshared::shared::surface_flags::{
+    CONTENTS_ABSEIL, CONTENTS_BOTCLIP, CONTENTS_DETAIL, CONTENTS_FOG, CONTENTS_INSIDE,
+    CONTENTS_LADDER, CONTENTS_LAVA, CONTENTS_MONSTERCLIP, CONTENTS_NODROP, CONTENTS_OPAQUE,
+    CONTENTS_OUTSIDE, CONTENTS_PLAYERCLIP, CONTENTS_SHOTCLIP, CONTENTS_SOLID,
+    CONTENTS_TERRAIN, CONTENTS_TRANSLUCENT, CONTENTS_TRIGGER, CONTENTS_WATER,
+    SURF_NODAMAGE, SURF_NODLIGHT, SURF_NODRAW, SURF_NOIMPACT, SURF_NOMARKS, SURF_NOSTEPS,
+    SURF_SKY, SURF_SLICK,
+        };
 use mp_qshared::shared::cvar::cvar_t;
 use mp_qshared::shared::limits::MAX_SUB_BSP;
 use mp_qshared::shared::qboolean;
@@ -246,14 +254,6 @@ impl CollisionWorld {
     ///
     /// Source: `oracle/codemp/qcommon/cm_shader.cpp:226-259`
     pub fn init_svInfoParms() -> [InfoParm; NUM_SV_INFO_PARMS] {
-        use mp_qshared::shared::surface_flags::{
-            CONTENTS_ABSEIL, CONTENTS_BOTCLIP, CONTENTS_DETAIL, CONTENTS_FOG, CONTENTS_INSIDE,
-            CONTENTS_LADDER, CONTENTS_LAVA, CONTENTS_MONSTERCLIP, CONTENTS_NODROP, CONTENTS_OPAQUE,
-            CONTENTS_OUTSIDE, CONTENTS_PLAYERCLIP, CONTENTS_SHOTCLIP, CONTENTS_SOLID,
-            CONTENTS_TERRAIN, CONTENTS_TRANSLUCENT, CONTENTS_TRIGGER, CONTENTS_WATER,
-            SURF_NODAMAGE, SURF_NODLIGHT, SURF_NODRAW, SURF_NOIMPACT, SURF_NOMARKS, SURF_NOSTEPS,
-            SURF_SKY, SURF_SLICK,
-        };
         const fn p(
             name: *const c_char,
             clear_solid: c_int,

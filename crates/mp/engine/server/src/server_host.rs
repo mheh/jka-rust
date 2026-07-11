@@ -1,6 +1,7 @@
 //! `Server` (the `Engine.sv` island host) + `ServerGame` (the game dispatcher's
 //! reborrowed host state) + `sv_game_system_calls` (the MP game dispatcher).
 
+use mp_abi::game::imports::MpGameImport;
 use core::ffi::{c_char, c_int};
 
 use mp_engine_botlib::be_interface::botlib_export_s::botlib_export_t;
@@ -184,7 +185,6 @@ pub type ServerGame = Server;
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:458`
 pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize {
-    use mp_abi::game::imports::MpGameImport;
     let _ = engine;
 
     // Slice-0 minimal dispatch: only the GAME_INIT-era traps the minimal
@@ -200,8 +200,7 @@ pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize {
         // `&mut Common` lands with the ServerGame reborrow wiring.
         let msg = unsafe { core::ffi::CStr::from_ptr(args[1] as *const core::ffi::c_char) };
         print!("{}", msg.to_string_lossy());
-        use std::io::Write as _;
-        let _ = std::io::stdout().flush();
+        let _ = std::io::Write::flush(&mut std::io::stdout());
         return 0;
     }
     todo!("Port SV_GameSystemCalls trap {trap} — oracle/codemp/server/sv_game.cpp:458")
@@ -245,7 +244,6 @@ pub extern "C-unwind" fn game_system_calls_shim(
     //TODO: Port SV_InitGameProgs ctx injection (&mut Engine.sv)
     // Source: docs/architecture/engine-seam.md § Engine-side dispatchers;
     // oracle/codemp/server/sv_game.cpp:1734-1753
-    use mp_abi::game::imports::MpGameImport;
     let trap = frame[0] as i32;
     if trap == MpGameImport::G_PRINT as i32 {
         // `case G_PRINT: Com_Printf( "%s", VMA(1) );` (sv_game.cpp:503-505;
@@ -254,8 +252,7 @@ pub extern "C-unwind" fn game_system_calls_shim(
         // `&mut Common` lands with the ctx injection wiring.
         let msg = unsafe { core::ffi::CStr::from_ptr(frame[1] as *const core::ffi::c_char) };
         print!("{}", msg.to_string_lossy());
-        use std::io::Write as _;
-        let _ = std::io::stdout().flush();
+        let _ = std::io::Write::flush(&mut std::io::stdout());
         return 0;
     }
     todo!(

@@ -21,6 +21,9 @@ use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use native_math::vector::vec3_t;
 use native_types::clipHandle_t;
 
+use mp_abi::game::imports::MpGameImport as G;
+use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
+use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::svEntity_t;
 use crate::Server;
 
@@ -406,7 +409,6 @@ pub fn SV_InitGameVM(
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:1766-1772`
 pub fn SV_GameCommand(common: &mut Common, sv: &mut Server) -> qboolean {
-    use crate::server::server_state_t::serverState_t;
     if sv.sv.state as c_int != serverState_t::SS_GAME as c_int {
         return qfalse;
     }
@@ -640,8 +642,6 @@ pub fn SV_GameSystemCalls(
     host: &mut dyn EngineHost,
     args: *mut c_int,
 ) -> c_int {
-    use mp_abi::game::imports::MpGameImport as G;
-    use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
 
     // SAFETY: `args` is the trampoline's raw syscall word array (seam
     // pointer, porting-rules §D11); every arm reads only the words its trap
