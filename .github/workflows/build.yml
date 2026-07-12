@@ -65,20 +65,11 @@ jobs:
           key: test-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
           restore-keys: test-cargo-
 
-      # TEMPORARY SCOPE (2026-07-11): the engine C-track closure is in flight and
-      # the workspace intentionally carries a red mp_engine_server tail, so the
-      # gate covers the shipping jampgame lane only. Revert to
-      # `cargo build --workspace` + `cargo test --workspace` when the engine
-      # closure lands workspace-green.
-      - name: jampgame lane build (layout asserts are compile-time)
-        run: cargo build -p jampgame
+      - name: workspace build (layout asserts are compile-time)
+        run: cargo build --workspace
 
-      # mp_game's test targets dev-depend on mp_engine_qcommon (saberload
-      # parity mock engine), which is mid-closure and intentionally red, so
-      # the mp_game parity suites are excluded until qcommon compiles; the
-      # jampgame build above still gates mp_game's lib + layout asserts.
-      - name: bg/qshared tests incl. oracle parity suites (single-threaded)
-        run: cargo test -p mp_bg -p mp_qshared -- --test-threads=1
+      - name: workspace tests incl. oracle parity suites (single-threaded)
+        run: cargo test --workspace -- --test-threads=1
 
   build:
     name: ${{ matrix.target.module }} (${{ matrix.profile }})
