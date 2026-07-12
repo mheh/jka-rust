@@ -169,9 +169,83 @@ jobs:
           path: dist/${{ env.ZIP_NAME }}
           if-no-files-found: error
 
+  server:
+    name: jampded ${{ matrix.target.artifact_suffix }} (${{ matrix.profile }})
+    needs: test
+    if: github.ref == 'refs/heads/master'
+    runs-on: ${{ matrix.target.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [release, debug]
+        target:
+          # The dedicated-server EXECUTABLE (mp_app, the jampded equivalent).
+          # Unix 64-bit lanes only: the engine island ports Raven's unix/
+          # platform tree (the win32 twin is unported, native_platform gates
+          # it cfg(unix)) and has had no ILP32 layout-assert pass — the
+          # jampgame MODULE lanes above are unaffected (separate crate tree).
+          - runner: ubuntu-latest
+            triple: x86_64-unknown-linux-gnu
+            artifact_suffix: x86_64-linux
+          - runner: macos-latest
+            triple: aarch64-apple-darwin
+            artifact_suffix: arm64-macos
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target.triple }}
+
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target.triple }}-server-${{ matrix.profile }}-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: ${{ matrix.target.triple }}-server-${{ matrix.profile }}-cargo-
+
+      - name: Build (${{ matrix.profile }} executable)
+        shell: bash
+        run: |
+          if [ "${{ matrix.profile }}" = "release" ]; then
+            cargo build -p mp_app --release --target ${{ matrix.target.triple }}
+            echo "PROFILE_DIR=release" >> "$GITHUB_ENV"
+          else
+            cargo build -p mp_app --target ${{ matrix.target.triple }}
+            echo "PROFILE_DIR=debug" >> "$GITHUB_ENV"
+          fi
+
+      - name: Package zip
+        shell: bash
+        run: |
+          src="target/${{ matrix.target.triple }}/${PROFILE_DIR}/mp_app"
+          test -f "$src" || { echo "::error::built server not found at $src"; exit 1; }
+          zip_name="jampded-${{ matrix.target.artifact_suffix }}-${{ matrix.profile }}.zip"
+          rm -rf package dist
+          mkdir -p package dist
+          # ship under the Raven-equivalent binary name
+          cp "$src" "package/jampded"
+          chmod +x package/jampded
+          ( cd package && 7z a -tzip tmp.zip jampded >/dev/null )
+          mv package/tmp.zip "dist/${zip_name}"
+          echo "ZIP_NAME=${zip_name}" >> "$GITHUB_ENV"
+          ls -l dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: dist/${{ env.ZIP_NAME }}
+          if-no-files-found: error
+
   release:
     name: Update rolling release
-    needs: build
+    needs: [build, server]
     # Master-only (see `build`'s `if`).
     if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -194,8 +268,9 @@ jobs:
           body: |
             Automated build of `master` @ ${{ github.sha }}.
 
-            Each zip contains the module under the exact filename the engine
-            loads (`jampgamex86_64.dll`, `jampgamex86_64.so`, …). Asset URLs
-            are stable across builds.
+            Each module zip contains the file under the exact name the engine
+            loads (`jampgamex86_64.dll`, `jampgamex86_64.so`, …); the
+            `jampded-*` zips carry the pure-Rust dedicated-server executable
+            (unix 64-bit lanes). Asset URLs are stable across builds.
           files: dist/*.zip
           fail_on_unmatched_files: false
