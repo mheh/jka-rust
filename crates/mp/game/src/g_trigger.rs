@@ -1589,7 +1589,7 @@ pub fn hurt_touch(
             (*other_client).ps.eFlags |= EF_RAG;
 
             // make sure his jetpack is off
-            Jetpack_Off(other);
+            Jetpack_Off(&mut *other);
 
             if !(*other).NPC.is_null() {
                 // kill it now

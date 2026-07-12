@@ -74,7 +74,12 @@ pub fn Use_Target_Give(
             if (*t).item.is_null() {
                 continue;
             }
-            Touch_Item(ctx, t, ctx.entity_mut(activator), &mut trace);
+            Touch_Item(
+                ctx,
+                ctx.entity_id_of(t).unwrap(),
+                Some(activator),
+                &mut trace,
+            );
 
             // make sure it isn't going to respawn or show any events
             (*t).nextthink = 0;

@@ -4381,7 +4381,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
             );
         }
 
-        Jetpack_Off(gripEnt); //make sure the guy being gripped has his jetpack off.
+        Jetpack_Off(&mut *gripEnt); //make sure the guy being gripped has his jetpack off.
 
         if gripLevel == FORCE_LEVEL_1 as c_int {
             (*gcl).ps.fd.forceGripBeingGripped = (level_time + 1000) as f32;

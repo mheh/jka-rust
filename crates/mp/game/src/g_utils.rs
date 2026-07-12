@@ -2041,7 +2041,7 @@ fn goto_tryJetPack(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // Jetpack check
         if ((*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_JETPACK)) != 0 {
             if (*client).jetPackOn != qfalse || (*client).ps.groundEntityNum == ENTITYNUM_NONE {
-                ItemUse_Jetpack(ctx, ent);
+                ItemUse_Jetpack(ctx, ctx.entity_id_of(ent).unwrap());
                 return;
             }
         }
@@ -2073,7 +2073,7 @@ fn goto_tryJetPack(ctx: GameContext<'_>, ent: *mut gentity_t) {
             );
 
             if tr_toss.fraction == 1.0f32 && tr_toss.allsolid == 0 && tr_toss.startsolid == 0 {
-                ItemUse_UseDisp(ctx, ent, HI_AMMODISP);
+                ItemUse_UseDisp(ctx, ctx.entity_id_of(ent).unwrap(), HI_AMMODISP);
                 G_AddEvent(
                     ent,
                     mp_bg::public::entity_event::entity_event_t::EV_USE_ITEM0 as c_int

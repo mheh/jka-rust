@@ -822,7 +822,7 @@ pub fn Team_ResetFlag(ctx: GameContext<'_>, team: c_int) -> *mut gentity_t {
                 G_FreeEntity(ctx, ent);
             } else {
                 rent = ent;
-                RespawnItem(ctx, ent);
+                RespawnItem(ctx, ctx.entity_id_of(ent).unwrap());
             }
         }
 

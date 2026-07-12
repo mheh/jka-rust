@@ -578,7 +578,7 @@ pub fn TossClientItems(ctx: GameContext<'_>, self_: *mut gentity_t) {
             (*te).s.eventParm = (*self_).s.number;
 
             // spawn the item
-            crate::g_items::Drop_Item(ctx, self_, item, 0.0);
+            crate::g_items::Drop_Item(ctx, ctx.entity_id_of(self_).unwrap(), item, 0.0);
         }
 
         // drop all the powerups if not in teamplay
@@ -595,7 +595,12 @@ pub fn TossClientItems(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     if item.is_null() {
                         continue;
                     }
-                    let drop = crate::g_items::Drop_Item(ctx, self_, item, angle);
+                    let drop = crate::g_items::Drop_Item(
+                        ctx,
+                        ctx.entity_id_of(self_).unwrap(),
+                        item,
+                        angle,
+                    );
                     // decide how many seconds it has left
                     (*drop).count =
                         ((*client).ps.powerups[i as usize] - (*ctx.world).level.time) / 1000;
@@ -2192,7 +2197,7 @@ pub fn player_die(
         }
 
         // Make sure the jetpack is turned off.
-        crate::g_items::Jetpack_Off(self_);
+        crate::g_items::Jetpack_Off(&mut *self_);
 
         (*cl).ps.heldByClient = 0;
         (*cl).beingThrown = 0;
@@ -5387,7 +5392,7 @@ pub fn G_Damage(
                 } else {
                     if (*client).jetPackOn != qfalse {
                         // disable jetpack temporarily
-                        crate::g_items::Jetpack_Off(targ);
+                        crate::g_items::Jetpack_Off(&mut *targ);
                         (*client).jetPackToggleTime = (*ctx.world).level.time
                             + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);
                     }

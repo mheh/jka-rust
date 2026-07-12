@@ -145,6 +145,21 @@ pub const PLAYEREVENT_GAUNTLETREWARD: c_int = 0x0002;
 pub const TURRET_DEATH_DELAY: c_int = 2000;
 pub const TURRET_LIFETIME: c_int = 60000;
 
+// Stage-1 seam helper (safe-state migration): optional `gentity_t*` handles are
+// `Option<EntityId>`; resolve one back to the live raw pointer the still-verbatim
+// function bodies deref. NULL-preserving (`None` -> null pointer), so a body's
+// verbatim `x.is_null()` check keeps its exact meaning. Deref-saturated fns
+// re-derive their `EntityId`/`Option<EntityId>` params at the top of the body
+// (this + `ctx.entity_mut(id)`) and are otherwise kept verbatim — Stage-2 body
+// debt, same recipe as `g_trigger.rs`.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_adaptRespawn`
 // (cvar) and `level.numPlayingClients` — no world handle on the staged
 // raw-pointer signature.
@@ -207,8 +222,11 @@ pub fn adjustRespawnTime(
 /// Raven `ShieldRemove`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:108-119`
-pub fn ShieldRemove(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn ShieldRemove(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         (*self_).think = Some(EntThink::G_FreeEntity).into();
         (*self_).nextthink = (*ctx.world).level.time + 100;
 
@@ -228,12 +246,15 @@ pub fn ShieldRemove(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `ShieldThink`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:123-141`
-pub fn ShieldThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn ShieldThink(ctx: GameContext<'_>, self_: EntityId) {
     // Raven `#define SHIELD_HEALTH_DEC 10` / `SHIELD_SIEGE_HEALTH_DEC (2000/25)` (`g_items.c:92,99`).
     pub const SHIELD_SIEGE_HEALTH_DEC: c_int = 2000 / 25;
     pub const SHIELD_HEALTH_DEC: c_int = 10;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         (*self_).s.trickedentindex = 0;
 
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
@@ -243,7 +264,7 @@ pub fn ShieldThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
         (*self_).nextthink = (*ctx.world).level.time + 1000;
         if (*self_).health <= 0 {
-            ShieldRemove(ctx, self_);
+            ShieldRemove(ctx, ctx.entity_id_of(self_).unwrap());
         }
     }
 }
@@ -255,13 +276,18 @@ pub fn ShieldThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_items.c:145-151`
 pub fn ShieldDie(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     r#mod: c_int,
 ) {
     unsafe {
+        // Stage-1: handle signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let inflictor = ent_resolve_opt(ctx, inflictor);
+        let attacker = ent_resolve_opt(ctx, attacker);
         // Play damaging sound...
         G_AddEvent(
             self_,
@@ -269,7 +295,7 @@ pub fn ShieldDie(
             (*ctx.world).globals.shieldDamageSound,
         );
 
-        ShieldRemove(ctx, self_);
+        ShieldRemove(ctx, ctx.entity_id_of(self_).unwrap());
     }
 }
 
@@ -280,11 +306,15 @@ pub fn ShieldDie(
 /// Source: `oracle/codemp/game/g_items.c:155-167`
 pub fn ShieldPain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
     unsafe {
+        // Stage-1: handle signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let attacker = ent_resolve_opt(ctx, attacker);
         // Set the itemplaceholder flag to indicate the the shield drawing that the shield pain should be drawn.
         (*self_).think = Some(EntThink::ShieldThink).into();
         (*self_).nextthink = (*ctx.world).level.time + 400;
@@ -306,14 +336,17 @@ pub fn ShieldPain(
 /// Raven `ShieldGoSolid`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:171-207`
-pub fn ShieldGoSolid(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn ShieldGoSolid(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let mut tr: trace_t = core::mem::zeroed();
 
         // see if we're valid
         (*self_).health -= 1;
         if (*self_).health <= 0 {
-            ShieldRemove(ctx, self_);
+            ShieldRemove(ctx, ctx.entity_id_of(self_).unwrap());
             return;
         }
 
@@ -361,8 +394,11 @@ pub fn ShieldGoSolid(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `ShieldGoNotSolid`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:211-226`
-pub fn ShieldGoNotSolid(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn ShieldGoNotSolid(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         // make the shield non-solid very briefly
         (*self_).r.contents = 0;
         (*self_).s.eFlags |= EF_NODRAW;
@@ -390,11 +426,15 @@ pub fn ShieldGoNotSolid(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_items.c:230-250`
 pub fn ShieldTouch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
     unsafe {
+        // Stage-1: handle signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let other = ent_resolve_opt(ctx, other);
         let parent = match (*self_).parent {
             Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
@@ -405,13 +445,13 @@ pub fn ShieldTouch(
             // compare the parent's team to the "other's" team
             if !parent.is_null() && !(*parent).client.is_null() && !(*other).client.is_null() {
                 if OnSameTeam(ctx, parent, other) != 0 {
-                    ShieldGoNotSolid(ctx, self_);
+                    ShieldGoNotSolid(ctx, ctx.entity_id_of(self_).unwrap());
                 }
             }
         } else {
             // let the person who dropped the shield through
             if !parent.is_null() && (*parent).s.number == (*other).s.number {
-                ShieldGoNotSolid(ctx, self_);
+                ShieldGoNotSolid(ctx, ctx.entity_id_of(self_).unwrap());
             }
         }
     }
@@ -423,7 +463,7 @@ pub fn ShieldTouch(
 /// Raven `CreateShield`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:254-380`
-pub fn CreateShield(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn CreateShield(ctx: GameContext<'_>, ent: EntityId) {
     // Raven `g_items.c:91-99` shield #defines.
     pub const SHIELD_HEALTH: f32 = 250.0;
     pub const SHIELD_SIEGE_HEALTH: f32 = 2000.0;
@@ -432,6 +472,9 @@ pub fn CreateShield(ctx: GameContext<'_>, ent: *mut gentity_t) {
     pub const SHIELD_HALFTHICKNESS: f32 = 4.0;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let mut tr: trace_t = core::mem::zeroed();
 
         // trace upward to find height of shield
@@ -594,7 +637,7 @@ pub fn CreateShield(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).s.loopIsSoundset = qfalse;
         }
 
-        ShieldGoSolid(ctx, ent);
+        ShieldGoSolid(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }
 
@@ -605,10 +648,13 @@ pub fn CreateShield(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `PlaceShield`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:382-470`
-pub fn PlaceShield(ctx: GameContext<'_>, playerent: *mut gentity_t) -> qboolean {
+pub fn PlaceShield(ctx: GameContext<'_>, playerent: EntityId) -> qboolean {
     pub const SHIELD_PLACEDIST: f32 = 64.0;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let playerent = ctx.entity_mut(playerent) as *mut gentity_t;
         let mut shield: *mut gentity_t = core::ptr::null_mut();
         let mut tr: trace_t = core::mem::zeroed();
         let mut fwd: vec3_t = [0.0; 3];
@@ -744,8 +790,11 @@ pub fn PlaceShield(ctx: GameContext<'_>, playerent: *mut gentity_t) -> qboolean 
 /// Raven `ItemUse_Binoculars`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:472-502`
-pub fn ItemUse_Binoculars(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ItemUse_Binoculars(ctx: GameContext<'_>, ent: Option<EntityId>) {
     unsafe {
+        // Stage-1: `Option<EntityId>` signature (body NULL-checks `ent`); body kept
+        // verbatim via a NULL-preserving re-derived raw pointer (Stage-2 body debt).
+        let ent = ent_resolve_opt(ctx, ent);
         if ent.is_null() || (*ent).client.is_null() {
             return;
         }
@@ -770,14 +819,14 @@ pub fn ItemUse_Binoculars(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `ItemUse_Shield`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:504-507`
-pub fn ItemUse_Shield(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ItemUse_Shield(ctx: GameContext<'_>, ent: EntityId) {
     PlaceShield(ctx, ent);
 }
 
 /// Raven `SentryTouch`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:515-518`
-pub fn SentryTouch(ent: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn SentryTouch(ent: EntityId, other: Option<EntityId>, trace: *mut trace_t) {
     return;
 }
 
@@ -786,8 +835,11 @@ pub fn SentryTouch(ent: *mut gentity_t, other: *mut gentity_t, trace: *mut trace
 /// Raven `pas_fire`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:521-542`
-pub fn pas_fire(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn pas_fire(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let mut myOrg = (*ent).r.currentOrigin;
         myOrg[2] += 24.0;
 
@@ -830,12 +882,15 @@ pub fn pas_fire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `pas_find_enemies`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:547-639`
-pub fn pas_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
+pub fn pas_find_enemies(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
     // Raven `#define TURRET_RADIUS 800` (`g_items.c:544`).
     pub const TURRET_RADIUS: f32 = 800.0;
     const MAX_GENTITIES: usize = mp_qshared::shared::MAX_GENTITIES;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let mut found = qfalse;
         let mut bestDist = TURRET_RADIUS * TURRET_RADIUS;
 
@@ -968,8 +1023,11 @@ pub fn pas_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean
 /// Raven `pas_adjust_enemy`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:642-695`
-pub fn pas_adjust_enemy(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn pas_adjust_enemy(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let mut keep = qtrue;
         // Raven derefs `ent->enemy` unconditionally here; callers only invoke
         // `pas_adjust_enemy` when `ent->enemy` is non-null (see `pas_think`).
@@ -1042,8 +1100,15 @@ pub fn pas_adjust_enemy(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `sentryExpire`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:702-705`
-pub fn sentryExpire(ctx: GameContext<'_>, self_: *mut gentity_t) {
-    turret_die(ctx, self_, self_, self_, 1000, MOD_UNKNOWN as c_int);
+pub fn sentryExpire(ctx: GameContext<'_>, self_: EntityId) {
+    turret_die(
+        ctx,
+        self_,
+        Some(self_),
+        Some(self_),
+        1000,
+        MOD_UNKNOWN as c_int,
+    );
 }
 
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
@@ -1052,10 +1117,13 @@ pub fn sentryExpire(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `pas_think`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:708-937`
-pub fn pas_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn pas_think(ctx: GameContext<'_>, ent: EntityId) {
     const MAX_GENTITIES: usize = mp_qshared::shared::MAX_GENTITIES;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let testMins: vec3_t = [
             (*ent).r.currentOrigin[0] + (*ent).r.mins[0] + 4.0,
             (*ent).r.currentOrigin[1] + (*ent).r.mins[1] + 4.0,
@@ -1158,7 +1226,7 @@ pub fn pas_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if !(*ent).enemy.is_none() {
             // make sure that the enemy is still valid
-            pas_adjust_enemy(ctx, ent);
+            pas_adjust_enemy(ctx, ctx.entity_id_of(ent).unwrap());
         }
 
         if let Some(enemy_id) = (*ent).enemy {
@@ -1173,7 +1241,7 @@ pub fn pas_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if (*ent).enemy.is_none() {
-            pas_find_enemies(ctx, ent);
+            pas_find_enemies(ctx, ctx.entity_id_of(ent).unwrap());
         }
 
         if let Some(enemy_id) = (*ent).enemy {
@@ -1257,7 +1325,7 @@ pub fn pas_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).count -= 1;
 
             if (*ent).count != 0 {
-                pas_fire(ctx, ent);
+                pas_fire(ctx, ctx.entity_id_of(ent).unwrap());
                 (*ent).s.fireflag = 1;
                 (*ent).attackDebounceTime = (*ctx.world).level.time + 200;
             } else {
@@ -1285,13 +1353,18 @@ pub fn pas_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_items.c:940-973`
 pub fn turret_die(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     r#mod: c_int,
 ) {
     unsafe {
+        // Stage-1: handle signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let inflictor = ent_resolve_opt(ctx, inflictor);
+        let attacker = ent_resolve_opt(ctx, attacker);
         // Turn off the thinking of the base & use it's targets
         (*self_).think = FnId::NONE;
         (*self_).use_ = FnId::NONE;
@@ -1342,11 +1415,14 @@ pub fn turret_die(
 /// Raven `SP_PAS`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:978-1011`
-pub fn SP_PAS(ctx: GameContext<'_>, base: *mut gentity_t) {
+pub fn SP_PAS(ctx: GameContext<'_>, base: EntityId) {
     // Raven `#define TURRET_AMMO_COUNT 40` (`g_items.c:975`).
     pub const TURRET_AMMO_COUNT: c_int = 40;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let base = ctx.entity_mut(base) as *mut gentity_t;
         if (*base).count == 0 {
             // give ammo
             (*base).count = TURRET_AMMO_COUNT;
@@ -1388,8 +1464,11 @@ pub fn SP_PAS(ctx: GameContext<'_>, base: *mut gentity_t) {
 /// Raven `ItemUse_Sentry`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1014-1093`
-pub fn ItemUse_Sentry(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ItemUse_Sentry(ctx: GameContext<'_>, ent: Option<EntityId>) {
     unsafe {
+        // Stage-1: `Option<EntityId>` signature (body NULL-checks `ent`); body kept
+        // verbatim via a NULL-preserving re-derived raw pointer (Stage-2 body debt).
+        let ent = ent_resolve_opt(ctx, ent);
         if ent.is_null() || (*ent).client.is_null() {
             return;
         }
@@ -1459,7 +1538,7 @@ pub fn ItemUse_Sentry(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*sentry).s.teamowner = 16;
         }
 
-        SP_PAS(ctx, sentry);
+        SP_PAS(ctx, ctx.entity_id_of(sentry).unwrap());
     }
 }
 
@@ -1468,8 +1547,11 @@ pub fn ItemUse_Sentry(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `ItemUse_Seeker`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1096-1125`
-pub fn ItemUse_Seeker(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ItemUse_Seeker(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
             && (*ctx.world).cvars.d_siegeSeekerNPC.integer != 0
         {
@@ -1507,8 +1589,12 @@ pub fn ItemUse_Seeker(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `MedPackGive`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1127-1152`
-pub fn MedPackGive(ent: *mut gentity_t, amount: c_int) {
+pub fn MedPackGive(ent: &mut gentity_t, amount: c_int) {
     unsafe {
+        // Stage-1: ctx-free leaf takes `&mut gentity_t` (§rule 2); body kept
+        // verbatim via a re-derived raw pointer (the `ent.is_null()` arm is now
+        // vacuous — a live borrow is never null — but harmless).
+        let ent: *mut gentity_t = ent;
         if ent.is_null() || (*ent).client.is_null() {
             return;
         }
@@ -1536,22 +1622,25 @@ pub fn MedPackGive(ent: *mut gentity_t, amount: c_int) {
 /// Raven `ItemUse_MedPack_Big`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1154-1157`
-pub fn ItemUse_MedPack_Big(ent: *mut gentity_t) {
+pub fn ItemUse_MedPack_Big(ent: &mut gentity_t) {
     MedPackGive(ent, MAX_MEDPACK_BIG_HEAL_AMOUNT);
 }
 
 /// Raven `ItemUse_MedPack`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1159-1162`
-pub fn ItemUse_MedPack(ent: *mut gentity_t) {
+pub fn ItemUse_MedPack(ent: &mut gentity_t) {
     MedPackGive(ent, MAX_MEDPACK_HEAL_AMOUNT);
 }
 
 /// Raven `Jetpack_Off`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1165-1175`
-pub fn Jetpack_Off(ent: *mut gentity_t) {
+pub fn Jetpack_Off(ent: &mut gentity_t) {
     unsafe {
+        // Stage-1: ctx-free leaf takes `&mut gentity_t` (§rule 2); body kept
+        // verbatim via a re-derived raw pointer (Stage-2 body debt).
+        let ent: *mut gentity_t = ent;
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
         if (*((*ent).client as *mut gclient_t)).jetPackOn == qfalse {
@@ -1568,8 +1657,11 @@ pub fn Jetpack_Off(ent: *mut gentity_t) {
 /// Raven `Jetpack_On`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1177-1199`
-pub fn Jetpack_On(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn Jetpack_On(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
         if (*((*ent).client as *mut gclient_t)).jetPackOn != qfalse {
@@ -1608,11 +1700,14 @@ pub fn Jetpack_On(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `ItemUse_Jetpack`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1201-1234`
-pub fn ItemUse_Jetpack(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ItemUse_Jetpack(ctx: GameContext<'_>, ent: EntityId) {
     // Raven `#define JETPACK_TOGGLE_TIME` (`g_items.c`).
     pub const JETPACK_TOGGLE_TIME: c_int = 1000;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
         if (*((*ent).client as *mut gclient_t)).jetPackToggleTime >= (*ctx.world).level.time {
@@ -1636,9 +1731,9 @@ pub fn ItemUse_Jetpack(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if (*((*ent).client as *mut gclient_t)).jetPackOn != qfalse {
-            Jetpack_Off(ent);
+            Jetpack_Off(&mut *ent);
         } else {
-            Jetpack_On(ctx, ent);
+            Jetpack_On(ctx, ctx.entity_id_of(ent).unwrap());
         }
 
         (*((*ent).client as *mut gclient_t)).jetPackToggleTime =
@@ -1651,11 +1746,14 @@ pub fn ItemUse_Jetpack(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `ItemUse_UseCloak`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1239-1272`
-pub fn ItemUse_UseCloak(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ItemUse_UseCloak(ctx: GameContext<'_>, ent: EntityId) {
     // Raven `#define CLOAK_TOGGLE_TIME` (`g_items.c`).
     pub const CLOAK_TOGGLE_TIME: c_int = 1000;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
         if (*((*ent).client as *mut gclient_t)).cloakToggleTime >= (*ctx.world).level.time {
@@ -1696,12 +1794,15 @@ pub fn ItemUse_UseCloak(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SpecialItemThink`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1277-1293`
-pub fn SpecialItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SpecialItemThink(ctx: GameContext<'_>, ent: EntityId) {
     let gravity: f32 = 3.0;
     let mass: f32 = 0.09;
     let bounce: f32 = 1.1;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         if (*ent).genericValue5 < (*ctx.world).level.time {
             (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = (*ctx.world).level.time;
@@ -1732,8 +1833,11 @@ pub fn SpecialItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 // bg-owned `bg_itemlist` table (not ported anywhere in the crate graph —
 // even `BG_FindItem`/`BG_FindItemForWeapon` etc. are themselves parked on
 // it; see `bg_misc.rs`). Not decidable from this packet.
-pub fn G_SpecialSpawnItem(ctx: GameContext<'_>, ent: *mut gentity_t, item: *mut gitem_t) {
+pub fn G_SpecialSpawnItem(ctx: GameContext<'_>, ent: EntityId, item: *mut gitem_t) {
     unsafe {
+        // Stage-1: `EntityId` signature (`item` is a `gitem_t*`, not an entity —
+        // stays raw); body kept verbatim via a re-derived raw pointer.
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         RegisterItem(ctx, item);
         (*ent).item = item;
 
@@ -1800,11 +1904,14 @@ pub fn G_PrecacheDispensers(ctx: GameContext<'_>) {
 /// Raven `ItemUse_UseDisp`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1353-1410`
-pub fn ItemUse_UseDisp(ctx: GameContext<'_>, ent: *mut gentity_t, r#type: c_int) {
+pub fn ItemUse_UseDisp(ctx: GameContext<'_>, ent: EntityId, r#type: c_int) {
     // Raven `#define TOSS_DEBOUNCE_TIME 5000` (`bg_public.h:181`).
     pub const TOSS_DEBOUNCE_TIME: c_int = 5000;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         if (*ent).client.is_null()
             || (*((*ent).client as *mut gclient_t)).tossableItemDebounce > (*ctx.world).level.time
         {
@@ -1840,7 +1947,7 @@ pub fn ItemUse_UseDisp(ctx: GameContext<'_>, ent: *mut gentity_t, r#type: c_int)
             (*eItem).s.origin = (*eItem).r.currentOrigin;
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(eItem));
 
-            G_SpecialSpawnItem(ctx, eItem, item);
+            G_SpecialSpawnItem(ctx, ctx.entity_id_of(eItem).unwrap(), item);
 
             let mut fwd: vec3_t = [0.0; 3];
             AngleVectors(
@@ -1871,8 +1978,12 @@ pub fn ItemUse_UseDisp(ctx: GameContext<'_>, ent: *mut gentity_t, r#type: c_int)
 /// Raven `EWebDisattach`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1417-1431`
-pub fn EWebDisattach(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_t) {
+pub fn EWebDisattach(ctx: GameContext<'_>, owner: EntityId, eweb: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let owner = ctx.entity_mut(owner) as *mut gentity_t;
+        let eweb = ctx.entity_mut(eweb) as *mut gentity_t;
         (*((*owner).client as *mut gclient_t)).ewebIndex = 0;
         (*((*owner).client as *mut gclient_t)).ps.emplacedIndex = 0;
         if (*owner).health > 0 {
@@ -1904,9 +2015,9 @@ pub fn EWebPrecache(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/g_items.c:1449-1481`
 pub fn EWebDie(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     r#mod: c_int,
 ) {
@@ -1915,6 +2026,11 @@ pub fn EWebDie(
     pub const EWEB_DEATH_RADIUS: f32 = 128.0;
 
     unsafe {
+        // Stage-1: handle signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let inflictor = ent_resolve_opt(ctx, inflictor);
+        let attacker = ent_resolve_opt(ctx, attacker);
         G_RadiusDamage(
             ctx,
             (*self_).r.currentOrigin,
@@ -1938,7 +2054,11 @@ pub fn EWebDie(
                 &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
             if (*owner).inuse != 0 && !(*owner).client.is_null() {
-                EWebDisattach(ctx, owner, self_);
+                EWebDisattach(
+                    ctx,
+                    ctx.entity_id_of(owner).unwrap(),
+                    ctx.entity_id_of(self_).unwrap(),
+                );
 
                 // make sure it resets next time we spawn one in case we someone obtain one before death
                 (*((*owner).client as *mut gclient_t)).ewebHealth = -1;
@@ -1975,13 +2095,12 @@ pub fn EWebDie(
 /// Raven `EWebPain`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1484-1496`
-pub fn EWebPain(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
-    damage: c_int,
-) {
+pub fn EWebPain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId>, damage: c_int) {
     unsafe {
+        // Stage-1: handle signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let attacker = ent_resolve_opt(ctx, attacker);
         // update the owner's health status of me
         if (*self_).r.ownerNum != ENTITYNUM_NONE {
             let owner =
@@ -2000,18 +2119,16 @@ pub fn EWebPain(
 /// Raven `EWeb_SetBoneAngles`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1499-1598`
-pub fn EWeb_SetBoneAngles(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    bone: *mut c_char,
-    angles: vec3_t,
-) {
+pub fn EWeb_SetBoneAngles(ctx: GameContext<'_>, ent: EntityId, bone: *mut c_char, angles: vec3_t) {
     // Raven `BONE_ANGLES_POSTMULT` resolves via the canonical
     // `mp_qshared::common::mp::ghoul2::bone_flags` module (crate prelude glob).
     // Orientations (`POSITIVE_Y`/`NEGATIVE_Z`/`NEGATIVE_X`) come from the
     // already-ported `Eorientations` enum (prelude glob import).
 
     unsafe {
+        // Stage-1: `EntityId` signature (`bone` is a `char*` — stays raw); body
+        // kept verbatim via a re-derived raw pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let boneIndex = G_BoneIndex(ctx, bone as *const c_char);
 
         // Walk the 4 fixed bone-index/bone-angle slot pairs looking for an
@@ -2099,13 +2216,11 @@ pub fn EWeb_SetBoneAngles(
 /// Raven `EWeb_SetBoneAnim`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1601-1620`
-pub fn EWeb_SetBoneAnim(
-    ctx: GameContext<'_>,
-    eweb: *mut gentity_t,
-    startFrame: c_int,
-    endFrame: c_int,
-) {
+pub fn EWeb_SetBoneAnim(ctx: GameContext<'_>, eweb: EntityId, startFrame: c_int, endFrame: c_int) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let eweb = ctx.entity_mut(eweb) as *mut gentity_t;
         // set info on the entity so it knows to start the anim on the client next snapshot.
         (*eweb).s.eFlags |= EF_G2ANIMATING;
 
@@ -2146,7 +2261,7 @@ pub fn EWeb_SetBoneAnim(
 /// Raven `EWebFire`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1624-1664`
-pub fn EWebFire(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_t) {
+pub fn EWebFire(ctx: GameContext<'_>, owner: EntityId, eweb: EntityId) {
     // Raven `#define EWEB_MISSILE_DAMAGE 20` (`g_items.c:1623`).
     pub const EWEB_MISSILE_DAMAGE: c_int = 20;
     // Raven `DAMAGE_DEATH_KNOCKBACK` == 0x80, canonical in `crate::level::damage_flags`.
@@ -2156,6 +2271,10 @@ pub fn EWebFire(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_
     use crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let owner = ctx.entity_mut(owner) as *mut gentity_t;
+        let eweb = ctx.entity_mut(eweb) as *mut gentity_t;
         if (*eweb).genericValue10 == -1 {
             // oh no
             debug_assert!(false, "Bad e-web bolt");
@@ -2229,8 +2348,12 @@ pub fn EWebFire(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_
 /// Raven `EWebPositionUser`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1667-1732`
-pub fn EWebPositionUser(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_t) {
+pub fn EWebPositionUser(ctx: GameContext<'_>, owner: EntityId, eweb: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let owner = ctx.entity_mut(owner) as *mut gentity_t;
+        let eweb = ctx.entity_mut(eweb) as *mut gentity_t;
         let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
         trap::G2API_GetBoltMatrix(
             ctx.engine,
@@ -2356,7 +2479,11 @@ pub fn EWebPositionUser(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut 
             }
         } else {
             // can't move here.. stop using the thing I guess
-            EWebDisattach(ctx, owner, eweb);
+            EWebDisattach(
+                ctx,
+                ctx.entity_id_of(owner).unwrap(),
+                ctx.entity_id_of(eweb).unwrap(),
+            );
         }
     }
 }
@@ -2364,8 +2491,12 @@ pub fn EWebPositionUser(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut 
 /// Raven `EWebUpdateBoneAngles`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1735-1769`
-pub fn EWebUpdateBoneAngles(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_t) {
+pub fn EWebUpdateBoneAngles(ctx: GameContext<'_>, owner: EntityId, eweb: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let owner = ctx.entity_mut(owner) as *mut gentity_t;
+        let eweb = ctx.entity_mut(eweb) as *mut gentity_t;
         let turnCap: f32 = 4.0;
 
         let mut yAng: vec3_t = [0.0, 0.0, 0.0];
@@ -2384,9 +2515,18 @@ pub fn EWebUpdateBoneAngles(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *
         (*eweb).angle += incr;
 
         yAng[0] = (*eweb).angle;
-        EWeb_SetBoneAngles(ctx, eweb, c"cannon_Yrot".as_ptr() as *mut c_char, yAng);
+        EWeb_SetBoneAngles(
+            ctx,
+            ctx.entity_id_of(eweb).unwrap(),
+            c"cannon_Yrot".as_ptr() as *mut c_char,
+            yAng,
+        );
 
-        EWebPositionUser(ctx, owner, eweb);
+        EWebPositionUser(
+            ctx,
+            ctx.entity_id_of(owner).unwrap(),
+            ctx.entity_id_of(eweb).unwrap(),
+        );
         if (*((*owner).client as *mut gclient_t)).ewebIndex == 0 {
             // was removed during position function
             return;
@@ -2397,7 +2537,12 @@ pub fn EWebUpdateBoneAngles(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *
             (*((*owner).client as *mut gclient_t)).ps.viewangles[PITCH],
             (*eweb).s.angles[PITCH],
         ) * 0.8;
-        EWeb_SetBoneAngles(ctx, eweb, c"cannon_Xrot".as_ptr() as *mut c_char, yAng2);
+        EWeb_SetBoneAngles(
+            ctx,
+            ctx.entity_id_of(eweb).unwrap(),
+            c"cannon_Xrot".as_ptr() as *mut c_char,
+            yAng2,
+        );
     }
 }
 
@@ -2407,8 +2552,11 @@ pub fn EWebUpdateBoneAngles(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *
 /// Raven `EWebThink`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1776-1854`
-pub fn EWebThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn EWebThink(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let mut killMe = qfalse;
         let gravity: f32 = 3.0;
         let mass: f32 = 0.09;
@@ -2429,7 +2577,11 @@ pub fn EWebThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 killMe = qtrue;
             } else if (*((*owner).client as *mut gclient_t)).ps.emplacedIndex != (*self_).s.number {
                 // just go back to the inventory then
-                EWebDisattach(ctx, owner, self_);
+                EWebDisattach(
+                    ctx,
+                    ctx.entity_id_of(owner).unwrap(),
+                    ctx.entity_id_of(self_).unwrap(),
+                );
                 return;
             }
 
@@ -2451,7 +2603,11 @@ pub fn EWebThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
                 if (*self_).genericValue8 < (*ctx.world).level.time {
                     // make sure the anim timer is done
-                    EWebUpdateBoneAngles(ctx, owner, self_);
+                    EWebUpdateBoneAngles(
+                        ctx,
+                        ctx.entity_id_of(owner).unwrap(),
+                        ctx.entity_id_of(self_).unwrap(),
+                    );
                     if (*((*owner).client as *mut gclient_t)).ewebIndex == 0 {
                         // was removed during position function
                         return;
@@ -2462,10 +2618,14 @@ pub fn EWebThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     {
                         if (*self_).genericValue5 < (*ctx.world).level.time {
                             // we can fire another shot off
-                            EWebFire(ctx, owner, self_);
+                            EWebFire(
+                                ctx,
+                                ctx.entity_id_of(owner).unwrap(),
+                                ctx.entity_id_of(self_).unwrap(),
+                            );
 
                             // cheap firing anim
-                            EWeb_SetBoneAnim(ctx, self_, 2, 4);
+                            EWeb_SetBoneAnim(ctx, ctx.entity_id_of(self_).unwrap(), 2, 4);
                             (*self_).genericValue3 = 1;
 
                             // set fire debounce time
@@ -2475,7 +2635,7 @@ pub fn EWebThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         && (*self_).genericValue3 != 0
                     {
                         // reset the anim back to non-firing
-                        EWeb_SetBoneAnim(ctx, self_, 0, 1);
+                        EWeb_SetBoneAnim(ctx, ctx.entity_id_of(self_).unwrap(), 0, 1);
                         (*self_).genericValue3 = 0;
                     }
                 }
@@ -2484,7 +2644,14 @@ pub fn EWebThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         if killMe != qfalse {
             // something happened to the owner, let's explode
-            EWebDie(ctx, self_, self_, self_, 999, MOD_SUICIDE as c_int);
+            EWebDie(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(self_),
+                999,
+                MOD_SUICIDE as c_int,
+            );
             return;
         }
 
@@ -2510,11 +2677,15 @@ pub fn EWebThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `EWeb_Create`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1859-1980`
-pub fn EWeb_Create(ctx: GameContext<'_>, spawner: *mut gentity_t) -> *mut gentity_t {
+pub fn EWeb_Create(ctx: GameContext<'_>, spawner: EntityId) -> *mut gentity_t {
     // Raven `#define EWEB_HEALTH 200` (`g_items.c:1856`).
     pub const EWEB_HEALTH: c_int = 200;
 
     unsafe {
+        // Stage-1: `EntityId` param; the `*mut gentity_t` RETURN keeps its raw shape
+        // (returns ride a later pass). Body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let spawner = ctx.entity_mut(spawner) as *mut gentity_t;
         let modelName = c"models/map_objects/hoth/eweb_model.glm";
         let failSound = G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr());
 
@@ -2651,13 +2822,13 @@ pub fn EWeb_Create(ctx: GameContext<'_>, spawner: *mut gentity_t) -> *mut gentit
         // crate prelude, pass-3 symbol backfill).
         EWeb_SetBoneAngles(
             ctx,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             c"cannon_Yrot".as_ptr() as *mut c_char,
             vec3_origin,
         );
         EWeb_SetBoneAngles(
             ctx,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             c"cannon_Xrot".as_ptr() as *mut c_char,
             vec3_origin,
         );
@@ -2695,7 +2866,7 @@ pub fn EWeb_Create(ctx: GameContext<'_>, spawner: *mut gentity_t) -> *mut gentit
             (*((*spawner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize];
 
         // start the "unfolding" anim
-        EWeb_SetBoneAnim(ctx, ent, 4, 20);
+        EWeb_SetBoneAnim(ctx, ctx.entity_id_of(ent).unwrap(), 4, 20);
         // don't allow use until the anim is done playing (rough time estimate)
         (*ent).genericValue8 = (*ctx.world).level.time + 500;
 
@@ -2711,11 +2882,14 @@ pub fn EWeb_Create(ctx: GameContext<'_>, spawner: *mut gentity_t) -> *mut gentit
 /// Raven `ItemUse_UseEWeb`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1984-2018`
-pub fn ItemUse_UseEWeb(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ItemUse_UseEWeb(ctx: GameContext<'_>, ent: EntityId) {
     // Raven `#define EWEB_USE_DEBOUNCE 1000` (`g_items.c:1982`).
     pub const EWEB_USE_DEBOUNCE: c_int = 1000;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         if (*((*ent).client as *mut gclient_t)).ewebTime > (*ctx.world).level.time {
             // can't use again yet
             return;
@@ -2740,10 +2914,14 @@ pub fn ItemUse_UseEWeb(ctx: GameContext<'_>, ent: *mut gentity_t) {
             let eweb = &mut (*ctx.world).g_entities
                 [(*((*ent).client as *mut gclient_t)).ewebIndex as usize]
                 as *mut gentity_t;
-            EWebDisattach(ctx, ent, eweb);
+            EWebDisattach(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                ctx.entity_id_of(eweb).unwrap(),
+            );
         } else {
             // create it
-            let eweb = EWeb_Create(ctx, ent);
+            let eweb = EWeb_Create(ctx, ctx.entity_id_of(ent).unwrap());
 
             if !eweb.is_null() {
                 // if it's null the thing couldn't spawn (probably no room)
@@ -2762,13 +2940,17 @@ pub fn ItemUse_UseEWeb(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `Pickup_Powerup`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2024-2100`
-pub fn Pickup_Powerup(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
+pub fn Pickup_Powerup(ctx: GameContext<'_>, ent: EntityId, other: EntityId) -> c_int {
     // Raven `#define RESPAWN_POWERUP 120` (`g_items.c:27`).
     pub const RESPAWN_POWERUP: c_int = 120;
     // Raven `PLAYEREVENT_DENIEDREWARD` (`bg_public.h:716`) — not yet ported; transcribed locally.
     pub const PLAYEREVENT_DENIEDREWARD: c_int = 0x0001;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
+        let other = ctx.entity_mut(other) as *mut gentity_t;
         let giTag = (*(*ent).item).giTag;
         if (*((*other).client as *mut gclient_t)).ps.powerups[giTag as usize] == 0 {
             // round timing to seconds to make multiple powerup timers
@@ -2866,8 +3048,12 @@ pub fn Pickup_Powerup(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gen
 /// Raven `Pickup_Holdable`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2104-2113`
-pub fn Pickup_Holdable(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
+pub fn Pickup_Holdable(ctx: GameContext<'_>, ent: EntityId, other: EntityId) -> c_int {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
+        let other = ctx.entity_mut(other) as *mut gentity_t;
         (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] =
             (*ent).item.offset_from(bg_itemlist.as_ptr()) as c_int;
 
@@ -2893,8 +3079,11 @@ pub fn Pickup_Holdable(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut ge
 /// Raven `Add_Ammo`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2118-2128`
-pub fn Add_Ammo(ctx: GameContext<'_>, ent: *mut gentity_t, weapon: c_int, count: c_int) {
+pub fn Add_Ammo(ctx: GameContext<'_>, ent: EntityId, weapon: c_int, count: c_int) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         if (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize]
             < ammoData[weapon as usize].max
         {
@@ -2914,11 +3103,16 @@ pub fn Add_Ammo(ctx: GameContext<'_>, ent: *mut gentity_t, weapon: c_int, count:
 /// Raven `Pickup_Ammo`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2130-2175`
-pub fn Pickup_Ammo(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
+pub fn Pickup_Ammo(ctx: GameContext<'_>, ent: EntityId, other: EntityId) -> c_int {
     // Raven `#define RESPAWN_AMMO 40` (`g_items.c:26`).
     const RESPAWN_AMMO: f32 = 40.0;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt). The `Add_Ammo` calls below re-wrap
+        // `other` as a handle (it now takes `EntityId`).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
+        let other = ctx.entity_mut(other) as *mut gentity_t;
         let quantity = if (*ent).count != 0 {
             (*ent).count
         } else {
@@ -2929,36 +3123,96 @@ pub fn Pickup_Ammo(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentit
             // an ammo_all, give them a bit of everything
             if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
                 // complaints that siege tech's not giving enough ammo.  Does anything else use ammo all?
-                Add_Ammo(ctx, other, AMMO_BLASTER as c_int, 100);
-                Add_Ammo(ctx, other, AMMO_POWERCELL as c_int, 100);
-                Add_Ammo(ctx, other, AMMO_METAL_BOLTS as c_int, 100);
-                Add_Ammo(ctx, other, AMMO_ROCKETS as c_int, 5);
+                Add_Ammo(
+                    ctx,
+                    ctx.entity_id_of(other).unwrap(),
+                    AMMO_BLASTER as c_int,
+                    100,
+                );
+                Add_Ammo(
+                    ctx,
+                    ctx.entity_id_of(other).unwrap(),
+                    AMMO_POWERCELL as c_int,
+                    100,
+                );
+                Add_Ammo(
+                    ctx,
+                    ctx.entity_id_of(other).unwrap(),
+                    AMMO_METAL_BOLTS as c_int,
+                    100,
+                );
+                Add_Ammo(
+                    ctx,
+                    ctx.entity_id_of(other).unwrap(),
+                    AMMO_ROCKETS as c_int,
+                    5,
+                );
                 if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
                     & (1 << WP_DET_PACK as c_int))
                     != 0
                 {
-                    Add_Ammo(ctx, other, AMMO_DETPACK as c_int, 2);
+                    Add_Ammo(
+                        ctx,
+                        ctx.entity_id_of(other).unwrap(),
+                        AMMO_DETPACK as c_int,
+                        2,
+                    );
                 }
                 if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
                     & (1 << WP_THERMAL as c_int))
                     != 0
                 {
-                    Add_Ammo(ctx, other, AMMO_THERMAL as c_int, 2);
+                    Add_Ammo(
+                        ctx,
+                        ctx.entity_id_of(other).unwrap(),
+                        AMMO_THERMAL as c_int,
+                        2,
+                    );
                 }
                 if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
                     & (1 << WP_TRIP_MINE as c_int))
                     != 0
                 {
-                    Add_Ammo(ctx, other, AMMO_TRIPMINE as c_int, 2);
+                    Add_Ammo(
+                        ctx,
+                        ctx.entity_id_of(other).unwrap(),
+                        AMMO_TRIPMINE as c_int,
+                        2,
+                    );
                 }
             } else {
-                Add_Ammo(ctx, other, AMMO_BLASTER as c_int, 50);
-                Add_Ammo(ctx, other, AMMO_POWERCELL as c_int, 50);
-                Add_Ammo(ctx, other, AMMO_METAL_BOLTS as c_int, 50);
-                Add_Ammo(ctx, other, AMMO_ROCKETS as c_int, 2);
+                Add_Ammo(
+                    ctx,
+                    ctx.entity_id_of(other).unwrap(),
+                    AMMO_BLASTER as c_int,
+                    50,
+                );
+                Add_Ammo(
+                    ctx,
+                    ctx.entity_id_of(other).unwrap(),
+                    AMMO_POWERCELL as c_int,
+                    50,
+                );
+                Add_Ammo(
+                    ctx,
+                    ctx.entity_id_of(other).unwrap(),
+                    AMMO_METAL_BOLTS as c_int,
+                    50,
+                );
+                Add_Ammo(
+                    ctx,
+                    ctx.entity_id_of(other).unwrap(),
+                    AMMO_ROCKETS as c_int,
+                    2,
+                );
             }
         } else {
-            Add_Ammo(ctx, other, (*(*ent).item).giTag, quantity);
+            Add_Ammo(
+                ctx,
+                ctx.entity_id_of(other).unwrap(),
+                (*(*ent).item).giTag,
+                quantity,
+            );
         }
 
         adjustRespawnTime(
@@ -2975,8 +3229,13 @@ pub fn Pickup_Ammo(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentit
 /// Raven `Pickup_Weapon`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2180-2232`
-pub fn Pickup_Weapon(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
+pub fn Pickup_Weapon(ctx: GameContext<'_>, ent: EntityId, other: EntityId) -> c_int {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt). The `Add_Ammo` call below re-wraps `other`
+        // as a handle (it now takes `EntityId`).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
+        let other = ctx.entity_mut(other) as *mut gentity_t;
         let mut quantity: c_int;
 
         if (*ent).count < 0 {
@@ -3015,7 +3274,7 @@ pub fn Pickup_Weapon(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gent
 
         Add_Ammo(
             ctx,
-            other,
+            ctx.entity_id_of(other).unwrap(),
             weaponData[(*(*ent).item).giTag as usize].ammoIndex,
             quantity,
         );
@@ -3047,12 +3306,16 @@ pub fn Pickup_Weapon(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gent
 /// Raven `Pickup_Health`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2237-2266`
-pub fn Pickup_Health(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
+pub fn Pickup_Health(ctx: GameContext<'_>, ent: EntityId, other: EntityId) -> c_int {
     // Raven local `#define`s (`g_items.c:23-27`).
     pub const RESPAWN_HEALTH: f32 = 30.0;
     pub const RESPAWN_MEGAHEALTH: c_int = 120;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
+        let other = ctx.entity_mut(other) as *mut gentity_t;
         let item = (*ent).item;
 
         // small and mega healths will go over the max
@@ -3089,11 +3352,15 @@ pub fn Pickup_Health(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gent
 /// Raven `Pickup_Armor`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2270-2279`
-pub fn Pickup_Armor(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
+pub fn Pickup_Armor(ctx: GameContext<'_>, ent: EntityId, other: EntityId) -> c_int {
     // Raven local `#define` (`g_items.c:21`).
     pub const RESPAWN_ARMOR: f32 = 20.0;
 
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via re-derived raw
+        // pointers (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
+        let other = ctx.entity_mut(other) as *mut gentity_t;
         let item = (*ent).item;
         let cl = (*other).client as *mut gclient_t;
 
@@ -3113,8 +3380,11 @@ pub fn Pickup_Armor(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut genti
 /// Raven `RespawnItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2288-2334`
-pub fn RespawnItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn RespawnItem(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let mut ent = ent;
         // randomly select from teamed entities
         if !(*ent).team.is_null() {
@@ -3195,14 +3465,18 @@ pub fn RespawnItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_items.c:2336-2355`
 pub fn CheckItemCanBePickedUpByNPC(
     ctx: GameContext<'_>,
-    item: *mut gentity_t,
-    pickerupper: *mut gentity_t,
+    item: EntityId,
+    pickerupper: EntityId,
 ) -> qboolean {
     // Raven `SCF_FORCED_MARCH` (`b_public.h:43`), canonical in
     // `crate::npc::script_flags`. Source: `oracle/codemp/game/b_public.h:43`
     use crate::npc::script_flags::SCF_FORCED_MARCH;
 
     unsafe {
+        // Stage-1: `EntityId` signature (`item` is the item *entity*, not a
+        // `gitem_t`); body kept verbatim via re-derived raw pointers.
+        let item = ctx.entity_mut(item) as *mut gentity_t;
+        let pickerupper = ctx.entity_mut(pickerupper) as *mut gentity_t;
         let npc = (*pickerupper).NPC as *mut gNPC_t;
         if ((*item).flags & FL_DROPPED_ITEM) != 0
             && crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*item).activator) != &mut (*ctx.world).g_entities[0] as *mut gentity_t
@@ -3233,11 +3507,16 @@ pub fn CheckItemCanBePickedUpByNPC(
 /// Source: `oracle/codemp/game/g_items.c:2362-2646`
 pub fn Touch_Item(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
     unsafe {
+        // Stage-1: handle signature (`ent` is the item entity, never NULL; `other`
+        // is the toucher and IS NULL-checked); body kept verbatim via re-derived
+        // raw pointers (`other` NULL-preserving) — Stage-2 body debt.
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
+        let other = ent_resolve_opt(ctx, other);
         if (*ent).genericValue10 > (*ctx.world).level.time
             && !other.is_null()
             && (*other).s.number == (*ent).genericValue11
@@ -3319,7 +3598,12 @@ pub fn Touch_Item(
             return;
         }
 
-        if CheckItemCanBePickedUpByNPC(ctx, ent, other) != 0 {
+        if CheckItemCanBePickedUpByNPC(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            ctx.entity_id_of(other).unwrap(),
+        ) != 0
+        {
             let npc = (*other).NPC as *mut gNPC_t;
             if !npc.is_null() {
                 if let Some(goal_id) = (*npc).goalEntity {
@@ -3379,11 +3663,19 @@ pub fn Touch_Item(
         let mut respawn: c_int;
         match (*(*ent).item).giType {
             x if x == IT_WEAPON => {
-                respawn = Pickup_Weapon(ctx, ent, other);
+                respawn = Pickup_Weapon(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(other).unwrap(),
+                );
                 predict = qtrue;
             }
             x if x == IT_AMMO => {
-                respawn = Pickup_Ammo(ctx, ent, other);
+                respawn = Pickup_Ammo(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(other).unwrap(),
+                );
                 if (*(*ent).item).giTag == AMMO_THERMAL as c_int
                     || (*(*ent).item).giTag == AMMO_TRIPMINE as c_int
                     || (*(*ent).item).giTag == AMMO_DETPACK as c_int
@@ -3411,22 +3703,38 @@ pub fn Touch_Item(
                 predict = qtrue;
             }
             x if x == IT_ARMOR => {
-                respawn = Pickup_Armor(ctx, ent, other);
+                respawn = Pickup_Armor(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(other).unwrap(),
+                );
                 predict = qtrue;
             }
             x if x == IT_HEALTH => {
-                respawn = Pickup_Health(ctx, ent, other);
+                respawn = Pickup_Health(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(other).unwrap(),
+                );
                 predict = qtrue;
             }
             x if x == IT_POWERUP => {
-                respawn = Pickup_Powerup(ctx, ent, other);
+                respawn = Pickup_Powerup(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(other).unwrap(),
+                );
                 predict = qfalse;
             }
             x if x == IT_TEAM => {
                 respawn = Pickup_Team(ctx, ent, other);
             }
             x if x == IT_HOLDABLE => {
-                respawn = Pickup_Holdable(ctx, ent, other);
+                respawn = Pickup_Holdable(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(other).unwrap(),
+                );
             }
             _ => return,
         }
@@ -3653,11 +3961,15 @@ pub fn LaunchItem(
 /// Source: `oracle/codemp/game/g_items.c:2742-2755`
 pub fn Drop_Item(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     item: *mut gitem_t,
     angle: f32,
 ) -> *mut gentity_t {
     unsafe {
+        // Stage-1: `EntityId` param (`item` is a `gitem_t*`; the `*mut gentity_t`
+        // RETURN keeps its raw shape — returns ride a later pass). Body kept
+        // verbatim via a re-derived raw pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let mut angles = (*ent).s.apos.trBase;
         angles[YAW] += angle;
         angles[PITCH] = 0.0; // always forward
@@ -3678,9 +3990,9 @@ pub fn Drop_Item(
 /// Source: `oracle/codemp/game/g_items.c:2765-2767`
 pub fn Use_Item(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
     RespawnItem(ctx, ent);
 }
@@ -3691,8 +4003,11 @@ pub fn Use_Item(
 /// Raven `FinishSpawningItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2779-2963`
-pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
             // in siege remove all powerups
             if (*(*ent).item).giType == IT_POWERUP {
@@ -3972,8 +4287,11 @@ pub fn G_ItemDisabled(ctx: GameContext<'_>, item: *mut gitem_t) -> c_int {
 /// Raven `G_SpawnItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3079-3121`
-pub fn G_SpawnItem(ctx: GameContext<'_>, ent: *mut gentity_t, item: *mut gitem_t) {
+pub fn G_SpawnItem(ctx: GameContext<'_>, ent: EntityId, item: *mut gitem_t) {
     unsafe {
+        // Stage-1: `EntityId` param (`item` is a `gitem_t*` — stays raw); body kept
+        // verbatim via a re-derived raw pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         G_SpawnFloat(
             ctx,
             c"random".as_ptr(),
@@ -4032,8 +4350,11 @@ pub fn G_SpawnItem(ctx: GameContext<'_>, ent: *mut gentity_t, item: *mut gitem_t
 /// Raven `G_BounceItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3130-3174`
-pub fn G_BounceItem(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut trace_t) {
+pub fn G_BounceItem(ctx: GameContext<'_>, ent: EntityId, trace: *mut trace_t) {
     unsafe {
+        // Stage-1: `EntityId` signature (`trace` is a `trace_t*` — stays raw); body
+        // kept verbatim via a re-derived raw pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         // reflect the velocity on the trace plane
         let hitTime = (*ctx.world).level.previousTime
             + (((*ctx.world).level.time - (*ctx.world).level.previousTime) as f32
@@ -4120,8 +4441,11 @@ pub fn G_BounceItem(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut trace
 /// Raven `G_RunItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3183-3242`
-pub fn G_RunItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn G_RunItem(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         // if groundentity has been set to -1, it may have been pushed off an edge
         if (*ent).s.groundEntityNum == -1 && (*ent).s.pos.trType != trType_t::TR_GRAVITY {
             (*ent).s.pos.trType = trType_t::TR_GRAVITY;
@@ -4194,6 +4518,6 @@ pub fn G_RunItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
             return;
         }
 
-        G_BounceItem(ctx, ent, &mut tr as *mut trace_t);
+        G_BounceItem(ctx, ctx.entity_id_of(ent).unwrap(), &mut tr as *mut trace_t);
     }
 }

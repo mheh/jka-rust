@@ -899,7 +899,12 @@ pub fn WeaponThink(ctx: GameContext<'_>, inCombat: qboolean) {
         //For now, no-one runs out of ammo
         let npc_client = (*npc).client as *mut gclient_t;
         if (*npc_client).ps.ammo[weaponData[(*client).ps.weapon as usize].ammoIndex as usize] < 10 {
-            Add_Ammo(ctx, npc, (*client).ps.weapon, 100);
+            Add_Ammo(
+                ctx,
+                ctx.entity_id_of(npc).unwrap(),
+                (*client).ps.weapon,
+                100,
+            );
         }
         //MCG - End
 
@@ -2879,7 +2884,12 @@ pub fn NPC_SearchForWeapons(ctx: GameContext<'_>) -> *mut gentity_t {
             if ((*found).s.eFlags & EF_NODRAW) != 0 {
                 continue;
             }
-            if CheckItemCanBePickedUpByNPC(ctx, found, npc) != qfalse {
+            if CheckItemCanBePickedUpByNPC(
+                ctx,
+                ctx.entity_id_of(found).unwrap(),
+                ctx.entity_id_of(npc).unwrap(),
+            ) != qfalse
+            {
                 if trap::InPVS(
                     ctx.engine,
                     GInPvsArgs::new(

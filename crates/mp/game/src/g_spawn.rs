@@ -287,7 +287,7 @@ pub fn SP_gametype_item(ctx: GameContext<'_>, ent: EntityId) {
             if !item.is_null() {
                 (*ent).targetname = std::ptr::null_mut();
                 (*ent).classname = (*item).classname;
-                G_SpawnItem(ctx, ent, item);
+                G_SpawnItem(ctx, ctx.entity_id_of(ent).unwrap(), item);
             }
         }
     }
@@ -315,7 +315,7 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
         while !(*item).classname.is_null() {
             // Raven matches items with case-sensitive `strcmp`, not `Q_stricmp`.
             if CStr::from_ptr((*item).classname) == CStr::from_ptr((*ent).classname) {
-                G_SpawnItem(ctx, ent, item);
+                G_SpawnItem(ctx, ctx.entity_id_of(ent).unwrap(), item);
                 return qtrue;
             }
             item = item.add(1);

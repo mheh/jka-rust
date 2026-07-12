@@ -1207,35 +1207,35 @@ pub fn ClientEvents(ctx: GameContext<'_>, ent: *mut gentity_t, oldEventSequence:
                 (*client).invulnerableTimer = 0;
             } else if event == EV_USE_ITEM1 as c_int {
                 //seeker droid
-                ItemUse_Seeker(ctx, ent);
+                ItemUse_Seeker(ctx, ctx.entity_id_of(ent).unwrap());
             } else if event == EV_USE_ITEM2 as c_int {
                 //shield
-                ItemUse_Shield(ctx, ent);
+                ItemUse_Shield(ctx, ctx.entity_id_of(ent).unwrap());
             } else if event == EV_USE_ITEM3 as c_int {
                 //medpack
-                ItemUse_MedPack(ent);
+                ItemUse_MedPack(&mut *ent);
             } else if event == EV_USE_ITEM4 as c_int {
                 //big medpack
-                ItemUse_MedPack_Big(ent);
+                ItemUse_MedPack_Big(&mut *ent);
             } else if event == EV_USE_ITEM5 as c_int {
                 //binoculars
-                ItemUse_Binoculars(ctx, ent);
+                ItemUse_Binoculars(ctx, ctx.entity_id_of(ent));
             } else if event == EV_USE_ITEM6 as c_int {
                 //sentry gun
-                ItemUse_Sentry(ctx, ent);
+                ItemUse_Sentry(ctx, ctx.entity_id_of(ent));
             } else if event == EV_USE_ITEM7 as c_int {
                 //jetpack
-                ItemUse_Jetpack(ctx, ent);
+                ItemUse_Jetpack(ctx, ctx.entity_id_of(ent).unwrap());
             } else if event == EV_USE_ITEM8 as c_int {
                 //health disp — ItemUse_UseDisp(ent, HI_HEALTHDISP);
             } else if event == EV_USE_ITEM9 as c_int {
                 //ammo disp — ItemUse_UseDisp(ent, HI_AMMODISP);
             } else if event == EV_USE_ITEM10 as c_int {
                 //eweb
-                ItemUse_UseEWeb(ctx, ent);
+                ItemUse_UseEWeb(ctx, ctx.entity_id_of(ent).unwrap());
             } else if event == EV_USE_ITEM11 as c_int {
                 //cloak
-                ItemUse_UseCloak(ctx, ent);
+                ItemUse_UseCloak(ctx, ctx.entity_id_of(ent).unwrap());
             }
 
             i += 1;
@@ -3388,7 +3388,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_SEEKER as c_int) != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_SEEKER as c_int) != 0
                 {
-                    ItemUse_Seeker(ctx, ent);
+                    ItemUse_Seeker(ctx, ctx.entity_id_of(ent).unwrap());
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_SEEKER as c_int, 0);
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_SEEKER as c_int);
                 }
@@ -3396,7 +3396,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_SHIELD as c_int) != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_SHIELD as c_int) != 0
                 {
-                    ItemUse_Shield(ctx, ent);
+                    ItemUse_Shield(ctx, ctx.entity_id_of(ent).unwrap());
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_SHIELD as c_int, 0);
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_SHIELD as c_int);
                 }
@@ -3404,7 +3404,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_MEDPAC as c_int) != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_MEDPAC as c_int) != 0
                 {
-                    ItemUse_MedPack(ent);
+                    ItemUse_MedPack(&mut *ent);
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_MEDPAC as c_int, 0);
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_MEDPAC as c_int);
                 }
@@ -3413,7 +3413,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_MEDPAC_BIG as c_int) != 0
                 {
-                    ItemUse_MedPack_Big(ent);
+                    ItemUse_MedPack_Big(&mut *ent);
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_MEDPAC_BIG as c_int, 0);
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
                         !(1 << HI_MEDPAC_BIG as c_int);
@@ -3423,7 +3423,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_BINOCULARS as c_int) != 0
                 {
-                    ItemUse_Binoculars(ctx, ent);
+                    ItemUse_Binoculars(ctx, ctx.entity_id_of(ent));
                     if (*client).ps.zoomMode == 0 {
                         G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_BINOCULARS as c_int, 1);
                     } else {
@@ -3435,7 +3435,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_BINOCULARS as c_int) != 0
                 {
-                    ItemUse_Binoculars(ctx, ent);
+                    ItemUse_Binoculars(ctx, ctx.entity_id_of(ent));
                     if (*client).ps.zoomMode == 0 {
                         G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_BINOCULARS as c_int, 1);
                     } else {
@@ -3447,7 +3447,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_SENTRY_GUN as c_int) != 0
                 {
-                    ItemUse_Sentry(ctx, ent);
+                    ItemUse_Sentry(ctx, ctx.entity_id_of(ent));
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_SENTRY_GUN as c_int, 0);
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
                         !(1 << HI_SENTRY_GUN as c_int);
@@ -3457,7 +3457,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_JETPACK as c_int) != 0
                 {
-                    ItemUse_Jetpack(ctx, ent);
+                    ItemUse_Jetpack(ctx, ctx.entity_id_of(ent).unwrap());
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_JETPACK as c_int, 0);
                 }
             } else if gc == GENCMD_USE_HEALTHDISP as c_int {
@@ -3480,7 +3480,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_EWEB as c_int) != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_EWEB as c_int) != 0
                 {
-                    ItemUse_UseEWeb(ctx, ent);
+                    ItemUse_UseEWeb(ctx, ctx.entity_id_of(ent).unwrap());
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_EWEB as c_int, 0);
                 }
             } else if gc == GENCMD_USE_CLOAK as c_int {

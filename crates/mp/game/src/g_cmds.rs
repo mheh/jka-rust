@@ -601,10 +601,15 @@ pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: *mut gentity_t, baseArg: c_int) 
             let it_ent = crate::g_utils::G_Spawn(ctx);
             crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*it_ent).s.origin);
             (*it_ent).classname = (*it).classname;
-            crate::g_items::G_SpawnItem(ctx, it_ent, it);
-            crate::g_items::FinishSpawningItem(ctx, it_ent);
+            crate::g_items::G_SpawnItem(ctx, ctx.entity_id_of(it_ent).unwrap(), it);
+            crate::g_items::FinishSpawningItem(ctx, ctx.entity_id_of(it_ent).unwrap());
             let mut trace: trace_t = core::mem::zeroed();
-            crate::g_items::Touch_Item(ctx, it_ent, ent, &mut trace);
+            crate::g_items::Touch_Item(
+                ctx,
+                ctx.entity_id_of(it_ent).unwrap(),
+                ctx.entity_id_of(ent),
+                &mut trace,
+            );
             if (*it_ent).inuse != qfalse {
                 crate::g_utils::G_FreeEntity(ctx, it_ent);
             }

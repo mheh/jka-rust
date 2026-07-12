@@ -3686,7 +3686,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
             }
 
             if (*ent).s.eType == entityType_t::ET_ITEM as c_int || (*ent).physicsObject != qfalse {
-                G_RunItem(ctx, ent);
+                G_RunItem(ctx, ctx.entity_id_of(ent).unwrap());
                 i += 1;
                 continue;
             }
@@ -3823,7 +3823,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         if (*client).ps.jetpackFuel <= 0 {
                             // turn it off
                             (*client).ps.jetpackFuel = 0;
-                            Jetpack_Off(ent);
+                            Jetpack_Off(&mut *ent);
                         }
                         (*client).jetPackDebReduce = world.level.time + 200;
                     }
