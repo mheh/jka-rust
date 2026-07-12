@@ -26,31 +26,35 @@ static PADDING: [c_uchar; 64] = {
     a
 };
 
+// Raven's `UINT4` is 32-bit on every retail platform; `c_ulong` widens to 8
+// bytes on LP64, so the round math truncates to `u32` — digests match the
+// 32-bit retail client's bit-for-bit on every host.
+
 /// Raven `F` — basic MD4 function.
 /// Source: `oracle/codemp/qcommon/md4.cpp:83`
 #[inline(always)]
-fn F(x: UINT4, y: UINT4, z: UINT4) -> UINT4 {
+fn F(x: u32, y: u32, z: u32) -> u32 {
     (x & y) | (!x & z)
 }
 
 /// Raven `G` — basic MD4 function.
 /// Source: `oracle/codemp/qcommon/md4.cpp:84`
 #[inline(always)]
-fn G(x: UINT4, y: UINT4, z: UINT4) -> UINT4 {
+fn G(x: u32, y: u32, z: u32) -> u32 {
     (x & y) | (x & z) | (y & z)
 }
 
 /// Raven `H` — basic MD4 function.
 /// Source: `oracle/codemp/qcommon/md4.cpp:85`
 #[inline(always)]
-fn H(x: UINT4, y: UINT4, z: UINT4) -> UINT4 {
+fn H(x: u32, y: u32, z: u32) -> u32 {
     x ^ y ^ z
 }
 
 /// Raven `ROTATE_LEFT`.
 /// Source: `oracle/codemp/qcommon/md4.cpp:88`
 #[inline(always)]
-fn ROTATE_LEFT(x: UINT4, n: u32) -> UINT4 {
+fn ROTATE_LEFT(x: u32, n: u32) -> u32 {
     (x << n) | (x >> (32 - n))
 }
 
@@ -58,30 +62,32 @@ fn ROTATE_LEFT(x: UINT4, n: u32) -> UINT4 {
 /// Source: `oracle/codemp/qcommon/md4.cpp:92`
 #[inline(always)]
 fn FF(a: UINT4, b: UINT4, c: UINT4, d: UINT4, x: UINT4, s: u32) -> UINT4 {
-    let a = a.wrapping_add(F(b, c, d)).wrapping_add(x);
-    ROTATE_LEFT(a, s)
+    let a = (a as u32)
+        .wrapping_add(F(b as u32, c as u32, d as u32))
+        .wrapping_add(x as u32);
+    ROTATE_LEFT(a, s) as UINT4
 }
 
 /// Raven `GG` — transformation for round 2.
 /// Source: `oracle/codemp/qcommon/md4.cpp:94`
 #[inline(always)]
 fn GG(a: UINT4, b: UINT4, c: UINT4, d: UINT4, x: UINT4, s: u32) -> UINT4 {
-    let a = a
-        .wrapping_add(G(b, c, d))
-        .wrapping_add(x)
+    let a = (a as u32)
+        .wrapping_add(G(b as u32, c as u32, d as u32))
+        .wrapping_add(x as u32)
         .wrapping_add(0x5a827999);
-    ROTATE_LEFT(a, s)
+    ROTATE_LEFT(a, s) as UINT4
 }
 
 /// Raven `HH` — transformation for round 3.
 /// Source: `oracle/codemp/qcommon/md4.cpp:96`
 #[inline(always)]
 fn HH(a: UINT4, b: UINT4, c: UINT4, d: UINT4, x: UINT4, s: u32) -> UINT4 {
-    let a = a
-        .wrapping_add(H(b, c, d))
-        .wrapping_add(x)
+    let a = (a as u32)
+        .wrapping_add(H(b as u32, c as u32, d as u32))
+        .wrapping_add(x as u32)
         .wrapping_add(0x6ed9eba1);
-    ROTATE_LEFT(a, s)
+    ROTATE_LEFT(a, s) as UINT4
 }
 
 /// Raven `MD4Init` — MD4 initialization. Begins an MD4 operation, writing a new context.
