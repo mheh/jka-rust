@@ -357,7 +357,12 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
                         && (*((*radiusEnt).client as *mut gclient_t)).NPC_class
                             != crate::prelude::CLASS_ATST
                     {
-                        crate::g_utils::G_Throw(ctx, radiusEnt, pushDir, 65.0);
+                        crate::g_utils::G_Throw(
+                            ctx,
+                            ctx.entity_id_of(radiusEnt).unwrap(),
+                            pushDir,
+                            65.0,
+                        );
                         if crate::bg_pmove::BG_KnockDownable(
                             &mut (*((*radiusEnt).client as *mut gclient_t)).ps as *mut _,
                         ) != 0
@@ -429,7 +434,7 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
                 }
                 crate::g_utils::G_Sound(
                     ctx,
-                    radiusEnt,
+                    ctx.entity_id_of(radiusEnt),
                     crate::prelude::CHAN_WEAPON,
                     crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()),
                 );
@@ -857,7 +862,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                     ));
                     crate::g_utils::G_Sound(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         crate::prelude::CHAN_VOICE,
                         crate::g_utils::G_SoundIndex(angrynoise_snd.as_ptr()),
                     );
@@ -961,7 +966,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
             if crate::g_timer::TIMER_Done(ctx, npc, c"idlenoise".as_ptr()) != 0 {
                 crate::g_utils::G_Sound(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     crate::prelude::CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(c"sound/chars/wampa/misc/anger3.wav".as_ptr()),
                 );

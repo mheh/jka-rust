@@ -96,7 +96,7 @@ impl Default for shooterClient_t {
 /// Source: `oracle/codemp/game/g_misc.c:25-27`
 pub fn SP_info_camp(self_: *mut gentity_t) {
     unsafe {
-        G_SetOrigin(self_, (*self_).s.origin);
+        G_SetOrigin(&mut *(self_), (*self_).s.origin);
     }
 }
 
@@ -106,7 +106,7 @@ pub fn SP_info_camp(self_: *mut gentity_t) {
 /// (spotlights, etc), but removed during gameplay.
 /// Source: `oracle/codemp/game/g_misc.c:33-35`
 pub fn SP_info_null(ctx: GameContext<'_>, self_: *mut gentity_t) {
-    G_FreeEntity(ctx, self_);
+    G_FreeEntity(ctx, ctx.entity_id_of(self_));
 }
 
 /// Raven `SP_info_notnull`.
@@ -116,7 +116,7 @@ pub fn SP_info_null(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:42-44`
 pub fn SP_info_notnull(self_: *mut gentity_t) {
     unsafe {
-        G_SetOrigin(self_, (*self_).s.origin);
+        G_SetOrigin(&mut *(self_), (*self_).s.origin);
     }
 }
 
@@ -233,7 +233,7 @@ pub fn SP_light(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).targetname.is_null() {
             // if i don't have a light style switch, then i go away
-            G_FreeEntity(ctx, self_);
+            G_FreeEntity(ctx, ctx.entity_id_of(self_));
             return;
         }
 
@@ -255,7 +255,7 @@ pub fn SP_light(ctx: GameContext<'_>, self_: *mut gentity_t) {
             c"0".as_ptr(),
             &mut (*self_).fly_sound_debounce_time as *mut c_int,
         );
-        G_SetOrigin(self_, (*self_).s.origin);
+        G_SetOrigin(&mut *(self_), (*self_).s.origin);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
 
         (*self_).use_ = Some(EntUse::misc_dlight_use).into();
@@ -331,7 +331,7 @@ pub fn TeleportPlayer(
 
         // kill anything at the destination
         if (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR {
-            G_KillBox(ctx, player);
+            G_KillBox(ctx, ctx.entity_id_of(player).unwrap());
         }
 
         // save results of pmove
@@ -369,14 +369,14 @@ pub fn SP_misc_teleporter_dest(ent: *mut gentity_t) {}
 /// generation was compiled out.
 /// Source: `oracle/codemp/game/g_misc.c:249-262`
 pub fn SP_misc_model(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    G_FreeEntity(ctx, ent);
+    G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 
 /// Raven `SP_misc_model_static`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:277-280`
 pub fn SP_misc_model_static(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    G_FreeEntity(ctx, ent);
+    G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 
 /// Raven `SP_misc_G2model`.
@@ -384,7 +384,7 @@ pub fn SP_misc_model_static(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// The live (non-`#if 0`) path just frees the entity.
 /// Source: `oracle/codemp/game/g_misc.c:285-301`
 pub fn SP_misc_G2model(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    G_FreeEntity(ctx, ent);
+    G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 
 /// Raven `locateCamera`.
@@ -398,7 +398,7 @@ pub fn locateCamera(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 ctx,
                 c"Couldn't find target for misc_partal_surface\n".as_ptr(),
             );
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
         (*ent).r.ownerNum = (*owner).s.number;
@@ -837,7 +837,7 @@ pub fn G_PortalifyEntities(ctx: GameContext<'_>, ent: *mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:675-678`
 pub fn SP_misc_skyportal_orient(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    G_FreeEntity(ctx, ent);
+    G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 
 /// Raven `SP_misc_skyportal`.
@@ -1032,7 +1032,7 @@ pub fn HolocronTouch(
 
         //G_Sound(other, CHAN_AUTO, G_SoundIndex("sound/weapons/w_pkup.wav"));
         G_AddEvent(
-            other,
+            &mut *(other),
             mp_bg::public::entity_event::entity_event_t::EV_ITEM_PICKUP as c_int,
             (*self_).s.number,
         );
@@ -1047,7 +1047,7 @@ pub fn HolocronTouch(
 
         if force_reselect != WP_NONE {
             G_AddEvent(
-                other,
+                &mut *(other),
                 mp_bg::public::entity_event::entity_event_t::EV_NOAMMO as c_int,
                 force_reselect,
             );
@@ -1212,7 +1212,7 @@ pub fn SP_misc_holocron(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let mut tr: trace_t = core::mem::zeroed();
 
         if (*ctx.world).cvars.g_gametype.integer != GT_HOLOCRON {
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -1222,7 +1222,7 @@ pub fn SP_misc_holocron(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 || (*ent).count == FP_SABERTHROW
             {
                 // having saber holocrons in saber only mode is pointless
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return;
             }
         }
@@ -1261,7 +1261,7 @@ pub fn SP_misc_holocron(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 ))
                 .as_ptr(),
             );
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -1271,7 +1271,7 @@ pub fn SP_misc_holocron(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // allow to ride movers
         //	ent->s.groundEntityNum = tr.entityNum;
 
-        G_SetOrigin(ent, tr.endpos);
+        G_SetOrigin(&mut *(ent), tr.endpos);
 
         if (*ent).count < 0 {
             (*ent).count = 0;
@@ -1372,7 +1372,7 @@ pub fn Use_Shooter(
         }
 
         G_AddEvent(
-            ent,
+            &mut *(ent),
             mp_bg::public::entity_event::entity_event_t::EV_FIRE_WEAPON as c_int,
             0,
         );
@@ -1450,7 +1450,12 @@ pub fn check_recharge(ctx: GameContext<'_>, ent: *mut gentity_t) {
             || (*activator_cl).pers.cmd.buttons & BUTTON_USE == 0
         {
             if !activator.is_null() {
-                G_Sound(ctx, ent, CHAN_AUTO as c_int, (*ent).genericValue7);
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(ent),
+                    CHAN_AUTO as c_int,
+                    (*ent).genericValue7,
+                );
             }
             (*ent).s.loopSound = 0;
             (*ent).s.loopIsSoundset = qfalse;
@@ -1532,7 +1537,7 @@ pub fn shield_power_converter_use(
                 // can't use it!
                 G_Sound(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_),
                     CHAN_AUTO as c_int,
                     G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr()),
                 );
@@ -1595,12 +1600,17 @@ pub fn shield_power_converter_use(
                 if (*self_).count <= 0 {
                     G_Sound(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         CHAN_AUTO as c_int,
                         G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr()),
                     );
                 } else {
-                    G_Sound(ctx, self_, CHAN_AUTO as c_int, (*self_).genericValue7);
+                    G_Sound(
+                        ctx,
+                        ctx.entity_id_of(self_),
+                        CHAN_AUTO as c_int,
+                        (*self_).genericValue7,
+                    );
                 }
             }
             (*self_).s.loopSound = 0;
@@ -1711,12 +1721,17 @@ pub fn ammo_generic_power_converter_use(
                 if (*self_).count <= 0 {
                     G_Sound(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         CHAN_AUTO as c_int,
                         G_SoundIndex(c"sound/interface/ammocon_empty".as_ptr()),
                     );
                 } else {
-                    G_Sound(ctx, self_, CHAN_AUTO as c_int, (*self_).genericValue7);
+                    G_Sound(
+                        ctx,
+                        ctx.entity_id_of(self_),
+                        CHAN_AUTO as c_int,
+                        (*self_).genericValue7,
+                    );
                 }
             }
             (*self_).s.loopSound = 0;
@@ -1770,7 +1785,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 ))
                 .as_ptr(),
             );
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -1780,7 +1795,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // allow to ride movers
         (*ent).s.groundEntityNum = (tr.entityNum) as i32;
 
-        G_SetOrigin(ent, tr.endpos);
+        G_SetOrigin(&mut *(ent), tr.endpos);
 
         if (*ent).health == 0 {
             (*ent).health = 60;
@@ -1852,7 +1867,7 @@ pub fn SP_misc_shield_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
             && (*ctx.world).cvars.g_gametype.integer != GT_CTY
             && (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
         {
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -1888,7 +1903,7 @@ pub fn SP_misc_shield_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 ))
                 .as_ptr(),
             );
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -1898,7 +1913,7 @@ pub fn SP_misc_shield_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // allow to ride movers
         (*ent).s.groundEntityNum = (tr.entityNum) as i32;
 
-        G_SetOrigin(ent, tr.endpos);
+        G_SetOrigin(&mut *(ent), tr.endpos);
 
         if (*ent).health == 0 {
             (*ent).health = 60;
@@ -1990,7 +2005,7 @@ pub fn SP_misc_model_shield_power_converter(ctx: GameContext<'_>, ent: *mut gent
 
         (*ent).use_ = Some(EntUse::shield_power_converter_use).into();
 
-        G_SetOrigin(ent, (*ent).s.origin);
+        G_SetOrigin(&mut *(ent), (*ent).s.origin);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
@@ -2124,7 +2139,7 @@ pub fn SP_misc_model_ammo_power_converter(ctx: GameContext<'_>, ent: *mut gentit
 
         (*ent).nextthink = (*ctx.world).level.time + 200;
 
-        G_SetOrigin(ent, (*ent).s.origin);
+        G_SetOrigin(&mut *(ent), (*ent).s.origin);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
@@ -2234,7 +2249,7 @@ pub fn SP_misc_model_health_power_converter(ctx: GameContext<'_>, ent: *mut gent
 
         (*ent).nextthink = (*ctx.world).level.time + 200;
 
-        G_SetOrigin(ent, (*ent).s.origin);
+        G_SetOrigin(&mut *(ent), (*ent).s.origin);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
@@ -2301,7 +2316,12 @@ pub fn fx_runner_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if !(*ent).target2.is_null() && *(*ent).target2 != 0 {
             // let our target know that we have spawned an effect
-            G_UseTargets2(ctx, ent, ent, (*ent).target2);
+            G_UseTargets2(
+                ctx,
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
+                (*ent).target2,
+            );
         }
 
         if (*ent).spawnflags & 2 == 0 && (*ent).s.loopSound == 0 {
@@ -2346,13 +2366,18 @@ pub fn fx_runner_use(
 
             if !(*self_).target2.is_null() {
                 // let our target know that we have spawned an effect
-                G_UseTargets2(ctx, self_, self_, (*self_).target2);
+                G_UseTargets2(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    ctx.entity_id_of(self_),
+                    (*self_).target2,
+                );
             }
 
             if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
                 (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
                 G_AddEvent(
-                    self_,
+                    &mut *(self_),
                     mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int,
                     BMS_START,
                 );
@@ -2370,7 +2395,7 @@ pub fn fx_runner_use(
                 if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
                     (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
                     G_AddEvent(
-                        self_,
+                        &mut *(self_),
                         mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int,
                         BMS_START,
                     );
@@ -2387,7 +2412,7 @@ pub fn fx_runner_use(
                 if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
                     (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
                     G_AddEvent(
-                        self_,
+                        &mut *(self_),
                         mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int,
                         BMS_END,
                     );
@@ -2410,7 +2435,7 @@ pub fn fx_runner_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
             // try to use the target to override the orientation
             let target = G_Find(
                 ctx,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 (*ent).target,
             );
@@ -2438,7 +2463,7 @@ pub fn fx_runner_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if !(*ent).target2.is_null() && *(*ent).target2 != 0 {
             let target = G_Find(
                 ctx,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 (*ent).target2,
             );
@@ -2455,7 +2480,7 @@ pub fn fx_runner_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
         }
 
-        G_SetAngles(ent, (*ent).s.angles);
+        G_SetAngles(&mut *(ent), (*ent).s.angles);
 
         if (*ent).spawnflags & 1 != 0 || (*ent).spawnflags & 2 != 0 {
             // STARTOFF || ONESHOT
@@ -2528,7 +2553,7 @@ pub fn SP_fx_runner(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 ))
                 .as_ptr(),
             );
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -2547,7 +2572,7 @@ pub fn SP_fx_runner(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).nextthink = (*ctx.world).level.time + 400;
 
         // Save our position and link us up!
-        G_SetOrigin(ent, (*ent).s.origin);
+        G_SetOrigin(&mut *(ent), (*ent).s.origin);
 
         (*ent).r.maxs = [FX_ENT_RADIUS, FX_ENT_RADIUS, FX_ENT_RADIUS];
         crate::q_math::_VectorScale((*ent).r.maxs, -1.0, &mut (*ent).r.mins);
@@ -2602,7 +2627,7 @@ pub fn Use_Target_Screenshake(
         G_ScreenShake(
             ctx,
             (*ent).s.origin,
-            std::ptr::null_mut(),
+            ctx.entity_id_of(std::ptr::null_mut()),
             (*ent).speed,
             (*ent).genericValue5,
             bGlobal,
@@ -2703,7 +2728,7 @@ pub fn SP_target_escapetrig(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_SINGLE_PLAYER;
     unsafe {
         if (*ctx.world).cvars.g_gametype.integer != GT_SINGLE_PLAYER {
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -2747,7 +2772,7 @@ pub fn maglock_die(
                 (*door).flags &= !FL_INACTIVE;
             }
         }
-        G_UseTargets(ctx, self_, attacker);
+        G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(attacker));
     }
 }
 
@@ -2765,7 +2790,7 @@ pub fn SP_misc_maglock(ctx: GameContext<'_>, self_: *mut gentity_t) {
             G_ModelIndex(c"models/map_objects/imp_detention/door_lock.md3".as_ptr());
         (*self_).genericValue1 = G_EffectIndex(c"maglock/explosion".as_ptr());
 
-        G_SetOrigin(self_, (*self_).s.origin);
+        G_SetOrigin(&mut *(self_), (*self_).s.origin);
 
         (*self_).think = Some(EntThink::maglock_link).into();
         //FIXME: for some reason, when you re-load a level, these fail to find their doors...?  Random?  Testing an additional 200ms after the START_TIME_FIND_LINKS
@@ -2814,7 +2839,7 @@ pub fn maglock_link(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 ))
                 .as_ptr(),
             );
-            G_FreeEntity(ctx, self_);
+            G_FreeEntity(ctx, ctx.entity_id_of(self_));
             return;
         }
         if trace.fraction == 1.0 {
@@ -2849,8 +2874,8 @@ pub fn maglock_link(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         // now position and orient it
         vectoangles(trace.plane.normal, &mut end);
-        G_SetOrigin(self_, trace.endpos);
-        G_SetAngles(self_, end);
+        G_SetOrigin(&mut *(self_), trace.endpos);
+        G_SetAngles(&mut *(self_), end);
 
         // make it hittable
         (*self_).r.mins = [-8.0, -8.0, -8.0];
@@ -2890,8 +2915,18 @@ pub fn faller_touch(
                 G_SoundIndex(c"sound/chars/stofficer1/misc/pain75".as_ptr())
             };
 
-            G_EntitySound(ctx, self_, CHAN_VOICE as c_int, (*self_).genericValue11);
-            G_EntitySound(ctx, self_, CHAN_AUTO as c_int, (*self_).genericValue10);
+            G_EntitySound(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                CHAN_VOICE as c_int,
+                (*self_).genericValue11,
+            );
+            G_EntitySound(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                CHAN_AUTO as c_int,
+                (*self_).genericValue10,
+            );
 
             (*self_).genericValue6 = (*ctx.world).level.time + 3000;
             (*self_).genericValue7 = (*ctx.world).level.time + 200;
@@ -2919,7 +2954,12 @@ pub fn faller_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if (*ent).epVelocity[2] < -100.0 {
             if (*ent).genericValue8 == 0 {
-                G_EntitySound(ctx, ent, CHAN_VOICE as c_int, (*ent).genericValue9);
+                G_EntitySound(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    CHAN_VOICE as c_int,
+                    (*ent).genericValue9,
+                );
                 (*ent).genericValue8 = 1;
             }
         } else {
@@ -2964,7 +3004,7 @@ pub fn misc_faller_create(
 
         (*faller).genericValue6 = (*ctx.world).level.time + 15000;
 
-        G_SetOrigin(faller, (*ent).s.origin);
+        G_SetOrigin(&mut *(faller), (*ent).s.origin);
 
         (*faller).s.modelGhoul2 = 1;
         (*faller).s.modelindex = G_ModelIndex(c"models/players/stormtrooper/model.glm".as_ptr());
@@ -3388,7 +3428,7 @@ pub fn ref_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
             //TODO: Find the target and set our angles to that direction
             let target = G_Find(
                 ctx,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 (*ent).target,
             );
@@ -3425,7 +3465,7 @@ pub fn ref_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         // Delete immediately, cannot be refered to as an entity again
         // NOTE: this means if you wanted to link them in a chain for, say, a path, you can't
-        G_FreeEntity(ctx, ent);
+        G_FreeEntity(ctx, ctx.entity_id_of(ent));
     }
 }
 
@@ -3547,7 +3587,7 @@ pub fn misc_weapon_shooter_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if !(*self_).target.is_null() {
             let targ = G_Find(
                 ctx,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 (*self_).target,
             );
@@ -3632,7 +3672,7 @@ pub fn SP_misc_weapon_shooter(ctx: GameContext<'_>, self_: *mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3491-3494`
 pub fn SP_misc_weather_zone(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    G_FreeEntity(ctx, ent);
+    G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 
 // The local `G_SpawnInt` shim formerly here (adapting byte-string literals to

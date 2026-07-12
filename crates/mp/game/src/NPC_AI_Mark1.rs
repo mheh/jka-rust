@@ -228,7 +228,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
 
         crate::g_utils::G_Sound(
             ctx,
-            npc,
+            ctx.entity_id_of(npc),
             CHAN_AUTO,
             crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
         );
@@ -328,7 +328,7 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
 
         crate::g_utils::G_Sound(
             ctx,
-            npc,
+            ctx.entity_id_of(npc),
             CHAN_AUTO,
             crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
         );
@@ -371,7 +371,7 @@ pub fn Mark1_die(
 
         crate::g_utils::G_Sound(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             CHAN_AUTO,
             crate::g_utils::G_SoundIndex(
                 cstr(&format!(
@@ -504,7 +504,7 @@ pub fn NPC_Mark1_Pain(
 
         crate::g_utils::G_Sound(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             CHAN_AUTO,
             crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_pain".as_ptr()),
         );
@@ -769,7 +769,7 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
 
         crate::g_utils::G_Sound(
             ctx,
-            npc,
+            ctx.entity_id_of(npc),
             CHAN_AUTO,
             crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
         );
@@ -935,7 +935,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
 
         crate::g_utils::G_Sound(
             ctx,
-            npc,
+            ctx.entity_id_of(npc),
             CHAN_AUTO,
             crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
         );
@@ -1133,7 +1133,7 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
         if crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth(ctx) != 0 {
             crate::g_utils::G_Sound(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 CHAN_AUTO,
                 crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_wakeup".as_ptr()),
             );

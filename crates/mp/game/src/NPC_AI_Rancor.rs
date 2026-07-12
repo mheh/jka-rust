@@ -212,7 +212,7 @@ pub fn Rancor_DropVictim(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 crate::g_client::SetClientViewAngle(activator, (*activator_client).ps.viewangles);
                 (*activator).r.currentAngles[PITCH] = 0.0;
                 (*activator).r.currentAngles[ROLL] = 0.0;
-                crate::g_utils::G_SetAngles(activator, (*activator).r.currentAngles);
+                crate::g_utils::G_SetAngles(&mut *(activator), (*activator).r.currentAngles);
             }
             if (*activator).health <= 0 {
                 //if ( self->activator->s.number )
@@ -368,7 +368,7 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
 
                     crate::g_utils::G_Sound(
                         ctx,
-                        radiusEnt,
+                        ctx.entity_id_of(radiusEnt),
                         CHAN_AUTO,
                         crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()),
                     );
@@ -400,7 +400,12 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
                             DAMAGE_NO_ARMOR | DAMAGE_NO_KNOCKBACK,
                             MOD_MELEE as c_int,
                         );
-                        crate::g_utils::G_Throw(ctx, radiusEnt, pushDir, 250.0);
+                        crate::g_utils::G_Throw(
+                            ctx,
+                            ctx.entity_id_of(radiusEnt).unwrap(),
+                            pushDir,
+                            250.0,
+                        );
                         if (*radiusEnt).health > 0 {
                             //do pain on enemy
                             crate::g_combat::G_Knockdown(ctx, ctx.entity_id_of(radiusEnt));
@@ -470,7 +475,7 @@ pub fn Rancor_Smash(ctx: GameContext<'_>) {
             if distSq <= radiusSquared {
                 crate::g_utils::G_Sound(
                     ctx,
-                    radiusEnt,
+                    ctx.entity_id_of(radiusEnt),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()),
                 );
@@ -607,7 +612,7 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
                 }
                 crate::g_utils::G_Sound(
                     ctx,
-                    radiusEnt,
+                    ctx.entity_id_of(radiusEnt),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()),
                 );
@@ -652,7 +657,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                     //Make victim scream in fright
                     if (*activator).health > 0 && !(*activator).client.is_null() {
                         crate::g_utils::G_AddEvent(
-                            activator,
+                            &mut *(activator),
                             (*ctx.world)
                                 .bg_state
                                 .rng
@@ -747,7 +752,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                     crate::g_utils::G_ScreenShake(
                         ctx,
                         shakePos,
-                        core::ptr::null_mut(),
+                        ctx.entity_id_of(core::ptr::null_mut()),
                         4.0,
                         1000,
                         qfalse,
@@ -801,7 +806,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                         }
                         crate::g_utils::G_Sound(
                             ctx,
-                            activator,
+                            ctx.entity_id_of(activator),
                             CHAN_AUTO,
                             crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()),
                         );
@@ -860,14 +865,14 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                         crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg2".as_ptr(), 1350);
                         crate::g_utils::G_Sound(
                             ctx,
-                            activator,
+                            ctx.entity_id_of(activator),
                             CHAN_AUTO,
                             crate::g_utils::G_SoundIndex(
                                 c"sound/chars/rancor/swipehit.wav".as_ptr(),
                             ),
                         );
                         crate::g_utils::G_AddEvent(
-                            activator,
+                            &mut *(activator),
                             EV_JUMP as c_int,
                             (*activator).health,
                         );
@@ -889,7 +894,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                         //swallow victim
                         crate::g_utils::G_Sound(
                             ctx,
-                            activator,
+                            ctx.entity_id_of(activator),
                             CHAN_AUTO,
                             crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()),
                         );
@@ -936,7 +941,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                             );
                             crate::g_utils::G_AddEvent(
-                                activator,
+                                &mut *(activator),
                                 EV_JUMP as c_int,
                                 (*activator).health,
                             );
@@ -1335,7 +1340,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             if crate::g_timer::TIMER_Done(ctx, npc, c"angrynoise".as_ptr()) != 0 {
                 crate::g_utils::G_Sound(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(
                         cstr(&format!(
@@ -1436,7 +1441,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             if crate::g_timer::TIMER_Done(ctx, npc, c"idlenoise".as_ptr()) != 0 {
                 crate::g_utils::G_Sound(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(
                         cstr(&format!(

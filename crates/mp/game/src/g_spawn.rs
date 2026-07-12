@@ -251,7 +251,7 @@ pub fn SP_gametype_item(ctx: GameContext<'_>, ent: EntityId) {
         let mut value: *mut c_char = std::ptr::null_mut();
         G_SpawnString(ctx, c"teamfilter".as_ptr(), c"".as_ptr(), &mut value);
 
-        G_SetOrigin(ent, (*ent).s.origin);
+        G_SetOrigin(&mut *(ent), (*ent).s.origin);
 
         // If a team filter is set then override any team settings for the spawns
         let mut team: c_int = -1;
@@ -813,7 +813,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
         if (*ctx.world).cvars.g_gametype.integer == GT_SINGLE_PLAYER {
             G_SpawnInt(ctx, c"notsingle".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return;
             }
         }
@@ -821,20 +821,20 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
         if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
             G_SpawnInt(ctx, c"notteam".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return;
             }
         } else {
             G_SpawnInt(ctx, c"notfree".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return;
             }
         }
 
         G_SpawnInt(ctx, c"notta".as_ptr(), c"0".as_ptr(), &mut i);
         if i != 0 {
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -845,7 +845,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
                 let gametype_name = GAMETYPE_NAMES[gt as usize];
                 let value_str = CStr::from_ptr(value).to_string_lossy();
                 if !value_str.contains(gametype_name.to_str().unwrap()) {
-                    G_FreeEntity(ctx, ent);
+                    G_FreeEntity(ctx, ctx.entity_id_of(ent));
                     return;
                 }
             }
@@ -857,7 +857,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
 
         // if we didn't get a classname, don't bother spawning anything
         if G_CallSpawn(ctx, ctx.entity_id_of(ent).unwrap()) == qfalse {
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
         }
 
         // Tag on the ICARUS scripting information only to valid recipients

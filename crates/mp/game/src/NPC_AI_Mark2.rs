@@ -146,7 +146,7 @@ pub fn NPC_Mark2_Pain(
 
         G_Sound(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             CHAN_AUTO,
             G_SoundIndex(b"sound/chars/mark2/misc/mark2_pain\0".as_ptr() as *const c_char),
         );
@@ -265,7 +265,7 @@ pub fn Mark2_FireBlaster(ctx: GameContext<'_>, advance: qboolean) {
 
         G_Sound(
             ctx,
-            npc_ptr,
+            ctx.entity_id_of(npc_ptr),
             CHAN_AUTO,
             G_SoundIndex(b"sound/chars/mark2/misc/mark2_fire\0".as_ptr() as *const c_char),
         );

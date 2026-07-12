@@ -194,7 +194,7 @@ pub fn Boba_ChangeWeapon(ctx: GameContext<'_>, wp: c_int) {
         }
         crate::NPC_combat::NPC_ChangeWeapon(wp);
         crate::g_utils::G_AddEvent(
-            npc,
+            &mut *(npc),
             entity_event_t::EV_GENERAL_SOUND as c_int,
             crate::g_utils::G_SoundIndex(c"sound/weapons/change.wav".as_ptr()),
         );
@@ -350,7 +350,7 @@ pub fn Boba_StopKnockdown(
                 crate::g_timer::TIMER_Set(ctx, self_, c"strafeLeft".as_ptr(), strafeTime);
                 crate::g_timer::TIMER_Set(ctx, self_, c"strafeRight".as_ptr(), -1);
             }
-            crate::g_utils::G_AddEvent(self_, entity_event_t::EV_JUMP as c_int, 0);
+            crate::g_utils::G_AddEvent(&mut *(self_), entity_event_t::EV_JUMP as c_int, 0);
             if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                 //flip
                 (*client).ps.fd.forceJumpCharge = 280.0; //FIXME: calc this intelligently?
@@ -392,7 +392,7 @@ pub fn Boba_FlyStart(ctx: GameContext<'_>, self_: *mut gentity_t) {
             //take-off sound
             crate::g_utils::G_SoundOnEnt(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 CHAN_ITEM as c_int,
                 c"sound/boba/jeton.wav".as_ptr(),
             );
@@ -542,7 +542,7 @@ pub fn Boba_StartFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
         crate::g_timer::TIMER_Set(ctx, self_, c"flameTime".as_ptr(), flameTime);
         crate::g_utils::G_SoundOnEnt(
             ctx,
-            self_,
+            ctx.entity_id_of(self_).unwrap(),
             CHAN_WEAPON as c_int,
             c"sound/effects/combustfire.mp3".as_ptr(),
         );
@@ -961,7 +961,7 @@ pub fn Jedi_Cloak(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
                     crate::g_utils::G_Sound(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         CHAN_ITEM as c_int,
                         crate::g_utils::G_SoundIndex(
                             c"sound/chars/shadowtrooper/cloak.wav".as_ptr(),
@@ -988,7 +988,7 @@ pub fn Jedi_Decloak(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
                     crate::g_utils::G_Sound(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         CHAN_ITEM as c_int,
                         crate::g_utils::G_SoundIndex(
                             c"sound/chars/shadowtrooper/decloak.wav".as_ptr(),
@@ -2386,7 +2386,7 @@ pub fn Jedi_CheckFlipEvasions(
                     anim,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
-                crate::g_utils::G_AddEvent(self_, entity_event_t::EV_JUMP as c_int, 0);
+                crate::g_utils::G_AddEvent(&mut *(self_), entity_event_t::EV_JUMP as c_int, 0);
                 return evasionType_t::EVASION_OTHER;
             }
         } else if (*client).NPC_class != CLASS_DESANN
@@ -2495,11 +2495,11 @@ pub fn Jedi_CheckFlipEvasions(
                 (*client).ps.velocity[2] = 200.0;
                 (*client).ps.fd.forceJumpZStart = (*self_).r.currentOrigin[2];
                 if (*client).NPC_class == CLASS_BOBAFETT {
-                    crate::g_utils::G_AddEvent(self_, entity_event_t::EV_JUMP as c_int, 0);
+                    crate::g_utils::G_AddEvent(&mut *(self_), entity_event_t::EV_JUMP as c_int, 0);
                 } else {
                     crate::g_utils::G_SoundOnEnt(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_).unwrap(),
                         CHAN_BODY as c_int,
                         c"sound/weapons/force/jump.wav".as_ptr(),
                     );
@@ -2589,14 +2589,14 @@ pub fn Jedi_CheckFlipEvasions(
                                     (*client).ps.fd.forceJumpZStart = (*self_).r.currentOrigin[2];
                                     if (*client).NPC_class == CLASS_BOBAFETT {
                                         crate::g_utils::G_AddEvent(
-                                            self_,
+                                            &mut *(self_),
                                             entity_event_t::EV_JUMP as c_int,
                                             0,
                                         );
                                     } else {
                                         crate::g_utils::G_SoundOnEnt(
                                             ctx,
-                                            self_,
+                                            ctx.entity_id_of(self_).unwrap(),
                                             CHAN_BODY as c_int,
                                             c"sound/weapons/force/jump.wav".as_ptr(),
                                         );
@@ -2682,14 +2682,14 @@ pub fn Jedi_CheckFlipEvasions(
                             (*client).ps.fd.forceJumpZStart = (*self_).r.currentOrigin[2];
                             if (*client).NPC_class == CLASS_BOBAFETT {
                                 crate::g_utils::G_AddEvent(
-                                    self_,
+                                    &mut *(self_),
                                     entity_event_t::EV_JUMP as c_int,
                                     0,
                                 );
                             } else {
                                 crate::g_utils::G_SoundOnEnt(
                                     ctx,
-                                    self_,
+                                    ctx.entity_id_of(self_).unwrap(),
                                     CHAN_BODY as c_int,
                                     c"sound/weapons/force/jump.wav".as_ptr(),
                                 );
@@ -3309,14 +3309,14 @@ pub fn Jedi_SaberBlockGo(
                                 (*client).ps.fd.forceJumpZStart = (*self_).r.currentOrigin[2];
                                 if (*client).NPC_class == CLASS_BOBAFETT {
                                     crate::g_utils::G_AddEvent(
-                                        self_,
+                                        &mut *(self_),
                                         entity_event_t::EV_JUMP as c_int,
                                         0,
                                     );
                                 } else {
                                     crate::g_utils::G_Sound(
                                         ctx,
-                                        self_,
+                                        ctx.entity_id_of(self_),
                                         CHAN_BODY as c_int,
                                         crate::g_utils::G_SoundIndex(
                                             c"sound/weapons/force/jump.wav".as_ptr(),
@@ -5239,7 +5239,7 @@ pub fn Jedi_TryJump(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
                                     if (*client).NPC_class == CLASS_BOBAFETT {
                                         crate::g_utils::G_SoundOnEnt(
                                             ctx,
-                                            npc,
+                                            ctx.entity_id_of(npc).unwrap(),
                                             CHAN_ITEM as c_int,
                                             c"sound/boba/jeton.wav".as_ptr(),
                                         );
@@ -5248,7 +5248,7 @@ pub fn Jedi_TryJump(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
                                     } else {
                                         crate::g_utils::G_SoundOnEnt(
                                             ctx,
-                                            npc,
+                                            ctx.entity_id_of(npc).unwrap(),
                                             CHAN_BODY as c_int,
                                             c"sound/weapons/force/jump.wav".as_ptr(),
                                         );
@@ -5777,17 +5777,17 @@ pub fn Jedi_Combat(ctx: GameContext<'_>) {
                     if (*npc_info).aiFlags & NPCAI_BLOCKED != 0 {
                         //try to jump to the blockedDest
                         let tempGoal = crate::g_utils::G_Spawn(ctx);
-                        crate::g_utils::G_SetOrigin(tempGoal, (*npc_info).blockedDest);
+                        crate::g_utils::G_SetOrigin(&mut *(tempGoal), (*npc_info).blockedDest);
                         crate::trap::LinkEntity(
                             ctx.engine,
                             mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(tempGoal),
                         );
                         if Jedi_TryJump(ctx, tempGoal) != qfalse {
                             //going to jump to the dest
-                            crate::g_utils::G_FreeEntity(ctx, tempGoal);
+                            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempGoal));
                             return;
                         }
-                        crate::g_utils::G_FreeEntity(ctx, tempGoal);
+                        crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempGoal));
                     }
 
                     enemy_lost = qtrue;
@@ -6529,7 +6529,7 @@ pub fn NPC_BSJedi_FollowLeader(ctx: GameContext<'_>) {
                 //try to jump to the blockedDest
                 if ((*npc_info).blockedDest[2] - (*npc).r.currentOrigin[2]).abs() > 64.0 {
                     let tempGoal = crate::g_utils::G_Spawn(ctx);
-                    crate::g_utils::G_SetOrigin(tempGoal, (*npc_info).blockedDest);
+                    crate::g_utils::G_SetOrigin(&mut *(tempGoal), (*npc_info).blockedDest);
                     crate::trap::LinkEntity(
                         ctx.engine,
                         mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(tempGoal),
@@ -6537,10 +6537,10 @@ pub fn NPC_BSJedi_FollowLeader(ctx: GameContext<'_>) {
                     crate::g_timer::TIMER_Set(ctx, npc, c"jumpChaseDebounce".as_ptr(), -1);
                     if Jedi_TryJump(ctx, tempGoal) != qfalse {
                         //going to jump to the dest
-                        crate::g_utils::G_FreeEntity(ctx, tempGoal);
+                        crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempGoal));
                         return;
                     }
-                    crate::g_utils::G_FreeEntity(ctx, tempGoal);
+                    crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempGoal));
                 }
             }
         }

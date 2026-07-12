@@ -273,7 +273,11 @@ impl Dispatch<GameRoffNotetrackCallback> for GameContext<'_> {
         // SAFETY: seam reborrow of the owned entity arena (STATE-D6).
         let cent =
             unsafe { &mut (*self.world).g_entities[args.ent_num() as usize] as *mut gentity_t };
-        crate::g_utils::G_ROFF_NotetrackCallback(*self, cent, args.notetrack())
+        crate::g_utils::G_ROFF_NotetrackCallback(
+            *self,
+            (*self).entity_id_of(cent),
+            args.notetrack(),
+        )
     }
 }
 

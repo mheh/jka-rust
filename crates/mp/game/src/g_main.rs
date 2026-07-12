@@ -1440,7 +1440,9 @@ pub fn SendScoreboardMessageToAllClients(ctx: GameContext<'_>) {
 /// Raven `MoveClientToIntermission`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1943-1967`
-pub fn MoveClientToIntermission(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn MoveClientToIntermission(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
 
@@ -1493,29 +1495,39 @@ pub fn FindIntermissionPoint(ctx: GameContext<'_>) {
             if world.globals.gSiegeRoundWinningTeam == SIEGETEAM_TEAM1 as qboolean {
                 ent = G_Find(
                     ctx,
-                    std::ptr::null_mut(),
+                    ctx.entity_id_of(std::ptr::null_mut()),
                     classname_ofs,
                     cstr("info_player_intermission_red").as_ptr(),
                 );
                 if !ent.is_null() && !(*ent).target2.is_null() {
-                    G_UseTargets2(ctx, ent, ent, (*ent).target2);
+                    G_UseTargets2(
+                        ctx,
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(ent),
+                        (*ent).target2,
+                    );
                 }
             } else if world.globals.gSiegeRoundWinningTeam == SIEGETEAM_TEAM2 as qboolean {
                 ent = G_Find(
                     ctx,
-                    std::ptr::null_mut(),
+                    ctx.entity_id_of(std::ptr::null_mut()),
                     classname_ofs,
                     cstr("info_player_intermission_blue").as_ptr(),
                 );
                 if !ent.is_null() && !(*ent).target2.is_null() {
-                    G_UseTargets2(ctx, ent, ent, (*ent).target2);
+                    G_UseTargets2(
+                        ctx,
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(ent),
+                        (*ent).target2,
+                    );
                 }
             }
         }
         if ent.is_null() {
             ent = G_Find(
                 ctx,
-                std::ptr::null_mut(),
+                ctx.entity_id_of(std::ptr::null_mut()),
                 classname_ofs,
                 cstr("info_player_intermission").as_ptr(),
             );
@@ -1608,7 +1620,7 @@ pub fn BeginIntermission(ctx: GameContext<'_>) {
                     respawn(ctx, client);
                 }
             }
-            MoveClientToIntermission(ctx, client);
+            MoveClientToIntermission(ctx, ctx.entity_id_of(client).unwrap());
             i += 1;
         }
 
@@ -3335,8 +3347,10 @@ pub fn CheckCvars(ctx: GameContext<'_>) {
 /// Raven `G_RunThink`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3489-3512`
-pub fn G_RunThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn G_RunThink(ctx: GameContext<'_>, ent: EntityId) {
     use crate::ent_fn_enums::dispatch_think;
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // Raven casts `nextthink` to float and compares against `level.time` as
         // float; the int comparison here only diverges past f32's exact-integer
@@ -3661,7 +3675,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         (*ent).s.eType = 0;
                         (*ent).eventTime = 0;
                     } else {
-                        G_FreeEntity(ctx, ent);
+                        G_FreeEntity(ctx, ctx.entity_id_of(ent));
                         i += 1;
                         continue;
                     }
@@ -3748,7 +3762,12 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                                     let n = world.bg_state.rng.Q_irand(1, 3);
                                     let snd =
                                         G_SoundIndex(cstr(&format!("*choke{}.wav", n)).as_ptr());
-                                    G_EntitySound(ctx, ent, CHAN_VOICE, snd);
+                                    G_EntitySound(
+                                        ctx,
+                                        ctx.entity_id_of(ent).unwrap(),
+                                        CHAN_VOICE,
+                                        snd,
+                                    );
 
                                     // make them grasp their throat
                                     (*client).ps.forceHandExtend = HANDEXTEND_CHOKE as c_int;
@@ -3780,7 +3799,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                     if (*client).ps.torsoAnim != BOTH_CONSOLE1 as c_int {
                         G_SetAnim(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent).unwrap(),
                             std::ptr::null_mut(),
                             SETANIM_TORSO,
                             BOTH_CONSOLE1 as c_int,
@@ -3915,7 +3934,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                 WP_SaberStartMissileBlockCheck(ctx, ent, &mut (*client).pers.cmd);
             }
 
-            G_RunThink(ctx, ent);
+            G_RunThink(ctx, ctx.entity_id_of(ent).unwrap());
 
             if world.cvars.g_allowNPC.integer != 0 {
                 ClearNPCGlobals(ctx);

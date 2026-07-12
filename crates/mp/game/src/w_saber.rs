@@ -385,7 +385,7 @@ pub fn WP_DeactivateSaber(ctx: GameContext<'_>, self_: *mut gentity_t, clearLeng
             if (*client).saber[0].soundOff != 0 {
                 crate::g_utils::G_Sound(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_),
                     CHAN_WEAPON as c_int,
                     (*client).saber[0].soundOff,
                 );
@@ -394,7 +394,7 @@ pub fn WP_DeactivateSaber(ctx: GameContext<'_>, self_: *mut gentity_t, clearLeng
             if (*client).saber[1].soundOff != 0 && (*client).saber[1].model[0] != 0 {
                 crate::g_utils::G_Sound(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_),
                     CHAN_WEAPON as c_int,
                     (*client).saber[1].soundOff,
                 );
@@ -429,11 +429,21 @@ pub fn WP_ActivateSaber(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if (*client).ps.saberHolstered != 0 {
             (*client).ps.saberHolstered = 0;
             if (*client).saber[0].soundOn != 0 {
-                G_Sound(ctx, self_, CHAN_WEAPON as c_int, (*client).saber[0].soundOn);
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    CHAN_WEAPON as c_int,
+                    (*client).saber[0].soundOn,
+                );
             }
 
             if (*client).saber[1].soundOn != 0 {
-                G_Sound(ctx, self_, CHAN_WEAPON as c_int, (*client).saber[1].soundOn);
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    CHAN_WEAPON as c_int,
+                    (*client).saber[1].soundOn,
+                );
             }
         }
     }
@@ -752,10 +762,10 @@ pub fn WP_SaberInitBladeData(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 } else {
                     // take it as my own; free but don't issue a kg2.
                     (*checkEnt).s.modelGhoul2 = 0;
-                    G_FreeEntity(ctx, checkEnt);
+                    G_FreeEntity(ctx, ctx.entity_id_of(checkEnt));
 
                     // now init it manually and reuse this ent slot.
-                    G_InitGentity(ctx, checkEnt);
+                    G_InitGentity(ctx, ctx.entity_id_of(checkEnt).unwrap());
                     saberent = checkEnt;
                 }
             }
@@ -1670,7 +1680,7 @@ pub fn WP_SabersCheckLock2(
 
         crate::g_utils::G_SetAnim(
             ctx,
-            attacker,
+            ctx.entity_id_of(attacker).unwrap(),
             core::ptr::null_mut(),
             SETANIM_BOTH,
             attAnim,
@@ -1687,7 +1697,7 @@ pub fn WP_SabersCheckLock2(
 
         crate::g_utils::G_SetAnim(
             ctx,
-            defender,
+            ctx.entity_id_of(defender).unwrap(),
             core::ptr::null_mut(),
             SETANIM_BOTH,
             defAnim,
@@ -1754,7 +1764,7 @@ pub fn WP_SabersCheckLock2(
             ),
         );
         if trace.startsolid == 0 && trace.allsolid == 0 {
-            G_SetOrigin(attacker, trace.endpos);
+            G_SetOrigin(&mut *(attacker), trace.endpos);
             if !(*attacker).client.is_null() {
                 _VectorCopy(trace.endpos, &mut (*ac).ps.origin);
             }
@@ -1785,7 +1795,7 @@ pub fn WP_SabersCheckLock2(
             if !(*defender).client.is_null() {
                 _VectorCopy(trace.endpos, &mut (*dc).ps.origin);
             }
-            G_SetOrigin(defender, trace.endpos);
+            G_SetOrigin(&mut *(defender), trace.endpos);
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(defender));
         }
 
@@ -4282,7 +4292,12 @@ pub fn WP_SaberRadiusDamage(
                         let knockbackStr = knockBack * dist / radius;
                         entDir[2] += 0.1;
                         VectorNormalize(&mut entDir);
-                        G_Throw(ctx, radiusEnt, entDir, knockbackStr);
+                        G_Throw(
+                            ctx,
+                            ctx.entity_id_of(radiusEnt).unwrap(),
+                            entDir,
+                            knockbackStr,
+                        );
                         if (*radiusEnt).health > 0 {
                             // still alive
                             if knockbackStr > 50.0 {
@@ -4350,7 +4365,7 @@ pub fn WP_SaberBounceSound(
         if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == 0 && (*saber).bounceSound[0] != 0 {
             G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 CHAN_AUTO as c_int,
                 (*saber).bounceSound[(*ctx.world).bg_state.rng.Q_irand(0, 2) as usize],
             );
@@ -4359,7 +4374,7 @@ pub fn WP_SaberBounceSound(
         {
             G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 CHAN_AUTO as c_int,
                 (*saber).bounce2Sound[(*ctx.world).bg_state.rng.Q_irand(0, 2) as usize],
             );
@@ -4368,7 +4383,7 @@ pub fn WP_SaberBounceSound(
         {
             G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 CHAN_AUTO as c_int,
                 (*saber).blockSound[(*ctx.world).bg_state.rng.Q_irand(0, 2) as usize],
             );
@@ -4377,7 +4392,7 @@ pub fn WP_SaberBounceSound(
         {
             G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 CHAN_AUTO as c_int,
                 (*saber).block2Sound[(*ctx.world).bg_state.rng.Q_irand(0, 2) as usize],
             );
@@ -4387,7 +4402,12 @@ pub fn WP_SaberBounceSound(
             let path =
                 std::ffi::CString::new(format!("sound/weapons/saber/saberblock{}.wav", index))
                     .unwrap();
-            G_Sound(ctx, ent, CHAN_AUTO as c_int, G_SoundIndex(path.as_ptr()));
+            G_Sound(
+                ctx,
+                ctx.entity_id_of(ent),
+                CHAN_AUTO as c_int,
+                G_SoundIndex(path.as_ptr()),
+            );
         }
     }
 }
@@ -5090,7 +5110,7 @@ pub fn CheckSaberDamage(
                         (*ctx.world).bg_state.saberMoveData[(*sc).ps.saberMove as usize].animToUse;
                     G_SetAnim(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_).unwrap(),
                         &mut (*sc).pers.cmd as *mut usercmd_t,
                         SETANIM_BOTH,
                         anim,
@@ -6976,7 +6996,7 @@ pub fn CheckThrownSaberDamaged(
                             && ((*soc).saber[0].saberFlags2 & SFL2_NO_CLASH_FLARE) != 0
                         {
                             // don't do clash flare
-                            G_FreeEntity(ctx, te);
+                            G_FreeEntity(ctx, ctx.entity_id_of(te));
                         } else {
                             let teS =
                                 G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
@@ -7235,7 +7255,7 @@ pub fn MakeDeadSaber(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 );
             } else {
                 // argh!!!!
-                G_FreeEntity(ctx, saberent);
+                G_FreeEntity(ctx, ctx.entity_id_of(saberent));
                 return;
             }
         }
@@ -7374,15 +7394,25 @@ pub fn DownedSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
 
             G_Sound(
                 ctx,
-                saberOwn,
+                ctx.entity_id_of(saberOwn),
                 CHAN_BODY as c_int,
                 G_SoundIndex(cstr("sound/weapons/force/pull.wav").as_ptr()),
             );
             if (*soc).saber[0].soundOn != 0 {
-                G_Sound(ctx, saberent, CHAN_BODY as c_int, (*soc).saber[0].soundOn);
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(saberent),
+                    CHAN_BODY as c_int,
+                    (*soc).saber[0].soundOn,
+                );
             }
             if (*soc).saber[1].soundOn != 0 {
-                G_Sound(ctx, saberOwn, CHAN_BODY as c_int, (*soc).saber[1].soundOn);
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(saberOwn),
+                    CHAN_BODY as c_int,
+                    (*soc).saber[1].soundOn,
+                );
             }
 
             return;
@@ -7517,13 +7547,18 @@ pub fn saberKnockDown(
         );
 
         if (*soc).saber[0].soundOff != 0 {
-            G_Sound(ctx, saberent, CHAN_BODY as c_int, (*soc).saber[0].soundOff);
+            G_Sound(
+                ctx,
+                ctx.entity_id_of(saberent),
+                CHAN_BODY as c_int,
+                (*soc).saber[0].soundOff,
+            );
         }
 
         if (*soc).saber[1].soundOff != 0 && (*soc).saber[1].model[0] != 0 {
             G_Sound(
                 ctx,
-                saberOwner,
+                ctx.entity_id_of(saberOwner),
                 CHAN_BODY as c_int,
                 (*soc).saber[1].soundOff,
             );
@@ -7669,7 +7704,7 @@ pub fn saberKnockOutOfHand(
 
         // use this as opposed to the right hand bolt, because I don't want to risk
         // reconstructing the skel again to get it here.
-        G_SetOrigin(saberent, (*soc).lastSaberBase_Always);
+        G_SetOrigin(&mut *(saberent), (*soc).lastSaberBase_Always);
         saberKnockDown(ctx, saberent, saberOwner, saberOwner);
         // override the velocity on the knocked away saber.
         crate::q_math::_VectorCopy(velocity, &mut (*saberent).s.pos.trDelta);
@@ -8034,7 +8069,12 @@ pub fn saberBackToOwner(ctx: GameContext<'_>, saberent: *mut gentity_t) {
             (*saberent).nextthink = level_time;
 
             if !(*saberOwner).client.is_null() && (*soc).saber[0].soundOff != 0 {
-                G_Sound(ctx, saberent, CHAN_AUTO as c_int, (*soc).saber[0].soundOff);
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(saberent),
+                    CHAN_AUTO as c_int,
+                    (*soc).saber[0].soundOff,
+                );
             }
             MakeDeadSaber(ctx, saberent);
 
@@ -8106,7 +8146,7 @@ pub fn saberBackToOwner(ctx: GameContext<'_>, saberent: *mut gentity_t) {
             if ownerLen <= 32.0 {
                 G_Sound(
                     ctx,
-                    saberent,
+                    ctx.entity_id_of(saberent),
                     CHAN_AUTO as c_int,
                     G_SoundIndex(cstr("sound/weapons/saber/saber_catch.wav").as_ptr()),
                 );
@@ -8225,7 +8265,12 @@ pub fn saberFirstThrown(ctx: GameContext<'_>, saberent: *mut gentity_t) {
             (*saberent).nextthink = level_time;
 
             if !(*saberOwn).client.is_null() && (*soc).saber[0].soundOff != 0 {
-                G_Sound(ctx, saberent, CHAN_AUTO as c_int, (*soc).saber[0].soundOff);
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(saberent),
+                    CHAN_AUTO as c_int,
+                    (*soc).saber[0].soundOff,
+                );
             }
             MakeDeadSaber(ctx, saberent);
 
@@ -8870,14 +8915,14 @@ pub fn G_KickTrace(
             //G_PlayEffect( "misc/kickHit", trace.endpos, trace.plane.normal );
             if (*client).ps.torsoAnim == BOTH_A7_HILT as c_int {
                 let idx = G_SoundIndex(cstr("sound/movers/objects/saber_slam").as_ptr());
-                G_Sound(ctx, ent, CHAN_AUTO, idx);
+                G_Sound(ctx, ctx.entity_id_of(ent), CHAN_AUTO, idx);
             } else {
                 let s = format!(
                     "sound/weapons/melee/punch{}",
                     (*ctx.world).bg_state.rng.Q_irand(1, 4)
                 );
                 let idx = G_SoundIndex(cstr(&s).as_ptr());
-                G_Sound(ctx, ent, CHAN_AUTO, idx);
+                G_Sound(ctx, ctx.entity_id_of(ent), CHAN_AUTO, idx);
             }
             if (*hitEnt).inuse != 0 {
                 //we hit an entity
@@ -9468,7 +9513,7 @@ pub fn G_GrabSomeMofos(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         // you failed to grab anyone, play the "failed to grab" anim
                         G_SetAnim(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_).unwrap(),
                             &mut (*client).pers.cmd,
                             SETANIM_BOTH,
                             animNumber_t::BOTH_KYLE_MISS as c_int,
@@ -9492,7 +9537,7 @@ pub fn G_GrabSomeMofos(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 // time to crack some heads
                 G_SetAnim(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     &mut (*client).pers.cmd,
                     SETANIM_BOTH,
                     tortureAnim,
@@ -9506,7 +9551,7 @@ pub fn G_GrabSomeMofos(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
                 G_SetAnim(
                     ctx,
-                    grabbed,
+                    ctx.entity_id_of(grabbed).unwrap(),
                     &mut (*gcl).pers.cmd,
                     SETANIM_BOTH,
                     correspondingAnim,
@@ -9520,10 +9565,20 @@ pub fn G_GrabSomeMofos(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         if (*gcl).ps.saberHolstered == 0 {
                             (*gcl).ps.saberHolstered = 2;
                             if (*gcl).saber[0].soundOff != 0 {
-                                G_Sound(ctx, grabbed, CHAN_AUTO as c_int, (*gcl).saber[0].soundOff);
+                                G_Sound(
+                                    ctx,
+                                    ctx.entity_id_of(grabbed),
+                                    CHAN_AUTO as c_int,
+                                    (*gcl).saber[0].soundOff,
+                                );
                             }
                             if (*gcl).saber[1].soundOff != 0 && (*gcl).saber[1].model[0] != 0 {
-                                G_Sound(ctx, grabbed, CHAN_AUTO as c_int, (*gcl).saber[1].soundOff);
+                                G_Sound(
+                                    ctx,
+                                    ctx.entity_id_of(grabbed),
+                                    CHAN_AUTO as c_int,
+                                    (*gcl).saber[1].soundOff,
+                                );
                             }
                         }
                     }
@@ -9540,7 +9595,7 @@ pub fn G_GrabSomeMofos(ctx: GameContext<'_>, self_: *mut gentity_t) {
             // you failed to grab anyone, play the "failed to grab" anim
             G_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 &mut (*client).pers.cmd,
                 SETANIM_BOTH,
                 animNumber_t::BOTH_KYLE_MISS as c_int,
@@ -9650,7 +9705,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                     // if they're pretty far from finishing the anim then shove them into another anim
                     G_SetAnim(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_).unwrap(),
                         &mut (*client).pers.cmd,
                         SETANIM_BOTH,
                         animNumber_t::BOTH_KYLE_MISS as c_int,
@@ -9678,7 +9733,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
 
                         G_SetAnim(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_).unwrap(),
                             &mut (*client).pers.cmd,
                             SETANIM_BOTH,
                             animNumber_t::BOTH_KYLE_MISS as c_int,
@@ -9728,7 +9783,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                         if trace.startsolid == 0 && trace.allsolid == 0 && trace.fraction == 1.0f32
                         {
                             // go there
-                            G_SetOrigin(self_, idealSpot);
+                            G_SetOrigin(&mut *(self_), idealSpot);
                             crate::q_math::_VectorCopy(idealSpot, &mut (*client).ps.origin);
                         }
                     } else if (*client).grappleState >= 1 {
@@ -9740,7 +9795,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                                 if (*gcl).saber[0].soundOff != 0 {
                                     G_Sound(
                                         ctx,
-                                        grappler,
+                                        ctx.entity_id_of(grappler),
                                         CHAN_AUTO as c_int,
                                         (*gcl).saber[0].soundOff,
                                     );
@@ -9748,7 +9803,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                                 if (*gcl).saber[1].soundOff != 0 && (*gcl).saber[1].model[0] != 0 {
                                     G_Sound(
                                         ctx,
-                                        grappler,
+                                        ctx.entity_id_of(grappler),
                                         CHAN_AUTO as c_int,
                                         (*gcl).saber[1].soundOff,
                                     );
@@ -9891,7 +9946,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                                     // don't do damage on this one, it would look very freaky if they died
                                     G_EntitySound(
                                         ctx,
-                                        grappler,
+                                        ctx.entity_id_of(grappler).unwrap(),
                                         CHAN_VOICE as c_int,
                                         G_SoundIndex(cstr("*pain100.wav").as_ptr()),
                                     );

@@ -1199,8 +1199,8 @@ pub fn G_FindLocalInterestPoint(ctx: GameContext<'_>, self_: *mut gentity_t) -> 
     {
         G_UseTargets2(
             ctx,
-            self_,
-            self_,
+            ctx.entity_id_of(self_),
+            ctx.entity_id_of(self_),
             world.level.interestPoints[best_point as usize].target,
         );
     }
@@ -1225,7 +1225,7 @@ pub fn SP_target_interest(ctx: GameContext<'_>, self_: *mut gentity_t) {
             ))
             .as_ptr(),
         );
-        G_FreeEntity(ctx, self_);
+        G_FreeEntity(ctx, ctx.entity_id_of(self_));
         return;
     }
 
@@ -1241,5 +1241,5 @@ pub fn SP_target_interest(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
     world.level.numInterestPoints += 1;
 
-    G_FreeEntity(ctx, self_);
+    G_FreeEntity(ctx, ctx.entity_id_of(self_));
 }

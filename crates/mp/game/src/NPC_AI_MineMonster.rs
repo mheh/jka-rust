@@ -184,12 +184,12 @@ pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: *mut gentity_t, damage
             let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
             let bite_str = cstr(&format!("sound/chars/mine/misc/bite{}.wav", idx));
             let sound_idx = G_EffectIndex(bite_str.as_ptr());
-            G_Sound(ctx, npc, CHAN_AUTO, sound_idx);
+            G_Sound(ctx, ctx.entity_id_of(npc), CHAN_AUTO, sound_idx);
         } else {
             let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
             let miss_str = cstr(&format!("sound/chars/mine/misc/miss{}.wav", idx));
             let sound_idx = G_EffectIndex(miss_str.as_ptr());
-            G_Sound(ctx, npc, CHAN_AUTO, sound_idx);
+            G_Sound(ctx, ctx.entity_id_of(npc), CHAN_AUTO, sound_idx);
         }
     }
 }
@@ -343,7 +343,7 @@ pub fn NPC_MineMonster_Pain(
             / ((*((*self_).client as *mut gclient_t)).pers.maxHealth as f32))
             * 100.0)
             .floor() as c_int;
-        G_AddEvent(self_, EV_PAIN as c_int, parm);
+        G_AddEvent(&mut *(self_), EV_PAIN as c_int, parm);
 
         if damage >= 10 {
             TIMER_Remove(ctx, self_, cstr("attacking").as_ptr());

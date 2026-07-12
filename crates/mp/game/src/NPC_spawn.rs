@@ -594,7 +594,12 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         ))
                         .as_ptr(),
                     );
-                    crate::g_utils::G_UseTargets2(ctx, ent, ent, (*ent).target3 as *const c_char);
+                    crate::g_utils::G_UseTargets2(
+                        ctx,
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(ent),
+                        (*ent).target3 as *const c_char,
+                    );
                     (*ent).think = Some(EntThink::G_FreeEntity).into();
                     (*ent).nextthink = (*ctx.world).level.time + 100;
                 } else {
@@ -760,7 +765,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*client).renderInfo.lookTarget = ENTITYNUM_NONE;
 
         if (*ent).spawnflags & 64 == 0 {
-            crate::g_utils::G_KillBox(ctx, ent);
+            crate::g_utils::G_KillBox(ctx, ctx.entity_id_of(ent).unwrap());
             trap::LinkEntity(
                 ctx.engine,
                 mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
@@ -796,7 +801,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if !spawn_point.is_null() {
-            crate::g_utils::G_UseTargets(ctx, spawn_point, ent);
+            crate::g_utils::G_UseTargets(ctx, ctx.entity_id_of(spawn_point), ctx.entity_id_of(ent));
         }
 
         trap::ICARUS_InitEnt(
@@ -841,13 +846,13 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if (*ent).s.shouldtarget != 0 {
             (*ent).maxHealth = (*ent).health;
-            crate::g_utils::G_ScaleNetHealth(ent);
+            crate::g_utils::G_ScaleNetHealth(&mut *(ent));
         }
 
         ChangeWeapon(ctx, ent, (*client).ps.weapon);
 
         if (*ent).spawnflags & SFB_STARTINSOLID == 0 {
-            crate::g_utils::G_CheckInSolid(ctx, ent, qtrue);
+            crate::g_utils::G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qtrue);
         }
         (*((*ent).NPC as *mut gNPC_t)).lastClearOrigin = [0.0; 3];
 
@@ -942,7 +947,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
                                 (*ent).r.currentOrigin,
                                 &mut (*((*droid_ent).client as *mut gclient_t)).ps.origin,
                             );
-                            crate::g_utils::G_SetOrigin(droid_ent, (*droid_ent).s.origin);
+                            crate::g_utils::G_SetOrigin(&mut *(droid_ent), (*droid_ent).s.origin);
                             trap::LinkEntity(
                                 ctx.engine,
                                 mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
@@ -953,7 +958,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
                                 (*ent).r.currentAngles,
                                 &mut (*droid_ent).s.angles,
                             );
-                            crate::g_utils::G_SetAngles(droid_ent, (*droid_ent).s.angles);
+                            crate::g_utils::G_SetAngles(&mut *(droid_ent), (*droid_ent).s.angles);
                             if !(*droid_ent).NPC.is_null() {
                                 (*((*droid_ent).NPC as *mut gNPC_t)).desiredYaw =
                                     (*droid_ent).s.angles[YAW as usize];
@@ -962,7 +967,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
                             }
                             (*droid_ent).flags |= FL_UNDYING;
                         } else {
-                            crate::g_utils::G_FreeEntity(ctx, droid_ent);
+                            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(droid_ent));
                         }
                     }
                 }
@@ -1039,7 +1044,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
                 ),
             );
             if tr.allsolid == 0 && tr.startsolid == 0 && tr.fraction < 1.0 {
-                crate::g_utils::G_SetOrigin(ent, tr.endpos);
+                crate::g_utils::G_SetOrigin(&mut *(ent), tr.endpos);
             }
         }
 
@@ -1077,7 +1082,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
             // Raven: goto finish; (unreachable `return NULL;` right after — the
             // goto always wins). Preserve control-flow, not shape (§C10).
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
-                crate::g_utils::G_SetOrigin(ent, save_org);
+                crate::g_utils::G_SetOrigin(&mut *(ent), save_org);
             }
             return newent;
         }
@@ -1096,7 +1101,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
         if (*((*newent).NPC as *mut gNPC_t)).tempGoal.is_none() {
             (*newent).NPC = core::ptr::null_mut();
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
-                crate::g_utils::G_SetOrigin(ent, save_org);
+                crate::g_utils::G_SetOrigin(&mut *(ent), save_org);
             }
             return core::ptr::null_mut();
         }
@@ -1117,7 +1122,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
                 .as_ptr(),
             );
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
-                crate::g_utils::G_SetOrigin(ent, save_org);
+                crate::g_utils::G_SetOrigin(&mut *(ent), save_org);
             }
             return newent;
         }
@@ -1170,8 +1175,8 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
             );
 
             if i_veh_index == VEHICLE_NONE {
-                crate::g_utils::G_FreeEntity(ctx, newent);
-                crate::g_utils::G_FreeEntity(ctx, ent);
+                crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(newent));
+                crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return core::ptr::null_mut();
             }
 
@@ -1213,8 +1218,8 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
                         ))
                         .as_ptr(),
                     );
-                    crate::g_utils::G_FreeEntity(ctx, newent);
-                    crate::g_utils::G_FreeEntity(ctx, ent);
+                    crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(newent));
+                    crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
                     return core::ptr::null_mut();
                 }
             }
@@ -1253,7 +1258,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
                     .m_vOrientation
                     .add(2),
             ];
-            crate::g_utils::G_SetAngles(newent, orient);
+            crate::g_utils::G_SetAngles(&mut *(newent), orient);
             SetClientViewAngle(newent, orient);
 
             (*newent).fly_sound_debounce_time = (*ent).fly_sound_debounce_time;
@@ -1273,7 +1278,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
             &mut (*((*newent).client as *mut gclient_t)).ps.origin,
         );
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*newent).r.currentOrigin);
-        crate::g_utils::G_SetOrigin(newent, (*ent).s.origin);
+        crate::g_utils::G_SetOrigin(&mut *(newent), (*ent).s.origin);
         if crate::NPC_stats::NPC_ParseParms(ctx, (*ent).NPC_type as *const c_char, newent) == qfalse
         {
             crate::g_main::Com_Printf(
@@ -1284,8 +1289,8 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
                 ))
                 .as_ptr(),
             );
-            crate::g_utils::G_FreeEntity(ctx, newent);
-            crate::g_utils::G_FreeEntity(ctx, ent);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(newent));
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return core::ptr::null_mut();
         }
 
@@ -1425,17 +1430,17 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
 
         if (*ent).use_.is_none() {
             if !(*ent).target.is_null() {
-                crate::g_utils::G_UseTargets(ctx, ent, ent);
+                crate::g_utils::G_UseTargets(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(ent));
             }
             if !(*ent).closetarget.is_null() {
                 (*newent).target = (*ent).closetarget;
             }
             (*ent).targetname = core::ptr::null_mut();
-            crate::g_utils::G_FreeEntity(ctx, ent);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
         }
 
         if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
-            crate::g_utils::G_SetOrigin(ent, save_org);
+            crate::g_utils::G_SetOrigin(&mut *(ent), save_org);
         }
 
         newent
@@ -1514,7 +1519,7 @@ pub fn NPC_PrecacheType(ctx: GameContext<'_>, NPC_type: *mut c_char) {
         if !fakespawner.is_null() {
             (*fakespawner).NPC_type = NPC_type;
             crate::NPC_stats::NPC_Precache(ctx, fakespawner);
-            crate::g_utils::G_FreeEntity(ctx, fakespawner);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(fakespawner));
         }
     }
 }
@@ -1752,8 +1757,8 @@ pub fn SP_NPC_Vehicle(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
         (*self_).delay *= 1000;
 
-        crate::g_utils::G_SetOrigin(self_, (*self_).s.origin);
-        crate::g_utils::G_SetAngles(self_, (*self_).s.angles);
+        crate::g_utils::G_SetOrigin(&mut *(self_), (*self_).s.origin);
+        crate::g_utils::G_SetAngles(&mut *(self_), (*self_).s.angles);
         let drop_time_key = cstr("dropTime");
         let zero_f = cstr("0");
         crate::g_spawn::G_SpawnFloat(ctx, drop_time_key.as_ptr(), zero_f.as_ptr(), &mut drop_time);
@@ -1770,14 +1775,14 @@ pub fn SP_NPC_Vehicle(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         if !(*self_).targetname.is_null() {
             if NPC_VehiclePrecache(ctx, self_) == qfalse {
-                crate::g_utils::G_FreeEntity(ctx, self_);
+                crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(self_));
                 return;
             }
             (*self_).use_ = Some(EntUse::NPC_VehicleSpawnUse).into();
         } else {
             if (*self_).delay != 0 {
                 if NPC_VehiclePrecache(ctx, self_) == qfalse {
-                    crate::g_utils::G_FreeEntity(ctx, self_);
+                    crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(self_));
                     return;
                 }
                 (*self_).think = Some(EntThink::G_VehicleSpawn).into();
@@ -2797,7 +2802,7 @@ pub fn NPC_SpawnType(
         end[2] += 24.0;
     }
 
-    G_SetOrigin(npc_spawner, end);
+    G_SetOrigin(unsafe { &mut *npc_spawner }, end);
 
     unsafe {
         (*npc_spawner).s.origin = (*npc_spawner).r.currentOrigin;
@@ -3074,7 +3079,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                             ))
                             .as_ptr(),
                         );
-                        G_FreeEntity(ctx, player);
+                        G_FreeEntity(ctx, ctx.entity_id_of(player));
                     }
                 }
             }
@@ -3221,7 +3226,12 @@ pub fn Cmd_NPC_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
         } else {
             // Find specific NPC
-            let found_ent = G_Find(ctx, std::ptr::null_mut(), 0, cmd2.as_ptr() as *const c_char);
+            let found_ent = G_Find(
+                ctx,
+                ctx.entity_id_of(std::ptr::null_mut()),
+                0,
+                cmd2.as_ptr() as *const c_char,
+            );
             if !found_ent.is_null() && !unsafe { (*found_ent).client.is_null() } {
                 NPC_PrintScore(ctx, found_ent);
             } else {

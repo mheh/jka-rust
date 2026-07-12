@@ -103,7 +103,7 @@ pub fn Remote_MaintainHeight(ctx: GameContext<'_>) {
                 };
                 crate::g_utils::G_Sound(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(c"sound/chars/remote/misc/hiss.wav".as_ptr()),
                 );
@@ -215,7 +215,7 @@ pub fn Remote_Strafe(ctx: GameContext<'_>) {
 
             crate::g_utils::G_Sound(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 CHAN_AUTO,
                 crate::g_utils::G_SoundIndex(c"sound/chars/remote/misc/hiss.wav".as_ptr()),
             );

@@ -173,7 +173,12 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
                 if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
                     let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", idx);
-                    G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr()); // CHAN_AUTO = 0
+                    G_SoundOnEnt(
+                        ctx,
+                        ctx.entity_id_of(npc).unwrap(),
+                        0,
+                        cstr(&sound_path).as_ptr(),
+                    ); // CHAN_AUTO = 0
 
                     TIMER_Set(
                         ctx,
@@ -189,7 +194,12 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
                 if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
                     let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx);
-                    G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr());
+                    G_SoundOnEnt(
+                        ctx,
+                        ctx.entity_id_of(npc).unwrap(),
+                        0,
+                        cstr(&sound_path).as_ptr(),
+                    );
 
                     TIMER_Set(
                         ctx,
@@ -205,7 +215,12 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
                 if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
                     let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", idx);
-                    G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr());
+                    G_SoundOnEnt(
+                        ctx,
+                        ctx.entity_id_of(npc).unwrap(),
+                        0,
+                        cstr(&sound_path).as_ptr(),
+                    );
 
                     TIMER_Set(
                         ctx,
@@ -222,7 +237,12 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
                 if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 2);
                     let sound_path = format!("sound/chars/gonk/misc/gonktalk{}.wav", idx);
-                    G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr());
+                    G_SoundOnEnt(
+                        ctx,
+                        ctx.entity_id_of(npc).unwrap(),
+                        0,
+                        cstr(&sound_path).as_ptr(),
+                    );
 
                     TIMER_Set(
                         ctx,

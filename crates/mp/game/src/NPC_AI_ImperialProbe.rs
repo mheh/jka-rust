@@ -345,7 +345,7 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
 
         G_Sound(
             ctx,
-            npc,
+            ctx.entity_id_of(npc),
             CHAN_AUTO,
             G_SoundIndex(c"sound/chars/probe/misc/fire".as_ptr()),
         );
@@ -451,7 +451,12 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
             if TIMER_Done(ctx, npc, c"angerNoise".as_ptr()) != 0 {
                 let sound_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
-                G_SoundOnEnt(ctx, npc, CHAN_AUTO, cstr(&s).as_ptr());
+                G_SoundOnEnt(
+                    ctx,
+                    ctx.entity_id_of(npc).unwrap(),
+                    CHAN_AUTO,
+                    cstr(&s).as_ptr(),
+                );
 
                 TIMER_Set(
                     ctx,
@@ -644,7 +649,12 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
             if TIMER_Done(ctx, npc, c"patrolNoise".as_ptr()) != 0 {
                 let sound_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
-                G_SoundOnEnt(ctx, npc, CHAN_AUTO, cstr(&s).as_ptr());
+                G_SoundOnEnt(
+                    ctx,
+                    ctx.entity_id_of(npc).unwrap(),
+                    CHAN_AUTO,
+                    cstr(&s).as_ptr(),
+                );
 
                 TIMER_Set(
                     ctx,
@@ -657,7 +667,7 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
             // He's got an enemy. Make him angry.
             G_SoundOnEnt(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 CHAN_AUTO,
                 c"sound/chars/probe/misc/anger1".as_ptr(),
             );

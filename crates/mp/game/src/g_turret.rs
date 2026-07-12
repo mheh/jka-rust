@@ -57,7 +57,7 @@ pub fn TurretPain(
         if !target.is_null() {
             (*target).health = (*self_).health;
             if (*target).maxHealth != 0 {
-                G_ScaleNetHealth(target);
+                G_ScaleNetHealth(&mut *(target));
             }
         }
 
@@ -94,7 +94,7 @@ pub fn TurretBasePain(
         if !target.is_null() {
             (*target).health = (*self_).health;
             if (*target).maxHealth != 0 {
-                G_ScaleNetHealth(target);
+                G_ScaleNetHealth(&mut *(target));
             }
             TurretPain(ctx, target, attacker, damage);
         }
@@ -177,7 +177,7 @@ pub fn auto_turret_die(
             (*self_).s.apos.trDelta[2] = 0.0;
 
             if !(*self_).target.is_null() {
-                G_UseTargets(ctx, self_, attacker);
+                G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(attacker));
             }
         } else {
             ObjectDie(
@@ -211,7 +211,7 @@ pub fn bottom_die(
         if !target.is_null() && (*target).health > 0 {
             (*target).health = (*self_).health;
             if (*target).maxHealth != 0 {
-                G_ScaleNetHealth(target);
+                G_ScaleNetHealth(&mut *(target));
             }
             auto_turret_die(ctx, target, inflictor, attacker, damage, meansOfDeath);
         }
@@ -596,7 +596,7 @@ pub fn turret_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
             ctx,
             org2,
             (*self_).radius,
-            self_,
+            ctx.entity_id_of(self_),
             qtrue,
             entity_list.as_mut_ptr(),
         );
@@ -691,7 +691,12 @@ pub fn turret_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
         if found != 0 {
             G_SetEnemy(ctx, self_, bestTarget);
             if VALIDSTRING((*self_).target2) {
-                G_UseTargets2(ctx, self_, self_, (*self_).target2);
+                G_UseTargets2(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    ctx.entity_id_of(self_),
+                    (*self_).target2,
+                );
             }
         }
 
@@ -846,8 +851,8 @@ pub fn SP_misc_turret(ctx: GameContext<'_>, base: *mut gentity_t) {
             (*base).s.genericenemyindex = G_IconIndex(ctx, s);
         }
 
-        G_SetAngles(base, (*base).s.angles);
-        G_SetOrigin(base, (*base).s.origin);
+        G_SetAngles(&mut *(base), (*base).s.angles);
+        G_SetOrigin(&mut *(base), (*base).s.origin);
 
         (*base).r.contents = CONTENTS_BODY;
 
@@ -871,7 +876,7 @@ pub fn SP_misc_turret(ctx: GameContext<'_>, base: *mut gentity_t) {
         );
 
         if turret_base_spawn_top(ctx, base) == 0 {
-            G_FreeEntity(ctx, base);
+            G_FreeEntity(ctx, ctx.entity_id_of(base));
         }
     }
 }
@@ -891,12 +896,12 @@ pub fn turret_base_spawn_top(ctx: GameContext<'_>, base: *mut gentity_t) -> qboo
 
         (*top).s.modelindex = G_ModelIndex(c"models/map_objects/hoth/turret_top_new.md3".as_ptr());
         (*top).s.modelindex2 = G_ModelIndex(c"models/map_objects/hoth/turret_top.md3".as_ptr());
-        G_SetAngles(top, (*base).s.angles);
+        G_SetAngles(&mut *(top), (*base).s.angles);
 
         org[0] = (*base).s.origin[0];
         org[1] = (*base).s.origin[1];
         org[2] = (*base).s.origin[2] + 128.0;
-        G_SetOrigin(top, org);
+        G_SetOrigin(&mut *(top), org);
 
         (*base).r.ownerNum = (*top).s.number;
         (*top).r.ownerNum = (*base).s.number;
@@ -931,10 +936,10 @@ pub fn turret_base_spawn_top(ctx: GameContext<'_>, base: *mut gentity_t) -> qboo
         if t != 0 {
             // Show health on HUD
             (*top).maxHealth = (*base).health;
-            G_ScaleNetHealth(top);
+            G_ScaleNetHealth(&mut *(top));
 
             (*base).maxHealth = (*base).health;
-            G_ScaleNetHealth(base);
+            G_ScaleNetHealth(&mut *(base));
         }
 
         (*base).takedamage = qtrue;

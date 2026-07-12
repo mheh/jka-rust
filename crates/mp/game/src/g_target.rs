@@ -64,7 +64,7 @@ pub fn Use_Target_Give(
         loop {
             t = G_Find(
                 ctx,
-                t,
+                ctx.entity_id_of(t),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 ent_target,
             );
@@ -136,7 +136,7 @@ pub fn Think_Target_Delay(ctx: GameContext<'_>, ent: EntityId) {
     let activator = ctx.entity(ent).activator;
     let activator_ptr =
         unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
-    G_UseTargets(ctx, ctx.entity_mut(ent), activator_ptr);
+    G_UseTargets(ctx, Some(ent), ctx.entity_id_of(activator_ptr));
 }
 
 /// Raven `Use_Target_Delay`.
@@ -387,7 +387,7 @@ pub fn Use_Target_Speaker(
             let activator_ptr =
                 unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
             G_AddEvent(
-                activator_ptr,
+                unsafe { &mut *activator_ptr },
                 entity_event_t::EV_GENERAL_SOUND as c_int,
                 noise_index,
             );
@@ -621,7 +621,7 @@ pub fn target_laser_start(ctx: GameContext<'_>, self_: EntityId) {
     if !target.is_null() {
         let ent = G_Find(
             ctx,
-            core::ptr::null_mut(),
+            ctx.entity_id_of(core::ptr::null_mut()),
             core::mem::offset_of!(gentity_t, targetname) as c_int,
             target,
         );
@@ -754,12 +754,17 @@ pub fn target_relay_use(
         let target = ctx.entity(self_).target;
         let ent = G_PickTarget(ctx, target);
         if !ent.is_null() && unsafe { (*ent).use_ }.is_some() {
-            GlobalUse(ctx, ent, ctx.entity_mut(self_), activator_ptr);
+            GlobalUse(
+                ctx,
+                ctx.entity_id_of(ent),
+                Some(self_),
+                ctx.entity_id_of(activator_ptr),
+            );
         }
         return;
     }
 
-    G_UseTargets(ctx, ctx.entity_mut(self_), activator_ptr);
+    G_UseTargets(ctx, Some(self_), ctx.entity_id_of(activator_ptr));
 }
 
 /// Raven `SP_target_relay`.
@@ -810,7 +815,7 @@ pub fn SP_target_kill(self_: &mut gentity_t) {
 /// Source: `oracle/codemp/game/g_target.c:546-552`
 pub fn SP_target_position(self_: &mut gentity_t) {
     let origin = self_.s.origin;
-    G_SetOrigin(self_, origin);
+    G_SetOrigin(&mut *(self_), origin);
 }
 
 /// Raven `target_location_linkup`.
@@ -907,8 +912,8 @@ pub fn target_counter_use(
         if !target2.is_null() {
             G_UseTargets2(
                 ctx,
-                ctx.entity_mut(self_),
-                activator_ptr,
+                Some(self_),
+                ctx.entity_id_of(activator_ptr),
                 target2 as *const c_char,
             );
         }
@@ -922,7 +927,7 @@ pub fn target_counter_use(
     }
 
     ctx.entity_mut(self_).activator = activator;
-    G_UseTargets(ctx, ctx.entity_mut(self_), activator_ptr);
+    G_UseTargets(ctx, Some(self_), ctx.entity_id_of(activator_ptr));
 
     if ctx.entity(self_).count == 0 {
         if ctx.entity(self_).bounceCount == 0 {
@@ -976,7 +981,7 @@ pub fn target_random_use(
     loop {
         t = G_Find(
             ctx,
-            t,
+            ctx.entity_id_of(t),
             core::mem::offset_of!(gentity_t, targetname) as c_int,
             target,
         );
@@ -993,7 +998,7 @@ pub fn target_random_use(
     }
 
     if t_count == 1 {
-        G_UseTargets(ctx, ctx.entity_mut(self_), activator_ptr);
+        G_UseTargets(ctx, Some(self_), ctx.entity_id_of(activator_ptr));
         return;
     }
 
@@ -1004,7 +1009,7 @@ pub fn target_random_use(
     loop {
         t = G_Find(
             ctx,
-            t,
+            ctx.entity_id_of(t),
             core::mem::offset_of!(gentity_t, targetname) as c_int,
             target,
         );
@@ -1022,7 +1027,12 @@ pub fn target_random_use(
         } else if t_count == pick {
             if unsafe { (*t).use_ }.is_some() {
                 // check can be omitted
-                GlobalUse(ctx, t, ctx.entity_mut(self_), activator_ptr);
+                GlobalUse(
+                    ctx,
+                    ctx.entity_id_of(t),
+                    Some(self_),
+                    ctx.entity_id_of(activator_ptr),
+                );
                 return;
             }
         }
@@ -1183,7 +1193,7 @@ pub fn G_SetActiveState(ctx: GameContext<'_>, targetstring: *mut c_char, actStat
         loop {
             target = G_Find(
                 ctx,
-                target,
+                ctx.entity_id_of(target),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 targetstring as *const c_char,
             );
@@ -1232,7 +1242,7 @@ pub fn target_deactivate_use(
 /// Source: `oracle/codemp/game/g_target.c:930-934`
 pub fn SP_target_activate(self_: &mut gentity_t) {
     let origin = self_.s.origin;
-    G_SetOrigin(self_, origin);
+    G_SetOrigin(&mut *(self_), origin);
     self_.use_ = Some(EntUse::target_activate_use).into();
 }
 
@@ -1241,7 +1251,7 @@ pub fn SP_target_activate(self_: &mut gentity_t) {
 /// Source: `oracle/codemp/game/g_target.c:939-943`
 pub fn SP_target_deactivate(self_: &mut gentity_t) {
     let origin = self_.s.origin;
-    G_SetOrigin(self_, origin);
+    G_SetOrigin(&mut *(self_), origin);
     self_.use_ = Some(EntUse::target_deactivate_use).into();
 }
 

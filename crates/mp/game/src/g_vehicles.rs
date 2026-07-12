@@ -294,7 +294,7 @@ pub fn G_AttachToVehicle(ctx: GameContext<'_>, pEnt: *mut gentity_t, ucmd: *mut 
             Eorientations::ORIGIN as c_int,
             &mut (*entClient).ps.origin,
         );
-        crate::g_utils::G_SetOrigin(ent, (*entClient).ps.origin);
+        crate::g_utils::G_SetOrigin(&mut *(ent), (*entClient).ps.origin);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
 }
@@ -479,7 +479,7 @@ pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
                     (*gParent).spawnflags &= !2;
                     crate::g_utils::G_Sound(
                         ctx,
-                        gParent,
+                        ctx.entity_id_of(gParent),
                         CHAN_AUTO,
                         G_SoundIndex(c"sound/vehicles/common/release.wav".as_ptr()),
                     );
@@ -557,7 +557,7 @@ pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
 
         // Play the start sounds.
         if (*vi).soundOn != 0 {
-            crate::g_utils::G_Sound(ctx, parent, CHAN_AUTO, (*vi).soundOn);
+            crate::g_utils::G_Sound(ctx, ctx.entity_id_of(parent), CHAN_AUTO, (*vi).soundOn);
         }
 
         let mut vPlayerDir: vec3_t = [0.0; 3];
@@ -1475,7 +1475,7 @@ pub fn UpdateRider(
                         Vehicle_SetAnim(ctx, rider, SETANIM_BOTH, Anim, iFlags, iBlend);
                         // just to make sure it's cleared when roll is done
                         (*rc).ps.weaponTime = (*rc).ps.torsoTimer - 200;
-                        crate::g_utils::G_AddEvent(rider, EV_ROLL as c_int, 0);
+                        crate::g_utils::G_AddEvent(&mut *(rider), EV_ROLL as c_int, 0);
                         return qfalse;
                     }
                 } else {
@@ -1544,7 +1544,7 @@ pub fn UpdateRider(
                         GIcarusTaskidpendingArgs::new(rider, TID_CHAN_VOICE as c_int),
                     ) == qfalse
                     {
-                        crate::g_utils::G_AddEvent(rider, (EV_JUMP) as i32, 0);
+                        crate::g_utils::G_AddEvent(&mut *(rider), (EV_JUMP) as i32, 0);
                     }
                     Vehicle_SetAnim(
                         ctx,
@@ -1589,7 +1589,7 @@ pub fn UpdateRider(
                         );
                         // just to make sure it's cleared when roll is done
                         (*rc).ps.weaponTime = (*rc).ps.torsoTimer - 200;
-                        crate::g_utils::G_AddEvent(rider, EV_ROLL as c_int, 0);
+                        crate::g_utils::G_AddEvent(&mut *(rider), EV_ROLL as c_int, 0);
                     }
                     return qfalse;
                 }
@@ -1621,7 +1621,7 @@ pub fn AttachRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 
             // assuming we updated him relative to the bolt in AttachRidersGeneric
             let pcl = (*pilot).client as *mut gclient_t;
-            crate::g_utils::G_SetOrigin(pilot, (*pcl).ps.origin);
+            crate::g_utils::G_SetOrigin(&mut *(pilot), (*pcl).ps.origin);
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(pilot));
         }
 
@@ -1631,7 +1631,7 @@ pub fn AttachRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             (*oldpilot).waypoint = (*parent).waypoint;
 
             let pcl = (*oldpilot).client as *mut gclient_t;
-            crate::g_utils::G_SetOrigin(oldpilot, (*pcl).ps.origin);
+            crate::g_utils::G_SetOrigin(&mut *(oldpilot), (*pcl).ps.origin);
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(oldpilot));
         }
 
@@ -1675,7 +1675,7 @@ pub fn AttachRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     &mut (*ppc).ps.origin,
                 );
 
-                crate::g_utils::G_SetOrigin(pilot, (*ppc).ps.origin);
+                crate::g_utils::G_SetOrigin(&mut *(pilot), (*ppc).ps.origin);
                 trap::LinkEntity(ctx.engine, GLinkentityArgs::new(pilot));
             }
             i += 1;
@@ -1723,8 +1723,8 @@ pub fn AttachRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 );
                 vectoangles(fwd, &mut (*dcl).ps.viewangles);
 
-                crate::g_utils::G_SetOrigin(droid, (*dcl).ps.origin);
-                crate::g_utils::G_SetAngles(droid, (*dcl).ps.viewangles);
+                crate::g_utils::G_SetOrigin(&mut *(droid), (*dcl).ps.origin);
+                crate::g_utils::G_SetAngles(&mut *(droid), (*dcl).ps.viewangles);
                 crate::g_client::SetClientViewAngle(droid, (*dcl).ps.viewangles);
                 trap::LinkEntity(ctx.engine, GLinkentityArgs::new(droid));
 
@@ -2280,7 +2280,7 @@ pub fn G_FlyVehicleDestroySurface(
                 // make the pilot scream to his death
                 crate::g_utils::G_EntitySound(
                     ctx,
-                    (*vp).m_pPilot as *mut gentity_t,
+                    ctx.entity_id_of((*vp).m_pPilot as *mut gentity_t).unwrap(),
                     CHAN_VOICE,
                     G_SoundIndex(c"*falling1.wav".as_ptr()),
                 );
@@ -2536,7 +2536,7 @@ pub fn Eject(
             }
 
             // Move them to the exit position.
-            G_SetOrigin(ent, vExitPos);
+            G_SetOrigin(&mut *(ent), vExitPos);
             (*((*ent).client as *mut gclient_t)).ps.origin = (*ent).r.currentOrigin;
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 

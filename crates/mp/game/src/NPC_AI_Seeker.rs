@@ -261,7 +261,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
                 if (*((*NPC).client as *mut gclient_t)).NPC_class != CLASS_BOBAFETT {
                     crate::g_utils::G_Sound(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC),
                         CHAN_AUTO,
                         crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/hiss".as_ptr()),
                     );
@@ -348,7 +348,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
                 if (*((*NPC).client as *mut gclient_t)).NPC_class != CLASS_BOBAFETT {
                     crate::g_utils::G_Sound(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC),
                         CHAN_AUTO,
                         crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/hiss".as_ptr()),
                     );
@@ -732,7 +732,7 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
                     );
                     crate::g_utils::G_Sound(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC),
                         CHAN_AUTO,
                         crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/hiss".as_ptr()),
                     );

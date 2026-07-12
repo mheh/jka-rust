@@ -633,7 +633,7 @@ pub fn Team_FragBonuses(
 
         let mut flag: *mut gentity_t = core::ptr::null_mut();
         loop {
-            flag = G_Find(ctx, flag, fofs_classname(), c.as_ptr());
+            flag = G_Find(ctx, ctx.entity_id_of(flag), fofs_classname(), c.as_ptr());
             if flag.is_null() {
                 break;
             }
@@ -814,12 +814,17 @@ pub fn Team_ResetFlag(ctx: GameContext<'_>, team: c_int) -> *mut gentity_t {
         let mut ent: *mut gentity_t = core::ptr::null_mut();
         let mut rent: *mut gentity_t = core::ptr::null_mut();
         loop {
-            ent = G_Find(ctx, ent, fofs_classname(), classname.as_ptr());
+            ent = G_Find(
+                ctx,
+                ctx.entity_id_of(ent),
+                fofs_classname(),
+                classname.as_ptr(),
+            );
             if ent.is_null() {
                 break;
             }
             if (*ent).flags & FL_DROPPED_ITEM != 0 {
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
             } else {
                 rent = ent;
                 RespawnItem(ctx, ctx.entity_id_of(ent).unwrap());
@@ -1364,7 +1369,12 @@ pub fn SelectRandomTeamSpawnPoint(
         let mut spot: *mut gentity_t = core::ptr::null_mut();
 
         loop {
-            spot = G_Find(ctx, spot, fofs_classname(), classname.as_ptr());
+            spot = G_Find(
+                ctx,
+                ctx.entity_id_of(spot),
+                fofs_classname(),
+                classname.as_ptr(),
+            );
             if spot.is_null() {
                 break;
             }
@@ -1387,7 +1397,7 @@ pub fn SelectRandomTeamSpawnPoint(
         if count == 0 {
             return G_Find(
                 ctx,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 fofs_classname(),
                 classname.as_ptr(),
             );

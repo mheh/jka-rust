@@ -480,7 +480,7 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
 
                     crate::g_utils::G_Sound(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         CHAN_AUTO,
                         crate::g_utils::G_SoundIndex(
                             c"sound/chars/interrogator/misc/torture_droid_inject.mp3".as_ptr(),
@@ -518,7 +518,7 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
                 let _ = (*ctx.world).bg_state.rng.Q_irand(1, 3);
                 crate::g_utils::G_SoundOnEnt(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     CHAN_AUTO,
                     c"sound/chars/probe/misc/talk.wav".as_ptr(),
                 );
@@ -594,7 +594,7 @@ pub fn Interrogator_Idle(ctx: GameContext<'_>) {
         if crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth(ctx) != 0 {
             crate::g_utils::G_SoundOnEnt(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 CHAN_AUTO,
                 c"sound/chars/mark1/misc/anger.wav".as_ptr(),
             );

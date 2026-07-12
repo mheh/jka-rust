@@ -1658,7 +1658,7 @@ pub fn DEMP2_AltDetonate(ctx: GameContext<'_>, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        crate::g_utils::G_SetOrigin(ent, (*ent).r.currentOrigin);
+        crate::g_utils::G_SetOrigin(&mut *(ent), (*ent).r.currentOrigin);
         if (*ent).pos1[0] == 0.0 && (*ent).pos1[1] == 0.0 && (*ent).pos1[2] == 0.0 {
             // don't play effect with a 0'd out directional vector
             (*ent).pos1[1] = 1.0;
@@ -1741,7 +1741,7 @@ pub fn WP_DEMP2_AltFire(ctx: GameContext<'_>, ent: EntityId) {
         );
 
         let missile = crate::g_utils::G_Spawn(ctx);
-        crate::g_utils::G_SetOrigin(missile, tr.endpos);
+        crate::g_utils::G_SetOrigin(&mut *(missile), tr.endpos);
         // In SP the impact actually travels as a missile based on the trace fraction, but we're
         // just going to be instant. -rww
 
@@ -1860,7 +1860,7 @@ pub fn prox_mine_think(ctx: GameContext<'_>, ent: EntityId) {
                 ctx,
                 (*ent).r.currentOrigin,
                 (FLECHETTE_MINE_RADIUS_CHECK) as f32,
-                ent,
+                ctx.entity_id_of(ent),
                 qtrue,
                 ent_list.as_mut_ptr(),
             );
@@ -2129,7 +2129,7 @@ pub fn rocketThink(ctx: GameContext<'_>, ent: EntityId) {
                 );
             } else {
                 // just remove when die
-                crate::g_utils::G_FreeEntity(ctx, ent);
+                crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             }
             return;
         }
@@ -2407,7 +2407,7 @@ pub fn thermalDetonatorExplode(ctx: GameContext<'_>, ent: EntityId) {
         if (*ent).count == 0 {
             crate::g_utils::G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 CHAN_WEAPON,
                 crate::g_utils::G_SoundIndex(c"sound/weapons/thermal/warning.wav".as_ptr()),
             );
@@ -2430,11 +2430,11 @@ pub fn thermalDetonatorExplode(ctx: GameContext<'_>, ent: EntityId) {
                 ctx.engine,
                 mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut origin),
             );
-            crate::g_utils::G_SetOrigin(ent, origin);
+            crate::g_utils::G_SetOrigin(&mut *(ent), origin);
 
             (*ent).s.eType = (ET_GENERAL) as i32;
             crate::g_utils::G_AddEvent(
-                ent,
+                &mut *(ent),
                 EV_MISSILE_MISS as c_int,
                 crate::q_math::DirToByte(dir),
             );
@@ -2829,7 +2829,7 @@ pub fn laserTrapExplode(ctx: GameContext<'_>, self_: EntityId) {
         }
 
         if (*self_).s.weapon != WP_FLECHETTE {
-            crate::g_utils::G_AddEvent(self_, EV_MISSILE_MISS as c_int, 0);
+            crate::g_utils::G_AddEvent(&mut *(self_), EV_MISSILE_MISS as c_int, 0);
         }
 
         v = (*self_).s.pos.trDelta;
@@ -3025,7 +3025,7 @@ pub fn laserTrapThink(ctx: GameContext<'_>, ent: EntityId) {
             // arm me
             crate::g_utils::G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 CHAN_WEAPON,
                 crate::g_utils::G_SoundIndex(c"sound/weapons/laser_trap/warning.wav".as_ptr()),
             );
@@ -3072,7 +3072,7 @@ pub fn laserTrapStick(ctx: GameContext<'_>, ent: EntityId, endpos: vec3_t, norma
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        crate::g_utils::G_SetOrigin(ent, endpos);
+        crate::g_utils::G_SetOrigin(&mut *(ent), endpos);
         (*ent).pos1 = normal;
 
         (*ent).s.apos.trDelta = [0.0, 0.0, 0.0];
@@ -3091,7 +3091,7 @@ pub fn laserTrapStick(ctx: GameContext<'_>, ent: EntityId, endpos: vec3_t, norma
 
         crate::g_utils::G_Sound(
             ctx,
-            ent,
+            ctx.entity_id_of(ent),
             CHAN_WEAPON,
             crate::g_utils::G_SoundIndex(c"sound/weapons/laser_trap/stick.wav".as_ptr()),
         );
@@ -3135,7 +3135,7 @@ pub fn laserTrapStick(ctx: GameContext<'_>, ent: EntityId, endpos: vec3_t, norma
                 // arm me
                 crate::g_utils::G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_WEAPON,
                     crate::g_utils::G_SoundIndex(c"sound/weapons/laser_trap/warning.wav".as_ptr()),
                 );
@@ -3258,7 +3258,12 @@ pub fn WP_PlaceLaserTrap(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean
         // see how many there are now
         let mut found: *mut gentity_t = std::ptr::null_mut();
         loop {
-            found = crate::g_utils::G_Find(ctx, found, fofs_classname, c"laserTrap".as_ptr());
+            found = crate::g_utils::G_Find(
+                ctx,
+                ctx.entity_id_of(found),
+                fofs_classname,
+                c"laserTrap".as_ptr(),
+            );
             if found.is_null() {
                 break;
             }
@@ -3290,7 +3295,7 @@ pub fn WP_PlaceLaserTrap(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean
                 let victim = &mut (*ctx.world).g_entities
                     [foundLaserTraps[removeMe as usize] as usize]
                     as *mut gentity_t;
-                crate::g_utils::G_FreeEntity(ctx, victim);
+                crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(victim));
                 foundLaserTraps[removeMe as usize] = ENTITYNUM_NONE as c_int;
                 trapcount -= 1;
             } else {
@@ -3460,7 +3465,7 @@ pub fn charge_stick(
 
         crate::g_utils::G_Sound(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             CHAN_WEAPON,
             crate::g_utils::G_SoundIndex(c"sound/weapons/detpack/stick.wav".as_ptr()),
         );
@@ -3628,7 +3633,7 @@ pub fn drop_charge(ctx: GameContext<'_>, self_: EntityId, start: vec3_t, dir: ve
 
         (*bolt).setTime = (*ctx.world).level.time;
 
-        crate::g_utils::G_SetOrigin(bolt, start);
+        crate::g_utils::G_SetOrigin(&mut *(bolt), start);
         (*bolt).s.pos.trType = TR_GRAVITY;
         (*bolt).s.pos.trBase = start;
         crate::q_math::_VectorScale(dir, 300.0, &mut (*bolt).s.pos.trDelta);
@@ -3670,7 +3675,12 @@ pub fn BlowDetpacks(ctx: GameContext<'_>, ent: EntityId) {
         if (*((*ent).client as *mut gclient_t)).ps.hasDetPackPlanted != qfalse {
             let mut found: *mut gentity_t = std::ptr::null_mut();
             loop {
-                found = crate::g_utils::G_Find(ctx, found, fofs_classname, c"detpack".as_ptr());
+                found = crate::g_utils::G_Find(
+                    ctx,
+                    ctx.entity_id_of(found),
+                    fofs_classname,
+                    c"detpack".as_ptr(),
+                );
                 if found.is_null() {
                     break;
                 }
@@ -3683,7 +3693,7 @@ pub fn BlowDetpacks(ctx: GameContext<'_>, ent: EntityId) {
                         + ((*ctx.world).bg_state.rng.random() * 200.0) as c_int;
                     crate::g_utils::G_Sound(
                         ctx,
-                        found,
+                        ctx.entity_id_of(found),
                         CHAN_BODY,
                         crate::g_utils::G_SoundIndex(c"sound/weapons/detpack/warning.wav".as_ptr()),
                     );
@@ -3727,7 +3737,12 @@ pub fn WP_DropDetPack(ctx: GameContext<'_>, ent: Option<EntityId>, alt_fire: qbo
         // see how many there are now
         let mut found: *mut gentity_t = std::ptr::null_mut();
         loop {
-            found = crate::g_utils::G_Find(ctx, found, fofs_classname, c"detpack".as_ptr());
+            found = crate::g_utils::G_Find(
+                ctx,
+                ctx.entity_id_of(found),
+                fofs_classname,
+                c"detpack".as_ptr(),
+            );
             if found.is_null() {
                 break;
             }
@@ -3761,7 +3776,7 @@ pub fn WP_DropDetPack(ctx: GameContext<'_>, ent: Option<EntityId>, alt_fire: qbo
                     let victim = &mut (*ctx.world).g_entities
                         [foundDetPacks[removeMe as usize] as usize]
                         as *mut gentity_t;
-                    crate::g_utils::G_FreeEntity(ctx, victim);
+                    crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(victim));
                 }
                 foundDetPacks[removeMe as usize] = ENTITYNUM_NONE as c_int;
                 trapcount -= 1;
@@ -4222,7 +4237,7 @@ pub fn WP_FireStunBaton(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean)
 
             crate::g_utils::G_Sound(
                 ctx,
-                tr_ent,
+                ctx.entity_id_of(tr_ent),
                 CHAN_WEAPON,
                 crate::g_utils::G_SoundIndex(
                     cstr(&format!(
@@ -4340,7 +4355,7 @@ pub fn WP_FireMelee(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean) {
 
             crate::g_utils::G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 CHAN_AUTO,
                 crate::g_utils::G_SoundIndex(
                     cstr(&format!(
@@ -4865,7 +4880,7 @@ pub fn WP_FireVehicleWeapon(
                 }
                 // only do damage when someone touches us
                 (*missile).s.weapon = WP_THERMAL; // does this really matter?
-                crate::g_utils::G_SetOrigin(missile, start);
+                crate::g_utils::G_SetOrigin(&mut *(missile), start);
                 (*missile).touch = Some(EntTouch::WP_TouchVehMissile).into();
                 (*missile).s.eFlags |= EF_RADAROBJECT; // FIXME: externalize
                                                        // crap, if we have a lifetime, need to store that somewhere else on ent
@@ -4933,7 +4948,7 @@ pub fn G_VehMuzzleFireFX(
 
         if !broadcaster.is_null() {
             // add the event
-            crate::g_utils::G_AddEvent(b, EV_VEH_FIRE as c_int, 0);
+            crate::g_utils::G_AddEvent(&mut *(b), EV_VEH_FIRE as c_int, 0);
         }
     }
 }
@@ -5369,7 +5384,7 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean
                             && pVeh.m_iMuzzleWait[i as usize] < (*ctx.world).level.time
                         {
                             G_AddEvent(
-                                pVeh.m_pPilot as *mut gentity_t,
+                                &mut *(pVeh.m_pPilot as *mut gentity_t),
                                 (EV_NOAMMO) as i32,
                                 weaponNum,
                             );
@@ -5444,7 +5459,7 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean
                     if !pVeh.m_pPilot.is_null() && (*pVeh.m_pPilot).s.number < MAX_CLIENTS as c_int
                     {
                         G_AddEvent(
-                            pVeh.m_pPilot as *mut gentity_t,
+                            &mut *(pVeh.m_pPilot as *mut gentity_t),
                             (EV_NOAMMO) as i32,
                             weaponNum,
                         );
@@ -5481,7 +5496,7 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean
                                     && (*pVeh.m_pPilot).s.number < MAX_CLIENTS as c_int
                                 {
                                     G_AddEvent(
-                                        pVeh.m_pPilot as *mut gentity_t,
+                                        &mut *(pVeh.m_pPilot as *mut gentity_t),
                                         (EV_NOAMMO) as i32,
                                         weaponNum,
                                     );
@@ -5907,7 +5922,7 @@ pub fn WP_FireEmplaced(ctx: GameContext<'_>, ent: EntityId, altFire: qboolean) {
         }
 
         (*gun).genericValue10 = side;
-        G_AddEvent(gun, (EV_FIRE_WEAPON) as i32, side);
+        G_AddEvent(&mut *(gun), (EV_FIRE_WEAPON) as i32, side);
 
         let mut angs = [0.0f32; 3];
         let mut dir = [0.0f32; 3];
@@ -6010,7 +6025,7 @@ pub fn emplaced_gun_use(
         let mut dot = crate::q_math::_DotProduct(fwd1, fwd2);
 
         if dot < -0.2f32 {
-            TryHeal(ctx, activator, self_);
+            TryHeal(ctx, ctx.entity_id_of(activator), ctx.entity_id_of(self_));
             return;
         }
 
@@ -6024,7 +6039,7 @@ pub fn emplaced_gun_use(
         dot = crate::q_math::_DotProduct(fwd1, fwd2);
 
         if dot < 0.6f32 {
-            TryHeal(ctx, activator, self_);
+            TryHeal(ctx, ctx.entity_id_of(activator), ctx.entity_id_of(self_));
             return;
         }
 
@@ -6306,7 +6321,7 @@ pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: EntityId) {
         }
 
         (*ent).maxHealth = (*ent).health;
-        G_ScaleNetHealth(ent);
+        G_ScaleNetHealth(&mut *(ent));
 
         (*ent).genericValue4 = 0;
 
@@ -6337,7 +6352,7 @@ pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: EntityId) {
 
         (*ent).s.weapon = WP_EMPLACED_GUN;
 
-        G_SetOrigin(ent, (*ent).s.origin);
+        G_SetOrigin(&mut *(ent), (*ent).s.origin);
 
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).pos1);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).r.currentAngles);

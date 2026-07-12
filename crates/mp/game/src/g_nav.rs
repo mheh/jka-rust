@@ -483,7 +483,7 @@ pub fn NAV_FindClosestWaypointForPoint(
             return WAYPOINT_NONE;
         }
 
-        G_SetOrigin(marker, point);
+        G_SetOrigin(&mut *(marker), point);
 
         crate::q_math::_VectorCopy((*ent).r.mins, &mut (*marker).r.mins); // stepsize?
         crate::q_math::_VectorCopy((*ent).r.mins, &mut (*marker).r.maxs); // crouching?
@@ -496,7 +496,7 @@ pub fn NAV_FindClosestWaypointForPoint(
             GNavGetnearestnodeArgs::new(marker, (*marker).waypoint, NF_CLEAR_PATH, WAYPOINT_NONE),
         );
 
-        G_FreeEntity(ctx, marker);
+        G_FreeEntity(ctx, ctx.entity_id_of(marker));
 
         bestWP
     }
@@ -513,7 +513,7 @@ pub fn NAV_FindClosestWaypointForPoint2(ctx: GameContext<'_>, point: vec3_t) -> 
             return WAYPOINT_NONE;
         }
 
-        G_SetOrigin(marker, point);
+        G_SetOrigin(&mut *(marker), point);
 
         (*marker).r.mins = [-16.0, -16.0, -6.0]; // includes stepsize
         (*marker).r.maxs = [16.0, 16.0, 32.0];
@@ -526,7 +526,7 @@ pub fn NAV_FindClosestWaypointForPoint2(ctx: GameContext<'_>, point: vec3_t) -> 
             GNavGetnearestnodeArgs::new(marker, (*marker).waypoint, NF_CLEAR_PATH, WAYPOINT_NONE),
         );
 
-        G_FreeEntity(ctx, marker);
+        G_FreeEntity(ctx, ctx.entity_id_of(marker));
 
         bestWP
     }
@@ -1695,10 +1695,12 @@ pub fn SP_waypoint(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).count = -1;
             (*ent).classname = c"waypoint".as_ptr() as *mut c_char;
 
-            if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qtrue) != 0 {
+            if ((*ent).spawnflags & 1) == 0
+                && G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qtrue) != 0
+            {
                 // if not SOLID_OK, and in solid
                 (*ent).r.maxs[2] = CROUCH_MAXS_2;
-                if G_CheckInSolid(ctx, ent, qtrue) != 0 {
+                if G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qtrue) != 0 {
                     let s = format!(
                         "ERROR: Waypoint {} at {} in solid!\n",
                         cstr_to_str((*ent).targetname),
@@ -1706,7 +1708,7 @@ pub fn SP_waypoint(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     );
                     Com_Printf(cstr(&s).as_ptr());
                     debug_assert!(false, "Waypoint in solid!");
-                    G_FreeEntity(ctx, ent);
+                    G_FreeEntity(ctx, ctx.entity_id_of(ent));
                     return;
                 }
             }
@@ -1722,11 +1724,11 @@ pub fn SP_waypoint(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 ),
             );
             NAV_StoreWaypoint(ctx, ent);
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
-        G_FreeEntity(ctx, ent);
+        G_FreeEntity(ctx, ctx.entity_id_of(ent));
     }
 }
 
@@ -1747,9 +1749,11 @@ pub fn SP_waypoint_small(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).count = -1;
             (*ent).classname = c"waypoint".as_ptr() as *mut c_char;
 
-            if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qtrue) != 0 {
+            if ((*ent).spawnflags & 1) == 0
+                && G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qtrue) != 0
+            {
                 (*ent).r.maxs[2] = CROUCH_MAXS_2;
-                if G_CheckInSolid(ctx, ent, qtrue) != 0 {
+                if G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qtrue) != 0 {
                     let s = format!(
                         "ERROR: Waypoint_small {} at {} in solid!\n",
                         cstr_to_str((*ent).targetname),
@@ -1757,7 +1761,7 @@ pub fn SP_waypoint_small(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     );
                     Com_Printf(cstr(&s).as_ptr());
                     debug_assert!(false);
-                    G_FreeEntity(ctx, ent);
+                    G_FreeEntity(ctx, ctx.entity_id_of(ent));
                     return;
                 }
             }
@@ -1771,11 +1775,11 @@ pub fn SP_waypoint_small(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 ),
             );
             NAV_StoreWaypoint(ctx, ent);
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
-        G_FreeEntity(ctx, ent);
+        G_FreeEntity(ctx, ctx.entity_id_of(ent));
     }
 }
 
@@ -1793,7 +1797,9 @@ pub fn SP_waypoint_navgoal(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).r.mins = [-16.0, -16.0, -24.0];
         (*ent).r.maxs = [16.0, 16.0, 32.0];
         (*ent).s.origin[2] += 0.125;
-        if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
+        if ((*ent).spawnflags & 1) == 0
+            && G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qfalse) != 0
+        {
             let s = format!(
                 "ERROR: Waypoint_navgoal {} at {} in solid!\n",
                 cstr_to_str((*ent).targetname),
@@ -1813,7 +1819,7 @@ pub fn SP_waypoint_navgoal(ctx: GameContext<'_>, ent: *mut gentity_t) {
         );
 
         (*ent).classname = c"navgoal".as_ptr() as *mut c_char;
-        G_FreeEntity(ctx, ent); // can't do this, they need to be found later by some functions, though those could be fixed, maybe?
+        G_FreeEntity(ctx, ctx.entity_id_of(ent)); // can't do this, they need to be found later by some functions, though those could be fixed, maybe?
     }
 }
 
@@ -1825,7 +1831,9 @@ pub fn SP_waypoint_navgoal_8(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).r.mins = [-8.0, -8.0, -24.0];
         (*ent).r.maxs = [8.0, 8.0, 32.0];
         (*ent).s.origin[2] += 0.125;
-        if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
+        if ((*ent).spawnflags & 1) == 0
+            && G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qfalse) != 0
+        {
             let s = format!(
                 "ERROR: Waypoint_navgoal_8 {} at {} in solid!\n",
                 cstr_to_str((*ent).targetname),
@@ -1846,7 +1854,7 @@ pub fn SP_waypoint_navgoal_8(ctx: GameContext<'_>, ent: *mut gentity_t) {
         );
 
         (*ent).classname = c"navgoal".as_ptr() as *mut c_char;
-        G_FreeEntity(ctx, ent);
+        G_FreeEntity(ctx, ctx.entity_id_of(ent));
     }
 }
 
@@ -1858,7 +1866,9 @@ pub fn SP_waypoint_navgoal_4(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).r.mins = [-4.0, -4.0, -24.0];
         (*ent).r.maxs = [4.0, 4.0, 32.0];
         (*ent).s.origin[2] += 0.125;
-        if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
+        if ((*ent).spawnflags & 1) == 0
+            && G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qfalse) != 0
+        {
             let s = format!(
                 "ERROR: Waypoint_navgoal_4 {} at {} in solid!\n",
                 cstr_to_str((*ent).targetname),
@@ -1879,7 +1889,7 @@ pub fn SP_waypoint_navgoal_4(ctx: GameContext<'_>, ent: *mut gentity_t) {
         );
 
         (*ent).classname = c"navgoal".as_ptr() as *mut c_char;
-        G_FreeEntity(ctx, ent);
+        G_FreeEntity(ctx, ctx.entity_id_of(ent));
     }
 }
 
@@ -1891,7 +1901,9 @@ pub fn SP_waypoint_navgoal_2(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).r.mins = [-2.0, -2.0, -24.0];
         (*ent).r.maxs = [2.0, 2.0, 32.0];
         (*ent).s.origin[2] += 0.125;
-        if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
+        if ((*ent).spawnflags & 1) == 0
+            && G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qfalse) != 0
+        {
             let s = format!(
                 "ERROR: Waypoint_navgoal_2 {} at {} in solid!\n",
                 cstr_to_str((*ent).targetname),
@@ -1912,7 +1924,7 @@ pub fn SP_waypoint_navgoal_2(ctx: GameContext<'_>, ent: *mut gentity_t) {
         );
 
         (*ent).classname = c"navgoal".as_ptr() as *mut c_char;
-        G_FreeEntity(ctx, ent);
+        G_FreeEntity(ctx, ctx.entity_id_of(ent));
     }
 }
 
@@ -1924,7 +1936,9 @@ pub fn SP_waypoint_navgoal_1(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).r.mins = [-1.0, -1.0, -24.0];
         (*ent).r.maxs = [1.0, 1.0, 32.0];
         (*ent).s.origin[2] += 0.125;
-        if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
+        if ((*ent).spawnflags & 1) == 0
+            && G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qfalse) != 0
+        {
             let s = format!(
                 "ERROR: Waypoint_navgoal_1 {} at {} in solid!\n",
                 cstr_to_str((*ent).targetname),
@@ -1945,7 +1959,7 @@ pub fn SP_waypoint_navgoal_1(ctx: GameContext<'_>, ent: *mut gentity_t) {
         );
 
         (*ent).classname = c"navgoal".as_ptr() as *mut c_char;
-        G_FreeEntity(ctx, ent);
+        G_FreeEntity(ctx, ctx.entity_id_of(ent));
     }
 }
 

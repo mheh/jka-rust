@@ -277,7 +277,12 @@ pub fn TurretG2Pain(
     unsafe {
         if !(*self_).paintarget.is_null() && VALIDSTRING((*self_).paintarget as *const c_char) {
             if (*self_).genericValue8 < (*ctx.world).level.time {
-                G_UseTargets2(ctx, self_, self_, (*self_).paintarget as *const c_char);
+                G_UseTargets2(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    ctx.entity_id_of(self_),
+                    (*self_).paintarget as *const c_char,
+                );
                 (*self_).genericValue8 = (*ctx.world).level.time + (*self_).genericValue4;
             }
         }
@@ -379,7 +384,7 @@ pub fn turretG2_die(
             (*self_).s.apos.trDelta = [0.0, 0.0, 0.0];
 
             if !(*self_).target.is_null() {
-                G_UseTargets(ctx, self_, attacker);
+                G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(attacker));
             }
 
             if (*self_).spawnflags & SPF_TURRETG2_CANRESPAWN != 0 {
@@ -560,7 +565,7 @@ pub fn turretG2_respawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*self_).health = (*self_).genericValue6;
 
         if (*self_).maxHealth != 0 {
-            G_ScaleNetHealth(self_);
+            G_ScaleNetHealth(&mut *(self_));
         }
 
         (*self_).genericValue5 = 0; // clear this now
@@ -830,7 +835,7 @@ pub fn turretG2_turnoff(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if (*self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
             G_Sound(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_),
                 CHAN_BODY as c_int,
                 G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()),
             );
@@ -862,7 +867,7 @@ pub fn turretG2_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbo
                 if (*self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
                     G_Sound(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         CHAN_BODY as c_int,
                         G_SoundIndex(c"sound/chars/turret/ping.wav".as_ptr()),
                     );
@@ -883,7 +888,7 @@ pub fn turretG2_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbo
             ctx,
             org2,
             (*self_).radius,
-            self_,
+            ctx.entity_id_of(self_),
             qtrue,
             entity_list.as_mut_ptr(),
         );
@@ -989,7 +994,7 @@ pub fn turretG2_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbo
                         if (*self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
                             G_Sound(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_),
                                 CHAN_BODY as c_int,
                                 G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()),
                             );
@@ -1013,7 +1018,12 @@ pub fn turretG2_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbo
         if found != 0 {
             G_SetEnemy(ctx, self_, bestTarget);
             if VALIDSTRING((*self_).target2 as *const c_char) {
-                G_UseTargets2(ctx, self_, self_, (*self_).target2 as *const c_char);
+                G_UseTargets2(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    ctx.entity_id_of(self_),
+                    (*self_).target2 as *const c_char,
+                );
             }
         }
 
@@ -1256,10 +1266,10 @@ pub fn finish_spawning_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
             (*base).s.origin[2] -= 22.0;
         }
 
-        G_SetAngles(base, (*base).s.angles);
+        G_SetAngles(&mut *(base), (*base).s.angles);
         crate::q_math::AngleVectors((*base).r.currentAngles, Some(&mut fwd), None, None);
 
-        G_SetOrigin(base, (*base).s.origin);
+        G_SetOrigin(&mut *(base), (*base).s.origin);
 
         (*base).s.eType = ET_GENERAL as c_int;
 
@@ -1408,7 +1418,7 @@ pub fn finish_spawning_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
         if t != 0 {
             // a non-0 maxhealth value will mean we want to show the health on the hud
             (*base).maxHealth = (*base).health;
-            G_ScaleNetHealth(base);
+            G_ScaleNetHealth(&mut *(base));
             (*base).s.shouldtarget = qtrue;
         }
 

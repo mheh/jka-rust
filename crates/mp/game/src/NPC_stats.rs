@@ -1478,7 +1478,7 @@ pub fn NPC_ParseParms(
                     (*NPC).s.origin[2] += (DEFAULT_MINS_2 - (*NPC).r.mins[2]) + 0.125f32;
                     crate::q_math::_VectorCopy((*NPC).s.origin, &mut (*client_ptr).ps.origin);
                     crate::q_math::_VectorCopy((*NPC).s.origin, &mut (*NPC).r.currentOrigin);
-                    crate::g_utils::G_SetOrigin(NPC, (*NPC).s.origin);
+                    crate::g_utils::G_SetOrigin(&mut *(NPC), (*NPC).s.origin);
                     trap::LinkEntity(
                         ctx.engine,
                         mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(NPC),

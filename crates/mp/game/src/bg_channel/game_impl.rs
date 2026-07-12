@@ -554,7 +554,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // Source: `oracle/codemp/game/g_utils.c` (`G_AddEvent`).
         unsafe {
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            crate::g_utils::G_AddEvent(ent, event, eventParm);
+            crate::g_utils::G_AddEvent(&mut *(ent), event, eventParm);
         }
     }
     fn entity_legs_anim(&self, entNum: c_int) -> c_int {
@@ -679,7 +679,15 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 engine: self.engine,
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            crate::g_utils::G_SetAnim(ctx, ent, ucmd, setAnimParts, anim, setAnimFlags, blendTime);
+            crate::g_utils::G_SetAnim(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                ucmd,
+                setAnimParts,
+                anim,
+                setAnimFlags,
+                blendTime,
+            );
         }
     }
     fn npc_set_anim(&mut self, entNum: c_int, type_: c_int, anim: c_int, priority: c_int) {

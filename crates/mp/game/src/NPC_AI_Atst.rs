@@ -77,14 +77,14 @@ pub fn G_ATSTCheckPain(
         if (*ctx.world).bg_state.rng.rand() & 1 != 0 {
             G_SoundOnEnt(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 CHAN_LESS_ATTEN,
                 b"sound/chars/atst/atst_damaged1\0".as_ptr() as *const c_char,
             );
         } else {
             G_SoundOnEnt(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 CHAN_LESS_ATTEN,
                 b"sound/chars/atst/atst_damaged2\0".as_ptr() as *const c_char,
             );

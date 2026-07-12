@@ -756,7 +756,12 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 if (*parentPS).velocity[2] <= 0.0 && (*vi).soundTakeOff != 0 {
                     // taking off for the first time (QAGAME game-side)
                     let parent_ent = parent as *mut gentity_t;
-                    crate::g_utils::G_EntitySound(ctx, parent_ent, CHAN_AUTO, (*vi).soundTakeOff);
+                    crate::g_utils::G_EntitySound(
+                        ctx,
+                        ctx.entity_id_of(parent_ent).unwrap(),
+                        CHAN_AUTO,
+                        (*vi).soundTakeOff,
+                    );
                 }
                 (*parentPS).velocity[2] += (*vi).acceleration * (*pVeh).m_fTimeModifier;
             } else if (*pVeh).m_ucmd.upmove < 0 {
@@ -789,7 +794,12 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 if (*vi).soundTurbo != 0 {
                     // QAGAME game-side turbo sound
                     let parent_ent = parent as *mut gentity_t;
-                    crate::g_utils::G_EntitySound(ctx, parent_ent, CHAN_AUTO, (*vi).soundTurbo);
+                    crate::g_utils::G_EntitySound(
+                        ctx,
+                        ctx.entity_id_of(parent_ent).unwrap(),
+                        CHAN_AUTO,
+                        (*vi).soundTurbo,
+                    );
                 }
             }
         }
@@ -1379,7 +1389,12 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     if (*vi).soundLand != 0 {
                         // just landed (QAGAME game-side)
                         let parent_ent = (*pVeh).m_pParentEntity as *mut gentity_t;
-                        crate::g_utils::G_EntitySound(ctx, parent_ent, CHAN_AUTO, (*vi).soundLand);
+                        crate::g_utils::G_EntitySound(
+                            ctx,
+                            ctx.entity_id_of(parent_ent).unwrap(),
+                            CHAN_AUTO,
+                            (*vi).soundLand,
+                        );
                     }
                     (*pVeh).m_ulFlags |= VEH_GEARSOPEN;
                     Anim = BOTH_GEARS_OPEN as c_int;

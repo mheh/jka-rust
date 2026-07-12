@@ -275,7 +275,7 @@ pub fn Q3_PlaySound(
                 // Skip the damn sound!
                 return qtrue;
             } else {
-                G_Sound(ctx, ent, voice_chan, sound_handle);
+                G_Sound(ctx, ctx.entity_id_of(ent), voice_chan, sound_handle);
             }
             trap::ICARUS_TaskIDSet(
                 ctx.engine,
@@ -289,7 +289,7 @@ pub fn Q3_PlaySound(
             (*te).s.eventParm = sound_handle;
             (*te).r.svFlags |= SVF_BROADCAST;
         } else {
-            G_Sound(ctx, ent, CHAN_AUTO, sound_handle);
+            G_Sound(ctx, ctx.entity_id_of(ent), CHAN_AUTO, sound_handle);
         }
 
         qtrue
@@ -430,7 +430,7 @@ pub fn Blocked_Mover(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gent
         {
             // if your not a client, or your a dead client remove yourself...
             // if an item or weapon can we do a little explosion..?
-            G_FreeEntity(ctx, other);
+            G_FreeEntity(ctx, ctx.entity_id_of(other));
             return;
         }
 
@@ -762,7 +762,7 @@ pub fn Q3_Use(ctx: GameContext<'_>, entID: c_int, target: *const c_char) {
             return;
         }
 
-        G_UseTargets2(ctx, ent, ent, target);
+        G_UseTargets2(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(ent), target);
     }
 }
 
@@ -787,7 +787,7 @@ pub fn Q3_Kill(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
         } else {
             victim = G_Find(
                 ctx,
-                std::ptr::null_mut(),
+                ctx.entity_id_of(std::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 name,
             );
@@ -878,7 +878,7 @@ pub fn Q3_Remove(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
         } else {
             let mut victim = G_Find(
                 ctx,
-                std::ptr::null_mut(),
+                ctx.entity_id_of(std::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 name,
             );
@@ -894,7 +894,7 @@ pub fn Q3_Remove(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
                 Q3_RemoveEnt(ctx, victim);
                 victim = G_Find(
                     ctx,
-                    victim,
+                    ctx.entity_id_of(victim),
                     core::mem::offset_of!(gentity_t, targetname) as c_int,
                     name,
                 );
@@ -1543,7 +1543,7 @@ pub fn MoveOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if SpotWouldTelefrag2(ctx, owner, (*self_).r.currentOrigin) != 0 {
             (*self_).think = Some(EntThink::MoveOwner).into();
         } else {
-            G_SetOrigin(owner, (*self_).r.currentOrigin);
+            G_SetOrigin(&mut *(owner), (*self_).r.currentOrigin);
             trap::ICARUS_TaskIDComplete(
                 ctx.engine,
                 GIcarusTaskidcompleteArgs::new(owner, taskID_t::TID_MOVE_NAV as c_int),
@@ -1563,7 +1563,7 @@ pub fn Q3_SetTeleportDest(ctx: GameContext<'_>, entID: c_int, org: vec3_t) -> qb
         if SpotWouldTelefrag2(ctx, tele_ent, org) != 0 {
             let teleporter = G_Spawn(ctx);
 
-            G_SetOrigin(teleporter, org);
+            G_SetOrigin(&mut *(teleporter), org);
             (*teleporter).r.ownerNum = (*tele_ent).s.number;
 
             (*teleporter).think = Some(EntThink::MoveOwner).into();
@@ -1571,7 +1571,7 @@ pub fn Q3_SetTeleportDest(ctx: GameContext<'_>, entID: c_int, org: vec3_t) -> qb
 
             qfalse
         } else {
-            G_SetOrigin(tele_ent, org);
+            G_SetOrigin(&mut *(tele_ent), org);
             qtrue
         }
     }
@@ -1601,7 +1601,7 @@ pub fn Q3_SetOrigin(ctx: GameContext<'_>, entID: c_int, origin: vec3_t) {
 
             (*client).ps.eFlags ^= EF_TELEPORT_BIT;
         } else {
-            G_SetOrigin(ent, origin);
+            G_SetOrigin(&mut *(ent), origin);
         }
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
@@ -1615,7 +1615,7 @@ pub fn Q3_SetCopyOrigin(ctx: GameContext<'_>, entID: c_int, name: *const c_char)
     unsafe {
         let found = G_Find(
             ctx,
-            std::ptr::null_mut(),
+            ctx.entity_id_of(std::ptr::null_mut()),
             core::mem::offset_of!(gentity_t, targetname) as c_int,
             name,
         );
@@ -1807,7 +1807,7 @@ pub fn Q3_SetEnemy(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
         } else {
             let enemy = G_Find(
                 ctx,
-                std::ptr::null_mut(),
+                ctx.entity_id_of(std::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 name,
             );
@@ -1857,7 +1857,7 @@ pub fn Q3_SetLeader(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
         } else {
             let leader = G_Find(
                 ctx,
-                std::ptr::null_mut(),
+                ctx.entity_id_of(std::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 name,
             );
@@ -1951,7 +1951,7 @@ pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) ->
         if TAG_GetOrigin2(ctx, std::ptr::null(), name, &mut goalPos) == qfalse {
             let targ = G_Find(
                 ctx,
-                std::ptr::null_mut(),
+                ctx.entity_id_of(std::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 name,
             );
@@ -2017,7 +2017,7 @@ pub fn SetLowerAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
 
         G_SetAnim(
             ctx,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             std::ptr::null_mut(),
             SETANIM_LEGS,
             animID,
@@ -2046,7 +2046,7 @@ pub fn SetUpperAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
 
         G_SetAnim(
             ctx,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             std::ptr::null_mut(),
             SETANIM_TORSO,
             animID,
@@ -2248,7 +2248,7 @@ pub fn Q3_SetBState(ctx: GameContext<'_>, entID: c_int, bs_name: *const c_char) 
             (*npc).tempBehavior = BS_DEFAULT;
             if (*npc).behaviorState == BS_NOCLIP && bSID != (BS_NOCLIP) as i32 {
                 (*ent).r.currentOrigin[2] += 0.125;
-                G_SetOrigin(ent, (*ent).r.currentOrigin);
+                G_SetOrigin(&mut *(ent), (*ent).r.currentOrigin);
             }
             (*npc).behaviorState = core::mem::transmute::<c_int, bState_t>(bSID);
             if bSID == (BS_DEFAULT) as i32 {
@@ -2559,14 +2559,14 @@ pub fn Q3_SetICARUSFreeze(
     unsafe {
         let mut self_ = G_Find(
             ctx,
-            std::ptr::null_mut(),
+            ctx.entity_id_of(std::ptr::null_mut()),
             core::mem::offset_of!(gentity_t, targetname) as c_int,
             name,
         );
         if self_.is_null() {
             self_ = G_Find(
                 ctx,
-                std::ptr::null_mut(),
+                ctx.entity_id_of(std::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, script_targetname) as c_int,
                 name,
             );
@@ -4143,7 +4143,7 @@ pub fn Q3_Set(
                     let s = cstr_to_str(data);
                     sscanf_f32s(&s, &mut vector_data);
                 }
-                G_SetOrigin(ent, vector_data);
+                G_SetOrigin(&mut *(ent), vector_data);
                 if Q_strncmp(b"NPC_\0".as_ptr() as *const c_char, (*ent).classname, 4) == 0 {
                     //hack for moving spawners
                     crate::q_math::_VectorCopy(vector_data, &mut (*ent).s.origin);

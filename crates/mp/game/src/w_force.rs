@@ -1259,7 +1259,12 @@ pub fn ForceHeal(ctx: GameContext<'_>, self_: *mut gentity_t) {
         //NOTE: Decided to make all levels instant.
 
         let snd = std::ffi::CString::new("sound/weapons/force/heal.wav").unwrap();
-        G_Sound(ctx, self_, CHAN_ITEM, G_SoundIndex(snd.as_ptr()));
+        G_Sound(
+            ctx,
+            ctx.entity_id_of(self_),
+            CHAN_ITEM,
+            G_SoundIndex(snd.as_ptr()),
+        );
     }
 }
 
@@ -1651,10 +1656,15 @@ pub fn ForceSpeed(ctx: GameContext<'_>, self_: *mut gentity_t, forceDuration: c_
 
         WP_ForcePowerStart(ctx, self_, FP_SPEED, forceDuration);
         let snd = std::ffi::CString::new("sound/weapons/force/speed.wav").unwrap();
-        G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
         G_Sound(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
+            CHAN_BODY,
+            G_SoundIndex(snd.as_ptr()),
+        );
+        G_Sound(
+            ctx,
+            ctx.entity_id_of(self_),
             TRACK_CHANNEL_2 as c_int,
             (*ctx.world).speedLoopSound,
         );
@@ -1689,10 +1699,15 @@ pub fn ForceSeeing(ctx: GameContext<'_>, self_: *mut gentity_t) {
         WP_ForcePowerStart(ctx, self_, FP_SEE, 0);
 
         let snd = std::ffi::CString::new("sound/weapons/force/see.wav").unwrap();
-        G_Sound(ctx, self_, CHAN_AUTO, G_SoundIndex(snd.as_ptr()));
         G_Sound(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
+            CHAN_AUTO,
+            G_SoundIndex(snd.as_ptr()),
+        );
+        G_Sound(
+            ctx,
+            ctx.entity_id_of(self_),
             TRACK_CHANNEL_5 as c_int,
             (*ctx.world).seeLoopSound,
         );
@@ -1736,7 +1751,7 @@ pub fn ForceProtect(ctx: GameContext<'_>, self_: *mut gentity_t) {
         G_PreDefSound(ctx, (*cl).ps.origin, PDSOUND_PROTECT as c_int);
         G_Sound(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             TRACK_CHANNEL_3 as c_int,
             (*ctx.world).protectLoopSound,
         );
@@ -1780,7 +1795,7 @@ pub fn ForceAbsorb(ctx: GameContext<'_>, self_: *mut gentity_t) {
         G_PreDefSound(ctx, (*cl).ps.origin, PDSOUND_ABSORB as c_int);
         G_Sound(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             TRACK_CHANNEL_3 as c_int,
             (*ctx.world).absorbLoopSound,
         );
@@ -1833,13 +1848,13 @@ pub fn ForceRage(ctx: GameContext<'_>, self_: *mut gentity_t) {
         let snd = std::ffi::CString::new("sound/weapons/force/rage.wav").unwrap();
         G_Sound(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             TRACK_CHANNEL_4 as c_int,
             G_SoundIndex(snd.as_ptr()),
         );
         G_Sound(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             TRACK_CHANNEL_3 as c_int,
             (*ctx.world).rageLoopSound,
         );
@@ -1879,7 +1894,12 @@ pub fn ForceLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*cl).ps.forceHandExtendTime = level_time + 20000;
 
         let snd = std::ffi::CString::new("sound/weapons/force/lightning").unwrap();
-        G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
+        G_Sound(
+            ctx,
+            ctx.entity_id_of(self_),
+            CHAN_BODY,
+            G_SoundIndex(snd.as_ptr()),
+        );
 
         WP_ForcePowerStart(ctx, self_, FP_LIGHTNING, 500);
     }
@@ -1980,7 +2000,12 @@ pub fn ForceLightningDamage(
                                 (*ctx.world).bg_state.rng.Q_irand(1, 3)
                             ))
                             .unwrap();
-                            G_Sound(ctx, traceEnt, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(traceEnt),
+                                CHAN_BODY,
+                                G_SoundIndex(snd.as_ptr()),
+                            );
                         }
 
                         if (*tcl).ps.electrifyTime < (level_time + 400) {
@@ -2207,7 +2232,12 @@ pub fn ForceDrain(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*cl).ps.forceHandExtendTime = level_time + 20000;
 
         let snd = std::ffi::CString::new("sound/weapons/force/drain.wav").unwrap();
-        G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
+        G_Sound(
+            ctx,
+            ctx.entity_id_of(self_),
+            CHAN_BODY,
+            G_SoundIndex(snd.as_ptr()),
+        );
 
         WP_ForcePowerStart(ctx, self_, FP_DRAIN, 500);
     }
@@ -2546,7 +2576,7 @@ pub fn ForceJumpCharge(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut u
             let s = cstr("sound/weapons/force/jumpbuild.wav");
             G_Sound(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_),
                 TRACK_CHANNEL_1 as c_int,
                 G_SoundIndex(s.as_ptr()),
             );
@@ -3009,7 +3039,12 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: *mut gentity_t) {
             //hit an NPC directly
             (*cl).ps.forceAllowDeactivateTime = level_time + 1500;
             let snd = std::ffi::CString::new("sound/weapons/force/distract.wav").unwrap();
-            G_Sound(ctx, self_, CHAN_AUTO, G_SoundIndex(snd.as_ptr()));
+            G_Sound(
+                ctx,
+                ctx.entity_id_of(self_),
+                CHAN_AUTO,
+                G_SoundIndex(snd.as_ptr()),
+            );
             (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
             (*cl).ps.forceHandExtendTime = level_time + 1000;
             return;
@@ -3050,7 +3085,12 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 }
 
                 let snd = std::ffi::CString::new("sound/weapons/force/distract.wav").unwrap();
-                G_Sound(ctx, self_, CHAN_AUTO, G_SoundIndex(snd.as_ptr()));
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    CHAN_AUTO,
+                    G_SoundIndex(snd.as_ptr()),
+                );
 
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
                 (*cl).ps.forceHandExtendTime = level_time + 1000;
@@ -3118,7 +3158,12 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 }
 
                 let snd = std::ffi::CString::new("sound/weapons/force/distract.wav").unwrap();
-                G_Sound(ctx, self_, CHAN_AUTO, G_SoundIndex(snd.as_ptr()));
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    CHAN_AUTO,
+                    G_SoundIndex(snd.as_ptr()),
+                );
 
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
                 (*cl).ps.forceHandExtendTime = level_time + 1000;
@@ -3136,7 +3181,12 @@ pub fn GEntity_UseFunc(
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    GlobalUse(ctx, self_, other, activator);
+    GlobalUse(
+        ctx,
+        ctx.entity_id_of(self_),
+        ctx.entity_id_of(other),
+        ctx.entity_id_of(activator),
+    );
 }
 
 /// Raven `CanCounterThrow`.
@@ -3350,7 +3400,12 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
 
         if pull == 0 && (*cl).ps.saberLockTime > level_time && (*cl).ps.saberLockFrame != 0 {
             let s = cstr("sound/weapons/force/push.wav");
-            G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(s.as_ptr()));
+            G_Sound(
+                ctx,
+                ctx.entity_id_of(self_),
+                CHAN_BODY,
+                G_SoundIndex(s.as_ptr()),
+            );
             (*cl).ps.powerups[PW_DISINT_4 as usize] = level_time + 1500;
 
             (*cl).ps.saberLockHits += (*cl).ps.fd.forcePowerLevel[FP_PUSH as usize] * 2;
@@ -3364,7 +3419,12 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
         //make sure this plays and that you cannot press fire for about 1 second after this
         if pull != 0 {
             let s = cstr("sound/weapons/force/pull.wav");
-            G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(s.as_ptr()));
+            G_Sound(
+                ctx,
+                ctx.entity_id_of(self_),
+                CHAN_BODY,
+                G_SoundIndex(s.as_ptr()),
+            );
             if (*cl).ps.forceHandExtend == HANDEXTEND_NONE as c_int {
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPULL as c_int;
                 if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE as c_int
@@ -3380,7 +3440,12 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
             (*cl).ps.powerups[PW_PULL as usize] = (*cl).ps.powerups[PW_DISINT_4 as usize];
         } else {
             let s = cstr("sound/weapons/force/push.wav");
-            G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(s.as_ptr()));
+            G_Sound(
+                ctx,
+                ctx.entity_id_of(self_),
+                CHAN_BODY,
+                G_SoundIndex(s.as_ptr()),
+            );
             if (*cl).ps.forceHandExtend == HANDEXTEND_NONE as c_int {
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
                 (*cl).ps.forceHandExtendTime = level_time + 1000;
@@ -3779,12 +3844,22 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                     if otherPushPower != 0 && CanCounterThrow(ctx, push_list[x], self_, pull) != 0 {
                         if pull != 0 {
                             let s = cstr("sound/weapons/force/pull.wav");
-                            G_Sound(ctx, push_list[x], CHAN_BODY, G_SoundIndex(s.as_ptr()));
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(push_list[x]),
+                                CHAN_BODY,
+                                G_SoundIndex(s.as_ptr()),
+                            );
                             (*pcl).ps.forceHandExtend = HANDEXTEND_FORCEPULL as c_int;
                             (*pcl).ps.forceHandExtendTime = level_time + 400;
                         } else {
                             let s = cstr("sound/weapons/force/push.wav");
-                            G_Sound(ctx, push_list[x], CHAN_BODY, G_SoundIndex(s.as_ptr()));
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(push_list[x]),
+                                CHAN_BODY,
+                                G_SoundIndex(s.as_ptr()),
+                            );
                             (*pcl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
                             (*pcl).ps.forceHandExtendTime = level_time + 1000;
                         }
@@ -4169,7 +4244,12 @@ pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower
                 if wasActive & (1 << FP_TELEPATHY) != 0 {
                     let snd =
                         std::ffi::CString::new("sound/weapons/force/distractstop.wav").unwrap();
-                    G_Sound(ctx, self_, CHAN_AUTO, G_SoundIndex(snd.as_ptr()));
+                    G_Sound(
+                        ctx,
+                        ctx.entity_id_of(self_),
+                        CHAN_AUTO,
+                        G_SoundIndex(snd.as_ptr()),
+                    );
                 }
                 (*cl).ps.fd.forceMindtrickTargetIndex = 0;
                 (*cl).ps.fd.forceMindtrickTargetIndex2 = 0;
@@ -4203,7 +4283,12 @@ pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower
                     //if we had our throat crushed in for more than half a second, gasp for air when we're let go
                     if wasActive & (1 << FP_GRIP) != 0 {
                         let snd = std::ffi::CString::new("*gasp.wav").unwrap();
-                        G_EntitySound(ctx, gripEnt, CHAN_VOICE, G_SoundIndex(snd.as_ptr()));
+                        G_EntitySound(
+                            ctx,
+                            ctx.entity_id_of(gripEnt).unwrap(),
+                            CHAN_VOICE,
+                            G_SoundIndex(snd.as_ptr()),
+                        );
                     }
                 }
 
@@ -4439,7 +4524,12 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
                 let snd = format!("*choke{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 3));
-                G_EntitySound(ctx, gripEnt, CHAN_VOICE, G_SoundIndex(cstr(&snd).as_ptr()));
+                G_EntitySound(
+                    ctx,
+                    ctx.entity_id_of(gripEnt).unwrap(),
+                    CHAN_VOICE,
+                    G_SoundIndex(cstr(&snd).as_ptr()),
+                );
 
                 (*gcl).ps.forceHandExtend = HANDEXTEND_CHOKE as c_int;
                 (*gcl).ps.forceHandExtendTime = level_time + 2000;
@@ -4534,7 +4624,12 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
                 let snd = format!("*choke{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 3));
-                G_EntitySound(ctx, gripEnt, CHAN_VOICE, G_SoundIndex(cstr(&snd).as_ptr()));
+                G_EntitySound(
+                    ctx,
+                    ctx.entity_id_of(gripEnt).unwrap(),
+                    CHAN_VOICE,
+                    G_SoundIndex(cstr(&snd).as_ptr()),
+                );
 
                 (*gcl).ps.forceHandExtend = HANDEXTEND_CHOKE as c_int;
                 (*gcl).ps.forceHandExtendTime = level_time + 2000;
@@ -5134,7 +5229,12 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
             (*cl).ps.genericEnemyIndex = (1024.0 + (*cl).ps.droneExistTime) as c_int;
             if (*cl).ps.droneFireTime < (level_time) as f32 {
                 let snd = std::ffi::CString::new("sound/weapons/laser_trap/warning.wav").unwrap();
-                G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    CHAN_BODY,
+                    G_SoundIndex(snd.as_ptr()),
+                );
                 (*cl).ps.droneFireTime = (level_time + 100) as f32;
             }
             return;
@@ -5450,7 +5550,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
         if (*cl).pers.cmd.rightmove > 0 && (*cl).pers.cmd.forwardmove == 0 {
             G_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 cmd,
                 SETANIM_BOTH,
                 BOTH_GETUP_BROLL_R as c_int,
@@ -5461,7 +5561,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
         } else if (*cl).pers.cmd.rightmove < 0 && (*cl).pers.cmd.forwardmove == 0 {
             G_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 cmd,
                 SETANIM_BOTH,
                 BOTH_GETUP_BROLL_L as c_int,
@@ -5472,7 +5572,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
         } else if (*cl).pers.cmd.rightmove == 0 && (*cl).pers.cmd.forwardmove > 0 {
             G_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 cmd,
                 SETANIM_BOTH,
                 BOTH_GETUP_BROLL_F as c_int,
@@ -5483,7 +5583,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
         } else if (*cl).pers.cmd.rightmove == 0 && (*cl).pers.cmd.forwardmove < 0 {
             G_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 cmd,
                 SETANIM_BOTH,
                 BOTH_GETUP_BROLL_B as c_int,
@@ -5499,7 +5599,12 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
 
         if rolled != 0 {
             let snd = std::ffi::CString::new("*jump1.wav").unwrap();
-            G_EntitySound(ctx, self_, CHAN_VOICE, G_SoundIndex(snd.as_ptr()));
+            G_EntitySound(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                CHAN_VOICE,
+                G_SoundIndex(snd.as_ptr()),
+            );
         }
 
         rolled
@@ -5618,7 +5723,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                         } else if (*cl).ps.quickerGetup != 0 {
                             G_EntitySound(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_).unwrap(),
                                 CHAN_VOICE,
                                 G_SoundIndex(cstr("*jump1.wav").as_ptr()),
                             );
@@ -5641,7 +5746,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                     (*cl).ps.forceHandExtendTime = level_time + 1000;
                     G_EntitySound(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_).unwrap(),
                         CHAN_VOICE,
                         G_SoundIndex(cstr("*jump1.wav").as_ptr()),
                     );
@@ -6134,7 +6239,12 @@ pub fn Jedi_DodgeEvasion(
                 ForceSpeed(ctx, self_, 500);
             } else {
                 let snd = std::ffi::CString::new("sound/weapons/force/speed.wav").unwrap();
-                G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    CHAN_BODY,
+                    G_SoundIndex(snd.as_ptr()),
+                );
             }
             return qtrue;
         }

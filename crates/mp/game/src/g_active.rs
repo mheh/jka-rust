@@ -189,7 +189,7 @@ pub fn P_DamageFeedback(ctx: GameContext<'_>, player: EntityId) {
             P_SetTwitchInfo(ctx, ctx.entity_id_of(player).unwrap());
             (*player).pain_debounce_time = (*ctx.world).level.time + 700;
 
-            G_AddEvent(player, EV_PAIN as c_int, (*player).health);
+            G_AddEvent(&mut *(player), EV_PAIN as c_int, (*player).health);
             (*client).ps.damageEvent += 1;
 
             if (*client).damage_armor != 0 && (*client).damage_blood == 0 {
@@ -250,21 +250,21 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: EntityId) {
                     if (*ent).health <= (*ent).damage {
                         G_Sound(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             CHAN_VOICE as c_int,
                             G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()),
                         );
                     } else if (*ctx.world).bg_state.rng.rand() & 1 != 0 {
                         G_Sound(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             CHAN_VOICE as c_int,
                             G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()),
                         );
                     } else {
                         G_Sound(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             CHAN_VOICE as c_int,
                             G_SoundIndex(cstr("sound/player/gurp2.wav").as_ptr()),
                         );
@@ -295,7 +295,7 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: EntityId) {
         if waterlevel != 0 && ((*ent).watertype & (CONTENTS_LAVA | CONTENTS_SLIME)) != 0 {
             if (*ent).health > 0 && (*ent).pain_debounce_time <= (*ctx.world).level.time {
                 if envirosuit != 0 {
-                    G_AddEvent(ent, EV_POWERUP_BATTLESUIT as c_int, 0);
+                    G_AddEvent(&mut *(ent), EV_POWERUP_BATTLESUIT as c_int, 0);
                 } else {
                     if (*ent).watertype & CONTENTS_LAVA != 0 {
                         G_Damage(
@@ -1087,7 +1087,7 @@ pub fn G_VehicleAttachDroidUnit(ctx: GameContext<'_>, vehEnt: EntityId) {
                 (*droidCl).ps.origin = (*droidEnt).r.currentOrigin;
             }
 
-            G_SetOrigin(droidEnt, (*droidEnt).r.currentOrigin);
+            G_SetOrigin(&mut *(droidEnt), (*droidEnt).r.currentOrigin);
             trap::LinkEntity(
                 ctx.engine,
                 mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(droidEnt),
@@ -1227,7 +1227,7 @@ pub fn ClientEvents(ctx: GameContext<'_>, ent: EntityId, oldEventSequence: c_int
                     if (*ent).health < 1 {
                         G_Sound(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             CHAN_AUTO as c_int,
                             G_SoundIndex(cstr("sound/player/fallsplat.wav").as_ptr()),
                         );
@@ -1683,7 +1683,7 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: Option<EntityId>, ucmd: *mut
             if idleAnim != -1 && idleAnim > 0 && idleAnim < MAX_ANIMATIONS as c_int {
                 G_SetAnim(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent).unwrap(),
                     ucmd,
                     SETANIM_BOTH as c_int,
                     idleAnim,
@@ -1891,9 +1891,9 @@ pub fn G_HeldByMonster(ctx: GameContext<'_>, ent: Option<EntityId>, ucmd: *mut *
                     );
                 }
                 (*cl).ps.velocity = [0.0; 3];
-                G_SetOrigin(ent, (*cl).ps.origin);
+                G_SetOrigin(&mut *(ent), (*cl).ps.origin);
                 SetClientViewAngle(ent, (*cl).ps.viewangles);
-                G_SetAngles(ent, (*cl).ps.viewangles);
+                G_SetAngles(&mut *(ent), (*cl).ps.viewangles);
                 trap::LinkEntity(
                     ctx.engine,
                     mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
@@ -1952,10 +1952,20 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: EntityId, taunt: c_int) {
                     if saberAnimLevel == SS_FAST as c_int || saberAnimLevel == SS_TAVION as c_int {
                         if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                             //turn off second saber
-                            G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[1].soundOff);
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                CHAN_WEAPON as c_int,
+                                (*cl).saber[1].soundOff,
+                            );
                         } else if (*cl).ps.saberHolstered == 0 {
                             //turn off first
-                            G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[0].soundOff);
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                CHAN_WEAPON as c_int,
+                                (*cl).saber[0].soundOff,
+                            );
                         }
                         (*cl).ps.saberHolstered = 2;
                         anim = BOTH_GESTURE1 as c_int;
@@ -1967,17 +1977,32 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: EntityId, taunt: c_int) {
                     } else if saberAnimLevel == SS_DUAL as c_int {
                         if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                             //turn on second saber
-                            G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[1].soundOn);
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                CHAN_WEAPON as c_int,
+                                (*cl).saber[1].soundOn,
+                            );
                         } else if (*cl).ps.saberHolstered == 2 {
                             //turn on first
-                            G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                CHAN_WEAPON as c_int,
+                                (*cl).saber[0].soundOn,
+                            );
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_DUAL_TAUNT as c_int;
                     } else if saberAnimLevel == SS_STAFF as c_int {
                         if (*cl).ps.saberHolstered > 0 {
                             //turn on all blades
-                            G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                CHAN_WEAPON as c_int,
+                                (*cl).saber[0].soundOn,
+                            );
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_STAFF_TAUNT as c_int;
@@ -1993,10 +2018,20 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: EntityId, taunt: c_int) {
                 }
                 if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                     //turn off second saber
-                    G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[1].soundOff);
+                    G_Sound(
+                        ctx,
+                        ctx.entity_id_of(ent),
+                        CHAN_WEAPON as c_int,
+                        (*cl).saber[1].soundOff,
+                    );
                 } else if (*cl).ps.saberHolstered == 0 {
                     //turn off first
-                    G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[0].soundOff);
+                    G_Sound(
+                        ctx,
+                        ctx.entity_id_of(ent),
+                        CHAN_WEAPON as c_int,
+                        (*cl).saber[0].soundOff,
+                    );
                 }
                 (*cl).ps.saberHolstered = 2;
             } else if taunt == TAUNT_MEDITATE {
@@ -2009,20 +2044,40 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: EntityId, taunt: c_int) {
                 }
                 if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                     //turn off second saber
-                    G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[1].soundOff);
+                    G_Sound(
+                        ctx,
+                        ctx.entity_id_of(ent),
+                        CHAN_WEAPON as c_int,
+                        (*cl).saber[1].soundOff,
+                    );
                 } else if (*cl).ps.saberHolstered == 0 {
                     //turn off first
-                    G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[0].soundOff);
+                    G_Sound(
+                        ctx,
+                        ctx.entity_id_of(ent),
+                        CHAN_WEAPON as c_int,
+                        (*cl).saber[0].soundOff,
+                    );
                 }
                 (*cl).ps.saberHolstered = 2;
             } else if taunt == TAUNT_FLOURISH {
                 if (*cl).ps.weapon == WP_SABER {
                     if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                         //turn on second saber
-                        G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[1].soundOn);
+                        G_Sound(
+                            ctx,
+                            ctx.entity_id_of(ent),
+                            CHAN_WEAPON as c_int,
+                            (*cl).saber[1].soundOn,
+                        );
                     } else if (*cl).ps.saberHolstered == 2 {
                         //turn on first
-                        G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
+                        G_Sound(
+                            ctx,
+                            ctx.entity_id_of(ent),
+                            CHAN_WEAPON as c_int,
+                            (*cl).saber[0].soundOn,
+                        );
                     }
                     (*cl).ps.saberHolstered = 0;
                     if (*cl).saber[0].flourishAnim != -1 {
@@ -2062,24 +2117,44 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: EntityId, taunt: c_int) {
                     {
                         if (*cl).ps.saberHolstered != 0 {
                             //turn on first
-                            G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                CHAN_WEAPON as c_int,
+                                (*cl).saber[0].soundOn,
+                            );
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_VICTORY_STRONG as c_int;
                     } else if saberAnimLevel == SS_DUAL as c_int {
                         if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                             //turn on second saber
-                            G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[1].soundOn);
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                CHAN_WEAPON as c_int,
+                                (*cl).saber[1].soundOn,
+                            );
                         } else if (*cl).ps.saberHolstered == 2 {
                             //turn on first
-                            G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                CHAN_WEAPON as c_int,
+                                (*cl).saber[0].soundOn,
+                            );
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_VICTORY_DUAL as c_int;
                     } else if saberAnimLevel == SS_STAFF as c_int {
                         if (*cl).ps.saberHolstered != 0 {
                             //turn on first
-                            G_Sound(ctx, ent, CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
+                            G_Sound(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                CHAN_WEAPON as c_int,
+                                (*cl).saber[0].soundOn,
+                            );
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_VICTORY_STAFF as c_int;
@@ -2099,7 +2174,7 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: EntityId, taunt: c_int) {
                 }
                 if taunt != TAUNT_MEDITATE && taunt != TAUNT_BOW {
                     //no sound for meditate or bow
-                    G_AddEvent(ent, EV_TAUNT as c_int, taunt);
+                    G_AddEvent(&mut *(ent), EV_TAUNT as c_int, taunt);
                 }
             }
         }
@@ -2431,7 +2506,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     );
                     G_Sound(
                         ctx,
-                        grabbed,
+                        ctx.entity_id_of(grabbed),
                         CHAN_AUTO as c_int,
                         G_SoundIndex(cstr("sound/player/roll1.wav").as_ptr()),
                     );
@@ -2634,13 +2709,23 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     (*client).ps.saberHolstered = 0;
 
                     if (*client).saber[0].soundOn != 0 {
-                        G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[0].soundOn);
+                        G_Sound(
+                            ctx,
+                            ctx.entity_id_of(ent),
+                            CHAN_AUTO as c_int,
+                            (*client).saber[0].soundOn,
+                        );
                     }
                     if (*client).saber[1].soundOn != 0 {
-                        G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[1].soundOn);
+                        G_Sound(
+                            ctx,
+                            ctx.entity_id_of(ent),
+                            CHAN_AUTO as c_int,
+                            (*client).saber[1].soundOn,
+                        );
                     }
 
-                    G_AddEvent(ent, EV_PRIVATE_DUEL as c_int, 2);
+                    G_AddEvent(&mut *(ent), EV_PRIVATE_DUEL as c_int, 2);
 
                     (*client).ps.duelTime = 0;
                 }
@@ -2661,7 +2746,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     if (*daClient).saber[0].soundOn != 0 {
                         G_Sound(
                             ctx,
-                            duelAgainst,
+                            ctx.entity_id_of(duelAgainst),
                             CHAN_AUTO as c_int,
                             (*daClient).saber[0].soundOn,
                         );
@@ -2669,13 +2754,13 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     if (*daClient).saber[1].soundOn != 0 {
                         G_Sound(
                             ctx,
-                            duelAgainst,
+                            ctx.entity_id_of(duelAgainst),
                             CHAN_AUTO as c_int,
                             (*daClient).saber[1].soundOn,
                         );
                     }
 
-                    G_AddEvent(duelAgainst, EV_PRIVATE_DUEL as c_int, 2);
+                    G_AddEvent(&mut *(duelAgainst), EV_PRIVATE_DUEL as c_int, 2);
 
                     (*daClient).ps.duelTime = 0;
                 }
@@ -2693,7 +2778,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                 || (*((*duelAgainst).client as *mut gclient_t)).ps.duelIndex != (*ent).s.number
             {
                 (*client).ps.duelInProgress = 0;
-                G_AddEvent(ent, EV_PRIVATE_DUEL as c_int, 0);
+                G_AddEvent(&mut *(ent), EV_PRIVATE_DUEL as c_int, 0);
             } else if (*duelAgainst).health < 1
                 || (*((*duelAgainst).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] < 1
             {
@@ -2701,8 +2786,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                 (*client).ps.duelInProgress = 0;
                 (*daClient).ps.duelInProgress = 0;
 
-                G_AddEvent(ent, EV_PRIVATE_DUEL as c_int, 0);
-                G_AddEvent(duelAgainst, EV_PRIVATE_DUEL as c_int, 0);
+                G_AddEvent(&mut *(ent), EV_PRIVATE_DUEL as c_int, 0);
+                G_AddEvent(&mut *(duelAgainst), EV_PRIVATE_DUEL as c_int, 0);
 
                 // Winner gets full health.. providing he's still alive
                 if (*ent).health > 0 && (*client).ps.stats[STAT_HEALTH as usize] > 0 {
@@ -2769,8 +2854,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     (*client).ps.duelInProgress = 0;
                     (*daClient).ps.duelInProgress = 0;
 
-                    G_AddEvent(ent, EV_PRIVATE_DUEL as c_int, 0);
-                    G_AddEvent(duelAgainst, EV_PRIVATE_DUEL as c_int, 0);
+                    G_AddEvent(&mut *(ent), EV_PRIVATE_DUEL as c_int, 0);
+                    G_AddEvent(&mut *(duelAgainst), EV_PRIVATE_DUEL as c_int, 0);
 
                     let m = crate::g_main::G_GetStringEdString(
                         ctx,
@@ -2885,7 +2970,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                         (*thClient).doingThrow = 0;
 
                         (*thClient).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
-                        G_EntitySound(ctx, thrower, CHAN_VOICE as c_int, G_SoundIndex(cstr("*pain25.wav").as_ptr()));
+                        G_EntitySound(ctx, ctx.entity_id_of(thrower).unwrap(), CHAN_VOICE as c_int, G_SoundIndex(cstr("*pain25.wav").as_ptr()));
 
                         (*client).ps.forceDodgeAnim = 2;
                         (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
@@ -2911,8 +2996,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                         (*client).ps.velocity[1] = vDif[1] * vScale;
                         (*client).ps.velocity[2] = 400.0;
 
-                        G_EntitySound(ctx, ent, CHAN_VOICE as c_int, G_SoundIndex(cstr("*pain100.wav").as_ptr()));
-                        G_EntitySound(ctx, thrower, CHAN_VOICE as c_int, G_SoundIndex(cstr("*jump1.wav").as_ptr()));
+                        G_EntitySound(ctx, ctx.entity_id_of(ent).unwrap(), CHAN_VOICE as c_int, G_SoundIndex(cstr("*pain100.wav").as_ptr()));
+                        G_EntitySound(ctx, ctx.entity_id_of(thrower).unwrap(), CHAN_VOICE as c_int, G_SoundIndex(cstr("*jump1.wav").as_ptr()));
 
                         // Set the thrower as the "other killer", so if we die from
                         // fall/impact damage he is credited.
@@ -2975,7 +3060,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                             (*thClient).doingThrow = 0;
 
                             (*thClient).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
-                            G_EntitySound(ctx, thrower, CHAN_VOICE as c_int, G_SoundIndex(cstr("*pain25.wav").as_ptr()));
+                            G_EntitySound(ctx, ctx.entity_id_of(thrower).unwrap(), CHAN_VOICE as c_int, G_SoundIndex(cstr("*pain25.wav").as_ptr()));
 
                             (*client).ps.forceDodgeAnim = 2;
                             (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
@@ -3458,7 +3543,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_SEEKER as c_int) != 0
                 {
                     ItemUse_Seeker(ctx, ctx.entity_id_of(ent).unwrap());
-                    G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_SEEKER as c_int, 0);
+                    G_AddEvent(&mut *(ent), EV_USE_ITEM0 as c_int + HI_SEEKER as c_int, 0);
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_SEEKER as c_int);
                 }
             } else if gc == GENCMD_USE_FIELD as c_int {
@@ -3466,7 +3551,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_SHIELD as c_int) != 0
                 {
                     ItemUse_Shield(ctx, ctx.entity_id_of(ent).unwrap());
-                    G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_SHIELD as c_int, 0);
+                    G_AddEvent(&mut *(ent), EV_USE_ITEM0 as c_int + HI_SHIELD as c_int, 0);
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_SHIELD as c_int);
                 }
             } else if gc == GENCMD_USE_BACTA as c_int {
@@ -3474,7 +3559,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_MEDPAC as c_int) != 0
                 {
                     ItemUse_MedPack(&mut *ent);
-                    G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_MEDPAC as c_int, 0);
+                    G_AddEvent(&mut *(ent), EV_USE_ITEM0 as c_int + HI_MEDPAC as c_int, 0);
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_MEDPAC as c_int);
                 }
             } else if gc == GENCMD_USE_BACTABIG as c_int {
@@ -3483,7 +3568,11 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_MEDPAC_BIG as c_int) != 0
                 {
                     ItemUse_MedPack_Big(&mut *ent);
-                    G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_MEDPAC_BIG as c_int, 0);
+                    G_AddEvent(
+                        &mut *(ent),
+                        EV_USE_ITEM0 as c_int + HI_MEDPAC_BIG as c_int,
+                        0,
+                    );
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
                         !(1 << HI_MEDPAC_BIG as c_int);
                 }
@@ -3494,9 +3583,17 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                 {
                     ItemUse_Binoculars(ctx, ctx.entity_id_of(ent));
                     if (*client).ps.zoomMode == 0 {
-                        G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_BINOCULARS as c_int, 1);
+                        G_AddEvent(
+                            &mut *(ent),
+                            EV_USE_ITEM0 as c_int + HI_BINOCULARS as c_int,
+                            1,
+                        );
                     } else {
-                        G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_BINOCULARS as c_int, 2);
+                        G_AddEvent(
+                            &mut *(ent),
+                            EV_USE_ITEM0 as c_int + HI_BINOCULARS as c_int,
+                            2,
+                        );
                     }
                 }
             } else if gc == GENCMD_ZOOM as c_int {
@@ -3506,9 +3603,17 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                 {
                     ItemUse_Binoculars(ctx, ctx.entity_id_of(ent));
                     if (*client).ps.zoomMode == 0 {
-                        G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_BINOCULARS as c_int, 1);
+                        G_AddEvent(
+                            &mut *(ent),
+                            EV_USE_ITEM0 as c_int + HI_BINOCULARS as c_int,
+                            1,
+                        );
                     } else {
-                        G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_BINOCULARS as c_int, 2);
+                        G_AddEvent(
+                            &mut *(ent),
+                            EV_USE_ITEM0 as c_int + HI_BINOCULARS as c_int,
+                            2,
+                        );
                     }
                 }
             } else if gc == GENCMD_USE_SENTRY as c_int {
@@ -3517,7 +3622,11 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_SENTRY_GUN as c_int) != 0
                 {
                     ItemUse_Sentry(ctx, ctx.entity_id_of(ent));
-                    G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_SENTRY_GUN as c_int, 0);
+                    G_AddEvent(
+                        &mut *(ent),
+                        EV_USE_ITEM0 as c_int + HI_SENTRY_GUN as c_int,
+                        0,
+                    );
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
                         !(1 << HI_SENTRY_GUN as c_int);
                 }
@@ -3527,7 +3636,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_JETPACK as c_int) != 0
                 {
                     ItemUse_Jetpack(ctx, ctx.entity_id_of(ent).unwrap());
-                    G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_JETPACK as c_int, 0);
+                    G_AddEvent(&mut *(ent), EV_USE_ITEM0 as c_int + HI_JETPACK as c_int, 0);
                 }
             } else if gc == GENCMD_USE_HEALTHDISP as c_int {
                 if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_HEALTHDISP as c_int)
@@ -3535,7 +3644,11 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_HEALTHDISP as c_int) != 0
                 {
                     // ItemUse_UseDisp(ent, HI_HEALTHDISP);
-                    G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_HEALTHDISP as c_int, 0);
+                    G_AddEvent(
+                        &mut *(ent),
+                        EV_USE_ITEM0 as c_int + HI_HEALTHDISP as c_int,
+                        0,
+                    );
                 }
             } else if gc == GENCMD_USE_AMMODISP as c_int {
                 if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_AMMODISP as c_int)
@@ -3543,14 +3656,14 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_AMMODISP as c_int) != 0
                 {
                     // ItemUse_UseDisp(ent, HI_AMMODISP);
-                    G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_AMMODISP as c_int, 0);
+                    G_AddEvent(&mut *(ent), EV_USE_ITEM0 as c_int + HI_AMMODISP as c_int, 0);
                 }
             } else if gc == GENCMD_USE_EWEB as c_int {
                 if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_EWEB as c_int) != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_EWEB as c_int) != 0
                 {
                     ItemUse_UseEWeb(ctx, ctx.entity_id_of(ent).unwrap());
-                    G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_EWEB as c_int, 0);
+                    G_AddEvent(&mut *(ent), EV_USE_ITEM0 as c_int + HI_EWEB as c_int, 0);
                 }
             } else if gc == GENCMD_USE_CLOAK as c_int {
                 if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_CLOAK as c_int) != 0
@@ -3632,7 +3745,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
         if (*client).pers.cmd.buttons & BUTTON_USE != 0
             && (*client).ps.useDelay < (*ctx.world).level.time
         {
-            TryUse(ctx, ent);
+            TryUse(ctx, ctx.entity_id_of(ent));
             (*client).ps.useDelay = (*ctx.world).level.time + 100;
         }
 
@@ -3739,7 +3852,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
 
                     G_Sound(
                         ctx,
-                        faceKicked,
+                        ctx.entity_id_of(faceKicked),
                         CHAN_AUTO as c_int,
                         G_SoundIndex(
                             cstr(&format!(

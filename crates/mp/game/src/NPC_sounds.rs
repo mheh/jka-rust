@@ -63,7 +63,7 @@ pub fn G_AddVoiceEvent(
             return;
         }
 
-        G_SpeechEvent(ctx, self_, event);
+        G_SpeechEvent(ctx, ctx.entity_id_of(self_).unwrap(), event);
 
         let new_time = (*ctx.world).level.time
             + if speakDebounceTime == 0 {

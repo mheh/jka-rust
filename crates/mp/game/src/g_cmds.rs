@@ -611,7 +611,7 @@ pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: *mut gentity_t, baseArg: c_int) 
                 &mut trace,
             );
             if (*it_ent).inuse != qfalse {
-                crate::g_utils::G_FreeEntity(ctx, it_ent);
+                crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(it_ent));
             }
         }
     }
@@ -3842,7 +3842,7 @@ pub fn G_ItemUsable(ctx: GameContext<'_>, ps: *mut playerState_t, forcedUse: c_i
             HI_SEEKER => {
                 if (*ps).eFlags & EF_SEEKERDRONE != 0 {
                     crate::g_utils::G_AddEvent(
-                        &mut (*world).g_entities[(*ps).clientNum as usize],
+                        &mut *(&mut (*world).g_entities[(*ps).clientNum as usize]),
                         EV_ITEMUSEFAIL as c_int,
                         mp_qshared::shared::itemUseFail_t::SEEKER_ALREADYDEPLOYED as c_int,
                     );
@@ -3853,7 +3853,7 @@ pub fn G_ItemUsable(ctx: GameContext<'_>, ps: *mut playerState_t, forcedUse: c_i
             HI_SENTRY_GUN => {
                 if (*ps).fd.sentryDeployed != 0 {
                     crate::g_utils::G_AddEvent(
-                        &mut (*world).g_entities[(*ps).clientNum as usize],
+                        &mut *(&mut (*world).g_entities[(*ps).clientNum as usize]),
                         EV_ITEMUSEFAIL as c_int,
                         mp_qshared::shared::itemUseFail_t::SENTRY_ALREADYPLACED as c_int,
                     );
@@ -3901,7 +3901,7 @@ pub fn G_ItemUsable(ctx: GameContext<'_>, ps: *mut playerState_t, forcedUse: c_i
                     || tr.allsolid != qfalse as u8
                 {
                     crate::g_utils::G_AddEvent(
-                        &mut (*world).g_entities[(*ps).clientNum as usize],
+                        &mut *(&mut (*world).g_entities[(*ps).clientNum as usize]),
                         EV_ITEMUSEFAIL as c_int,
                         mp_qshared::shared::itemUseFail_t::SENTRY_NOROOM as c_int,
                     );
@@ -3955,7 +3955,7 @@ pub fn G_ItemUsable(ctx: GameContext<'_>, ps: *mut playerState_t, forcedUse: c_i
                     }
                 }
                 crate::g_utils::G_AddEvent(
-                    &mut (*world).g_entities[(*ps).clientNum as usize],
+                    &mut *(&mut (*world).g_entities[(*ps).clientNum as usize]),
                     EV_ITEMUSEFAIL as c_int,
                     mp_qshared::shared::itemUseFail_t::SHIELD_NOROOM as c_int,
                 );
@@ -4015,7 +4015,7 @@ pub fn Cmd_ToggleSaber_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).saber[0].soundOn != 0 {
                     crate::g_utils::G_Sound(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent),
                         CHAN_AUTO as c_int,
                         (*client).saber[0].soundOn,
                     );
@@ -4023,7 +4023,7 @@ pub fn Cmd_ToggleSaber_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).saber[1].soundOn != 0 {
                     crate::g_utils::G_Sound(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent),
                         CHAN_AUTO as c_int,
                         (*client).saber[1].soundOn,
                     );
@@ -4033,7 +4033,7 @@ pub fn Cmd_ToggleSaber_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).saber[0].soundOff != 0 {
                     crate::g_utils::G_Sound(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent),
                         CHAN_AUTO as c_int,
                         (*client).saber[0].soundOff,
                     );
@@ -4041,7 +4041,7 @@ pub fn Cmd_ToggleSaber_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).saber[1].soundOff != 0 && (*client).saber[1].model[0] != 0 {
                     crate::g_utils::G_Sound(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent),
                         CHAN_AUTO as c_int,
                         (*client).saber[1].soundOff,
                     );
@@ -4079,7 +4079,7 @@ pub fn Cmd_SaberAttackCycle_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).ps.saberHolstered == 1 {
                     crate::g_utils::G_Sound(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent),
                         CHAN_AUTO as c_int,
                         (*client).saber[1].soundOn,
                     );
@@ -4095,7 +4095,7 @@ pub fn Cmd_SaberAttackCycle_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     } else {
                         crate::g_utils::G_Sound(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             CHAN_AUTO as c_int,
                             (*client).saber[1].soundOff,
                         );
@@ -4119,7 +4119,12 @@ pub fn Cmd_SaberAttackCycle_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     }
                     return;
                 }
-                crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[0].soundOn);
+                crate::g_utils::G_Sound(
+                    ctx,
+                    ctx.entity_id_of(ent),
+                    CHAN_AUTO as c_int,
+                    (*client).saber[0].soundOn,
+                );
                 (*client).ps.saberHolstered = 0;
                 if (*client).saber[0].stylesForbidden != 0 {
                     crate::bg_saberLoad::WP_UseFirstValidSaberStyle(
@@ -4144,7 +4149,7 @@ pub fn Cmd_SaberAttackCycle_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 } else {
                     crate::g_utils::G_Sound(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent),
                         CHAN_AUTO as c_int,
                         (*client).saber[0].soundOff,
                     );
@@ -4447,14 +4452,14 @@ pub fn Cmd_EngageDuel_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 (*client).ps.duelTime = (*world).level.time + 2000;
                 (*challengedClient).ps.duelTime = (*world).level.time + 2000;
 
-                crate::g_utils::G_AddEvent(ent, EV_PRIVATE_DUEL as c_int, 1);
-                crate::g_utils::G_AddEvent(challenged, EV_PRIVATE_DUEL as c_int, 1);
+                crate::g_utils::G_AddEvent(&mut *(ent), EV_PRIVATE_DUEL as c_int, 1);
+                crate::g_utils::G_AddEvent(&mut *(challenged), EV_PRIVATE_DUEL as c_int, 1);
 
                 if (*client).ps.saberHolstered == 0 {
                     if (*client).saber[0].soundOff != 0 {
                         crate::g_utils::G_Sound(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             CHAN_AUTO as c_int,
                             (*client).saber[0].soundOff,
                         );
@@ -4462,7 +4467,7 @@ pub fn Cmd_EngageDuel_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     if (*client).saber[1].soundOff != 0 && (*client).saber[1].model[0] != 0 {
                         crate::g_utils::G_Sound(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             CHAN_AUTO as c_int,
                             (*client).saber[1].soundOff,
                         );
@@ -4474,7 +4479,7 @@ pub fn Cmd_EngageDuel_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     if (*challengedClient).saber[0].soundOff != 0 {
                         crate::g_utils::G_Sound(
                             ctx,
-                            challenged,
+                            ctx.entity_id_of(challenged),
                             CHAN_AUTO as c_int,
                             (*challengedClient).saber[0].soundOff,
                         );
@@ -4484,7 +4489,7 @@ pub fn Cmd_EngageDuel_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     {
                         crate::g_utils::G_Sound(
                             ctx,
-                            challenged,
+                            ctx.entity_id_of(challenged),
                             CHAN_AUTO as c_int,
                             (*challengedClient).saber[1].soundOff,
                         );
@@ -4658,7 +4663,7 @@ pub fn StandardSetBodyAnim(ctx: GameContext<'_>, self_: *mut gentity_t, anim: c_
     use mp_bg::public::set_anim::SETANIM_BOTH;
     crate::g_utils::G_SetAnim(
         ctx,
-        self_,
+        ctx.entity_id_of(self_).unwrap(),
         std::ptr::null_mut(),
         SETANIM_BOTH,
         anim,
@@ -4724,7 +4729,7 @@ pub fn TryGrapple(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 
         crate::g_utils::G_SetAnim(
             ctx,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             &mut (*client).pers.cmd as *mut _,
             SETANIM_BOTH,
             kyle_grab,
@@ -4891,7 +4896,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                 let targetname_ofs = std::mem::offset_of!(gentity_t, targetname) as c_int;
                 let mut targ = crate::g_utils::G_Find(
                     ctx,
-                    std::ptr::null_mut(),
+                    ctx.entity_id_of(std::ptr::null_mut()),
                     targetname_ofs,
                     sArg.as_ptr(),
                 );
@@ -4900,7 +4905,12 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                     if let Some(use_fn) = (*targ).use_.get() {
                         crate::ent_fn_enums::dispatch_use(ctx, use_fn, targ, ent, ent);
                     }
-                    targ = crate::g_utils::G_Find(ctx, targ, targetname_ofs, sArg.as_ptr());
+                    targ = crate::g_utils::G_Find(
+                        ctx,
+                        ctx.entity_id_of(targ),
+                        targetname_ofs,
+                        sArg.as_ptr(),
+                    );
                 }
             }
         } else if cmd_s.eq_ignore_ascii_case("god") {
@@ -5328,19 +5338,19 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
 
                     crate::g_utils::G_EntitySound(
                         ctx,
-                        other,
+                        ctx.entity_id_of(other).unwrap(),
                         CHAN_VOICE as c_int,
                         crate::g_utils::G_SoundIndex(c"*pain100.wav".as_ptr()),
                     );
                     crate::g_utils::G_EntitySound(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent).unwrap(),
                         CHAN_VOICE as c_int,
                         crate::g_utils::G_SoundIndex(c"*jump1.wav".as_ptr()),
                     );
                     crate::g_utils::G_Sound(
                         ctx,
-                        other,
+                        ctx.entity_id_of(other),
                         CHAN_AUTO as c_int,
                         crate::g_utils::G_SoundIndex(
                             c"sound/movers/objects/objectHit.wav".as_ptr(),
@@ -5407,7 +5417,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                         (*client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                         crate::g_utils::G_EntitySound(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent).unwrap(),
                             CHAN_VOICE as c_int,
                             crate::g_utils::G_SoundIndex(c"*pain25.wav".as_ptr()),
                         );

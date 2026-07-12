@@ -903,7 +903,7 @@ pub fn NPC_BSRemove(ctx: GameContext<'_>) {
         ) == 0
         {
             let target3 = (*NPC).target3;
-            G_UseTargets2(ctx, NPC, NPC, target3);
+            G_UseTargets2(ctx, ctx.entity_id_of(NPC), ctx.entity_id_of(NPC), target3);
             (*NPC).s.eFlags |= EF_NODRAW;
             (*NPC).s.eType = entityType_t::ET_INVISIBLE as c_int;
             (*NPC).r.contents = 0;

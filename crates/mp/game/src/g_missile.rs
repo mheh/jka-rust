@@ -250,7 +250,7 @@ pub fn G_BounceMissile(ctx: GameContext<'_>, ent: EntityId, trace: &trace_t) {
         ));
         G_Sound(
             ctx,
-            ctx.entity_mut(ent),
+            Some(ent),
             CHAN_BODY as c_int,
             G_SoundIndex(sound_name.as_ptr()),
         );
@@ -261,7 +261,7 @@ pub fn G_BounceMissile(ctx: GameContext<'_>, ent: EntityId, trace: &trace_t) {
         ));
         G_Sound(
             ctx,
-            ctx.entity_mut(ent),
+            Some(ent),
             CHAN_BODY as c_int,
             G_SoundIndex(sound_name.as_ptr()),
         );
@@ -397,7 +397,7 @@ pub fn G_RunStuckMissile(ctx: GameContext<'_>, ent: EntityId) {
         }
     }
     // Check think function
-    G_RunThink(ctx, ctx.entity_mut(ent));
+    G_RunThink(ctx, ent);
 }
 
 /// Raven `G_BounceProjectile`.
@@ -520,7 +520,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
             && (((*ent).flags & (FL_BOUNCE | FL_BOUNCE_HALF)) != 0)
         {
             G_BounceMissile(ctx, ent_id, &*trace);
-            G_AddEvent(ent, EV_GRENADE_BOUNCE as c_int, 0);
+            G_AddEvent(&mut *(ent), EV_GRENADE_BOUNCE as c_int, 0);
             return;
         } else if (*ent).neverFree != 0
             && (*ent).s.weapon == WP_SABER
@@ -529,7 +529,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
             // This is a knocked-away saber
             if (*ent).bounceCount > 0 || (*ent).bounceCount == -5 {
                 G_BounceMissile(ctx, ent_id, &*trace);
-                G_AddEvent(ent, EV_GRENADE_BOUNCE as c_int, 0);
+                G_AddEvent(&mut *(ent), EV_GRENADE_BOUNCE as c_int, 0);
                 return;
             }
             isKnockedSaber = qtrue;
@@ -565,23 +565,31 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 // Jump to killProj label
                 let mut dir: vec3_t = [0.0, 0.0, 1.0];
                 if (*other).takedamage != 0 && !(*other).client.is_null() && isKnockedSaber == 0 {
-                    G_AddEvent(ent, EV_MISSILE_HIT as c_int, DirToByte(tr.plane.normal));
+                    G_AddEvent(
+                        &mut *(ent),
+                        EV_MISSILE_HIT as c_int,
+                        DirToByte(tr.plane.normal),
+                    );
                     (*ent).s.otherEntityNum = (*other).s.number;
                 } else if (tr.surfaceFlags & SURF_METALSTEPS) != 0 {
                     G_AddEvent(
-                        ent,
+                        &mut *(ent),
                         EV_MISSILE_MISS_METAL as c_int,
                         DirToByte(tr.plane.normal),
                     );
                 } else if (*ent).s.weapon != G2_MODEL_PART && isKnockedSaber == 0 {
-                    G_AddEvent(ent, EV_MISSILE_MISS as c_int, DirToByte(tr.plane.normal));
+                    G_AddEvent(
+                        &mut *(ent),
+                        EV_MISSILE_MISS as c_int,
+                        DirToByte(tr.plane.normal),
+                    );
                 }
                 if isKnockedSaber == 0 {
                     (*ent).freeAfterEvent = qtrue;
                     (*ent).s.eType = ET_GENERAL as c_int;
                 }
                 tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
-                G_SetOrigin(ent, tr.endpos);
+                G_SetOrigin(&mut *(ent), tr.endpos);
                 (*ent).takedamage = qfalse;
                 if (*ent).splashDamage != 0 {
                     if G_RadiusDamage(
@@ -624,23 +632,31 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 // Jump to killProj label
                 let mut dir: vec3_t = [0.0, 0.0, 1.0];
                 if (*other).takedamage != 0 && !(*other).client.is_null() && isKnockedSaber == 0 {
-                    G_AddEvent(ent, EV_MISSILE_HIT as c_int, DirToByte(tr.plane.normal));
+                    G_AddEvent(
+                        &mut *(ent),
+                        EV_MISSILE_HIT as c_int,
+                        DirToByte(tr.plane.normal),
+                    );
                     (*ent).s.otherEntityNum = (*other).s.number;
                 } else if (tr.surfaceFlags & SURF_METALSTEPS) != 0 {
                     G_AddEvent(
-                        ent,
+                        &mut *(ent),
                         EV_MISSILE_MISS_METAL as c_int,
                         DirToByte(tr.plane.normal),
                     );
                 } else if (*ent).s.weapon != G2_MODEL_PART && isKnockedSaber == 0 {
-                    G_AddEvent(ent, EV_MISSILE_MISS as c_int, DirToByte(tr.plane.normal));
+                    G_AddEvent(
+                        &mut *(ent),
+                        EV_MISSILE_MISS as c_int,
+                        DirToByte(tr.plane.normal),
+                    );
                 }
                 if isKnockedSaber == 0 {
                     (*ent).freeAfterEvent = qtrue;
                     (*ent).s.eType = ET_GENERAL as c_int;
                 }
                 tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
-                G_SetOrigin(ent, tr.endpos);
+                G_SetOrigin(&mut *(ent), tr.endpos);
                 (*ent).takedamage = qfalse;
                 if (*ent).splashDamage != 0 {
                     if G_RadiusDamage(
@@ -900,7 +916,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 tr.endpos,
                 tr.plane.normal,
             );
-            G_AddEvent(ent, EV_MISSILE_STICK as c_int, 0);
+            G_AddEvent(&mut *(ent), EV_MISSILE_STICK as c_int, 0);
             return;
         }
 
@@ -1051,16 +1067,24 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
         // killProj label - generate impact event
         let mut dir: vec3_t = [0.0, 0.0, 1.0];
         if (*other).takedamage != 0 && !(*other).client.is_null() && isKnockedSaber == 0 {
-            G_AddEvent(ent, EV_MISSILE_HIT as c_int, DirToByte(tr.plane.normal));
+            G_AddEvent(
+                &mut *(ent),
+                EV_MISSILE_HIT as c_int,
+                DirToByte(tr.plane.normal),
+            );
             (*ent).s.otherEntityNum = (*other).s.number;
         } else if (tr.surfaceFlags & SURF_METALSTEPS) != 0 {
             G_AddEvent(
-                ent,
+                &mut *(ent),
                 EV_MISSILE_MISS_METAL as c_int,
                 DirToByte(tr.plane.normal),
             );
         } else if (*ent).s.weapon != G2_MODEL_PART && isKnockedSaber == 0 {
-            G_AddEvent(ent, EV_MISSILE_MISS as c_int, DirToByte(tr.plane.normal));
+            G_AddEvent(
+                &mut *(ent),
+                EV_MISSILE_MISS as c_int,
+                DirToByte(tr.plane.normal),
+            );
         }
 
         if isKnockedSaber == 0 {
@@ -1069,7 +1093,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
         }
 
         tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
-        G_SetOrigin(ent, tr.endpos);
+        G_SetOrigin(&mut *(ent), tr.endpos);
 
         (*ent).takedamage = qfalse;
         // Splash damage
@@ -1278,10 +1302,10 @@ pub fn G_RunMissile(ctx: GameContext<'_>, ent: EntityId) {
                     if ((*ent).s.weapon == WP_SABER && (*ent).isSaberEntity != 0)
                         || isKnockedSaber != 0
                     {
-                        G_RunThink(ctx, ent);
+                        G_RunThink(ctx, ctx.entity_id_of(ent).unwrap());
                         return;
                     } else if (*ent).s.weapon != G2_MODEL_PART {
-                        G_FreeEntity(ctx, ent);
+                        G_FreeEntity(ctx, ctx.entity_id_of(ent));
                         return;
                     }
                 }
@@ -1344,6 +1368,6 @@ pub fn G_RunMissile(ctx: GameContext<'_>, ent: EntityId) {
         }
 
         // Check think function after bouncing
-        G_RunThink(ctx, ent);
+        G_RunThink(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }

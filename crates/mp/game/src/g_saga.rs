@@ -752,7 +752,12 @@ pub fn UseSiegeTarget(
 
         let mut t: *mut gentity_t = core::ptr::null_mut();
         loop {
-            t = G_Find(ctx, t, targetname_ofs, target as *const c_char);
+            t = G_Find(
+                ctx,
+                ctx.entity_id_of(t),
+                targetname_ofs,
+                target as *const c_char,
+            );
             if t.is_null() {
                 break;
             }
@@ -763,7 +768,12 @@ pub fn UseSiegeTarget(
                     b"WARNING: Entity used itself.\n\0".as_ptr() as *const c_char,
                 );
             } else if !(*t).use_.is_none() {
-                GlobalUse(ctx, t, ent, ent);
+                GlobalUse(
+                    ctx,
+                    ctx.entity_id_of(t),
+                    ctx.entity_id_of(ent),
+                    ctx.entity_id_of(ent),
+                );
             }
             if (*ent).inuse == 0 {
                 crate::g_main::G_Printf(
@@ -1088,8 +1098,8 @@ pub fn SiegeRoundComplete(ctx: GameContext<'_>, winningteam: c_int, winningclien
             }
             G_UseTargets2(
                 ctx,
-                &mut (*ctx.world).g_entities[originalWinningClient as usize] as *mut gentity_t,
-                &mut (*ctx.world).g_entities[originalWinningClient as usize] as *mut gentity_t,
+                Some(EntityId(originalWinningClient as u32)),
+                Some(EntityId(originalWinningClient as u32)),
                 teamstr.as_ptr(),
             );
         }
@@ -1337,8 +1347,8 @@ pub fn SiegeBeginRound(ctx: GameContext<'_>, entNum: c_int) {
             if targname[0] != 0 {
                 G_UseTargets2(
                     ctx,
-                    &mut (*ctx.world).g_entities[entNum as usize] as *mut gentity_t,
-                    &mut (*ctx.world).g_entities[entNum as usize] as *mut gentity_t,
+                    Some(EntityId(entNum as u32)),
+                    Some(EntityId(entNum as u32)),
                     targname.as_ptr(),
                 );
             }
@@ -1643,7 +1653,7 @@ pub fn SP_info_siege_objective(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ctx.world).bg_state.siege_valid == 0
             || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
         {
-            crate::g_utils::G_FreeEntity(ctx, ent);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -1663,7 +1673,7 @@ pub fn SP_info_siege_objective(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if (*ent).objective == 0 || (*ent).side == 0 {
             // j00 fux0red something up
-            crate::g_utils::G_FreeEntity(ctx, ent);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             crate::g_main::G_Printf(
                 ctx,
                 cstr("ERROR: info_siege_objective without an objective or side value\n").as_ptr(),
@@ -1737,7 +1747,7 @@ pub fn SP_info_siege_radaricon(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ctx.world).bg_state.siege_valid == 0
             || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
         {
-            crate::g_utils::G_FreeEntity(ctx, ent);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -1869,7 +1879,7 @@ pub fn SP_info_siege_decomplete(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ctx.world).bg_state.siege_valid == 0
             || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
         {
-            crate::g_utils::G_FreeEntity(ctx, ent);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -1889,7 +1899,7 @@ pub fn SP_info_siege_decomplete(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if (*ent).objective == 0 || (*ent).side == 0 {
             // j00 fux0red something up
-            crate::g_utils::G_FreeEntity(ctx, ent);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             crate::g_main::G_Printf(
                 ctx,
                 cstr("ERROR: info_siege_objective_decomplete without an objective or side value\n")
@@ -1922,7 +1932,7 @@ pub fn SP_target_siege_end(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ctx.world).bg_state.siege_valid == 0
             || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
         {
-            crate::g_utils::G_FreeEntity(ctx, ent);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -1953,7 +1963,12 @@ pub fn SiegeItemRemoveOwner(ent: *mut gentity_t, carrier: *mut gentity_t) {
 pub fn SiegeItemRespawnEffect(ctx: GameContext<'_>, ent: *mut gentity_t, newOrg: vec3_t) {
     unsafe {
         if !(*ent).target5.is_null() && *(*ent).target5 != 0 {
-            G_UseTargets2(ctx, ent, ent, (*ent).target5 as *const c_char);
+            G_UseTargets2(
+                ctx,
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
+                (*ent).target5 as *const c_char,
+            );
         }
 
         if (*ent).genericValue10 == 0 {
@@ -1980,7 +1995,7 @@ pub fn SiegeItemRespawnOnOriginalSpot(
 ) {
     unsafe {
         SiegeItemRespawnEffect(ctx, ent, (*ent).pos1);
-        G_SetOrigin(ent, (*ent).pos1);
+        G_SetOrigin(&mut *(ent), (*ent).pos1);
         SiegeItemRemoveOwner(ent, carrier);
 
         // Stop the item from flashing on the radar
@@ -2068,7 +2083,12 @@ pub fn SiegeItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
             } else if (*carrier).health < 1 {
                 // The carrier died so pop out where he is (unless in nodrop).
                 if !(*ent).target6.is_null() && *(*ent).target6 != 0 {
-                    G_UseTargets2(ctx, ent, ent, (*ent).target6 as *const c_char);
+                    G_UseTargets2(
+                        ctx,
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(ent),
+                        (*ent).target6 as *const c_char,
+                    );
                 }
 
                 let carrier_origin = (*((*carrier).client as *mut gclient_t)).ps.origin;
@@ -2083,7 +2103,7 @@ pub fn SiegeItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     // In nodrop land, go back to the original spot.
                     SiegeItemRespawnOnOriginalSpot(ctx, ent, carrier);
                 } else {
-                    G_SetOrigin(ent, carrier_origin);
+                    G_SetOrigin(&mut *(ent), carrier_origin);
                     (*ent).epVelocity[0] = (*ctx.world).bg_state.rng.Q_irand(-80, 80) as f32;
                     (*ent).epVelocity[1] = (*ctx.world).bg_state.rng.Q_irand(-80, 80) as f32;
                     (*ent).epVelocity[2] = (*ctx.world).bg_state.rng.Q_irand(40, 80) as f32;
@@ -2101,7 +2121,7 @@ pub fn SiegeItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ent).genericValue9 != 0 && (*ent).genericValue9 < (*ctx.world).level.time {
             // time to respawn on the original spot then
             SiegeItemRespawnEffect(ctx, ent, (*ent).pos1);
-            G_SetOrigin(ent, (*ent).pos1);
+            G_SetOrigin(&mut *(ent), (*ent).pos1);
             (*ent).genericValue9 = 0;
 
             // stop flashing on radar
@@ -2133,7 +2153,7 @@ pub fn SiegeItemTouch(
                 escapePos[2] += 1.0;
 
                 // I hope you weren't stuck in the ceiling.
-                G_SetOrigin(self_, escapePos);
+                G_SetOrigin(&mut *(self_), escapePos);
             }
             return;
         }
@@ -2172,7 +2192,12 @@ pub fn SiegeItemTouch(
 
         if (*self_).noise_index != 0 {
             // play the pickup noise.
-            G_Sound(ctx, other, CHAN_AUTO, (*self_).noise_index);
+            G_Sound(
+                ctx,
+                ctx.entity_id_of(other),
+                CHAN_AUTO,
+                (*self_).noise_index,
+            );
         }
 
         (*self_).genericValue2 = 1; // Mark it as picked up.
@@ -2190,7 +2215,12 @@ pub fn SiegeItemTouch(
             // fire the target for pickup, if it's set to fire every time, or
             // set to only fire the first time and the first time has not yet
             // occured.
-            G_UseTargets2(ctx, self_, self_, (*self_).target2 as *const c_char);
+            G_UseTargets2(
+                ctx,
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(self_),
+                (*self_).target2 as *const c_char,
+            );
             (*self_).genericValue5 = 1; // mark it as having been picked up
         }
 
@@ -2239,7 +2269,12 @@ pub fn SiegeItemDie(
 
         // Fire off the death target if we've got one.
         if !(*self_).target4.is_null() && *(*self_).target4 != 0 {
-            G_UseTargets2(ctx, self_, self_, (*self_).target4 as *const c_char);
+            G_UseTargets2(
+                ctx,
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(self_),
+                (*self_).target4 as *const c_char,
+            );
         }
     }
 }
@@ -2295,13 +2330,13 @@ pub fn SiegeItemUse(
             let targetname_ofs = core::mem::offset_of!(gentity_t, targetname) as c_int;
             let targ = G_Find(
                 ctx,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 targetname_ofs,
                 (*ent).paintarget as *const c_char,
             );
 
             if !targ.is_null() && (*targ).inuse != 0 {
-                G_SetOrigin(ent, (*targ).r.currentOrigin);
+                G_SetOrigin(&mut *(ent), (*targ).r.currentOrigin);
                 trap::LinkEntity(
                     ctx.engine,
                     mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
@@ -2326,7 +2361,7 @@ pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ctx.world).bg_state.siege_valid == 0
             || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
         {
-            crate::g_utils::G_FreeEntity(ctx, ent);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -2493,7 +2528,7 @@ pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
         );
 
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*ent).pos1); // store off the initial origin for respawning
-        G_SetOrigin(ent, (*ent).s.origin);
+        G_SetOrigin(&mut *(ent), (*ent).s.origin);
 
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).r.currentAngles);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
@@ -2523,7 +2558,7 @@ pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 // a non-0 maxhealth value will mean we want to show the
                 // health on the hud
                 (*ent).maxHealth = (*ent).health;
-                G_ScaleNetHealth(ent);
+                G_ScaleNetHealth(&mut *(ent));
 
                 G_SpawnInt(
                     ctx,

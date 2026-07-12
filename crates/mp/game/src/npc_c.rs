@@ -197,7 +197,7 @@ pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
                 {
                     //not being held by a Rancor
-                    crate::g_utils::G_FreeEntity(ctx, self_);
+                    crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(self_));
                 }
             }
             return;
@@ -265,9 +265,9 @@ pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 .g_entities
                                 .as_mut_ptr()
                                 .add((*client).ps.saberEntityNum as usize);
-                            crate::g_utils::G_FreeEntity(ctx, saberent);
+                            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(saberent));
                         }
-                        crate::g_utils::G_FreeEntity(ctx, self_);
+                        crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(self_));
                     }
                 }
             }
@@ -718,7 +718,7 @@ pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
 
         let mut found: *mut gentity_t = core::ptr::null_mut();
         loop {
-            found = crate::g_utils::G_Find(ctx, found, fieldofs, c"NPC".as_ptr());
+            found = crate::g_utils::G_Find(ctx, ctx.entity_id_of(found), fieldofs, c"NPC".as_ptr());
             if found.is_null() {
                 break;
             }
@@ -1628,7 +1628,7 @@ pub fn NPC_CheckInSolid(ctx: GameContext<'_>) {
             (*npc_info).lastClearOrigin = (*npc_ent).r.currentOrigin;
         } else if crate::q_math::VectorLengthSquared((*npc_info).lastClearOrigin) != 0.0 {
             //			Com_Printf("%s stuck in solid at %s: fixing...\n", NPC->script_targetname, vtos(NPC->r.currentOrigin));
-            crate::g_utils::G_SetOrigin(npc_ent, (*npc_info).lastClearOrigin);
+            crate::g_utils::G_SetOrigin(&mut *(npc_ent), (*npc_info).lastClearOrigin);
             trap::LinkEntity(
                 ctx.engine,
                 mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc_ent),
@@ -1676,7 +1676,12 @@ pub fn G_DroidSounds(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 _ => return,
             };
 
-            crate::g_utils::G_SoundOnEnt(ctx, self_, CHAN_AUTO, cstr(&sound_path).as_ptr());
+            crate::g_utils::G_SoundOnEnt(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                CHAN_AUTO,
+                cstr(&sound_path).as_ptr(),
+            );
 
             let duration = (*ctx.world).bg_state.rng.Q_irand(2000, 4000);
             crate::g_timer::TIMER_Set(ctx, self_, c"patrolNoise".as_ptr(), duration);
@@ -1869,7 +1874,7 @@ pub fn NPC_SetAnim(
 ) {
     G_SetAnim(
         ctx,
-        ent,
+        ctx.entity_id_of(ent).unwrap(),
         core::ptr::null_mut(),
         setAnimParts,
         anim,

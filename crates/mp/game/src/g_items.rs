@@ -232,7 +232,7 @@ pub fn ShieldRemove(ctx: GameContext<'_>, self_: EntityId) {
 
         // Play kill sound...
         G_AddEvent(
-            self_,
+            &mut *(self_),
             entity_event_t::EV_GENERAL_SOUND as c_int,
             (*ctx.world).globals.shieldDeactivateSound,
         );
@@ -290,7 +290,7 @@ pub fn ShieldDie(
         let attacker = ent_resolve_opt(ctx, attacker);
         // Play damaging sound...
         G_AddEvent(
-            self_,
+            &mut *(self_),
             entity_event_t::EV_GENERAL_SOUND as c_int,
             (*ctx.world).globals.shieldDamageSound,
         );
@@ -321,7 +321,7 @@ pub fn ShieldPain(
 
         // Play damaging sound...
         G_AddEvent(
-            self_,
+            &mut *(self_),
             entity_event_t::EV_GENERAL_SOUND as c_int,
             (*ctx.world).globals.shieldDamageSound,
         );
@@ -379,7 +379,7 @@ pub fn ShieldGoSolid(ctx: GameContext<'_>, self_: EntityId) {
 
             // Play raising sound...
             G_AddEvent(
-                self_,
+                &mut *(self_),
                 entity_event_t::EV_GENERAL_SOUND as c_int,
                 (*ctx.world).globals.shieldActivateSound,
             );
@@ -410,7 +410,7 @@ pub fn ShieldGoNotSolid(ctx: GameContext<'_>, self_: EntityId) {
 
         // Play kill sound...
         G_AddEvent(
-            self_,
+            &mut *(self_),
             entity_event_t::EV_GENERAL_SOUND as c_int,
             (*ctx.world).globals.shieldDeactivateSound,
         );
@@ -629,7 +629,7 @@ pub fn CreateShield(ctx: GameContext<'_>, ent: EntityId) {
 
             // Play raising sound...
             G_AddEvent(
-                ent,
+                &mut *(ent),
                 entity_event_t::EV_GENERAL_SOUND as c_int,
                 (*ctx.world).globals.shieldActivateSound,
             );
@@ -754,7 +754,7 @@ pub fn PlaceShield(ctx: GameContext<'_>, playerent: EntityId) -> qboolean {
                 // allow to ride movers
                 (*shield).s.groundEntityNum = tr.entityNum as c_int;
 
-                G_SetOrigin(shield, tr.endpos);
+                G_SetOrigin(&mut *(shield), tr.endpos);
 
                 (*shield).s.eFlags &= !EF_NODRAW;
                 (*shield).r.svFlags &= !SVF_NOCLIENT;
@@ -772,7 +772,7 @@ pub fn PlaceShield(ctx: GameContext<'_>, playerent: EntityId) -> qboolean {
 
                 // Play placing sound...
                 G_AddEvent(
-                    shield,
+                    &mut *(shield),
                     entity_event_t::EV_GENERAL_SOUND as c_int,
                     (*ctx.world).globals.shieldAttachSound,
                 );
@@ -899,7 +899,7 @@ pub fn pas_find_enemies(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
             if (*self_).painDebounceTime < (*ctx.world).level.time {
                 G_Sound(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_),
                     CHAN_BODY,
                     G_SoundIndex(c"sound/chars/turret/ping.wav".as_ptr()),
                 );
@@ -914,7 +914,7 @@ pub fn pas_find_enemies(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
             ctx,
             org2,
             TURRET_RADIUS,
-            self_,
+            ctx.entity_id_of(self_),
             qtrue,
             entity_list.as_mut_ptr(),
         );
@@ -996,7 +996,7 @@ pub fn pas_find_enemies(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
                         // We haven't fired or acquired an enemy in the last 2 seconds-start-up sound
                         G_Sound(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_),
                             CHAN_BODY,
                             G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()),
                         );
@@ -1079,7 +1079,7 @@ pub fn pas_adjust_enemy(ctx: GameContext<'_>, ent: EntityId) {
             // shut-down sound
             G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 CHAN_BODY,
                 G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()),
             );
@@ -1210,7 +1210,7 @@ pub fn pas_think(ctx: GameContext<'_>, ent: EntityId) {
         if (*ent).genericValue8 + TURRET_LIFETIME < (*ctx.world).level.time {
             G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 CHAN_BODY,
                 G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()),
             );
@@ -1332,7 +1332,7 @@ pub fn pas_think(ctx: GameContext<'_>, ent: EntityId) {
                 //ent->nextthink = 0;
                 G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_BODY,
                     G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()),
                 );
@@ -1370,12 +1370,12 @@ pub fn turret_die(
         (*self_).use_ = FnId::NONE;
 
         if !(*self_).target.is_null() {
-            G_UseTargets(ctx, self_, attacker);
+            G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(attacker));
         }
 
         let owner = &mut (*ctx.world).g_entities[(*self_).genericValue3 as usize] as *mut gentity_t;
         if (*owner).inuse == 0 || (*owner).client.is_null() {
-            G_FreeEntity(ctx, self_);
+            G_FreeEntity(ctx, ctx.entity_id_of(self_));
             return;
         }
 
@@ -1406,7 +1406,7 @@ pub fn turret_die(
         (*((*owner).client as *mut gclient_t)).ps.fd.sentryDeployed = qfalse;
 
         //ExplodeDeath( self );
-        G_FreeEntity(ctx, self_);
+        G_FreeEntity(ctx, ctx.entity_id_of(self_));
     }
 }
 
@@ -1452,7 +1452,7 @@ pub fn SP_PAS(ctx: GameContext<'_>, base: EntityId) {
 
         G_Sound(
             ctx,
-            base,
+            ctx.entity_id_of(base),
             CHAN_BODY,
             G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()),
         );
@@ -1498,7 +1498,7 @@ pub fn ItemUse_Sentry(ctx: GameContext<'_>, ent: Option<EntityId>) {
         (*sentry).s.g2radius = 30;
         (*sentry).s.modelGhoul2 = 1;
 
-        G_SetOrigin(sentry, fwdorg);
+        G_SetOrigin(&mut *(sentry), fwdorg);
         (*sentry).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
         (*sentry).r.contents = CONTENTS_SOLID;
         (*sentry).s.solid = 2;
@@ -1686,7 +1686,7 @@ pub fn Jetpack_On(ctx: GameContext<'_>, ent: EntityId) {
 
         G_Sound(
             ctx,
-            ent,
+            ctx.entity_id_of(ent),
             CHAN_AUTO,
             G_SoundIndex(c"sound/boba/JETON".as_ptr()),
         );
@@ -1943,7 +1943,7 @@ pub fn ItemUse_UseDisp(ctx: GameContext<'_>, ent: EntityId, r#type: c_int) {
             let mut pos = (*((*ent).client as *mut gclient_t)).ps.origin;
             pos[2] += (*((*ent).client as *mut gclient_t)).ps.viewheight as f32;
 
-            G_SetOrigin(eItem, pos);
+            G_SetOrigin(&mut *(eItem), pos);
             (*eItem).s.origin = (*eItem).r.currentOrigin;
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(eItem));
 
@@ -2441,7 +2441,7 @@ pub fn EWebPositionUser(ctx: GameContext<'_>, owner: EntityId, eweb: EntityId) {
                         }
                         G_SetAnim(
                             ctx,
-                            owner,
+                            ctx.entity_id_of(owner).unwrap(),
                             &mut (*((*owner).client as *mut gclient_t)).pers.cmd,
                             SETANIM_LEGS as c_int,
                             BOTH_STRAFE_LEFT1 as c_int,
@@ -2457,7 +2457,7 @@ pub fn EWebPositionUser(ctx: GameContext<'_>, owner: EntityId, eweb: EntityId) {
                         }
                         G_SetAnim(
                             ctx,
-                            owner,
+                            ctx.entity_id_of(owner).unwrap(),
                             &mut (*((*owner).client as *mut gclient_t)).pers.cmd,
                             SETANIM_LEGS as c_int,
                             BOTH_STRAFE_RIGHT1 as c_int,
@@ -2474,7 +2474,7 @@ pub fn EWebPositionUser(ctx: GameContext<'_>, owner: EntityId, eweb: EntityId) {
                     (*((*owner).client as *mut gclient_t)).ps.legsTimer = 0;
                 }
 
-                G_SetOrigin(owner, tr.endpos);
+                G_SetOrigin(&mut *(owner), tr.endpos);
                 (*((*owner).client as *mut gclient_t)).ps.origin = tr.endpos;
             }
         } else {
@@ -2726,7 +2726,7 @@ pub fn EWeb_Create(ctx: GameContext<'_>, spawner: EntityId) -> *mut gentity_t {
 
         if tr.allsolid != 0 || tr.startsolid != 0 || tr.fraction != 1.0 {
             // can't spawn here, we are in solid
-            G_Sound(ctx, spawner, CHAN_AUTO, failSound);
+            G_Sound(ctx, ctx.entity_id_of(spawner), CHAN_AUTO, failSound);
             return core::ptr::null_mut();
         }
 
@@ -2761,14 +2761,14 @@ pub fn EWeb_Create(ctx: GameContext<'_>, spawner: EntityId) -> *mut gentity_t {
             || (tr.entityNum as c_int) < ENTITYNUM_WORLD
         {
             // didn't hit ground.
-            G_FreeEntity(ctx, ent);
-            G_Sound(ctx, spawner, CHAN_AUTO, failSound);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
+            G_Sound(ctx, ctx.entity_id_of(spawner), CHAN_AUTO, failSound);
             return core::ptr::null_mut();
         }
 
         let pos = tr.endpos;
 
-        G_SetOrigin(ent, pos);
+        G_SetOrigin(&mut *(ent), pos);
 
         (*ent).s.apos.trBase = fAng;
         (*ent).r.currentAngles = fAng;
@@ -2786,7 +2786,7 @@ pub fn EWeb_Create(ctx: GameContext<'_>, spawner: EntityId) -> *mut gentity_t {
         // resume health of last deployment
         (*ent).maxHealth = EWEB_HEALTH;
         (*ent).health = (*((*spawner).client as *mut gclient_t)).ewebHealth;
-        G_ScaleNetHealth(ent);
+        G_ScaleNetHealth(&mut *(ent));
 
         (*ent).die = Some(EntDie::EWebDie).into();
         (*ent).pain = Some(EntPain::EWebPain).into();
@@ -2814,7 +2814,7 @@ pub fn EWeb_Create(ctx: GameContext<'_>, spawner: EntityId) -> *mut gentity_t {
 
         if (*ent).ghoul2.is_null() {
             // should not happen, but just to be safe.
-            G_FreeEntity(ctx, ent);
+            G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return core::ptr::null_mut();
         }
 
@@ -3452,7 +3452,7 @@ pub fn RespawnItem(ctx: GameContext<'_>, ent: EntityId) {
         }
 
         // play the normal respawn sound only to nearby clients
-        G_AddEvent(ent, entity_event_t::EV_ITEM_RESPAWN as c_int, 0);
+        G_AddEvent(&mut *(ent), entity_event_t::EV_ITEM_RESPAWN as c_int, 0);
 
         (*ent).nextthink = 0;
     }
@@ -3637,7 +3637,7 @@ pub fn Touch_Item(
                         if (*other).health > (*other).maxHealth {
                             (*other).health = (*other).maxHealth;
                         }
-                        G_ScaleNetHealth(other);
+                        G_ScaleNetHealth(&mut *(other));
                         dontGo = qtrue;
                     }
                 }
@@ -3753,14 +3753,14 @@ pub fn Touch_Item(
                 );
             } else {
                 G_AddPredictableEvent(
-                    other,
+                    (other).as_mut(),
                     entity_event_t::EV_ITEM_PICKUP as c_int,
                     (*ent).s.number,
                 );
             }
         } else {
             G_AddEvent(
-                other,
+                &mut *(other),
                 entity_event_t::EV_ITEM_PICKUP as c_int,
                 (*ent).s.number,
             );
@@ -3794,7 +3794,7 @@ pub fn Touch_Item(
         }
 
         // fire item targets
-        G_UseTargets(ctx, ent, other);
+        G_UseTargets(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(other));
 
         // wait of -1 will not respawn
         if (*ent).wait == -1.0 {
@@ -3893,7 +3893,7 @@ pub fn LaunchItem(
 
         (*dropped).touch = Some(EntTouch::Touch_Item).into();
 
-        G_SetOrigin(dropped, origin);
+        G_SetOrigin(&mut *(dropped), origin);
         (*dropped).s.pos.trType = trType_t::TR_GRAVITY;
         (*dropped).s.pos.trTime = (*ctx.world).level.time;
         (*dropped).s.pos.trDelta = velocity;
@@ -4011,7 +4011,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
             // in siege remove all powerups
             if (*(*ent).item).giType == IT_POWERUP {
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return;
             }
         }
@@ -4019,7 +4019,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
         if (*ctx.world).cvars.g_gametype.integer != GT_JEDIMASTER {
             if HasSetSaberOnly(ctx) != 0 {
                 if (*(*ent).item).giType == IT_AMMO {
-                    G_FreeEntity(ctx, ent);
+                    G_FreeEntity(ctx, ctx.entity_id_of(ent));
                     return;
                 }
 
@@ -4028,7 +4028,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
                         || (*(*ent).item).giTag == HI_SHIELD as c_int
                         || (*(*ent).item).giTag == HI_SENTRY_GUN as c_int
                     {
-                        G_FreeEntity(ctx, ent);
+                        G_FreeEntity(ctx, ctx.entity_id_of(ent));
                         return;
                     }
                 }
@@ -4036,7 +4036,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
         } else {
             // no powerups in jedi master
             if (*(*ent).item).giType == IT_POWERUP {
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return;
             }
         }
@@ -4046,7 +4046,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
                 if (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int
                     || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int
                 {
-                    G_FreeEntity(ctx, ent);
+                    G_FreeEntity(ctx, ctx.entity_id_of(ent));
                     return;
                 }
             }
@@ -4059,7 +4059,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
                     || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int
                     || (*(*ent).item).giTag == PW_FORCE_BOON as c_int
                 {
-                    G_FreeEntity(ctx, ent);
+                    G_FreeEntity(ctx, ctx.entity_id_of(ent));
                     return;
                 }
             }
@@ -4074,7 +4074,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
                     && ((*(*ent).item).giTag == HI_MEDPAC as c_int
                         || (*(*ent).item).giTag == HI_MEDPAC_BIG as c_int))
             {
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return;
             }
         }
@@ -4093,7 +4093,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
             }
 
             if killMe {
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return;
             }
         }
@@ -4112,7 +4112,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
 
         if ((*ent).spawnflags & ITMSF_SUSPEND) != 0 {
             // suspended
-            G_SetOrigin(ent, (*ent).s.origin);
+            G_SetOrigin(&mut *(ent), (*ent).s.origin);
         } else {
             // drop to floor
 
@@ -4141,7 +4141,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
             );
             if tr.startsolid != 0 {
                 G_Printf(ctx, c"FinishSpawningItem: %s startsolid at %s\n".as_ptr());
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return;
             }
 
@@ -4151,7 +4151,7 @@ pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: EntityId) {
             // allow to ride movers
             (*ent).s.groundEntityNum = tr.entityNum as c_int;
 
-            G_SetOrigin(ent, tr.endpos);
+            G_SetOrigin(&mut *(ent), tr.endpos);
         }
 
         // team slaves and targeted items aren't present at start
@@ -4315,7 +4315,7 @@ pub fn G_SpawnItem(ctx: GameContext<'_>, ent: EntityId, item: *mut gitem_t) {
 
         if (*item).giType == IT_WEAPON && wDisable != 0 && (wDisable & (1 << (*item).giTag)) != 0 {
             if (*ctx.world).cvars.g_gametype.integer != GT_JEDIMASTER {
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
                 return;
             }
         }
@@ -4403,7 +4403,7 @@ pub fn G_BounceItem(ctx: GameContext<'_>, ent: EntityId, trace: *mut trace_t) {
                     &mut (*trace).endpos as *mut vec3_t,
                 ),
             );
-            G_SetOrigin(ent, (*trace).endpos);
+            G_SetOrigin(&mut *(ent), (*trace).endpos);
             (*ent).s.groundEntityNum = (*trace).entityNum as c_int;
             return;
         }
@@ -4454,7 +4454,7 @@ pub fn G_RunItem(ctx: GameContext<'_>, ent: EntityId) {
 
         if (*ent).s.pos.trType == trType_t::TR_STATIONARY {
             // check think function
-            G_RunThink(ctx, ent);
+            G_RunThink(ctx, ctx.entity_id_of(ent).unwrap());
             return;
         }
 
@@ -4495,7 +4495,7 @@ pub fn G_RunItem(ctx: GameContext<'_>, ent: EntityId) {
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent)); // FIXME: avoid this for stationary?
 
         // check think function
-        G_RunThink(ctx, ent);
+        G_RunThink(ctx, ctx.entity_id_of(ent).unwrap());
 
         if tr.fraction == 1.0 {
             return;
@@ -4513,7 +4513,7 @@ pub fn G_RunItem(ctx: GameContext<'_>, ent: EntityId) {
             if !(*ent).item.is_null() && (*(*ent).item).giType == IT_TEAM {
                 Team_FreeEntity(ctx, ent);
             } else {
-                G_FreeEntity(ctx, ent);
+                G_FreeEntity(ctx, ctx.entity_id_of(ent));
             }
             return;
         }

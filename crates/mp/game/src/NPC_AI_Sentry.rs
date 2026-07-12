@@ -118,7 +118,7 @@ pub fn NPC_Sentry_Pain(
             );
             crate::g_utils::G_Sound(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_),
                 CHAN_AUTO,
                 crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_pain").as_ptr()),
             );
@@ -163,7 +163,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
 
             crate::g_utils::G_Sound(
                 ctx,
-                NPC,
+                ctx.entity_id_of(NPC),
                 CHAN_AUTO,
                 crate::g_utils::G_SoundIndex(
                     cstr("sound/chars/sentry/misc/sentry_shield_open").as_ptr(),
@@ -559,7 +559,7 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
                     );
                     crate::g_utils::G_SoundOnEnt(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         CHAN_AUTO,
                         cstr("sound/chars/sentry/misc/sentry_shield_close").as_ptr(),
                     );
@@ -600,7 +600,12 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
             if crate::g_timer::TIMER_Done(ctx, NPC, cstr("angerNoise").as_ptr()) != qfalse {
                 let talk_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
-                crate::g_utils::G_SoundOnEnt(ctx, NPC, CHAN_AUTO, cstr(&s).as_ptr());
+                crate::g_utils::G_SoundOnEnt(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    CHAN_AUTO,
+                    cstr(&s).as_ptr(),
+                );
 
                 crate::g_timer::TIMER_Set(
                     ctx,
@@ -688,7 +693,12 @@ pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
             if crate::g_timer::TIMER_Done(ctx, NPC, cstr("patrolNoise").as_ptr()) != qfalse {
                 let talk_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
-                crate::g_utils::G_SoundOnEnt(ctx, NPC, CHAN_AUTO, cstr(&s).as_ptr());
+                crate::g_utils::G_SoundOnEnt(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    CHAN_AUTO,
+                    cstr(&s).as_ptr(),
+                );
 
                 crate::g_timer::TIMER_Set(
                     ctx,

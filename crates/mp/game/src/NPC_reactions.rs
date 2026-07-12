@@ -152,7 +152,7 @@ pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 let stat_max_health = (*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize];
                 let parm =
                     ((*self_).health as f32 / stat_max_health as f32 * 100.0f32).floor() as c_int;
-                G_AddEvent(self_, entity_event_t::EV_PAIN as c_int, parm);
+                G_AddEvent(&mut *(self_), entity_event_t::EV_PAIN as c_int, parm);
             }
         }
     }
@@ -595,7 +595,12 @@ pub fn NPC_Pain(
 
         // Attempt to fire any paintargets we might have
         if !(*self_).paintarget.is_null() && *((*self_).paintarget) != 0 {
-            G_UseTargets2(ctx, self_, other, (*self_).paintarget);
+            G_UseTargets2(
+                ctx,
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(other),
+                (*self_).paintarget,
+            );
         }
 
         RestoreNPCGlobals(ctx);
@@ -957,7 +962,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                     (*ctx.world).bg_state.rng.Q_irand(1, 3)
                 );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
-                G_Sound(ctx, self_, CHAN_AUTO, sound_index);
+                G_Sound(ctx, ctx.entity_id_of(self_), CHAN_AUTO, sound_index);
             }
             CLASS_R5D2 => {
                 let sound_path = format!(
@@ -965,7 +970,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                     (*ctx.world).bg_state.rng.Q_irand(1, 4)
                 );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
-                G_Sound(ctx, self_, CHAN_AUTO, sound_index);
+                G_Sound(ctx, ctx.entity_id_of(self_), CHAN_AUTO, sound_index);
             }
             CLASS_MOUSE => {
                 let sound_path = format!(
@@ -973,7 +978,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                     (*ctx.world).bg_state.rng.Q_irand(1, 3)
                 );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
-                G_Sound(ctx, self_, CHAN_AUTO, sound_index);
+                G_Sound(ctx, ctx.entity_id_of(self_), CHAN_AUTO, sound_index);
             }
             CLASS_GONK => {
                 let sound_path = format!(
@@ -981,7 +986,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                     (*ctx.world).bg_state.rng.Q_irand(1, 2)
                 );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
-                G_Sound(ctx, self_, CHAN_AUTO, sound_index);
+                G_Sound(ctx, ctx.entity_id_of(self_), CHAN_AUTO, sound_index);
             }
             _ => {}
         }

@@ -157,20 +157,35 @@ pub fn multi_trigger_run(ctx: GameContext<'_>, ent: EntityId) {
                 && !(*ent).target3.is_null()
                 && *(*ent).target3 != 0
             {
-                G_UseTargets2(ctx, ent, activator_ptr, (*ent).target3);
+                G_UseTargets2(
+                    ctx,
+                    ctx.entity_id_of(ent),
+                    ctx.entity_id_of(activator_ptr),
+                    (*ent).target3,
+                );
             } else if (*ent).genericValue4 == SIEGETEAM_TEAM2
                 && !(*ent).target4.is_null()
                 && *(*ent).target4 != 0
             {
-                G_UseTargets2(ctx, ent, activator_ptr, (*ent).target4);
+                G_UseTargets2(
+                    ctx,
+                    ctx.entity_id_of(ent),
+                    ctx.entity_id_of(activator_ptr),
+                    (*ent).target4,
+                );
             }
 
             (*ent).genericValue4 = 0;
         }
 
-        G_UseTargets(ctx, ent, activator_ptr);
+        G_UseTargets(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(activator_ptr));
         if (*ent).noise_index != 0 {
-            G_Sound(ctx, activator_ptr, CHAN_AUTO, (*ent).noise_index);
+            G_Sound(
+                ctx,
+                ctx.entity_id_of(activator_ptr),
+                CHAN_AUTO,
+                (*ent).noise_index,
+            );
         }
 
         if !(*ent).target2.is_null() && *(*ent).target2 != 0 && (*ent).wait >= 0.0 {
@@ -316,7 +331,12 @@ pub fn multi_trigger(ctx: GameContext<'_>, ent_id: EntityId, activator_id: Optio
                             // disallows objective scoring for it
                             if !(*obj_item).target3.is_null() && *(*obj_item).target3 != 0 {
                                 // if it has a target3, fire it off instead of using the trigger
-                                G_UseTargets2(ctx, obj_item, obj_item, (*obj_item).target3);
+                                G_UseTargets2(
+                                    ctx,
+                                    ctx.entity_id_of(obj_item),
+                                    ctx.entity_id_of(obj_item),
+                                    (*obj_item).target3,
+                                );
 
                                 //3-24-03 - want to fire off the target too I guess, if we have one.
                                 if !(*ent).targetname.is_null() && *(*ent).targetname != 0 {
@@ -330,7 +350,7 @@ pub fn multi_trigger(ctx: GameContext<'_>, ent_id: EntityId, activator_id: Optio
                             crate::g_saga::SiegeItemRemoveOwner(obj_item, activator);
                             (*obj_item).nextthink = 0;
                             (*obj_item).neverFree = qfalse;
-                            G_FreeEntity(ctx, obj_item);
+                            G_FreeEntity(ctx, ctx.entity_id_of(obj_item));
                         }
                     }
                 }
@@ -684,7 +704,7 @@ pub fn Touch_Multi(
             {
                 G_SetAnim(
                     ctx,
-                    other,
+                    ctx.entity_id_of(other).unwrap(),
                     core::ptr::null_mut(),
                     SETANIM_TORSO as c_int,
                     BOTH_BUTTON_HOLD as c_int,
@@ -716,7 +736,12 @@ pub fn trigger_cleared_fire(ctx: GameContext<'_>, self_: EntityId) {
         // pointer (Stage-2 body debt).
         let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let activator_ptr = ent_resolve_opt(ctx, (*self_).activator);
-        G_UseTargets2(ctx, self_, activator_ptr, (*self_).target2);
+        G_UseTargets2(
+            ctx,
+            ctx.entity_id_of(self_),
+            ctx.entity_id_of(activator_ptr),
+            (*self_).target2,
+        );
         (*self_).think = FnId::NONE;
         // should start the wait timer now, because the trigger's just been
         // cleared, so we must "wait" from this point
@@ -1050,8 +1075,8 @@ pub fn trigger_always_think(ctx: GameContext<'_>, ent: EntityId) {
     // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
     // pointer (Stage-2 body debt).
     let ent = ctx.entity_mut(ent) as *mut gentity_t;
-    G_UseTargets(ctx, ent, ent);
-    G_FreeEntity(ctx, ent);
+    G_UseTargets(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(ent));
+    G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 
 /// Raven `SP_trigger_always`.
@@ -1200,7 +1225,7 @@ pub fn AimAtTarget(ctx: GameContext<'_>, self_: EntityId) {
 
         let ent = G_PickTarget(ctx, (*self_).target);
         if ent.is_null() {
-            G_FreeEntity(ctx, self_);
+            G_FreeEntity(ctx, ctx.entity_id_of(self_));
             return;
         }
 
@@ -1248,7 +1273,7 @@ pub fn AimAtTarget(ctx: GameContext<'_>, self_: EntityId) {
         // promotes to double and sqrt is the double libm call; the result narrows to float.
         let time = ((height as f64) / (0.5 * gravity as f64)).sqrt() as f32;
         if time == 0.0 {
-            G_FreeEntity(ctx, self_);
+            G_FreeEntity(ctx, ctx.entity_id_of(self_));
             return;
         }
 
@@ -1339,7 +1364,12 @@ pub fn Use_target_push(
         if (*activator).fly_sound_debounce_time < (*ctx.world).level.time {
             (*activator).fly_sound_debounce_time = (*ctx.world).level.time + 1500;
             if (*self_).noise_index != 0 {
-                G_Sound(ctx, activator, CHAN_AUTO, (*self_).noise_index);
+                G_Sound(
+                    ctx,
+                    ctx.entity_id_of(activator),
+                    CHAN_AUTO,
+                    (*self_).noise_index,
+                );
             }
         }
     }
@@ -1608,7 +1638,7 @@ pub fn hurt_touch(
             } else {
                 G_EntitySound(
                     ctx,
-                    other,
+                    ctx.entity_id_of(other).unwrap(),
                     CHAN_VOICE,
                     G_SoundIndex(c"*falling1.wav".as_ptr()),
                 );
@@ -1807,7 +1837,7 @@ pub fn shipboundary_touch(
 
         let ent = G_Find(
             ctx,
-            core::ptr::null_mut(),
+            ctx.entity_id_of(core::ptr::null_mut()),
             core::mem::offset_of!(gentity_t, targetname) as c_int,
             (*self_).target,
         );
@@ -1983,7 +2013,7 @@ pub fn hyperspace_touch(
                     // Get the offset from the local position
                     let mut ent = G_Find(
                         ctx,
-                        core::ptr::null_mut(),
+                        ctx.entity_id_of(core::ptr::null_mut()),
                         core::mem::offset_of!(gentity_t, targetname) as c_int,
                         (*self_).target,
                     );
@@ -2016,7 +2046,7 @@ pub fn hyperspace_touch(
                     // Now get the base position of the destination
                     ent = G_Find(
                         ctx,
-                        core::ptr::null_mut(),
+                        ctx.entity_id_of(core::ptr::null_mut()),
                         core::mem::offset_of!(gentity_t, targetname) as c_int,
                         (*self_).target2,
                     );
@@ -2076,7 +2106,7 @@ pub fn hyperspace_touch(
                     // sound
                     G_Sound(
                         ctx,
-                        other,
+                        ctx.entity_id_of(other),
                         CHAN_LOCAL,
                         G_SoundIndex(c"sound/vehicles/common/hyperend.wav".as_ptr()),
                     );
@@ -2086,7 +2116,7 @@ pub fn hyperspace_touch(
         } else {
             let ent = G_Find(
                 ctx,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 (*self_).target,
             );
@@ -2174,7 +2204,11 @@ pub fn func_timer_think(ctx: GameContext<'_>, self_: EntityId) {
         // pointer (Stage-2 body debt).
         let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let activator_ptr = ent_resolve_opt(ctx, (*self_).activator);
-        G_UseTargets(ctx, self_, activator_ptr);
+        G_UseTargets(
+            ctx,
+            ctx.entity_id_of(self_),
+            ctx.entity_id_of(activator_ptr),
+        );
         // set time before next firing
         (*self_).nextthink = (*ctx.world).level.time
             + (1000.0 * ((*self_).wait + (*ctx.world).bg_state.rng.crandom() * (*self_).random))
@@ -2267,7 +2301,7 @@ pub fn asteroid_pick_random_asteroid(ctx: GameContext<'_>, self_: EntityId) -> *
         loop {
             t = G_Find(
                 ctx,
-                t,
+                ctx.entity_id_of(t),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 (*self_).target,
             );
@@ -2286,7 +2320,7 @@ pub fn asteroid_pick_random_asteroid(ctx: GameContext<'_>, self_: EntityId) -> *
         if t_count == 1 {
             return G_Find(
                 ctx,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 (*self_).target,
             );
@@ -2299,7 +2333,7 @@ pub fn asteroid_pick_random_asteroid(ctx: GameContext<'_>, self_: EntityId) -> *
         loop {
             t = G_Find(
                 ctx,
-                t,
+                ctx.entity_id_of(t),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
                 (*self_).target,
             );
@@ -2390,7 +2424,7 @@ pub fn asteroid_move_to_start2(
             // FIXME: maybe trace from start to end to make sure nothing is in
             // the way? How big of a trace?
 
-            G_SetOrigin(self_, start_spot);
+            G_SetOrigin(&mut *(self_), start_spot);
             let dist = crate::q_math::Distance(end_spot, start_spot);
             let time = ((dist / speed).ceil() as c_int) * 1000;
             crate::g_ICARUScb::Q3_Lerp2Origin(ctx, -1, (*self_).s.number, end_spot, time as f32);
@@ -2401,7 +2435,7 @@ pub fn asteroid_move_to_start2(
                 (*ctx.world).bg_state.rng.flrand(-360.0, 360.0),
                 (*ctx.world).bg_state.rng.flrand(-360.0, 360.0),
             ];
-            G_SetAngles(self_, start_angles);
+            G_SetAngles(&mut *(self_), start_angles);
             (*self_).s.apos.trDelta = [
                 (*ctx.world).bg_state.rng.flrand(-100.0, 100.0),
                 (*ctx.world).bg_state.rng.flrand(-100.0, 100.0),
@@ -2461,8 +2495,8 @@ pub fn asteroid_field_think(ctx: GameContext<'_>, self_id: EntityId) {
                     (*new_asteroid).damage = (*copy_asteroid).damage;
                     (*new_asteroid).speed = (*copy_asteroid).speed;
 
-                    G_SetOrigin(new_asteroid, (*copy_asteroid).s.origin);
-                    G_SetAngles(new_asteroid, (*copy_asteroid).s.angles);
+                    G_SetOrigin(&mut *(new_asteroid), (*copy_asteroid).s.origin);
+                    G_SetAngles(&mut *(new_asteroid), (*copy_asteroid).s.angles);
                     (*new_asteroid).classname = c"func_rotating".as_ptr() as *mut c_char;
 
                     SP_func_rotating(ctx, ctx.entity_id_of(new_asteroid).unwrap());
@@ -2470,7 +2504,7 @@ pub fn asteroid_field_think(ctx: GameContext<'_>, self_id: EntityId) {
                     (*new_asteroid).genericValue15 = (*copy_asteroid).genericValue15;
                     (*new_asteroid).s.iModelScale = (*copy_asteroid).s.iModelScale;
                     (*new_asteroid).maxHealth = (*new_asteroid).health;
-                    G_ScaleNetHealth(new_asteroid);
+                    G_ScaleNetHealth(&mut *(new_asteroid));
                     (*new_asteroid).radius = (*copy_asteroid).radius;
                     (*new_asteroid).material = (*copy_asteroid).material;
                     // CacheChunkEffects( self->material );

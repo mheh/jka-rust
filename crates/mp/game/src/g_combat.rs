@@ -155,11 +155,11 @@ pub fn ObjectDie(
         unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), attacker) };
     unsafe {
         if !(*self_).target.is_null() {
-            G_UseTargets(ctx, self_, attacker);
+            G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(attacker));
         }
 
         // remove my script_targetname
-        G_FreeEntity(ctx, self_);
+        G_FreeEntity(ctx, ctx.entity_id_of(self_));
     }
 }
 
@@ -542,7 +542,7 @@ pub fn TossClientWeapon(ctx: GameContext<'_>, self_: EntityId, direction: vec3_t
                 (*client).ps.weapon = 0;
             }
 
-            G_AddEvent(self_, entity_event_t::EV_NOAMMO as c_int, weapon);
+            G_AddEvent(&mut *(self_), entity_event_t::EV_NOAMMO as c_int, weapon);
         }
     }
 }
@@ -687,7 +687,11 @@ pub fn GibEntity(ctx: GameContext<'_>, self_: EntityId, killer: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        G_AddEvent(self_, entity_event_t::EV_GIB_PLAYER as c_int, killer);
+        G_AddEvent(
+            &mut *(self_),
+            entity_event_t::EV_GIB_PLAYER as c_int,
+            killer,
+        );
         (*self_).takedamage = qfalse;
         (*self_).s.eType = entityType_t::ET_INVISIBLE as c_int;
         (*self_).r.contents = 0;
@@ -1540,7 +1544,7 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: Option<EntityId>) {
                 );
                 crate::g_utils::G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(cstr("sound/chars/mouse/misc/death1").as_ptr()),
                 );
@@ -1586,7 +1590,7 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: Option<EntityId>) {
                 );
                 crate::g_utils::G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(cstr(&s).as_ptr()),
                 );
@@ -1607,7 +1611,7 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: Option<EntityId>) {
                 );
                 crate::g_utils::G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(
                         cstr("sound/chars/mark2/misc/mark2_explo").as_ptr(),
@@ -1624,7 +1628,7 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: Option<EntityId>) {
                 );
                 crate::g_utils::G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(
                         cstr("sound/chars/mark2/misc/mark2_explo").as_ptr(),
@@ -1641,7 +1645,7 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: Option<EntityId>) {
                 );
                 crate::g_utils::G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(
                         cstr("sound/chars/mark2/misc/mark2_explo").as_ptr(),
@@ -1658,7 +1662,7 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: Option<EntityId>) {
                 );
                 crate::g_utils::G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(
                         cstr("sound/chars/interrogator/misc/int_droid_explo").as_ptr(),
@@ -1688,7 +1692,7 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: Option<EntityId>) {
                 );
                 crate::g_utils::G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(
                         cstr("sound/chars/mark1/misc/mark1_explo").as_ptr(),
@@ -1698,7 +1702,7 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: Option<EntityId>) {
             class_t::CLASS_SENTRY => {
                 crate::g_utils::G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_AUTO,
                     crate::g_utils::G_SoundIndex(
                         cstr("sound/chars/sentry/misc/sentry_explo").as_ptr(),
@@ -2109,7 +2113,7 @@ pub fn player_die(
                 );
             }
             if tempInflictor != qfalse {
-                crate::g_utils::G_FreeEntity(ctx, tempInflictorEnt);
+                crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempInflictorEnt));
             }
             tempInflictorEnt = inflictor;
             tempInflictor = qfalse;
@@ -2163,7 +2167,7 @@ pub fn player_die(
 
                     // put me over where my vehicle exploded
                     crate::g_utils::G_SetOrigin(
-                        self_,
+                        &mut *(self_),
                         (*((*veh).client as *mut gclient_t)).ps.origin,
                     );
                     crate::q_math::_VectorCopy(
@@ -2227,10 +2231,7 @@ pub fn player_die(
 
             if (*npc).tempGoal.is_some() {
                 let tg = (*npc).tempGoal.unwrap();
-                crate::g_utils::G_FreeEntity(
-                    ctx,
-                    &mut (*ctx.world).g_entities[tg.0 as usize] as *mut gentity_t,
-                );
+                crate::g_utils::G_FreeEntity(ctx, Some(tg));
                 (*npc).tempGoal = None;
             }
             if false {
@@ -2253,15 +2254,25 @@ pub fn player_die(
             && (*cl).ps.saberEntityNum != 0
         {
             if (*cl).ps.saberInFlight == qfalse && (*cl).saber[0].soundOff != 0 {
-                crate::g_utils::G_Sound(ctx, self_, CHAN_AUTO, (*cl).saber[0].soundOff);
+                crate::g_utils::G_Sound(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    CHAN_AUTO,
+                    (*cl).saber[0].soundOff,
+                );
             }
             if (*cl).saber[1].soundOff != 0 && (*cl).saber[1].model[0] != 0 {
-                crate::g_utils::G_Sound(ctx, self_, CHAN_AUTO, (*cl).saber[1].soundOff);
+                crate::g_utils::G_Sound(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    CHAN_AUTO,
+                    (*cl).saber[1].soundOff,
+                );
             }
         }
 
         // Use any target we had
-        G_UseTargets(ctx, self_, self_);
+        G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(self_));
 
         if (*ctx.world).cvars.g_slowmoDuelEnd.integer != 0
             && ((*ctx.world).cvars.g_gametype.integer == GT_DUEL
@@ -2461,7 +2472,7 @@ pub fn player_die(
             wasJediMaster,
         );
         if tempInflictor != qfalse {
-            crate::g_utils::G_FreeEntity(ctx, tempInflictorEnt);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempInflictorEnt));
         }
 
         (*self_).enemy = Some(ent_id(base, attacker));
@@ -2783,7 +2794,7 @@ pub fn player_die(
                     // not disconnecting
                     crate::g_utils::G_SetAnim(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_).unwrap(),
                         core::ptr::null_mut(),
                         SETANIM_BOTH,
                         anim,
@@ -2821,9 +2832,9 @@ pub fn player_die(
             }
 
             if wasJediMaster != qfalse {
-                G_AddEvent(self_, entity_event_t::EV_DEATH1 as c_int + i_val, 1);
+                G_AddEvent(&mut *(self_), entity_event_t::EV_DEATH1 as c_int + i_val, 1);
             } else {
-                G_AddEvent(self_, entity_event_t::EV_DEATH1 as c_int + i_val, 0);
+                G_AddEvent(&mut *(self_), entity_event_t::EV_DEATH1 as c_int + i_val, 0);
             }
 
             if self_ != attacker {
@@ -2864,7 +2875,12 @@ pub fn player_die(
             if G_ActivateBehavior(ctx, self_, bSet_t::BSET_FFDEATH as c_int) != qfalse {
                 //deathScript = qtrue;
             }
-            crate::g_utils::G_UseTargets2(ctx, self_, self_, (*self_).target4);
+            crate::g_utils::G_UseTargets2(
+                ctx,
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(self_),
+                (*self_).target4,
+            );
         }
 
         // Free up any timers we may have on us.
@@ -3547,7 +3563,7 @@ pub fn G_Dismember(
         let limb = crate::g_utils::G_Spawn(ctx);
         (*limb).classname = c"playerlimb".as_ptr() as *mut c_char;
 
-        crate::g_utils::G_SetOrigin(limb, newPoint);
+        crate::g_utils::G_SetOrigin(&mut *(limb), newPoint);
         crate::q_math::_VectorCopy(newPoint, &mut (*limb).s.pos.trBase);
         (*limb).think = Some(EntThink::LimbThink).into();
         (*limb).touch = Some(EntTouch::LimbTouch).into();
@@ -4978,7 +4994,12 @@ pub fn G_Damage(
         // shootable doors / buttons don't actually have any health
         if (*targ).s.eType == entityType_t::ET_MOVER as c_int && (*targ).genericValue4 != 1 {
             if (*targ).use_.is_some() && (*targ).moverState == MOVER_POS1 {
-                crate::g_utils::GlobalUse(ctx, targ, inflictor, attacker);
+                crate::g_utils::GlobalUse(
+                    ctx,
+                    ctx.entity_id_of(targ),
+                    ctx.entity_id_of(inflictor),
+                    ctx.entity_id_of(attacker),
+                );
             }
             return;
         }
@@ -5322,7 +5343,11 @@ pub fn G_Damage(
 
         // battlesuit protects from all radius damage (but takes knockback) and 50% against all damage
         if !client.is_null() && (*client).ps.powerups[PW_BATTLESUIT as usize] != 0 {
-            G_AddEvent(targ, entity_event_t::EV_POWERUP_BATTLESUIT as c_int, 0);
+            G_AddEvent(
+                &mut *(targ),
+                entity_event_t::EV_POWERUP_BATTLESUIT as c_int,
+                0,
+            );
             if (dflags & DAMAGE_RADIUS) != 0 || r#mod == meansOfDeath_t::MOD_FALLING as c_int {
                 return;
             }
@@ -5897,7 +5922,7 @@ pub fn G_Damage(
             }
 
             if (*targ).maxHealth != 0 {
-                crate::g_utils::G_ScaleNetHealth(targ);
+                crate::g_utils::G_ScaleNetHealth(&mut *(targ));
             }
 
             if (*targ).health <= 0 {
@@ -6064,7 +6089,7 @@ pub fn G_DamageFromKiller(
             r#mod,
         );
         if tempInflictor != qfalse {
-            crate::g_utils::G_FreeEntity(ctx, inflictor);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(inflictor));
         }
     }
 }

@@ -552,7 +552,7 @@ pub fn JMSaberTouch(
         (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 1 << WP_SABER;
         (*((*other).client as *mut gclient_t)).ps.weapon = WP_SABER;
         (*other).s.weapon = WP_SABER;
-        G_AddEvent(other, (EV_BECOME_JEDIMASTER) as i32, 0);
+        G_AddEvent(&mut *(other), (EV_BECOME_JEDIMASTER) as i32, 0);
 
         // Track the jedi master
         let cs = format!("{}", (*other).s.number);
@@ -626,7 +626,7 @@ pub fn SP_info_jedimaster_start(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ctx.world).cvars.g_gametype.integer != GT_JEDIMASTER {
             (*ctx.world).globals.gJMSaberEnt = None;
-            crate::g_utils::G_FreeEntity(ctx, ent);
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
 
@@ -757,7 +757,7 @@ pub fn SelectNearestDeathmatchSpawnPoint(ctx: GameContext<'_>, from: vec3_t) -> 
         loop {
             spot = crate::g_utils::G_Find(
                 ctx,
-                spot,
+                ctx.entity_id_of(spot),
                 fofs_classname(),
                 b"info_player_deathmatch\0".as_ptr() as *const c_char,
             );
@@ -793,7 +793,7 @@ pub fn SelectRandomDeathmatchSpawnPoint(ctx: GameContext<'_>) -> *mut gentity_t 
         loop {
             spot = crate::g_utils::G_Find(
                 ctx,
-                spot,
+                ctx.entity_id_of(spot),
                 fofs_classname(),
                 b"info_player_deathmatch\0".as_ptr() as *const c_char,
             );
@@ -811,7 +811,7 @@ pub fn SelectRandomDeathmatchSpawnPoint(ctx: GameContext<'_>) -> *mut gentity_t 
             // no spots that won't telefrag
             return crate::g_utils::G_Find(
                 ctx,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 fofs_classname(),
                 b"info_player_deathmatch\0".as_ptr() as *const c_char,
             );
@@ -853,7 +853,12 @@ pub fn SelectRandomFurthestSpawnPoint(
                 b"info_player_start_blue\0".as_ptr() as *const c_char
             };
             loop {
-                spot = crate::g_utils::G_Find(ctx, spot, fofs_classname(), classname);
+                spot = crate::g_utils::G_Find(
+                    ctx,
+                    ctx.entity_id_of(spot),
+                    fofs_classname(),
+                    classname,
+                );
                 if spot.is_null() {
                     break;
                 }
@@ -901,7 +906,7 @@ pub fn SelectRandomFurthestSpawnPoint(
             loop {
                 spot = crate::g_utils::G_Find(
                     ctx,
-                    spot,
+                    ctx.entity_id_of(spot),
                     fofs_classname(),
                     b"info_player_deathmatch\0".as_ptr() as *const c_char,
                 );
@@ -947,7 +952,7 @@ pub fn SelectRandomFurthestSpawnPoint(
             if numSpots == 0 {
                 spot = crate::g_utils::G_Find(
                     ctx,
-                    core::ptr::null_mut(),
+                    ctx.entity_id_of(core::ptr::null_mut()),
                     fofs_classname(),
                     b"info_player_deathmatch\0".as_ptr() as *const c_char,
                 );
@@ -1011,7 +1016,8 @@ pub fn SelectDuelSpawnPoint(
             let mut spot: *mut gentity_t = core::ptr::null_mut();
 
             loop {
-                spot = crate::g_utils::G_Find(ctx, spot, fofs_classname(), spotName);
+                spot =
+                    crate::g_utils::G_Find(ctx, ctx.entity_id_of(spot), fofs_classname(), spotName);
                 if spot.is_null() {
                     break;
                 }
@@ -1065,7 +1071,7 @@ pub fn SelectDuelSpawnPoint(
                 // no free duel or DM spots, just try the first DM spot
                 spot = crate::g_utils::G_Find(
                     ctx,
-                    core::ptr::null_mut(),
+                    ctx.entity_id_of(core::ptr::null_mut()),
                     fofs_classname(),
                     b"info_player_deathmatch\0".as_ptr() as *const c_char,
                 );
@@ -1125,7 +1131,7 @@ pub fn SelectInitialSpawnPoint(
         loop {
             spot = crate::g_utils::G_Find(
                 ctx,
-                spot,
+                ctx.entity_id_of(spot),
                 fofs_classname(),
                 b"info_player_deathmatch\0".as_ptr() as *const c_char,
             );
@@ -1196,7 +1202,7 @@ pub fn BodySink(ctx: GameContext<'_>, ent: *mut gentity_t) {
             return;
         }
 
-        crate::g_utils::G_AddEvent(ent, entity_event_t::EV_BODYFADE as c_int, 0);
+        crate::g_utils::G_AddEvent(&mut *(ent), entity_event_t::EV_BODYFADE as c_int, 0);
         (*ent).nextthink = (*ctx.world).level.time + 18000;
         (*ent).takedamage = qfalse;
     }
@@ -2006,7 +2012,7 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
         if (*ent).r.linked != qfalse {
             trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
         }
-        crate::g_utils::G_InitGentity(ctx, ent);
+        crate::g_utils::G_InitGentity(ctx, ctx.entity_id_of(ent).unwrap());
         (*ent).touch = FnId::NONE;
         (*ent).pain = FnId::NONE;
         (*ent).client = client as *mut c_void;
@@ -2245,7 +2251,7 @@ pub fn G_BreakArm(ctx: GameContext<'_>, ent: *mut gentity_t, arm: c_int) {
                 // the left arm shuts off its saber upon being broken
                 G_Sound(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     CHAN_AUTO,
                     (*((*ent).client as *mut gclient_t)).saber[1].soundOff,
                 );
@@ -2268,7 +2274,7 @@ pub fn G_BreakArm(ctx: GameContext<'_>, ent: *mut gentity_t, arm: c_int) {
 
         G_SetAnim(
             ctx,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             &mut (*((*ent).client as *mut gclient_t)).pers.cmd as *mut usercmd_t,
             SETANIM_BOTH,
             anim,
@@ -2280,7 +2286,7 @@ pub fn G_BreakArm(ctx: GameContext<'_>, ent: *mut gentity_t, arm: c_int) {
         // enough to worry about it.
         G_EntitySound(
             ctx,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             CHAN_VOICE,
             G_SoundIndex(cstr("*pain25.wav").as_ptr()),
         );
@@ -2288,7 +2294,7 @@ pub fn G_BreakArm(ctx: GameContext<'_>, ent: *mut gentity_t, arm: c_int) {
         let n = (*ctx.world).bg_state.rng.Q_irand(1, 3);
         G_Sound(
             ctx,
-            ent,
+            ctx.entity_id_of(ent),
             CHAN_AUTO,
             G_SoundIndex(cstr(&format!("sound/player/bodyfall_human{}.wav", n)).as_ptr()),
         );
@@ -3211,7 +3217,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 ((*client).ps.stats[STAT_MAX_HEALTH as usize] as f32 * 0.25) as c_int;
         }
 
-        crate::g_utils::G_SetOrigin(ent, spawn_origin);
+        crate::g_utils::G_SetOrigin(&mut *(ent), spawn_origin);
         crate::q_math::_VectorCopy(spawn_origin, &mut (*client).ps.origin);
 
         // the respawned flag will be cleared after the attack and jump keys come up
@@ -3234,7 +3240,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*((*ent).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR {
             // (nothing)
         } else {
-            crate::g_utils::G_KillBox(ctx, ent);
+            crate::g_utils::G_KillBox(ctx, ctx.entity_id_of(ent).unwrap());
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
             if (*client).ps.weapon <= WP_NONE {
@@ -3247,7 +3253,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if (*client).ps.weapon == WP_SABER {
                 G_SetAnim(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent).unwrap(),
                     core::ptr::null_mut(),
                     SETANIM_BOTH,
                     (BOTH_STAND1TO2) as i32,
@@ -3257,7 +3263,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
             } else {
                 G_SetAnim(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent).unwrap(),
                     core::ptr::null_mut(),
                     SETANIM_TORSO,
                     (TORSO_RAISEWEAP1) as i32,
@@ -3280,10 +3286,10 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*client).latched_buttons = 0;
 
         if (*ctx.world).level.intermissiontime != 0 {
-            crate::g_main::MoveClientToIntermission(ctx, ent);
+            crate::g_main::MoveClientToIntermission(ctx, ctx.entity_id_of(ent).unwrap());
         } else {
             // fire the targets of the spawn point
-            crate::g_utils::G_UseTargets(ctx, spawn_point, ent);
+            crate::g_utils::G_UseTargets(ctx, ctx.entity_id_of(spawn_point), ctx.entity_id_of(ent));
         }
 
         // set teams for NPCs to recognize
@@ -3618,7 +3624,7 @@ pub fn SetupGameGhoul2Model(
         {
             if (*ctx.world).cvars.d_perPlayerGhoul2.integer != 0
                 || (*ent).s.number >= (MAX_CLIENTS) as i32
-                || G_PlayerHasCustomSkeleton(ent) != qfalse
+                || G_PlayerHasCustomSkeleton(&*(ent)) != qfalse
             {
                 // rww - allow option for perplayer models on server for collision and bolt stuff.
                 let mut modelFullPath: [c_char; 260] = [0; 260];
@@ -3822,7 +3828,7 @@ pub fn SetupGameGhoul2Model(
                         )
                         .is_null()
                             && (*ent).s.number < (MAX_CLIENTS) as i32
-                            && G_PlayerHasCustomSkeleton(ent) == qfalse
+                            && G_PlayerHasCustomSkeleton(&*(ent)) == qfalse
                     {
                         // a bad model
                         trap::G2API_CleanGhoul2Models(
@@ -3906,7 +3912,7 @@ pub fn SetupGameGhoul2Model(
             }
         }
 
-        if (*ent).s.number >= (MAX_CLIENTS) as i32 || G_PlayerHasCustomSkeleton(ent) != qfalse {
+        if (*ent).s.number >= (MAX_CLIENTS) as i32 || G_PlayerHasCustomSkeleton(&*(ent)) != qfalse {
             (*ent).localAnimIndex = -1;
 
             GLAName[0] = 0;
@@ -4478,7 +4484,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
                 }
 
                 // force them to use their class model on the server, if the class dictates
-                if G_PlayerHasCustomSkeleton(ent) != qfalse {
+                if G_PlayerHasCustomSkeleton(&*(ent)) != qfalse {
                     if crate::q_shared::Q_stricmp(model.as_ptr(), (*client).modelname.as_ptr()) != 0
                         || (*ent).localAnimIndex == 0
                     {

@@ -242,7 +242,7 @@ pub fn G_RunExPhys(
             return;
         }
 
-        G_SetOrigin(ent, tr.endpos);
+        G_SetOrigin(&mut *(ent), tr.endpos);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
         if tr.fraction == 1.0f32 {

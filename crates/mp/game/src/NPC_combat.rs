@@ -383,7 +383,7 @@ pub fn G_ForceSaberOn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*client).saber[0].soundOn != 0 {
             G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 mp_qshared::shared::sound_channel::CHAN_AUTO,
                 (*client).saber[0].soundOn,
             );
@@ -391,7 +391,7 @@ pub fn G_ForceSaberOn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*client).saber[1].soundOn != 0 {
             G_Sound(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 mp_qshared::shared::sound_channel::CHAN_AUTO,
                 (*client).saber[1].soundOn,
             );
@@ -2313,18 +2313,18 @@ pub fn SP_point_combat(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 MAX_COMBAT_POINTS
             );
             Com_Printf(cstr(&s).as_ptr());
-            G_FreeEntity(ctx, self_);
+            G_FreeEntity(ctx, ctx.entity_id_of(self_));
             return;
         }
 
         (*self_).s.origin[2] += 0.125;
-        G_SetOrigin(self_, (*self_).s.origin);
+        G_SetOrigin(&mut *(self_), (*self_).s.origin);
         trap::LinkEntity(
             ctx.engine,
             mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(self_),
         );
 
-        if G_CheckInSolid(ctx, self_, 1) != 0 {
+        if G_CheckInSolid(ctx, ctx.entity_id_of(self_).unwrap(), 1) != 0 {
             let s = format!(
                 "{}ERROR: combat point at {} in solid!\n",
                 S_COLOR_RED.to_str().unwrap(),
@@ -2339,7 +2339,7 @@ pub fn SP_point_combat(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         (*ctx.world).level.numCombatPoints += 1;
 
-        G_FreeEntity(ctx, self_);
+        G_FreeEntity(ctx, ctx.entity_id_of(self_));
     }
 }
 

@@ -317,7 +317,7 @@ pub fn VEH_TurretFindEnemies(
             ctx,
             org2,
             (*turretStats).fAIRange,
-            parent,
+            ctx.entity_id_of(parent),
             qtrue,
             entity_list.as_mut_ptr(),
         );

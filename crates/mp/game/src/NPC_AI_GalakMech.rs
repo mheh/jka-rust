@@ -870,7 +870,7 @@ pub fn NPC_GM_StartLaser(ctx: GameContext<'_>) {
             );
             crate::g_utils::G_SoundOnEnt(
                 ctx,
-                npc_ent,
+                ctx.entity_id_of(npc_ent).unwrap(),
                 CHAN_AUTO,
                 c"sound/weapons/galak/lasercharge.wav".as_ptr(),
             );
@@ -985,7 +985,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         if !cover_ent.is_null() {
                             (*npc_info).coverTarg = Some(ent_id(g_entities_base, cover_ent));
                             crate::g_utils::G_SetOrigin(
-                                cover_ent,
+                                &mut *(cover_ent),
                                 (*client).renderInfo.muzzlePoint,
                             );
                             (*cover_ent).r.svFlags |= SVF_BROADCAST;
@@ -1002,7 +1002,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     (*npc_ent).lockCount = 0;
                     if let Some(cover_id) = (*npc_info).coverTarg {
                         let cover_ent_ptr = g_entities_base.add(cover_id.0 as usize);
-                        crate::g_utils::G_FreeEntity(ctx, cover_ent_ptr);
+                        crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(cover_ent_ptr));
                     }
                     (*npc_ent).s.loopSound = 0;
                     crate::g_timer::TIMER_Set(
@@ -1041,7 +1041,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         if let Some(cover_id) = (*npc_info).coverTarg {
                             let cover_ent_ptr = g_entities_base.add(cover_id.0 as usize);
                             crate::g_utils::G_SetOrigin(
-                                cover_ent_ptr,
+                                &mut *(cover_ent_ptr),
                                 (*client).renderInfo.muzzlePoint,
                             );
                         }
@@ -1075,7 +1075,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         }
                         if let Some(cover_id) = (*npc_info).coverTarg {
                             let cover_ent_ptr = g_entities_base.add(cover_id.0 as usize);
-                            crate::g_utils::G_SetOrigin(cover_ent_ptr, trace.endpos);
+                            crate::g_utils::G_SetOrigin(&mut *(cover_ent_ptr), trace.endpos);
                         }
                         if (*ctx.world).bg_state.rng.Q_irand(0, 5) == 0 {
                             crate::g_utils::G_SoundAtLoc(
@@ -1557,7 +1557,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     DAMAGE_NO_KNOCKBACK,
                     meansOfDeath_t::MOD_UNKNOWN as c_int,
                 );
-                crate::g_utils::G_Throw(ctx, enemy_ent, smackDir, 100.0);
+                crate::g_utils::G_Throw(ctx, ctx.entity_id_of(enemy_ent).unwrap(), smackDir, 100.0);
                 if (*enemy_ent).client != core::ptr::null_mut() {
                     (*((*enemy_ent).client as *mut gclient_t)).ps.electrifyTime = level_time + 1000;
                 }
