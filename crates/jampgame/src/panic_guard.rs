@@ -1,12 +1,12 @@
-//! Panic capture at the module's C-ABI boundary (ABI panic policy, 2026-07-08).
+//! Panic capture at the module's C-ABI boundary (ABI panic policy, 2026-07-08;
+//! foreign-exception ruling 2026-07-12).
 //!
-//! `std::panic::catch_unwind` recovers only a lossy `Box<dyn Any>`: it can pull
-//! a `&str`/`String` payload back out, but it can NEVER recover the panic
-//! *location*. So `dllEntry` installs a process panic hook that records both the
-//! payload AND the `file:line:col` location into a thread-local the instant a
-//! panic fires; the `vmMain` choke point reads it back after `catch_unwind`
-//! unwinds, so every panic yields a readable `file:line — message` before the
-//! game dies through the engine's error path.
+//! The hook `dllEntry` installs does two things the instant a module panic
+//! fires: PRINTS a readable `jampgame panic: file:line:col — message` to
+//! stderr (the module's last words — with no `vmMain` catch, a genuine bug
+//! unwinds out into the host engine and dies fatally there), and records the
+//! same text into a thread-local so `dllEntry`'s own setup catch (which runs
+//! before any cross-image traffic and is therefore safe) can report it.
 
 use std::cell::RefCell;
 
@@ -27,7 +27,9 @@ pub fn install_hook() {
             .location()
             .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()));
         let message = payload_message(info.payload());
-        store(format_record(location.as_deref(), &message));
+        let record = format_record(location.as_deref(), &message);
+        eprintln!("jampgame panic: {record}");
+        store(record);
     }));
 }
 
