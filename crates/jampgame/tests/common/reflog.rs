@@ -372,3 +372,78 @@ pub fn gen_melee_brawl() -> Scenario {
         cmds,
     }
 }
+
+/// `real-duel1-idle.reflog` (referee swap, plan §3c): map `mp/duel1`, 4 clients,
+/// 900 frames, NO input. The clients spawn on the map's REAL spawn points and
+/// fall/settle via REAL traces against real geometry — the first real-engine
+/// scenario, so any divergence is a spawn/ground-trace finding.
+pub fn gen_real_duel1_idle() -> Scenario {
+    let models = [
+        "kyle/default",
+        "jan/default",
+        "luke/default",
+        "desann/default",
+    ];
+    let mut userinfos = BTreeMap::new();
+    for c in 0..4i32 {
+        userinfos.insert(c, userinfo_for(c, models[c as usize]));
+    }
+    Scenario {
+        name: "real-duel1-idle".into(),
+        map: "mp/duel1".into(),
+        seed: 4001,
+        clients: 4,
+        msec: 50,
+        starttime: 600,
+        frames: 900,
+        userinfos,
+        cmds: BTreeMap::new(),
+    }
+}
+
+/// `real-duel1-walk.reflog` (referee swap, plan §3c): map `mp/duel1`, 2 clients,
+/// 1500 frames, walking (forwardmove 127) with a slow deterministic yaw sweep
+/// (the `gen_solo` LCG pattern) so the clients drive into real walls/geometry —
+/// exercising the real `SV_Trace` collision arm at scale.
+pub fn gen_real_duel1_walk() -> Scenario {
+    let mut userinfos = BTreeMap::new();
+    userinfos.insert(0, userinfo_for(0, "kyle/default"));
+    userinfos.insert(1, userinfo_for(1, "jan/default"));
+
+    let frames = 1500;
+    let mut cmds = BTreeMap::new();
+    // Independent input streams per client, each seeded distinctly.
+    for client in 0..2i32 {
+        let mut rng = Lcg(0xD0E1_0000u32.wrapping_add(client as u32 * 0x9E37_79B9));
+        // Absolute view yaw as an ANGLE2SHORT-scale int, sweeping slowly so the
+        // constant forward walk carries the client along real corridors/walls.
+        let mut yaw: i32 = rng.range(0, 65535);
+        for frame in 0..frames {
+            yaw = (yaw + rng.range(-800, 800)).rem_euclid(65536);
+            cmds.insert(
+                (frame, client),
+                CmdInput {
+                    angles: [0, yaw, 0],
+                    buttons: 0,
+                    forwardmove: 127,
+                    rightmove: 0,
+                    upmove: 0,
+                    weapon: WP_MELEE,
+                    forcesel: 0,
+                },
+            );
+        }
+    }
+
+    Scenario {
+        name: "real-duel1-walk".into(),
+        map: "mp/duel1".into(),
+        seed: 4002,
+        clients: 2,
+        msec: 50,
+        starttime: 600,
+        frames,
+        userinfos,
+        cmds,
+    }
+}

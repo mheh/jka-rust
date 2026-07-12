@@ -23,3 +23,13 @@ mp_engine_qcommon = { path = "../mp/engine/qcommon" }
 native_platform = { path = "../native/platform" }
 mp_abi = { path = "../mp/abi" }
 mp_qshared = { path = "../mp/qshared" }
+# Referee swap (plan §3c): the real engine island backs the spatial/world
+# syscall arms on real-map scenarios (`tests/referee.rs` hybrid mode). `Engine`
+# + `engine_host_view` come from core; `SV_GameSystemCalls`/`SV_ClearWorld`/the
+# server hook installer from server; `mp_renderer` only to call its hook
+# installer directly (the mock owns the game slot, so we cannot use core's
+# `install_engine_hooks`, which also arms it). All other engine subsystems
+# (renderer/rmg/ghoul2/icarus/botlib) come transitively via `mp_engine_core`.
+mp_engine_core = { path = "../mp/engine/core" }
+mp_engine_server = { path = "../mp/engine/server" }
+mp_renderer = { path = "../mp/renderer" }

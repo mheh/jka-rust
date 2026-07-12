@@ -22,6 +22,17 @@
 //! ```
 //! The `reflog_roundtrip` test below is NOT ignored (no C++ toolchain needed).
 //!
+//! # Real-map scenarios (referee swap, plan §3c)
+//! A scenario whose `map` starts with `"mp/"` (e.g. `referee_real_duel1_idle`)
+//! runs each child over a HYBRID engine: the mock keeps cvars/userinfo/
+//! configstrings/prints/FS-missing/usercmd-injection/digest exactly as always,
+//! but the spatial/world syscall arms (traces, link/unlink, entities-in-box,
+//! contacts, PVS, area portals, brush models, entity tokens) route to the REAL
+//! engine crates with a real BSP loaded via `CM_LoadMap` + `SV_ClearWorld`
+//! (`tests/common/mod.rs`'s `RealWorld`). These tests need the retail assets:
+//! the assets dir is env `JKA_REF_BASEPATH` (default `~/Developer/jka/jka_server`)
+//! and its `base/` must hold `assets0.pk3`. They self-skip (print + pass) when
+//! the assets are absent, so the suite stays green without a game install.
 //! # Mock determinism audit (the harness must be a pure function of inputs)
 //! `tests/common/mod.rs`'s mock was audited for nondeterminism:
 //!   * cvar / configstring / userinfo tables are `BTreeMap` (ordered iteration).
@@ -56,9 +67,9 @@ use std::path::{Path, PathBuf};
 use common::reflog::{self, Scenario};
 use common::{
     referee_arm, referee_begin_frame, referee_error, referee_frame_syscall_digest,
-    referee_frame_syscalls, referee_import_name, referee_load, referee_locate, referee_reset,
-    referee_set_cvar, referee_set_map, referee_set_usercmd, referee_set_userinfo, referee_vm_call,
-    run_on_engine_thread_fn, LocateData,
+    referee_frame_syscalls, referee_import_name, referee_install_real_world, referee_load,
+    referee_locate, referee_reset, referee_set_cvar, referee_set_map, referee_set_usercmd,
+    referee_set_userinfo, referee_vm_call, run_on_engine_thread_fn, LocateData,
 };
 
 use mp_abi::game::exports::MpGameExport;
@@ -324,7 +335,16 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
     // ClientThink_real from the latched usercmd every frame (async engine
     // ClientThink dispatch does not exist in this harness). Both runs identical.
     referee_set_cvar("g_synchronousClients", "1");
-    referee_set_map(&map_tokens(&sc.map));
+    // Referee swap (plan §3c): a `"mp/"` map name selects a REAL BSP — boot the
+    // real engine island so the spatial/world arms route to it, and skip the
+    // synthetic tokens (the entity stream comes from the real entity string).
+    // Synthetic maps keep the exact prior behavior.
+    if sc.map.starts_with("mp/") {
+        let bsp = format!("maps/{}.bsp", sc.map);
+        referee_install_real_world(&bsp, &ref_basepath().to_string_lossy());
+    } else {
+        referee_set_map(&map_tokens(&sc.map));
+    }
     for (&num, ui) in &sc.userinfos {
         referee_set_userinfo(num, ui);
     }
@@ -621,6 +641,26 @@ fn logs_dir() -> PathBuf {
     repo_root().join("tools/referee-oracle/logs")
 }
 
+/// Assets dir for real-map scenarios (referee swap, plan §3c): env
+/// `JKA_REF_BASEPATH`, else `~/Developer/jka/jka_server`. Its `base/` must hold
+/// `assets0.pk3` (the stock BSPs live in the retail pk3s). Both the parent
+/// orchestrator and the re-exec'd children read it, so the value must be stable
+/// across the two processes — env or the fixed default, never wall-clock.
+fn ref_basepath() -> PathBuf {
+    if let Ok(p) = std::env::var("JKA_REF_BASEPATH") {
+        return PathBuf::from(p);
+    }
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
+    PathBuf::from(home).join("Developer/jka/jka_server")
+}
+
+/// Whether the real-map assets are present — the gate for the `referee_real_*`
+/// tests, which self-skip when absent so the suite stays green without a retail
+/// game install.
+fn real_assets_present() -> bool {
+    ref_basepath().join("base/assets0.pk3").exists()
+}
+
 // ===========================================================================
 // Crash-isolated orchestration
 //
@@ -880,6 +920,8 @@ fn reflog_roundtrip() {
         reflog::gen_idle(),
         reflog::gen_solo(),
         reflog::gen_melee_brawl(),
+        reflog::gen_real_duel1_idle(),
+        reflog::gen_real_duel1_walk(),
     ] {
         let text = reflog::to_text(&sc);
         let reparsed = reflog::parse(&text);
@@ -918,6 +960,8 @@ fn regenerate_logs() {
         reflog::gen_idle(),
         reflog::gen_solo(),
         reflog::gen_melee_brawl(),
+        reflog::gen_real_duel1_idle(),
+        reflog::gen_real_duel1_walk(),
     ] {
         let path = dir.join(format!("{}.reflog", sc.name));
         std::fs::write(&path, reflog::to_text(&sc)).unwrap();
@@ -941,4 +985,39 @@ fn referee_idle() {
 #[ignore = "requires tools/referee-oracle/build.sh + cargo build --workspace; run with --ignored"]
 fn referee_melee_brawl() {
     run_referee("referee_melee_brawl", reflog::gen_melee_brawl());
+}
+
+/// Real-map (plan §3c) idle scenario on `mp/duel1`: 4 clients spawn on the REAL
+/// spawn points and settle via REAL traces against real geometry. Self-skips
+/// when the assets dir is missing (see `ref_basepath`). PASS = engine+module
+/// parity on real geometry; a divergence is a genuine finding to report.
+#[test]
+#[ignore = "requires retail assets (JKA_REF_BASEPATH) + oracle dylib + cargo build; run with --ignored"]
+fn referee_real_duel1_idle() {
+    if !real_assets_present() {
+        eprintln!(
+            "[referee] SKIP referee_real_duel1_idle: real-map assets missing at {} \
+             (set JKA_REF_BASEPATH; its base/ must hold assets0.pk3)",
+            ref_basepath().display()
+        );
+        return;
+    }
+    run_referee("referee_real_duel1_idle", reflog::gen_real_duel1_idle());
+}
+
+/// Real-map (plan §3c) walking scenario on `mp/duel1`: 2 clients walk into the
+/// real walls/geometry with a deterministic yaw sweep, exercising the real
+/// `SV_Trace` collision arm heavily. Self-skips when assets are missing.
+#[test]
+#[ignore = "requires retail assets (JKA_REF_BASEPATH) + oracle dylib + cargo build; run with --ignored"]
+fn referee_real_duel1_walk() {
+    if !real_assets_present() {
+        eprintln!(
+            "[referee] SKIP referee_real_duel1_walk: real-map assets missing at {} \
+             (set JKA_REF_BASEPATH; its base/ must hold assets0.pk3)",
+            ref_basepath().display()
+        );
+        return;
+    }
+    run_referee("referee_real_duel1_walk", reflog::gen_real_duel1_walk());
 }

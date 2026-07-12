@@ -79,9 +79,12 @@ version = "0.1.0"
 dependencies = [
  "abi_transport",
  "mp_abi",
+ "mp_engine_core",
  "mp_engine_qcommon",
+ "mp_engine_server",
  "mp_game",
  "mp_qshared",
+ "mp_renderer",
  "native_platform",
 ]
 

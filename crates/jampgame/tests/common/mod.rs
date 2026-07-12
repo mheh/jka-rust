@@ -46,10 +46,29 @@ use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::cvar::vmCvar_t;
 use mp_qshared::shared::limits::ENTITYNUM_NONE;
 use mp_qshared::shared::vec3_t;
-use native_platform::entrypoints::{AbiWord, RawSyscall, RawVmMain};
+use native_platform::entrypoints::{AbiCommand, AbiWord, RawSyscall, RawVmMain};
 use native_platform::module_loader::{
     sys_load_dll, LoadedModule, ModuleNaming, ModuleSearchPolicy, SearchStep,
 };
+
+// ---- Referee swap (plan §3c): the real engine island behind the mock -------
+// A real BSP + the real `SV_Trace`/`SV_LinkEntity`/`sv_world` back the spatial
+// arms on real-map scenarios; the rest of the mock stays trusted.
+use mp_engine_core::engine::Engine;
+use mp_engine_core::host_view::engine_host_view;
+use mp_engine_qcommon::cm_load::{CM_EntityString, CM_LoadMap};
+use mp_engine_qcommon::cmd_common::{Cbuf_Init, Cmd_Init};
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
+use mp_engine_qcommon::common::opaque_slots;
+use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_Init};
+use mp_engine_qcommon::files_common::FS_InitFilesystem;
+use mp_engine_qcommon::vm::vm_s::vm_t;
+use mp_engine_qcommon::z_memman_pc::{Com_InitHunkMemory, Com_InitZoneMemory};
+use mp_engine_server::server::server_state_t::serverState_t;
+use mp_engine_server::sv_game::SV_GameSystemCalls;
+use mp_engine_server::sv_world::SV_ClearWorld;
+use mp_qshared::shared::cvar::CVAR_INIT;
+use mp_qshared::shared::{qfalse, qtrue};
 
 // The referee differential driver (`tests/referee.rs`) reuses this mock verbatim
 // as its deterministic engine; the pub surface below (`referee_*` fns) is its
@@ -88,6 +107,48 @@ const G_SEND_CONSOLE_COMMAND: isize = MpGameImport::G_SEND_CONSOLE_COMMAND as is
 const G_TRACE: isize = MpGameImport::G_TRACE as isize;
 const G_TRACECAPSULE: isize = MpGameImport::G_TRACECAPSULE as isize;
 const G_G2TRACE: isize = MpGameImport::G_G2TRACE as isize;
+// Spatial/world arms routed to the REAL engine on real-map scenarios (referee
+// swap, plan §3c). The already-declared G_LOCATE_GAME_DATA/G_TRACE/
+// G_TRACECAPSULE/G_G2TRACE/G_GET_ENTITY_TOKEN complete the REAL set.
+const G_POINT_CONTENTS: isize = MpGameImport::G_POINT_CONTENTS as isize;
+const G_LINKENTITY: isize = MpGameImport::G_LINKENTITY as isize;
+const G_UNLINKENTITY: isize = MpGameImport::G_UNLINKENTITY as isize;
+const G_ENTITIES_IN_BOX: isize = MpGameImport::G_ENTITIES_IN_BOX as isize;
+const G_ENTITY_CONTACT: isize = MpGameImport::G_ENTITY_CONTACT as isize;
+const G_ENTITY_CONTACTCAPSULE: isize = MpGameImport::G_ENTITY_CONTACTCAPSULE as isize;
+const G_IN_PVS: isize = MpGameImport::G_IN_PVS as isize;
+const G_IN_PVS_IGNORE_PORTALS: isize = MpGameImport::G_IN_PVS_IGNORE_PORTALS as isize;
+const G_AREAS_CONNECTED: isize = MpGameImport::G_AREAS_CONNECTED as isize;
+const G_ADJUST_AREA_PORTAL_STATE: isize = MpGameImport::G_ADJUST_AREA_PORTAL_STATE as isize;
+const G_SET_BRUSH_MODEL: isize = MpGameImport::G_SET_BRUSH_MODEL as isize;
+
+/// True when `n` is in the REAL set — the spatial/world syscall arms the referee
+/// swap routes to the real engine crates (real BSP + `SV_Trace`/`SV_LinkEntity`/
+/// `sv_world`). Everything else keeps the trusted mock behavior. `G_G2TRACE` is
+/// included: its real arm (`sv_game.rs` G_G2TRACE) is a plain `SV_Trace` with no
+/// ghoul2 dereference, so it is safe with zero ghoul2 instances (G2 model init
+/// stays mocked to 0). Source: `sv_game.rs` REAL-set dispatch arms.
+fn is_real_set(n: isize) -> bool {
+    matches!(
+        n,
+        G_LOCATE_GAME_DATA
+            | G_TRACE
+            | G_TRACECAPSULE
+            | G_G2TRACE
+            | G_POINT_CONTENTS
+            | G_LINKENTITY
+            | G_UNLINKENTITY
+            | G_ENTITIES_IN_BOX
+            | G_ENTITY_CONTACT
+            | G_ENTITY_CONTACTCAPSULE
+            | G_IN_PVS
+            | G_IN_PVS_IGNORE_PORTALS
+            | G_AREAS_CONNECTED
+            | G_ADJUST_AREA_PORTAL_STATE
+            | G_SET_BRUSH_MODEL
+            | G_GET_ENTITY_TOKEN
+    )
+}
 
 /// Realistic userinfo string for client 0, exercising the keys
 /// `ClientUserinfoChanged` reads (g_client.c:1888). A drop-in of what a real
@@ -122,6 +183,174 @@ pub struct LocateData {
     pub sizeof_g_entity_t: c_int,
     pub clients: *mut c_void,
     pub sizeof_g_client: c_int,
+}
+
+// ---------------------------------------------------------------------------
+// Referee swap (plan §3c): the real engine island behind the spatial arms.
+// ---------------------------------------------------------------------------
+
+/// A never-invoked native `vmMain` stand-in. The real engine's `VM_ArgPtrWord`
+/// (`vm_fns.rs:213`) only checks `currentVM.entryPoint.is_some()` to pick the
+/// native identity-cast branch (dataBase 0 → the arg word already IS the real
+/// pointer); it never CALLS `entryPoint`. A `Some(_)` holding any valid fn
+/// pointer is all that path needs, so the routed arms resolve the module's real
+/// `trace_t`/`vec3`/`sharedEntity_t` pointer args unchanged.
+extern "C-unwind" fn real_world_native_marker(
+    _command: AbiCommand,
+    _a0: AbiWord,
+    _a1: AbiWord,
+    _a2: AbiWord,
+    _a3: AbiWord,
+    _a4: AbiWord,
+    _a5: AbiWord,
+    _a6: AbiWord,
+    _a7: AbiWord,
+    _a8: AbiWord,
+    _a9: AbiWord,
+    _a10: AbiWord,
+    _a11: AbiWord,
+) -> AbiWord {
+    0
+}
+
+/// The real engine island backing the referee's spatial/world syscall arms.
+/// Owns a `Box<Engine>` booted just far enough to load a real BSP and answer
+/// `SV_Trace`/`SV_LinkEntity`/`sv_world`/PVS/pointcontents/brushmodel/entity-
+/// token traps. The rest of the engine (VM load, spawn, frames) is deliberately
+/// NOT run — the MOCK owns the game slot and drives the module itself.
+struct RealWorld {
+    engine: Box<Engine>,
+    /// Kept alive for the island's lifetime: `engine.common.currentVM` points
+    /// at it so `VM_ArgPtrWord` takes the native identity-cast branch.
+    _vm: Box<vm_t>,
+}
+
+impl RealWorld {
+    /// Boot the real island: a minimal FS bring-up (the ordered subset of
+    /// `Com_Init` FS/CM need), `CM_LoadMap`, then the `SV_SpawnServer` tail that
+    /// the routed arms read (`SV_ClearWorld` worldSectors + `entityParsePoint`
+    /// from the real entity string + `sv.state`).
+    ///
+    /// `map_bsp` is `"maps/<map>.bsp"`; `basepath` is the assets dir (its `base/`
+    /// holds `assets0.pk3`). Panics (a loud finding) if the map or assets are
+    /// missing — callers gate on the assets dir first.
+    fn new(map_bsp: &str, basepath: &str) -> RealWorld {
+        let mut engine = Engine::new();
+
+        // Install the server + renderer hook tables — but NOT the game-slot
+        // arm. `mp_engine_core::install_engine_hooks` also builds the
+        // GameDispatchCtx note and calls `arm_game_slot`; here the MOCK owns the
+        // slot (`referee_arm`), so we replicate that fn's body MINUS the arm
+        // step (host_view.rs:47-70).
+        mp_engine_server::hook_install::install_engine_hooks(&mut engine.common.hooks);
+        mp_renderer::hook_install::install_engine_hooks(&mut engine.common.hooks);
+
+        // ---- Phase A: FS bring-up + CM_LoadMap (view-scoped) --------------
+        // Minimal ordered subset of `Com_Init` (`common_fns.rs:1535-1602`):
+        // Cvar_Init → Cbuf_Init → Com_InitZoneMemory (FS pack loads Z_Malloc) →
+        // Cmd_Init (FS_Startup registers commands) → FS_InitFilesystem, then
+        // `dedicated` (CM_LoadMap dereferences `com_dedicated`, common_fns:1595)
+        // → Com_InitHunkMemory (CM_LoadMap loads geometry onto the hunk). NET/
+        // console/journaling/config-exec and the later subsystem inits are
+        // provably unneeded by FS+CM, so they are skipped.
+        {
+            let mut view = engine_host_view(&mut engine);
+            Cvar_Init(&mut view);
+            Cbuf_Init(view.common);
+            Com_InitZoneMemory(&mut view);
+            Cmd_Init(&mut view);
+
+            // Point fs_basepath at the assets dir BEFORE FS_Startup reads it.
+            // Cvar_Get keeps this value when FS_Startup re-registers the cvar
+            // with its platform default (cvar_fns.rs:230-272).
+            let bp = CString::new(basepath).expect("basepath cstring");
+            Cvar_Get(&mut view, c"fs_basepath".as_ptr(), bp.as_ptr(), CVAR_INIT);
+            FS_InitFilesystem(&mut view);
+
+            let ded = Cvar_Get(&mut view, c"dedicated".as_ptr(), c"0".as_ptr(), 0);
+            view.common.com_dedicated = ded;
+            // The trace path dereferences `com_terrainPhysics` directly
+            // (cm_trace.rs:1216); an unregistered (null) field aborts. Register
+            // it exactly as `Com_Init` does (common_fns.rs:1662). The routed
+            // arms' other `com_*` reads are null-safe (`com_optvehtrace` via
+            // name lookup; `com_RMG` behind an `is_null` guard), so only this
+            // one is required.
+            view.common.com_terrainPhysics = Cvar_Get(
+                &mut view,
+                c"com_terrainPhysics".as_ptr(),
+                c"1".as_ptr(),
+                mp_qshared::shared::cvar::CVAR_CHEAT,
+            );
+            Com_InitHunkMemory(&mut view);
+
+            let map = CString::new(map_bsp).expect("map cstring");
+            let mut checksum: c_int = 0;
+            CM_LoadMap(&mut view, map.as_ptr(), qfalse, &mut checksum);
+        }
+
+        // ---- Phase B: the SV_SpawnServer tail the routed arms read --------
+        // `SV_GetEntityToken` takes the main-BSP path only when
+        // `mLocalSubBSPIndex == -1` (sv_game.cpp:210) — the alloc_zeroed default
+        // is 0, so set it (a real server's SV_SetActiveSubBSP(-1) equivalent).
+        engine.sv.sv.mLocalSubBSPIndex = -1;
+        let eps = CM_EntityString(&mut engine.cm);
+        engine.sv.sv.entityParsePoint = eps;
+        SV_ClearWorld(&mut engine.cm, &mut engine.sv);
+        engine.sv.sv.state = serverState_t::SS_GAME;
+
+        // A native `currentVM` marker so `vma`/`VM_ArgPtrWord` in the routed
+        // dispatcher resolve the module's real pointer args by identity
+        // (dataBase 0, entryPoint Some). The real boot's `VM_Create` sets this;
+        // we skip loading a VM (the MOCK drives the module), so wire it by hand.
+        // MUST come AFTER Phase A: `Com_InitHunkMemory` → `Hunk_Clear` →
+        // `VM_Clear` (vm_fns.rs:382) nulls `currentVM`, so setting it earlier
+        // would be wiped.
+        let mut vm: Box<vm_t> = Box::new(unsafe { core::mem::zeroed() });
+        vm.entryPoint = Some(real_world_native_marker);
+        vm.dataBase = core::ptr::null_mut();
+        engine.common.currentVM = &mut *vm as *mut vm_t;
+        // `qtrue` is only pulled in for symmetry with the `qfalse` clientload
+        // arg above; touch it so the shared import is never flagged unused.
+        let _ = qtrue;
+
+        RealWorld { engine, _vm: vm }
+    }
+
+    /// Route one syscall frame to the real dispatcher, rebuilding the
+    /// `EngineHostView` + icarus/nav/roff sidecars from disjoint engine-field
+    /// borrows (mirrors `server_host.rs::game_system_calls_shim`).
+    fn dispatch(&mut self, args: *const isize) -> isize {
+        let engine: &mut Engine = &mut self.engine;
+        let cl_raw = match engine.cl.as_mut() {
+            Some(cl) => cl as *mut _ as *mut (),
+            None => core::ptr::null_mut(),
+        };
+        let mut view = EngineHostView {
+            sv: opaque_slots::Server::from_raw(&mut engine.sv as *mut _ as *mut ()),
+            cl: opaque_slots::Client::from_raw(cl_raw),
+            bot: opaque_slots::BotLib::from_raw(&mut engine.bot as *mut _ as *mut ()),
+            rm: opaque_slots::RenderModels::from_raw(
+                &mut engine.render_models as *mut _ as *mut (),
+            ),
+            rmg: opaque_slots::RmManager::from_raw(&mut engine.rmg as *mut _ as *mut ()),
+            g2: opaque_slots::Ghoul2System::from_raw(&mut engine.g2 as *mut _ as *mut ()),
+            common: &mut engine.common,
+            cm: &mut engine.cm,
+        };
+        // The raw slot casts alias disjoint engine fields that
+        // `SV_GameSystemCalls` reborrows exactly as the boot shim does (DEC-23
+        // slot-cast discipline, single-threaded referee); `icarus`/`nav`/`roff`
+        // are disjoint from `common`/`cm`, so these field borrows never overlap.
+        // `args` is the trampoline's 16-word frame (pointer args already real).
+        // `SV_GameSystemCalls` is a safe fn — its own `unsafe` is internal.
+        SV_GameSystemCalls(
+            &mut view,
+            &mut engine.icarus,
+            &mut engine.nav,
+            &mut engine.roff,
+            args as *mut isize,
+        )
+    }
 }
 
 struct MockEngine {
@@ -164,6 +393,10 @@ struct MockEngine {
     /// (`SET_CONFIGSTRING`/`SEND_SERVER_COMMAND`/`SEND_CONSOLE_COMMAND`/`PRINT`),
     /// captured by pointed-to DATA so the digest never hashes a raw address.
     frame_texts: Vec<(isize, c_int, String)>,
+    /// The real engine island (referee swap, plan §3c). `Some` only on real-map
+    /// scenarios (`sc.map` starting with `"mp/"`); when armed, the spatial/world
+    /// syscall arms in [`is_real_set`] route to it instead of the mock arm.
+    real: Option<RealWorld>,
 }
 
 impl MockEngine {
@@ -233,6 +466,7 @@ impl MockEngine {
             usercmds: BTreeMap::new(),
             frame_imports: Vec::new(),
             frame_texts: Vec::new(),
+            real: None,
         }
     }
 
@@ -313,6 +547,28 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
         // Pointer-free syscall-stream record for the referee digest: the wire
         // number in call order. String/scalar payloads are added per arm below.
         m.frame_imports.push(n);
+
+        // Referee swap (plan §3c): on real-map scenarios, forward the spatial/
+        // world arms to the real engine (real BSP + SV_Trace/SV_LinkEntity/
+        // sv_world). Recording above is unchanged (digest semantics preserved);
+        // everything NOT in the REAL set falls through to the trusted mock.
+        if m.real.is_some() && is_real_set(n) {
+            // G_LOCATE_GAME_DATA feeds BOTH sides: the mock records the module's
+            // array pointers (the referee snapshots through them) AND the real
+            // SV_LocateGameData records them so SV_LinkEntity/SV_Trace reach the
+            // module's entities. Capture here, then route.
+            if n == G_LOCATE_GAME_DATA {
+                m.locate = Some(LocateData {
+                    g_ents: unsafe { word(args, 1) } as *mut c_void,
+                    num_g_entities: unsafe { word(args, 2) } as c_int,
+                    sizeof_g_entity_t: unsafe { word(args, 3) } as c_int,
+                    clients: unsafe { word(args, 4) } as *mut c_void,
+                    sizeof_g_client: unsafe { word(args, 5) } as c_int,
+                });
+            }
+            let real = m.real.as_mut().unwrap();
+            return real.dispatch(args);
+        }
 
         match n {
             G_PRINT => {
@@ -990,6 +1246,17 @@ pub fn referee_set_map(tokens: &[&str]) {
         m.tokens = tokens.iter().map(|s| CString::new(*s).unwrap()).collect();
         m.token_idx = 0;
     });
+}
+
+/// Referee swap (plan §3c): boot the real engine island for a real-map scenario
+/// and arm it in the mock. Call BEFORE `referee_arm` and INSTEAD OF
+/// `referee_set_map` — the entity token stream comes from the real BSP's entity
+/// string (routed `G_GET_ENTITY_TOKEN`), not synthetic tokens. `map_bsp` is
+/// `"maps/<map>.bsp"`; `basepath` is the assets dir (its `base/` holds the
+/// pk3s). Runs on the caller's (engine) thread; must follow `referee_reset`.
+pub fn referee_install_real_world(map_bsp: &str, basepath: &str) {
+    let real = RealWorld::new(map_bsp, basepath);
+    MOCK.with(|m| m.borrow_mut().real = Some(real));
 }
 
 /// Override an engine cvar value (served by the cvar-family syscalls). The
