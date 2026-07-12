@@ -849,7 +849,7 @@ pub fn BroadcastObjectiveCompletion(
             // the opposing team
             AddScore(
                 ctx,
-                &mut (*ctx.world).g_entities[client as usize] as *mut gentity_t,
+                EntityId::from_num(client).unwrap(),
                 (*((*ctx.world).g_entities[client as usize].client as *mut gclient_t))
                     .ps
                     .origin,
@@ -881,14 +881,14 @@ pub fn AddSiegeWinningTeamPoints(ctx: GameContext<'_>, team: c_int, winner: c_in
                 if i == winner {
                     AddScore(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent).unwrap(),
                         (*((*ent).client as *mut gclient_t)).ps.origin,
                         SIEGE_POINTS_TEAMWONROUND + SIEGE_POINTS_FINALOBJECTIVECOMPLETED,
                     );
                 } else {
                     AddScore(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent).unwrap(),
                         (*((*ent).client as *mut gclient_t)).ps.origin,
                         SIEGE_POINTS_TEAMWONROUND,
                     );

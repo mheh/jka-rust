@@ -508,9 +508,9 @@ pub fn Boba_FireFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if (tr.entityNum as c_int) < ENTITYNUM_WORLD && (*traceEnt).takedamage != qfalse {
             crate::g_combat::G_Damage(
                 ctx,
-                traceEnt,
-                self_,
-                self_,
+                ctx.entity_id_of(traceEnt),
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(self_),
                 Some(&mut dir),
                 tr.endpos,
                 damage,

@@ -206,7 +206,7 @@ pub fn Use_Target_Score(
     let (origin, count) = (e.r.currentOrigin, e.count);
     let activator_ptr =
         unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
-    AddScore(ctx, activator_ptr, origin, count);
+    AddScore(ctx, ctx.entity_id_of(activator_ptr).unwrap(), origin, count);
 }
 
 /// Raven `SP_target_score`.
@@ -554,9 +554,9 @@ pub fn target_laser_think(ctx: GameContext<'_>, self_: EntityId) {
         let damage = ctx.entity(self_).damage;
         G_Damage(
             ctx,
-            targ,
-            self_ptr,
-            activator_ptr,
+            ctx.entity_id_of(targ),
+            ctx.entity_id_of(self_ptr),
+            ctx.entity_id_of(activator_ptr),
             Some(unsafe { &mut (*self_ptr).movedir }),
             tr.endpos,
             damage,
@@ -786,9 +786,9 @@ pub fn target_kill_use(
         unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
     G_Damage(
         ctx,
-        activator_ptr,
-        core::ptr::null_mut(),
-        core::ptr::null_mut(),
+        ctx.entity_id_of(activator_ptr),
+        ctx.entity_id_of(core::ptr::null_mut()),
+        ctx.entity_id_of(core::ptr::null_mut()),
         None,
         [0.0; 3],
         100000,

@@ -75,9 +75,9 @@ pub fn NPC_Seeker_Pain(
             let mut origin = vec3_origin;
             crate::g_combat::G_Damage(
                 ctx,
-                self_,
-                core::ptr::null_mut(),
-                core::ptr::null_mut(),
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(core::ptr::null_mut()),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 Some(&mut origin),
                 crate::q_math::vec3_origin,
                 999,
@@ -509,9 +509,9 @@ pub fn Seeker_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qboolean)
                 // out of ammo, so let it die...give it a push up so it can fall more and blow up on impact
                 crate::g_combat::G_Damage(
                     ctx,
-                    NPC,
-                    NPC,
-                    NPC,
+                    ctx.entity_id_of(NPC),
+                    ctx.entity_id_of(NPC),
+                    ctx.entity_id_of(NPC),
                     None,
                     crate::q_math::vec3_origin,
                     999,
@@ -777,9 +777,9 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
                 //remove me
                 crate::g_combat::G_Damage(
                     ctx,
-                    NPC,
-                    core::ptr::null_mut(),
-                    core::ptr::null_mut(),
+                    ctx.entity_id_of(NPC),
+                    ctx.entity_id_of(core::ptr::null_mut()),
+                    ctx.entity_id_of(core::ptr::null_mut()),
                     None,
                     crate::q_math::vec3_origin,
                     10000,

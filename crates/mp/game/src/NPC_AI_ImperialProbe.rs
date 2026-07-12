@@ -713,9 +713,9 @@ pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
                 };
                 G_Damage(
                     ctx,
-                    npc,
-                    enemy_ptr,
-                    enemy_ptr,
+                    ctx.entity_id_of(npc),
+                    ctx.entity_id_of(enemy_ptr),
+                    ctx.entity_id_of(enemy_ptr),
                     None,
                     [0.0; 3],
                     2000,

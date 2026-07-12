@@ -1140,7 +1140,14 @@ pub fn G_ResetDuelists(ctx: GameContext<'_>) {
             let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
 
             (*ctx.world).globals.g_noPDuelCheck = qtrue;
-            crate::g_combat::player_die(ctx, ent, ent, ent, 999, MOD_SUICIDE as c_int);
+            crate::g_combat::player_die(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
+                999,
+                MOD_SUICIDE as c_int,
+            );
             (*ctx.world).globals.g_noPDuelCheck = qfalse;
             trap::UnlinkEntity(
                 ctx.engine,
@@ -3726,9 +3733,9 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                                 let dmg = world.bg_state.rng.Q_irand(50, 70);
                                 G_Damage(
                                     ctx,
-                                    ent,
-                                    spacetrigger,
-                                    spacetrigger,
+                                    ctx.entity_id_of(ent),
+                                    ctx.entity_id_of(spacetrigger),
+                                    ctx.entity_id_of(spacetrigger),
                                     None,
                                     (*client).ps.origin,
                                     dmg,

@@ -256,9 +256,9 @@ pub fn G_TryPushingEntity(
             // just blow the fuck out of them
             G_Damage(
                 ctx,
-                check,
-                pusher,
-                pusher,
+                ctx.entity_id_of(check),
+                ctx.entity_id_of(pusher),
+                ctx.entity_id_of(pusher),
                 None,
                 [0.0, 0.0, 0.0],
                 (*pusher).damage,
@@ -353,9 +353,9 @@ pub fn G_TryPushingEntity(
             if (*check).health > 0 {
                 G_Damage(
                     ctx,
-                    check,
-                    pusher,
-                    pusher,
+                    ctx.entity_id_of(check),
+                    ctx.entity_id_of(pusher),
+                    ctx.entity_id_of(pusher),
                     Some(&mut [0.0, 0.0, 0.0]), // Raven passes `vec3_origin` here.
                     (*check).r.currentOrigin,
                     999,
@@ -512,9 +512,9 @@ pub fn G_MoverPush(
             {
                 G_Damage(
                     ctx,
-                    check,
-                    pusher,
-                    pusher,
+                    ctx.entity_id_of(check),
+                    ctx.entity_id_of(pusher),
+                    ctx.entity_id_of(pusher),
                     None,
                     [0.0, 0.0, 0.0],
                     (*pusher).damage,
@@ -530,9 +530,9 @@ pub fn G_MoverPush(
                 // whatever, just crush it
                 G_Damage(
                     ctx,
-                    check,
-                    pusher,
-                    pusher,
+                    ctx.entity_id_of(check),
+                    ctx.entity_id_of(pusher),
+                    ctx.entity_id_of(pusher),
                     None,
                     [0.0, 0.0, 0.0],
                     999,
@@ -550,9 +550,9 @@ pub fn G_MoverPush(
             {
                 G_Damage(
                     ctx,
-                    check,
-                    pusher,
-                    pusher,
+                    ctx.entity_id_of(check),
+                    ctx.entity_id_of(pusher),
+                    ctx.entity_id_of(pusher),
                     None,
                     [0.0, 0.0, 0.0],
                     99999,
@@ -1333,9 +1333,9 @@ pub fn Blocked_Door(ctx: GameContext<'_>, ent: EntityId, other: Option<EntityId>
             // is itself an unported stub either way.
             G_Damage(
                 ctx,
-                other,
-                ent,
-                ent,
+                ctx.entity_id_of(other),
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
                 None,
                 [0.0, 0.0, 0.0],
                 (*ent).damage,
@@ -2863,9 +2863,9 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: EntityId) {
             {
                 G_Damage(
                     ctx,
-                    other,
-                    self_,
-                    self_,
+                    ctx.entity_id_of(other),
+                    ctx.entity_id_of(self_),
+                    ctx.entity_id_of(self_),
                     None,
                     [0.0, 0.0, 0.0],
                     99999,
@@ -2974,11 +2974,11 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: EntityId) {
             G_RadiusDamage(
                 ctx,
                 org,
-                self_,
+                ctx.entity_id_of(self_),
                 (*self_).splashDamage as f32,
                 (*self_).splashRadius as f32,
-                self_,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 meansOfDeath_t::MOD_UNKNOWN as c_int,
             );
 

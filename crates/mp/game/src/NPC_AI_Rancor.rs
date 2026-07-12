@@ -391,9 +391,9 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
                     {
                         crate::g_combat::G_Damage(
                             ctx,
-                            radiusEnt,
-                            npc,
-                            npc,
+                            ctx.entity_id_of(radiusEnt),
+                            ctx.entity_id_of(npc),
+                            ctx.entity_id_of(npc),
                             Some(&mut [0.0; 3]),
                             (*radiusEnt).r.currentOrigin,
                             (*ctx.world).bg_state.rng.Q_irand(25, 40),
@@ -403,7 +403,8 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
                         crate::g_utils::G_Throw(ctx, radiusEnt, pushDir, 250.0);
                         if (*radiusEnt).health > 0 {
                             //do pain on enemy
-                            crate::g_combat::G_Knockdown(ctx, radiusEnt); //, NPC, pushDir, 100, qtrue );
+                            crate::g_combat::G_Knockdown(ctx, ctx.entity_id_of(radiusEnt));
+                            //, NPC, pushDir, 100, qtrue );
                         }
                     }
                 }
@@ -477,9 +478,9 @@ pub fn Rancor_Smash(ctx: GameContext<'_>) {
                     //close enough to do damage, too
                     crate::g_combat::G_Damage(
                         ctx,
-                        radiusEnt,
-                        npc,
-                        npc,
+                        ctx.entity_id_of(radiusEnt),
+                        ctx.entity_id_of(npc),
+                        ctx.entity_id_of(npc),
                         Some(&mut [0.0; 3]),
                         (*radiusEnt).r.currentOrigin,
                         (*ctx.world).bg_state.rng.Q_irand(10, 25),
@@ -499,7 +500,8 @@ pub fn Rancor_Smash(ctx: GameContext<'_>) {
                             != ENTITYNUM_NONE
                     {
                         //within range of my fist or withing ground-shaking range and not in the air
-                        crate::g_combat::G_Knockdown(ctx, radiusEnt); //, NPC, vec3_origin, 100, qtrue );
+                        crate::g_combat::G_Knockdown(ctx, ctx.entity_id_of(radiusEnt));
+                        //, NPC, vec3_origin, 100, qtrue );
                     }
                 }
             }
@@ -553,9 +555,9 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
             if DistanceSquared((*radiusEnt).r.currentOrigin, boltOrg) <= radiusSquared {
                 crate::g_combat::G_Damage(
                     ctx,
-                    radiusEnt,
-                    npc,
-                    npc,
+                    ctx.entity_id_of(radiusEnt),
+                    ctx.entity_id_of(npc),
+                    ctx.entity_id_of(npc),
                     Some(&mut [0.0; 3]),
                     (*radiusEnt).r.currentOrigin,
                     (*ctx.world).bg_state.rng.Q_irand(15, 30),
@@ -591,8 +593,8 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
                         //FIXME: the limb should just disappear, cuz I ate it
                         crate::g_combat::G_Dismember(
                             ctx,
-                            radiusEnt,
-                            npc,
+                            ctx.entity_id_of(radiusEnt).unwrap(),
+                            ctx.entity_id_of(npc),
                             (*radiusEnt).r.currentOrigin,
                             hitLoc,
                             90.0,
@@ -666,7 +668,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                         );
                         if !(*activator).NPC.is_null() {
                             //no more thinking for you
-                            crate::g_combat::TossClientItems(ctx, npc);
+                            crate::g_combat::TossClientItems(ctx, ctx.entity_id_of(npc).unwrap());
                             (*((*activator).NPC as *mut gNPC_t)).nextBStateThink = Q3_INFINITE;
                         }
                     }
@@ -761,9 +763,9 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                         let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
                         crate::g_combat::G_Damage(
                             ctx,
-                            activator,
-                            npc,
-                            npc,
+                            ctx.entity_id_of(activator),
+                            ctx.entity_id_of(npc),
+                            ctx.entity_id_of(npc),
                             Some(&mut [0.0; 3]),
                             (*activator).r.currentOrigin,
                             (*ctx.world).bg_state.rng.Q_irand(25, 40),
@@ -777,8 +779,8 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                             let activator_client = (*activator).client as *mut gclient_t;
                             crate::g_combat::G_Dismember(
                                 ctx,
-                                activator,
-                                npc,
+                                ctx.entity_id_of(activator).unwrap(),
+                                ctx.entity_id_of(npc),
                                 (*activator).r.currentOrigin,
                                 G2_MODELPART_HEAD as c_int,
                                 90.0,
@@ -817,8 +819,8 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                             //NPC->activator->client->dismembered = qfalse;
                             crate::g_combat::G_Dismember(
                                 ctx,
-                                activator,
-                                npc,
+                                ctx.entity_id_of(activator).unwrap(),
+                                ctx.entity_id_of(npc),
                                 (*activator).r.currentOrigin,
                                 G2_MODELPART_WAIST as c_int,
                                 90.0,
@@ -831,9 +833,9 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                         //KILL
                         crate::g_combat::G_Damage(
                             ctx,
-                            activator,
-                            npc,
-                            npc,
+                            ctx.entity_id_of(activator),
+                            ctx.entity_id_of(npc),
+                            ctx.entity_id_of(npc),
                             Some(&mut [0.0; 3]),
                             (*activator).r.currentOrigin,
                             (*crate::ent_id::resolve(ent_base, (*npc).enemy)).health + 10,
@@ -899,8 +901,8 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                             let activator_client = (*activator).client as *mut gclient_t;
                             crate::g_combat::G_Dismember(
                                 ctx,
-                                activator,
-                                npc,
+                                ctx.entity_id_of(activator).unwrap(),
+                                ctx.entity_id_of(npc),
                                 (*activator).r.currentOrigin,
                                 G2_MODELPART_WAIST as c_int,
                                 90.0,
@@ -912,9 +914,9 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                             //KILL
                             crate::g_combat::G_Damage(
                                 ctx,
-                                activator,
-                                npc,
-                                npc,
+                                ctx.entity_id_of(activator),
+                                ctx.entity_id_of(npc),
+                                ctx.entity_id_of(npc),
                                 Some(&mut [0.0; 3]),
                                 (*activator).r.currentOrigin,
                                 (*crate::ent_id::resolve(ent_base, (*npc).enemy)).health + 10,
@@ -1251,9 +1253,9 @@ pub fn Rancor_Crush(ctx: GameContext<'_>) {
             //a humanoid, smash them good.
             crate::g_combat::G_Damage(
                 ctx,
-                crush as *mut gentity_t,
-                npc,
-                npc,
+                ctx.entity_id_of(crush as *mut gentity_t),
+                ctx.entity_id_of(npc),
+                ctx.entity_id_of(npc),
                 None,
                 (*npc).r.currentOrigin,
                 200,

@@ -144,11 +144,11 @@ pub fn auto_turret_die(
             G_RadiusDamage(
                 ctx,
                 (*self_).r.currentOrigin,
-                attacker,
+                ctx.entity_id_of(attacker),
                 (*self_).splashDamage as f32,
                 (*self_).splashRadius as f32,
-                attacker,
-                std::ptr::null_mut(),
+                ctx.entity_id_of(attacker),
+                ctx.entity_id_of(std::ptr::null_mut()),
                 MOD_UNKNOWN as c_int,
             );
         }
@@ -180,7 +180,14 @@ pub fn auto_turret_die(
                 G_UseTargets(ctx, self_, attacker);
             }
         } else {
-            ObjectDie(ctx, self_, inflictor, attacker, damage, meansOfDeath);
+            ObjectDie(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(inflictor),
+                ctx.entity_id_of(attacker),
+                damage,
+                meansOfDeath,
+            );
         }
     }
 }

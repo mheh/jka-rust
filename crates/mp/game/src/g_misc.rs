@@ -2284,11 +2284,11 @@ pub fn fx_runner_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
             G_RadiusDamage(
                 ctx,
                 (*ent).r.currentOrigin,
-                ent,
+                ctx.entity_id_of(ent),
                 (*ent).splashDamage as f32,
                 (*ent).splashRadius as f32,
-                ent,
-                ent,
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
                 MOD_UNKNOWN as c_int,
             );
         }
@@ -2664,7 +2664,12 @@ pub fn Use_Target_Escapetrig(
                     && (*((*e).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW == 0
                 {
                     // all of the survivors get 100 points!
-                    AddScore(ctx, e, (*((*e).client as *mut gclient_t)).ps.origin, 100);
+                    AddScore(
+                        ctx,
+                        ctx.entity_id_of(e).unwrap(),
+                        (*((*e).client as *mut gclient_t)).ps.origin,
+                        100,
+                    );
                 }
                 i += 1;
             }
@@ -2672,7 +2677,7 @@ pub fn Use_Target_Escapetrig(
                 // the one who escaped gets 500
                 AddScore(
                     ctx,
-                    activator,
+                    ctx.entity_id_of(activator).unwrap(),
                     (*((*activator).client as *mut gclient_t)).ps.origin,
                     500,
                 );

@@ -120,18 +120,25 @@ fn sec_hitloc(o: &mut String, ctx: GameContext<'_>) {
         if tok.is_empty() || tok[0].starts_with('#') || tok[0] != "h" {
             continue;
         }
-        let mut ent: gentity_t = unsafe { core::mem::zeroed() };
+        // Safe-state Stage 1: `G_GetHitLocation` takes an `EntityId`, so the
+        // target lives in the world arena (slot 0); its `client` points at a
+        // stack `gclient_t` as before.
+        let id = EntityId::from_num(0).unwrap();
         let mut client: gclient_t = unsafe { core::mem::zeroed() };
-        ent.client = &mut client as *mut gclient_t as *mut c_void;
-        ent.r.currentAngles[YAW] = pf(tok[1]);
-        ent.r.absmin = [pf(tok[2]), pf(tok[3]), pf(tok[4])];
-        ent.r.absmax = [pf(tok[5]), pf(tok[6]), pf(tok[7])];
-        ent.r.mins[0] = pf(tok[8]);
-        ent.r.mins[1] = pf(tok[9]);
-        ent.r.maxs[0] = pf(tok[10]);
-        ent.r.maxs[1] = pf(tok[11]);
+        {
+            let ent = ctx.entity_mut(id);
+            *ent = unsafe { core::mem::zeroed() };
+            ent.client = &mut client as *mut gclient_t as *mut c_void;
+            ent.r.currentAngles[YAW] = pf(tok[1]);
+            ent.r.absmin = [pf(tok[2]), pf(tok[3]), pf(tok[4])];
+            ent.r.absmax = [pf(tok[5]), pf(tok[6]), pf(tok[7])];
+            ent.r.mins[0] = pf(tok[8]);
+            ent.r.mins[1] = pf(tok[9]);
+            ent.r.maxs[0] = pf(tok[10]);
+            ent.r.maxs[1] = pf(tok[11]);
+        }
         let ppoint: vec3_t = [pf(tok[12]), pf(tok[13]), pf(tok[14])];
-        let hl = G_GetHitLocation(ctx, &mut ent, ppoint);
+        let hl = G_GetHitLocation(ctx, id, ppoint);
         let _ = writeln!(o, "h {idx} hl {hl}");
         idx += 1;
     }
@@ -150,9 +157,11 @@ fn sec_armor(o: &mut String, ctx: GameContext<'_>) {
         if tok.is_empty() || tok[0].starts_with('#') || tok[0] != "a" {
             continue;
         }
-        let mut ent: gentity_t = unsafe { core::mem::zeroed() };
+        // Safe-state Stage 1: `CheckArmor` takes an `EntityId`, so the target
+        // lives in the world arena (slot 0); its `client` points at a stack
+        // `gclient_t` as before.
+        let id = EntityId::from_num(0).unwrap();
         let mut client: gclient_t = unsafe { core::mem::zeroed() };
-        ent.client = &mut client as *mut gclient_t as *mut c_void;
         client.ps.stats[STAT_ARMOR as usize] = pi(tok[1]);
         client.NPC_class = if pi(tok[2]) != 0 {
             class_t::CLASS_VEHICLE
@@ -160,18 +169,23 @@ fn sec_armor(o: &mut String, ctx: GameContext<'_>) {
             class_t::CLASS_NONE
         };
         client.ps.electrifyTime = pi(tok[3]);
-        ent.m_pVehicle = if pi(tok[4]) != 0 {
-            &mut dummy_veh as *mut u8 as *mut c_void
-        } else {
-            core::ptr::null_mut()
-        };
+        {
+            let ent = ctx.entity_mut(id);
+            *ent = unsafe { core::mem::zeroed() };
+            ent.client = &mut client as *mut gclient_t as *mut c_void;
+            ent.m_pVehicle = if pi(tok[4]) != 0 {
+                &mut dummy_veh as *mut u8 as *mut c_void
+            } else {
+                core::ptr::null_mut()
+            };
+        }
         // SAFETY: `ctx.world` is the live boxed GameWorld built in the test.
         unsafe {
             (*ctx.world).level.time = pi(tok[5]);
         }
         let damage = pi(tok[6]);
         let dflags = pi(tok[7]);
-        let r = CheckArmor(ctx, &mut ent, damage, dflags);
+        let r = CheckArmor(ctx, id, damage, dflags);
         let armor = client.ps.stats[STAT_ARMOR as usize];
         let _ = writeln!(o, "a {idx} ret {r} armor {armor}");
         idx += 1;

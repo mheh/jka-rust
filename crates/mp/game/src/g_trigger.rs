@@ -917,11 +917,11 @@ pub fn Do_Strike(ctx: GameContext<'_>, ent: EntityId) {
             G_RadiusDamage(
                 ctx,
                 strike_point,
-                ent,
+                ctx.entity_id_of(ent),
                 (*ent).damage as f32,
                 (*ent).radius,
-                ent,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 MOD_SUICIDE as c_int,
             );
         } else {
@@ -933,9 +933,9 @@ pub fn Do_Strike(ctx: GameContext<'_>, ent: EntityId) {
                 // damage it then
                 G_Damage(
                     ctx,
-                    tr_hit,
-                    ent,
-                    ent,
+                    ctx.entity_id_of(tr_hit),
+                    ctx.entity_id_of(ent),
+                    ctx.entity_id_of(ent),
                     None,
                     (*tr_hit).r.currentOrigin,
                     (*ent).damage,
@@ -1596,9 +1596,9 @@ pub fn hurt_touch(
                 let mut v_dir: vec3_t = [0.0, 1.0, 0.0];
                 G_Damage(
                     ctx,
-                    other,
-                    other,
-                    other,
+                    ctx.entity_id_of(other),
+                    ctx.entity_id_of(other),
+                    ctx.entity_id_of(other),
                     Some(&mut v_dir),
                     (*other_client).ps.origin,
                     Q3_INFINITE,
@@ -1630,9 +1630,9 @@ pub fn hurt_touch(
             {
                 G_Damage(
                     ctx,
-                    other,
-                    activator_ptr,
-                    activator_ptr,
+                    ctx.entity_id_of(other),
+                    ctx.entity_id_of(activator_ptr),
+                    ctx.entity_id_of(activator_ptr),
                     None,
                     vec3_origin,
                     dmg,
@@ -1642,9 +1642,9 @@ pub fn hurt_touch(
             } else {
                 G_Damage(
                     ctx,
-                    other,
-                    self_,
-                    self_,
+                    ctx.entity_id_of(other),
+                    ctx.entity_id_of(self_),
+                    ctx.entity_id_of(self_),
                     None,
                     vec3_origin,
                     dmg,
@@ -1826,9 +1826,9 @@ pub fn shipboundary_touch(
             // parts missing, just blow the thing up
             G_Damage(
                 ctx,
-                other,
-                other,
-                other,
+                ctx.entity_id_of(other),
+                ctx.entity_id_of(other),
+                ctx.entity_id_of(other),
                 None,
                 (*other_client).ps.origin,
                 99999,
@@ -2106,9 +2106,9 @@ pub fn hyperspace_touch(
                 // with parts missing, just blow the thing up
                 G_Damage(
                     ctx,
-                    other,
-                    other,
-                    other,
+                    ctx.entity_id_of(other),
+                    ctx.entity_id_of(other),
+                    ctx.entity_id_of(other),
                     None,
                     (*other_client).ps.origin,
                     99999,

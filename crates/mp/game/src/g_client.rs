@@ -3435,7 +3435,7 @@ pub fn ClientDisconnect(ctx: GameContext<'_>, clientNum: c_int) {
 
             // They don't get to take powerups with them!
             // Especially important for stuff like CTF flags
-            TossClientItems(ctx, ent);
+            TossClientItems(ctx, ctx.entity_id_of(ent).unwrap());
         }
 
         G_LogPrintf(

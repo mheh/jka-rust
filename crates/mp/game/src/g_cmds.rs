@@ -1077,7 +1077,14 @@ pub fn Cmd_Kill_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).flags &= !FL_GODMODE;
         (*client).ps.stats[STAT_HEALTH as usize] = -999;
         (*ent).health = -999;
-        crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_SUICIDE as c_int);
+        crate::g_combat::player_die(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            ctx.entity_id_of(ent),
+            ctx.entity_id_of(ent),
+            100000,
+            MOD_SUICIDE as c_int,
+        );
     }
 }
 
@@ -1366,9 +1373,9 @@ pub fn SetTeam(ctx: GameContext<'_>, ent: *mut gentity_t, s: *mut c_char) {
                         (*ent).health = 0;
                         crate::g_combat::player_die(
                             ctx,
-                            ent,
-                            ent,
-                            ent,
+                            ctx.entity_id_of(ent).unwrap(),
+                            ctx.entity_id_of(ent),
+                            ctx.entity_id_of(ent),
                             100000,
                             MOD_TEAM_CHANGE as c_int,
                         );
@@ -1417,7 +1424,14 @@ pub fn SetTeam(ctx: GameContext<'_>, ent: *mut gentity_t, s: *mut c_char) {
             (*client).ps.stats[STAT_HEALTH as usize] = 0;
             (*ent).health = 0;
             (*world).globals.g_dontPenalizeTeam = qtrue;
-            crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_SUICIDE as c_int);
+            crate::g_combat::player_die(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
+                100000,
+                MOD_SUICIDE as c_int,
+            );
             (*world).globals.g_dontPenalizeTeam = qfalse;
         }
         if team == TEAM_SPECTATOR {
@@ -1695,9 +1709,9 @@ pub fn Cmd_DuelTeam_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*client).sess.duelTeam = oldTeam;
             crate::g_combat::G_Damage(
                 ctx,
-                ent,
-                ent,
-                ent,
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
                 None,
                 (*client).ps.origin,
                 99999,
@@ -1873,7 +1887,14 @@ pub fn Cmd_SiegeClass_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 (*ent).flags &= !FL_GODMODE;
                 (*client).ps.stats[STAT_HEALTH as usize] = 0;
                 (*ent).health = 0;
-                crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_SUICIDE as c_int);
+                crate::g_combat::player_die(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(ent),
+                    ctx.entity_id_of(ent),
+                    100000,
+                    MOD_SUICIDE as c_int,
+                );
             }
 
             if (*client).sess.sessionTeam == TEAM_SPECTATOR || startedAsSpec != qfalse {
@@ -4951,9 +4972,9 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                         (*kEnt).health = -999;
                         crate::g_combat::player_die(
                             ctx,
-                            kEnt,
-                            kEnt,
-                            kEnt,
+                            ctx.entity_id_of(kEnt).unwrap(),
+                            ctx.entity_id_of(kEnt),
+                            ctx.entity_id_of(kEnt),
                             100000,
                             MOD_SUICIDE as c_int,
                         );
@@ -5068,7 +5089,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                         iArg = atoi_str(&cstr_to_str(arg.as_ptr()));
                     }
                 }
-                crate::g_combat::DismembermentByNum(ctx, ent, iArg);
+                crate::g_combat::DismembermentByNum(ctx, ctx.entity_id_of(ent).unwrap(), iArg);
             }
         } else if cmd_s.eq_ignore_ascii_case("debugDropSaber") {
             let client = (*ent).client as *mut gclient_t;

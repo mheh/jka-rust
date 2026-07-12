@@ -1395,11 +1395,11 @@ pub fn turret_die(
         G_RadiusDamage(
             ctx,
             (*self_).s.pos.trBase,
-            owner,
+            ctx.entity_id_of(owner),
             30.0,
             256.0,
-            self_,
-            self_,
+            ctx.entity_id_of(self_),
+            ctx.entity_id_of(self_),
             MOD_UNKNOWN as c_int,
         );
 
@@ -2034,11 +2034,11 @@ pub fn EWebDie(
         G_RadiusDamage(
             ctx,
             (*self_).r.currentOrigin,
-            self_,
+            ctx.entity_id_of(self_),
             EWEB_DEATH_DMG,
             EWEB_DEATH_RADIUS,
-            self_,
-            self_,
+            ctx.entity_id_of(self_),
+            ctx.entity_id_of(self_),
             MOD_SUICIDE as c_int,
         );
 

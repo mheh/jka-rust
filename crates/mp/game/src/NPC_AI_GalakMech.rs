@@ -1062,9 +1062,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                                 );
                                 crate::g_combat::G_Damage(
                                     ctx,
-                                    trace_ent,
-                                    npc_ent,
-                                    npc_ent,
+                                    ctx.entity_id_of(trace_ent),
+                                    ctx.entity_id_of(npc_ent),
+                                    ctx.entity_id_of(npc_ent),
                                     Some(&mut (*client).renderInfo.muzzleDir),
                                     trace.endpos,
                                     10,
@@ -1493,9 +1493,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     (*client).ps.powerups[PW_BATTLESUIT as usize] = level_time + ARMOR_EFFECT_TIME;
                     crate::g_combat::G_Damage(
                         ctx,
-                        enemy_ent,
-                        npc_ent,
-                        npc_ent,
+                        ctx.entity_id_of(enemy_ent),
+                        ctx.entity_id_of(npc_ent),
+                        ctx.entity_id_of(npc_ent),
                         None,
                         (*npc_ent).r.currentOrigin,
                         100,
@@ -1505,9 +1505,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 } else {
                     crate::g_combat::G_Damage(
                         ctx,
-                        enemy_ent,
-                        npc_ent,
-                        npc_ent,
+                        ctx.entity_id_of(enemy_ent),
+                        ctx.entity_id_of(npc_ent),
+                        ctx.entity_id_of(npc_ent),
                         None,
                         (*npc_ent).r.currentOrigin,
                         100,
@@ -1547,9 +1547,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 VectorNormalize(&mut smackDir);
                 crate::g_combat::G_Damage(
                     ctx,
-                    enemy_ent,
-                    npc_ent,
-                    npc_ent,
+                    ctx.entity_id_of(enemy_ent),
+                    ctx.entity_id_of(npc_ent),
+                    ctx.entity_id_of(npc_ent),
                     Some(&mut smackDir),
                     (*npc_ent).r.currentOrigin,
                     ((*ctx.world).cvars.g_spskill.integer + 1)

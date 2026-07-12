@@ -441,9 +441,9 @@ pub fn Blocked_Mover(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gent
             // so the zero vector (`vec3_origin`) remains the stand-in there.
             G_Damage(
                 ctx,
-                other,
-                ent,
-                ent,
+                ctx.entity_id_of(other),
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
                 None,
                 vec3_origin,
                 (*ent).damage,
@@ -2156,7 +2156,14 @@ pub fn Q3_SetHealth(ctx: GameContext<'_>, entID: c_int, data: c_int) {
             (*ent).flags &= !FL_GODMODE;
             (*ent).health = -999;
             (*client).ps.stats[STAT_HEALTH as usize] = (*ent).health;
-            player_die(ctx, ent, ent, ent, 100000, MOD_FALLING as c_int);
+            player_die(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
+                100000,
+                MOD_FALLING as c_int,
+            );
         }
     }
 }

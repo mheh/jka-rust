@@ -610,9 +610,9 @@ pub fn NPC_Mark1_Pain(
         {
             crate::g_combat::G_Damage(
                 ctx,
-                self_,
-                core::ptr::null_mut(),
-                core::ptr::null_mut(),
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(core::ptr::null_mut()),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 None,
                 [0.0, 0.0, 0.0],
                 (*self_).health,

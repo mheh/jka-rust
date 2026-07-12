@@ -332,7 +332,12 @@ pub fn turretG2_die(
             && OnSameTeam(ctx, attacker, self_) == 0
         {
             // give them a point for the kill
-            AddScore(ctx, attacker, (*self_).r.currentOrigin, 1);
+            AddScore(
+                ctx,
+                ctx.entity_id_of(attacker).unwrap(),
+                (*self_).r.currentOrigin,
+                1,
+            );
         }
 
         // hack the effect angle so that explode death can orient the effect properly
@@ -351,11 +356,11 @@ pub fn turretG2_die(
             G_RadiusDamage(
                 ctx,
                 (*self_).r.currentOrigin,
-                attacker,
+                ctx.entity_id_of(attacker),
                 (*self_).splashDamage as f32,
                 (*self_).splashRadius as f32,
-                attacker,
-                core::ptr::null_mut(),
+                ctx.entity_id_of(attacker),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 MOD_UNKNOWN as c_int,
             );
         }
@@ -385,7 +390,14 @@ pub fn turretG2_die(
                 }
             }
         } else {
-            ObjectDie(ctx, self_, inflictor, attacker, damage, meansOfDeath);
+            ObjectDie(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(inflictor),
+                ctx.entity_id_of(attacker),
+                damage,
+                meansOfDeath,
+            );
         }
     }
 }

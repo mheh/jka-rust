@@ -498,7 +498,15 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 Some(&mut *(dir as *mut vec3_t))
             };
             crate::g_combat::G_Damage(
-                ctx, targ, inflictor, attacker, dir, *point, damage, dflags, mod_,
+                ctx,
+                ctx.entity_id_of(targ),
+                ctx.entity_id_of(inflictor),
+                ctx.entity_id_of(attacker),
+                dir,
+                *point,
+                damage,
+                dflags,
+                mod_,
             );
         }
     }
@@ -530,7 +538,14 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             let pVehEnt = &mut (*self.world).g_entities[inflictorNum as usize] as *mut gentity_t;
             let attacker = &mut (*self.world).g_entities[attackerNum as usize] as *mut gentity_t;
             crate::g_combat::G_DamageFromKiller(
-                ctx, pEnt, pVehEnt, attacker, *point, damage, dflags, mod_,
+                ctx,
+                ctx.entity_id_of(pEnt),
+                ctx.entity_id_of(pVehEnt),
+                ctx.entity_id_of(attacker),
+                *point,
+                damage,
+                dflags,
+                mod_,
             );
         }
     }

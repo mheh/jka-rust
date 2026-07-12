@@ -161,9 +161,9 @@ pub fn Howler_TryDamage(ctx: GameContext<'_>, enemy: *mut gentity_t, damage: c_i
         if tr.entityNum != ENTITYNUM_WORLD as c_short {
             crate::g_combat::G_Damage(
                 ctx,
-                &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t,
-                npc,
-                npc,
+                EntityId::from_num(tr.entityNum as c_int),
+                ctx.entity_id_of(npc),
+                ctx.entity_id_of(npc),
                 Some(&mut dir),
                 tr.endpos,
                 damage,

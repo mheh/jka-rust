@@ -324,9 +324,9 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
                 let mut origin = vec3_origin;
                 crate::g_combat::G_Damage(
                     ctx,
-                    radiusEnt,
-                    npc,
-                    npc,
+                    ctx.entity_id_of(radiusEnt),
+                    ctx.entity_id_of(npc),
+                    ctx.entity_id_of(npc),
                     Some(&mut origin),
                     (*radiusEnt).r.currentOrigin,
                     damage,
@@ -402,8 +402,8 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
                         }
                         crate::g_combat::G_Dismember(
                             ctx,
-                            radiusEnt,
-                            npc,
+                            ctx.entity_id_of(radiusEnt).unwrap(),
+                            ctx.entity_id_of(npc),
                             (*radiusEnt).r.currentOrigin,
                             hitLoc,
                             90.0,
@@ -425,7 +425,7 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
                     angs[crate::prelude::PITCH as usize] =
                         (*ctx.world).bg_state.rng.flrand(-25.0, -15.0);
                     crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
-                    crate::g_combat::G_Knockdown(ctx, radiusEnt);
+                    crate::g_combat::G_Knockdown(ctx, ctx.entity_id_of(radiusEnt));
                 }
                 crate::g_utils::G_Sound(
                     ctx,

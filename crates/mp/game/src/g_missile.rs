@@ -331,11 +331,11 @@ pub fn G_ExplodeMissile(ctx: GameContext<'_>, ent: EntityId) {
         if G_RadiusDamage(
             ctx,
             currentOrigin,
-            parent_ptr,
+            ctx.entity_id_of(parent_ptr),
             splashDamage as f32,
             splashRadius as f32,
-            ctx.entity_mut(ent),
-            ctx.entity_mut(ent),
+            ctx.entity_id_of(ctx.entity_mut(ent)),
+            ctx.entity_id_of(ctx.entity_mut(ent)),
             splashMod,
         ) != 0
         {
@@ -383,9 +383,9 @@ pub fn G_RunStuckMissile(ctx: GameContext<'_>, ent: EntityId) {
                 // Thing I stuck to is moving or rotating now, kill me
                 G_Damage(
                     ctx,
-                    ctx.entity_mut(ent),
-                    ctx.entity_mut(other),
-                    ctx.entity_mut(other),
+                    ctx.entity_id_of(ctx.entity_mut(ent)),
+                    ctx.entity_id_of(ctx.entity_mut(other)),
+                    ctx.entity_id_of(ctx.entity_mut(other)),
                     None,
                     crate::q_math::vec3_origin,
                     99999,
@@ -587,11 +587,11 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                     if G_RadiusDamage(
                         ctx,
                         tr.endpos,
-                        ent_resolve_opt(ctx, (*ent).parent),
+                        ctx.entity_id_of(ent_resolve_opt(ctx, (*ent).parent)),
                         (*ent).splashDamage as f32,
                         (*ent).splashRadius as f32,
-                        other,
-                        ent,
+                        ctx.entity_id_of(other),
+                        ctx.entity_id_of(ent),
                         (*ent).splashMethodOfDeath,
                     ) != 0
                     {
@@ -646,11 +646,11 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                     if G_RadiusDamage(
                         ctx,
                         tr.endpos,
-                        ent_resolve_opt(ctx, (*ent).parent),
+                        ctx.entity_id_of(ent_resolve_opt(ctx, (*ent).parent)),
                         (*ent).splashDamage as f32,
                         (*ent).splashRadius as f32,
-                        other,
-                        ent,
+                        ctx.entity_id_of(other),
+                        ctx.entity_id_of(ent),
                         (*ent).splashMethodOfDeath,
                     ) != 0
                     {
@@ -938,9 +938,9 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                     } else {
                         G_Damage(
                             ctx,
-                            other,
-                            ent,
-                            &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize],
+                            ctx.entity_id_of(other),
+                            ctx.entity_id_of(ent),
+                            EntityId::from_num((*ent).r.ownerNum),
                             Some(&mut velocity),
                             (*ent).r.currentOrigin,
                             (*ent).damage,
@@ -952,9 +952,9 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 } else {
                     G_Damage(
                         ctx,
-                        other,
-                        ent,
-                        &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize],
+                        ctx.entity_id_of(other),
+                        ctx.entity_id_of(ent),
+                        EntityId::from_num((*ent).r.ownerNum),
                         Some(&mut velocity),
                         (*ent).r.currentOrigin,
                         (*ent).damage,
@@ -1070,11 +1070,11 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
             if G_RadiusDamage(
                 ctx,
                 tr.endpos,
-                ent_resolve_opt(ctx, (*ent).parent),
+                ctx.entity_id_of(ent_resolve_opt(ctx, (*ent).parent)),
                 (*ent).splashDamage as f32,
                 (*ent).splashRadius as f32,
-                other,
-                ent,
+                ctx.entity_id_of(other),
+                ctx.entity_id_of(ent),
                 (*ent).splashMethodOfDeath,
             ) != 0
             {

@@ -1963,9 +1963,9 @@ pub fn ForceLightningDamage(
                         //rww - Shields can now absorb lightning too.
                         G_Damage(
                             ctx,
-                            traceEnt,
-                            self_,
-                            self_,
+                            ctx.entity_id_of(traceEnt),
+                            ctx.entity_id_of(self_),
+                            ctx.entity_id_of(self_),
                             Some(&mut dir),
                             impactPoint,
                             dmg,
@@ -3857,7 +3857,12 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                                 ];
                                 VectorNormalize(&mut vecnorm);
 
-                                TossClientWeapon(ctx, push_list[x], vecnorm, 500.0);
+                                TossClientWeapon(
+                                    ctx,
+                                    ctx.entity_id_of(push_list[x]).unwrap(),
+                                    vecnorm,
+                                    500.0,
+                                );
                             }
                         }
                     } else {
@@ -4375,9 +4380,9 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
             (*cl).ps.fd.forcePowerDebounce[FP_GRIP as usize] = level_time + 1000;
             G_Damage(
                 ctx,
-                gripEnt,
-                self_,
-                self_,
+                ctx.entity_id_of(gripEnt),
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(self_),
                 None,
                 [0.0; 3],
                 2,
@@ -4422,9 +4427,9 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
                 (*cl).ps.fd.forceGripDamageDebounceTime = 1;
                 G_Damage(
                     ctx,
-                    gripEnt,
-                    self_,
-                    self_,
+                    ctx.entity_id_of(gripEnt),
+                    ctx.entity_id_of(self_),
+                    ctx.entity_id_of(self_),
                     None,
                     [0.0; 3],
                     20,
@@ -4517,9 +4522,9 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
                 (*cl).ps.fd.forceGripDamageDebounceTime = 1;
                 G_Damage(
                     ctx,
-                    gripEnt,
-                    self_,
-                    self_,
+                    ctx.entity_id_of(gripEnt),
+                    ctx.entity_id_of(self_),
+                    ctx.entity_id_of(self_),
                     None,
                     [0.0; 3],
                     40,

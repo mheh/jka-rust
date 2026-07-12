@@ -4052,9 +4052,9 @@ pub fn WP_SaberApplyDamage(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
             G_Damage(
                 ctx,
-                victim,
-                self_,
-                self_,
+                ctx.entity_id_of(victim),
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(self_),
                 Some(&mut (*ctx.world).globals.dmgDir[iu]),
                 (*ctx.world).globals.dmgSpot[iu],
                 (*ctx.world).globals.totalDmg[iu] as c_int,
@@ -4231,9 +4231,9 @@ pub fn WP_SaberRadiusDamage(
                     let mut zeroDir = vec3_origin;
                     G_Damage(
                         ctx,
-                        radiusEnt,
-                        ent,
-                        ent,
+                        ctx.entity_id_of(radiusEnt),
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(ent),
                         Some(&mut zeroDir),
                         (*radiusEnt).r.currentOrigin,
                         10,
@@ -4261,9 +4261,9 @@ pub fn WP_SaberRadiusDamage(
                     let mut zeroDir = vec3_origin;
                     G_Damage(
                         ctx,
-                        radiusEnt,
-                        ent,
-                        ent,
+                        ctx.entity_id_of(radiusEnt),
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(ent),
                         Some(&mut zeroDir),
                         (*radiusEnt).r.currentOrigin,
                         points,
@@ -4290,7 +4290,7 @@ pub fn WP_SaberRadiusDamage(
                                 if dist < (radius * 0.5)
                                     || (*rClient).ps.groundEntityNum != ENTITYNUM_NONE
                                 {
-                                    G_Knockdown(ctx, radiusEnt);
+                                    G_Knockdown(ctx, ctx.entity_id_of(radiusEnt));
                                 }
                             }
                         }
@@ -6807,9 +6807,9 @@ pub fn CheckThrownSaberDamaged(
                             // 2x damage for the Jedi Master
                             G_Damage(
                                 ctx,
-                                ent,
-                                saberOwner,
-                                saberOwner,
+                                ctx.entity_id_of(ent),
+                                ctx.entity_id_of(saberOwner),
+                                ctx.entity_id_of(saberOwner),
                                 Some(&mut dir),
                                 tr.endpos,
                                 (*saberent).damage * 2,
@@ -6819,9 +6819,9 @@ pub fn CheckThrownSaberDamaged(
                         } else {
                             G_Damage(
                                 ctx,
-                                ent,
-                                saberOwner,
-                                saberOwner,
+                                ctx.entity_id_of(ent),
+                                ctx.entity_id_of(saberOwner),
+                                ctx.entity_id_of(saberOwner),
                                 Some(&mut dir),
                                 tr.endpos,
                                 (*saberent).damage,
@@ -6933,9 +6933,9 @@ pub fn CheckThrownSaberDamaged(
                         // an animent
                         G_Damage(
                             ctx,
-                            ent,
-                            saberOwner,
-                            saberOwner,
+                            ctx.entity_id_of(ent),
+                            ctx.entity_id_of(saberOwner),
+                            ctx.entity_id_of(saberOwner),
                             Some(&mut dir),
                             tr.endpos,
                             40,
@@ -6945,9 +6945,9 @@ pub fn CheckThrownSaberDamaged(
                     } else {
                         G_Damage(
                             ctx,
-                            ent,
-                            saberOwner,
-                            saberOwner,
+                            ctx.entity_id_of(ent),
+                            ctx.entity_id_of(saberOwner),
+                            ctx.entity_id_of(saberOwner),
                             Some(&mut dir),
                             tr.endpos,
                             5,
@@ -8897,9 +8897,9 @@ pub fn G_KickTrace(
                     if (*ctx.world).cvars.d_saberKickTweak.integer != 0 {
                         G_Damage(
                             ctx,
-                            hitEnt,
-                            ent,
-                            ent,
+                            ctx.entity_id_of(hitEnt),
+                            ctx.entity_id_of(ent),
+                            ctx.entity_id_of(ent),
                             Some(&mut kickDir),
                             trace.endpos,
                             (kickDamage as f32 * 0.2f32) as c_int,
@@ -8909,9 +8909,9 @@ pub fn G_KickTrace(
                     } else {
                         G_Damage(
                             ctx,
-                            hitEnt,
-                            ent,
-                            ent,
+                            ctx.entity_id_of(hitEnt),
+                            ctx.entity_id_of(ent),
+                            ctx.entity_id_of(ent),
                             Some(&mut kickDir),
                             trace.endpos,
                             kickDamage,
@@ -9767,9 +9767,9 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
 
                                     G_Damage(
                                         ctx,
-                                        grappler,
-                                        self_,
-                                        self_,
+                                        ctx.entity_id_of(grappler),
+                                        ctx.entity_id_of(self_),
+                                        ctx.entity_id_of(self_),
                                         None,
                                         (*client).ps.origin,
                                         10,
@@ -9795,9 +9795,9 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
 
                                     G_Damage(
                                         ctx,
-                                        grappler,
-                                        self_,
-                                        self_,
+                                        ctx.entity_id_of(grappler),
+                                        ctx.entity_id_of(self_),
+                                        ctx.entity_id_of(self_),
                                         None,
                                         (*client).ps.origin,
                                         10,
@@ -9821,9 +9821,9 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
 
                                     G_Damage(
                                         ctx,
-                                        grappler,
-                                        self_,
-                                        self_,
+                                        ctx.entity_id_of(grappler),
+                                        ctx.entity_id_of(self_),
+                                        ctx.entity_id_of(self_),
                                         None,
                                         (*client).ps.origin,
                                         30,
@@ -9866,9 +9866,9 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
 
                                     G_Damage(
                                         ctx,
-                                        grappler,
-                                        self_,
-                                        self_,
+                                        ctx.entity_id_of(grappler),
+                                        ctx.entity_id_of(self_),
+                                        ctx.entity_id_of(self_),
                                         None,
                                         (*client).ps.origin,
                                         20,
@@ -9902,9 +9902,9 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                                 if (*client).ps.torsoTimer < 1000 {
                                     G_Damage(
                                         ctx,
-                                        grappler,
-                                        self_,
-                                        self_,
+                                        ctx.entity_id_of(grappler),
+                                        ctx.entity_id_of(self_),
+                                        ctx.entity_id_of(self_),
                                         None,
                                         (*client).ps.origin,
                                         30,

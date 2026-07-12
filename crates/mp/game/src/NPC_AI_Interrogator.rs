@@ -468,9 +468,9 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
                     );
                     crate::g_combat::G_Damage(
                         ctx,
-                        enemy_ptr,
-                        npc,
-                        npc,
+                        ctx.entity_id_of(enemy_ptr),
+                        ctx.entity_id_of(npc),
+                        ctx.entity_id_of(npc),
                         None,
                         [0.0f32; 3],
                         2,

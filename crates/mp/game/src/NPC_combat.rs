@@ -123,8 +123,8 @@ pub fn G_AngerAlert(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
         G_AlertTeam(
             ctx,
-            self_,
-            ent_ptr(ctx, (*self_).enemy),
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(ent_ptr(ctx, (*self_).enemy)),
             ANGER_ALERT_RADIUS,
             ANGER_ALERT_SOUND_RADIUS,
         );

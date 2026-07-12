@@ -698,9 +698,9 @@ pub fn G_EjectDroidUnit(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, kill: qboole
             // nullable INs) — a zero vec3 stands in for the C NULL. See shape_mismatch.
             crate::g_combat::G_Damage(
                 ctx,
-                droidEnt,
-                core::ptr::null_mut(),
-                core::ptr::null_mut(),
+                ctx.entity_id_of(droidEnt),
+                ctx.entity_id_of(core::ptr::null_mut()),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 None,
                 (*droidEnt).s.origin,
                 10000,
@@ -734,9 +734,9 @@ pub fn EjectAll(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
                 crate::g_utils::G_MuteSound(ctx, (*pilot).s.number, CHAN_VOICE);
                 crate::g_combat::G_Damage(
                     ctx,
-                    pilot,
-                    core::ptr::null_mut(),
-                    core::ptr::null_mut(),
+                    ctx.entity_id_of(pilot),
+                    ctx.entity_id_of(core::ptr::null_mut()),
+                    ctx.entity_id_of(core::ptr::null_mut()),
                     None,
                     (*pilot).s.origin,
                     10000,
@@ -752,9 +752,9 @@ pub fn EjectAll(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
                 crate::g_utils::G_MuteSound(ctx, (*pilot).s.number, CHAN_VOICE);
                 crate::g_combat::G_Damage(
                     ctx,
-                    pilot,
-                    core::ptr::null_mut(),
-                    core::ptr::null_mut(),
+                    ctx.entity_id_of(pilot),
+                    ctx.entity_id_of(core::ptr::null_mut()),
+                    ctx.entity_id_of(core::ptr::null_mut()),
                     None,
                     (*pilot).s.origin,
                     10000,
@@ -779,9 +779,9 @@ pub fn EjectAll(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
                         crate::g_utils::G_MuteSound(ctx, (*rider).s.number, CHAN_VOICE);
                         crate::g_combat::G_Damage(
                             ctx,
-                            rider,
-                            core::ptr::null_mut(),
-                            core::ptr::null_mut(),
+                            ctx.entity_id_of(rider),
+                            ctx.entity_id_of(core::ptr::null_mut()),
+                            ctx.entity_id_of(core::ptr::null_mut()),
                             None,
                             (*rider).s.origin,
                             10000,
@@ -1112,9 +1112,9 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
                     // no longer in the game?
                     crate::g_combat::G_Damage(
                         ctx,
-                        parent,
-                        parent,
-                        parent,
+                        ctx.entity_id_of(parent),
+                        ctx.entity_id_of(parent),
+                        ctx.entity_id_of(parent),
                         None,
                         (*pclient).ps.origin,
                         99999,
@@ -1132,9 +1132,9 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
                         // dying time
                         crate::g_combat::G_Damage(
                             ctx,
-                            parent,
-                            parent,
-                            parent,
+                            ctx.entity_id_of(parent),
+                            ctx.entity_id_of(parent),
+                            ctx.entity_id_of(parent),
                             None,
                             (*pclient).ps.origin,
                             99999,
@@ -1387,9 +1387,9 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
                     / 180.0f32;
                 crate::g_combat::G_DamageFromKiller(
                     ctx,
-                    parent,
-                    parent,
-                    parent,
+                    ctx.entity_id_of(parent),
+                    ctx.entity_id_of(parent),
+                    ctx.entity_id_of(parent),
                     (*pclient).ps.origin,
                     dmg as c_int,
                     DAMAGE_NO_SELF_PROTECTION
@@ -1868,9 +1868,9 @@ pub fn G_VehicleDamageBoxSizing(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             // oh well, DIE!
             crate::g_combat::G_Damage(
                 ctx,
-                parent,
-                parent,
-                parent,
+                ctx.entity_id_of(parent),
+                ctx.entity_id_of(parent),
+                ctx.entity_id_of(parent),
                 None,
                 (*pcl).ps.origin,
                 9999,
@@ -2084,9 +2084,9 @@ pub fn G_SetVehDamageFlags(
                             let null_point: vec3_t = [0.0; 3];
                             crate::g_combat::G_Damage(
                                 ctx,
-                                droidEnt,
-                                enemy_ptr,
-                                enemy_ptr,
+                                ctx.entity_id_of(droidEnt),
+                                ctx.entity_id_of(enemy_ptr),
+                                ctx.entity_id_of(enemy_ptr),
                                 None,
                                 null_point,
                                 99999,
@@ -2294,11 +2294,11 @@ pub fn G_FlyVehicleDestroySurface(
         crate::g_combat::G_RadiusDamage(
             ctx,
             (*vcl).ps.origin,
-            veh,
+            ctx.entity_id_of(veh),
             100.0,
             500.0,
-            veh,
-            core::ptr::null_mut(),
+            ctx.entity_id_of(veh),
+            ctx.entity_id_of(core::ptr::null_mut()),
             MOD_VEH_EXPLOSION as c_int,
         );
 
@@ -2705,9 +2705,9 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                         //FIXME: does this give proper credit to the enemy who shot you down?
                         crate::g_combat::G_Damage(
                             ctx,
-                            (*pVeh).m_pPilot as *mut gentity_t,
-                            parent,
-                            parent,
+                            ctx.entity_id_of((*pVeh).m_pPilot as *mut gentity_t),
+                            ctx.entity_id_of(parent),
+                            ctx.entity_id_of(parent),
                             None,
                             (*pc).ps.origin,
                             999,
@@ -2722,10 +2722,12 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                                 //FIXME: does this give proper credit to the enemy who shot you down?
                                 crate::g_combat::G_Damage(
                                     ctx,
-                                    *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize)
-                                        as *mut gentity_t,
-                                    parent,
-                                    parent,
+                                    ctx.entity_id_of(
+                                        *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize)
+                                            as *mut gentity_t,
+                                    ),
+                                    ctx.entity_id_of(parent),
+                                    ctx.entity_id_of(parent),
                                     None,
                                     (*pc).ps.origin,
                                     999,
@@ -2802,11 +2804,11 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     crate::g_combat::G_RadiusDamage(
                         ctx,
                         trace.endpos,
-                        parent,
+                        ctx.entity_id_of(parent),
                         (*vi).explosionDamage as f32,
                         (*vi).explosionRadius,
-                        core::ptr::null_mut(),
-                        core::ptr::null_mut(),
+                        ctx.entity_id_of(core::ptr::null_mut()),
+                        ctx.entity_id_of(core::ptr::null_mut()),
                         MOD_VEH_EXPLOSION as c_int,
                     );
                 }

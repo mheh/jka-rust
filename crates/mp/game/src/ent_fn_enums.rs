@@ -119,7 +119,7 @@ pub use mp_qshared::common::mp::ent_fn_ids::{
 pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t) {
     match id {
         EntThink::AimAtTarget => AimAtTarget(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::BodyRid => BodyRid(ctx, self_),
+        EntThink::BodyRid => BodyRid(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::BodySink => BodySink(ctx, self_),
         EntThink::CreateShield => CreateShield(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::DEMP2_AltDetonate => DEMP2_AltDetonate(ctx, self_),
@@ -138,7 +138,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::HolocronThink => HolocronThink(ctx, self_),
         EntThink::InitShooter_Finish => InitShooter_Finish(ctx, self_),
         EntThink::JMSaberThink => JMSaberThink(ctx, self_),
-        EntThink::LimbThink => LimbThink(ctx, self_),
+        EntThink::LimbThink => LimbThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::MoveOwner => MoveOwner(ctx, self_),
         EntThink::NPC_Begin => NPC_Begin(ctx, self_),
         EntThink::NPC_RemoveBody => NPC_RemoveBody(ctx, self_),
@@ -270,7 +270,11 @@ pub fn dispatch_touch(
         EntTouch::HolocronTouch => HolocronTouch(ctx, self_, other, trace),
         EntTouch::NPC_Touch => NPC_Touch(ctx, self_, other, trace),
         EntTouch::JMSaberTouch => JMSaberTouch(ctx, self_, other, trace),
-        EntTouch::LimbTouch => LimbTouch(self_, other, trace),
+        EntTouch::LimbTouch => LimbTouch(
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::SaberBounceSound => SaberBounceSound(self_, other, trace),
         EntTouch::SaberGotHit => SaberGotHit(ctx, self_, other, trace),
         EntTouch::SentryTouch => SentryTouch(
@@ -695,7 +699,14 @@ pub fn dispatch_die(
         ),
         EntDie::SiegeItemDie => SiegeItemDie(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::auto_turret_die => auto_turret_die(ctx, self_, inflictor, attacker, damage, r#mod),
-        EntDie::body_die => body_die(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::body_die => body_die(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::bottom_die => bottom_die(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::emplaced_gun_die => {
             emplaced_gun_die(ctx, self_, inflictor, attacker, damage, r#mod)
@@ -720,7 +731,14 @@ pub fn dispatch_die(
             laserTrapDelayedExplode(ctx, self_, inflictor, attacker, damage, r#mod)
         }
         EntDie::maglock_die => maglock_die(ctx, self_, inflictor, attacker, damage, r#mod),
-        EntDie::player_die => player_die(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::player_die => player_die(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::turretG2_die => turretG2_die(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::turret_die => turret_die(
             ctx,

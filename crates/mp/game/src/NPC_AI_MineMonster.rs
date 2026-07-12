@@ -172,9 +172,9 @@ pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: *mut gentity_t, damage
             let mut dir_copy = dir;
             G_Damage(
                 ctx,
-                damage_entity,
-                npc,
-                npc,
+                ctx.entity_id_of(damage_entity),
+                ctx.entity_id_of(npc),
+                ctx.entity_id_of(npc),
                 Some(&mut dir_copy),
                 tr.endpos,
                 damage,

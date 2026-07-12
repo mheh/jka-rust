@@ -668,7 +668,11 @@ pub fn WP_DisruptorMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 traceEnt,
                 ent,
                 &mut tr,
-                crate::g_combat::G_GetHitLocation(ctx, traceEnt, tr.endpos),
+                crate::g_combat::G_GetHitLocation(
+                    ctx,
+                    ctx.entity_id_of(traceEnt).unwrap(),
+                    tr.endpos,
+                ),
             ) != qfalse
             {
                 // act like we didn't even hit him
@@ -745,9 +749,9 @@ pub fn WP_DisruptorMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
                 crate::g_combat::G_Damage(
                     ctx,
-                    traceEnt,
-                    ent,
-                    ent,
+                    ctx.entity_id_of(traceEnt),
+                    ctx.entity_id_of(ent),
+                    ctx.entity_id_of(ent),
                     Some(&mut (*ctx.world).globals.forward),
                     tr.endpos,
                     damage,
@@ -934,7 +938,11 @@ pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 traceEnt,
                 ent,
                 &mut tr,
-                crate::g_combat::G_GetHitLocation(ctx, traceEnt, tr.endpos),
+                crate::g_combat::G_GetHitLocation(
+                    ctx,
+                    ctx.entity_id_of(traceEnt).unwrap(),
+                    tr.endpos,
+                ),
             ) != qfalse
             {
                 skip = (tr.entityNum) as i32;
@@ -1010,9 +1018,9 @@ pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         if (*traceEnt).takedamage != 0 {
                             crate::g_combat::G_Damage(
                                 ctx,
-                                traceEnt,
-                                ent,
-                                ent,
+                                ctx.entity_id_of(traceEnt),
+                                ctx.entity_id_of(ent),
+                                ctx.entity_id_of(ent),
                                 Some(&mut (*ctx.world).globals.forward),
                                 tr.endpos,
                                 damage,
@@ -1056,9 +1064,9 @@ pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
                     crate::g_combat::G_Damage(
                         ctx,
-                        traceEnt,
-                        ent,
-                        ent,
+                        ctx.entity_id_of(traceEnt),
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(ent),
                         Some(&mut (*ctx.world).globals.forward),
                         tr.endpos,
                         damage,
@@ -1515,9 +1523,9 @@ pub fn DEMP2_AltRadiusDamage(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if gent != myOwner {
                 crate::g_combat::G_Damage(
                     ctx,
-                    gent,
-                    myOwner,
-                    myOwner,
+                    ctx.entity_id_of(gent),
+                    ctx.entity_id_of(myOwner),
+                    ctx.entity_id_of(myOwner),
                     Some(&mut dir),
                     (*ent).r.currentOrigin,
                     (*ent).damage,
@@ -2331,13 +2339,13 @@ pub fn thermalDetonatorExplode(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if crate::g_combat::G_RadiusDamage(
                 ctx,
                 (*ent).r.currentOrigin,
-                (*ent).parent.map_or(std::ptr::null_mut(), |id| {
+                ctx.entity_id_of((*ent).parent.map_or(std::ptr::null_mut(), |id| {
                     &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t
-                }),
+                })),
                 (*ent).splashDamage as f32,
                 ((*ent).splashRadius) as f32,
-                ent,
-                ent,
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
                 (*ent).splashMethodOfDeath,
             ) != qfalse
             {
@@ -2689,11 +2697,11 @@ pub fn laserTrapExplode(ctx: GameContext<'_>, self_: *mut gentity_t) {
             crate::g_combat::G_RadiusDamage(
                 ctx,
                 (*self_).r.currentOrigin,
-                activator,
+                ctx.entity_id_of(activator),
                 (*self_).splashDamage as f32,
                 ((*self_).splashRadius) as f32,
-                self_,
-                self_,
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(self_),
                 MOD_TRIP_MINE_SPLASH as c_int, /* MOD_LT_SPLASH */
             );
         }
@@ -3245,13 +3253,13 @@ pub fn charge_stick(
             crate::g_combat::G_RadiusDamage(
                 ctx,
                 (*self_).r.currentOrigin,
-                (*self_).parent.map_or(std::ptr::null_mut(), |id| {
+                ctx.entity_id_of((*self_).parent.map_or(std::ptr::null_mut(), |id| {
                     &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t
-                }),
+                })),
                 (*self_).splashDamage as f32,
                 ((*self_).splashRadius) as f32,
-                self_,
-                self_,
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(self_),
                 MOD_DET_PACK_SPLASH as c_int,
             );
             v = (*trace).plane.normal;
@@ -3332,9 +3340,9 @@ pub fn DetPackBlow(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
             crate::g_combat::G_Damage(
                 ctx,
-                target,
-                self_,
-                owner,
+                ctx.entity_id_of(target),
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(owner),
                 // §19: C passes an UNINITIALIZED `vec3_t v` as G_Damage's dir here;
                 // that read is UB — we pass a defined zero vector instead.
                 Some(&mut [0.0_f32, 0.0, 0.0]),
@@ -3347,13 +3355,13 @@ pub fn DetPackBlow(ctx: GameContext<'_>, self_: *mut gentity_t) {
         crate::g_combat::G_RadiusDamage(
             ctx,
             (*self_).r.currentOrigin,
-            (*self_).parent.map_or(std::ptr::null_mut(), |id| {
+            ctx.entity_id_of((*self_).parent.map_or(std::ptr::null_mut(), |id| {
                 &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t
-            }),
+            })),
             (*self_).splashDamage as f32,
             ((*self_).splashRadius) as f32,
-            self_,
-            self_,
+            ctx.entity_id_of(self_),
+            ctx.entity_id_of(self_),
             MOD_DET_PACK_SPLASH as c_int,
         );
         v = [0.0, 0.0, 1.0];
@@ -3771,9 +3779,9 @@ pub fn WP_FireConcussionAlt(ctx: GameContext<'_>, ent: *mut gentity_t) {
                             // hehe
                             crate::g_combat::G_Damage(
                                 ctx,
-                                traceEnt,
-                                ent,
-                                ent,
+                                ctx.entity_id_of(traceEnt),
+                                ctx.entity_id_of(ent),
+                                ctx.entity_id_of(ent),
                                 Some(&mut (*ctx.world).globals.forward),
                                 tr.endpos,
                                 10,
@@ -3784,9 +3792,9 @@ pub fn WP_FireConcussionAlt(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         }
                         crate::g_combat::G_Damage(
                             ctx,
-                            traceEnt,
-                            ent,
-                            ent,
+                            ctx.entity_id_of(traceEnt),
+                            ctx.entity_id_of(ent),
+                            ctx.entity_id_of(ent),
                             Some(&mut (*ctx.world).globals.forward),
                             tr.endpos,
                             damage,
@@ -4034,9 +4042,9 @@ pub fn WP_FireStunBaton(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qbo
             );
             crate::g_combat::G_Damage(
                 ctx,
-                tr_ent,
-                ent,
-                ent,
+                ctx.entity_id_of(tr_ent),
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
                 Some(&mut (*ctx.world).globals.forward),
                 tr.endpos,
                 STUN_BATON_DAMAGE,
@@ -4176,16 +4184,16 @@ pub fn WP_FireMelee(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qboolea
                     dmg = MELEE_SWING2_DAMAGE;
                 }
 
-                if crate::g_combat::G_HeavyMelee(ctx, ent) != qfalse {
+                if crate::g_combat::G_HeavyMelee(ctx, ctx.entity_id_of(ent)) != qfalse {
                     // 2x damage for heavy melee class
                     dmg *= 2;
                 }
 
                 crate::g_combat::G_Damage(
                     ctx,
-                    tr_ent,
-                    ent,
-                    ent,
+                    ctx.entity_id_of(tr_ent),
+                    ctx.entity_id_of(ent),
+                    ctx.entity_id_of(ent),
                     Some(&mut (*ctx.world).globals.forward),
                     tr.endpos,
                     dmg,
@@ -5852,11 +5860,11 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
             G_RadiusDamage(
                 ctx,
                 (*self_).r.currentOrigin,
-                self_,
+                ctx.entity_id_of(self_),
                 (*self_).splashDamage as f32,
                 (*self_).splashRadius as f32,
-                self_,
-                std::ptr::null_mut(),
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(std::ptr::null_mut()),
                 MOD_UNKNOWN as c_int,
             );
 

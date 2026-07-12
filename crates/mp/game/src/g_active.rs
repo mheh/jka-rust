@@ -275,9 +275,9 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: EntityId) {
 
                     G_Damage(
                         ctx,
-                        ent,
-                        core::ptr::null_mut(),
-                        core::ptr::null_mut(),
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(core::ptr::null_mut()),
+                        ctx.entity_id_of(core::ptr::null_mut()),
                         None,
                         [0.0; 3],
                         (*ent).damage,
@@ -300,9 +300,9 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: EntityId) {
                     if (*ent).watertype & CONTENTS_LAVA != 0 {
                         G_Damage(
                             ctx,
-                            ent,
-                            core::ptr::null_mut(),
-                            core::ptr::null_mut(),
+                            ctx.entity_id_of(ent),
+                            ctx.entity_id_of(core::ptr::null_mut()),
+                            ctx.entity_id_of(core::ptr::null_mut()),
                             None,
                             [0.0; 3],
                             30 * waterlevel,
@@ -314,9 +314,9 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: EntityId) {
                     if (*ent).watertype & CONTENTS_SLIME != 0 {
                         G_Damage(
                             ctx,
-                            ent,
-                            core::ptr::null_mut(),
-                            core::ptr::null_mut(),
+                            ctx.entity_id_of(ent),
+                            ctx.entity_id_of(core::ptr::null_mut()),
+                            ctx.entity_id_of(core::ptr::null_mut()),
                             None,
                             [0.0; 3],
                             10 * waterlevel,
@@ -432,9 +432,9 @@ pub fn DoImpact(ctx: GameContext<'_>, self_: EntityId, other: EntityId, damageSe
                     if (*other).takedamage != 0 {
                         G_Damage(
                             ctx,
-                            other,
-                            self_,
-                            self_,
+                            ctx.entity_id_of(other),
+                            ctx.entity_id_of(self_),
+                            ctx.entity_id_of(self_),
                             Some(&mut velocity),
                             (*self_).r.currentOrigin,
                             force as c_int,
@@ -442,7 +442,7 @@ pub fn DoImpact(ctx: GameContext<'_>, self_: EntityId, other: EntityId, damageSe
                             MOD_CRUSH as c_int,
                         ); //FIXME: MOD_IMPACT
                     } else {
-                        G_ApplyKnockback(ctx, other, dir2, force);
+                        G_ApplyKnockback(ctx, ctx.entity_id_of(other).unwrap(), dir2, force);
                     }
                 }
             }
@@ -478,9 +478,9 @@ pub fn DoImpact(ctx: GameContext<'_>, self_: EntityId, other: EntityId, damageSe
                     if magnitude >= 1.0 {
                         G_Damage(
                             ctx,
-                            self_,
-                            core::ptr::null_mut(),
-                            core::ptr::null_mut(),
+                            ctx.entity_id_of(self_),
+                            ctx.entity_id_of(core::ptr::null_mut()),
+                            ctx.entity_id_of(core::ptr::null_mut()),
                             None,
                             (*self_).r.currentOrigin,
                             (magnitude / 2.0) as c_int,
@@ -1214,9 +1214,9 @@ pub fn ClientEvents(ctx: GameContext<'_>, ent: EntityId, oldEventSequence: c_int
                     (*ent).pain_debounce_time = (*ctx.world).level.time + 200; // no normal pain sound
                     G_Damage(
                         ctx,
-                        ent,
-                        core::ptr::null_mut(),
-                        core::ptr::null_mut(),
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(core::ptr::null_mut()),
+                        ctx.entity_id_of(core::ptr::null_mut()),
                         None,
                         [0.0; 3],
                         damage,
@@ -3020,9 +3020,9 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                 }
                 G_Damage(
                     ctx,
-                    ent,
-                    otherKiller,
-                    otherKiller,
+                    ctx.entity_id_of(ent),
+                    ctx.entity_id_of(otherKiller),
+                    ctx.entity_id_of(otherKiller),
                     None,
                     (*client).ps.origin,
                     9999,
@@ -3252,9 +3252,9 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                             // FIXME: we'll be doing traces down from each foot, so we'll have a real impact origin
                             G_Damage(
                                 ctx,
-                                under,
-                                ent,
-                                ent,
+                                ctx.entity_id_of(under),
+                                ctx.entity_id_of(ent),
+                                ctx.entity_id_of(ent),
                                 Some(&mut down.clone()),
                                 (*under).r.currentOrigin,
                                 100,
@@ -3327,9 +3327,9 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     (*ctx.world).globals.gGAvoidDismember = 1;
                     G_Damage(
                         ctx,
-                        clientLost,
-                        ent,
-                        ent,
+                        ctx.entity_id_of(clientLost),
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(ent),
                         Some(&mut attDir),
                         (*clClient).ps.origin,
                         9999,
@@ -3341,8 +3341,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                         (*ctx.world).globals.gGAvoidDismember = 2;
                         G_CheckForDismemberment(
                             ctx,
-                            clientLost,
-                            ent,
+                            ctx.entity_id_of(clientLost).unwrap(),
+                            ctx.entity_id_of(ent),
                             (*clClient).ps.origin,
                             999,
                             (*clClient).ps.legsAnim,
@@ -3394,9 +3394,9 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     let up: vec3_t = [0.0, 0.0, 1.0];
                     G_Damage(
                         ctx,
-                        ent,
-                        core::ptr::null_mut(),
-                        core::ptr::null_mut(),
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(core::ptr::null_mut()),
+                        ctx.entity_id_of(core::ptr::null_mut()),
                         Some(&mut up.clone()),
                         (*ent).r.currentOrigin,
                         9999999,
@@ -3694,9 +3694,9 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
 
                     G_Damage(
                         ctx,
-                        faceKicked,
-                        ent,
-                        ent,
+                        ctx.entity_id_of(faceKicked),
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(ent),
                         Some(&mut oppDir),
                         (*client).ps.origin,
                         strength,

@@ -309,7 +309,7 @@ pub fn OnSameTeam(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut gentity
         if (*ent1).s.eType == entityType_t::ET_NPC as c_int
             && (*ent2).s.eType == entityType_t::ET_PLAYER as c_int
         {
-            if G_CheckVehicleNPCTeamDamage(ent1) != 0 {
+            if G_CheckVehicleNPCTeamDamage(ent1.as_ref()) != 0 {
                 if (*((*ent1).client as *mut gclient_t)).sess.sessionTeam as c_int
                     == (*((*ent2).client as *mut gclient_t)).sess.sessionTeam as c_int
                     || (*ent1).teamnodmg
@@ -473,7 +473,7 @@ pub fn Team_FragBonuses(
                 .lastfraggedcarrier = world.level.time as f32;
             AddScore(
                 ctx,
-                attacker,
+                ctx.entity_id_of(attacker).unwrap(),
                 (*targ).r.currentOrigin,
                 CTF_FRAG_CARRIER_BONUS,
             );
@@ -513,7 +513,7 @@ pub fn Team_FragBonuses(
                 .lastfraggedcarrier = world.level.time as f32;
             AddScore(
                 ctx,
-                attacker,
+                ctx.entity_id_of(attacker).unwrap(),
                 (*targ).r.currentOrigin,
                 CTF_FRAG_CARRIER_BONUS * tokens * tokens,
             );
@@ -545,7 +545,7 @@ pub fn Team_FragBonuses(
             // attacker is on the same team as the flag carrier and fragged a guy who hurt our flag carrier
             AddScore(
                 ctx,
-                attacker,
+                ctx.entity_id_of(attacker).unwrap(),
                 (*targ).r.currentOrigin,
                 CTF_CARRIER_DANGER_PROTECT_BONUS,
             );
@@ -583,7 +583,7 @@ pub fn Team_FragBonuses(
             // attacker is on the same team as the skull carrier and
             AddScore(
                 ctx,
-                attacker,
+                ctx.entity_id_of(attacker).unwrap(),
                 (*targ).r.currentOrigin,
                 CTF_CARRIER_DANGER_PROTECT_BONUS,
             );
@@ -684,7 +684,7 @@ pub fn Team_FragBonuses(
             // we defended the base flag
             AddScore(
                 ctx,
-                attacker,
+                ctx.entity_id_of(attacker).unwrap(),
                 (*targ).r.currentOrigin,
                 CTF_FLAG_DEFENSE_BONUS,
             );
@@ -736,7 +736,7 @@ pub fn Team_FragBonuses(
             {
                 AddScore(
                     ctx,
-                    attacker,
+                    ctx.entity_id_of(attacker).unwrap(),
                     (*targ).r.currentOrigin,
                     CTF_CARRIER_PROTECT_BONUS,
                 );
@@ -1028,7 +1028,12 @@ pub fn Team_TouchOurFlag(
                 team,
                 ctfMsg_t::CTFMESSAGE_PLAYER_RETURNED_FLAG as c_int,
             );
-            AddScore(ctx, other, (*ent).r.currentOrigin, CTF_RECOVERY_BONUS);
+            AddScore(
+                ctx,
+                ctx.entity_id_of(other).unwrap(),
+                (*ent).r.currentOrigin,
+                CTF_RECOVERY_BONUS,
+            );
             (*cl).pers.teamState.flagrecovery += 1;
             (*cl).pers.teamState.lastreturnedflag = world.level.time as f32;
             Team_ReturnFlagSound(ctx, Team_ResetFlag(ctx, team), team);
@@ -1060,7 +1065,12 @@ pub fn Team_TouchOurFlag(
         (*cl).ps.persistant[persEnum_t::PERS_CAPTURES as usize] += 1;
 
         // other gets another 10 frag bonus
-        AddScore(ctx, other, (*ent).r.currentOrigin, CTF_CAPTURE_BONUS);
+        AddScore(
+            ctx,
+            ctx.entity_id_of(other).unwrap(),
+            (*ent).r.currentOrigin,
+            CTF_CAPTURE_BONUS,
+        );
 
         Team_CaptureFlagSound(ctx, ent, team);
 
@@ -1083,7 +1093,12 @@ pub fn Team_TouchOurFlag(
                 == (*cl).sess.sessionTeam as c_int
             {
                 if player as *mut gentity_t != other {
-                    AddScore(ctx, player, (*ent).r.currentOrigin, CTF_TEAM_BONUS);
+                    AddScore(
+                        ctx,
+                        ctx.entity_id_of(player).unwrap(),
+                        (*ent).r.currentOrigin,
+                        CTF_TEAM_BONUS,
+                    );
                 }
                 // award extra points for capture assists
                 if (*((*player).client as *mut gclient_t))
@@ -1096,7 +1111,7 @@ pub fn Team_TouchOurFlag(
                     // CTF_RETURN_FLAG_ASSIST_TIMEOUT = 10000 (g_team.h:22)
                     AddScore(
                         ctx,
-                        player,
+                        ctx.entity_id_of(player).unwrap(),
                         (*ent).r.currentOrigin,
                         CTF_RETURN_FLAG_ASSIST_BONUS,
                     );
@@ -1115,7 +1130,7 @@ pub fn Team_TouchOurFlag(
                     // CTF_FRAG_CARRIER_ASSIST_TIMEOUT = 10000 (g_team.h:21)
                     AddScore(
                         ctx,
-                        player,
+                        ctx.entity_id_of(player).unwrap(),
                         (*ent).r.currentOrigin,
                         CTF_FRAG_CARRIER_ASSIST_BONUS,
                     );
@@ -1162,7 +1177,12 @@ pub fn Team_TouchEnemyFlag(
         Team_SetFlagStatus(ctx, team, 1); // FLAG_TAKEN
 
         let world = &*ctx.world;
-        AddScore(ctx, other, (*ent).r.currentOrigin, CTF_FLAG_BONUS);
+        AddScore(
+            ctx,
+            ctx.entity_id_of(other).unwrap(),
+            (*ent).r.currentOrigin,
+            CTF_FLAG_BONUS,
+        );
         (*cl).pers.teamState.flagsince = world.level.time as f32;
         Team_TakeFlagSound(ctx, ent, team);
 

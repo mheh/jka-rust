@@ -1316,9 +1316,9 @@ pub fn G_KillBox(ctx: GameContext<'_>, ent: *mut gentity_t) {
             // nail it
             crate::g_combat::G_Damage(
                 ctx,
-                hit,
-                ent,
-                ent,
+                ctx.entity_id_of(hit),
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(ent),
                 None,
                 [0.0, 0.0, 0.0],
                 100000,

@@ -154,9 +154,9 @@ pub fn NPC_Mark2_Pain(
         if (*self_).count > 0 {
             G_Damage(
                 ctx,
-                self_,
-                core::ptr::null_mut(),
-                core::ptr::null_mut(),
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(core::ptr::null_mut()),
+                ctx.entity_id_of(core::ptr::null_mut()),
                 None,
                 [0.0; 3],
                 (*self_).health,
