@@ -7162,7 +7162,7 @@ pub fn DeadSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
             return;
         }
 
-        G_RunObject(ctx, saberent);
+        G_RunObject(ctx, ctx.entity_id_of(saberent).unwrap());
     }
 }
 
@@ -7388,7 +7388,7 @@ pub fn DownedSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
             return;
         }
 
-        G_RunObject(ctx, saberent);
+        G_RunObject(ctx, ctx.entity_id_of(saberent).unwrap());
         (*saberent).nextthink = level_time;
     }
 }
@@ -8347,7 +8347,7 @@ pub fn saberFirstThrown(ctx: GameContext<'_>, saberent: *mut gentity_t) {
 
         // runMin:
         saberCheckRadiusDamage(ctx, saberent, 0);
-        G_RunObject(ctx, saberent);
+        G_RunObject(ctx, ctx.entity_id_of(saberent).unwrap());
     }
 }
 

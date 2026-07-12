@@ -821,7 +821,7 @@ pub fn pas_fire(ctx: GameContext<'_>, ent: *mut gentity_t) {
             ent,
         );
 
-        G_RunObject(ctx, ent);
+        G_RunObject(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }
 
@@ -1360,7 +1360,7 @@ pub fn SP_PAS(ctx: GameContext<'_>, base: *mut gentity_t) {
         (*base).r.mins = [-8.0, -8.0, 0.0];
         (*base).r.maxs = [8.0, 8.0, 24.0];
 
-        G_RunObject(ctx, base);
+        G_RunObject(ctx, ctx.entity_id_of(base).unwrap());
 
         (*base).think = Some(EntThink::pas_think).into();
         (*base).nextthink = (*ctx.world).level.time + FRAMETIME;

@@ -8,4 +8,4 @@
 //!
 //! Source: `docs/architecture/state-ownership.md` § `EntityId`.
 
-pub use mp_qshared::common::mp::entity_id::{ent_id, ent_id_opt, EntityId};
+pub use mp_qshared::common::mp::entity_id::{ent_id, ent_id_opt, to_num, EntityId};

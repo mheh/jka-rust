@@ -1073,7 +1073,7 @@ pub fn HolocronThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 || (*ent).s.pos.trDelta[1] != 0.0
                 || (*ent).s.pos.trDelta[2] != 0.0
             {
-                G_RunObject(ctx, ent);
+                G_RunObject(ctx, ctx.entity_id_of(ent).unwrap());
             }
         };
 

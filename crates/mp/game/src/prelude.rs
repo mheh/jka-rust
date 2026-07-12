@@ -153,7 +153,7 @@ pub use crate::ent_fn_enums::EntSpawn;
 // p))` / `ent_id_opt(base, p)` fill the `Option<EntityId>` stored fields at
 // pointer-assignment sites; `field.is_none()` / id-equality replace NULL/address
 // compares.
-pub use crate::world::{ent_id, ent_id_opt, EntityId};
+pub use crate::world::{ent_id, ent_id_opt, to_num, EntityId};
 // Index->pointer counterpart: `crate::ent_id::resolve` re-derives a
 // live `gentity_t*` from a stored `Option<EntityId>` field.
 pub use crate::ent_id;

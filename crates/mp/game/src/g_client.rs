@@ -507,7 +507,7 @@ pub fn JMSaberThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         (*ent).nextthink = (*ctx.world).level.time + 50;
-        crate::g_object::G_RunObject(ctx, ent);
+        crate::g_object::G_RunObject(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }
 

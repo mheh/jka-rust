@@ -133,7 +133,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::G_ExplodeMissile => G_ExplodeMissile(ctx, self_),
         EntThink::G_FreeEntity => G_FreeEntity(ctx, self_),
         EntThink::G_PortalifyEntities => G_PortalifyEntities(ctx, self_),
-        EntThink::G_RunObject => G_RunObject(ctx, self_),
+        EntThink::G_RunObject => G_RunObject(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::G_VehicleSpawn => G_VehicleSpawn(ctx, self_),
         EntThink::HolocronThink => HolocronThink(ctx, self_),
         EntThink::InitShooter_Finish => InitShooter_Finish(ctx, self_),

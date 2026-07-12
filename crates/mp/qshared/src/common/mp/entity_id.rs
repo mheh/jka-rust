@@ -6,7 +6,10 @@
 //! therefore be visible in `mp_qshared`. `mp_game` re-exports it (via
 //! `crate::world::EntityId` + the prelude) so every existing use keeps compiling.
 
+use core::ffi::c_int;
+
 use crate::common::mp::gentity::gentity_t;
+use crate::shared::{ENTITYNUM_NONE, MAX_GENTITIES};
 
 /// Raven's `gentity_t*` become an index into `GameWorld.entities`. Module logic
 /// passes `(world, id)` and re-indexes per access — GP2's `GpGroupId` precedent;
@@ -26,6 +29,37 @@ impl EntityId {
     #[inline]
     pub const fn index(self) -> usize {
         self.0 as usize
+    }
+
+    /// Seam edge: a raw Raven entity number → `Option<EntityId>`, the
+    /// number-half companion of the pointer-half [`ent_id_opt`]. `None` for the
+    /// `ENTITYNUM_NONE` "no entity" sentinel and for anything outside the valid
+    /// arena range `[0, MAX_GENTITIES)` (negatives included) — the same set of
+    /// values Raven treats as a NULL `gentity_t*`, so a NULL-pointer check
+    /// becomes an `is_none()`.
+    ///
+    /// Source: `oracle/codemp/game/q_shared.h:2014-2016` (`ENTITYNUM_NONE`) and
+    /// the `entityNum >= 0` guards throughout `oracle/codemp/game`.
+    #[inline]
+    pub fn from_num(n: c_int) -> Option<EntityId> {
+        if n < 0 || n >= MAX_GENTITIES as c_int || n == ENTITYNUM_NONE {
+            None
+        } else {
+            Some(EntityId(n as u32))
+        }
+    }
+}
+
+/// Seam edge: `Option<EntityId>` → a raw Raven entity number, the inverse of
+/// [`EntityId::from_num`]. `None` (no entity) becomes `ENTITYNUM_NONE`, matching
+/// what Raven writes into `entityNum`/`otherEntityNum` fields for "no entity".
+///
+/// Source: `oracle/codemp/game/q_shared.h:2014-2016` (`ENTITYNUM_NONE`).
+#[inline]
+pub fn to_num(id: Option<EntityId>) -> c_int {
+    match id {
+        Some(e) => e.0 as c_int,
+        None => ENTITYNUM_NONE,
     }
 }
 

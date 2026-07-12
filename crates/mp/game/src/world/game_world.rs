@@ -8,6 +8,7 @@ use mp_qshared::shared::{MAX_CLIENTS, MAX_GENTITIES};
 use crate::client::gclient_t;
 use crate::game_cvars::GameCvars;
 use crate::level::level_locals::level_locals_t;
+use crate::world::EntityId;
 
 /// A value type owned by the module crate. NOT a global. Field types are the
 /// EXISTING Raven-faithful, already-offset-asserted structs (§D12) — exactly the
@@ -82,6 +83,35 @@ pub struct GameWorld {
 }
 
 impl GameWorld {
+    /// Borrow entity `id` out of the owned `g_entities` arena (§B5). Safe: the
+    /// world owns the arena, so this is a plain checked index, not pointer math.
+    ///
+    /// Source: `docs/architecture/state-ownership.md` § `EntityId` (§B5).
+    #[inline]
+    pub fn entity(&self, id: EntityId) -> &gentity_t {
+        &self.g_entities[id.index()]
+    }
+
+    /// Mutable [`Self::entity`].
+    #[inline]
+    pub fn entity_mut(&mut self, id: EntityId) -> &mut gentity_t {
+        &mut self.g_entities[id.index()]
+    }
+
+    /// Borrow client `i` out of the owned `clients` arena. `i` is the Raven
+    /// client number (`0..MAX_CLIENTS`), the same index Raven uses for
+    /// `level.clients[i]` / `g_entities[i].client`.
+    #[inline]
+    pub fn client(&self, i: usize) -> &gclient_t {
+        &self.clients[i]
+    }
+
+    /// Mutable [`Self::client`].
+    #[inline]
+    pub fn client_mut(&mut self, i: usize) -> &mut gclient_t {
+        &mut self.clients[i]
+    }
+
     /// Builds the zeroed island (STATE-D9), then wires `level`'s
     /// self-referencing back-pointers in the allocate-first order — the latter in
     /// `G_InitGame`'s dispatched arm, not here. Uses `native_platform::zeroed_box`

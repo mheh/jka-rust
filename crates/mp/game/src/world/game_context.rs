@@ -25,6 +25,60 @@ pub struct GameContext<'e> {
     pub engine: &'e Engine,
 }
 
+impl GameContext<'_> {
+    /// Reborrow the owned [`GameWorld`] behind the raw `self.world` pointer.
+    ///
+    /// TRANSITIONAL (safe-state migration Stage 0). This is the ONE sanctioned
+    /// deref of the raw `world` pointer; every downstream accessor and rewritten
+    /// call site reaches world state through it (or through [`Self::entity_mut`])
+    /// instead of `unsafe { &mut *ctx.world }`. Stage 2 flips the field to
+    /// `&'a mut GameWorld` and DELETES this method — `world()` becomes a plain
+    /// field reborrow and the borrow checker enforces §B4 directly.
+    ///
+    /// SAFETY: `self.world` is the single owned island instance the `vmMain`
+    /// shell built and keeps alive for the whole call (STATE-D1/D6). The module
+    /// is single-threaded, and every caller follows the STATE-D1 reborrow
+    /// discipline — thread the borrow inward, never hold two live
+    /// `world()`/`entity()`/`entity_mut()` borrows across a nested call. Under
+    /// that discipline no two `&mut` alias, so the reborrow is sound. (Until
+    /// Stage 2 the borrow checker cannot yet enforce this — it is the same
+    /// invariant the raw pointer relied on, now behind one auditable seam.)
+    #[inline]
+    pub fn world(&self) -> &mut GameWorld {
+        unsafe { &mut *self.world }
+    }
+
+    /// Borrow entity `id` out of the owned arena (convenience over
+    /// [`Self::world`]). Same reborrow discipline as [`Self::world`].
+    #[inline]
+    pub fn entity(&self, id: EntityId) -> &gentity_t {
+        &self.world().g_entities[id.index()]
+    }
+
+    /// Mutable [`Self::entity`].
+    #[inline]
+    pub fn entity_mut(&self, id: EntityId) -> &mut gentity_t {
+        &mut self.world().g_entities[id.index()]
+    }
+
+    /// Bridge for the Stage-1 mixed world: recover the [`EntityId`] of a legacy
+    /// raw `*mut gentity_t` (NULL → `None`). Unconverted callers use this at a
+    /// converted fn's boundary to turn their raw pointer into a handle.
+    ///
+    /// Uses Raven's `ent - g_entities` pointer arithmetic (via [`ent_id_opt`]),
+    /// the canonical `ENTITYNUM` idiom — identical to reading `ent->s.number`
+    /// (Raven sets `s.number = ent - g_entities` at spawn) but not dependent on
+    /// that field being current.
+    ///
+    /// SAFETY: `ent` is NULL or points into this world's contiguous `g_entities`
+    /// arena (the only place `gentity_t`s live); the pointer→index arithmetic is
+    /// confined to the [`ent_id_opt`] seam helper.
+    #[inline]
+    pub fn entity_id_of(&self, ent: *const gentity_t) -> Option<EntityId> {
+        unsafe { ent_id_opt(self.world().g_entities.as_ptr(), ent) }
+    }
+}
+
 // The per-command `impl Dispatch<C> for GameContext` blocks colocate here
 // (round-6 pinning: thin adapters only; per-command logic stays
 // one-fn-per-file). Each unpacks `self.world` via STATE-D6 leaf reborrows and

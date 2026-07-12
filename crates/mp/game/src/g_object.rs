@@ -1,12 +1,13 @@
-// PORT-COMPLETE: g_object.c 0/4
-//! FAITHFUL signature skeleton for `oracle/codemp/game/g_object.c`.
+// PORT-COMPLETE: g_object.c 4/4
+//! `oracle/codemp/game/g_object.c` — object physics (bounce/run/start/stop).
 //!
-//! All 4 functions in this file read ambient game state (`level`, `g_gravity`,
-//! `g_entities`) that is not reachable through the raw-pointer-only signatures
-//! (no `GameWorld`/engine context parameter). This matches the precedent in
-//! `g_main.rs`, `g_combat.rs`, and others where `raw-ptr-skeleton-no-world-handle`
-//! escalations block porting. Once the seam decision is settled (how to thread
-//! `GameWorld` through raw-pointer game logic functions), these will unblock.
+//! Safe-state migration **Stage 0 pilot**. Entity params are `EntityId`
+//! handles (§B5) instead of raw `gentity_t*`; bodies reach the world and their
+//! entity through the `GameContext`/`GameWorld` accessors
+//! (`ctx.world()`/`ctx.entity_mut()`), so the per-line `unsafe { (*ent).… }`
+//! derefs are gone. Behavior is byte-identical to the pre-migration port — this
+//! is a mechanical reshape, referee-verified. Callers in still-raw files bridge
+//! their `*mut gentity_t` at the boundary with `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -14,22 +15,22 @@ use crate::prelude::*;
 /// Raven `G_BounceObject`. Reflects velocity on trace plane.
 ///
 /// Source: `oracle/codemp/game/g_object.c:14-59`
-pub fn G_BounceObject(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut trace_t) {
+pub fn G_BounceObject(ctx: GameContext<'_>, id: EntityId, trace: &trace_t) {
     let mut velocity: [f32; 3] = [0.0; 3];
-    let world = unsafe { &mut *ctx.world };
+    let world = ctx.world();
+    let ent = ctx.entity_mut(id);
 
     // reflect the velocity on the trace plane
     let hit_time = world.level.previousTime as c_int
-        + ((world.level.time - world.level.previousTime) as f32 * unsafe { (*trace).fraction })
-            as c_int;
+        + ((world.level.time - world.level.previousTime) as f32 * trace.fraction) as c_int;
 
     crate::bg_misc::BG_EvaluateTrajectoryDelta(
-        unsafe { &(*ent).s.pos as *const trajectory_t },
+        &ent.s.pos as *const trajectory_t,
         hit_time,
         &mut velocity,
     );
 
-    let dot = crate::q_math::_DotProduct(velocity, unsafe { (*trace).plane.normal });
+    let dot = crate::q_math::_DotProduct(velocity, trace.plane.normal);
     // bounceFactor = 60/ent->mass;		// NOTENOTE Mass is not yet implemented
     let bounce_factor = 1.0f32;
     let bounce_factor = if bounce_factor > 1.0f32 {
@@ -41,37 +42,29 @@ pub fn G_BounceObject(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut tra
     crate::q_math::_VectorMA(
         velocity,
         -2.0f32 * dot * bounce_factor,
-        unsafe { (*trace).plane.normal },
-        unsafe { &mut (*ent).s.pos.trDelta },
+        trace.plane.normal,
+        &mut ent.s.pos.trDelta,
     );
 
     // FIXME: customized or material-based impact/bounce sounds
-    if unsafe { (*ent).flags & FL_BOUNCE_HALF } != 0 {
-        crate::q_math::_VectorScale(unsafe { (*ent).s.pos.trDelta }, 0.5f32, unsafe {
-            &mut (*ent).s.pos.trDelta
-        });
+    if ent.flags & FL_BOUNCE_HALF != 0 {
+        crate::q_math::_VectorScale(ent.s.pos.trDelta, 0.5f32, &mut ent.s.pos.trDelta);
 
         // check for stop
-        let normal_z = unsafe { (*trace).plane.normal[2] };
+        let normal_z = trace.plane.normal[2];
         let g_grav = world.cvars.g_gravity.value;
-        let delta_z = unsafe { (*ent).s.pos.trDelta[2] };
+        let delta_z = ent.s.pos.trDelta[2];
 
         if ((normal_z > 0.7f32 && g_grav > 0.0f32) || (normal_z < -0.7f32 && g_grav < 0.0f32))
             && ((delta_z < 40.0f32 && g_grav > 0.0f32) || (delta_z > -40.0f32 && g_grav < 0.0f32))
         {
             // G_SetOrigin( ent, trace->endpos );
             // ent->nextthink = level.time + 500;
-            unsafe { (*ent).s.apos.trType = TR_STATIONARY };
-            crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe {
-                &mut (*ent).s.apos.trBase
-            });
-            crate::q_math::_VectorCopy(unsafe { (*trace).endpos }, unsafe {
-                &mut (*ent).r.currentOrigin
-            });
-            crate::q_math::_VectorCopy(unsafe { (*trace).endpos }, unsafe {
-                &mut (*ent).s.pos.trBase
-            });
-            unsafe { (*ent).s.pos.trTime = world.level.time };
+            ent.s.apos.trType = TR_STATIONARY;
+            crate::q_math::_VectorCopy(ent.r.currentAngles, &mut ent.s.apos.trBase);
+            crate::q_math::_VectorCopy(trace.endpos, &mut ent.r.currentOrigin);
+            crate::q_math::_VectorCopy(trace.endpos, &mut ent.s.pos.trBase);
+            ent.s.pos.trTime = world.level.time;
             return;
         }
     }
@@ -79,110 +72,100 @@ pub fn G_BounceObject(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut tra
     // NEW--It would seem that we want to set our trBase to the trace endpos
     // and set the trTime to the actual time of impact....
     // FIXME: Should we still consider adding the normal though??
-    crate::q_math::_VectorCopy(unsafe { (*trace).endpos }, unsafe {
-        &mut (*ent).r.currentOrigin
-    });
-    unsafe { (*ent).s.pos.trTime = hit_time };
+    crate::q_math::_VectorCopy(trace.endpos, &mut ent.r.currentOrigin);
+    ent.s.pos.trTime = hit_time;
 
-    crate::q_math::_VectorCopy(unsafe { (*ent).r.currentOrigin }, unsafe {
-        &mut (*ent).s.pos.trBase
-    });
-    crate::q_math::_VectorCopy(unsafe { (*trace).plane.normal }, unsafe {
-        &mut (*ent).pos1
-    }); //???
+    crate::q_math::_VectorCopy(ent.r.currentOrigin, &mut ent.s.pos.trBase);
+    crate::q_math::_VectorCopy(trace.plane.normal, &mut ent.pos1); //???
 }
 
 /// Raven `G_RunObject`. Main object physics simulation.
 ///
 /// Source: `oracle/codemp/game/g_object.c:72-241`
-pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn G_RunObject(ctx: GameContext<'_>, id: EntityId) {
     let mut origin: [f32; 3] = [0.0; 3];
     let mut old_org: [f32; 3] = [0.0; 3];
+    // trace_t has no zeroing constructor; the mem::zeroed is a plain
+    // POD-init, not part of the entity/world unsafe this migration retires.
     let mut tr: trace_t = unsafe { std::mem::zeroed() };
-    let mut trace_ent: *mut gentity_t = std::ptr::null_mut();
 
-    let world = unsafe { &mut *ctx.world };
+    let world = ctx.world();
+    let ent = ctx.entity_mut(id);
 
     // FIXME: floaters need to stop floating up after a while, even if gravity stays negative?
-    if unsafe { (*ent).s.pos.trType } == TR_STATIONARY {
-        unsafe { (*ent).s.pos.trType = TR_GRAVITY };
-        crate::q_math::_VectorCopy(unsafe { (*ent).r.currentOrigin }, unsafe {
-            &mut (*ent).s.pos.trBase
-        });
-        unsafe { (*ent).s.pos.trTime = world.level.previousTime };
+    if ent.s.pos.trType == TR_STATIONARY {
+        ent.s.pos.trType = TR_GRAVITY;
+        crate::q_math::_VectorCopy(ent.r.currentOrigin, &mut ent.s.pos.trBase);
+        ent.s.pos.trTime = world.level.previousTime;
         if world.cvars.g_gravity.value == 0.0f32 {
-            unsafe { (*ent).s.pos.trDelta[2] += 100.0f32 };
+            ent.s.pos.trDelta[2] += 100.0f32;
         }
     }
 
-    unsafe { (*ent).nextthink = world.level.time + FRAMETIME as c_int };
+    ent.nextthink = world.level.time + FRAMETIME as c_int;
 
-    crate::q_math::_VectorCopy(unsafe { (*ent).r.currentOrigin }, &mut old_org);
+    crate::q_math::_VectorCopy(ent.r.currentOrigin, &mut old_org);
     // get current position
     crate::bg_misc::BG_EvaluateTrajectory(
-        unsafe { &(*ent).s.pos as *const trajectory_t },
+        &ent.s.pos as *const trajectory_t,
         world.level.time,
         &mut origin,
     );
     // Get current angles?
     crate::bg_misc::BG_EvaluateTrajectory(
-        unsafe { &(*ent).s.apos as *const trajectory_t },
+        &ent.s.apos as *const trajectory_t,
         world.level.time,
-        unsafe { &mut (*ent).r.currentAngles },
+        &mut ent.r.currentAngles,
     );
 
-    if crate::q_math::VectorCompare(unsafe { (*ent).r.currentOrigin }, origin) != 0 {
+    if crate::q_math::VectorCompare(ent.r.currentOrigin, origin) != 0 {
         // error - didn't move at all!
         return;
     }
 
     // trace a line from the previous position to the current position,
     // ignoring interactions with the missile owner
-    let trace_skip_num = if let Some(parent_id) = unsafe { (*ent).parent } {
-        unsafe { (*world).g_entities[parent_id.0 as usize].s.number as c_int }
+    let trace_skip_num = if let Some(parent_id) = ent.parent {
+        world.g_entities[parent_id.index()].s.number as c_int
     } else {
-        unsafe { (*ent).s.number as c_int }
+        ent.s.number as c_int
     };
 
     crate::trap::Trace(
         ctx.engine,
         mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
             &mut tr as *mut trace_t,
-            &unsafe { (*ent).r.currentOrigin } as *const vec3_t,
-            &unsafe { (*ent).r.mins } as *const vec3_t,
-            &unsafe { (*ent).r.maxs } as *const vec3_t,
+            &ent.r.currentOrigin as *const vec3_t,
+            &ent.r.mins as *const vec3_t,
+            &ent.r.maxs as *const vec3_t,
             &origin as *const vec3_t,
             trace_skip_num,
-            unsafe { (*ent).clipmask },
+            ent.clipmask,
         ),
     );
 
     if tr.startsolid == 0 && tr.allsolid == 0 && tr.fraction > 0.0f32 {
-        crate::q_math::_VectorCopy(tr.endpos, unsafe { &mut (*ent).r.currentOrigin });
+        crate::q_math::_VectorCopy(tr.endpos, &mut ent.r.currentOrigin);
         crate::trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(&mut *ent),
         );
     } else {
         // if ( tr.startsolid )
         tr.fraction = 0.0f32;
     }
 
-    crate::g_active::G_MoverTouchPushTriggers(ctx, ent, old_org);
+    crate::g_active::G_MoverTouchPushTriggers(ctx, &mut *ent, old_org);
 
     if tr.fraction == 1.0f32 {
         if world.cvars.g_gravity.value <= 0.0f32 {
-            if unsafe { (*ent).s.apos.trType } == TR_STATIONARY {
-                crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe {
-                    &mut (*ent).s.apos.trBase
-                });
-                unsafe { (*ent).s.apos.trType = TR_LINEAR };
-                unsafe {
-                    (*ent).s.apos.trDelta[1] = world.bg_state.rng.flrand(-300.0f32, 300.0f32)
-                };
-                unsafe { (*ent).s.apos.trDelta[0] = world.bg_state.rng.flrand(-10.0f32, 10.0f32) };
-                unsafe { (*ent).s.apos.trDelta[2] = world.bg_state.rng.flrand(-10.0f32, 10.0f32) };
-                unsafe { (*ent).s.apos.trTime = world.level.time };
+            if ent.s.apos.trType == TR_STATIONARY {
+                crate::q_math::_VectorCopy(ent.r.currentAngles, &mut ent.s.apos.trBase);
+                ent.s.apos.trType = TR_LINEAR;
+                ent.s.apos.trDelta[1] = world.bg_state.rng.flrand(-300.0f32, 300.0f32);
+                ent.s.apos.trDelta[0] = world.bg_state.rng.flrand(-10.0f32, 10.0f32);
+                ent.s.apos.trDelta[2] = world.bg_state.rng.flrand(-10.0f32, 10.0f32);
+                ent.s.apos.trTime = world.level.time;
             }
         }
         // friction in zero-G
@@ -193,42 +176,40 @@ pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 friction = 0.1f32;
             }
 
-            crate::q_math::_VectorScale(unsafe { (*ent).s.pos.trDelta }, friction, unsafe {
-                &mut (*ent).s.pos.trDelta
-            });
-            crate::q_math::_VectorCopy(unsafe { (*ent).r.currentOrigin }, unsafe {
-                &mut (*ent).s.pos.trBase
-            });
-            unsafe { (*ent).s.pos.trTime = world.level.time };
+            crate::q_math::_VectorScale(ent.s.pos.trDelta, friction, &mut ent.s.pos.trDelta);
+            crate::q_math::_VectorCopy(ent.r.currentOrigin, &mut ent.s.pos.trBase);
+            ent.s.pos.trTime = world.level.time;
         }
         return;
     }
 
     // hit something
 
-    // Do impact damage
-    trace_ent = unsafe { &mut (*world).g_entities[tr.entityNum as usize] as *mut gentity_t };
+    // Do impact damage. Raven: trace_ent = &g_entities[tr.entityNum]. On this
+    // path (tr.fraction < 1) the trace struck a live entity, so tr.entityNum
+    // indexes a real arena slot and the reference is never NULL — Raven's
+    // `trace_ent != NULL` guards below are vacuous and collapse to the
+    // takedamage tests (faithful index, not a from_num sentinel reinterpret).
+    let trace_ent = EntityId(tr.entityNum as u32);
 
-    if tr.fraction > 0.0f32
-        || (trace_ent != std::ptr::null_mut() && unsafe { (*trace_ent).takedamage != 0 })
-    {
-        if crate::q_math::VectorCompare(unsafe { (*ent).r.currentOrigin }, old_org) == 0 {
+    if tr.fraction > 0.0f32 || ctx.entity(trace_ent).takedamage != 0 {
+        if crate::q_math::VectorCompare(ent.r.currentOrigin, old_org) == 0 {
             // moved and impacted
-            if trace_ent != std::ptr::null_mut() && unsafe { (*trace_ent).takedamage != 0 } {
+            if ctx.entity(trace_ent).takedamage != 0 {
                 // hurt someone
                 // G_Sound( ent, G_SoundIndex( "sound/movers/objects/objectHurt.wav" ) );
             }
             // G_Sound( ent, G_SoundIndex( "sound/movers/objects/objectHit.wav" ) );
         }
 
-        if unsafe { (*ent).s.weapon } != WP_SABER {
-            crate::g_active::DoImpact(ctx, ent, trace_ent, qtrue);
+        if ent.s.weapon != WP_SABER {
+            crate::g_active::DoImpact(ctx, &mut *ent, ctx.entity_mut(trace_ent), qtrue);
         }
     }
 
-    if ent == std::ptr::null_mut()
-        || (unsafe { (*ent).takedamage != 0 } && unsafe { (*ent).health } <= 0)
-    {
+    // Raven: if ( !ent || (ent->takedamage && ent->health <= 0) ). `ent` is a
+    // live arena entity (never NULL), so the NULL arm is vacuous.
+    if ent.takedamage != 0 && ent.health <= 0 {
         // been destroyed by impact
         // chunks?
         // G_Sound( ent, G_SoundIndex( "sound/movers/objects/objectBreak.wav" ) );
@@ -236,65 +217,64 @@ pub fn G_RunObject(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 
     // do impact physics
-    if unsafe { (*ent).s.pos.trType } == TR_GRAVITY {
+    if ent.s.pos.trType == TR_GRAVITY {
         // FIXME: only do this if no trDelta
         if world.cvars.g_gravity.value <= 0.0f32 || tr.plane.normal[2] < 0.7f32 {
-            if unsafe { (*ent).flags & (FL_BOUNCE | FL_BOUNCE_HALF) } != 0 {
+            if ent.flags & (FL_BOUNCE | FL_BOUNCE_HALF) != 0 {
                 if tr.fraction <= 0.0f32 {
-                    crate::q_math::_VectorCopy(tr.endpos, unsafe { &mut (*ent).r.currentOrigin });
-                    crate::q_math::_VectorCopy(tr.endpos, unsafe { &mut (*ent).s.pos.trBase });
-                    unsafe { (*ent).s.pos.trDelta = [0.0f32; 3] };
-                    unsafe { (*ent).s.pos.trTime = world.level.time };
+                    crate::q_math::_VectorCopy(tr.endpos, &mut ent.r.currentOrigin);
+                    crate::q_math::_VectorCopy(tr.endpos, &mut ent.s.pos.trBase);
+                    ent.s.pos.trDelta = [0.0f32; 3];
+                    ent.s.pos.trTime = world.level.time;
                 } else {
-                    G_BounceObject(ctx, ent, &mut tr);
+                    G_BounceObject(ctx, id, &tr);
                 }
             } else {
                 // slide down?
                 // FIXME: slide off the slope
             }
         } else {
-            unsafe { (*ent).s.apos.trType = TR_STATIONARY };
-            crate::npc_c::pitch_roll_for_slope(ctx, ent, Some(&mut tr.plane.normal));
+            ent.s.apos.trType = TR_STATIONARY;
+            crate::npc_c::pitch_roll_for_slope(ctx, &mut *ent, Some(&mut tr.plane.normal));
             // ent->r.currentAngles[0] = 0;//FIXME: match to slope
             // ent->r.currentAngles[2] = 0;//FIXME: match to slope
-            crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe {
-                &mut (*ent).s.apos.trBase
-            });
+            crate::q_math::_VectorCopy(ent.r.currentAngles, &mut ent.s.apos.trBase);
             // okay, we hit the floor, might as well stop or prediction will
             // make us go through the floor!
             // FIXME: this means we can't fall if something is pulled out from under us...
-            G_StopObjectMoving(ent);
+            G_StopObjectMoving(&mut *ent);
         }
-    } else if unsafe { (*ent).s.weapon } != WP_SABER {
-        unsafe { (*ent).s.apos.trType = TR_STATIONARY };
-        crate::npc_c::pitch_roll_for_slope(ctx, ent, Some(&mut tr.plane.normal));
+    } else if ent.s.weapon != WP_SABER {
+        ent.s.apos.trType = TR_STATIONARY;
+        crate::npc_c::pitch_roll_for_slope(ctx, &mut *ent, Some(&mut tr.plane.normal));
         // ent->r.currentAngles[0] = 0;//FIXME: match to slope
         // ent->r.currentAngles[2] = 0;//FIXME: match to slope
-        crate::q_math::_VectorCopy(unsafe { (*ent).r.currentAngles }, unsafe {
-            &mut (*ent).s.apos.trBase
-        });
+        crate::q_math::_VectorCopy(ent.r.currentAngles, &mut ent.s.apos.trBase);
     }
 
     // call touch func
-    if let Some(touch_fn) = unsafe { (*ent).touch.get() } {
-        crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, trace_ent, unsafe {
-            &tr as *const trace_t as *mut trace_t
-        });
+    if let Some(touch_fn) = ent.touch.get() {
+        crate::ent_fn_enums::dispatch_touch(
+            ctx,
+            touch_fn,
+            &mut *ent,
+            ctx.entity_mut(trace_ent),
+            &tr as *const trace_t as *mut trace_t,
+        );
     }
 }
 
 /// Raven `G_StopObjectMoving`. Stops an object from moving.
 ///
+/// Ctx-free leaf helper — takes a `&mut gentity_t` borrow from the caller's
+/// accessor (Stage-1 rule: ctx-free single-entity mutators may borrow directly).
+///
 /// Source: `oracle/codemp/game/g_object.c:244-258`
-pub fn G_StopObjectMoving(object: *mut gentity_t) {
-    unsafe { (*object).s.pos.trType = TR_STATIONARY };
-    crate::q_math::_VectorCopy(unsafe { (*object).r.currentOrigin }, unsafe {
-        &mut (*object).s.origin
-    });
-    crate::q_math::_VectorCopy(unsafe { (*object).r.currentOrigin }, unsafe {
-        &mut (*object).s.pos.trBase
-    });
-    unsafe { (*object).s.pos.trDelta = [0.0f32; 3] };
+pub fn G_StopObjectMoving(object: &mut gentity_t) {
+    object.s.pos.trType = TR_STATIONARY;
+    crate::q_math::_VectorCopy(object.r.currentOrigin, &mut object.s.origin);
+    crate::q_math::_VectorCopy(object.r.currentOrigin, &mut object.s.pos.trBase);
+    object.s.pos.trDelta = [0.0f32; 3];
 
     // Stop spinning (commented out in Raven)
     // VectorClear( self->s.apos.trDelta );
@@ -308,7 +288,7 @@ pub fn G_StopObjectMoving(object: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_object.c:260-287`
 pub fn G_StartObjectMoving(
     ctx: GameContext<'_>,
-    object: *mut gentity_t,
+    object: EntityId,
     dir: vec3_t,
     speed: f32,
     trType: trType_t,
@@ -319,15 +299,14 @@ pub fn G_StartObjectMoving(
     let mut dir_mut = dir;
     crate::q_math::VectorNormalize(&mut dir_mut);
 
-    let world = unsafe { &mut *ctx.world };
+    let world = ctx.world();
+    let obj = ctx.entity_mut(object);
 
     // object->s.eType = ET_GENERAL;
-    unsafe { (*object).s.pos.trType = trType };
-    crate::q_math::_VectorCopy(unsafe { (*object).r.currentOrigin }, unsafe {
-        &mut (*object).s.pos.trBase
-    });
-    crate::q_math::_VectorScale(dir_mut, speed, unsafe { &mut (*object).s.pos.trDelta });
-    unsafe { (*object).s.pos.trTime = world.level.time };
+    obj.s.pos.trType = trType;
+    crate::q_math::_VectorCopy(obj.r.currentOrigin, &mut obj.s.pos.trBase);
+    crate::q_math::_VectorScale(dir_mut, speed, &mut obj.s.pos.trDelta);
+    obj.s.pos.trTime = world.level.time;
 
     // FIXME: incorporate spin?
     // vectoangles(dir, object->s.angles);
@@ -336,9 +315,9 @@ pub fn G_StartObjectMoving(
     // object->s.apos.trTime = level.time;
 
     // FIXME: make these objects go through G_RunObject automatically, like missiles do
-    if unsafe { (*object).think.is_none() } {
-        unsafe { (*object).nextthink = world.level.time + FRAMETIME as c_int };
-        unsafe { (*object).think = Some(EntThink::G_RunObject).into() };
+    if obj.think.is_none() {
+        obj.nextthink = world.level.time + FRAMETIME as c_int;
+        obj.think = Some(EntThink::G_RunObject).into();
     } else {
         // You're responsible for calling RunObject
     }

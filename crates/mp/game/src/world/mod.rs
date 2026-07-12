@@ -10,6 +10,6 @@ pub mod entity_id;
 pub mod game_context;
 pub mod game_world;
 
-pub use entity_id::{ent_id, ent_id_opt, EntityId};
+pub use entity_id::{ent_id, ent_id_opt, to_num, EntityId};
 pub use game_context::GameContext;
 pub use game_world::GameWorld;

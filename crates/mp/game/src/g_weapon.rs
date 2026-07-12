@@ -2322,7 +2322,7 @@ pub fn thermalThinkStandard(ctx: GameContext<'_>, ent: *mut gentity_t) {
             return;
         }
     }
-    crate::g_object::G_RunObject(ctx, ent);
+    crate::g_object::G_RunObject(ctx, ctx.entity_id_of(ent).unwrap());
     unsafe {
         (*ent).nextthink = (*ctx.world).level.time;
     }
@@ -2963,7 +2963,7 @@ pub fn TrapThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).nextthink = (*ctx.world).level.time + 50;
     }
-    crate::g_object::G_RunObject(ctx, ent);
+    crate::g_object::G_RunObject(ctx, ctx.entity_id_of(ent).unwrap());
 }
 
 // PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and `trap_LinkEntity`-adjacent globals are needed — how is state threaded in?
