@@ -22,7 +22,7 @@ the exact symbols the engines load. See
 crate graph and [`docs/porting-rules.md`](docs/porting-rules.md) for how code
 is ported.
 
-## Status (2026-07-11)
+## Status (2026-07-12)
 
 - **Type port: complete** (Waves 0–7, both trees). Every ABI-crossing struct
   carries `size_of`/`offset_of!` static-asserts — a green build is the layout
@@ -31,33 +31,37 @@ is ported.
   compiles green with zero `todo!()` stubs and zero open `TODO: Port` markers;
   all `vmMain` dispatch arms are wired. The built cdylib exports
   `dllEntry`/`vmMain`/`GetModuleAPI`.
-- **MP dedicated-server engine: transcription complete, closure in flight.**
-  The full `jampDed` link set (2,481 functions) is ported or being closed:
-  seven C++ subsystems (ICARUS, ghoul2-server, RMG/terrain, NPC nav, StringEd,
-  ROFF, headless model registry) are golden-verified against unmodified oracle
-  TUs; the C track (qcommon/server/botlib) is transcribed and integrated, with
-  `botlib` fully closed (compiles green, zero stubs, zero forward-declarations)
-  and `qcommon`/`server` carrying an honest, machine-audited list of remaining
-  unported functions being ported in dependency order. The platform layer
+- **MP dedicated-server engine: closure complete (2026-07-12).** The full
+  `jampDed` link set is transcribed and the workspace is **green** —
+  `cargo check --workspace` builds every crate and **343 tests pass**, including
+  the §F oracle-parity golden suites (GP2, ghoul2 bone/bolt/collision, ICARUS,
+  RMG, StringEd, ROFF, tr_model). `qcommon`, `botlib`, and `server` are
+  **closed** — zero `todo!()` stubs, zero open `TODO: Port` markers, zero extern
+  forward-declaration blocks. The seven C++ subsystems (ICARUS, ghoul2-server,
+  RMG/terrain, NPC nav, StringEd, ROFF, headless model/skin registry) are
+  golden-verified against unmodified oracle TUs; the platform layer
   (`Sys_*`/console/sockets) is implemented natively in Rust behind the
-  `EngineHost` seam rather than transcribed, and the client draw surface is
-  out of the dedicated scope by ruling.
-- **CI**: pushes to `skeleton` and `master` run a compile+test gate
-  (temporarily scoped to the `jampgame` lane while the engine closure is in
-  flight); `master` pushes additionally build `jampgame` for Windows/Linux ×
-  release/debug and publish the zips to the rolling
+  `EngineHost`/`EngineHooks` seams; the client draw surface is out of the
+  dedicated scope by ruling (DEC-01).
+- **CI**: pushes to `skeleton` and `master` run the full-workspace
+  compile+test gate (`cargo build --workspace` + the oracle parity suites,
+  single-threaded); `master`
+  pushes additionally build `jampgame` for Windows/Linux × release/debug and
+  publish the zips to the rolling
   [`latest` release](../../releases/tag/latest) under the exact filenames the
   engine loads (`jampgamex86_64.dll`, `jampgamex86_64.so`, …). 32-bit lanes
   are allowed failures pending the queued ILP32 layout-assert pass.
-- **Not yet verified**: compiling green is not parity. After the engine
-  closure lands workspace-green: the referee swap — oracle differential tests
-  (single-threaded, replay-based) become the ground truth — followed by the
-  safe-state migration that retires the transcription's raw-pointer
-  scaffolding.
-- Remaining port surface is machine-audited against the link-set manifest
+- **Remaining roadmap** (compiling green is not parity): boot/lifecycle wiring
+  (hook install + core lifecycle so the dedicated server actually runs); the
+  **referee swap** — oracle differential tests (single-threaded, replay-based)
+  become the ground truth; then warning-zero, the safe-state migration that
+  retires the transcription's raw-pointer scaffolding, and the ILP32
+  layout-assert pass.
+- Architectural decisions live in
+  [`docs/decisions.md`](docs/decisions.md); remaining port surface is
+  machine-audited against the link-set manifest
   (`tools/closure-prototype/out/engine/engine-port-order.tsv`); older audits
-  live under [`docs/audits/`](docs/audits/); architectural decisions live in
-  [`docs/decisions.md`](docs/decisions.md).
+  live under [`docs/audits/`](docs/audits/).
 
 ## Ship targets
 

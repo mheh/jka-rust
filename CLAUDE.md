@@ -68,11 +68,21 @@ c_void-family modes). **jampgame transcription and integration are done**:
 `TODO: Port` markers both at zero (2026-07-06). CI builds and publishes
 engine-named modules on master pushes (`.github/workflows/build.yml`, rolling
 `latest` release; 32-bit lanes allowed-failure pending an ILP32 assert pass).
-Remaining on jampgame: per-file oracle review and the referee swap — oracle
-differential tests (single-threaded; the oracle has global state) replace
-clang layout as ground truth — then the safe-state migration. The
-`dangerous_implicit_autorefs` lint is allowed crate-wide in `mp_game`
+The `dangerous_implicit_autorefs` lint is allowed crate-wide in `mp_game`
 (documented in its lib.rs) pending the safe-state migration.
+
+**The MP dedicated-server engine island is closure-complete (workspace green
+2026-07-12).** The `jampDed` link set — `qcommon`, `botlib`, `server`, the seven
+C++ subsystems (ghoul2-server, ICARUS, RMG/terrain, NPC nav, StringEd, ROFF,
+headless renderer model/skin subset), and the native platform layer — is
+transcribed and integrated: `cargo check --workspace` is 0 errors, 343 tests
+pass (incl. §F oracle-parity goldens), and `qcommon`/`botlib`/`server` are closed
+with zero stubs, zero `TODO: Port` markers, and zero extern forward-decl blocks.
+Closure rulings are recorded in `docs/decisions.md` (DEC-13…DEC-22). Remaining:
+boot/lifecycle wiring (hook install + core lifecycle), the referee swap — oracle
+differential tests (single-threaded; the oracle has global state) replace clang
+layout as ground truth — then warning-zero, the safe-state migration, and the
+ILP32 layout-assert pass.
 
 - **MP** (`jamp` engine) ships 3 loadable DLLs: `jampgame`, `cgame`, `ui`.
 - **SP** (`jasp` engine) ships **only** `jagame`; SP cgame/ui are statically

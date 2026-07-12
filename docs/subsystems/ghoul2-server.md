@@ -1487,3 +1487,26 @@ closed by ruling 29 (`G2SV-D13`, pass 5), and `G2SV-Q11` closed by ruling 36
 by ruling 29 (pass 5), and `G2SV-Q1`–`G2SV-Q8` earlier. No item remains open, so this
 section is empty (doc-standards: `## Open questions` MUST be empty at FROZEN — it is
 already empty at DRAFT).
+
+## Amendment (user ruling 2026-07-12) — server skins name-pool closes model-memory gap #2
+
+The FROZEN content above is unchanged. This records the closure-campaign ruling
+(`DEC-18`, commit `64a48bb8`) that closes the second loader model-memory gap — the
+skin/shader-by-name read — sibling to the `.glm`/`.gla` block read `G2SV-D15` closed.
+
+- **Gap #2 (skin/shader read) closed.** Beyond the `model_mdxm`/`model_mdxa` block read
+  (`G2SV-D15`), the server surface path reads a skin's per-surface shader **by name**
+  (`surf->shader->name`, `G2_surfaces.cpp:212`). That read is now served by a new
+  `EngineHost` accessor **`R_GetSkinByHandle`**, backed by `tr-model.md`'s `RenderModels`
+  skin pool (its matching amendment) — so `mp_engine_ghoul2` reaches the skin/shader name
+  across the service seam, never a `mp_renderer` crate edge (`G2SV-D5` preserved),
+  exactly as the model-memory accessors do.
+- **Name-only, no compile.** The dedicated path uses only `shader->name`; no compiled
+  `shader_t` is produced or read server-side (consistent with the client-draw §20 drops
+  and the fixed-`false` `HackadelicOnClient` fold). `mp_engine_ghoul2` **never names** an
+  `mp_renderer` skin/shader type — the same type-location discipline `G2SV-D5` fixes for
+  the mdxm/mdxa headers.
+- **State ownership.** `tr.skins`/`numSkins` are owned by `RenderModels` in `mp_renderer`
+  (the `tr-model.md` amendment), not `Ghoul2System`; ghoul2 holds no skin pool and reads
+  on demand through the host, mirroring the `cvar_integer`/`model_mdxa` service rows in
+  State ownership.

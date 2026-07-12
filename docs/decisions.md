@@ -209,3 +209,122 @@ Fallbacks when unregistered (in-process tests without `dllEntry`):
 On the registered path `Com_Error` forwards and returns, dropping `level`,
 exactly as Raven's body does. GameWorld is untouched — no world state goes
 ambient; the two statics hold immutable fn pointers set once.
+
+## DEC-13 — Botlib export tables → receiver-carrying fn-ptr structs; import stays C-shaped (2026-07-11)
+
+The botlib **export** tables (the `botlib_export_t` surface the engine calls into)
+are retyped as engine-internal receiver-carrying function-pointer structs — each
+slot threads the botlib receiver instead of Raven's ambient `void(*)()` — while the
+botlib **import** table (the services botlib calls back through) stays C-shaped in
+`mp_qshared`. Commits `871e168b` / `cbd8388f`.
+
+Rationale: the export side is reached only by our engine, so it is free to carry the
+receiver (porting-rules §B4, state threaded not reached); the import side is the
+foreign-facing seam botlib fills, so it keeps Raven's layout.
+
+## DEC-14 — Console-command table slots → receiver-threaded fn pointers (2026-07-11, extended 2026-07-12)
+
+Raven's console-command handlers (`void(*)(void)`) become table slots of
+receiver-threaded function pointers; command dispatch threads the pinned receiver
+set into each handler rather than reaching ambient `level`/engine state. Extended to
+the RMG and ghoul2 (`g2`) command registrations 2026-07-12. Commits `ee62d80b` /
+`f7cbb74d` / `2f355e97`.
+
+Rationale: keeps the table-driven dispatch shape while honoring §B4 — a console
+handler that mutates the world receives it, never reaches it.
+
+## DEC-15 — EngineHooks upcall table on Common resolves the qcommon→server/client seam (2026-07-12)
+
+The `qcommon`→`server`/`client` link seam (Raven's direct cross-module calls the
+linker resolved) is modeled as an **EngineHooks upcall table owned by `Common`**. The
+dedicated build installs WinDed's null link set as the defaults (mirroring
+`null_client`/`null_snddma`); the `SV_*` server hooks and the renderer hooks are
+**mandatory** — no null default, a missing install is a bug, not a silent no-op.
+Commit `7c31900b`.
+
+> **AMENDS DEC-01's framing:** WinDed also links the **real** `tr_model.cpp`, so on the
+> dedicated build `RE_RegisterModels_LevelLoadEnd` / `R_HunkClearCrap` are **not** null
+> stubs — they have real bodies (now in `mp_renderer`), not the null-renderer no-ops
+> DEC-01's headless-boot framing implied. The renderer hooks are mandatory for exactly
+> this reason.
+
+## DEC-16 — Above-tier receivers are type-erased opaque slots in qcommon (ruling A, 2026-07-12)
+
+The receivers that live *above* the `qcommon` tier — `Server`, `Client`, `BotLib`,
+`Ghoul2System`, `RmManager`, `RenderModels` — are held in `qcommon` as **type-erased
+opaque slots** (pass-through proven: qcommon never names their types, only stores and
+forwards them), cast back to the concrete type at the owning crate's boundary through
+**one documented `unsafe` pair** (erase at install, recover at use). Commits
+`633d7291` / `cbd8388f` / `0530967c`.
+
+Rationale: qcommon is below these crates in the graph and cannot name their types; the
+opaque slot keeps the dependency acyclic while the single cast pair confines the unsafe
+to the seam (§D11).
+
+## DEC-17 — zlib via flate2 both directions; minizip parsed faithfully (2026-07-11/12)
+
+zlib is backed by **flate2** in both directions: raw inflate for pk3 entry reads, and
+zlib-framed deflate with `Z_SYNC_FLUSH` for the download stream (the deflate seam
+landed for `sv_client` `:768-803`). The minizip container format is parsed
+**faithfully** in Rust, not delegated to a minizip binding. Commits `d7706fab` /
+`07974910`.
+
+Rationale: flate2 is the sanctioned vendored-replacement for the codec (DEC-03-class
+policy); the container parse stays ours so pk3 iteration/order matches Raven
+byte-for-byte.
+
+## DEC-18 — Server skins are a name-only pool; R_GetSkinByHandle is the host accessor (2026-07-12)
+
+On the dedicated build the skin system is a **name-only pool**: `RenderModels` owns
+`tr.skins`/`numSkins`, and a skin surface's `shader` is resolved by **name only** — the
+dedicated path reads exclusively `shader->name` (`G2_surfaces.cpp:212`), never a
+compiled shader. `R_GetSkinByHandle` is exposed as an `EngineHost` accessor so
+`mp_engine_ghoul2` reaches skins across the service seam without an `mp_renderer` edge.
+Amends `docs/subsystems/tr-model.md` and `docs/subsystems/ghoul2-server.md` (dated
+amendments). Commit `64a48bb8`.
+
+Rationale: the DEDICATED `refexport_t` carries no shader-compile surface (DEC-01); the
+server needs only the surface→shader-name mapping, so the pool carries names — closing
+ghoul2's second loader model-memory gap (the sibling of the `model_mdxm`/`model_mdxa`
+block read).
+
+## DEC-19 — q_shared.c shared families are module-island duplicates at the shared tier (2026-07-12)
+
+The `q_shared.c` string / format / parse / math / swap families live at the **shared
+tier** (`mp_qshared`) as **module-island duplicates** of `mp_game`'s already-verified
+copies — the two are not unified (DEC-04, duplicate-don't-unify), each island carrying
+its own §20 function-scope statics. Commits `9f074a04` / `46daed79`.
+
+Rationale: engine crates below `mp_game` need these helpers but cannot depend on the
+game module; duplicating the verified copy at the shared tier keeps the graph acyclic
+and each island diffable against the one oracle TU.
+
+## DEC-20 — Extern forward-declaration blocks are BANNED (the closure-sweep convention, 2026-07-12)
+
+Extern / forward-declaration blocks that paper over an unported callee are **banned**.
+An unported callee is left as an honest unresolved reference — a real `E0425`/`E0432`
+at the callee's canonical home — so the remaining work surfaces as a compile error at
+the right location rather than a silent forward decl. Commits `54fe7d6c` / `55904017`
+/ `082e89b5`.
+
+Rationale: porting-rules §E14 (unported deps explicit, never a silent fake); a forward
+decl is exactly the silent fake the marker convention forbids.
+
+## DEC-21 — The BOTLIB import slot is the state-capture dual of GAME_SLOT (SEAM-D11, 2026-07-11)
+
+The `BOTLIB` import slot captures the botlib receiver the way `GAME_SLOT` captures the
+game module's — it is the **state-capture dual of `GAME_SLOT`** (SEAM-D11): the shell
+pins the receiver at install and every botlib import dispatch threads it, mirroring the
+game-module boundary. Commit `cbd8388f`.
+
+## DEC-22 — Platform seams: native Sys_*, engine-state wrappers in qcommon, threaded net/event receivers (2026-07-12)
+
+`native_platform` implements the `Sys_*` surface **natively** in Rust (against the host
+OS) rather than transcribing Raven's unix oracle; the `Sys_*` wrappers that reach engine
+state live in `qcommon`'s `sys_engine` module; and the net/event receivers are
+**threaded** — no `PlatformHost` global (§B3). Commits `e5977d43` / `d8111bd3` /
+`e5731cfb`.
+
+Rationale: the platform layer is the one place a faithful transcription buys nothing
+(the oracle is unix-specific); native Rust is cleaner and cross-platform, while
+engine-reaching wrappers stay in qcommon so no platform global is introduced.

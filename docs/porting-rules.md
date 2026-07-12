@@ -119,6 +119,21 @@ Every ported item keeps the current codebase style:
   #[repr(i8)]
   ```
 
+## Import & path style
+
+Two conventions the closure sweep made explicit (user rules 2026-07-12):
+
+- **No function-body `use` declarations.** Imports live at the file top, never inside a
+  fn body. A symbol a function needs is `use`d once at the module head, not pulled in
+  locally.
+- **No inline fully-qualified crate paths in expressions.** Reference a symbol by its
+  short name (imported at file top), not by an inline `crate::a::b::c` /
+  `mp_qshared::x::y` path spelled out at the call site.
+
+Exempt: `#[cfg(test)]` modules and the `const` layout-assert blocks (the
+`size_of`/`offset_of!` static-asserts), where fully-qualified paths and local `use`s
+are idiomatic and stay.
+
 ## Unported-work markers
 
 Every not-yet-ported placeholder uses one consistent, greppable pattern so the

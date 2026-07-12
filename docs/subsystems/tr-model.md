@@ -1010,3 +1010,28 @@ None. Every hole raised across passes 1-3 is resolved: `TRM-Q1`/`TRM-Q2` by
 `TRM-D1` (ruling 56), `TRM-Q3`/`TRM-Q4` by `TRM-D4` (ruling 58), and `TRM-Q5` by
 `TRM-D5` (ruling 59a) — all recorded in `## Resolved questions`. The empty section
 is the REVIEWED-gate condition.
+
+## Amendment (user ruling 2026-07-12) — server skins are a name-only pool
+
+The FROZEN content above is unchanged. This records the closure-campaign ruling
+(`DEC-18`, commit `64a48bb8`) that extends the model-loader slice with the skin pool
+`R_HunkClearCrap` already zeroes.
+
+- **Skins ownership.** `tr.skins`/`numSkins` — the skin pool the frozen `hunk_clear`
+  already zeros (`R_HunkClearCrap`, `tr_model.cpp:1683`; State ownership row) — now
+  have a stored owner: `RenderModels.skins` + `RenderModels.num_skins`, threaded via
+  the same `render_models_call` split-borrow as the model pool. `RenderModels` was
+  the sorted-map/`Vec` owner already; the skin pool joins it, not `Ghoul2System`.
+- **Shader resolution is name-only.** A skin surface's `shader` is a **name-only pool**
+  on the dedicated build: the server reads only `shader->name` (`G2_surfaces.cpp:212`),
+  never a compiled `shader_t` — consistent with this doc's §20 classification of the
+  whole `tr_shader.cpp` TU (the DEDICATED `refexport_t` has no shader entry, `GetRefAPI`
+  `tr_init.cpp:1472`). The skin surface stores the shader **name**; no `R_FindShader`
+  poke runs server-side (the same client-dead arm the `_Malloc` replay is, ruling 54).
+- **`R_GetSkinByHandle` is the host accessor.** `R_GetSkinByHandle` (the pooled skin for
+  a `qhandle_t`) is exposed as an `EngineHost` accessor so `mp_engine_ghoul2` reaches
+  skins across the service seam, never by naming an `mp_renderer` type (`G2SV-D5`
+  preserved) — exactly as `model_mdxm`/`model_mdxa` back the `.glm`/`.gla` block read.
+  This doc **backs** it (owns `RenderModels.skins`); the frozen bone/surface subset in
+  `ghoul2-server.md` **consumes** it (that doc's matching amendment closes its model-
+  memory gap #2).
