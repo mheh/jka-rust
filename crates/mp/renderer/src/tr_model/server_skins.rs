@@ -227,10 +227,12 @@ impl RenderModels {
             // stylesDefault, qtrue)` — the live `gServerSkinHack` arm (module
             // doc-comment).
             let shader = self.find_server_shader(&String::from_utf8_lossy(&token));
-            self.skins[h_skin as usize].surfaces.push(ServerSkinSurface {
-                name: String::from_utf8_lossy(&surf_name).into_owned(),
-                shader,
-            });
+            self.skins[h_skin as usize]
+                .surfaces
+                .push(ServerSkinSurface {
+                    name: String::from_utf8_lossy(&surf_name).into_owned(),
+                    shader,
+                });
         }
 
         host.fs_free_file(text);
@@ -351,7 +353,13 @@ fn re_split_skins(name: &str) -> Option<(String, String, String)> {
 ///
 /// Source: `oracle/codemp/renderer/tr_image.cpp:3193-3292`
 fn comma_parse(data: &[u8], pos: &mut usize) -> Vec<u8> {
-    let at = |i: usize| -> u8 { if i < data.len() { data[i] } else { 0 } };
+    let at = |i: usize| -> u8 {
+        if i < data.len() {
+            data[i]
+        } else {
+            0
+        }
+    };
 
     let mut token: Vec<u8> = Vec::new();
     let mut c;
@@ -495,7 +503,10 @@ mod tests {
                 "models/players/jedi_tf/lower01.skin".to_owned(),
             ))
         );
-        assert_eq!(re_split_skins("models/players/jedi_tf/|head01|torso01"), None);
+        assert_eq!(
+            re_split_skins("models/players/jedi_tf/|head01|torso01"),
+            None
+        );
         assert_eq!(re_split_skins("models/players/jedi_tf/model.skin"), None);
 
         let mut rm = seeded();

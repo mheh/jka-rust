@@ -134,7 +134,8 @@ pub fn SV_GetChallenge(view: &mut EngineHostView, sv: &mut Server, from: netadr_
     while i < MAX_CHALLENGES {
         let challenge = &mut sv.svs.challenges[i];
         if challenge.connected == qfalse
-            && mp_engine_qcommon::net_chan::NET_CompareAdr(view.common, from, challenge.adr) == qtrue
+            && mp_engine_qcommon::net_chan::NET_CompareAdr(view.common, from, challenge.adr)
+                == qtrue
         {
             break;
         }
@@ -353,12 +354,7 @@ pub fn SV_NextDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
         // We aren't getting an acknowledge for the correct block, drop the client
         // FIXME: this is bad... the client will never parse the disconnect message
         //			because the cgame isn't loaded yet
-        crate::SV_DropClient(
-            common,
-            sv,
-            cl,
-            c"broken download".as_ptr() as *const c_char,
-        );
+        crate::SV_DropClient(common, sv, cl, c"broken download".as_ptr() as *const c_char);
     }
 }
 
@@ -793,10 +789,13 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             );
 
             let ping = sv.svs.time - sv.svs.challenges[i].pingTime;
-            let conn_msg =
-                mp_engine_qcommon::stringed::SE_GetString2(view, "MP_SVGAME", "CLIENT_CONN_WITH_PING")
-                    .replace("%i", &i.to_string())
-                    .replacen("%i", &ping.to_string(), 1);
+            let conn_msg = mp_engine_qcommon::stringed::SE_GetString2(
+                view,
+                "MP_SVGAME",
+                "CLIENT_CONN_WITH_PING",
+            )
+            .replace("%i", &i.to_string())
+            .replacen("%i", &ping.to_string(), 1);
             mp_engine_qcommon::common::common::com_printf(view.common, &conn_msg);
             sv.svs.challenges[i].connected = qtrue;
 
@@ -919,15 +918,12 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                 // have "password" set to the value of "sv_privatePassword"
                 let password =
                     Info_ValueForKey(userinfo.as_mut_ptr(), c"password".as_ptr() as *mut c_char);
-                let start_index: c_int = if strcmp(
-                    password,
-                    (*view.common.sv_privatePassword).string,
-                ) == 0
-                {
-                    0
-                } else {
-                    (*view.common.sv_privateClients).integer
-                };
+                let start_index: c_int =
+                    if strcmp(password, (*view.common.sv_privatePassword).string) == 0 {
+                        0
+                    } else {
+                        (*view.common.sv_privateClients).integer
+                    };
 
                 let mut new_slot: *mut client_t = core::ptr::null_mut();
                 {
@@ -976,11 +972,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                             from,
                             format!(
                                 "print\n{}\n",
-                                crate::SV_GetStringEdString_str(
-                                    sv,
-                                    "MP_SVGAME",
-                                    "SERVER_IS_FULL"
-                                )
+                                crate::SV_GetStringEdString_str(sv, "MP_SVGAME", "SERVER_IS_FULL")
                             ),
                         );
                         mp_engine_qcommon::common::common::com_printf(
@@ -1132,10 +1124,7 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
                     (*client).name
                 ),
             );
-            mp_engine_qcommon::net_chan::Netchan_TransmitNextFragment(
-                view,
-                &mut (*client).netchan,
-            );
+            mp_engine_qcommon::net_chan::Netchan_TransmitNextFragment(view, &mut (*client).netchan);
         }
 
         mp_engine_qcommon::common::common::com_printf(
@@ -1388,8 +1377,12 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
         // store checksums since tokenization is not re-entrant
         let mut i: usize = 0;
         while n_cur_arg < n_client_paks {
-            n_client_chk_sum[i] =
-                unsafe { atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, n_cur_arg)) };
+            n_client_chk_sum[i] = unsafe {
+                atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(
+                    view.common,
+                    n_cur_arg,
+                ))
+            };
             n_cur_arg += 1;
             i += 1;
         }
@@ -1651,7 +1644,8 @@ pub fn SV_UserMove(
 
         // save time for ping calculation
         let pmask_idx = ((*cl).messageAcknowledge
-            & mp_engine_qcommon::qcommon::net_limits::PACKET_MASK as c_int) as usize;
+            & mp_engine_qcommon::qcommon::net_limits::PACKET_MASK as c_int)
+            as usize;
         (*cl).frames[pmask_idx].messageAcked = sv.svs.time;
 
         // if this is the first usercmd we have received
@@ -1846,7 +1840,10 @@ pub fn SV_DropClient(
             &format!("print \"{}^7 {}\n\"", name, reason_str),
         );
 
-        mp_engine_qcommon::common_fns::Com_DPrintf(common, &format!("Going to CS_ZOMBIE for {}\n", name));
+        mp_engine_qcommon::common_fns::Com_DPrintf(
+            common,
+            &format!("Going to CS_ZOMBIE for {}\n", name),
+        );
         (*drop).state = clientState_t::CS_ZOMBIE; // become free in a few seconds
 
         if (*drop).download != 0 {
@@ -1973,7 +1970,8 @@ pub fn SV_WriteDownloadToClient(
                         &format!(
                             "clientDownload: {} : \"{}\" cannot download id pk3 files\n",
                             client_index,
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                                .to_string_lossy()
                         ),
                     );
                     if missionPack != qfalse {
@@ -1991,7 +1989,8 @@ pub fn SV_WriteDownloadToClient(
                             errorMessage.len() as c_int,
                             &format!(
                                 "Cannot autodownload id pk3 file \"{}\"",
-                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                                    .to_string_lossy()
                             ),
                         );
                     }
@@ -2001,7 +2000,8 @@ pub fn SV_WriteDownloadToClient(
                         &format!(
                             "clientDownload: {} : \"{}\" download disabled",
                             client_index,
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                                .to_string_lossy()
                         ),
                     );
                     if (*view.common.sv_pure).integer != 0 {
@@ -2029,7 +2029,8 @@ pub fn SV_WriteDownloadToClient(
                         &format!(
                             "clientDownload: {} : \"{}\" file not found on server\n",
                             client_index,
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                                .to_string_lossy()
                         ),
                     );
                     Com_sprintf(
@@ -2037,7 +2038,8 @@ pub fn SV_WriteDownloadToClient(
                         errorMessage.len() as c_int,
                         &format!(
                             "File \"{}\" not found on server for autodownloading.\n",
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                                .to_string_lossy()
                         ),
                     );
                 }
@@ -2173,7 +2175,11 @@ pub fn SV_WriteDownloadToClient(
                 mp_engine_qcommon::msg::MSG_WriteLong(view.common, msg, (*cl).downloadSize);
             }
 
-            mp_engine_qcommon::msg::MSG_WriteShort(view.common, msg, (*cl).downloadBlockSize[curindex]);
+            mp_engine_qcommon::msg::MSG_WriteShort(
+                view.common,
+                msg,
+                (*cl).downloadBlockSize[curindex],
+            );
 
             // Write the block
             if (*cl).downloadBlockSize[curindex] != 0 {

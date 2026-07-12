@@ -10,6 +10,7 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::common::mp::gentity::{NUM_BSETS, NUM_TIDS};
 use mp_qshared::common::mp::qcommon::failedEdge_t;
 use mp_qshared::common::mp::qcommon::parms::parms_t;
@@ -17,25 +18,29 @@ use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
-use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::pc_token_t;
+use mp_qshared::shared::q_math::{
+    AngleVectors, MatrixMultiply, PerpendicularVector, Sys_SnapVector,
+};
 use mp_qshared::shared::surface_flags::CONTENTS_LIGHTSABER;
-use mp_qshared::shared::q_math::{AngleVectors, MatrixMultiply, PerpendicularVector, Sys_SnapVector};
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
-use native_platform::Sys_CheckCD;
 use native_math::vector::vec3_t;
+use native_platform::Sys_CheckCD;
 use native_types::clipHandle_t;
 
-use mp_abi::game::imports::MpGameImport as G;
-use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
-use crate::{SV_BotAllocateClient, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity, SV_BotLibSetup, SV_BotLibShutdown, SV_DropClient, SV_SendServerCommand, SV_SetUserinfo};
+use crate::game_system_calls_shim;
 use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::svEntity_t;
 use crate::server_host::sv_game_system_call;
 use crate::sv_renderer::RE_RegisterServerSkin;
-use crate::game_system_calls_shim;
 use crate::Server;
+use crate::{
+    SV_BotAllocateClient, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity,
+    SV_BotLibSetup, SV_BotLibShutdown, SV_DropClient, SV_SendServerCommand, SV_SetUserinfo,
+};
+use mp_abi::game::imports::MpGameImport as G;
+use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
 use mp_engine_qcommon::vm::{arm_game_slot, VM_Call};
 
 // PORT-NOTE(engine-host-state): `CollisionWorld`, `Common`, and `EngineHost`
@@ -46,8 +51,6 @@ use mp_engine_qcommon::vm::{arm_game_slot, VM_Call};
 // by their preamble-table decl-home crate; genuinely missing, escalated in
 // missing_symbols rather than stubbed (ZERO-PARK).
 use mp_engine_botlib::BotLib;
-use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
-use mp_engine_icarus::Icarus;
 use mp_engine_icarus::game_interface::{
     icarus_associate_ent, icarus_free_ent, icarus_init, icarus_init_ent, icarus_is_initialized,
     icarus_is_running, icarus_maintain_task_manager, icarus_register_script, icarus_run_script,
@@ -59,14 +62,14 @@ use mp_engine_icarus::q3_interface::{
 use mp_engine_icarus::q3_registers::{
     q3_get_float_variable, q3_get_string_variable, q3_get_vector_variable, q3_variable_declared,
 };
+use mp_engine_icarus::Icarus;
+use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
+use mp_engine_qcommon::cm_test::CM_AreasConnected;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::roff::RoffSystem;
 use mp_engine_qcommon::stringed::SE_GetString;
-use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
-use mp_engine_qcommon::cm_test::CM_AreasConnected;
-use mp_host_interface::engine_host::EngineHost;
 
 use crate::npcnav::Navigator;
 
@@ -656,7 +659,6 @@ pub fn SV_GameSystemCalls(
     roff: &mut RoffSystem,
     args: *mut c_int,
 ) -> c_int {
-
     // SAFETY: `args` is the trampoline's raw syscall word array (seam
     // pointer, porting-rules §D11); every arm reads only the words its trap
     // number defines, exactly as Raven's `int *args` does.
@@ -727,8 +729,8 @@ pub fn SV_GameSystemCalls(
         } else if trap == T::TRAP_ASIN as c_int {
             return FloatAsInt(mp_engine_qcommon::common_fns::Q_asin(vmf(args, 1)));
         } else if trap == G::G_PRINT as c_int {
-            let s =
-                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char).to_string_lossy();
+            let s = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                .to_string_lossy();
             mp_engine_qcommon::common::common::com_printf(view.common, &s);
             return 0;
         } else if trap == G::G_ERROR as c_int {
@@ -775,7 +777,10 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_CVAR_VARIABLE_INTEGER_VALUE as c_int {
-            return Cvar_VariableIntegerValue(view.common, vma(view.common, args, 1) as *const c_char);
+            return Cvar_VariableIntegerValue(
+                view.common,
+                vma(view.common, args, 1) as *const c_char,
+            );
         } else if trap == G::G_CVAR_VARIABLE_STRING_BUFFER as c_int {
             Cvar_VariableStringBuffer(
                 view.common,
@@ -1037,7 +1042,11 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_GET_SERVERINFO as c_int {
-            SV_GetServerinfo(view.common, vma(view.common, args, 1) as *mut c_char, *args.offset(2));
+            SV_GetServerinfo(
+                view.common,
+                vma(view.common, args, 1) as *mut c_char,
+                *args.offset(2),
+            );
             return 0;
         } else if trap == G::G_ADJUST_AREA_PORTAL_STATE as c_int {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
@@ -1063,7 +1072,12 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_GET_USERCMD as c_int {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
             let sv = &mut *(view.sv.as_raw() as *mut Server);
-            SV_GetUsercmd(view.common, sv, *args.offset(1), vma(view.common, args, 2) as *mut usercmd_t);
+            SV_GetUsercmd(
+                view.common,
+                sv,
+                *args.offset(1),
+                vma(view.common, args, 2) as *mut usercmd_t,
+            );
             return 0;
         } else if trap == G::G_SIEGEPERSSET as c_int {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
@@ -1168,21 +1182,21 @@ pub fn SV_GameSystemCalls(
             // host methods) so no other cast of this slot is live (rule 7).
             let ent = {
                 let sv = &mut *(view.sv.as_raw() as *mut Server);
-                ConvertedEntity(view.common, sv, vma(view.common, args, 1) as *mut sharedEntity_t)
+                ConvertedEntity(
+                    view.common,
+                    sv,
+                    vma(view.common, args, 1) as *mut sharedEntity_t,
+                )
             };
             let script = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                 .to_str()
                 .unwrap_or("");
             return icarus_run_script(icarus, view, ent, script) as c_int;
         } else if trap == G::G_ICARUS_REGISTERSCRIPT as c_int {
-            return icarus_register_script(
-                icarus,
-                view,
-                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
-                *args.offset(2) != 0,
-            ) as c_int;
+            let script = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                .to_str()
+                .unwrap_or("");
+            return icarus_register_script(icarus, view, script, *args.offset(2) != 0) as c_int;
         } else if trap == G::G_ICARUS_INIT as c_int {
             icarus_init(icarus, view);
             return 0;
@@ -1191,7 +1205,11 @@ pub fn SV_GameSystemCalls(
             // before the icarus call (rule 7).
             let ent = {
                 let sv = &mut *(view.sv.as_raw() as *mut Server);
-                ConvertedEntity(view.common, sv, vma(view.common, args, 1) as *mut sharedEntity_t)
+                ConvertedEntity(
+                    view.common,
+                    sv,
+                    vma(view.common, args, 1) as *mut sharedEntity_t,
+                )
             };
             return icarus_valid_ent(icarus, view, ent) as c_int;
         } else if trap == G::G_ICARUS_ISINITIALIZED as c_int {
@@ -1202,12 +1220,10 @@ pub fn SV_GameSystemCalls(
             return icarus_is_running(icarus, view, *args.offset(1)) as c_int;
         } else if trap == G::G_ICARUS_TASKIDPENDING as c_int {
             return match task_id_from_word(*args.offset(2)) {
-                Some(task_type) => q3_task_id_pending(
-                    icarus,
-                    view,
-                    vma(view.common, args, 1) as *mut sharedEntity_t,
-                    task_type,
-                ) as c_int,
+                Some(task_type) => {
+                    let ent = vma(view.common, args, 1) as *mut sharedEntity_t;
+                    q3_task_id_pending(icarus, view, ent, task_type) as c_int
+                }
                 None => 0,
             };
         } else if trap == G::G_ICARUS_INITENT as c_int {
@@ -1215,7 +1231,11 @@ pub fn SV_GameSystemCalls(
             // before the icarus call (rule 7).
             let ent = {
                 let sv = &mut *(view.sv.as_raw() as *mut Server);
-                ConvertedEntity(view.common, sv, vma(view.common, args, 1) as *mut sharedEntity_t)
+                ConvertedEntity(
+                    view.common,
+                    sv,
+                    vma(view.common, args, 1) as *mut sharedEntity_t,
+                )
             };
             icarus_init_ent(icarus, view, ent);
             return 0;
@@ -1224,7 +1244,11 @@ pub fn SV_GameSystemCalls(
             // before the icarus call (rule 7).
             let ent = {
                 let sv = &mut *(view.sv.as_raw() as *mut Server);
-                ConvertedEntity(view.common, sv, vma(view.common, args, 1) as *mut sharedEntity_t)
+                ConvertedEntity(
+                    view.common,
+                    sv,
+                    vma(view.common, args, 1) as *mut sharedEntity_t,
+                )
             };
             icarus_free_ent(icarus, view, ent);
             return 0;
@@ -1233,7 +1257,11 @@ pub fn SV_GameSystemCalls(
             // before the icarus call (rule 7).
             let ent = {
                 let sv = &mut *(view.sv.as_raw() as *mut Server);
-                ConvertedEntity(view.common, sv, vma(view.common, args, 1) as *mut sharedEntity_t)
+                ConvertedEntity(
+                    view.common,
+                    sv,
+                    vma(view.common, args, 1) as *mut sharedEntity_t,
+                )
             };
             icarus_associate_ent(icarus, view, ent);
             return 0;
@@ -1245,48 +1273,38 @@ pub fn SV_GameSystemCalls(
             // because we allow modification of certain non-pointer values,
             // which is valid.
             if let Some(task_type) = task_id_from_word(*args.offset(2)) {
-                q3_task_id_set(
-                    icarus,
-                    view,
-                    vma(view.common, args, 1) as *mut sharedEntity_t,
-                    task_type,
-                    *args.offset(3),
-                );
+                let ent = vma(view.common, args, 1) as *mut sharedEntity_t;
+                q3_task_id_set(icarus, view, ent, task_type, *args.offset(3));
             }
             return 0;
         } else if trap == G::G_ICARUS_TASKIDCOMPLETE as c_int {
             // same as above.
             if let Some(task_type) = task_id_from_word(*args.offset(2)) {
-                q3_task_id_complete(
-                    icarus,
-                    view,
-                    vma(view.common, args, 1) as *mut sharedEntity_t,
-                    task_type,
-                );
+                let ent = vma(view.common, args, 1) as *mut sharedEntity_t;
+                q3_task_id_complete(icarus, view, ent, task_type);
             }
             return 0;
         } else if trap == G::G_ICARUS_SETVAR as c_int {
+            let var_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
+                .to_str()
+                .unwrap_or("");
+            let var_value = core::ffi::CStr::from_ptr(vma(view.common, args, 4) as *const c_char)
+                .to_str()
+                .unwrap_or("");
             q3_set_var(
                 icarus,
                 view,
                 *args.offset(1),
                 *args.offset(2),
-                core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
-                core::ffi::CStr::from_ptr(vma(view.common, args, 4) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
+                var_name,
+                var_value,
             );
             return 0;
         } else if trap == G::G_ICARUS_VARIABLEDECLARED as c_int {
-            return q3_variable_declared(
-                icarus,
-                view,
-                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
-            );
+            let name = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                .to_str()
+                .unwrap_or("");
+            return q3_variable_declared(icarus, view, name);
         } else if trap == G::G_ICARUS_GETFLOATVARIABLE as c_int {
             let name = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
                 .to_str()
@@ -1427,10 +1445,8 @@ pub fn SV_GameSystemCalls(
             nav.add_failed_edge(view, *args.offset(1), *args.offset(2), *args.offset(3));
             return 0;
         } else if trap == G::G_NAV_CHECKFAILEDEDGE as c_int {
-            return nav.check_failed_edge(
-                view,
-                &mut *(vma(view.common, args, 1) as *mut failedEdge_t),
-            );
+            return nav
+                .check_failed_edge(view, &mut *(vma(view.common, args, 1) as *mut failedEdge_t));
         } else if trap == G::G_NAV_CHECKALLFAILEDEDGES as c_int {
             nav.check_all_failed_edges(view);
             return 0;
@@ -1529,7 +1545,7 @@ pub fn SV_GameSystemCalls(
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
             let sv = &mut *(view.sv.as_raw() as *mut Server);
             return ((*sv.botlib_export).PC_AddGlobalDefine.unwrap())(
-                vma(view.common, args, 1) as *mut c_char,
+                vma(view.common, args, 1) as *mut c_char
             );
         } else if trap == G::BOTLIB_PC_LOAD_SOURCE as c_int {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
@@ -1644,8 +1660,11 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_GET_ENTITY_TOKEN as c_int {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
             let sv = &mut *(view.sv.as_raw() as *mut Server);
-            return SV_GetEntityToken(sv, vma(view.common, args, 1) as *mut c_char, *args.offset(2))
-                as c_int;
+            return SV_GetEntityToken(
+                sv,
+                vma(view.common, args, 1) as *mut c_char,
+                *args.offset(2),
+            ) as c_int;
         } else {
             mp_engine_qcommon::common::com_error(
                 errorParm_t::ERR_DROP,
@@ -1709,23 +1728,30 @@ pub fn SV_InitGameProgs(view: &mut EngineHostView, sv: &mut Server) {
     SV_InitGameVM(view, sv, qfalse);
 }
 
-/// Raven `SV_ShutdownGameProgs` — called every time a map changes.
+/// Raven `SV_ShutdownGameProgs` — called every time a map changes. The hook
+/// target (view signature); callers already holding the real `&mut Server`
+/// (SV_SpawnServer / the SV_Shutdown body) use [`SV_ShutdownGameProgs_body`]
+/// directly so no second cast of the `sv` slot is ever created.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:1665-1673`
 pub fn SV_ShutdownGameProgs(view: &mut EngineHostView) {
     // SAFETY: view-constructor slot, single-threaded, no other live cast of this
-    // slot for the borrow's duration; `VM_Call`/`VM_Free` read `sv.gvm` and never
-    // re-cast `view.sv` (rule 7).
+    // slot for the borrow's duration (rule 7).
     let sv = unsafe { &mut *(view.sv.as_raw() as *mut Server) };
+    SV_ShutdownGameProgs_body(view.common, sv);
+}
+
+/// [`SV_ShutdownGameProgs`]'s body over the already-cast receivers.
+pub fn SV_ShutdownGameProgs_body(common: &mut Common, sv: &mut Server) {
     if sv.gvm.is_null() {
         return;
     }
     VM_Call(
-        view.common,
+        common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_SHUTDOWN as c_int,
         &[qfalse as c_int],
     );
-    mp_engine_qcommon::vm_fns::VM_Free(view.common, sv.gvm);
+    mp_engine_qcommon::vm_fns::VM_Free(common, sv.gvm);
     sv.gvm = core::ptr::null_mut();
 }

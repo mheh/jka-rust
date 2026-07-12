@@ -286,7 +286,12 @@ extern "C" fn bot_import_debug_polygon_create(
     numPoints: c_int,
     points: *mut vec3_t,
 ) -> c_int {
-    BotImport_DebugPolygonCreate(unsafe { &mut *ctx().sv }, color, numPoints, points as *const vec3_t)
+    BotImport_DebugPolygonCreate(
+        unsafe { &mut *ctx().sv },
+        color,
+        numPoints,
+        points as *const vec3_t,
+    )
 }
 
 /// Raven `BotImport_DebugPolygonDelete` (`sv_bot.cpp:514-518`).

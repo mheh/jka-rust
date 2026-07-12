@@ -17,8 +17,8 @@ use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
 use native_types::{qfalse, qtrue, MAX_QPATH};
 
-use crate::common::Common;
 use crate::common::engine_host_view::EngineHostView;
+use crate::common::Common;
 use crate::qcommon::vm_interpret_t::vmInterpret_t;
 use crate::qfiles::vm_header_t::vmHeader_t;
 use crate::vm::module_registry::MAX_VM;
@@ -27,12 +27,12 @@ use crate::vm::vm_symbol_s::vmSymbol_t;
 use crate::vm::vmptr_t::vmptr_t;
 
 use crate::cmd::Cmd_AddCommand;
-use crate::z_memman_pc::Hunk_Alloc;
 use crate::cvar_fns::Cvar_VariableValue;
+use crate::sys_engine::Sys_LoadDll;
+use crate::z_memman_pc::Hunk_Alloc;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::shared::q_string::{COM_Parse, COM_StripExtension};
 use mp_qshared::shared::swap::LittleLong;
-use crate::sys_engine::Sys_LoadDll;
 use native_platform::Sys_UnloadDll;
 
 /// `VM_VM2C`.
@@ -371,13 +371,7 @@ pub fn VM_Shifted_Alloc(view: &mut EngineHostView, ptr: *mut *mut (), size: c_in
         }
 
         // first allocate our desired memory, up front
-        let mem = Z_Malloc(
-            view,
-            size + 1,
-            memtag_t::TAG_VM_ALLOCATED,
-            qfalse,
-            0,
-        );
+        let mem = Z_Malloc(view, size + 1, memtag_t::TAG_VM_ALLOCATED, qfalse, 0);
 
         if mem.is_null() {
             debug_assert!(false);
@@ -541,8 +535,16 @@ pub fn VM_Init(view: &mut EngineHostView) {
     // client wants to know if the server is using vm's for certain modules,
     // so if pure we can force the same method (be it vm or dll) -rww
 
-    Cmd_AddCommand(view, c"vmprofile".as_ptr(), Some(|view| VM_VmProfile_f(view)));
-    Cmd_AddCommand(view, c"vminfo".as_ptr(), Some(|view| VM_VmInfo_f(view.common)));
+    Cmd_AddCommand(
+        view,
+        c"vmprofile".as_ptr(),
+        Some(|view| VM_VmProfile_f(view)),
+    );
+    Cmd_AddCommand(
+        view,
+        c"vminfo".as_ptr(),
+        Some(|view| VM_VmInfo_f(view.common)),
+    );
 
     view.common.vmTable = unsafe { core::mem::zeroed() };
 }
@@ -625,10 +627,8 @@ pub fn VM_LoadSymbols(view: &mut EngineHostView, vm: *mut vm_t) {
             }
             let chars = token.len();
 
-            let sym = VM_Alloc(
-                view,
-                (core::mem::size_of::<vmSymbol_t>() + chars) as c_int,
-            ) as *mut vmSymbol_t;
+            let sym = VM_Alloc(view, (core::mem::size_of::<vmSymbol_t>() + chars) as c_int)
+                as *mut vmSymbol_t;
             *prev = sym;
             prev = &mut (*sym).next;
             (*sym).next = core::ptr::null_mut();
@@ -674,7 +674,8 @@ pub fn VM_Create(
 
         // see if we already have the VM
         for i in 0..MAX_VM {
-            let name = std::ffi::CStr::from_ptr(view.common.vmTable[i].name.as_ptr()).to_string_lossy();
+            let name =
+                std::ffi::CStr::from_ptr(view.common.vmTable[i].name.as_ptr()).to_string_lossy();
             if name.eq_ignore_ascii_case(&module_str) {
                 return &mut view.common.vmTable[i] as *mut vm_t;
             }
@@ -801,8 +802,7 @@ pub fn VM_Create(
         // allocate space for the jump targets, which will be filled in by
         // the compile/prep functions
         (*vm).instructionPointersLength = (*header).instructionCount * 4;
-        (*vm).instructionPointers =
-            VM_Alloc(view, (*vm).instructionPointersLength) as *mut c_int;
+        (*vm).instructionPointers = VM_Alloc(view, (*vm).instructionPointersLength) as *mut c_int;
 
         // copy or compile the instructions
         (*vm).codeLength = (*header).codeLength;
@@ -897,12 +897,7 @@ pub fn VM_Restart(view: &mut EngineHostView, vm: *mut vm_t) -> *mut vm_t {
             VM_Free(view.common, vm);
 
             let name_c = std::ffi::CString::new(name).unwrap();
-            return VM_Create(
-                view,
-                name_c.as_ptr(),
-                systemCall,
-                vmInterpret_t::VMI_NATIVE,
-            );
+            return VM_Create(view, name_c.as_ptr(), systemCall, vmInterpret_t::VMI_NATIVE);
         }
 
         // load the image

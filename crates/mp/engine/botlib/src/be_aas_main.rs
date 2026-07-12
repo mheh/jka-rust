@@ -33,7 +33,9 @@ use crate::BotLib;
 
 use crate::be_aas_bspq3_fns::{AAS_DumpBSPData, AAS_LoadBSPFile};
 use crate::be_aas_cluster_fns::AAS_InitClustering;
-use crate::be_aas_entity::{AAS_InvalidateEntities, AAS_ResetEntityLinks, AAS_UnlinkInvalidEntities};
+use crate::be_aas_entity::{
+    AAS_InvalidateEntities, AAS_ResetEntityLinks, AAS_UnlinkInvalidEntities,
+};
 // UNRESOLVED (rule 5): AAS_LoadAASFile/AAS_WriteAASFile/AAS_DumpAASData are
 // genuinely unported; this is their canonical future home.
 use crate::be_aas_file_fns::{AAS_DumpAASData, AAS_LoadAASFile, AAS_WriteAASFile};

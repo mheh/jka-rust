@@ -598,8 +598,7 @@ pub fn Com_InitZoneMemory(view: &mut EngineHostView) {
     //#ifdef _DEBUG
     //	com_validateZone = Cvar_Get("com_validateZone", "1", 0);
     //#else
-    view.common.com_validateZone =
-        Cvar_Get(view, c"com_validateZone".as_ptr(), c"0".as_ptr(), 0);
+    view.common.com_validateZone = Cvar_Get(view, c"com_validateZone".as_ptr(), c"0".as_ptr(), 0);
     //#endif
 
     Cmd_AddCommand(

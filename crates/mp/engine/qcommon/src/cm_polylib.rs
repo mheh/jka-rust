@@ -25,9 +25,9 @@ use core::ffi::c_int;
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::q_math::{
-    vec3_origin, CrossProduct, VectorLength, VectorNormalize2, _DotProduct as DotProduct,
-    _VectorAdd as VectorAdd, _VectorCopy as VectorCopy, _VectorMA as VectorMA,
-    _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
+    _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorCopy as VectorCopy,
+    _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
+    vec3_origin, CrossProduct, VectorLength, VectorNormalize2,
 };
 use mp_qshared::shared::{errorParm_t, vec3_t, vec_t};
 
@@ -249,10 +249,7 @@ pub fn RemoveColinearPoints(cm: &mut CollisionWorld, w: *mut winding_t) {
 /// Raven `AllocWinding`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:30-45`
-pub fn AllocWinding(
-    view: &mut EngineHostView,
-    points: c_int,
-) -> *mut winding_t {
+pub fn AllocWinding(view: &mut EngineHostView, points: c_int) -> *mut winding_t {
     // PORT-NOTE(missing-field): `c_active_windings`/`c_peak_windings`/
     // `c_winding_allocs`/`c_winding_points` (`cm_polylib.cpp:12-15`) have no
     // home fields yet; referenced as `common.c_active_windings` etc. per the
@@ -269,13 +266,7 @@ pub fn AllocWinding(
     // PORT-NOTE(missing-callee): `Z_Malloc` is part of the still-unlanded
     // z_memman unit; called with the exact resolved receivers and reported
     // as a missing symbol (cm_trace.rs/vm_x86.rs precedent).
-    let w = Z_Malloc(
-        view,
-        s,
-        memtag_t::TAG_BSP,
-        mp_qshared::shared::qtrue,
-        4,
-    ) as *mut winding_t;
+    let w = Z_Malloc(view, s, memtag_t::TAG_BSP, mp_qshared::shared::qtrue, 4) as *mut winding_t;
     // Raven: qtrue param in Z_Malloc does this (Com_Memset commented out).
     w
 }
@@ -462,10 +453,7 @@ pub fn BaseWindingForPlane(
 /// Raven `CopyWinding`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:249-258`
-pub fn CopyWinding(
-    view: &mut EngineHostView,
-    w: *mut winding_t,
-) -> *mut winding_t {
+pub fn CopyWinding(view: &mut EngineHostView, w: *mut winding_t) -> *mut winding_t {
     unsafe {
         let c = AllocWinding(view, (*w).numpoints);
         let size = core::mem::offset_of!(winding_t, p)
@@ -478,10 +466,7 @@ pub fn CopyWinding(
 /// Raven `ReverseWinding`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:265-277`
-pub fn ReverseWinding(
-    view: &mut EngineHostView,
-    w: *mut winding_t,
-) -> *mut winding_t {
+pub fn ReverseWinding(view: &mut EngineHostView, w: *mut winding_t) -> *mut winding_t {
     unsafe {
         let c = AllocWinding(view, (*w).numpoints);
         for i in 0..(*w).numpoints {
@@ -857,9 +842,7 @@ pub fn ChopWinding(
     let mut f: *mut winding_t = core::ptr::null_mut();
     let mut b: *mut winding_t = core::ptr::null_mut();
 
-    ClipWindingEpsilon(
-        view, in_, normal, dist, ON_EPSILON, &mut f, &mut b,
-    );
+    ClipWindingEpsilon(view, in_, normal, dist, ON_EPSILON, &mut f, &mut b);
     FreeWinding(view.common, view.cm, in_);
     if !b.is_null() {
         FreeWinding(view.common, view.cm, b);

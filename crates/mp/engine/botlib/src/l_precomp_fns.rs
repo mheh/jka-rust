@@ -53,7 +53,6 @@ fn ctime_buf(t: libc::time_t) -> [c_char; 26] {
     out
 }
 
-
 use crate::l_log_fns::Log_Write;
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory, GetMemory};
 use crate::l_script_fns::{

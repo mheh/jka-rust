@@ -21,8 +21,8 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::qfalse;
 use native_types::fileHandle_t;
 
-use crate::common::{com_error, com_printf, Common, MASK_QUED_EVENTS, MAX_QUED_EVENTS};
 use crate::common::engine_host_view::EngineHostView;
+use crate::common::{com_error, com_printf, Common, MASK_QUED_EVENTS, MAX_QUED_EVENTS};
 use crate::cvar_fns::{Cvar_Set, Cvar_VariableString};
 use crate::files_common::{FS_BuildOSPath4, FS_Read};
 use crate::files_pc::FS_Seek;
@@ -49,7 +49,11 @@ fn dlerror_string() -> String {
     if err.is_null() {
         String::new()
     } else {
-        unsafe { core::ffi::CStr::from_ptr(err).to_string_lossy().into_owned() }
+        unsafe {
+            core::ffi::CStr::from_ptr(err)
+                .to_string_lossy()
+                .into_owned()
+        }
     }
 }
 
@@ -75,7 +79,9 @@ pub unsafe fn Sys_LoadDll(
     // branch (`%si386.so`) — the only unix arch the oracle defines and the name
     // CI ships (`jampgamei386.so`).
     // Source: `oracle/codemp/unix/unix_main.c:342-356`
-    let name_str = core::ffi::CStr::from_ptr(name).to_string_lossy().into_owned();
+    let name_str = core::ffi::CStr::from_ptr(name)
+        .to_string_lossy()
+        .into_owned();
     let fname = std::ffi::CString::new(format!("{name_str}i386.so")).unwrap_or_default();
 
     // bk001129 - was RTLD_LAZY: `#define Q_RTLD RTLD_NOW`.
@@ -87,7 +93,9 @@ pub unsafe fn Sys_LoadDll(
 
     let mut path = FS_BuildOSPath4(common, basepath, gamedir, fname.as_ptr());
     // bk001206 - verbose
-    let path_str = core::ffi::CStr::from_ptr(path).to_string_lossy().into_owned();
+    let path_str = core::ffi::CStr::from_ptr(path)
+        .to_string_lossy()
+        .into_owned();
     com_printf(common, &format!("Sys_LoadDll({path_str})... \n"));
 
     // bk001129 - from cvs1.17 (mkv), was fname not fn
@@ -103,7 +111,9 @@ pub unsafe fn Sys_LoadDll(
 
             path = FS_BuildOSPath4(common, cdpath, gamedir, fname.as_ptr());
             lib_handle = libc::dlopen(path, q_rtld);
-            let path2 = core::ffi::CStr::from_ptr(path).to_string_lossy().into_owned();
+            let path2 = core::ffi::CStr::from_ptr(path)
+                .to_string_lossy()
+                .into_owned();
             if lib_handle.is_null() {
                 // bk001206 - report any problem
                 com_printf(
@@ -187,12 +197,7 @@ pub fn Sys_StreamedRead(
 ///
 /// Raven's `int offset` param is widened to `c_long` to match the `FS_Seek` seam
 /// (the caller already holds a `c_long` offset).
-pub fn Sys_StreamSeek(
-    view: &mut EngineHostView,
-    f: fileHandle_t,
-    offset: c_long,
-    origin: c_int,
-) {
+pub fn Sys_StreamSeek(view: &mut EngineHostView, f: fileHandle_t, offset: c_long, origin: c_int) {
     FS_Seek(view, f, offset, origin);
 }
 
@@ -269,7 +274,15 @@ pub fn Sys_GetEvent(view: &mut EngineHostView) -> sysEvent_t {
         unsafe {
             core::ptr::copy_nonoverlapping(bytes.as_ptr(), b, bytes.len());
             *b.add(bytes.len()) = 0;
-            Sys_QueEvent(view.common, 0, sysEventType_t::SE_CONSOLE, 0, 0, len, b as *mut c_void);
+            Sys_QueEvent(
+                view.common,
+                0,
+                sysEventType_t::SE_CONSOLE,
+                0,
+                0,
+                len,
+                b as *mut c_void,
+            );
         }
     }
 
@@ -289,7 +302,15 @@ pub fn Sys_GetEvent(view: &mut EngineHostView) -> sysEvent_t {
                 buf.add(1) as *mut u8,
                 netmsg.cursize as usize,
             );
-            Sys_QueEvent(view.common, 0, sysEventType_t::SE_PACKET, 0, 0, len, buf as *mut c_void);
+            Sys_QueEvent(
+                view.common,
+                0,
+                sysEventType_t::SE_PACKET,
+                0,
+                0,
+                len,
+                buf as *mut c_void,
+            );
         }
     }
 

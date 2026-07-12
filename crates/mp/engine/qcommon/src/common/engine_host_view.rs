@@ -33,7 +33,9 @@ use crate::common::common::{com_printf, Common};
 use crate::common::error::com_error;
 use crate::common::opaque_slots::{BotLib, Client, Ghoul2System, RenderModels, RmManager, Server};
 use crate::cvar_fns::{Cvar_FindVar, Cvar_Get, Cvar_VariableIntegerValue, Cvar_VariableString};
-use crate::files_common::{FS_FCloseFile, FS_FreeFile, FS_FreeFileList, FS_ListFiles, FS_ReadFile, FS_Write};
+use crate::files_common::{
+    FS_FCloseFile, FS_FreeFile, FS_FreeFileList, FS_ListFiles, FS_ReadFile, FS_Write,
+};
 use crate::files_pc::FS_FOpenFileByMode;
 use crate::sys_net::Sys_IsLANAddress;
 
@@ -118,8 +120,7 @@ impl EngineHost for EngineHostView<'_> {
         }
         // SAFETY: FS_ReadFile returned a live `len`-byte buffer it allocated;
         // copied whole before FS_FreeFile releases it.
-        let bytes =
-            unsafe { core::slice::from_raw_parts(buf as *const u8, len as usize) }.to_vec();
+        let bytes = unsafe { core::slice::from_raw_parts(buf as *const u8, len as usize) }.to_vec();
         FS_FreeFile(self.common, buf);
         Some(bytes)
     }
@@ -216,7 +217,12 @@ impl EngineHost for EngineHostView<'_> {
         if f == 0 {
             return false;
         }
-        FS_Write(self.common, data.as_ptr() as *const (), data.len() as c_int, f);
+        FS_Write(
+            self.common,
+            data.as_ptr() as *const (),
+            data.len() as c_int,
+            f,
+        );
         FS_FCloseFile(self.common, f);
         true
     }

@@ -568,11 +568,7 @@ pub fn StringReplaceWords(string: *mut c_char, synonym: *mut c_char, replacement
                     tail as *const c_void,
                     tail_len + 1,
                 );
-                Com_Memcpy(
-                    str_ as *mut (),
-                    replacement as *const (),
-                    rep_len as usize,
-                );
+                Com_Memcpy(str_ as *mut (), replacement as *const (), rep_len as usize);
             }
             str_ = StringContainsWord(str_.offset(libc::strlen(replacement) as isize), synonym, 0);
         }
@@ -652,11 +648,7 @@ pub fn BotReplaceReplySynonyms(bot: &mut BotLib, string: *mut c_char, context: c
                         tail as *const c_void,
                         tail_len + 1,
                     );
-                    Com_Memcpy(
-                        str1 as *mut (),
-                        replacement as *const (),
-                        rep_len as usize,
-                    );
+                    Com_Memcpy(str1 as *mut (), replacement as *const (), rep_len as usize);
                     break;
                 }
                 if !synonym.is_null() {
@@ -974,7 +966,11 @@ pub fn BotCheckValidReplyChatKeySet(
                     }
                     if (*key2).flags & RCKFL_STRING != 0 {
                         if StringContains((*key2).string, (*key).string, 0) != -1 {
-                            SourceWarning(bot, source, c"the key with prefix ! is inside another key".as_ptr());
+                            SourceWarning(
+                                bot,
+                                source,
+                                c"the key with prefix ! is inside another key".as_ptr(),
+                            );
                         }
                     } else if (*key2).flags & RCKFL_VARIABLES != 0 {
                         let mut m = (*key2).r#match;
@@ -1721,7 +1717,11 @@ pub fn InitConsoleMessageHeap(bot: &mut BotLib) {
         if !bot.consolemessageheap.is_null() {
             FreeMemory(bot, bot.consolemessageheap as *mut ());
         }
-        let max_messages = LibVarValue(bot, c"max_messages".as_ptr() as *mut c_char, c"1024".as_ptr() as *mut c_char) as isize;
+        let max_messages = LibVarValue(
+            bot,
+            c"max_messages".as_ptr() as *mut c_char,
+            c"1024".as_ptr() as *mut c_char,
+        ) as isize;
         bot.consolemessageheap = GetClearedHunkMemory(
             bot,
             (max_messages as usize * core::mem::size_of::<bot_consolemessage_t>()) as u64,
@@ -2134,7 +2134,8 @@ pub fn BotLoadSynonyms(bot: &mut BotLib, filename: *mut c_char) -> *mut bot_syno
                             numsynonyms += 1;
                             if PC_ExpectTokenString(bot, source, c",".as_ptr() as *mut c_char) == 0
                                 || PC_ExpectTokenType(bot, source, TT_NUMBER, 0, &mut token) == 0
-                                || PC_ExpectTokenString(bot, source, c")".as_ptr() as *mut c_char) == 0
+                                || PC_ExpectTokenString(bot, source, c")".as_ptr() as *mut c_char)
+                                    == 0
                             {
                                 FreeSource(bot, source);
                                 return core::ptr::null_mut();
@@ -2146,13 +2147,18 @@ pub fn BotLoadSynonyms(bot: &mut BotLib, filename: *mut c_char) -> *mut bot_syno
                             if PC_CheckTokenString(bot, source, c"]".as_ptr() as *mut c_char) != 0 {
                                 break;
                             }
-                            if PC_ExpectTokenString(bot, source, c",".as_ptr() as *mut c_char) == 0 {
+                            if PC_ExpectTokenString(bot, source, c",".as_ptr() as *mut c_char) == 0
+                            {
                                 FreeSource(bot, source);
                                 return core::ptr::null_mut();
                             }
                         }
                         if numsynonyms < 2 {
-                            SourceError(bot, source, c"synonym must have at least two entries\n".as_ptr());
+                            SourceError(
+                                bot,
+                                source,
+                                c"synonym must have at least two entries\n".as_ptr(),
+                            );
                             FreeSource(bot, source);
                             return core::ptr::null_mut();
                         }
@@ -2248,20 +2254,29 @@ pub fn BotLoadMatchPieces(
         while PC_ReadToken(bot, source, &mut token) != 0 {
             if token.r#type == TT_NUMBER && (token.subtype & TT_INTEGER) != 0 {
                 if token.intvalue as usize >= MAX_MATCHVARIABLES {
-                    SourceError(bot, source, c"can't have more than max match variables\n".as_ptr());
+                    SourceError(
+                        bot,
+                        source,
+                        c"can't have more than max match variables\n".as_ptr(),
+                    );
                     FreeSource(bot, source);
                     BotFreeMatchPieces(bot, firstpiece);
                     return core::ptr::null_mut();
                 }
                 if lastwasvariable {
-                    SourceError(bot, source, c"not allowed to have adjacent variables\n".as_ptr());
+                    SourceError(
+                        bot,
+                        source,
+                        c"not allowed to have adjacent variables\n".as_ptr(),
+                    );
                     FreeSource(bot, source);
                     BotFreeMatchPieces(bot, firstpiece);
                     return core::ptr::null_mut();
                 }
                 lastwasvariable = true;
-                let matchpiece = GetClearedHunkMemory(bot, (core::mem::size_of::<bot_matchpiece_t>()) as u64)
-                    as *mut bot_matchpiece_t;
+                let matchpiece =
+                    GetClearedHunkMemory(bot, (core::mem::size_of::<bot_matchpiece_t>()) as u64)
+                        as *mut bot_matchpiece_t;
                 (*matchpiece).r#type = MT_VARIABLE;
                 (*matchpiece).variable = token.intvalue as c_int;
                 (*matchpiece).next = core::ptr::null_mut();
@@ -2272,8 +2287,9 @@ pub fn BotLoadMatchPieces(
                 }
                 lastpiece = matchpiece;
             } else if token.r#type == TT_STRING {
-                let matchpiece = GetClearedHunkMemory(bot, (core::mem::size_of::<bot_matchpiece_t>()) as u64)
-                    as *mut bot_matchpiece_t;
+                let matchpiece =
+                    GetClearedHunkMemory(bot, (core::mem::size_of::<bot_matchpiece_t>()) as u64)
+                        as *mut bot_matchpiece_t;
                 (*matchpiece).firststring = core::ptr::null_mut();
                 (*matchpiece).r#type = MT_STRING;
                 (*matchpiece).variable = 0;
@@ -2525,14 +2541,16 @@ pub fn BotLoadReplyChat(
                 FreeSource(bot, source);
                 return core::ptr::null_mut();
             }
-            let replychat = GetClearedHunkMemory(bot, (core::mem::size_of::<bot_replychat_t>()) as u64)
-                as *mut bot_replychat_t;
+            let replychat =
+                GetClearedHunkMemory(bot, (core::mem::size_of::<bot_replychat_t>()) as u64)
+                    as *mut bot_replychat_t;
             (*replychat).keys = core::ptr::null_mut();
             (*replychat).next = replychatlist;
             replychatlist = replychat;
             loop {
-                let key = GetClearedHunkMemory(bot, (core::mem::size_of::<bot_replychatkey_t>()) as u64)
-                    as *mut bot_replychatkey_t;
+                let key =
+                    GetClearedHunkMemory(bot, (core::mem::size_of::<bot_replychatkey_t>()) as u64)
+                        as *mut bot_replychatkey_t;
                 (*key).flags = 0;
                 (*key).string = core::ptr::null_mut();
                 (*key).r#match = core::ptr::null_mut();
@@ -2623,9 +2641,10 @@ pub fn BotLoadReplyChat(
                     return core::ptr::null_mut();
                 }
                 let clen = libc::strlen(chatmessagestring.as_ptr());
-                let chatmessage =
-                    GetClearedHunkMemory(bot, (core::mem::size_of::<bot_chatmessage_t>() + clen + 1) as u64)
-                        as *mut bot_chatmessage_t;
+                let chatmessage = GetClearedHunkMemory(
+                    bot,
+                    (core::mem::size_of::<bot_chatmessage_t>() + clen + 1) as u64,
+                ) as *mut bot_chatmessage_t;
                 (*chatmessage).chatmessage =
                     (chatmessage as *mut c_char).add(core::mem::size_of::<bot_chatmessage_t>());
                 libc::strcpy((*chatmessage).chatmessage, chatmessagestring.as_ptr());
@@ -2706,7 +2725,8 @@ pub fn BotLoadInitialChat(
                                 return core::ptr::null_mut();
                             }
                             if PC_ExpectTokenType(bot, source, TT_STRING, 0, &mut token) == 0
-                                || PC_ExpectTokenString(bot, source, c"{".as_ptr() as *mut c_char) == 0
+                                || PC_ExpectTokenString(bot, source, c"{".as_ptr() as *mut c_char)
+                                    == 0
                             {
                                 FreeSource(bot, source);
                                 return core::ptr::null_mut();
@@ -2726,7 +2746,9 @@ pub fn BotLoadInitialChat(
                                 ptr = ptr.add(core::mem::size_of::<bot_chattype_t>());
                             }
                             size += core::mem::size_of::<bot_chattype_t>();
-                            while PC_CheckTokenString(bot, source, c"}".as_ptr() as *mut c_char) == 0 {
+                            while PC_CheckTokenString(bot, source, c"}".as_ptr() as *mut c_char)
+                                == 0
+                            {
                                 if BotLoadChatMessage(bot, source, chatmessagestring.as_mut_ptr())
                                     == 0
                                 {
@@ -2860,14 +2882,35 @@ pub fn BotLoadChatFile(
 ///
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:2934-2961`
 pub fn BotSetupChatAI(common: &mut Common, bot: &mut BotLib) -> c_int {
-    let file = LibVarString(bot, c"synfile".as_ptr() as *mut c_char, c"syn.c".as_ptr() as *mut c_char);
+    let file = LibVarString(
+        bot,
+        c"synfile".as_ptr() as *mut c_char,
+        c"syn.c".as_ptr() as *mut c_char,
+    );
     bot.synonyms = BotLoadSynonyms(bot, file);
-    let file = LibVarString(bot, c"rndfile".as_ptr() as *mut c_char, c"rnd.c".as_ptr() as *mut c_char);
+    let file = LibVarString(
+        bot,
+        c"rndfile".as_ptr() as *mut c_char,
+        c"rnd.c".as_ptr() as *mut c_char,
+    );
     bot.randomstrings = BotLoadRandomStrings(bot, file);
-    let file = LibVarString(bot, c"matchfile".as_ptr() as *mut c_char, c"match.c".as_ptr() as *mut c_char);
+    let file = LibVarString(
+        bot,
+        c"matchfile".as_ptr() as *mut c_char,
+        c"match.c".as_ptr() as *mut c_char,
+    );
     bot.matchtemplates = BotLoadMatchTemplates(bot, file);
-    if LibVarValue(bot, c"nochat".as_ptr() as *mut c_char, c"0".as_ptr() as *mut c_char) == 0.0 {
-        let file = LibVarString(bot, c"rchatfile".as_ptr() as *mut c_char, c"rchat.c".as_ptr() as *mut c_char);
+    if LibVarValue(
+        bot,
+        c"nochat".as_ptr() as *mut c_char,
+        c"0".as_ptr() as *mut c_char,
+    ) == 0.0
+    {
+        let file = LibVarString(
+            bot,
+            c"rchatfile".as_ptr() as *mut c_char,
+            c"rchat.c".as_ptr() as *mut c_char,
+        );
         bot.replychats = BotLoadReplyChat(common, bot, file);
     }
     InitConsoleMessageHeap(bot);

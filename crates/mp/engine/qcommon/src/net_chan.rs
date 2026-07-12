@@ -292,12 +292,7 @@ pub fn Netchan_Init(view: &mut EngineHostView, port: c_int) {
         view.common.showdrop = (*showdrop_cvar).integer;
 
         let qport_val = std::ffi::CString::new(format!("{port}")).unwrap();
-        let qport_cvar = Cvar_Get(
-            view,
-            c"net_qport".as_ptr(),
-            qport_val.as_ptr(),
-            CVAR_INIT,
-        );
+        let qport_cvar = Cvar_Get(view, c"net_qport".as_ptr(), qport_val.as_ptr(), CVAR_INIT);
         view.common.net_qport = (*qport_cvar).integer;
 
         let killdropped_cvar = Cvar_Get(
@@ -424,7 +419,13 @@ pub fn NET_OutOfBandPrint(common: &mut Common, sock: netsrc_t, adr: netadr_t, s:
     let len = 4 + bytes.len();
 
     // send the datagram
-    NET_SendPacket(common, sock, len as c_int, string.as_ptr() as *const (), adr);
+    NET_SendPacket(
+        common,
+        sock,
+        len as c_int,
+        string.as_ptr() as *const (),
+        adr,
+    );
 }
 
 /// Raven `NET_OutOfBandData`.
@@ -483,9 +484,18 @@ pub fn Netchan_TransmitNextFragment(view: &mut EngineHostView, chan: *mut netcha
         let mut send: msg_t = core::mem::zeroed();
 
         // write the packet header
-        MSG_InitOOB(view, &mut send, send_buf.as_mut_ptr(), send_buf.len() as c_int); // <-- only do the oob here
+        MSG_InitOOB(
+            view,
+            &mut send,
+            send_buf.as_mut_ptr(),
+            send_buf.len() as c_int,
+        ); // <-- only do the oob here
 
-        MSG_WriteLong(view.common, &mut send, (*chan).outgoingSequence | FRAGMENT_BIT);
+        MSG_WriteLong(
+            view.common,
+            &mut send,
+            (*chan).outgoingSequence | FRAGMENT_BIT,
+        );
 
         // send the qport if we are a client
         if matches!((*chan).sock, netsrc_t::NS_CLIENT) {
@@ -504,7 +514,10 @@ pub fn Netchan_TransmitNextFragment(view: &mut EngineHostView, chan: *mut netcha
         MSG_WriteData(
             view.common,
             &mut send,
-            (*chan).unsentBuffer.as_ptr().add((*chan).unsentFragmentStart as usize) as *const (),
+            (*chan)
+                .unsentBuffer
+                .as_ptr()
+                .add((*chan).unsentFragmentStart as usize) as *const (),
             fragmentLength,
         );
 
@@ -560,14 +573,20 @@ pub fn Netchan_Transmit(
         let mut send: msg_t = core::mem::zeroed();
 
         if length > MAX_MSGLEN as c_int {
-            com_error(errorParm_t::ERR_DROP, format!("Netchan_Transmit: length = {length}"));
+            com_error(
+                errorParm_t::ERR_DROP,
+                format!("Netchan_Transmit: length = {length}"),
+            );
         }
         (*chan).unsentFragmentStart = 0;
 
         if (*chan).unsentFragments != qfalse {
             crate::common::common::com_printf(
                 view.common,
-                &format!("[ISM] Stomping Unsent Fragments {}\n", NETSRC_STRING[(*chan).sock as usize]),
+                &format!(
+                    "[ISM] Stomping Unsent Fragments {}\n",
+                    NETSRC_STRING[(*chan).sock as usize]
+                ),
             );
         }
 
@@ -588,7 +607,12 @@ pub fn Netchan_Transmit(
         }
 
         // write the packet header
-        MSG_InitOOB(view, &mut send, send_buf.as_mut_ptr(), send_buf.len() as c_int);
+        MSG_InitOOB(
+            view,
+            &mut send,
+            send_buf.as_mut_ptr(),
+            send_buf.len() as c_int,
+        );
 
         MSG_WriteLong(view.common, &mut send, (*chan).outgoingSequence);
         (*chan).outgoingSequence += 1;

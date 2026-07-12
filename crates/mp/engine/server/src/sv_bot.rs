@@ -8,6 +8,7 @@
 
 use core::ffi::{c_char, c_int};
 
+use mp_abi::game::exports::MpGameExport;
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
@@ -15,15 +16,14 @@ use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_VariableIntegerValue};
 use mp_engine_qcommon::qcommon::net_limits::{MAX_RELIABLE_COMMANDS, PACKET_MASK};
 use mp_engine_qcommon::vm::VM_Call;
 use mp_engine_qcommon::z_memman_pc::{Z_Free, Z_Malloc};
-use mp_abi::game::exports::MpGameExport;
-use mp_qshared::shared::cvar::CVAR_CHEAT;
 use mp_qshared::common::mp::botlib::botlib_misc::BOTLIB_API_VERSION;
 use mp_qshared::common::mp::game::g_public::SVF_BOT;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
+use mp_qshared::shared::cvar::CVAR_CHEAT;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_math::{
-    CrossProduct, VectorNormalize, VectorSet, _DotProduct, _VectorMA, _VectorSubtract,
+    _DotProduct, _VectorMA, _VectorSubtract, CrossProduct, VectorNormalize, VectorSet,
 };
 use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::{qfalse, qtrue};
@@ -355,7 +355,12 @@ pub fn SV_BotInitCvars(view: &mut EngineHostView) {
     Cvar_Get(view, c"bot_maxdebugpolys".as_ptr(), c"2".as_ptr(), 0); //maximum number of debug polys
     Cvar_Get(view, c"bot_groundonly".as_ptr(), c"1".as_ptr(), 0); //only show ground faces of areas
     Cvar_Get(view, c"bot_reachability".as_ptr(), c"0".as_ptr(), 0); //show all reachabilities to other areas
-    Cvar_Get(view, c"bot_visualizejumppads".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //show jumppads
+    Cvar_Get(
+        view,
+        c"bot_visualizejumppads".as_ptr(),
+        c"0".as_ptr(),
+        CVAR_CHEAT,
+    ); //show jumppads
     Cvar_Get(view, c"bot_forceclustering".as_ptr(), c"0".as_ptr(), 0); //force cluster calculations
     Cvar_Get(view, c"bot_forcereachability".as_ptr(), c"0".as_ptr(), 0); //force reachability calculations
     Cvar_Get(view, c"bot_forcewrite".as_ptr(), c"0".as_ptr(), 0); //force writing aas file
@@ -366,7 +371,12 @@ pub fn SV_BotInitCvars(view: &mut EngineHostView) {
     Cvar_Get(view, c"bot_testichat".as_ptr(), c"0".as_ptr(), 0); //test ichats
     Cvar_Get(view, c"bot_testrchat".as_ptr(), c"0".as_ptr(), 0); //test rchats
     Cvar_Get(view, c"bot_testsolid".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //test for solid areas
-    Cvar_Get(view, c"bot_testclusters".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //test the AAS clusters
+    Cvar_Get(
+        view,
+        c"bot_testclusters".as_ptr(),
+        c"0".as_ptr(),
+        CVAR_CHEAT,
+    ); //test the AAS clusters
     Cvar_Get(view, c"bot_fastchat".as_ptr(), c"0".as_ptr(), 0); //fast chatting bots
     Cvar_Get(view, c"bot_nochat".as_ptr(), c"0".as_ptr(), 0); //disable chats
     Cvar_Get(view, c"bot_pause".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //pause the bots thinking
@@ -375,8 +385,28 @@ pub fn SV_BotInitCvars(view: &mut EngineHostView) {
     Cvar_Get(view, c"bot_rocketjump".as_ptr(), c"1".as_ptr(), 0); //enable rocket jumping
     Cvar_Get(view, c"bot_challenge".as_ptr(), c"0".as_ptr(), 0); //challenging bot
     Cvar_Get(view, c"bot_minplayers".as_ptr(), c"0".as_ptr(), 0); //minimum players in a team or the game
-    Cvar_Get(view, c"bot_interbreedchar".as_ptr(), c"".as_ptr(), CVAR_CHEAT); //bot character used for interbreeding
-    Cvar_Get(view, c"bot_interbreedbots".as_ptr(), c"10".as_ptr(), CVAR_CHEAT); //number of bots used for interbreeding
-    Cvar_Get(view, c"bot_interbreedcycle".as_ptr(), c"20".as_ptr(), CVAR_CHEAT); //bot interbreeding cycle
-    Cvar_Get(view, c"bot_interbreedwrite".as_ptr(), c"".as_ptr(), CVAR_CHEAT); //write interbreeded bots to this file
+    Cvar_Get(
+        view,
+        c"bot_interbreedchar".as_ptr(),
+        c"".as_ptr(),
+        CVAR_CHEAT,
+    ); //bot character used for interbreeding
+    Cvar_Get(
+        view,
+        c"bot_interbreedbots".as_ptr(),
+        c"10".as_ptr(),
+        CVAR_CHEAT,
+    ); //number of bots used for interbreeding
+    Cvar_Get(
+        view,
+        c"bot_interbreedcycle".as_ptr(),
+        c"20".as_ptr(),
+        CVAR_CHEAT,
+    ); //bot interbreeding cycle
+    Cvar_Get(
+        view,
+        c"bot_interbreedwrite".as_ptr(),
+        c"".as_ptr(),
+        CVAR_CHEAT,
+    ); //write interbreeded bots to this file
 }

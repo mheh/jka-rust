@@ -162,7 +162,9 @@ pub fn net_recvfrom(sock: i32, buf: &mut [u8]) -> NetRecvResult {
     if ret == -1 {
         let err = std::io::Error::last_os_error();
         return match err.raw_os_error() {
-            Some(e) if e == libc::EWOULDBLOCK || e == libc::ECONNREFUSED => NetRecvResult::WouldBlock,
+            Some(e) if e == libc::EWOULDBLOCK || e == libc::ECONNREFUSED => {
+                NetRecvResult::WouldBlock
+            }
             _ => NetRecvResult::Error(err.to_string()),
         };
     }

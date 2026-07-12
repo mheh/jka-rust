@@ -27,8 +27,9 @@ use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::errorParm_t;
 use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::q_math::{
-    CrossProduct, VectorClear, VectorLengthSquared, VectorNormalize, _DotProduct as DotProduct,
-    _VectorAdd as VectorAdd, _VectorMA as VectorMA, _VectorSubtract as VectorSubtract,
+    _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorMA as VectorMA,
+    _VectorSubtract as VectorSubtract, CrossProduct, VectorClear, VectorLengthSquared,
+    VectorNormalize,
 };
 use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t, vec4_t};
 
@@ -692,21 +693,14 @@ fn CM_SetBorderInward(
 /// screwed up.
 ///
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:755-800`
-fn CM_ValidateFacet(
-    view: &mut EngineHostView,
-    facet: *mut facet_t,
-) -> qboolean {
+fn CM_ValidateFacet(view: &mut EngineHostView, facet: *mut facet_t) -> qboolean {
     unsafe {
         if (*facet).surfacePlane == -1 {
             return qfalse;
         }
 
         let mut plane = view.cm.planes[(*facet).surfacePlane as usize].plane;
-        let mut w = BaseWindingForPlane(
-            view,
-            [plane[0], plane[1], plane[2]],
-            plane[3],
-        );
+        let mut w = BaseWindingForPlane(view, [plane[0], plane[1], plane[2]], plane[3]);
         let mut j = 0;
         while j < (*facet).numBorders && !w.is_null() {
             if (*facet).borderPlanes[j as usize] == -1 {
@@ -717,13 +711,7 @@ fn CM_ValidateFacet(
             if (*facet).borderInward[j as usize] == 0 {
                 plane = [-plane[0], -plane[1], -plane[2], -plane[3]];
             }
-            ChopWindingInPlace(
-                view,
-                &mut w,
-                [plane[0], plane[1], plane[2]],
-                plane[3],
-                0.1,
-            );
+            ChopWindingInPlace(view, &mut w, [plane[0], plane[1], plane[2]], plane[3], 0.1);
             j += 1;
         }
 
@@ -768,18 +756,11 @@ fn CM_ValidateFacet(
 /// Raven `CM_AddFacetBevels`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:807-968`
-fn CM_AddFacetBevels(
-    view: &mut EngineHostView,
-    facet: *mut facet_t,
-) {
+fn CM_AddFacetBevels(view: &mut EngineHostView, facet: *mut facet_t) {
     unsafe {
         let mut plane = view.cm.planes[(*facet).surfacePlane as usize].plane;
 
-        let mut w = BaseWindingForPlane(
-            view,
-            [plane[0], plane[1], plane[2]],
-            plane[3],
-        );
+        let mut w = BaseWindingForPlane(view, [plane[0], plane[1], plane[2]], plane[3]);
         let mut j = 0;
         while j < (*facet).numBorders && !w.is_null() {
             if (*facet).borderPlanes[j as usize] == (*facet).surfacePlane {
@@ -792,13 +773,7 @@ fn CM_AddFacetBevels(
                 plane = [-plane[0], -plane[1], -plane[2], -plane[3]];
             }
 
-            ChopWindingInPlace(
-                view,
-                &mut w,
-                [plane[0], plane[1], plane[2]],
-                plane[3],
-                0.1,
-            );
+            ChopWindingInPlace(view, &mut w, [plane[0], plane[1], plane[2]], plane[3], 0.1);
             j += 1;
         }
         if w.is_null() {
@@ -978,9 +953,9 @@ fn CM_AddFacetBevels(
                         (*facet).borderInward[(*facet).numBorders as usize] = flipped;
 
                         let mut w2 = CopyWinding(view, w);
-                        let mut newplane =
-                            view.cm.planes[(*facet).borderPlanes[(*facet).numBorders as usize] as usize]
-                                .plane;
+                        let mut newplane = view.cm.planes
+                            [(*facet).borderPlanes[(*facet).numBorders as usize] as usize]
+                            .plane;
                         if (*facet).borderInward[(*facet).numBorders as usize] == 0 {
                             newplane = [-newplane[0], -newplane[1], -newplane[2], -newplane[3]];
                         }
@@ -992,7 +967,10 @@ fn CM_AddFacetBevels(
                             0.1,
                         );
                         if w2.is_null() {
-                            Com_DPrintf(view.common, "WARNING: CM_AddFacetBevels... invalid bevel\n");
+                            Com_DPrintf(
+                                view.common,
+                                "WARNING: CM_AddFacetBevels... invalid bevel\n",
+                            );
                             dir += 2;
                             continue;
                         } else {
@@ -1029,11 +1007,7 @@ const EN_LEFT: usize = 3;
 /// Raven `CM_PatchCollideFromGrid`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:983-1150`
-fn CM_PatchCollideFromGrid(
-    view: &mut EngineHostView,
-    grid: &cGrid_t,
-    pf: *mut patchCollide_t,
-) {
+fn CM_PatchCollideFromGrid(view: &mut EngineHostView, grid: &cGrid_t, pf: *mut patchCollide_t) {
     unsafe {
         let mut borders = [0 as c_int; 4];
         let mut no_adjust = [0 as c_int; 4];
@@ -1085,7 +1059,8 @@ fn CM_PatchCollideFromGrid(
                 no_adjust[EN_TOP] =
                     (borders[EN_TOP] == grid_planes[i as usize][j as usize][0]) as c_int;
                 if borders[EN_TOP] == -1 || no_adjust[EN_TOP] != 0 {
-                    borders[EN_TOP] = CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 0);
+                    borders[EN_TOP] =
+                        CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 0);
                 }
 
                 borders[EN_BOTTOM] = -1;
@@ -1097,7 +1072,8 @@ fn CM_PatchCollideFromGrid(
                 no_adjust[EN_BOTTOM] =
                     (borders[EN_BOTTOM] == grid_planes[i as usize][j as usize][1]) as c_int;
                 if borders[EN_BOTTOM] == -1 || no_adjust[EN_BOTTOM] != 0 {
-                    borders[EN_BOTTOM] = CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 2);
+                    borders[EN_BOTTOM] =
+                        CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 2);
                 }
 
                 borders[EN_LEFT] = -1;
@@ -1109,7 +1085,8 @@ fn CM_PatchCollideFromGrid(
                 no_adjust[EN_LEFT] =
                     (borders[EN_LEFT] == grid_planes[i as usize][j as usize][1]) as c_int;
                 if borders[EN_LEFT] == -1 || no_adjust[EN_LEFT] != 0 {
-                    borders[EN_LEFT] = CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 3);
+                    borders[EN_LEFT] =
+                        CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 3);
                 }
 
                 borders[EN_RIGHT] = -1;
@@ -1121,7 +1098,8 @@ fn CM_PatchCollideFromGrid(
                 no_adjust[EN_RIGHT] =
                     (borders[EN_RIGHT] == grid_planes[i as usize][j as usize][0]) as c_int;
                 if borders[EN_RIGHT] == -1 || no_adjust[EN_RIGHT] != 0 {
-                    borders[EN_RIGHT] = CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 1);
+                    borders[EN_RIGHT] =
+                        CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 1);
                 }
 
                 if num_facets == MAX_FACETS as c_int {
@@ -1559,8 +1537,14 @@ pub fn CM_TraceThroughPatchCollide(
             }
 
             let mut hit: c_int = 0;
-            if CM_CheckFacetPlane(&plane, startp, endp, &mut enter_frac, &mut leave_frac, &mut hit)
-                == qfalse
+            if CM_CheckFacetPlane(
+                &plane,
+                startp,
+                endp,
+                &mut enter_frac,
+                &mut leave_frac,
+                &mut hit,
+            ) == qfalse
             {
                 facet = facet.add(1);
                 continue;
@@ -1669,10 +1653,7 @@ POSITION DETECTION
 /// affects it.
 ///
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:1545-1628`
-pub fn CM_PositionTestInPatchCollide(
-    tw: *mut traceWork_t,
-    pc: *const patchCollide_s,
-) -> qboolean {
+pub fn CM_PositionTestInPatchCollide(tw: *mut traceWork_t, pc: *const patchCollide_s) -> qboolean {
     unsafe {
         if (*tw).isPoint != qfalse {
             return qfalse;

@@ -74,14 +74,9 @@ pub fn VM_StackTrace(
 /// Raven `VM_PrepareInterpreter`.
 ///
 /// Source: `oracle/codemp/qcommon/vm_interpreted.cpp:139-266`
-pub fn VM_PrepareInterpreter(
-    view: &mut EngineHostView,
-    vm: *mut vm_t,
-    header: *mut vmHeader_t,
-) {
+pub fn VM_PrepareInterpreter(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeader_t) {
     unsafe {
-        (*vm).codeBase =
-            Hunk_Alloc(view, (*vm).codeLength * 4, ha_pref::h_high).cast::<u8>();
+        (*vm).codeBase = Hunk_Alloc(view, (*vm).codeLength * 4, ha_pref::h_high).cast::<u8>();
         // memcpy( vm->codeBase, (byte *)header + header->codeOffset, vm->codeLength ); (Raven: commented out)
 
         // we don't need to translate the instructions, but we still need

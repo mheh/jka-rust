@@ -107,47 +107,227 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
         substruct: core::ptr::null_mut(),
     };
     let mut weaponinfo_fields: [fielddef_t; 23] = [
-        fd(c"number", core::mem::offset_of!(weaponinfo_t, number), FT_INT, 0),
-        fd(c"name", core::mem::offset_of!(weaponinfo_t, name), FT_STRING, 0),
-        fd(c"level", core::mem::offset_of!(weaponinfo_t, level), FT_INT, 0),
-        fd(c"model", core::mem::offset_of!(weaponinfo_t, model), FT_STRING, 0),
-        fd(c"weaponindex", core::mem::offset_of!(weaponinfo_t, weaponindex), FT_INT, 0),
-        fd(c"flags", core::mem::offset_of!(weaponinfo_t, flags), FT_INT, 0),
-        fd(c"projectile", core::mem::offset_of!(weaponinfo_t, projectile), FT_STRING, 0),
-        fd(c"numprojectiles", core::mem::offset_of!(weaponinfo_t, numprojectiles), FT_INT, 0),
-        fd(c"hspread", core::mem::offset_of!(weaponinfo_t, hspread), FT_FLOAT, 0),
-        fd(c"vspread", core::mem::offset_of!(weaponinfo_t, vspread), FT_FLOAT, 0),
-        fd(c"speed", core::mem::offset_of!(weaponinfo_t, speed), FT_FLOAT, 0),
-        fd(c"acceleration", core::mem::offset_of!(weaponinfo_t, acceleration), FT_FLOAT, 0),
-        fd(c"recoil", core::mem::offset_of!(weaponinfo_t, recoil), FT_FLOAT | FT_ARRAY, 3),
-        fd(c"offset", core::mem::offset_of!(weaponinfo_t, offset), FT_FLOAT | FT_ARRAY, 3),
-        fd(c"angleoffset", core::mem::offset_of!(weaponinfo_t, angleoffset), FT_FLOAT | FT_ARRAY, 3),
-        fd(c"extrazvelocity", core::mem::offset_of!(weaponinfo_t, extrazvelocity), FT_FLOAT, 0),
-        fd(c"ammoamount", core::mem::offset_of!(weaponinfo_t, ammoamount), FT_INT, 0),
-        fd(c"ammoindex", core::mem::offset_of!(weaponinfo_t, ammoindex), FT_INT, 0),
-        fd(c"activate", core::mem::offset_of!(weaponinfo_t, activate), FT_FLOAT, 0),
-        fd(c"reload", core::mem::offset_of!(weaponinfo_t, reload), FT_FLOAT, 0),
-        fd(c"spinup", core::mem::offset_of!(weaponinfo_t, spinup), FT_FLOAT, 0),
-        fd(c"spindown", core::mem::offset_of!(weaponinfo_t, spindown), FT_FLOAT, 0),
+        fd(
+            c"number",
+            core::mem::offset_of!(weaponinfo_t, number),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"name",
+            core::mem::offset_of!(weaponinfo_t, name),
+            FT_STRING,
+            0,
+        ),
+        fd(
+            c"level",
+            core::mem::offset_of!(weaponinfo_t, level),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"model",
+            core::mem::offset_of!(weaponinfo_t, model),
+            FT_STRING,
+            0,
+        ),
+        fd(
+            c"weaponindex",
+            core::mem::offset_of!(weaponinfo_t, weaponindex),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"flags",
+            core::mem::offset_of!(weaponinfo_t, flags),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"projectile",
+            core::mem::offset_of!(weaponinfo_t, projectile),
+            FT_STRING,
+            0,
+        ),
+        fd(
+            c"numprojectiles",
+            core::mem::offset_of!(weaponinfo_t, numprojectiles),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"hspread",
+            core::mem::offset_of!(weaponinfo_t, hspread),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"vspread",
+            core::mem::offset_of!(weaponinfo_t, vspread),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"speed",
+            core::mem::offset_of!(weaponinfo_t, speed),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"acceleration",
+            core::mem::offset_of!(weaponinfo_t, acceleration),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"recoil",
+            core::mem::offset_of!(weaponinfo_t, recoil),
+            FT_FLOAT | FT_ARRAY,
+            3,
+        ),
+        fd(
+            c"offset",
+            core::mem::offset_of!(weaponinfo_t, offset),
+            FT_FLOAT | FT_ARRAY,
+            3,
+        ),
+        fd(
+            c"angleoffset",
+            core::mem::offset_of!(weaponinfo_t, angleoffset),
+            FT_FLOAT | FT_ARRAY,
+            3,
+        ),
+        fd(
+            c"extrazvelocity",
+            core::mem::offset_of!(weaponinfo_t, extrazvelocity),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"ammoamount",
+            core::mem::offset_of!(weaponinfo_t, ammoamount),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"ammoindex",
+            core::mem::offset_of!(weaponinfo_t, ammoindex),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"activate",
+            core::mem::offset_of!(weaponinfo_t, activate),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"reload",
+            core::mem::offset_of!(weaponinfo_t, reload),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"spinup",
+            core::mem::offset_of!(weaponinfo_t, spinup),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"spindown",
+            core::mem::offset_of!(weaponinfo_t, spindown),
+            FT_FLOAT,
+            0,
+        ),
         fd_end(),
     ];
     let mut projectileinfo_fields: [fielddef_t; 15] = [
-        fd(c"name", core::mem::offset_of!(projectileinfo_t, name), FT_STRING, 0),
+        fd(
+            c"name",
+            core::mem::offset_of!(projectileinfo_t, name),
+            FT_STRING,
+            0,
+        ),
         // Raven quirk: this row uses `WEAPON_OFS(model)`, not `PROJECTILE_OFS`
         // — preserved (be_ai_weap.cpp:69).
-        fd(c"model", core::mem::offset_of!(weaponinfo_t, model), FT_STRING, 0),
-        fd(c"flags", core::mem::offset_of!(projectileinfo_t, flags), FT_INT, 0),
-        fd(c"gravity", core::mem::offset_of!(projectileinfo_t, gravity), FT_FLOAT, 0),
-        fd(c"damage", core::mem::offset_of!(projectileinfo_t, damage), FT_INT, 0),
-        fd(c"radius", core::mem::offset_of!(projectileinfo_t, radius), FT_FLOAT, 0),
-        fd(c"visdamage", core::mem::offset_of!(projectileinfo_t, visdamage), FT_INT, 0),
-        fd(c"damagetype", core::mem::offset_of!(projectileinfo_t, damagetype), FT_INT, 0),
-        fd(c"healthinc", core::mem::offset_of!(projectileinfo_t, healthinc), FT_INT, 0),
-        fd(c"push", core::mem::offset_of!(projectileinfo_t, push), FT_FLOAT, 0),
-        fd(c"detonation", core::mem::offset_of!(projectileinfo_t, detonation), FT_FLOAT, 0),
-        fd(c"bounce", core::mem::offset_of!(projectileinfo_t, bounce), FT_FLOAT, 0),
-        fd(c"bouncefric", core::mem::offset_of!(projectileinfo_t, bouncefric), FT_FLOAT, 0),
-        fd(c"bouncestop", core::mem::offset_of!(projectileinfo_t, bouncestop), FT_FLOAT, 0),
+        fd(
+            c"model",
+            core::mem::offset_of!(weaponinfo_t, model),
+            FT_STRING,
+            0,
+        ),
+        fd(
+            c"flags",
+            core::mem::offset_of!(projectileinfo_t, flags),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"gravity",
+            core::mem::offset_of!(projectileinfo_t, gravity),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"damage",
+            core::mem::offset_of!(projectileinfo_t, damage),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"radius",
+            core::mem::offset_of!(projectileinfo_t, radius),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"visdamage",
+            core::mem::offset_of!(projectileinfo_t, visdamage),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"damagetype",
+            core::mem::offset_of!(projectileinfo_t, damagetype),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"healthinc",
+            core::mem::offset_of!(projectileinfo_t, healthinc),
+            FT_INT,
+            0,
+        ),
+        fd(
+            c"push",
+            core::mem::offset_of!(projectileinfo_t, push),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"detonation",
+            core::mem::offset_of!(projectileinfo_t, detonation),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"bounce",
+            core::mem::offset_of!(projectileinfo_t, bounce),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"bouncefric",
+            core::mem::offset_of!(projectileinfo_t, bouncefric),
+            FT_FLOAT,
+            0,
+        ),
+        fd(
+            c"bouncestop",
+            core::mem::offset_of!(projectileinfo_t, bouncestop),
+            FT_FLOAT,
+            0,
+        ),
         fd_end(),
     ];
     let mut weaponinfo_struct = structdef_t {
@@ -435,7 +615,8 @@ pub fn BotLoadWeaponWeights(bot: &mut BotLib, weaponstate: c_int, filename: *mut
         if bot.weaponconfig.is_null() {
             return BLERR_CANNOTLOADWEAPONCONFIG;
         }
-        (*ws).weaponweightindex = WeaponWeightIndex(bot, (*ws).weaponweightconfig, bot.weaponconfig);
+        (*ws).weaponweightindex =
+            WeaponWeightIndex(bot, (*ws).weaponweightconfig, bot.weaponconfig);
     }
     BLERR_NOERROR
 }
@@ -471,7 +652,11 @@ pub fn BotGetWeaponInfo(
 /// Raven `BotChooseBestFightWeapon`.
 ///
 /// Source: `oracle/codemp/botlib/be_ai_weap.cpp:387-417`
-pub fn BotChooseBestFightWeapon(bot: &mut BotLib, weaponstate: c_int, inventory: *mut c_int) -> c_int {
+pub fn BotChooseBestFightWeapon(
+    bot: &mut BotLib,
+    weaponstate: c_int,
+    inventory: *mut c_int,
+) -> c_int {
     let ws = BotWeaponStateFromHandle(bot, weaponstate);
     if ws.is_null() {
         return 0;

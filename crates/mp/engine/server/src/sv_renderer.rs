@@ -20,7 +20,6 @@ use mp_qshared::shared::{qboolean, qhandle_t};
 
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_renderer::tr_model::render_models::RenderModels as RealRenderModels;
-use mp_host_interface::engine_host::EngineHost;
 
 use crate::server_host::rm_from_slot;
 

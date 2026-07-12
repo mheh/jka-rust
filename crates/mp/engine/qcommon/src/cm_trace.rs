@@ -794,7 +794,9 @@ pub fn CM_TraceThroughTerrain(
 
         // Collide with any water
         if (*tw).contents & CONTENTS_WATER != 0 {
-            let fraction = view.cm.terrain_water_collide((*tw).start, (*tw).end, trace.fraction);
+            let fraction = view
+                .cm
+                .terrain_water_collide((*tw).start, (*tw).end, trace.fraction);
             if fraction < trace.fraction {
                 VectorSet(&mut trace.plane.normal, 0.0, 0.0, 1.0);
                 trace.contents = view.cm.terrain_water_contents();
@@ -891,11 +893,7 @@ pub fn CM_TestInLeaf(
 /// Raven `CM_PositionTest`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:448-483`
-pub fn CM_PositionTest(
-    view: &mut EngineHostView,
-    tw: *mut traceWork_t,
-    trace: &mut trace_t,
-) {
+pub fn CM_PositionTest(view: &mut EngineHostView, tw: *mut traceWork_t, trace: &mut trace_t) {
     unsafe {
         // §19: Raven leaves `leafs` uninitialized before `CM_BoxLeafnums_r` fills it;
         // zero-init here to avoid reading UB memory.
@@ -1710,13 +1708,7 @@ pub fn CM_Trace(
                         CM_TestBoundingBoxInCapsule(view, &mut tw, &mut *trace, model);
                     }
                 } else {
-                    CM_TestInLeaf(
-                        view,
-                        &mut tw,
-                        &mut *trace,
-                        &mut (*cmod).leaf,
-                        local,
-                    );
+                    CM_TestInLeaf(view, &mut tw, &mut *trace, &mut (*cmod).leaf, local);
                 }
             } else if (*cmod).firstNode == -1 {
                 CM_PositionTest(view, &mut tw, &mut *trace);
@@ -1755,21 +1747,10 @@ pub fn CM_Trace(
                     if tw.sphere.r#use != qfalse {
                         CM_TraceCapsuleThroughCapsule(view.cm, &mut tw, &mut *trace, model);
                     } else {
-                        CM_TraceBoundingBoxThroughCapsule(
-                            view,
-                            &mut tw,
-                            &mut *trace,
-                            model,
-                        );
+                        CM_TraceBoundingBoxThroughCapsule(view, &mut tw, &mut *trace, model);
                     }
                 } else {
-                    CM_TraceThroughLeaf(
-                        view,
-                        &mut tw,
-                        &mut *trace,
-                        local,
-                        &mut (*cmod).leaf,
-                    );
+                    CM_TraceThroughLeaf(view, &mut tw, &mut *trace, local, &mut (*cmod).leaf);
                 }
             } else {
                 CM_TraceThroughTree(

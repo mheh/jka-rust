@@ -269,15 +269,11 @@ pub fn CM_AreasConnected(cm: &mut CollisionWorld, area1: c_int, area2: c_int) ->
     }
 
     if area1 >= cm.cmg.numAreas || area2 >= cm.cmg.numAreas {
-        crate::common::error::com_error(
-            errorParm_t::ERR_DROP,
-            "area >= cmg.numAreas".to_string(),
-        );
+        crate::common::error::com_error(errorParm_t::ERR_DROP, "area >= cmg.numAreas".to_string());
     }
 
     if unsafe {
-        (*cm.cmg.areas.add(area1 as usize)).floodnum
-            == (*cm.cmg.areas.add(area2 as usize)).floodnum
+        (*cm.cmg.areas.add(area1 as usize)).floodnum == (*cm.cmg.areas.add(area2 as usize)).floodnum
     } {
         return qtrue;
     }

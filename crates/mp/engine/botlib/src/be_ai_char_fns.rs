@@ -108,8 +108,8 @@ pub fn BotDumpCharacter(bot: &mut BotLib, ch: *mut bot_character_t) {
         Log_Write(bot, __m.as_ptr() as *mut c_char);
         // Raven's own format string uses `%d` for the (float) `skill` field —
         // an oracle bug, kept faithful.
-        let __m = std::ffi::CString::new(format!("skill {}\n", (*ch).skill as c_int))
-            .unwrap_or_default();
+        let __m =
+            std::ffi::CString::new(format!("skill {}\n", (*ch).skill as c_int)).unwrap_or_default();
         Log_Write(bot, __m.as_ptr() as *mut c_char);
         Log_Write(bot, c"{\n".as_ptr() as *mut c_char);
         for i in 0..MAX_CHARACTERISTICS {
@@ -829,8 +829,7 @@ pub fn BotLoadCharacterSkill(bot: &mut BotLib, charfile: *mut c_char, skill: f32
         skill,
         qfalse as c_int,
     );
-    let reload =
-        LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) as c_int;
+    let reload = LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) as c_int;
     let ch = BotLoadCachedCharacter(bot, charfile, skill, reload);
 
     if defaultch != 0 && ch != 0 {

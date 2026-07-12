@@ -483,7 +483,10 @@ pub fn Cbuf_ExecuteText(view: &mut EngineHostView, exec_when: c_int, text: *cons
             Cbuf_AddText(view.common, text);
         }
         _ => {
-            com_error(errorParm_t::ERR_FATAL, "Cbuf_ExecuteText: bad exec_when".to_string());
-        },
+            com_error(
+                errorParm_t::ERR_FATAL,
+                "Cbuf_ExecuteText: bad exec_when".to_string(),
+            );
+        }
     }
 }

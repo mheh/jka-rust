@@ -228,8 +228,8 @@ pub fn AAS_UpdatePortal(bot: &mut BotLib, areanum: c_int, clusternum: c_int) -> 
         } //end for
           //
         if portalnum == bot.aasworld.numportals {
-            let __ae =
-                std::ffi::CString::new(format!("no portal of area {}", areanum)).unwrap_or_default();
+            let __ae = std::ffi::CString::new(format!("no portal of area {}", areanum))
+                .unwrap_or_default();
             AAS_Error(bot, __ae.as_ptr() as *mut c_char);
             return qtrue as c_int;
         } //end if
@@ -440,11 +440,8 @@ pub fn AAS_CountForcedClusterPortals(bot: &mut BotLib) {
             if (*bot.aasworld.areasettings.add(i as usize)).contents & AREACONTENTS_CLUSTERPORTAL
                 != 0
             {
-                let __m = std::ffi::CString::new(format!(
-                    "area {} is a forced portal area\r\n",
-                    i
-                ))
-                .unwrap_or_default();
+                let __m = std::ffi::CString::new(format!("area {} is a forced portal area\r\n", i))
+                    .unwrap_or_default();
                 Log_Write(bot, __m.as_ptr() as *mut c_char);
                 num += 1;
             } //end if
@@ -827,11 +824,9 @@ pub fn AAS_CheckAreaForPossiblePortals(bot: &mut BotLib, areanum: c_int) -> c_in
             (*settings).contents |= AREACONTENTS_CLUSTERPORTAL;
             //this area can be used as a route portal
             (*settings).contents |= AREACONTENTS_ROUTEPORTAL;
-            let __m = std::ffi::CString::new(format!(
-                "possible portal: {}\r\n",
-                areanums[i as usize]
-            ))
-            .unwrap_or_default();
+            let __m =
+                std::ffi::CString::new(format!("possible portal: {}\r\n", areanums[i as usize]))
+                    .unwrap_or_default();
             Log_Write(bot, __m.as_ptr() as *mut c_char);
         } //end for
           //

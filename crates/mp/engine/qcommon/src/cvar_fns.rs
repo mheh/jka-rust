@@ -11,7 +11,7 @@ use native_types::fileHandle_t;
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::cvar::{
-    cvar_t, cvarHandle_t, vmCvar_t, CVAR_ARCHIVE, CVAR_CHEAT, CVAR_INIT, CVAR_INTERNAL, CVAR_LATCH,
+    cvarHandle_t, cvar_t, vmCvar_t, CVAR_ARCHIVE, CVAR_CHEAT, CVAR_INIT, CVAR_INTERNAL, CVAR_LATCH,
     CVAR_NORESTART, CVAR_ROM, CVAR_SERVERINFO, CVAR_SYSTEMINFO, CVAR_USERINFO, CVAR_USER_CREATED,
     MAX_CVAR_VALUE_STRING,
 };
@@ -57,7 +57,8 @@ unsafe fn strchr_present(s: *const c_char, c: c_char) -> bool {
 pub fn Cvar_FreeString(common: &mut Common, string: *mut c_char) {
     if common.cvar_lastMemPool.is_null()
         || (string as usize) < (common.cvar_lastMemPool as usize)
-        || (string as usize) >= (common.cvar_lastMemPool as usize + common.cvar_memPoolSize as usize)
+        || (string as usize)
+            >= (common.cvar_lastMemPool as usize + common.cvar_memPoolSize as usize)
     {
         Z_Free(common, string as *mut ());
     }
@@ -206,7 +207,10 @@ pub fn Cvar_Get(
 
     unsafe {
         if var_name.is_null() || var_value.is_null() {
-            com_error(errorParm_t::ERR_FATAL, "Cvar_Get: NULL parameter".to_string());
+            com_error(
+                errorParm_t::ERR_FATAL,
+                "Cvar_Get: NULL parameter".to_string(),
+            );
         }
 
         if Cvar_ValidateString(var_name) == qfalse {
@@ -735,13 +739,41 @@ pub fn Cvar_List_f(common: &mut Common) {
             }
 
             let mut line = String::new();
-            line.push(if ((*cur).flags & CVAR_SERVERINFO) != 0 { 'S' } else { ' ' });
-            line.push(if ((*cur).flags & CVAR_USERINFO) != 0 { 'U' } else { ' ' });
-            line.push(if ((*cur).flags & CVAR_ROM) != 0 { 'R' } else { ' ' });
-            line.push(if ((*cur).flags & CVAR_INIT) != 0 { 'I' } else { ' ' });
-            line.push(if ((*cur).flags & CVAR_ARCHIVE) != 0 { 'A' } else { ' ' });
-            line.push(if ((*cur).flags & CVAR_LATCH) != 0 { 'L' } else { ' ' });
-            line.push(if ((*cur).flags & CVAR_CHEAT) != 0 { 'C' } else { ' ' });
+            line.push(if ((*cur).flags & CVAR_SERVERINFO) != 0 {
+                'S'
+            } else {
+                ' '
+            });
+            line.push(if ((*cur).flags & CVAR_USERINFO) != 0 {
+                'U'
+            } else {
+                ' '
+            });
+            line.push(if ((*cur).flags & CVAR_ROM) != 0 {
+                'R'
+            } else {
+                ' '
+            });
+            line.push(if ((*cur).flags & CVAR_INIT) != 0 {
+                'I'
+            } else {
+                ' '
+            });
+            line.push(if ((*cur).flags & CVAR_ARCHIVE) != 0 {
+                'A'
+            } else {
+                ' '
+            });
+            line.push(if ((*cur).flags & CVAR_LATCH) != 0 {
+                'L'
+            } else {
+                ' '
+            });
+            line.push(if ((*cur).flags & CVAR_CHEAT) != 0 {
+                'C'
+            } else {
+                ' '
+            });
             line.push_str(&format!(
                 " {} \"{}\"\n",
                 CStr::from_ptr((*cur).name).to_string_lossy(),
@@ -893,10 +925,16 @@ pub fn Cvar_Update(common: &mut Common, vmCvar: *mut vmCvar_t) {
     assert!(!vmCvar.is_null());
     unsafe {
         if (*vmCvar).handle as c_uint >= common.cvar_numIndexes as c_uint {
-            com_error(errorParm_t::ERR_DROP, "Cvar_Update: handle out of range".to_string());
+            com_error(
+                errorParm_t::ERR_DROP,
+                "Cvar_Update: handle out of range".to_string(),
+            );
         }
 
-        let cv = common.cvar_indexes.as_mut_ptr().add((*vmCvar).handle as usize);
+        let cv = common
+            .cvar_indexes
+            .as_mut_ptr()
+            .add((*vmCvar).handle as usize);
 
         if (*cv).modificationCount == (*vmCvar).modificationCount {
             return;
@@ -947,7 +985,11 @@ pub fn Cvar_Init(view: &mut EngineHostView) {
     Cmd_AddCommand(view, c"setu".as_ptr(), Some(|view| Cvar_SetU_f(view)));
     Cmd_AddCommand(view, c"seta".as_ptr(), Some(|view| Cvar_SetA_f(view)));
     Cmd_AddCommand(view, c"reset".as_ptr(), Some(|view| Cvar_Reset_f(view)));
-    Cmd_AddCommand(view, c"cvarlist".as_ptr(), Some(|view| Cvar_List_f(view.common)));
+    Cmd_AddCommand(
+        view,
+        c"cvarlist".as_ptr(),
+        Some(|view| Cvar_List_f(view.common)),
+    );
     Cmd_AddCommand(
         view,
         c"cvar_restart".as_ptr(),

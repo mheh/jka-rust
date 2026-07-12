@@ -4,11 +4,13 @@ use core::ffi::c_int;
 
 use mp_bg::public::entity_flags::EF_PERMANENT;
 use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
-use mp_engine_qcommon::cm_test::{CM_AreasConnected, CM_ClusterPVS, CM_PointLeafnum, CM_WriteAreaBits};
+use mp_engine_qcommon::cm_test::{
+    CM_AreasConnected, CM_ClusterPVS, CM_PointLeafnum, CM_WriteAreaBits,
+};
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::com_error;
-use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::common::{com_printf, Common};
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Memset};
 use mp_engine_qcommon::cvar_fns::Cvar_Set;
 use mp_engine_qcommon::msg::{
@@ -33,7 +35,7 @@ use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::shared::errorParm_t;
 use mp_qshared::shared::limits::{GENTITYNUM_BITS, SNAPFLAG_NOT_ACTIVE, SNAPFLAG_RATE_DELAYED};
 use mp_qshared::shared::q_math::{
-    VectorLength, VectorLengthSquared, _VectorAdd, _VectorCopy, _VectorScale, _VectorSubtract,
+    _VectorAdd, _VectorCopy, _VectorScale, _VectorSubtract, VectorLength, VectorLengthSquared,
 };
 use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t, MAX_GENTITIES};
 
@@ -147,7 +149,11 @@ pub fn SV_RateMsec(
 /// client hasn't acknowledged yet.
 ///
 /// Source: `oracle/codemp/server/sv_snapshot.cpp:225-235`
-pub fn SV_UpdateServerCommandsToClient(common: &mut Common, client: *mut client_t, msg: *mut msg_t) {
+pub fn SV_UpdateServerCommandsToClient(
+    common: &mut Common,
+    client: *mut client_t,
+    msg: *mut msg_t,
+) {
     unsafe {
         // write any unacknowledged serverCommands
         let mut i = (*client).reliableAcknowledge + 1;
@@ -261,9 +267,17 @@ pub fn SV_SendClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client:
             );
 
             // have to include this for each message.
-            mp_engine_qcommon::msg::MSG_WriteLong(view.common, &mut msg, (*client).lastClientCommand);
+            mp_engine_qcommon::msg::MSG_WriteLong(
+                view.common,
+                &mut msg,
+                (*client).lastClientCommand,
+            );
 
-            mp_engine_qcommon::msg::MSG_WriteByte(view.common, &mut msg, svc_ops_e::svc_setgame as c_int);
+            mp_engine_qcommon::msg::MSG_WriteByte(
+                view.common,
+                &mut msg,
+                svc_ops_e::svc_setgame as c_int,
+            );
 
             while *(*view.common.fs_gamedirvar).string.offset(i) != 0 {
                 mp_engine_qcommon::msg::MSG_WriteByte(
@@ -359,7 +373,11 @@ fn SV_EmitPacketEntities(
 ) {
     unsafe {
         // generate the delta update
-        let from_num_entities = if from.is_null() { 0 } else { (*from).num_entities };
+        let from_num_entities = if from.is_null() {
+            0
+        } else {
+            (*from).num_entities
+        };
 
         let mut newent: *mut entityState_t = core::ptr::null_mut();
         let mut oldent: *mut entityState_t = core::ptr::null_mut();
@@ -417,7 +435,8 @@ fn SV_EmitPacketEntities(
             }
         }
 
-        MSG_WriteBits(common, msg, MAX_GENTITIES as c_int - 1, GENTITYNUM_BITS); // end of packetentities
+        MSG_WriteBits(common, msg, MAX_GENTITIES as c_int - 1, GENTITYNUM_BITS);
+        // end of packetentities
     }
 }
 
@@ -463,8 +482,7 @@ pub fn SV_WriteSnapshotToClient(
             lastframe = 0;
         } else {
             // we have a valid snapshot to delta from
-            let of = &mut (*client).frames
-                [((*client).deltaMessage & PACKET_MASK as c_int) as usize]
+            let of = &mut (*client).frames[((*client).deltaMessage & PACKET_MASK as c_int) as usize]
                 as *mut clientSnapshot_t;
             // the snapshot's entities may still have rolled off the buffer, though
             if (*of).first_entity <= sv.svs.nextSnapshotEntities - sv.svs.numSnapshotEntities {
@@ -824,7 +842,10 @@ pub fn SV_BuildClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client
         // be regenerated from the playerstate
         let clientNum = (*frame).ps.clientNum;
         if clientNum < 0 || clientNum >= MAX_GENTITIES as c_int {
-            com_error(errorParm_t::ERR_DROP, "SV_SvEntityForGentity: bad gEnt".to_string());
+            com_error(
+                errorParm_t::ERR_DROP,
+                "SV_SvEntityForGentity: bad gEnt".to_string(),
+            );
         }
         let svEnt = &mut sv.sv.svEntities[clientNum as usize] as *mut svEntity_t;
         (*svEnt).snapshotCounter = sv.sv.snapshotCounter;
@@ -876,7 +897,10 @@ pub fn SV_BuildClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client
             sv.svs.nextSnapshotEntities += 1;
             // this should never hit, map should always be restarted first in SV_Frame
             if sv.svs.nextSnapshotEntities >= 0x7FFF_FFFE {
-                com_error(errorParm_t::ERR_FATAL, "svs.nextSnapshotEntities wrapped".to_string());
+                com_error(
+                    errorParm_t::ERR_FATAL,
+                    "svs.nextSnapshotEntities wrapped".to_string(),
+                );
             }
             (*frame).num_entities += 1;
         }

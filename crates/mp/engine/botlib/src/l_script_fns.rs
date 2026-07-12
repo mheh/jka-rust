@@ -28,9 +28,9 @@ use core::ffi::{c_char, c_int, c_long, c_ulong, c_void};
 use libc::sprintf;
 
 use crate::l_script::consts::{
-    MAX_TOKEN, SCFL_NOERRORS, SCFL_NOSTRINGESCAPECHARS, SCFL_NOSTRINGWHITESPACES,
-    SCFL_NOWARNINGS, SCFL_PRIMITIVE, TT_BINARY, TT_DECIMAL, TT_FLOAT, TT_HEX, TT_INTEGER,
-    TT_LITERAL, TT_LONG, TT_NAME, TT_NUMBER, TT_OCTAL, TT_PUNCTUATION, TT_STRING, TT_UNSIGNED,
+    MAX_TOKEN, SCFL_NOERRORS, SCFL_NOSTRINGESCAPECHARS, SCFL_NOSTRINGWHITESPACES, SCFL_NOWARNINGS,
+    SCFL_PRIMITIVE, TT_BINARY, TT_DECIMAL, TT_FLOAT, TT_HEX, TT_INTEGER, TT_LITERAL, TT_LONG,
+    TT_NAME, TT_NUMBER, TT_OCTAL, TT_PUNCTUATION, TT_STRING, TT_UNSIGNED,
 };
 use crate::l_script::punctuation_s::punctuation_t;
 use crate::l_script::script_s::script_t;
@@ -425,7 +425,11 @@ pub fn PS_SetBaseFolder(bot: &mut BotLib, path: *mut c_char) {
     unsafe {
         let path_str = core::ffi::CStr::from_ptr(path).to_string_lossy();
         let __s = std::ffi::CString::new(path_str.to_string()).unwrap_or_default();
-        Q_strncpyz(bot.basefolder.as_mut_ptr(), __s.as_ptr(), MAX_QPATH as c_int);
+        Q_strncpyz(
+            bot.basefolder.as_mut_ptr(),
+            __s.as_ptr(),
+            MAX_QPATH as c_int,
+        );
     }
 }
 
@@ -1156,8 +1160,8 @@ pub fn LoadScriptFile(bot: &mut BotLib, filename: *const c_char) -> *mut script_
         if libc::strlen(bot.basefolder.as_ptr()) != 0 {
             let basefolder_str =
                 core::ffi::CStr::from_ptr(bot.basefolder.as_ptr()).to_string_lossy();
-            let __s =
-                std::ffi::CString::new(format!("{}/{}", basefolder_str, filename_str)).unwrap_or_default();
+            let __s = std::ffi::CString::new(format!("{}/{}", basefolder_str, filename_str))
+                .unwrap_or_default();
             Q_strncpyz(pathname.as_mut_ptr(), __s.as_ptr(), MAX_QPATH as c_int);
         } else {
             let __s = std::ffi::CString::new(filename_str.to_string()).unwrap_or_default();

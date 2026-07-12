@@ -11,10 +11,10 @@ use core::ffi::c_int;
 use mp_engine_ghoul2::api_collision::{g2api_collision_detect, g2api_collision_detect_cache};
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
+use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
-use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::game::class_t::class_t;
 use mp_qshared::common::mp::game::g_public::{
@@ -215,10 +215,7 @@ pub fn SV_AreaEntities_r(
             }
 
             if (*ap).count == (*ap).maxcount {
-                mp_engine_qcommon::common_fns::Com_DPrintf(
-                    common,
-                    "SV_AreaEntities: MAXCOUNT\n",
-                );
+                mp_engine_qcommon::common_fns::Com_DPrintf(common, "SV_AreaEntities: MAXCOUNT\n");
                 return;
             }
 
@@ -256,7 +253,12 @@ pub fn SV_ClipHandleForEntity(cm: &mut CollisionWorld, ent: *const sharedEntity_
         }
         if (*ent).r.svFlags & SVF_CAPSULE != 0 {
             // create a temp capsule from bounding box sizes
-            return mp_engine_qcommon::cm_load::CM_TempBoxModel(cm, (*ent).r.mins, (*ent).r.maxs, 1);
+            return mp_engine_qcommon::cm_load::CM_TempBoxModel(
+                cm,
+                (*ent).r.mins,
+                (*ent).r.maxs,
+                1,
+            );
         }
 
         // create a temp tree from bounding box sizes

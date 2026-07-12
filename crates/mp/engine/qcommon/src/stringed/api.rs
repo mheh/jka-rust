@@ -17,12 +17,12 @@ use std::collections::BTreeSet;
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::error_parm::errorParm_t;
 
-use crate::common::engine_host_view::EngineHostView;
 use super::interface::{se_build_file_list, se_free_file_data_after_load, se_load_file_data};
 use super::package::StringEdPackage;
 use super::{
     SE_EXPORT_FILE_EXTENSION, SE_INGAME_FILE_EXTENSION, SE_KEYWORD_ENDMARKER, SE_STRINGS_DIR,
 };
+use crate::common::engine_host_view::EngineHostView;
 
 // Raven cvar registration flags (`oracle/codemp/game/q_shared.h:1782,1795,1799`);
 // not yet ported to a shared qshared const table, so inlined at their sole use.
@@ -435,7 +435,7 @@ pub fn se_init(pkg: &mut StringEdPackage, host: &mut impl EngineHost) {
 ///
 /// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:981-1007`
 pub fn SE_GetString(view: &mut EngineHostView, reference: &str) -> String {
-    let mut pkg = std::mem::take(&mut view.common.stringed);
+    let pkg = std::mem::take(&mut view.common.stringed);
     let result = pkg.get_string(reference, &mut *view).to_owned();
     view.common.stringed = pkg;
     result
@@ -448,10 +448,8 @@ pub fn SE_GetString(view: &mut EngineHostView, reference: &str) -> String {
 ///
 /// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:971-978`
 pub fn SE_GetString2(view: &mut EngineHostView, package: &str, string_ref: &str) -> String {
-    let mut pkg = std::mem::take(&mut view.common.stringed);
-    let result = pkg
-        .get_string2(package, string_ref, &mut *view)
-        .to_owned();
+    let pkg = std::mem::take(&mut view.common.stringed);
+    let result = pkg.get_string2(package, string_ref, &mut *view).to_owned();
     view.common.stringed = pkg;
     result
 }

@@ -20,25 +20,19 @@ use mp_qshared::shared::{qboolean, qfalse, qtrue, FS_READ, MAX_QPATH};
 
 use crate::collision_world::CollisionWorld;
 use crate::common::common_consts::{MAX_CONSOLE_LINES, MAX_PUSHED_EVENTS};
-use crate::common::Common;
 use crate::common::engine_host_view::EngineHostView;
+use crate::common::Common;
 use crate::gp2::generic_parser2::GenericParser2;
 use crate::qcommon::net_limits::MAX_MSGLEN;
 use crate::qcommon::sys_event_t::sysEvent_t;
 use crate::qcommon::sys_event_type_t::sysEventType_t;
 
 #[allow(dead_code)]
-use crate::cm_load::RenderModels;
-#[allow(dead_code)]
 use crate::cm_load::RmManager;
-#[allow(dead_code)]
-use crate::z_memman_pc::Ghoul2System;
 // `Server`/`Client`/`BotLib` are type-erased receiver slots (real types live in
 // the above-tier engine crates); re-exported at this historical home, defined
 // once in `common::opaque_slots`.
 pub use crate::common::opaque_slots::BotLib;
-#[allow(dead_code)]
-use crate::cmd_pc::Server;
 pub use crate::common::opaque_slots::Client;
 
 // Sweep: extern forward-declares eliminated. Genuinely-unported callees
@@ -46,9 +40,9 @@ pub use crate::common::opaque_slots::Client;
 // /msg). This file's own not-yet-ported `Com_*` (common.cpp subject) collapse
 // to their home; the `SV_*`/`CL_*`/`Key_*` engine entrypoints sit across the
 // server/client cycle seam with no importable home — left bare; reported.
+use crate::cm_load::CM_ClearMap;
 use crate::cmd::Cmd_AddCommand;
 use crate::cvar_fns::{Cvar_Get, Cvar_Init, Cvar_Set, Cvar_WriteVariables};
-use crate::cm_load::CM_ClearMap;
 use crate::files_common::{
     FS_FCloseFile, FS_FOpenFileRead, FS_FOpenFileWrite, FS_Read, FS_Shutdown, FS_Write,
 };
@@ -453,7 +447,8 @@ pub fn Com_ParseTextFileDestroy(parser: &mut GenericParser2) {
 pub fn Com_Quit_f(view: &mut EngineHostView) {
     // don't try to shutdown if we are in a recursive error
     if view.common.com_errorEntered == qfalse {
-        let sv_shutdown = view.common
+        let sv_shutdown = view
+            .common
             .hooks
             .SV_Shutdown
             .expect("SV_Shutdown hook — installed by mp_engine_server at boot");
@@ -480,8 +475,7 @@ pub fn Com_StartupVariable(view: &mut EngineHostView, r#match: *const c_char) {
         if r#match.is_null() || q_strcmp(s, r#match as *mut c_char) == 0 {
             let arg2 = crate::cmd_common::Cmd_Argv(view.common, 2);
             Cvar_Set(view, s, arg2);
-            let cv: *mut cvar_t =
-                Cvar_Get(view, s, c"".as_ptr() as *mut c_char, 0);
+            let cv: *mut cvar_t = Cvar_Get(view, s, c"".as_ptr() as *mut c_char, 0);
             unsafe {
                 (*cv).flags |= mp_qshared::shared::cvar::CVAR_USER_CREATED;
             }
@@ -596,14 +590,13 @@ pub fn Com_GetRealEvent(view: &mut EngineHostView) -> sysEvent_t {
             );
         }
         if ev.evPtrLength != 0 {
-            ev.evPtr = Z_Malloc(
-                view,
+            ev.evPtr = Z_Malloc(view, ev.evPtrLength, memtag_t::TAG_EVENT, qtrue, 4) as *mut c_void;
+            let r = FS_Read(
+                view.common,
+                ev.evPtr as *mut (),
                 ev.evPtrLength,
-                memtag_t::TAG_EVENT,
-                qtrue,
-                4,
-            ) as *mut c_void;
-            let r = FS_Read(view.common, ev.evPtr as *mut (), ev.evPtrLength, view.common.com_journalFile);
+                view.common.com_journalFile,
+            );
             if r != ev.evPtrLength {
                 crate::common::com_error(
                     errorParm_t::ERR_FATAL,
@@ -629,7 +622,12 @@ pub fn Com_GetRealEvent(view: &mut EngineHostView) -> sysEvent_t {
                 );
             }
             if ev.evPtrLength != 0 {
-                let r = FS_Write(view.common, ev.evPtr as *const (), ev.evPtrLength, view.common.com_journalFile);
+                let r = FS_Write(
+                    view.common,
+                    ev.evPtr as *const (),
+                    ev.evPtrLength,
+                    view.common.com_journalFile,
+                );
                 if r != ev.evPtrLength {
                     crate::common::com_error(
                         errorParm_t::ERR_FATAL,
@@ -817,7 +815,8 @@ pub fn Com_InitJournaling(view: &mut EngineHostView) {
         if (*view.common.com_journal).integer == 1 {
             crate::common::com_printf(view.common, "Journaling events\n");
             view.common.com_journalFile = FS_FOpenFileWrite(view.common, c"journal.dat".as_ptr());
-            view.common.com_journalDataFile = FS_FOpenFileWrite(view.common, c"journaldata.dat".as_ptr());
+            view.common.com_journalDataFile =
+                FS_FOpenFileWrite(view.common, c"journaldata.dat".as_ptr());
         } else if (*view.common.com_journal).integer == 2 {
             crate::common::com_printf(view.common, "Replaying journaled events\n");
             let mut jf = view.common.com_journalFile;
@@ -859,7 +858,11 @@ pub fn Com_WriteConfigToFile(view: &mut EngineHostView, filename: *const c_char)
         f,
         "// generated by Star Wars Jedi Academy MP, do not modify\n",
     );
-    let hook_fn = view.common.hooks.Key_WriteBindings.expect("Key_WriteBindings hook");
+    let hook_fn = view
+        .common
+        .hooks
+        .Key_WriteBindings
+        .expect("Key_WriteBindings hook");
     hook_fn(view, f);
     Cvar_WriteVariables(view.common, f);
     FS_FCloseFile(view.common, f);
@@ -922,7 +925,11 @@ pub fn Com_WriteConfig_f(view: &mut EngineHostView) {
 /// `Com_RunAndTimeServerPacket`.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:894-912`
-pub fn Com_RunAndTimeServerPacket(view: &mut EngineHostView, evFrom: *mut netadr_t, buf: *mut msg_t) {
+pub fn Com_RunAndTimeServerPacket(
+    view: &mut EngineHostView,
+    evFrom: *mut netadr_t,
+    buf: *mut msg_t,
+) {
     let mut t1 = 0;
 
     unsafe {
@@ -930,7 +937,8 @@ pub fn Com_RunAndTimeServerPacket(view: &mut EngineHostView, evFrom: *mut netadr
             t1 = crate::timing::sys_milliseconds(view.common);
         }
 
-        let sv_packet_event = view.common
+        let sv_packet_event = view
+            .common
             .hooks
             .SV_PacketEvent
             .expect("SV_PacketEvent hook — installed by mp_engine_server at boot");
@@ -952,12 +960,7 @@ pub fn Com_RunAndTimeServerPacket(view: &mut EngineHostView, evFrom: *mut netadr
 pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
     let mut buf_data = [0u8; MAX_MSGLEN];
     let mut buf: msg_t = unsafe { core::mem::zeroed() };
-    MSG_Init(
-        view,
-        &mut buf,
-        buf_data.as_mut_ptr(),
-        MAX_MSGLEN as c_int,
-    );
+    MSG_Init(view, &mut buf, buf_data.as_mut_ptr(), MAX_MSGLEN as c_int);
 
     loop {
         let ev = Com_GetEvent(view);
@@ -973,7 +976,11 @@ pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
                 &mut buf,
             ) != qfalse
             {
-                let hook_fn = view.common.hooks.CL_PacketEvent.expect("CL_PacketEvent hook");
+                let hook_fn = view
+                    .common
+                    .hooks
+                    .CL_PacketEvent
+                    .expect("CL_PacketEvent hook");
                 hook_fn(view, ev_from, &mut buf);
             }
 
@@ -986,11 +993,7 @@ pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
             {
                 // if the server just shut down, flush the events
                 if unsafe { (*view.common.com_sv_running).integer != 0 } {
-                    Com_RunAndTimeServerPacket(
-                        view,
-                        &mut ev_from,
-                        &mut buf,
-                    );
+                    Com_RunAndTimeServerPacket(view, &mut ev_from, &mut buf);
                 }
             }
 
@@ -1001,9 +1004,7 @@ pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
             sysEventType_t::SE_NONE => {}
             sysEventType_t::SE_KEY => {
                 let hook_fn = view.common.hooks.CL_KeyEvent.expect("CL_KeyEvent hook");
-                hook_fn(view, ev.evValue,
-                    ev.evValue2 != 0,
-                    ev.evTime,);
+                hook_fn(view, ev.evValue, ev.evValue2 != 0, ev.evTime);
             }
             sysEventType_t::SE_CHAR => {
                 let hook_fn = view.common.hooks.CL_CharEvent.expect("CL_CharEvent hook");
@@ -1011,15 +1012,15 @@ pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
             }
             sysEventType_t::SE_MOUSE => {
                 let hook_fn = view.common.hooks.CL_MouseEvent.expect("CL_MouseEvent hook");
-                hook_fn(view, ev.evValue,
-                    ev.evValue2,
-                    ev.evTime,);
+                hook_fn(view, ev.evValue, ev.evValue2, ev.evTime);
             }
             sysEventType_t::SE_JOYSTICK_AXIS => {
-                let hook_fn = view.common.hooks.CL_JoystickEvent.expect("CL_JoystickEvent hook");
-                hook_fn(view, ev.evValue,
-                    ev.evValue2,
-                    ev.evTime,);
+                let hook_fn = view
+                    .common
+                    .hooks
+                    .CL_JoystickEvent
+                    .expect("CL_JoystickEvent hook");
+                hook_fn(view, ev.evValue, ev.evValue2, ev.evTime);
             }
             sysEventType_t::SE_CONSOLE => {
                 unsafe {
@@ -1064,20 +1065,19 @@ pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
                         buf.cursize as usize,
                     );
                     if (*view.common.com_sv_running).integer != 0 {
-                        Com_RunAndTimeServerPacket(
-                            view,
-                            &mut ev_from,
-                            &mut buf,
-                        );
+                        Com_RunAndTimeServerPacket(view, &mut ev_from, &mut buf);
                     } else {
-                        let hook_fn = view.common.hooks.CL_PacketEvent.expect("CL_PacketEvent hook");
-                        hook_fn(view, ev_from, &mut buf,);
+                        let hook_fn = view
+                            .common
+                            .hooks
+                            .CL_PacketEvent
+                            .expect("CL_PacketEvent hook");
+                        hook_fn(view, ev_from, &mut buf);
                     }
                 }
-            }
-            // Raven's `default:` (`Com_Error(ERR_FATAL, "bad event type %i")`) guards
-            // against a corrupted/out-of-range int; `sysEventType_t` is a proper Rust
-            // enum, so every value is already one of the arms above — unreachable.
+            } // Raven's `default:` (`Com_Error(ERR_FATAL, "bad event type %i")`) guards
+              // against a corrupted/out-of-range int; `sysEventType_t` is a proper Rust
+              // enum, so every value is already one of the arms above — unreachable.
         }
 
         // free any block data
@@ -1156,7 +1156,8 @@ pub fn Com_Frame(view: &mut EngineHostView) {
             }
         }
 
-        let sv_frame = view.common
+        let sv_frame = view
+            .common
             .hooks
             .SV_Frame
             .expect("SV_Frame hook — installed by mp_engine_server at boot");
@@ -1180,7 +1181,11 @@ pub fn Com_Frame(view: &mut EngineHostView) {
                     let cl_init = view.common.hooks.CL_Init.expect("CL_Init hook");
                     cl_init(view);
                     view.sys_show_console((*view.common.com_viewlog).integer, qfalse);
-                    let hook_fn = view.common.hooks.CL_StartHunkUsers.expect("CL_StartHunkUsers hook");
+                    let hook_fn = view
+                        .common
+                        .hooks
+                        .CL_StartHunkUsers
+                        .expect("CL_StartHunkUsers hook");
                     hook_fn(view);
                 } else {
                     let hook_fn = view.common.hooks.CL_Shutdown.expect("CL_Shutdown hook");
@@ -1372,14 +1377,21 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         Com_StartupVariable(view, c"developer".as_ptr());
 
         // done early so bind command exists
-        let hook_fn = view.common.hooks.CL_InitKeyCommands.expect("CL_InitKeyCommands hook");
+        let hook_fn = view
+            .common
+            .hooks
+            .CL_InitKeyCommands
+            .expect("CL_InitKeyCommands hook");
         hook_fn(view);
 
         crate::files_common::FS_InitFilesystem(view);
 
         Com_InitJournaling(view);
 
-        crate::cmd_common::Cbuf_AddText(view.common, c"exec mpdefault.cfg\n".as_ptr() as *mut c_char);
+        crate::cmd_common::Cbuf_AddText(
+            view.common,
+            c"exec mpdefault.cfg\n".as_ptr() as *mut c_char,
+        );
 
         // skip the jampconfig.cfg if "safe" is on the command line
         if Com_SafeMode(view.common) == qfalse {
@@ -1389,7 +1401,10 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
             );
         }
 
-        crate::cmd_common::Cbuf_AddText(view.common, c"exec autoexec.cfg\n".as_ptr() as *mut c_char);
+        crate::cmd_common::Cbuf_AddText(
+            view.common,
+            c"exec autoexec.cfg\n".as_ptr() as *mut c_char,
+        );
 
         crate::cmd_common::Cbuf_Execute(view);
 
@@ -1666,7 +1681,8 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         );
 
         unsafe {
-            if (*view.common.com_dedicated).integer != 0 && (*view.common.com_viewlog).integer == 0 {
+            if (*view.common.com_dedicated).integer != 0 && (*view.common.com_viewlog).integer == 0
+            {
                 Cvar_Set(
                     view,
                     c"viewlog".as_ptr() as *mut c_char,
@@ -1675,7 +1691,11 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
             }
 
             if !view.common.com_developer.is_null() && (*view.common.com_developer).integer != 0 {
-                Cmd_AddCommand(view, c"error".as_ptr(), Some(|view| Com_Error_f(view.common)));
+                Cmd_AddCommand(
+                    view,
+                    c"error".as_ptr(),
+                    Some(|view| Com_Error_f(view.common)),
+                );
                 Cmd_AddCommand(view, c"crash".as_ptr(), Some(|_view| Com_Crash_f()));
                 Cmd_AddCommand(view, c"freeze".as_ptr(), Some(|view| Com_Freeze_f(view)));
             }
@@ -1686,7 +1706,11 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
             c"changeVectors".as_ptr(),
             Some(|view| crate::msg::MSG_ReportChangeVectors_f(view.common)),
         );
-        Cmd_AddCommand(view, c"writeconfig".as_ptr(), Some(|view| Com_WriteConfig_f(view)));
+        Cmd_AddCommand(
+            view,
+            c"writeconfig".as_ptr(),
+            Some(|view| Com_WriteConfig_f(view)),
+        );
 
         let s = format!(
             "{} {} {}",
@@ -1707,7 +1731,8 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         let netchan_port = (Com_Milliseconds(view) & 0xffff) as c_int;
         crate::net_chan::Netchan_Init(view, netchan_port);
         crate::vm_fns::VM_Init(view);
-        let sv_init = view.common
+        let sv_init = view
+            .common
             .hooks
             .SV_Init
             .expect("SV_Init hook — installed by mp_engine_server at boot");
@@ -1747,7 +1772,11 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
             c"1".as_ptr() as *mut c_char,
         );
 
-        let hook_fn = view.common.hooks.CL_StartHunkUsers.expect("CL_StartHunkUsers hook");
+        let hook_fn = view
+            .common
+            .hooks
+            .CL_StartHunkUsers
+            .expect("CL_StartHunkUsers hook");
         hook_fn(view);
 
         // make sure single player is off by default

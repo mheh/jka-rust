@@ -32,10 +32,12 @@ pub struct botlib_export_s {
     //shutdown the bot library, returns BLERR_
     pub BotLibShutdown: Option<fn(bot: &mut BotLib) -> c_int>,
     //sets a library variable returns BLERR_
-    pub BotLibVarSet: Option<fn(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> c_int>,
+    pub BotLibVarSet:
+        Option<fn(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> c_int>,
     //gets a library variable returns BLERR_
-    pub BotLibVarGet:
-        Option<fn(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char, size: c_int) -> c_int>,
+    pub BotLibVarGet: Option<
+        fn(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char, size: c_int) -> c_int,
+    >,
 
     //sets a C-like define returns BLERR_
     pub PC_AddGlobalDefine: Option<fn(string: *mut c_char) -> c_int>,
@@ -43,8 +45,9 @@ pub struct botlib_export_s {
     pub PC_FreeSourceHandle: Option<fn(bot: &mut BotLib, handle: c_int) -> c_int>,
     pub PC_ReadTokenHandle:
         Option<fn(bot: &mut BotLib, handle: c_int, pc_token: *mut pc_token_t) -> c_int>,
-    pub PC_SourceFileAndLine:
-        Option<fn(bot: &mut BotLib, handle: c_int, filename: *mut c_char, line: *mut c_int) -> c_int>,
+    pub PC_SourceFileAndLine: Option<
+        fn(bot: &mut BotLib, handle: c_int, filename: *mut c_char, line: *mut c_int) -> c_int,
+    >,
     pub PC_LoadGlobalDefines: Option<fn(bot: &mut BotLib, filename: *const c_char) -> c_int>,
     pub PC_RemoveAllGlobalDefines: Option<fn(bot: &mut BotLib)>,
 
@@ -56,9 +59,7 @@ pub struct botlib_export_s {
     pub BotLibUpdateEntity:
         Option<fn(bot: &mut BotLib, ent: c_int, state: *mut bot_entitystate_t) -> c_int>,
     //just for testing
-    pub Test: Option<
-        fn(parm0: c_int, parm1: *mut c_char, parm2: vec3_t, parm3: vec3_t) -> c_int,
-    >,
+    pub Test: Option<fn(parm0: c_int, parm1: *mut c_char, parm2: vec3_t, parm3: vec3_t) -> c_int>,
 }
 
 /// Raven `botlib_export_t` typedef alias.

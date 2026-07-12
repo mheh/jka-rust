@@ -125,7 +125,11 @@ fn sv_shownet_entity_classname_hook(view: &mut EngineHostView, number: c_int) ->
         if ent.is_null() || (*ent).classname.is_null() {
             return None;
         }
-        Some(CStr::from_ptr((*ent).classname).to_string_lossy().into_owned())
+        Some(
+            CStr::from_ptr((*ent).classname)
+                .to_string_lossy()
+                .into_owned(),
+        )
     }
 }
 

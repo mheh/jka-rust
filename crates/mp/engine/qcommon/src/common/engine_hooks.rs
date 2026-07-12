@@ -284,6 +284,9 @@ fn SND_FreeOldestSound_null(_view: &mut EngineHostView) -> c_int {
 /// Raven null `SND_RegisterAudio_LevelLoadEnd` — returns `qfalse`.
 /// Source: `oracle/codemp/null/null_snddma.cpp:41-44`
 #[allow(non_snake_case)]
-fn SND_RegisterAudio_LevelLoadEnd_null(_view: &mut EngineHostView, _something: qboolean) -> qboolean {
+fn SND_RegisterAudio_LevelLoadEnd_null(
+    _view: &mut EngineHostView,
+    _something: qboolean,
+) -> qboolean {
     qfalse
 }

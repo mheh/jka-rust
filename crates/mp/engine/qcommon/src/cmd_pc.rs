@@ -15,7 +15,6 @@ use crate::z_memman_pc::{CopyString, S_Malloc, Z_Free};
 // `Server` is a type-erased receiver slot: the real type lives in
 // mp_engine_server, which depends on this crate (importing it would cycle).
 // Re-exported at this historical home; defined once in `common::opaque_slots`.
-pub(crate) use crate::cm_load::{RenderModels, RmManager};
 pub use crate::common::opaque_slots::Server;
 
 use crate::common::com_printf;
@@ -38,7 +37,10 @@ pub fn Cmd_AddCommand(
                 // allow completion-only commands to be silently doubled
                 if function.is_some() {
                     let name = CStr::from_ptr(cmd_name).to_string_lossy();
-                    com_printf(view.common, &format!("Cmd_AddCommand: {name} already defined\n"));
+                    com_printf(
+                        view.common,
+                        &format!("Cmd_AddCommand: {name} already defined\n"),
+                    );
                 }
                 return;
             }
@@ -183,7 +185,11 @@ pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
     // PORT-NOTE(com_cl_running/com_sv_running): `Common`'s `cvar_t*` handle
     // fields aren't landed yet (the cvar sub-struct TODO in `common/common.rs`);
     // referenced verbatim as missing symbols.
-    let cl_game_command = view.common.hooks.CL_GameCommand.expect("CL_GameCommand hook");
+    let cl_game_command = view
+        .common
+        .hooks
+        .CL_GameCommand
+        .expect("CL_GameCommand hook");
     if !view.common.com_cl_running.is_null()
         && unsafe { (*view.common.com_cl_running).integer != 0 && cl_game_command(view) != 0 }
     {
@@ -203,7 +209,11 @@ pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
     }
 
     // check ui commands
-    let ui_game_command = view.common.hooks.UI_GameCommand.expect("UI_GameCommand hook");
+    let ui_game_command = view
+        .common
+        .hooks
+        .UI_GameCommand
+        .expect("UI_GameCommand hook");
     if !view.common.com_cl_running.is_null()
         && unsafe { (*view.common.com_cl_running).integer != 0 && ui_game_command(view) != 0 }
     {

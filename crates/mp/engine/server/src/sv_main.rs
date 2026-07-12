@@ -21,7 +21,9 @@ use mp_qshared::shared::{qboolean, qfalse, qtrue, MAX_STRING_CHARS};
 
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
-use crate::server_host::{HEARTBEAT_GAME, HEARTBEAT_MSEC, MAX_MASTER_SERVERS, NEW_RESOLVE_DURATION};
+use crate::server_host::{
+    HEARTBEAT_GAME, HEARTBEAT_MSEC, MAX_MASTER_SERVERS, NEW_RESOLVE_DURATION,
+};
 use crate::Server;
 use mp_engine_qcommon::qcommon::protocol::PORT_MASTER;
 use mp_qshared::shared::q_string::{Q_strncmp, Q_strncpyz};
@@ -106,7 +108,6 @@ pub fn SV_ReplacePendingServerCommands(client: *mut client_t, cmd: *const c_char
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:116-141`
 pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut client_t, cmd: &str) {
-
     unsafe {
         // this is very ugly but it's also a waste to for instance send multiple
         // config string updates for the same config string index in one snapshot
@@ -125,7 +126,8 @@ pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut cl
             com_printf(common, "===== pending server commands =====\n");
             let mut i = (*client).reliableAcknowledge + 1;
             while i <= (*client).reliableSequence {
-                let slot = &(*client).reliableCommands[(i & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize];
+                let slot = &(*client).reliableCommands
+                    [(i & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize];
                 com_printf(
                     common,
                     &format!(
@@ -164,7 +166,6 @@ pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut cl
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:153-180`
 pub fn SV_SendServerCommand(common: &mut Common, sv: &mut Server, cl: *mut client_t, fmt: &str) {
-
     if !cl.is_null() {
         SV_AddServerCommand(common, sv, cl, fmt);
         return;
@@ -283,15 +284,21 @@ pub fn SV_MasterHeartbeat(view: &mut EngineHostView, sv: &mut Server) {
 
             sv.master_heartbeat[i] = time;
 
-            com_printf(view.common, &format!("Resolving {}\n", unsafe {
-                core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
-            }));
+            com_printf(
+                view.common,
+                &format!("Resolving {}\n", unsafe {
+                    core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
+                }),
+            );
             if NET_StringToAdr(unsafe { (*master).string }, &mut sv.master_adr[i]) == qfalse {
                 // if the address failed to resolve, clear it
                 // so we don't take repeated dns hits
-                com_printf(view.common, &format!("Couldn't resolve address: {}\n", unsafe {
-                    core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
-                }));
+                com_printf(
+                    view.common,
+                    &format!("Couldn't resolve address: {}\n", unsafe {
+                        core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
+                    }),
+                );
                 Cvar_Set(view, unsafe { (*master).name }, c"".as_ptr());
                 unsafe {
                     (*master).modified = qfalse;
@@ -304,20 +311,26 @@ pub fn SV_MasterHeartbeat(view: &mut EngineHostView, sv: &mut Server) {
                 sv.master_adr[i].port = BigShort(PORT_MASTER as c_short) as u16;
             }
             let adr = sv.master_adr[i];
-            com_printf(view.common, &format!(
-                "{} resolved to {}.{}.{}.{}:{}\n",
-                unsafe { core::ffi::CStr::from_ptr((*master).string).to_string_lossy() },
-                adr.ip[0],
-                adr.ip[1],
-                adr.ip[2],
-                adr.ip[3],
-                BigShort(adr.port as c_short),
-            ));
+            com_printf(
+                view.common,
+                &format!(
+                    "{} resolved to {}.{}.{}.{}:{}\n",
+                    unsafe { core::ffi::CStr::from_ptr((*master).string).to_string_lossy() },
+                    adr.ip[0],
+                    adr.ip[1],
+                    adr.ip[2],
+                    adr.ip[3],
+                    BigShort(adr.port as c_short),
+                ),
+            );
         }
 
-        com_printf(view.common, &format!("Sending heartbeat to {}\n", unsafe {
-            core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
-        }));
+        com_printf(
+            view.common,
+            &format!("Sending heartbeat to {}\n", unsafe {
+                core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
+            }),
+        );
         // this command should be changed if the server info / status format
         // ever incompatably changes
         NET_OutOfBandPrint(

@@ -12,8 +12,8 @@ use mp_qshared::shared::qboolean;
 use mp_qshared::shared::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
 use native_types::fileHandle_t;
 
-use crate::common::Common;
 use crate::common::engine_host_view::EngineHostView;
+use crate::common::Common;
 use crate::files::file_in_pack_s::fileInPack_t;
 use crate::files::files_consts::{BASEGAME, MAX_SEARCH_PATHS};
 use crate::files::pack_t::pack_t;
@@ -39,12 +39,12 @@ mod null {
 // `z_memman_pc`. All genuinely unported; reported.
 use crate::files::unz_file::unzOpenCurrentFile;
 use crate::files_common::{
-    FS_AddGameDirectory, FS_CopyFile, FS_CreatePath, FS_FCloseFile, FS_FileForHandle,
-    FS_FOpenFileRead, FS_FOpenFileWrite, FS_FreeFileList, FS_HandleForFile, FS_ListFiles, FS_Read,
+    FS_AddGameDirectory, FS_CopyFile, FS_CreatePath, FS_FCloseFile, FS_FOpenFileRead,
+    FS_FOpenFileWrite, FS_FileForHandle, FS_FreeFileList, FS_HandleForFile, FS_ListFiles, FS_Read,
     FS_Restart, FS_SV_FOpenFileRead,
 };
+use crate::sys_engine::{Sys_StreamSeek, Sys_StreamedRead};
 use crate::z_memman_pc::{CopyString, Z_Free};
-use crate::sys_engine::{Sys_StreamedRead, Sys_StreamSeek};
 use native_platform::{Sys_BeginStreamedFile, Sys_FreeFileList, Sys_ListFiles};
 
 /// Raven `FS_PakIsPure`.
@@ -930,12 +930,7 @@ pub fn FS_Read2(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_
 /// Raven `FS_Seek`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:1131-1181`
-pub fn FS_Seek(
-    view: &mut EngineHostView,
-    f: fileHandle_t,
-    offset: c_long,
-    origin: c_int,
-) -> c_int {
+pub fn FS_Seek(view: &mut EngineHostView, f: fileHandle_t, offset: c_long, origin: c_int) -> c_int {
     // §19: `foo[65536]` is read-before-write only through FS_Read (which
     // fills it) — zero-init to be safe.
     let mut foo = [0u8; 65536];
@@ -1095,9 +1090,8 @@ pub fn Sys_ConcatenateFileLists(
     // Create new list.
     // Raven's chain is Z_Malloc/Z_Free end-to-end; the lists come from the
     // libc-malloc'd native Sys_ListFiles here, so the whole chain uses libc.
-    let cat = unsafe {
-        libc::calloc(total_length + 1, core::mem::size_of::<*mut c_char>())
-    } as *mut *mut c_char;
+    let cat = unsafe { libc::calloc(total_length + 1, core::mem::size_of::<*mut c_char>()) }
+        as *mut *mut c_char;
     let mut dst = cat;
 
     unsafe {
@@ -1205,7 +1199,10 @@ pub fn FS_PureServerSetReferencedPaks(
 
     for i in 0..c as usize {
         if !view.common.fs_serverReferencedPakNames[i].is_null() {
-            Z_Free(view.common, view.common.fs_serverReferencedPakNames[i] as *mut ());
+            Z_Free(
+                view.common,
+                view.common.fs_serverReferencedPakNames[i] as *mut (),
+            );
         }
         view.common.fs_serverReferencedPakNames[i] = core::ptr::null_mut();
     }
@@ -1226,8 +1223,7 @@ pub fn FS_PureServerSetReferencedPaks(
 
         for i in 0..d as usize {
             let arg = crate::cmd_common::Cmd_Argv(view.common, i as c_int);
-            view.common.fs_serverReferencedPakNames[i] =
-                CopyString(view, arg);
+            view.common.fs_serverReferencedPakNames[i] = CopyString(view, arg);
         }
     }
 }
@@ -1237,8 +1233,7 @@ pub fn FS_PureServerSetReferencedPaks(
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:3048-3054`
 pub fn FS_ConditionalRestart(view: &mut EngineHostView, checksumFeed: c_int) -> qboolean {
     unsafe {
-        if (*view.common.fs_gamedirvar).modified != 0
-            || checksumFeed != view.common.fs_checksumFeed
+        if (*view.common.fs_gamedirvar).modified != 0 || checksumFeed != view.common.fs_checksumFeed
         {
             FS_Restart(view, checksumFeed);
             return mp_qshared::shared::qtrue;
@@ -1417,7 +1412,7 @@ pub fn FS_FOpenFileByMode(
     match mode {
         m if m == FS_READ => {
             r = FS_FOpenFileRead(view, qpath, f, mp_qshared::shared::qtrue);
-        },
+        }
         m if m == FS_WRITE => unsafe {
             *f = FS_FOpenFileWrite(view.common, qpath);
             r = if *f == 0 { -1 } else { 0 };

@@ -228,7 +228,11 @@ pub fn EmitCommand(view: &mut EngineHostView, command: ELastCommand) {
 pub fn EmitAddEDI4(view: &mut EngineHostView, vm: *mut vm_t) {
     unsafe {
         if view.common.last_command == ELastCommand::LAST_COMMAND_SUB_DI_4
-            && *view.common.jused.offset((view.common.instruction - 1) as isize) == 0
+            && *view
+                .common
+                .jused
+                .offset((view.common.instruction - 1) as isize)
+                == 0
         {
             // sub di,4
             view.common.compiled_ofs -= 3;
@@ -238,7 +242,11 @@ pub fn EmitAddEDI4(view: &mut EngineHostView, vm: *mut vm_t) {
             return;
         }
         if view.common.last_command == ELastCommand::LAST_COMMAND_SUB_DI_8
-            && *view.common.jused.offset((view.common.instruction - 1) as isize) == 0
+            && *view
+                .common
+                .jused
+                .offset((view.common.instruction - 1) as isize)
+                == 0
         {
             // sub di,8
             view.common.compiled_ofs -= 3;
@@ -276,8 +284,16 @@ pub fn EmitMovEAXEDI(view: &mut EngineHostView, vm: *mut vm_t) {
             return;
         }
         if view.common.pop1 == opcode_t::OP_CONST as c_int
-            && *view.common.buf.offset((view.common.compiled_ofs - 6) as isize) == 0xC7
-            && *view.common.buf.offset((view.common.compiled_ofs - 5) as isize) == 0x07
+            && *view
+                .common
+                .buf
+                .offset((view.common.compiled_ofs - 6) as isize)
+                == 0xC7
+            && *view
+                .common
+                .buf
+                .offset((view.common.compiled_ofs - 5) as isize)
+                == 0x07
         {
             // mov edi, 0x123456
             view.common.compiled_ofs -= 6;
@@ -318,8 +334,16 @@ pub fn EmitMovEBXEDI(view: &mut EngineHostView, vm: *mut vm_t, andit: c_int) -> 
             return qfalse;
         }
         if view.common.pop1 == opcode_t::OP_CONST as c_int
-            && *view.common.buf.offset((view.common.compiled_ofs - 6) as isize) == 0xC7
-            && *view.common.buf.offset((view.common.compiled_ofs - 5) as isize) == 0x07
+            && *view
+                .common
+                .buf
+                .offset((view.common.compiled_ofs - 6) as isize)
+                == 0xC7
+            && *view
+                .common
+                .buf
+                .offset((view.common.compiled_ofs - 5) as isize)
+                == 0x07
         {
             // mov edi, 0x123456
             view.common.compiled_ofs -= 6;
@@ -431,10 +455,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                             let c4 = Constant4(view.common);
                             Emit4(view.common, (c4 & (*vm).dataMask) + (*vm).dataBase as c_int);
                             EmitString(view, c"8B 03".as_ptr()); // mov	eax, dword ptr [ebx]
-                            EmitCommand(
-                                view,
-                                ELastCommand::LAST_COMMAND_MOV_EDI_EAX,
-                            ); // mov dword ptr [edi], eax
+                            EmitCommand(view, ELastCommand::LAST_COMMAND_MOV_EDI_EAX); // mov dword ptr [edi], eax
                             view.common.pc += 1; // OP_LOAD4
                             view.common.instruction += 1;
                         } else if *view.common.code.offset((view.common.pc + 4) as isize) as c_int
@@ -445,10 +466,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                             let c4 = Constant4(view.common);
                             Emit4(view.common, (c4 & (*vm).dataMask) + (*vm).dataBase as c_int);
                             EmitString(view, c"0F B7 03".as_ptr()); // movzx	eax, word ptr [ebx]
-                            EmitCommand(
-                                view,
-                                ELastCommand::LAST_COMMAND_MOV_EDI_EAX,
-                            ); // mov dword ptr [edi], eax
+                            EmitCommand(view, ELastCommand::LAST_COMMAND_MOV_EDI_EAX); // mov dword ptr [edi], eax
                             view.common.pc += 1; // OP_LOAD4
                             view.common.instruction += 1;
                         } else if *view.common.code.offset((view.common.pc + 4) as isize) as c_int
@@ -459,50 +477,33 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                             let c4 = Constant4(view.common);
                             Emit4(view.common, (c4 & (*vm).dataMask) + (*vm).dataBase as c_int);
                             EmitString(view, c"0F B6 03".as_ptr()); // movzx	eax, byte ptr [ebx]
-                            EmitCommand(
-                                view,
-                                ELastCommand::LAST_COMMAND_MOV_EDI_EAX,
-                            ); // mov dword ptr [edi], eax
+                            EmitCommand(view, ELastCommand::LAST_COMMAND_MOV_EDI_EAX); // mov dword ptr [edi], eax
                             view.common.pc += 1; // OP_LOAD4
                             view.common.instruction += 1;
                         } else if *view.common.code.offset((view.common.pc + 4) as isize) as c_int
                             == opcode_t::OP_STORE4 as c_int
                         {
-                            opt = EmitMovEBXEDI(
-                                view,
-                                vm,
-                                (*vm).dataMask & !3,
-                            );
+                            opt = EmitMovEBXEDI(view, vm, (*vm).dataMask & !3);
                             let _ = opt;
                             EmitString(view, c"B8".as_ptr()); // mov	eax, 0x12345678
                             let c4 = Constant4(view.common);
                             Emit4(view.common, c4);
                             EmitString(view, c"89 83".as_ptr()); // mov dword ptr [ebx+0x12345678], eax
                             Emit4(view.common, (*vm).dataBase as c_int);
-                            EmitCommand(
-                                view,
-                                ELastCommand::LAST_COMMAND_SUB_DI_4,
-                            ); // sub edi, 4
+                            EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                             view.common.pc += 1; // OP_STORE4
                             view.common.instruction += 1;
                         } else if *view.common.code.offset((view.common.pc + 4) as isize) as c_int
                             == opcode_t::OP_STORE2 as c_int
                         {
-                            opt = EmitMovEBXEDI(
-                                view,
-                                vm,
-                                (*vm).dataMask & !1,
-                            );
+                            opt = EmitMovEBXEDI(view, vm, (*vm).dataMask & !1);
                             let _ = opt;
                             EmitString(view, c"B8".as_ptr()); // mov	eax, 0x12345678
                             let c4 = Constant4(view.common);
                             Emit4(view.common, c4);
                             EmitString(view, c"66 89 83".as_ptr()); // mov word ptr [ebx+0x12345678], eax
                             Emit4(view.common, (*vm).dataBase as c_int);
-                            EmitCommand(
-                                view,
-                                ELastCommand::LAST_COMMAND_SUB_DI_4,
-                            ); // sub edi, 4
+                            EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                             view.common.pc += 1; // OP_STORE4
                             view.common.instruction += 1;
                         } else if *view.common.code.offset((view.common.pc + 4) as isize) as c_int
@@ -515,10 +516,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                             Emit4(view.common, c4);
                             EmitString(view, c"88 83".as_ptr()); // mov byte ptr [ebx+0x12345678], eax
                             Emit4(view.common, (*vm).dataBase as c_int);
-                            EmitCommand(
-                                view,
-                                ELastCommand::LAST_COMMAND_SUB_DI_4,
-                            ); // sub edi, 4
+                            EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                             view.common.pc += 1; // OP_STORE4
                             view.common.instruction += 1;
                         } else if *view.common.code.offset((view.common.pc + 4) as isize) as c_int
@@ -555,37 +553,32 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         view.common.oc0 = view.common.oc1;
                         view.common.oc1 = Constant4(view.common);
                         Emit4(view.common, view.common.oc1);
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_MOV_EDI_EAX,
-                        ); // mov dword ptr [edi], eax
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_MOV_EDI_EAX);
+                        // mov dword ptr [edi], eax
                     }
                     x if x == opcode_t::OP_ARG as c_int => {
                         EmitMovEAXEDI(view, vm); // mov	eax,dword ptr [edi]
                         EmitString(view, c"89 86".as_ptr()); // mov	dword ptr [esi+database],eax
-                                                                                       // FIXME: range check
+                                                             // FIXME: range check
                         let c1 = Constant1(view.common);
                         Emit4(view.common, c1 + (*vm).dataBase as c_int);
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_CALL as c_int => {
                         EmitString(view, c"C7 86".as_ptr()); // mov dword ptr [esi+database],0x12345678
                         Emit4(view.common, (*vm).dataBase as c_int);
                         Emit4(view.common, view.common.pc);
                         EmitString(view, c"FF 15".as_ptr()); // call asmCallPtr
-                        Emit4(view.common, core::ptr::addr_of!(view.common.asm_call_ptr) as c_int);
+                        Emit4(
+                            view.common,
+                            core::ptr::addr_of!(view.common.asm_call_ptr) as c_int,
+                        );
                     }
                     x if x == opcode_t::OP_PUSH as c_int => {
                         EmitAddEDI4(view, vm);
                     }
                     x if x == opcode_t::OP_POP as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_LEAVE as c_int => {
                         let v = Constant4(view.common);
@@ -634,19 +627,13 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                                     EmitString(view, c"89 83".as_ptr()); // mov dword ptr [ebx+0x12345678], eax
                                     Emit4(view.common, (*vm).dataBase as c_int);
                                 } else {
-                                    EmitCommand(
-                                        view,
-                                        ELastCommand::LAST_COMMAND_SUB_DI_4,
-                                    ); // sub edi, 4
+                                    EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                                     EmitString(view, c"8B 1F".as_ptr()); // mov	ebx, dword ptr [edi]
                                     EmitString(view, c"89 83".as_ptr()); // mov dword ptr [ebx+0x12345678], eax
                                     Emit4(view.common, (*vm).dataBase as c_int);
                                 }
                             }
-                            EmitCommand(
-                                view,
-                                ELastCommand::LAST_COMMAND_SUB_DI_4,
-                            ); // sub edi, 4
+                            EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                             view.common.pc += 1; // OP_ADD
                             view.common.pc += 1; // OP_STORE
                             view.common.instruction += 3;
@@ -689,98 +676,81 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                                     EmitString(view, c"89 83".as_ptr()); // mov dword ptr [ebx+0x12345678], eax
                                     Emit4(view.common, (*vm).dataBase as c_int);
                                 } else {
-                                    EmitCommand(
-                                        view,
-                                        ELastCommand::LAST_COMMAND_SUB_DI_4,
-                                    ); // sub edi, 4
+                                    EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                                     EmitString(view, c"8B 1F".as_ptr()); // mov	ebx, dword ptr [edi]
                                     EmitString(view, c"89 83".as_ptr()); // mov dword ptr [ebx+0x12345678], eax
                                     Emit4(view.common, (*vm).dataBase as c_int);
                                 }
                             }
-                            EmitCommand(
-                                view,
-                                ELastCommand::LAST_COMMAND_SUB_DI_4,
-                            ); // sub edi, 4
+                            EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                             view.common.pc += 1; // OP_SUB
                             view.common.pc += 1; // OP_STORE
                             view.common.instruction += 3;
-                        } else if *view.common.buf.offset((view.common.compiled_ofs - 2) as isize) == 0x89
-                            && *view.common.buf.offset((view.common.compiled_ofs - 1) as isize) == 0x07
+                        } else if *view
+                            .common
+                            .buf
+                            .offset((view.common.compiled_ofs - 2) as isize)
+                            == 0x89
+                            && *view
+                                .common
+                                .buf
+                                .offset((view.common.compiled_ofs - 1) as isize)
+                                == 0x07
                         {
                             view.common.compiled_ofs -= 2;
                             *(*vm)
                                 .instructionPointers
-                                .offset((view.common.instruction - 1) as isize) = view.common.compiled_ofs;
+                                .offset((view.common.instruction - 1) as isize) =
+                                view.common.compiled_ofs;
                             EmitString(view, c"8B 80".as_ptr()); // mov eax, dword ptr [eax + 0x1234567]
                             Emit4(view.common, (*vm).dataBase as c_int);
-                            EmitCommand(
-                                view,
-                                ELastCommand::LAST_COMMAND_MOV_EDI_EAX,
-                            ); // mov dword ptr [edi], eax
+                            EmitCommand(view, ELastCommand::LAST_COMMAND_MOV_EDI_EAX);
+                        // mov dword ptr [edi], eax
                         } else {
                             EmitMovEBXEDI(view, vm, (*vm).dataMask);
                             EmitString(view, c"8B 83".as_ptr()); // mov	eax, dword ptr [ebx + 0x12345678]
                             Emit4(view.common, (*vm).dataBase as c_int);
-                            EmitCommand(
-                                view,
-                                ELastCommand::LAST_COMMAND_MOV_EDI_EAX,
-                            ); // mov dword ptr [edi], eax
+                            EmitCommand(view, ELastCommand::LAST_COMMAND_MOV_EDI_EAX);
+                            // mov dword ptr [edi], eax
                         }
                     }
                     x if x == opcode_t::OP_LOAD2 as c_int => {
                         EmitMovEBXEDI(view, vm, (*vm).dataMask);
                         EmitString(view, c"0F B7 83".as_ptr()); // movzx	eax, word ptr [ebx + 0x12345678]
                         Emit4(view.common, (*vm).dataBase as c_int);
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_MOV_EDI_EAX,
-                        ); // mov dword ptr [edi], eax
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_MOV_EDI_EAX);
+                        // mov dword ptr [edi], eax
                     }
                     x if x == opcode_t::OP_LOAD1 as c_int => {
                         EmitMovEBXEDI(view, vm, (*vm).dataMask);
                         EmitString(view, c"0F B6 83".as_ptr()); // movzx eax, byte ptr [ebx + 0x12345678]
                         Emit4(view.common, (*vm).dataBase as c_int);
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_MOV_EDI_EAX,
-                        ); // mov dword ptr [edi], eax
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_MOV_EDI_EAX);
+                        // mov dword ptr [edi], eax
                     }
                     x if x == opcode_t::OP_STORE4 as c_int => {
                         EmitMovEAXEDI(view, vm);
                         EmitString(view, c"8B 5F FC".as_ptr()); // mov	ebx, dword ptr [edi-4]
                         EmitString(view, c"89 83".as_ptr()); // mov dword ptr [ebx+0x12345678], eax
                         Emit4(view.common, (*vm).dataBase as c_int);
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                     }
                     x if x == opcode_t::OP_STORE2 as c_int => {
                         EmitMovEAXEDI(view, vm);
                         EmitString(view, c"8B 5F FC".as_ptr()); // mov	ebx, dword ptr [edi-4]
                         EmitString(view, c"66 89 83".as_ptr()); // mov word ptr [ebx+0x12345678], eax
                         Emit4(view.common, (*vm).dataBase as c_int);
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                     }
                     x if x == opcode_t::OP_STORE1 as c_int => {
                         EmitMovEAXEDI(view, vm);
                         EmitString(view, c"8B 5F FC".as_ptr()); // mov	ebx, dword ptr [edi-4]
                         EmitString(view, c"88 83".as_ptr()); // mov byte ptr [ebx+0x12345678], eax
                         Emit4(view.common, (*vm).dataBase as c_int);
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                     }
                     x if x == opcode_t::OP_EQ as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"8B 47 04".as_ptr()); // mov	eax, dword ptr [edi+4]
                         EmitString(view, c"3B 47 08".as_ptr()); // cmp	eax, dword ptr [edi+8]
                         EmitString(view, c"75 06".as_ptr()); // jne +6
@@ -793,10 +763,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_NE as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"8B 47 04".as_ptr()); // mov	eax, dword ptr [edi+4]
                         EmitString(view, c"3B 47 08".as_ptr()); // cmp	eax, dword ptr [edi+8]
                         EmitString(view, c"74 06".as_ptr()); // je +6
@@ -809,10 +776,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_LTI as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"8B 47 04".as_ptr()); // mov	eax, dword ptr [edi+4]
                         EmitString(view, c"3B 47 08".as_ptr()); // cmp	eax, dword ptr [edi+8]
                         EmitString(view, c"7D 06".as_ptr()); // jnl +6
@@ -825,10 +789,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_LEI as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"8B 47 04".as_ptr()); // mov	eax, dword ptr [edi+4]
                         EmitString(view, c"3B 47 08".as_ptr()); // cmp	eax, dword ptr [edi+8]
                         EmitString(view, c"7F 06".as_ptr()); // jnle +6
@@ -841,10 +802,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_GTI as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"8B 47 04".as_ptr()); // mov	eax, dword ptr [edi+4]
                         EmitString(view, c"3B 47 08".as_ptr()); // cmp	eax, dword ptr [edi+8]
                         EmitString(view, c"7E 06".as_ptr()); // jng +6
@@ -857,10 +815,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_GEI as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"8B 47 04".as_ptr()); // mov	eax, dword ptr [edi+4]
                         EmitString(view, c"3B 47 08".as_ptr()); // cmp	eax, dword ptr [edi+8]
                         EmitString(view, c"7C 06".as_ptr()); // jnge +6
@@ -873,10 +828,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_LTU as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"8B 47 04".as_ptr()); // mov	eax, dword ptr [edi+4]
                         EmitString(view, c"3B 47 08".as_ptr()); // cmp	eax, dword ptr [edi+8]
                         EmitString(view, c"73 06".as_ptr()); // jnb +6
@@ -889,10 +841,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_LEU as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"8B 47 04".as_ptr()); // mov	eax, dword ptr [edi+4]
                         EmitString(view, c"3B 47 08".as_ptr()); // cmp	eax, dword ptr [edi+8]
                         EmitString(view, c"77 06".as_ptr()); // jnbe +6
@@ -905,10 +854,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_GTU as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"8B 47 04".as_ptr()); // mov	eax, dword ptr [edi+4]
                         EmitString(view, c"3B 47 08".as_ptr()); // cmp	eax, dword ptr [edi+8]
                         EmitString(view, c"76 06".as_ptr()); // jna +6
@@ -921,10 +867,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_GEU as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"8B 47 04".as_ptr()); // mov	eax, dword ptr [edi+4]
                         EmitString(view, c"3B 47 08".as_ptr()); // cmp	eax, dword ptr [edi+8]
                         EmitString(view, c"72 06".as_ptr()); // jnae +6
@@ -937,10 +880,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_EQF as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"D9 47 04".as_ptr()); // fld dword ptr [edi+4]
                         EmitString(view, c"D8 5F 08".as_ptr()); // fcomp dword ptr [edi+8]
                         EmitString(view, c"DF E0".as_ptr()); // fnstsw ax
@@ -955,10 +895,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_NEF as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"D9 47 04".as_ptr()); // fld dword ptr [edi+4]
                         EmitString(view, c"D8 5F 08".as_ptr()); // fcomp dword ptr [edi+8]
                         EmitString(view, c"DF E0".as_ptr()); // fnstsw ax
@@ -973,10 +910,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_LTF as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"D9 47 04".as_ptr()); // fld dword ptr [edi+4]
                         EmitString(view, c"D8 5F 08".as_ptr()); // fcomp dword ptr [edi+8]
                         EmitString(view, c"DF E0".as_ptr()); // fnstsw ax
@@ -991,10 +925,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_LEF as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"D9 47 04".as_ptr()); // fld dword ptr [edi+4]
                         EmitString(view, c"D8 5F 08".as_ptr()); // fcomp dword ptr [edi+8]
                         EmitString(view, c"DF E0".as_ptr()); // fnstsw ax
@@ -1009,10 +940,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_GTF as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"D9 47 04".as_ptr()); // fld dword ptr [edi+4]
                         EmitString(view, c"D8 5F 08".as_ptr()); // fcomp dword ptr [edi+8]
                         EmitString(view, c"DF E0".as_ptr()); // fnstsw ax
@@ -1027,10 +955,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         );
                     }
                     x if x == opcode_t::OP_GEF as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                         EmitString(view, c"D9 47 04".as_ptr()); // fld dword ptr [edi+4]
                         EmitString(view, c"D8 5F 08".as_ptr()); // fcomp dword ptr [edi+8]
                         EmitString(view, c"DF E0".as_ptr()); // fnstsw ax
@@ -1051,100 +976,67 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                     x if x == opcode_t::OP_ADD as c_int => {
                         EmitMovEAXEDI(view, vm); // mov eax, dword ptr [edi]
                         EmitString(view, c"01 47 FC".as_ptr()); // add dword ptr [edi-4],eax
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_SUB as c_int => {
                         EmitMovEAXEDI(view, vm); // mov eax, dword ptr [edi]
                         EmitString(view, c"29 47 FC".as_ptr()); // sub dword ptr [edi-4],eax
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_DIVI as c_int => {
                         EmitString(view, c"8B 47 FC".as_ptr()); // mov eax,dword ptr [edi-4]
                         EmitString(view, c"99".as_ptr()); // cdq
                         EmitString(view, c"F7 3F".as_ptr()); // idiv dword ptr [edi]
                         EmitString(view, c"89 47 FC".as_ptr()); // mov dword ptr [edi-4],eax
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_DIVU as c_int => {
                         EmitString(view, c"8B 47 FC".as_ptr()); // mov eax,dword ptr [edi-4]
                         EmitString(view, c"33 D2".as_ptr()); // xor edx, edx
                         EmitString(view, c"F7 37".as_ptr()); // div dword ptr [edi]
                         EmitString(view, c"89 47 FC".as_ptr()); // mov dword ptr [edi-4],eax
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_MODI as c_int => {
                         EmitString(view, c"8B 47 FC".as_ptr()); // mov eax,dword ptr [edi-4]
                         EmitString(view, c"99".as_ptr()); // cdq
                         EmitString(view, c"F7 3F".as_ptr()); // idiv dword ptr [edi]
                         EmitString(view, c"89 57 FC".as_ptr()); // mov dword ptr [edi-4],edx
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_MODU as c_int => {
                         EmitString(view, c"8B 47 FC".as_ptr()); // mov eax,dword ptr [edi-4]
                         EmitString(view, c"33 D2".as_ptr()); // xor edx, edx
                         EmitString(view, c"F7 37".as_ptr()); // div dword ptr [edi]
                         EmitString(view, c"89 57 FC".as_ptr()); // mov dword ptr [edi-4],edx
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_MULI as c_int => {
                         EmitString(view, c"8B 47 FC".as_ptr()); // mov eax,dword ptr [edi-4]
                         EmitString(view, c"F7 2F".as_ptr()); // imul dword ptr [edi]
                         EmitString(view, c"89 47 FC".as_ptr()); // mov dword ptr [edi-4],eax
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_MULU as c_int => {
                         EmitString(view, c"8B 47 FC".as_ptr()); // mov eax,dword ptr [edi-4]
                         EmitString(view, c"F7 27".as_ptr()); // mul dword ptr [edi]
                         EmitString(view, c"89 47 FC".as_ptr()); // mov dword ptr [edi-4],eax
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_BAND as c_int => {
                         EmitMovEAXEDI(view, vm); // mov eax, dword ptr [edi]
                         EmitString(view, c"21 47 FC".as_ptr()); // and dword ptr [edi-4],eax
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_BOR as c_int => {
                         EmitMovEAXEDI(view, vm); // mov eax, dword ptr [edi]
                         EmitString(view, c"09 47 FC".as_ptr()); // or dword ptr [edi-4],eax
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_BXOR as c_int => {
                         EmitMovEAXEDI(view, vm); // mov eax, dword ptr [edi]
                         EmitString(view, c"31 47 FC".as_ptr()); // xor dword ptr [edi-4],eax
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_BCOM as c_int => {
                         EmitString(view, c"F7 17".as_ptr());
@@ -1153,26 +1045,17 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                     x if x == opcode_t::OP_LSH as c_int => {
                         EmitString(view, c"8B 0F".as_ptr()); // mov ecx, dword ptr [edi]
                         EmitString(view, c"D3 67 FC".as_ptr()); // shl dword ptr [edi-4], cl
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_RSHI as c_int => {
                         EmitString(view, c"8B 0F".as_ptr()); // mov ecx, dword ptr [edi]
                         EmitString(view, c"D3 7F FC".as_ptr()); // sar dword ptr [edi-4], cl
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_RSHU as c_int => {
                         EmitString(view, c"8B 0F".as_ptr()); // mov ecx, dword ptr [edi]
                         EmitString(view, c"D3 6F FC".as_ptr()); // shr dword ptr [edi-4], cl
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_NEGF as c_int => {
                         EmitString(view, c"D9 07".as_ptr()); // fld dword ptr [edi]
@@ -1184,36 +1067,24 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         EmitString(view, c"D9 47 FC".as_ptr()); // fld dword ptr [edi-4]
                         EmitString(view, c"D8 07".as_ptr()); // fadd dword ptr [edi]
                         EmitString(view, c"D9 5F FC".as_ptr()); // fstp dword ptr [edi-4]
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                     }
                     x if x == opcode_t::OP_SUBF as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                         EmitString(view, c"D9 07".as_ptr()); // fld dword ptr [edi]
                         EmitString(view, c"D8 67 04".as_ptr()); // fsub dword ptr [edi+4]
                         EmitString(view, c"D9 1F".as_ptr());
                         // fstp dword ptr [edi]
                     }
                     x if x == opcode_t::OP_DIVF as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                         EmitString(view, c"D9 07".as_ptr()); // fld dword ptr [edi]
                         EmitString(view, c"D8 77 04".as_ptr()); // fdiv dword ptr [edi+4]
                         EmitString(view, c"D9 1F".as_ptr());
                         // fstp dword ptr [edi]
                     }
                     x if x == opcode_t::OP_MULF as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                         EmitString(view, c"D9 07".as_ptr()); // fld dword ptr [edi]
                         EmitString(view, c"D8 4f 04".as_ptr()); // fmul dword ptr [edi+4]
                         EmitString(view, c"D9 1F".as_ptr());
@@ -1234,17 +1105,13 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                     }
                     x if x == opcode_t::OP_SEX8 as c_int => {
                         EmitString(view, c"0F BE 07".as_ptr()); // movsx eax, byte ptr [edi]
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_MOV_EDI_EAX,
-                        ); // mov dword ptr [edi], eax
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_MOV_EDI_EAX);
+                        // mov dword ptr [edi], eax
                     }
                     x if x == opcode_t::OP_SEX16 as c_int => {
                         EmitString(view, c"0F BF 07".as_ptr()); // movsx eax, word ptr [edi]
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_MOV_EDI_EAX,
-                        ); // mov dword ptr [edi], eax
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_MOV_EDI_EAX);
+                        // mov dword ptr [edi], eax
                     }
                     x if x == opcode_t::OP_BLOCK_COPY as c_int => {
                         // FIXME: range check
@@ -1266,25 +1133,22 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
                         EmitString(view, c"F3 A5".as_ptr()); // rep movsd
                         EmitString(view, c"5F".as_ptr()); // pop edi
                         EmitString(view, c"5E".as_ptr()); // pop esi
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_8,
-                        ); // sub edi, 8
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_8); // sub edi, 8
                     }
                     x if x == opcode_t::OP_JUMP as c_int => {
-                        EmitCommand(
-                            view,
-                            ELastCommand::LAST_COMMAND_SUB_DI_4,
-                        ); // sub edi, 4
+                        EmitCommand(view, ELastCommand::LAST_COMMAND_SUB_DI_4); // sub edi, 4
                         EmitString(view, c"8B 47 04".as_ptr()); // mov eax,dword ptr [edi+4]
-                                                                                          // FIXME: range check
+                                                                // FIXME: range check
                         EmitString(view, c"FF 24 85".as_ptr()); // jmp dword ptr [instructionPointers + eax * 4]
                         Emit4(view.common, (*vm).instructionPointers as c_int);
                     }
                     _ => {
                         com_error(
                             errorParm_t::ERR_DROP,
-                            format!("VM_CompileX86: bad opcode {} at offset {}", op, view.common.pc),
+                            format!(
+                                "VM_CompileX86: bad opcode {} at offset {}",
+                                op, view.common.pc
+                            ),
                         );
                     }
                 }
@@ -1295,8 +1159,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
 
         // copy to an exact size buffer on the hunk
         (*vm).codeLength = view.common.compiled_ofs;
-        (*vm).codeBase =
-            Hunk_Alloc(view, view.common.compiled_ofs, ha_pref::h_low) as *mut byte;
+        (*vm).codeBase = Hunk_Alloc(view, view.common.compiled_ofs, ha_pref::h_low) as *mut byte;
         Com_Memcpy(
             (*vm).codeBase as *mut (),
             view.common.buf as *const (),

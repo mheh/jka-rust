@@ -18,7 +18,9 @@
 
 use core::ffi::c_int;
 
-use native_platform::net::{ip_socket, ipx_socket, net_is_lan_ip, net_recvfrom, net_sendto, NetRecvResult};
+use native_platform::net::{
+    ip_socket, ipx_socket, net_is_lan_ip, net_recvfrom, net_sendto, NetRecvResult,
+};
 
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
@@ -82,7 +84,13 @@ pub unsafe fn Sys_SendPacket(common: &mut Common, length: c_int, data: *const ()
     }
 
     // sin_port = a->port (already network order).
-    match net_sendto(net_socket, ip, to.port, data as *const core::ffi::c_void, length) {
+    match net_sendto(
+        net_socket,
+        ip,
+        to.port,
+        data as *const core::ffi::c_void,
+        length,
+    ) {
         Ok(()) => {}
         Err(err) => {
             let adr = adr_to_string(common, to);
@@ -96,9 +104,17 @@ pub unsafe fn Sys_SendPacket(common: &mut Common, length: c_int, data: *const ()
 /// ECONNREFUSED and oversize packets are skipped; other errors print.
 ///
 /// Source: `oracle/codemp/unix/unix_net.c:137-185`
-pub fn Sys_GetPacket(common: &mut Common, net_from: &mut netadr_t, net_message: &mut msg_t) -> bool {
+pub fn Sys_GetPacket(
+    common: &mut Common,
+    net_from: &mut netadr_t,
+    net_message: &mut msg_t,
+) -> bool {
     for protocol in 0..2 {
-        let net_socket = if protocol == 0 { ip_socket() } else { ipx_socket() };
+        let net_socket = if protocol == 0 {
+            ip_socket()
+        } else {
+            ipx_socket()
+        };
         if net_socket == 0 {
             continue;
         }

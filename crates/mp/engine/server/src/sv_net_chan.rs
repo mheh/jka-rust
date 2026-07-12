@@ -4,14 +4,14 @@
 
 use core::ffi::c_int;
 
-use mp_engine_qcommon::net_chan::{Netchan_Transmit, Netchan_TransmitNextFragment};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::msg::{MSG_ReadLong, MSG_WriteByte};
 use mp_engine_qcommon::net_chan::Netchan_Process;
+use mp_engine_qcommon::net_chan::{Netchan_Transmit, Netchan_TransmitNextFragment};
 use mp_engine_qcommon::qcommon::huffman_consts::{SV_DECODE_START, SV_ENCODE_START};
-use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_engine_qcommon::qcommon::net_limits::MAX_RELIABLE_COMMANDS;
+use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
@@ -139,12 +139,7 @@ pub fn SV_Netchan_Transmit(view: &mut EngineHostView, client: *mut client_t, msg
         SV_Netchan_Encode(view.common, client, msg);
         // Callee's canonical home is qcommon `net_chan`; not yet ported there
         // (honest missing symbol).
-        Netchan_Transmit(
-            view,
-            &mut (*client).netchan,
-            (*msg).cursize,
-            (*msg).data,
-        );
+        Netchan_Transmit(view, &mut (*client).netchan, (*msg).cursize, (*msg).data);
     }
 }
 

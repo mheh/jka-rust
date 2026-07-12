@@ -32,13 +32,15 @@ const S_COLOR_YELLOW: &str = "^3";
 // parse helpers (`COM_ParseExt`/`Skip*`/`Com_sprintf`), this crate's own
 // unported `FS_*` (files.cpp subject) and `Z_Malloc`/`Z_Free` (z_memman_pc.cpp
 // subject) referenced at their canonical homes; reported.
-use mp_qshared::shared::ha_pref;
-use mp_qshared::shared::q_string::{Q_stricmp, Q_strncpyz};
 use crate::common::com_error;
-use crate::z_memman_pc::Hunk_Alloc;
 use crate::files_common::{FS_FreeFile, FS_FreeFileList, FS_ListFiles, FS_ReadFile};
+use crate::z_memman_pc::Hunk_Alloc;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
-use mp_qshared::shared::q_string::{Com_sprintf, COM_ParseExt, SkipBracedSection, SkipRestOfLine, SkipWhitespace};
+use mp_qshared::shared::ha_pref;
+use mp_qshared::shared::q_string::{
+    COM_ParseExt, Com_sprintf, SkipBracedSection, SkipRestOfLine, SkipWhitespace,
+};
+use mp_qshared::shared::q_string::{Q_stricmp, Q_strncpyz};
 
 /// Raven `SV_ParseSurfaceParm` — match the next token against `svInfoParms`,
 /// OR/AND-ing the shader's surface/content flags from the matching row.
@@ -142,8 +144,12 @@ pub fn CM_GetShaderText(view: &mut EngineHostView, key: *const c_char) -> *const
 pub fn CM_LoadShaderFiles(view: &mut EngineHostView) {
     let mut numShaders1: c_int = 0;
     // scan for shader files
-    let shaderFiles1 =
-        FS_ListFiles(view, c"shaders".as_ptr(), c".shader".as_ptr(), &mut numShaders1);
+    let shaderFiles1 = FS_ListFiles(
+        view,
+        c"shaders".as_ptr(),
+        c".shader".as_ptr(),
+        &mut numShaders1,
+    );
     let mut numShaders2: c_int = 0;
     let shaderFiles2 = FS_ListFiles(
         view,
@@ -191,7 +197,10 @@ pub fn CM_LoadShaderFiles(view: &mut EngineHostView) {
             )
         };
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
-            com_error(errorParm_t::ERR_FATAL, format!("Couldn't load {}", "filename"));
+            com_error(
+                errorParm_t::ERR_FATAL,
+                format!("Couldn't load {}", "filename"),
+            );
         }
         i += 1;
     }
@@ -211,7 +220,10 @@ pub fn CM_LoadShaderFiles(view: &mut EngineHostView) {
             )
         };
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
-            com_error(errorParm_t::ERR_DROP, format!("Couldn't load {}", "filename"));
+            com_error(
+                errorParm_t::ERR_DROP,
+                format!("Couldn't load {}", "filename"),
+            );
         }
         i += 1;
     }
@@ -416,13 +428,15 @@ pub fn CM_ParseShader(
         // material deprecated as of 11 Jan 01
         // material undeprecated as of 7 May 01 - q3map_material deprecated
         else if (Q_stricmp(token, c"material".as_ptr()) == 0)
-            || (Q_stricmp(token, c"q3map_material".as_ptr()) == 0) {
+            || (Q_stricmp(token, c"q3map_material".as_ptr()) == 0)
+        {
             SV_ParseMaterial(common, cm, shader, text);
         }
         // sun parms
         // q3map_sun deprecated as of 11 Jan 01
         else if (Q_stricmp(token, c"sun".as_ptr()) == 0)
-            || (Q_stricmp(token, c"q3map_sun".as_ptr()) == 0) {
+            || (Q_stricmp(token, c"q3map_sun".as_ptr()) == 0)
+        {
             //			float	a, b;
 
             COM_ParseExt(text, qfalse);
@@ -495,7 +509,8 @@ pub fn CM_SetupShaderProperties(view: &mut EngineHostView) {
         let shader = CM_GetShaderInfo(view.cm, i);
         let def = CM_GetShaderText(view, unsafe { (*shader).shader.as_ptr() });
         if !def.is_null() {
-            CM_ParseShader(view.common, view.cm, shader, &mut { def } as *mut *const c_char);
+            CM_ParseShader(view.common, view.cm, shader, &mut { def }
+                as *mut *const c_char);
         }
     }
 }
@@ -516,7 +531,9 @@ pub fn CM_GetShaderInfo_ByName(view: &mut EngineHostView, name: *const c_char) -
     // Create a new CCMShader class
     out = Hunk_Alloc(
         view,
-        core::mem::size_of::<CCMShader>() as c_int, ha_pref::h_high) as *mut CCMShader;
+        core::mem::size_of::<CCMShader>() as c_int,
+        ha_pref::h_high,
+    ) as *mut CCMShader;
     // Set defaults
     unsafe {
         Q_strncpyz((*out).shader.as_mut_ptr(), name, MAX_QPATH as c_int);
@@ -526,7 +543,8 @@ pub fn CM_GetShaderInfo_ByName(view: &mut EngineHostView, name: *const c_char) -
     // Parse in any text if it exists
     let def = CM_GetShaderText(view, name);
     if !def.is_null() {
-        CM_ParseShader(view.common, view.cm, out, &mut { def } as *mut *const c_char);
+        CM_ParseShader(view.common, view.cm, out, &mut { def }
+            as *mut *const c_char);
     }
 
     view.cm.cmShaderTable.insert(out);

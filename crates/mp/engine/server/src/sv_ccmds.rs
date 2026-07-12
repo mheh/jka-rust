@@ -46,7 +46,7 @@ use crate::sv_client::SV_ClientEnterWorld;
 use crate::sv_game::{SV_GameClientNum, SV_RestartGameProgs};
 use crate::sv_init::{SV_SetConfigstring, SV_Shutdown, SV_SpawnServer};
 use crate::sv_world::SV_SectorList_f;
-use crate::{Server, SV_AddServerCommand, SV_DropClient, SV_SendServerCommand};
+use crate::{SV_AddServerCommand, SV_DropClient, SV_SendServerCommand, Server};
 
 /// Raven `SV_GetStringEdString`.
 ///
@@ -221,28 +221,19 @@ pub fn SV_GetPlayerByNum(common: &mut Common, sv: &mut Server) -> *mut client_t 
 
     for c in s_str.bytes() {
         if !c.is_ascii_digit() {
-            com_printf(
-                common,
-                &format!("Bad slot number: {}\n", s_str),
-            );
+            com_printf(common, &format!("Bad slot number: {}\n", s_str));
             return core::ptr::null_mut();
         }
     }
     let idnum = unsafe { libc::atoi(s) };
     if idnum < 0 || idnum >= unsafe { (*common.sv_maxclients).integer } {
-        com_printf(
-            common,
-            &format!("Bad client slot: {}\n", idnum),
-        );
+        com_printf(common, &format!("Bad client slot: {}\n", idnum));
         return core::ptr::null_mut();
     }
 
     let cl = unsafe { sv.svs.clients.offset(idnum as isize) };
     if unsafe { (*cl).state as i32 } == 0 {
-        com_printf(
-            common,
-            &format!("Client {} is not active\n", idnum),
-        );
+        com_printf(common, &format!("Client {} is not active\n", idnum));
         return core::ptr::null_mut();
     }
     cl
@@ -279,8 +270,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
             }
-        } else if Q_stricmp(name, c"allbots".as_ptr()) == 0
-        {
+        } else if Q_stricmp(name, c"allbots".as_ptr()) == 0 {
             let n = sv.svs.clients;
             for i in 0..unsafe { (*common.sv_maxclients).integer } {
                 let cl = unsafe { n.offset(i as isize) };
@@ -347,13 +337,7 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
     }
 
     if Cmd_Argc(view.common) > 1 {
-        if {
-            Q_stricmp(
-                c"notrunc".as_ptr(),
-                Cmd_Argv(view.common, 1),
-            )
-        } == 0
-        {
+        if { Q_stricmp(c"notrunc".as_ptr(), Cmd_Argv(view.common, 1)) } == 0 {
             avoidTruncation = qtrue;
         }
     }
@@ -394,12 +378,9 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
 
         let ps = SV_GameClientNum(sv, i);
         let s = unsafe {
-            core::ffi::CStr::from_ptr(NET_AdrToString(
-                view.common,
-                (*cl).netchan.remoteAddress,
-            ))
-            .to_string_lossy()
-            .into_owned()
+            core::ffi::CStr::from_ptr(NET_AdrToString(view.common, (*cl).netchan.remoteAddress))
+                .to_string_lossy()
+                .into_owned()
         };
 
         let name = unsafe { core::ffi::CStr::from_ptr((*cl).name.as_ptr()) }.to_string_lossy();
@@ -409,9 +390,7 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
                 &format!(
                     "{:3} {:5} {} {:<15.15} {:7} {:>21} {:5} {:5}\n",
                     i,
-                    unsafe {
-                        (*ps).persistant[PERS_SCORE as usize]
-                    },
+                    unsafe { (*ps).persistant[PERS_SCORE as usize] },
                     state,
                     name,
                     unsafe { sv.svs.time - (*cl).lastPacketTime },
@@ -426,9 +405,7 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
                 &format!(
                     "{:3} {:5} {} {} {:7} {:>21} {:5} {:5}\n",
                     i,
-                    unsafe {
-                        (*ps).persistant[PERS_SCORE as usize]
-                    },
+                    unsafe { (*ps).persistant[PERS_SCORE as usize] },
                     state,
                     name,
                     unsafe { sv.svs.time - (*cl).lastPacketTime },
@@ -462,9 +439,7 @@ pub fn SV_ConSay_f(common: &mut Common, sv: &mut Server) {
     }
 
     let mut text = "Server: ".to_string();
-    let mut p = unsafe {
-        core::ffi::CStr::from_ptr(Cmd_Args(common))
-    }
+    let mut p = unsafe { core::ffi::CStr::from_ptr(Cmd_Args(common)) }
         .to_string_lossy()
         .into_owned();
 
@@ -521,8 +496,7 @@ pub fn SV_ForceToggle_f(view: &mut EngineHostView, sv: &mut Server) {
         return;
     }
 
-    targetPower =
-        unsafe { libc::atoi(Cmd_Argv(view.common, 1)) };
+    targetPower = unsafe { libc::atoi(Cmd_Argv(view.common, 1)) };
 
     if targetPower < 0 || targetPower >= NUM_FORCE_POWERS {
         com_printf(
@@ -562,8 +536,7 @@ pub fn SV_ForceToggle_f(view: &mut EngineHostView, sv: &mut Server) {
 // packet's verbatim source slice (only "HEAL"/"JUMP" shown before elision);
 // transcribed against `NUM_FORCE_POWERS`'s FP_* order as best-effort. Escalate
 // if this drifts from the oracle's full array at review.
-const FORCE_TOGGLE_NAME_PRINTS: [&str;
-    NUM_FORCE_POWERS as usize] = [
+const FORCE_TOGGLE_NAME_PRINTS: [&str; NUM_FORCE_POWERS as usize] = [
     "HEAL",
     "JUMP",
     "SPEED",
@@ -612,26 +585,14 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
         return;
     }
 
-    if {
-        Q_stricmp(
-            Cmd_Argv(common, 1),
-            c"Padawan".as_ptr(),
-        )
-    } == 0
-    {
+    if { Q_stricmp(Cmd_Argv(common, 1), c"Padawan".as_ptr()) } == 0 {
         // if you try to kick the default name, also try to kick ""
         SV_KickByName(common, sv, c"".as_ptr());
     }
 
     let cl = SV_GetPlayerByName(common, sv);
     if cl.is_null() {
-        if {
-            Q_stricmp(
-                Cmd_Argv(common, 1),
-                c"all".as_ptr(),
-            )
-        } == 0
-        {
+        if { Q_stricmp(Cmd_Argv(common, 1), c"all".as_ptr()) } == 0 {
             let n = sv.svs.clients;
             for i in 0..unsafe { (*common.sv_maxclients).integer } {
                 let cl = unsafe { n.offset(i as isize) };
@@ -651,13 +612,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
             }
-        } else if {
-            Q_stricmp(
-                Cmd_Argv(common, 1),
-                c"allbots".as_ptr(),
-            )
-        } == 0
-        {
+        } else if { Q_stricmp(Cmd_Argv(common, 1), c"allbots".as_ptr()) } == 0 {
             let n = sv.svs.clients;
             for i in 0..unsafe { (*common.sv_maxclients).integer } {
                 let cl = unsafe { n.offset(i as isize) };
@@ -764,10 +719,7 @@ pub fn SV_KickNum_f(common: &mut Common, sv: &mut Server) {
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:888-894`
 pub fn SV_Serverinfo_f(common: &mut Common) {
     com_printf(common, "Server info settings:\n");
-    let info = Cvar_InfoString(
-        common,
-        CVAR_SERVERINFO,
-    );
+    let info = Cvar_InfoString(common, CVAR_SERVERINFO);
     Info_Print(common, info as *const c_char);
     // NOTE: com_sv_running is threaded through `Common` per the Cvar_Get
     // registration precedent elsewhere in this crate, not `Server`, since
@@ -782,10 +734,7 @@ pub fn SV_Serverinfo_f(common: &mut Common) {
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:904-907`
 pub fn SV_Systeminfo_f(common: &mut Common) {
     com_printf(common, "System info settings:\n");
-    let info = Cvar_InfoString(
-        common,
-        CVAR_SYSTEMINFO,
-    );
+    let info = Cvar_InfoString(common, CVAR_SYSTEMINFO);
     Info_Print(common, info as *const c_char);
 }
 
@@ -855,9 +804,7 @@ pub fn SV_Map_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghoul2Syste
         CVAR_SERVERINFO | CVAR_LATCH,
     );
 
-    let mut cmd = unsafe {
-        core::ffi::CStr::from_ptr(Cmd_Argv(view.common, 0))
-    }
+    let mut cmd = unsafe { core::ffi::CStr::from_ptr(Cmd_Argv(view.common, 0)) }
         .to_string_lossy()
         .into_owned();
     let (cheat, killBots);
@@ -886,19 +833,9 @@ pub fn SV_Map_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghoul2Syste
         killBots = qtrue;
     } else {
         let cmd_c = format!("{}\0", cmd);
-        if {
-            Q_stricmpn(
-                cmd_c.as_ptr() as *const c_char,
-                c"devmap".as_ptr(),
-                6,
-            )
+        if { Q_stricmpn(cmd_c.as_ptr() as *const c_char, c"devmap".as_ptr(), 6) } == 0 || {
+            Q_stricmp(cmd_c.as_ptr() as *const c_char, c"spdevmap".as_ptr())
         } == 0
-            || {
-                Q_stricmp(
-                    cmd_c.as_ptr() as *const c_char,
-                    c"spdevmap".as_ptr(),
-                )
-            } == 0
         {
             cheat = qtrue;
             killBots = qtrue;
@@ -923,21 +860,9 @@ pub fn SV_Map_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghoul2Syste
     // }
     // else
     let cmd_c = format!("{}\0", cmd);
-    if {
-        Q_stricmp(
-            cmd_c.as_ptr() as *const c_char,
-            c"devmapmdl".as_ptr(),
-        )
-    } == 0
-    {
+    if { Q_stricmp(cmd_c.as_ptr() as *const c_char, c"devmapmdl".as_ptr()) } == 0 {
         eForceReload = ForceReload_e::eForceReload_MODELS;
-    } else if {
-        Q_stricmp(
-            cmd_c.as_ptr() as *const c_char,
-            c"devmapall".as_ptr(),
-        )
-    } == 0
-    {
+    } else if { Q_stricmp(cmd_c.as_ptr() as *const c_char, c"devmapall".as_ptr()) } == 0 {
         eForceReload = ForceReload_e::eForceReload_ALL;
     }
 
@@ -1084,8 +1009,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_CONNECT as c_int,
             &[i, qfalse as c_int, isBot as c_int],
         );
-        let denied =
-            VM_ExplicitArgPtr(view.common, sv.gvm, connect_ret) as *mut c_char;
+        let denied = VM_ExplicitArgPtr(view.common, sv.gvm, connect_ret) as *mut c_char;
         if !denied.is_null() {
             // this generally shouldn't happen, because the client
             // was connected before the level change
@@ -1184,8 +1108,12 @@ pub fn SV_AddOperatorCommands(view: &mut EngineHostView, _sv: &mut Server) {
         let sv = unsafe { sv_from_view(view) };
         SV_Status_f(view, sv)
     });
-    add(view, c"serverinfo".as_ptr(), |view| SV_Serverinfo_f(view.common));
-    add(view, c"systeminfo".as_ptr(), |view| SV_Systeminfo_f(view.common));
+    add(view, c"serverinfo".as_ptr(), |view| {
+        SV_Serverinfo_f(view.common)
+    });
+    add(view, c"systeminfo".as_ptr(), |view| {
+        SV_Systeminfo_f(view.common)
+    });
     add(view, c"dumpuser".as_ptr(), |view| {
         let sv = unsafe { sv_from_view(view) };
         SV_DumpUser_f(view.common, sv)
@@ -1234,4 +1162,3 @@ fn SV_MapRestart_f_cmd(view: &mut EngineHostView) {
     let g2 = unsafe { g2_from_view(view) };
     SV_MapRestart_f(view, sv, g2)
 }
-
