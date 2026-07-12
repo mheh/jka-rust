@@ -46,17 +46,19 @@
 //! `trap_Milliseconds` value into `ps`/`es` AND the two modules called it a
 //! different number of times, that would surface as a (legitimate) divergence.
 //!
-//! # RNG seeding verdict (see the report accompanying this file)
-//! `Q_irand`/`Q_flrand`/`flrand`/`irand` (the fork-3 `holdrand` LCG) are bit
-//! identical on both sides: compile-time `holdrand = 0x89abcdef`, never reseeded
-//! by `srand` in either tree — so that stream matches. BUT the oracle's
-//! `G_InitGame` calls `srand(randomSeed)` and its `random()`/`crandom()`/bare
-//! `rand()` macros route through **libc rand** in this native build (`bg_lib.c`'s
-//! own `rand`/`srand` compile only under `Q3_VM`). Our port routes the same
-//! macros through `bg_lib.c`'s 69069-LCG (`BgState::rng.randSeed`) seeded by the
-//! same `randomSeed`. Those two streams DIVERGE — any `ps`/`es` field fed by
-//! `random()`/`crandom()` is expected to diverge. We REPORT this; we do not hack
-//! the port.
+//! # RNG seeding verdict
+//! Both RNG streams are bit-identical on both sides:
+//!   * `Q_irand`/`Q_flrand`/`flrand`/`irand` (the fork-3 `holdrand` LCG):
+//!     compile-time `holdrand = 0x89abcdef`, never reseeded by `srand` in
+//!     either tree.
+//!   * `random()`/`crandom()`/bare `rand()`: `bg_lib.c`'s own `rand`/`srand`
+//!     (`randSeed = 69069 * randSeed + 1`, masked `& 0x7fff`) are UNGUARDED
+//!     (`oracle/codemp/game/bg_lib.c:762-771` — only `tan` above them is
+//!     `Q3_VM`-gated), so the oracle dylib defines and uses them too (`nm`
+//!     shows `_rand`/`_srand`), NOT libc rand. Seeded by the same
+//!     `G_InitGame` `srand(randomSeed)` on both sides, the streams align —
+//!     confirmed empirically: real-map runs match byte-for-byte through spawn
+//!     selection, which calls `random()`.
 
 #![allow(non_snake_case)]
 
