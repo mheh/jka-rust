@@ -198,11 +198,11 @@ jobs:
           # The dedicated-server EXECUTABLE (mp_app, the jampded equivalent).
           # Unix lanes only: the engine island ports Raven's unix/ platform
           # tree (the win32 twin is unported, native_platform gates it
-          # cfg(unix)). The i386 lane is allowed-failure: layout asserts are
-          # gated by the enforced i686 cross-check in the `test` job; the
-          # full LINK still trips on the vm_x86 QVM-JIT asm statics
-          # (callMask/callAsmCall homes — tracked PORT-NOTE). Enforce once
-          # those land and the lane is observed green.
+          # cfg(unix)). All lanes enforced: the engine-island ILP32 assert
+          # pass (2026-07-12) covers the i386 lane, and its first run linked
+          # green in both profiles (the un-referenced vm_x86 QVM-JIT asm is
+          # GC'd at link; its callMask/callAsmCall homes remain a tracked
+          # PORT-NOTE for when the JIT path goes live).
           - runner: ubuntu-latest
             triple: x86_64-unknown-linux-gnu
             artifact_suffix: x86_64-linux
@@ -214,7 +214,7 @@ jobs:
           - runner: ubuntu-latest
             triple: i686-unknown-linux-gnu
             artifact_suffix: i386-linux
-            allow_failure: true
+            allow_failure: false
 
     steps:
       - uses: actions/checkout@v7
@@ -302,7 +302,7 @@ jobs:
             Each module zip contains the file under the exact name the engine
             loads (`jampgamex86_64.dll`, `jampgamex86_64.so`, …); the
             `jampded-*` zips carry the pure-Rust dedicated-server executable
-            (unix lanes; i386 is best-effort while the QVM-JIT asm statics
-            land). Asset URLs are stable across builds.
+            (linux x86_64/i386, macos arm64). Asset URLs are stable across
+            builds.
           files: dist/*.zip
           fail_on_unmatched_files: false
