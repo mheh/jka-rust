@@ -19,7 +19,40 @@
 
 use core::ffi::{c_char, c_int, c_long, c_ulong};
 
-use libc::{abs, ctime, free, sprintf, strcat, strcmp, strcpy, strlen, strncat, strncpy, time};
+use libc::{abs, free, sprintf, strcat, strcmp, strcpy, strlen, strncat, strncpy, time};
+
+/// `ctime(&t)` in asctime layout ("Www Mmm dd hh:mm:ss yyyy\n", 26 bytes incl.
+/// NUL) from `localtime` fields — libc's linux bindings omit `ctime`, and the
+/// oracle's `free(curtime)` on ctime's static buffer is dropped (§19: freeing
+/// a non-heap pointer; the port's buffer is a stack local).
+fn ctime_buf(t: libc::time_t) -> [c_char; 26] {
+    const WDAY: [&[u8; 3]; 7] = [b"Sun", b"Mon", b"Tue", b"Wed", b"Thu", b"Fri", b"Sat"];
+    const MON: [&[u8; 3]; 12] = [
+        b"Jan", b"Feb", b"Mar", b"Apr", b"May", b"Jun", b"Jul", b"Aug", b"Sep", b"Oct", b"Nov",
+        b"Dec",
+    ];
+    let mut out = [0 as c_char; 26];
+    let tm = unsafe { libc::localtime(&t) };
+    if tm.is_null() {
+        return out;
+    }
+    let tm = unsafe { &*tm };
+    let text = format!(
+        "{} {} {:2} {:02}:{:02}:{:02} {}\n",
+        core::str::from_utf8(WDAY[tm.tm_wday.rem_euclid(7) as usize]).unwrap(),
+        core::str::from_utf8(MON[tm.tm_mon.rem_euclid(12) as usize]).unwrap(),
+        tm.tm_mday,
+        tm.tm_hour,
+        tm.tm_min,
+        tm.tm_sec,
+        1900 + tm.tm_year
+    );
+    for (i, b) in text.bytes().take(25).enumerate() {
+        out[i] = b as c_char;
+    }
+    out
+}
+
 
 use crate::l_log_fns::Log_Write;
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory, GetMemory};
@@ -514,7 +547,7 @@ pub fn PC_ExpandBuiltinDefine(
     unsafe {
         let token: *mut token_t = PC_CopyToken(bot, deftoken);
         let mut t: c_ulong; // time_t t; (LCC warning workaround)
-        let mut curtime: *mut c_char;
+        let mut curtime: *const c_char;
         match (*define).builtin {
             BUILTIN_LINE => {
                 sprintf(
@@ -539,12 +572,12 @@ pub fn PC_ExpandBuiltinDefine(
             }
             BUILTIN_DATE => {
                 t = time(core::ptr::null_mut()) as c_ulong;
-                curtime = ctime(&t as *const c_ulong as *const c_long);
+                let curtime_buf = ctime_buf(t as libc::time_t);
+                curtime = curtime_buf.as_ptr();
                 strcpy((*token).string.as_mut_ptr(), c"\"".as_ptr());
                 strncat((*token).string.as_mut_ptr(), curtime.add(4), 7);
                 strncat((*token).string.as_mut_ptr().add(7), curtime.add(20), 4);
                 strcat((*token).string.as_mut_ptr(), c"\"".as_ptr());
-                free(curtime.cast());
                 (*token).r#type = TT_NAME;
                 (*token).subtype = strlen((*token).string.as_ptr()) as c_int;
                 *firsttoken = token;
@@ -552,11 +585,11 @@ pub fn PC_ExpandBuiltinDefine(
             }
             BUILTIN_TIME => {
                 t = time(core::ptr::null_mut()) as c_ulong;
-                curtime = ctime(&t as *const c_ulong as *const c_long);
+                let curtime_buf = ctime_buf(t as libc::time_t);
+                curtime = curtime_buf.as_ptr();
                 strcpy((*token).string.as_mut_ptr(), c"\"".as_ptr());
                 strncat((*token).string.as_mut_ptr(), curtime.add(11), 8);
                 strcat((*token).string.as_mut_ptr(), c"\"".as_ptr());
-                free(curtime.cast());
                 (*token).r#type = TT_NAME;
                 (*token).subtype = strlen((*token).string.as_ptr()) as c_int;
                 *firsttoken = token;
