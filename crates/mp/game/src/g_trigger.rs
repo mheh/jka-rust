@@ -94,8 +94,11 @@ unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut ge
 /// Raven `InitTrigger`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:8-20`
-pub fn InitTrigger(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn InitTrigger(ctx: GameContext<'_>, self_id: EntityId) {
     unsafe {
+        // Stage-1: signature is `EntityId`; the mega-fn body is kept verbatim by
+        // re-deriving the raw `gentity_t*` at the top (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
         if VectorCompare((*self_).s.angles, vec3_origin) == 0 {
             G_SetMovedir(&mut (*self_).s.angles, &mut (*self_).movedir);
         }
@@ -117,10 +120,8 @@ pub fn InitTrigger(ctx: GameContext<'_>, self_: *mut gentity_t) {
 ///
 /// the wait time has passed, so set back up for another activation
 /// Source: `oracle/codemp/game/g_trigger.c:23-25`
-pub fn multi_wait(ent: *mut gentity_t) {
-    unsafe {
-        (*ent).nextthink = 0;
-    }
+pub fn multi_wait(ent: &mut gentity_t) {
+    ent.nextthink = 0;
 }
 
 /// Raven `multi_trigger_run`.
@@ -129,8 +130,11 @@ pub fn multi_wait(ent: *mut gentity_t) {
 /// ent->activator should be set to the activator so it can be held through a
 /// delay so wait for the delay time before firing
 /// Source: `oracle/codemp/game/g_trigger.c:32-94`
-pub fn multi_trigger_run(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn multi_trigger_run(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; mega-fn body kept verbatim via a
+        // re-derived raw pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         (*ent).think = FnId::NONE;
 
         G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
@@ -234,8 +238,12 @@ pub fn G_NameInTriggerClassList(list: *mut c_char, str: *mut c_char) -> qboolean
 /// Raven `multi_trigger`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:130-341`
-pub fn multi_trigger(ctx: GameContext<'_>, ent: *mut gentity_t, activator: *mut gentity_t) {
+pub fn multi_trigger(ctx: GameContext<'_>, ent_id: EntityId, activator_id: Option<EntityId>) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; mega-fn body kept
+        // verbatim via re-derived raw pointers (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent_id) as *mut gentity_t;
+        let activator = ent_resolve_opt(ctx, activator_id);
         let mut halt_trigger = false;
 
         if (*ent).think.get() == Some(EntThink::multi_trigger_run) {
@@ -462,7 +470,7 @@ pub fn multi_trigger(ctx: GameContext<'_>, ent: *mut gentity_t, activator: *mut 
             (*ent).nextthink = (*ctx.world).level.time + (*ent).delay;
             (*ent).painDebounceTime = (*ctx.world).level.time;
         } else {
-            multi_trigger_run(ctx, ent);
+            multi_trigger_run(ctx, ent_id);
         }
     }
 }
@@ -472,9 +480,9 @@ pub fn multi_trigger(ctx: GameContext<'_>, ent: *mut gentity_t, activator: *mut 
 /// Source: `oracle/codemp/game/g_trigger.c:343-346`
 pub fn Use_Multi(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
     multi_trigger(ctx, ent, activator);
 }
@@ -484,11 +492,15 @@ pub fn Use_Multi(
 /// Source: `oracle/codemp/game/g_trigger.c:350-547`
 pub fn Touch_Multi(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_id: EntityId,
+    other_id: Option<EntityId>,
     trace: *mut trace_t,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; mega-fn body kept
+        // verbatim via re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
+        let other = ent_resolve_opt(ctx, other_id);
         if (*other).client.is_null() {
             return;
         }
@@ -691,15 +703,18 @@ pub fn Touch_Multi(
             return;
         }
 
-        multi_trigger(ctx, self_, other);
+        multi_trigger(ctx, self_id, other_id);
     }
 }
 
 /// Raven `trigger_cleared_fire`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:549-558`
-pub fn trigger_cleared_fire(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn trigger_cleared_fire(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let activator_ptr = ent_resolve_opt(ctx, (*self_).activator);
         G_UseTargets2(ctx, self_, activator_ptr, (*self_).target2);
         (*self_).think = FnId::NONE;
@@ -716,8 +731,11 @@ pub fn trigger_cleared_fire(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `SP_trigger_multiple`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:607-656`
-pub fn SP_trigger_multiple(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_trigger_multiple(ctx: GameContext<'_>, ent_id: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent_id) as *mut gentity_t;
         let mut s: *mut c_char = core::ptr::null_mut();
         if G_SpawnString(
             ctx,
@@ -779,7 +797,7 @@ pub fn SP_trigger_multiple(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).team = core::ptr::null_mut();
         }
 
-        InitTrigger(ctx, ent);
+        InitTrigger(ctx, ent_id);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
 }
@@ -787,8 +805,11 @@ pub fn SP_trigger_multiple(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_trigger_once`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:694-731`
-pub fn SP_trigger_once(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_trigger_once(ctx: GameContext<'_>, ent_id: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent_id) as *mut gentity_t;
         let mut s: *mut c_char = core::ptr::null_mut();
         if G_SpawnString(
             ctx,
@@ -833,7 +854,7 @@ pub fn SP_trigger_once(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         (*ent).delay *= 1000; // 1 = 1 msec, 1000 = 1 sec
 
-        InitTrigger(ctx, ent);
+        InitTrigger(ctx, ent_id);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
 }
@@ -842,8 +863,11 @@ pub fn SP_trigger_once(ctx: GameContext<'_>, ent: *mut gentity_t) {
 ///
 /// lightning strike trigger lightning strike event
 /// Source: `oracle/codemp/game/g_trigger.c:739-786`
-pub fn Do_Strike(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn Do_Strike(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; mega-fn body kept verbatim via a
+        // re-derived raw pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         // maybe allow custom fx direction at some point?
         let fx_ang: vec3_t = [90.0, 0.0, 0.0];
 
@@ -929,8 +953,11 @@ pub fn Do_Strike(ctx: GameContext<'_>, ent: *mut gentity_t) {
 ///
 /// lightning strike trigger think loop
 /// Source: `oracle/codemp/game/g_trigger.c:789-798`
-pub fn Think_Strike(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn Think_Strike(ctx: GameContext<'_>, ent_id: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent_id) as *mut gentity_t;
         if (*ent).genericValue1 != 0 {
             // turned off currently
             return;
@@ -939,7 +966,7 @@ pub fn Think_Strike(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).nextthink = (*ctx.world).level.time
             + (*ent).wait as c_int
             + (*ctx.world).bg_state.rng.Q_irand(0, (*ent).random as c_int);
-        Do_Strike(ctx, ent);
+        Do_Strike(ctx, ent_id);
     }
 }
 
@@ -949,11 +976,14 @@ pub fn Think_Strike(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_trigger.c:801-809`
 pub fn Use_Strike(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; body kept verbatim via
+        // a re-derived raw pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         (*ent).genericValue1 = (((*ent).genericValue1 == 0) as c_int);
 
         if (*ent).genericValue1 == 0 {
@@ -966,8 +996,11 @@ pub fn Use_Strike(
 /// Raven `SP_trigger_lightningstrike`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:824-861`
-pub fn SP_trigger_lightningstrike(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_trigger_lightningstrike(ctx: GameContext<'_>, ent_id: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent_id) as *mut gentity_t;
         (*ent).use_ = Some(EntUse::Use_Strike).into();
         (*ent).think = Some(EntThink::Think_Strike).into();
         (*ent).nextthink = (*ctx.world).level.time + 500;
@@ -1005,7 +1038,7 @@ pub fn SP_trigger_lightningstrike(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).damage = 50;
         }
 
-        InitTrigger(ctx, ent);
+        InitTrigger(ctx, ent_id);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
 }
@@ -1013,7 +1046,10 @@ pub fn SP_trigger_lightningstrike(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `trigger_always_think`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:872-875`
-pub fn trigger_always_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn trigger_always_think(ctx: GameContext<'_>, ent: EntityId) {
+    // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+    // pointer (Stage-2 body debt).
+    let ent = ctx.entity_mut(ent) as *mut gentity_t;
     G_UseTargets(ctx, ent, ent);
     G_FreeEntity(ctx, ent);
 }
@@ -1022,8 +1058,11 @@ pub fn trigger_always_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
 ///
 /// This trigger will always fire.  It is activated by the world.
 /// Source: `oracle/codemp/game/g_trigger.c:880-884`
-pub fn SP_trigger_always(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_trigger_always(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         // we must have some delay to make sure our use targets are present
         (*ent).nextthink = (*ctx.world).level.time + 300;
         (*ent).think = Some(EntThink::trigger_always_think).into();
@@ -1035,11 +1074,15 @@ pub fn SP_trigger_always(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_trigger.c:901-1029`
 pub fn trigger_push_touch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; mega-fn body kept
+        // verbatim via re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let other = ent_resolve_opt(ctx, other);
         if (*self_).flags & FL_INACTIVE != 0 {
             // set by target_deactivate
             return;
@@ -1143,8 +1186,11 @@ pub fn trigger_push_touch(
 ///
 /// Calculate origin2 so the target apogee will be hit
 /// Source: `oracle/codemp/game/g_trigger.c:1039-1097`
-pub fn AimAtTarget(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn AimAtTarget(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; mega-fn body kept verbatim via a
+        // re-derived raw pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let mut origin: vec3_t = [
             (*self_).r.absmin[0] + (*self_).r.absmax[0],
             (*self_).r.absmin[1] + (*self_).r.absmax[1],
@@ -1231,9 +1277,12 @@ pub fn AimAtTarget(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Must point at a target_position, which will be the apex of the leap.
 /// This will be client side predicted, unlike target_push
 /// Source: `oracle/codemp/game/g_trigger.c:1112-1136`
-pub fn SP_trigger_push(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_trigger_push(ctx: GameContext<'_>, self_id: EntityId) {
     unsafe {
-        InitTrigger(ctx, self_);
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
+        InitTrigger(ctx, self_id);
 
         // unlike other triggers, we need to send this one to the client
         (*self_).r.svFlags &= !SVF_NOCLIENT;
@@ -1264,11 +1313,15 @@ pub fn SP_trigger_push(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_trigger.c:1138-1159`
 pub fn Use_target_push(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; body kept verbatim via
+        // re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let activator = ent_resolve_opt(ctx, activator);
         if (*activator).client.is_null() {
             return;
         }
@@ -1296,8 +1349,11 @@ pub fn Use_target_push(
 ///
 /// CONSTANT will push activator in direction of 'target' at constant 'speed'
 /// Source: `oracle/codemp/game/g_trigger.c:1168-1187`
-pub fn SP_target_push(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_target_push(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         if (*self_).speed == 0.0 {
             (*self_).speed = 1000.0;
         }
@@ -1329,11 +1385,15 @@ pub fn SP_target_push(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_trigger.c:1197-1225`
 pub fn trigger_teleporter_touch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; body kept verbatim via
+        // re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let other = ent_resolve_opt(ctx, other);
         if (*self_).flags & FL_INACTIVE != 0 {
             // set by target_deactivate
             return;
@@ -1369,9 +1429,12 @@ pub fn trigger_teleporter_touch(
 ///
 /// Allows client side prediction of teleportation events.
 /// Source: `oracle/codemp/game/g_trigger.c:1236-1254`
-pub fn SP_trigger_teleport(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_trigger_teleport(ctx: GameContext<'_>, self_id: EntityId) {
     unsafe {
-        InitTrigger(ctx, self_);
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
+        InitTrigger(ctx, self_id);
 
         // unlike other triggers, we need to send this one to the client
         // unless is a spectator trigger
@@ -1396,11 +1459,15 @@ pub fn SP_trigger_teleport(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_trigger.c:1280-1297`
 pub fn hurt_use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; body kept verbatim via
+        // re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let activator = ent_resolve_opt(ctx, activator);
         if !activator.is_null() && (*activator).inuse != 0 && !(*activator).client.is_null() {
             (*self_).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
         } else {
@@ -1423,11 +1490,15 @@ pub fn hurt_use(
 /// Source: `oracle/codemp/game/g_trigger.c:1299-1411`
 pub fn hurt_touch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; mega-fn body kept
+        // verbatim via re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let other = ent_resolve_opt(ctx, other);
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
             && !(*self_).team.is_null()
             && *(*self_).team != 0
@@ -1588,9 +1659,12 @@ pub fn hurt_touch(
 /// Raven `SP_trigger_hurt`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:1413-1439`
-pub fn SP_trigger_hurt(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_trigger_hurt(ctx: GameContext<'_>, self_id: EntityId) {
     unsafe {
-        InitTrigger(ctx, self_);
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
+        InitTrigger(ctx, self_id);
 
         (*ctx.world).globals.gTrigFallSound = G_SoundIndex(c"*falling1.wav".as_ptr());
 
@@ -1621,11 +1695,15 @@ pub fn SP_trigger_hurt(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_trigger.c:1442-1478`
 pub fn space_touch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; mega-fn body kept
+        // verbatim via re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let other = ent_resolve_opt(ctx, other);
         if other.is_null() || (*other).inuse == 0 || (*other).client.is_null()
         // NOTE: we need vehicles to know this, too...
         // || other->s.number >= MAX_CLIENTS
@@ -1680,9 +1758,12 @@ pub fn space_touch(
 ///
 /// causes human clients to suffocate and have no gravity.
 /// Source: `oracle/codemp/game/g_trigger.c:1484-1492`
-pub fn SP_trigger_space(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_trigger_space(ctx: GameContext<'_>, self_id: EntityId) {
     unsafe {
-        InitTrigger(ctx, self_);
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
+        InitTrigger(ctx, self_id);
         (*self_).r.contents = CONTENTS_TRIGGER;
 
         (*self_).touch = Some(EntTouch::space_touch).into();
@@ -1696,11 +1777,15 @@ pub fn SP_trigger_space(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_trigger.c:1494-1531`
 pub fn shipboundary_touch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; mega-fn body kept
+        // verbatim via re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let other = ent_resolve_opt(ctx, other);
         if other.is_null()
             || (*other).inuse == 0
             || (*other).client.is_null()
@@ -1767,8 +1852,11 @@ pub fn shipboundary_touch(
 /// Raven `shipboundary_think`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:1533-1565`
-pub fn shipboundary_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn shipboundary_think(ctx: GameContext<'_>, ent_id: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; mega-fn body kept verbatim via a
+        // re-derived raw pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent_id) as *mut gentity_t;
         (*ent).nextthink = (*ctx.world).level.time + 100;
 
         if (*ent).genericValue7 < (*ctx.world).level.time {
@@ -1804,7 +1892,12 @@ pub fn shipboundary_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         && !(*p_veh).m_pVehicleInfo.is_null()
                         && (*(*p_veh).m_pVehicleInfo).r#type == VH_FIGHTER
                     {
-                        shipboundary_touch(ctx, ent, listed_ent, core::ptr::null_mut());
+                        shipboundary_touch(
+                            ctx,
+                            ent_id,
+                            ctx.entity_id_of(listed_ent),
+                            core::ptr::null_mut(),
+                        );
                     }
                 }
             }
@@ -1818,9 +1911,12 @@ pub fn shipboundary_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// causes vehicle to turn toward target and travel in that direction for a
 /// set time when hit.
 /// Source: `oracle/codemp/game/g_trigger.c:1574-1595`
-pub fn SP_trigger_shipboundary(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_trigger_shipboundary(ctx: GameContext<'_>, self_id: EntityId) {
     unsafe {
-        InitTrigger(ctx, self_);
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
+        InitTrigger(ctx, self_id);
         (*self_).r.contents = CONTENTS_TRIGGER;
 
         if (*self_).target.is_null() || *(*self_).target == 0 {
@@ -1850,11 +1946,15 @@ pub fn SP_trigger_shipboundary(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_trigger.c:1597-1680`
 pub fn hyperspace_touch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; mega-fn body kept
+        // verbatim via re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let other = ent_resolve_opt(ctx, other);
         if other.is_null()
             || (*other).inuse == 0
             || (*other).client.is_null()
@@ -2029,8 +2129,11 @@ pub fn hyperspace_touch(
 /// forward, playing the hyperspace effect, then pop out at a relative point
 /// around the target.
 /// Source: `oracle/codemp/game/g_trigger.c:1709-1736`
-pub fn SP_trigger_hyperspace(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_trigger_hyperspace(ctx: GameContext<'_>, self_id: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
         G_SpawnFloat(
             ctx,
             c"exitscale".as_ptr(),
@@ -2041,7 +2144,7 @@ pub fn SP_trigger_hyperspace(ctx: GameContext<'_>, self_: *mut gentity_t) {
         // register the hyperspace end sound (start sounds are customized)
         G_SoundIndex(c"sound/vehicles/common/hyperend.wav".as_ptr());
 
-        InitTrigger(ctx, self_);
+        InitTrigger(ctx, self_id);
         (*self_).r.contents = CONTENTS_TRIGGER;
 
         if (*self_).target.is_null() || *(*self_).target == 0 {
@@ -2065,8 +2168,11 @@ pub fn SP_trigger_hyperspace(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `func_timer_think`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:1757-1761`
-pub fn func_timer_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn func_timer_think(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let activator_ptr = ent_resolve_opt(ctx, (*self_).activator);
         G_UseTargets(ctx, self_, activator_ptr);
         // set time before next firing
@@ -2081,11 +2187,15 @@ pub fn func_timer_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_trigger.c:1763-1776`
 pub fn func_timer_use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_id: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; body kept verbatim via
+        // re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
+        let activator = ent_resolve_opt(ctx, activator);
         (*self_).activator = ent_id_opt(ent_base(ctx), activator);
 
         G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
@@ -2097,7 +2207,7 @@ pub fn func_timer_use(
         }
 
         // turn it on
-        func_timer_think(ctx, self_);
+        func_timer_think(ctx, self_id);
     }
 }
 
@@ -2107,8 +2217,11 @@ pub fn func_timer_use(
 /// Repeatedly fires its targets.
 /// Can be turned on or off by using.
 /// Source: `oracle/codemp/game/g_trigger.c:1778-1796`
-pub fn SP_func_timer(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_func_timer(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         G_SpawnFloat(ctx, c"random".as_ptr(), c"1".as_ptr(), &mut (*self_).random);
         G_SpawnFloat(ctx, c"wait".as_ptr(), c"1".as_ptr(), &mut (*self_).wait);
 
@@ -2142,11 +2255,12 @@ pub fn SP_func_timer(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `asteroid_pick_random_asteroid`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:1798-1841`
-pub fn asteroid_pick_random_asteroid(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) -> *mut gentity_t {
+pub fn asteroid_pick_random_asteroid(ctx: GameContext<'_>, self_: EntityId) -> *mut gentity_t {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt). Return type stays `*mut gentity_t` (§ returns
+        // out of Stage-1 scope).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let mut t_count: c_int = 0;
         let mut t: *mut gentity_t = core::ptr::null_mut();
 
@@ -2209,8 +2323,11 @@ pub fn asteroid_pick_random_asteroid(
 /// Raven `asteroid_count_num_asteroids`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:1843-1859`
-pub fn asteroid_count_num_asteroids(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
+pub fn asteroid_count_num_asteroids(ctx: GameContext<'_>, self_: EntityId) -> c_int {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let mut count: c_int = 0;
         let mut i = MAX_CLIENTS as c_int;
         while i < ENTITYNUM_WORLD as c_int {
@@ -2233,10 +2350,14 @@ pub fn asteroid_count_num_asteroids(ctx: GameContext<'_>, self_: *mut gentity_t)
 /// Source: `oracle/codemp/game/g_trigger.c:1864-1920`
 pub fn asteroid_move_to_start2(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    ownerTrigger: *mut gentity_t,
+    self_: EntityId,
+    ownerTrigger: Option<EntityId>,
 ) {
     unsafe {
+        // Stage-1: `EntityId`/`Option<EntityId>` signature; mega-fn body kept
+        // verbatim via re-derived raw pointers (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
+        let ownerTrigger = ent_resolve_opt(ctx, ownerTrigger);
         if !ownerTrigger.is_null() {
             // move it
             let speed = (*ctx.world)
@@ -2303,20 +2424,26 @@ pub fn asteroid_move_to_start2(
 ///
 /// move asteroid to a new start position
 /// Source: `oracle/codemp/game/g_trigger.c:1922-1925`
-pub fn asteroid_move_to_start(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn asteroid_move_to_start(ctx: GameContext<'_>, self_id: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
         let owner_trigger =
             &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
-        asteroid_move_to_start2(ctx, self_, owner_trigger);
+        asteroid_move_to_start2(ctx, self_id, ctx.entity_id_of(owner_trigger));
     }
 }
 
 /// Raven `asteroid_field_think`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:1927-1979`
-pub fn asteroid_field_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn asteroid_field_think(ctx: GameContext<'_>, self_id: EntityId) {
     unsafe {
-        let num_asteroids = asteroid_count_num_asteroids(ctx, self_);
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
+        let num_asteroids = asteroid_count_num_asteroids(ctx, self_id);
 
         (*self_).nextthink = (*ctx.world).level.time + 500;
 
@@ -2324,7 +2451,7 @@ pub fn asteroid_field_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
             // need to spawn a new asteroid
             let new_asteroid = G_Spawn(ctx);
             if !new_asteroid.is_null() {
-                let copy_asteroid = asteroid_pick_random_asteroid(ctx, self_);
+                let copy_asteroid = asteroid_pick_random_asteroid(ctx, self_id);
                 if !copy_asteroid.is_null() {
                     (*new_asteroid).model = (*copy_asteroid).model;
                     (*new_asteroid).model2 = (*copy_asteroid).model2;
@@ -2352,7 +2479,11 @@ pub fn asteroid_field_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     (*new_asteroid).r.ownerNum = (*self_).s.number;
 
                     // position it
-                    asteroid_move_to_start2(ctx, new_asteroid, self_);
+                    asteroid_move_to_start2(
+                        ctx,
+                        ctx.entity_id_of(new_asteroid).unwrap(),
+                        Some(self_id),
+                    );
 
                     // think again sooner if need even more
                     if num_asteroids + 1 < (*self_).count {
@@ -2368,8 +2499,11 @@ pub fn asteroid_field_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `SP_trigger_asteroid_field`.
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:1986-2007`
-pub fn SP_trigger_asteroid_field(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_trigger_asteroid_field(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         trap::SetBrushModel(
             ctx.engine,
             GSetBrushModelArgs::new(self_, std::ffi::CStr::from_ptr((*self_).model).to_owned()),

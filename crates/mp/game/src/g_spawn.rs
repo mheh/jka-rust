@@ -238,13 +238,16 @@ unsafe fn sscanf_1f(s: *const c_char, out: &mut f32) {
 /// Raven `SP_item_botroam` — empty body (Raven's is a stub too).
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:368-370`
-pub fn SP_item_botroam(ent: *mut gentity_t) {}
+pub fn SP_item_botroam(ent: &mut gentity_t) {}
 
 /// Raven `SP_gametype_item`.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:372-431`
-pub fn SP_gametype_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_gametype_item(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let mut value: *mut c_char = std::ptr::null_mut();
         G_SpawnString(ctx, c"teamfilter".as_ptr(), c"".as_ptr(), &mut value);
 
@@ -297,8 +300,11 @@ pub fn SP_gametype_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// normal spawn functions (from `spawns[]` table).
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:683-714`
-pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn G_CallSpawn(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
     unsafe {
+        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
+        // pointer (Stage-2 body debt).
+        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         if (*ent).classname.is_null() {
             G_Printf(ctx, c"G_CallSpawn: NULL classname\n".as_ptr());
             return qfalse;
@@ -850,7 +856,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
         (*ent).r.currentOrigin = (*ent).s.origin;
 
         // if we didn't get a classname, don't bother spawning anything
-        if G_CallSpawn(ctx, ent) == qfalse {
+        if G_CallSpawn(ctx, ctx.entity_id_of(ent).unwrap()) == qfalse {
             G_FreeEntity(ctx, ent);
         }
 
