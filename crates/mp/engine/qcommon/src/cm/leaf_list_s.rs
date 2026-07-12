@@ -27,14 +27,23 @@ pub struct leafList_s {
 
 pub type leafList_t = leafList_s;
 
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<leafList_t>() == 64);
 const _: () = assert!(core::mem::offset_of!(leafList_t, count) == 0);
 const _: () = assert!(core::mem::offset_of!(leafList_t, maxcount) == 4);
 const _: () = assert!(core::mem::offset_of!(leafList_t, overflowed) == 8);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(leafList_t, list) == 16);
-const _: () = assert!(core::mem::offset_of!(leafList_t, bounds) == 24);
-const _: () = assert!(core::mem::offset_of!(leafList_t, lastLeaf) == 48);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(leafList_t, storeLeafs) == 56);
+const _: () = {
+    assert!(core::mem::size_of::<leafList_t>() == 64);
+    assert!(core::mem::offset_of!(leafList_t, list) == 16);
+    assert!(core::mem::offset_of!(leafList_t, bounds) == 24);
+    assert!(core::mem::offset_of!(leafList_t, lastLeaf) == 48);
+    assert!(core::mem::offset_of!(leafList_t, storeLeafs) == 56);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<leafList_t>() == 48);
+    assert!(core::mem::offset_of!(leafList_t, list) == 12);
+    assert!(core::mem::offset_of!(leafList_t, bounds) == 16);
+    assert!(core::mem::offset_of!(leafList_t, lastLeaf) == 40);
+    assert!(core::mem::offset_of!(leafList_t, storeLeafs) == 44);
+};

@@ -39,7 +39,6 @@ pub struct srfGridMesh_t {
 /// C tag name; Raven typedefs `srfGridMesh_s` to `srfGridMesh_t`.
 pub type srfGridMesh_s = srfGridMesh_t;
 
-const _: () = assert!(core::mem::size_of::<srfGridMesh_t>() == 176);
 const _: () = assert!(core::mem::offset_of!(srfGridMesh_t, surfaceType) == 0);
 const _: () = assert!(core::mem::offset_of!(srfGridMesh_t, dlightBits) == 4);
 const _: () = assert!(core::mem::offset_of!(srfGridMesh_t, meshBounds) == 8);
@@ -51,6 +50,18 @@ const _: () = assert!(core::mem::offset_of!(srfGridMesh_t, lodFixed) == 64);
 const _: () = assert!(core::mem::offset_of!(srfGridMesh_t, lodStitched) == 68);
 const _: () = assert!(core::mem::offset_of!(srfGridMesh_t, width) == 72);
 const _: () = assert!(core::mem::offset_of!(srfGridMesh_t, height) == 76);
-const _: () = assert!(core::mem::offset_of!(srfGridMesh_t, widthLodError) == 80);
-const _: () = assert!(core::mem::offset_of!(srfGridMesh_t, heightLodError) == 88);
-const _: () = assert!(core::mem::offset_of!(srfGridMesh_t, verts) == 96);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<srfGridMesh_t>() == 176);
+    assert!(core::mem::offset_of!(srfGridMesh_t, widthLodError) == 80);
+    assert!(core::mem::offset_of!(srfGridMesh_t, heightLodError) == 88);
+    assert!(core::mem::offset_of!(srfGridMesh_t, verts) == 96);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<srfGridMesh_t>() == 168);
+    assert!(core::mem::offset_of!(srfGridMesh_t, widthLodError) == 80);
+    assert!(core::mem::offset_of!(srfGridMesh_t, heightLodError) == 84);
+    assert!(core::mem::offset_of!(srfGridMesh_t, verts) == 88);
+};

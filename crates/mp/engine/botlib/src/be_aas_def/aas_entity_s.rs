@@ -18,7 +18,18 @@ pub struct aas_entity_t {
 
 pub type aas_entity_s = aas_entity_t;
 
-const _: () = assert!(core::mem::size_of::<aas_entity_t>() == 160);
-const _: () = assert!(core::mem::offset_of!(aas_entity_t, i) == 0);
-const _: () = assert!(core::mem::offset_of!(aas_entity_t, areas) == 144);
-const _: () = assert!(core::mem::offset_of!(aas_entity_t, leaves) == 152);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_entity_t>() == 160);
+    assert!(core::mem::offset_of!(aas_entity_t, i) == 0);
+    assert!(core::mem::offset_of!(aas_entity_t, areas) == 144);
+    assert!(core::mem::offset_of!(aas_entity_t, leaves) == 152);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_entity_t>() == 148);
+    assert!(core::mem::offset_of!(aas_entity_t, i) == 0);
+    assert!(core::mem::offset_of!(aas_entity_t, areas) == 140);
+    assert!(core::mem::offset_of!(aas_entity_t, leaves) == 144);
+};

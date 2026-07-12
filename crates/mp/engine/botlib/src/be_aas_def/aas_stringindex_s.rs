@@ -15,6 +15,16 @@ pub struct aas_stringindex_t {
 /// is house style for the struct itself.
 pub type aas_stringindex_s = aas_stringindex_t;
 
-const _: () = assert!(core::mem::size_of::<aas_stringindex_t>() == 16);
-const _: () = assert!(core::mem::offset_of!(aas_stringindex_t, numindexes) == 0);
-const _: () = assert!(core::mem::offset_of!(aas_stringindex_t, index) == 8);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_stringindex_t>() == 16);
+    assert!(core::mem::offset_of!(aas_stringindex_t, numindexes) == 0);
+    assert!(core::mem::offset_of!(aas_stringindex_t, index) == 8);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_stringindex_t>() == 8);
+    assert!(core::mem::offset_of!(aas_stringindex_t, numindexes) == 0);
+    assert!(core::mem::offset_of!(aas_stringindex_t, index) == 4);
+};

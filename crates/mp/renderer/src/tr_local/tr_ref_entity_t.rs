@@ -26,13 +26,29 @@ pub struct trRefEntity_t {
     pub dlightBits: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<trRefEntity_t>() == 272);
 const _: () = assert!(core::mem::offset_of!(trRefEntity_t, e) == 0);
-const _: () = assert!(core::mem::offset_of!(trRefEntity_t, axisLength) == 216);
-const _: () = assert!(core::mem::offset_of!(trRefEntity_t, needDlights) == 220);
-const _: () = assert!(core::mem::offset_of!(trRefEntity_t, lightingCalculated) == 224);
-const _: () = assert!(core::mem::offset_of!(trRefEntity_t, lightDir) == 228);
-const _: () = assert!(core::mem::offset_of!(trRefEntity_t, ambientLight) == 240);
-const _: () = assert!(core::mem::offset_of!(trRefEntity_t, ambientLightInt) == 252);
-const _: () = assert!(core::mem::offset_of!(trRefEntity_t, directedLight) == 256);
-const _: () = assert!(core::mem::offset_of!(trRefEntity_t, dlightBits) == 268);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<trRefEntity_t>() == 272);
+    assert!(core::mem::offset_of!(trRefEntity_t, axisLength) == 216);
+    assert!(core::mem::offset_of!(trRefEntity_t, needDlights) == 220);
+    assert!(core::mem::offset_of!(trRefEntity_t, lightingCalculated) == 224);
+    assert!(core::mem::offset_of!(trRefEntity_t, lightDir) == 228);
+    assert!(core::mem::offset_of!(trRefEntity_t, ambientLight) == 240);
+    assert!(core::mem::offset_of!(trRefEntity_t, ambientLightInt) == 252);
+    assert!(core::mem::offset_of!(trRefEntity_t, directedLight) == 256);
+    assert!(core::mem::offset_of!(trRefEntity_t, dlightBits) == 268);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<trRefEntity_t>() == 268);
+    assert!(core::mem::offset_of!(trRefEntity_t, axisLength) == 212);
+    assert!(core::mem::offset_of!(trRefEntity_t, needDlights) == 216);
+    assert!(core::mem::offset_of!(trRefEntity_t, lightingCalculated) == 220);
+    assert!(core::mem::offset_of!(trRefEntity_t, lightDir) == 224);
+    assert!(core::mem::offset_of!(trRefEntity_t, ambientLight) == 236);
+    assert!(core::mem::offset_of!(trRefEntity_t, ambientLightInt) == 248);
+    assert!(core::mem::offset_of!(trRefEntity_t, directedLight) == 252);
+    assert!(core::mem::offset_of!(trRefEntity_t, dlightBits) == 264);
+};

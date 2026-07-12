@@ -42,17 +42,38 @@ pub struct sfx_t {
 /// Raven typedef `sfx_s` (the tagged struct name) for `sfx_t`.
 pub type sfx_s = sfx_t;
 
-const _: () = assert!(core::mem::size_of::<sfx_t>() == 136);
-const _: () = assert!(core::mem::offset_of!(sfx_t, pSoundData) == 0);
-const _: () = assert!(core::mem::offset_of!(sfx_t, bDefaultSound) == 8);
-const _: () = assert!(core::mem::offset_of!(sfx_t, bInMemory) == 12);
-const _: () = assert!(core::mem::offset_of!(sfx_t, eSoundCompressionMethod) == 16);
-const _: () = assert!(core::mem::offset_of!(sfx_t, pMP3StreamHeader) == 24);
-const _: () = assert!(core::mem::offset_of!(sfx_t, iSoundLengthInSamples) == 32);
-const _: () = assert!(core::mem::offset_of!(sfx_t, sSoundName) == 36);
-const _: () = assert!(core::mem::offset_of!(sfx_t, iLastTimeUsed) == 100);
-const _: () = assert!(core::mem::offset_of!(sfx_t, fVolRange) == 104);
-const _: () = assert!(core::mem::offset_of!(sfx_t, iLastLevelUsedOn) == 108);
-const _: () = assert!(core::mem::offset_of!(sfx_t, Buffer) == 112);
-const _: () = assert!(core::mem::offset_of!(sfx_t, lipSyncData) == 120);
-const _: () = assert!(core::mem::offset_of!(sfx_t, next) == 128);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<sfx_t>() == 136);
+    assert!(core::mem::offset_of!(sfx_t, pSoundData) == 0);
+    assert!(core::mem::offset_of!(sfx_t, bDefaultSound) == 8);
+    assert!(core::mem::offset_of!(sfx_t, bInMemory) == 12);
+    assert!(core::mem::offset_of!(sfx_t, eSoundCompressionMethod) == 16);
+    assert!(core::mem::offset_of!(sfx_t, pMP3StreamHeader) == 24);
+    assert!(core::mem::offset_of!(sfx_t, iSoundLengthInSamples) == 32);
+    assert!(core::mem::offset_of!(sfx_t, sSoundName) == 36);
+    assert!(core::mem::offset_of!(sfx_t, iLastTimeUsed) == 100);
+    assert!(core::mem::offset_of!(sfx_t, fVolRange) == 104);
+    assert!(core::mem::offset_of!(sfx_t, iLastLevelUsedOn) == 108);
+    assert!(core::mem::offset_of!(sfx_t, Buffer) == 112);
+    assert!(core::mem::offset_of!(sfx_t, lipSyncData) == 120);
+    assert!(core::mem::offset_of!(sfx_t, next) == 128);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<sfx_t>() == 112);
+    assert!(core::mem::offset_of!(sfx_t, pSoundData) == 0);
+    assert!(core::mem::offset_of!(sfx_t, bDefaultSound) == 4);
+    assert!(core::mem::offset_of!(sfx_t, bInMemory) == 8);
+    assert!(core::mem::offset_of!(sfx_t, eSoundCompressionMethod) == 12);
+    assert!(core::mem::offset_of!(sfx_t, pMP3StreamHeader) == 16);
+    assert!(core::mem::offset_of!(sfx_t, iSoundLengthInSamples) == 20);
+    assert!(core::mem::offset_of!(sfx_t, sSoundName) == 24);
+    assert!(core::mem::offset_of!(sfx_t, iLastTimeUsed) == 88);
+    assert!(core::mem::offset_of!(sfx_t, fVolRange) == 92);
+    assert!(core::mem::offset_of!(sfx_t, iLastLevelUsedOn) == 96);
+    assert!(core::mem::offset_of!(sfx_t, Buffer) == 100);
+    assert!(core::mem::offset_of!(sfx_t, lipSyncData) == 104);
+    assert!(core::mem::offset_of!(sfx_t, next) == 108);
+};

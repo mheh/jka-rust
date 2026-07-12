@@ -9,7 +9,7 @@
 //! `be_ai_weight/` type directory; DESTINATION line from the packet already
 //! reflects the `_fns` escape.
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, c_ulong};
 
 use mp_engine_qcommon::common::Common;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE};
@@ -613,7 +613,7 @@ pub fn ReadFuzzySeperators_r(bot: &mut BotLib, source: *mut source_t) -> *mut fu
         loop {
             def = (libc::strcmp(token.string.as_ptr(), c"default".as_ptr()) == 0) as c_int;
             if def != 0 || libc::strcmp(token.string.as_ptr(), c"case".as_ptr()) == 0 {
-                fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>() as u64)
+                fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>() as c_ulong)
                     as *mut fuzzyseperator_t;
                 (*fs).index = index;
                 if !lastfs.is_null() {
@@ -718,7 +718,7 @@ pub fn ReadFuzzySeperators_r(bot: &mut BotLib, source: *mut source_t) -> *mut fu
                 source,
                 c"switch without default\n".as_ptr() as *mut c_char,
             );
-            fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>() as u64)
+            fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>() as c_ulong)
                 as *mut fuzzyseperator_t;
             (*fs).index = index;
             (*fs).value = MAX_INVENTORYVALUE;
@@ -797,7 +797,7 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
             return core::ptr::null_mut();
         }
         //
-        config = GetClearedMemory(bot, core::mem::size_of::<weightconfig_t>() as u64)
+        config = GetClearedMemory(bot, core::mem::size_of::<weightconfig_t>() as c_ulong)
             as *mut weightconfig_t;
         (*config).numweights = 0;
         Q_strncpyz(
@@ -825,7 +825,7 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
                 }
                 crate::l_script_fns::StripDoubleQuotes(token.string.as_mut_ptr());
                 (*config).weights[(*config).numweights as usize].name =
-                    GetClearedMemory(bot, libc::strlen(token.string.as_ptr()) as u64 + 1)
+                    GetClearedMemory(bot, libc::strlen(token.string.as_ptr()) as c_ulong + 1)
                         as *mut c_char;
                 libc::strcpy(
                     (*config).weights[(*config).numweights as usize].name,
@@ -854,7 +854,7 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
                     }
                     (*config).weights[(*config).numweights as usize].firstseperator = fs;
                 } else if libc::strcmp(token.string.as_ptr(), c"return".as_ptr()) == 0 {
-                    fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>() as u64)
+                    fs = GetClearedMemory(bot, core::mem::size_of::<fuzzyseperator_t>() as c_ulong)
                         as *mut fuzzyseperator_t;
                     (*fs).index = 0;
                     (*fs).value = MAX_INVENTORYVALUE;

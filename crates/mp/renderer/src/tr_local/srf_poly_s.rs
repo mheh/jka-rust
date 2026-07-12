@@ -20,9 +20,18 @@ pub struct srfPoly_t {
 /// Raven `srfPoly_s` is the C tag; `srfPoly_t` is the typedef used everywhere.
 pub type srfPoly_s = srfPoly_t;
 
-const _: () = assert!(core::mem::size_of::<srfPoly_t>() == 24);
 const _: () = assert!(core::mem::offset_of!(srfPoly_t, surfaceType) == 0);
 const _: () = assert!(core::mem::offset_of!(srfPoly_t, hShader) == 4);
 const _: () = assert!(core::mem::offset_of!(srfPoly_t, fogIndex) == 8);
 const _: () = assert!(core::mem::offset_of!(srfPoly_t, numVerts) == 12);
-const _: () = assert!(core::mem::offset_of!(srfPoly_t, verts) == 16);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<srfPoly_t>() == 24);
+    assert!(core::mem::offset_of!(srfPoly_t, verts) == 16);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<srfPoly_t>() == 20);
+    assert!(core::mem::offset_of!(srfPoly_t, verts) == 16);
+};

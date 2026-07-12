@@ -17,7 +17,17 @@ pub struct fileInPack_t {
 /// Raven's C tag name for `fileInPack_t`.
 pub type fileInPack_s = fileInPack_t;
 
-const _: () = assert!(core::mem::size_of::<fileInPack_t>() == 24);
 const _: () = assert!(core::mem::offset_of!(fileInPack_t, name) == 0);
-const _: () = assert!(core::mem::offset_of!(fileInPack_t, pos) == 8);
-const _: () = assert!(core::mem::offset_of!(fileInPack_t, next) == 16);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<fileInPack_t>() == 24);
+    assert!(core::mem::offset_of!(fileInPack_t, pos) == 8);
+    assert!(core::mem::offset_of!(fileInPack_t, next) == 16);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<fileInPack_t>() == 12);
+    assert!(core::mem::offset_of!(fileInPack_t, pos) == 4);
+    assert!(core::mem::offset_of!(fileInPack_t, next) == 8);
+};

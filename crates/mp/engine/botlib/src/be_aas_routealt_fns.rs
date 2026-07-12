@@ -28,7 +28,7 @@
 //! site) — the `#ifdef ENABLE_ALTROUTING` bodies below therefore always
 //! execute, matching the shipped build.
 
-use core::ffi::c_int;
+use core::ffi::{c_int, c_ulong};
 
 use mp_qshared::shared::{qfalse, qtrue, vec3_t};
 
@@ -240,14 +240,14 @@ pub fn AAS_InitAlternativeRouting(bot: &mut BotLib) {
         bot,
         (bot.aasworld.numareas
             * core::mem::size_of::<crate::be_aas_routealt::midrangearea_t>() as c_int)
-            as u64,
+            as c_ulong,
     ) as *mut crate::be_aas_routealt::midrangearea_t;
     if !bot.clusterareas.is_null() {
         FreeMemory(bot, bot.clusterareas as *mut ());
     }
     bot.clusterareas = GetMemory(
         bot,
-        (bot.aasworld.numareas * core::mem::size_of::<c_int>() as c_int) as u64,
+        (bot.aasworld.numareas * core::mem::size_of::<c_int>() as c_int) as c_ulong,
     ) as *mut c_int;
 }
 

@@ -16,7 +16,17 @@ pub struct POLYEDGE {
     pub i: c_long,
 }
 
-const _: () = assert!(core::mem::size_of::<POLYEDGE>() == 24);
 const _: () = assert!(core::mem::offset_of!(POLYEDGE, x) == 0);
-const _: () = assert!(core::mem::offset_of!(POLYEDGE, dx) == 8);
-const _: () = assert!(core::mem::offset_of!(POLYEDGE, i) == 16);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<POLYEDGE>() == 24);
+    assert!(core::mem::offset_of!(POLYEDGE, dx) == 8);
+    assert!(core::mem::offset_of!(POLYEDGE, i) == 16);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<POLYEDGE>() == 12);
+    assert!(core::mem::offset_of!(POLYEDGE, dx) == 4);
+    assert!(core::mem::offset_of!(POLYEDGE, i) == 8);
+};

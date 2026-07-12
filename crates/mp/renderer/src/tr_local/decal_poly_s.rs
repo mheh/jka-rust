@@ -27,10 +27,23 @@ pub struct decalPoly_t {
 
 pub type decalPoly_s = decalPoly_t;
 
-const _: () = assert!(core::mem::size_of::<decalPoly_t>() == 288);
 const _: () = assert!(core::mem::offset_of!(decalPoly_t, time) == 0);
-const _: () = assert!(core::mem::offset_of!(decalPoly_t, fadetime) == 4);
-const _: () = assert!(core::mem::offset_of!(decalPoly_t, shader) == 8);
-const _: () = assert!(core::mem::offset_of!(decalPoly_t, color) == 12);
-const _: () = assert!(core::mem::offset_of!(decalPoly_t, poly) == 32);
-const _: () = assert!(core::mem::offset_of!(decalPoly_t, verts) == 48);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<decalPoly_t>() == 288);
+    assert!(core::mem::offset_of!(decalPoly_t, fadetime) == 4);
+    assert!(core::mem::offset_of!(decalPoly_t, shader) == 8);
+    assert!(core::mem::offset_of!(decalPoly_t, color) == 12);
+    assert!(core::mem::offset_of!(decalPoly_t, poly) == 32);
+    assert!(core::mem::offset_of!(decalPoly_t, verts) == 48);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<decalPoly_t>() == 280);
+    assert!(core::mem::offset_of!(decalPoly_t, fadetime) == 4);
+    assert!(core::mem::offset_of!(decalPoly_t, shader) == 8);
+    assert!(core::mem::offset_of!(decalPoly_t, color) == 12);
+    assert!(core::mem::offset_of!(decalPoly_t, poly) == 28);
+    assert!(core::mem::offset_of!(decalPoly_t, verts) == 40);
+};

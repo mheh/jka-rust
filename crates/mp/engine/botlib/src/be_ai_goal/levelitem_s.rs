@@ -31,15 +31,34 @@ pub struct levelitem_t {
 
 pub type levelitem_s = levelitem_t;
 
-const _: () = assert!(core::mem::size_of::<levelitem_t>() == 72);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, number) == 0);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, iteminfo) == 4);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, flags) == 8);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, weight) == 12);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, origin) == 16);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, goalareanum) == 28);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, goalorigin) == 32);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, entitynum) == 44);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, timeout) == 48);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, prev) == 56);
-const _: () = assert!(core::mem::offset_of!(levelitem_t, next) == 64);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<levelitem_t>() == 72);
+    assert!(core::mem::offset_of!(levelitem_t, number) == 0);
+    assert!(core::mem::offset_of!(levelitem_t, iteminfo) == 4);
+    assert!(core::mem::offset_of!(levelitem_t, flags) == 8);
+    assert!(core::mem::offset_of!(levelitem_t, weight) == 12);
+    assert!(core::mem::offset_of!(levelitem_t, origin) == 16);
+    assert!(core::mem::offset_of!(levelitem_t, goalareanum) == 28);
+    assert!(core::mem::offset_of!(levelitem_t, goalorigin) == 32);
+    assert!(core::mem::offset_of!(levelitem_t, entitynum) == 44);
+    assert!(core::mem::offset_of!(levelitem_t, timeout) == 48);
+    assert!(core::mem::offset_of!(levelitem_t, prev) == 56);
+    assert!(core::mem::offset_of!(levelitem_t, next) == 64);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<levelitem_t>() == 60);
+    assert!(core::mem::offset_of!(levelitem_t, number) == 0);
+    assert!(core::mem::offset_of!(levelitem_t, iteminfo) == 4);
+    assert!(core::mem::offset_of!(levelitem_t, flags) == 8);
+    assert!(core::mem::offset_of!(levelitem_t, weight) == 12);
+    assert!(core::mem::offset_of!(levelitem_t, origin) == 16);
+    assert!(core::mem::offset_of!(levelitem_t, goalareanum) == 28);
+    assert!(core::mem::offset_of!(levelitem_t, goalorigin) == 32);
+    assert!(core::mem::offset_of!(levelitem_t, entitynum) == 44);
+    assert!(core::mem::offset_of!(levelitem_t, timeout) == 48);
+    assert!(core::mem::offset_of!(levelitem_t, prev) == 52);
+    assert!(core::mem::offset_of!(levelitem_t, next) == 56);
+};

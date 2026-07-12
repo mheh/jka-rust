@@ -13,9 +13,21 @@ pub struct areaParms_t {
     pub maxcount: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<areaParms_t>() == 32);
 const _: () = assert!(core::mem::offset_of!(areaParms_t, mins) == 0);
-const _: () = assert!(core::mem::offset_of!(areaParms_t, maxs) == 8);
-const _: () = assert!(core::mem::offset_of!(areaParms_t, list) == 16);
-const _: () = assert!(core::mem::offset_of!(areaParms_t, count) == 24);
-const _: () = assert!(core::mem::offset_of!(areaParms_t, maxcount) == 28);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<areaParms_t>() == 32);
+    assert!(core::mem::offset_of!(areaParms_t, maxs) == 8);
+    assert!(core::mem::offset_of!(areaParms_t, list) == 16);
+    assert!(core::mem::offset_of!(areaParms_t, count) == 24);
+    assert!(core::mem::offset_of!(areaParms_t, maxcount) == 28);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<areaParms_t>() == 20);
+    assert!(core::mem::offset_of!(areaParms_t, maxs) == 4);
+    assert!(core::mem::offset_of!(areaParms_t, list) == 8);
+    assert!(core::mem::offset_of!(areaParms_t, count) == 12);
+    assert!(core::mem::offset_of!(areaParms_t, maxcount) == 16);
+};

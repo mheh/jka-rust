@@ -15,6 +15,15 @@ pub struct skinSurface_t {
     pub shader: *mut shader_s,
 }
 
-const _: () = assert!(core::mem::size_of::<skinSurface_t>() == 72);
 const _: () = assert!(core::mem::offset_of!(skinSurface_t, name) == 0);
-const _: () = assert!(core::mem::offset_of!(skinSurface_t, shader) == 64);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<skinSurface_t>() == 72);
+    assert!(core::mem::offset_of!(skinSurface_t, shader) == 64);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<skinSurface_t>() == 68);
+    assert!(core::mem::offset_of!(skinSurface_t, shader) == 64);
+};

@@ -25,11 +25,22 @@ pub struct srfTriangles_t {
     // vec3_t *tangents;
 }
 
-const _: () = assert!(core::mem::size_of::<srfTriangles_t>() == 64);
 const _: () = assert!(core::mem::offset_of!(srfTriangles_t, surfaceType) == 0);
 const _: () = assert!(core::mem::offset_of!(srfTriangles_t, dlightBits) == 4);
 const _: () = assert!(core::mem::offset_of!(srfTriangles_t, bounds) == 8);
 const _: () = assert!(core::mem::offset_of!(srfTriangles_t, numIndexes) == 32);
-const _: () = assert!(core::mem::offset_of!(srfTriangles_t, indexes) == 40);
-const _: () = assert!(core::mem::offset_of!(srfTriangles_t, numVerts) == 48);
-const _: () = assert!(core::mem::offset_of!(srfTriangles_t, verts) == 56);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<srfTriangles_t>() == 64);
+    assert!(core::mem::offset_of!(srfTriangles_t, indexes) == 40);
+    assert!(core::mem::offset_of!(srfTriangles_t, numVerts) == 48);
+    assert!(core::mem::offset_of!(srfTriangles_t, verts) == 56);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<srfTriangles_t>() == 48);
+    assert!(core::mem::offset_of!(srfTriangles_t, indexes) == 36);
+    assert!(core::mem::offset_of!(srfTriangles_t, numVerts) == 40);
+    assert!(core::mem::offset_of!(srfTriangles_t, verts) == 44);
+};

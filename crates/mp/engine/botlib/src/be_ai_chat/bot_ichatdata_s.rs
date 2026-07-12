@@ -19,7 +19,18 @@ pub struct bot_ichatdata_t {
 
 pub type bot_ichatdata_s = bot_ichatdata_t;
 
-const _: () = assert!(core::mem::size_of::<bot_ichatdata_t>() == 136);
-const _: () = assert!(core::mem::offset_of!(bot_ichatdata_t, chat) == 0);
-const _: () = assert!(core::mem::offset_of!(bot_ichatdata_t, filename) == 8);
-const _: () = assert!(core::mem::offset_of!(bot_ichatdata_t, chatname) == 72);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_ichatdata_t>() == 136);
+    assert!(core::mem::offset_of!(bot_ichatdata_t, chat) == 0);
+    assert!(core::mem::offset_of!(bot_ichatdata_t, filename) == 8);
+    assert!(core::mem::offset_of!(bot_ichatdata_t, chatname) == 72);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_ichatdata_t>() == 132);
+    assert!(core::mem::offset_of!(bot_ichatdata_t, chat) == 0);
+    assert!(core::mem::offset_of!(bot_ichatdata_t, filename) == 4);
+    assert!(core::mem::offset_of!(bot_ichatdata_t, chatname) == 68);
+};

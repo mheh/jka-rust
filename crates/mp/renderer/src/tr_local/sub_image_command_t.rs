@@ -17,9 +17,21 @@ pub struct subImageCommand_t {
     pub data: *mut c_void,
 }
 
-const _: () = assert!(core::mem::size_of::<subImageCommand_t>() == 32);
 const _: () = assert!(core::mem::offset_of!(subImageCommand_t, commandId) == 0);
-const _: () = assert!(core::mem::offset_of!(subImageCommand_t, image) == 8);
-const _: () = assert!(core::mem::offset_of!(subImageCommand_t, width) == 16);
-const _: () = assert!(core::mem::offset_of!(subImageCommand_t, height) == 20);
-const _: () = assert!(core::mem::offset_of!(subImageCommand_t, data) == 24);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<subImageCommand_t>() == 32);
+    assert!(core::mem::offset_of!(subImageCommand_t, image) == 8);
+    assert!(core::mem::offset_of!(subImageCommand_t, width) == 16);
+    assert!(core::mem::offset_of!(subImageCommand_t, height) == 20);
+    assert!(core::mem::offset_of!(subImageCommand_t, data) == 24);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<subImageCommand_t>() == 20);
+    assert!(core::mem::offset_of!(subImageCommand_t, image) == 4);
+    assert!(core::mem::offset_of!(subImageCommand_t, width) == 8);
+    assert!(core::mem::offset_of!(subImageCommand_t, height) == 12);
+    assert!(core::mem::offset_of!(subImageCommand_t, data) == 16);
+};

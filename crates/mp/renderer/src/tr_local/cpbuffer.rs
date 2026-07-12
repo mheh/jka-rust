@@ -34,15 +34,33 @@ pub struct CPBUFFER {
     pub m_uiPBufferTexture: u32,
 }
 
-const _: () = assert!(core::mem::size_of::<CPBUFFER>() == 64);
 const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_hRC) == 0);
-const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_hDC) == 8);
-const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_hOldRC) == 16);
-const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_hOldDC) == 24);
-const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_hBuffer) == 32);
-const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_iWidth) == 40);
-const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_iHeight) == 44);
-const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_iColorBits) == 48);
-const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_iDepthBits) == 52);
-const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_iStencilBits) == 56);
-const _: () = assert!(core::mem::offset_of!(CPBUFFER, m_uiPBufferTexture) == 60);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<CPBUFFER>() == 64);
+    assert!(core::mem::offset_of!(CPBUFFER, m_hDC) == 8);
+    assert!(core::mem::offset_of!(CPBUFFER, m_hOldRC) == 16);
+    assert!(core::mem::offset_of!(CPBUFFER, m_hOldDC) == 24);
+    assert!(core::mem::offset_of!(CPBUFFER, m_hBuffer) == 32);
+    assert!(core::mem::offset_of!(CPBUFFER, m_iWidth) == 40);
+    assert!(core::mem::offset_of!(CPBUFFER, m_iHeight) == 44);
+    assert!(core::mem::offset_of!(CPBUFFER, m_iColorBits) == 48);
+    assert!(core::mem::offset_of!(CPBUFFER, m_iDepthBits) == 52);
+    assert!(core::mem::offset_of!(CPBUFFER, m_iStencilBits) == 56);
+    assert!(core::mem::offset_of!(CPBUFFER, m_uiPBufferTexture) == 60);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<CPBUFFER>() == 44);
+    assert!(core::mem::offset_of!(CPBUFFER, m_hDC) == 4);
+    assert!(core::mem::offset_of!(CPBUFFER, m_hOldRC) == 8);
+    assert!(core::mem::offset_of!(CPBUFFER, m_hOldDC) == 12);
+    assert!(core::mem::offset_of!(CPBUFFER, m_hBuffer) == 16);
+    assert!(core::mem::offset_of!(CPBUFFER, m_iWidth) == 20);
+    assert!(core::mem::offset_of!(CPBUFFER, m_iHeight) == 24);
+    assert!(core::mem::offset_of!(CPBUFFER, m_iColorBits) == 28);
+    assert!(core::mem::offset_of!(CPBUFFER, m_iDepthBits) == 32);
+    assert!(core::mem::offset_of!(CPBUFFER, m_iStencilBits) == 36);
+    assert!(core::mem::offset_of!(CPBUFFER, m_uiPBufferTexture) == 40);
+};

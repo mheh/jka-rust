@@ -13,6 +13,16 @@ pub struct aas_reversedreachability_t {
 /// `aas_reversedreachability_t` is house style for the struct itself.
 pub type aas_reversedreachability_s = aas_reversedreachability_t;
 
-const _: () = assert!(core::mem::size_of::<aas_reversedreachability_t>() == 16);
-const _: () = assert!(core::mem::offset_of!(aas_reversedreachability_t, numlinks) == 0);
-const _: () = assert!(core::mem::offset_of!(aas_reversedreachability_t, first) == 8);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_reversedreachability_t>() == 16);
+    assert!(core::mem::offset_of!(aas_reversedreachability_t, numlinks) == 0);
+    assert!(core::mem::offset_of!(aas_reversedreachability_t, first) == 8);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_reversedreachability_t>() == 8);
+    assert!(core::mem::offset_of!(aas_reversedreachability_t, numlinks) == 0);
+    assert!(core::mem::offset_of!(aas_reversedreachability_t, first) == 4);
+};

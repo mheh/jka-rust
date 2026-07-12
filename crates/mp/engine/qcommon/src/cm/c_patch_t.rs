@@ -15,8 +15,17 @@ pub struct cPatch_t {
     pub pc: *mut patchCollide_s,
 }
 
-const _: () = assert!(core::mem::size_of::<cPatch_t>() == 24);
 const _: () = assert!(core::mem::offset_of!(cPatch_t, checkcount) == 0);
 const _: () = assert!(core::mem::offset_of!(cPatch_t, surfaceFlags) == 4);
 const _: () = assert!(core::mem::offset_of!(cPatch_t, contents) == 8);
-const _: () = assert!(core::mem::offset_of!(cPatch_t, pc) == 16);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<cPatch_t>() == 24);
+    assert!(core::mem::offset_of!(cPatch_t, pc) == 16);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<cPatch_t>() == 16);
+    assert!(core::mem::offset_of!(cPatch_t, pc) == 12);
+};

@@ -12,7 +12,18 @@ pub struct aas_reversedlink_t {
 
 pub type aas_reversedlink_s = aas_reversedlink_t;
 
-const _: () = assert!(core::mem::size_of::<aas_reversedlink_t>() == 16);
-const _: () = assert!(core::mem::offset_of!(aas_reversedlink_t, linknum) == 0);
-const _: () = assert!(core::mem::offset_of!(aas_reversedlink_t, areanum) == 4);
-const _: () = assert!(core::mem::offset_of!(aas_reversedlink_t, next) == 8);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_reversedlink_t>() == 16);
+    assert!(core::mem::offset_of!(aas_reversedlink_t, linknum) == 0);
+    assert!(core::mem::offset_of!(aas_reversedlink_t, areanum) == 4);
+    assert!(core::mem::offset_of!(aas_reversedlink_t, next) == 8);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_reversedlink_t>() == 12);
+    assert!(core::mem::offset_of!(aas_reversedlink_t, linknum) == 0);
+    assert!(core::mem::offset_of!(aas_reversedlink_t, areanum) == 4);
+    assert!(core::mem::offset_of!(aas_reversedlink_t, next) == 8);
+};

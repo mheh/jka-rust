@@ -42,14 +42,31 @@ pub struct model_t {
 
 pub type model_s = model_t;
 
-const _: () = assert!(core::mem::size_of::<model_t>() == 136);
 const _: () = assert!(core::mem::offset_of!(model_t, name) == 0);
-const _: () = assert!(core::mem::offset_of!(model_t, r#type) == 64);
-const _: () = assert!(core::mem::offset_of!(model_t, index) == 68);
-const _: () = assert!(core::mem::offset_of!(model_t, dataSize) == 72);
-const _: () = assert!(core::mem::offset_of!(model_t, bmodel) == 80);
-const _: () = assert!(core::mem::offset_of!(model_t, md3) == 88);
-const _: () = assert!(core::mem::offset_of!(model_t, mdxm) == 112);
-const _: () = assert!(core::mem::offset_of!(model_t, mdxa) == 120);
-const _: () = assert!(core::mem::offset_of!(model_t, numLods) == 128);
-const _: () = assert!(core::mem::offset_of!(model_t, bspInstance) == 132);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<model_t>() == 136);
+    assert!(core::mem::offset_of!(model_t, r#type) == 64);
+    assert!(core::mem::offset_of!(model_t, index) == 68);
+    assert!(core::mem::offset_of!(model_t, dataSize) == 72);
+    assert!(core::mem::offset_of!(model_t, bmodel) == 80);
+    assert!(core::mem::offset_of!(model_t, md3) == 88);
+    assert!(core::mem::offset_of!(model_t, mdxm) == 112);
+    assert!(core::mem::offset_of!(model_t, mdxa) == 120);
+    assert!(core::mem::offset_of!(model_t, numLods) == 128);
+    assert!(core::mem::offset_of!(model_t, bspInstance) == 132);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<model_t>() == 108);
+    assert!(core::mem::offset_of!(model_t, r#type) == 64);
+    assert!(core::mem::offset_of!(model_t, index) == 68);
+    assert!(core::mem::offset_of!(model_t, dataSize) == 72);
+    assert!(core::mem::offset_of!(model_t, bmodel) == 76);
+    assert!(core::mem::offset_of!(model_t, md3) == 80);
+    assert!(core::mem::offset_of!(model_t, mdxm) == 92);
+    assert!(core::mem::offset_of!(model_t, mdxa) == 96);
+    assert!(core::mem::offset_of!(model_t, numLods) == 100);
+    assert!(core::mem::offset_of!(model_t, bspInstance) == 104);
+};

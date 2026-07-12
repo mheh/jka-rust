@@ -17,12 +17,28 @@ pub struct fuzzyseperator_t {
 
 pub type fuzzyseperator_s = fuzzyseperator_t;
 
-const _: () = assert!(core::mem::size_of::<fuzzyseperator_t>() == 40);
-const _: () = assert!(core::mem::offset_of!(fuzzyseperator_t, index) == 0);
-const _: () = assert!(core::mem::offset_of!(fuzzyseperator_t, value) == 4);
-const _: () = assert!(core::mem::offset_of!(fuzzyseperator_t, r#type) == 8);
-const _: () = assert!(core::mem::offset_of!(fuzzyseperator_t, weight) == 12);
-const _: () = assert!(core::mem::offset_of!(fuzzyseperator_t, minweight) == 16);
-const _: () = assert!(core::mem::offset_of!(fuzzyseperator_t, maxweight) == 20);
-const _: () = assert!(core::mem::offset_of!(fuzzyseperator_t, child) == 24);
-const _: () = assert!(core::mem::offset_of!(fuzzyseperator_t, next) == 32);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<fuzzyseperator_t>() == 40);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, index) == 0);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, value) == 4);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, r#type) == 8);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, weight) == 12);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, minweight) == 16);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, maxweight) == 20);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, child) == 24);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, next) == 32);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<fuzzyseperator_t>() == 32);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, index) == 0);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, value) == 4);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, r#type) == 8);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, weight) == 12);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, minweight) == 16);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, maxweight) == 20);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, child) == 24);
+    assert!(core::mem::offset_of!(fuzzyseperator_t, next) == 28);
+};

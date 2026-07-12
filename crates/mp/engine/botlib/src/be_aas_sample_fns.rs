@@ -10,7 +10,7 @@
 //! constants-only) — so this file lands at the `_fns` escape per
 //! `_PREAMBLE.md`'s destination rule.
 //!
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, c_ulong};
 
 use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
@@ -877,7 +877,7 @@ pub fn AAS_InitAASLinkedEntities(bot: &mut BotLib) {
     }
     bot.aasworld.arealinkedentities = GetClearedHunkMemory(
         bot,
-        (bot.aasworld.numareas as usize * core::mem::size_of::<*mut aas_link_t>()) as u64,
+        (bot.aasworld.numareas as usize * core::mem::size_of::<*mut aas_link_t>()) as c_ulong,
     ) as *mut *mut aas_link_t;
 }
 
@@ -1326,7 +1326,7 @@ pub fn AAS_InitAASLinkHeap(bot: &mut BotLib) {
             bot.aasworld.linkheapsize = max_aaslinks;
             bot.aasworld.linkheap = GetHunkMemory(
                 bot,
-                (max_aaslinks as usize * core::mem::size_of::<aas_link_t>()) as u64,
+                (max_aaslinks as usize * core::mem::size_of::<aas_link_t>()) as c_ulong,
             ) as *mut aas_link_t;
         }
         //link the links on the heap

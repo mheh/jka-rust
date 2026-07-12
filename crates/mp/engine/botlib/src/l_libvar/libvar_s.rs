@@ -20,10 +20,24 @@ pub struct libvar_t {
 
 pub type libvar_s = libvar_t;
 
-const _: () = assert!(core::mem::size_of::<libvar_t>() == 40);
-const _: () = assert!(core::mem::offset_of!(libvar_t, name) == 0);
-const _: () = assert!(core::mem::offset_of!(libvar_t, string) == 8);
-const _: () = assert!(core::mem::offset_of!(libvar_t, flags) == 16);
-const _: () = assert!(core::mem::offset_of!(libvar_t, modified) == 20);
-const _: () = assert!(core::mem::offset_of!(libvar_t, value) == 24);
-const _: () = assert!(core::mem::offset_of!(libvar_t, next) == 32);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<libvar_t>() == 40);
+    assert!(core::mem::offset_of!(libvar_t, name) == 0);
+    assert!(core::mem::offset_of!(libvar_t, string) == 8);
+    assert!(core::mem::offset_of!(libvar_t, flags) == 16);
+    assert!(core::mem::offset_of!(libvar_t, modified) == 20);
+    assert!(core::mem::offset_of!(libvar_t, value) == 24);
+    assert!(core::mem::offset_of!(libvar_t, next) == 32);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<libvar_t>() == 24);
+    assert!(core::mem::offset_of!(libvar_t, name) == 0);
+    assert!(core::mem::offset_of!(libvar_t, string) == 4);
+    assert!(core::mem::offset_of!(libvar_t, flags) == 8);
+    assert!(core::mem::offset_of!(libvar_t, modified) == 12);
+    assert!(core::mem::offset_of!(libvar_t, value) == 16);
+    assert!(core::mem::offset_of!(libvar_t, next) == 20);
+};

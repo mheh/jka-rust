@@ -21,8 +21,19 @@ pub struct msurface_t {
 
 pub type msurface_s = msurface_t;
 
-const _: () = assert!(core::mem::size_of::<msurface_t>() == 32);
 const _: () = assert!(core::mem::offset_of!(msurface_t, viewCount) == 0);
-const _: () = assert!(core::mem::offset_of!(msurface_t, shader) == 8);
-const _: () = assert!(core::mem::offset_of!(msurface_t, fogIndex) == 16);
-const _: () = assert!(core::mem::offset_of!(msurface_t, data) == 24);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<msurface_t>() == 32);
+    assert!(core::mem::offset_of!(msurface_t, shader) == 8);
+    assert!(core::mem::offset_of!(msurface_t, fogIndex) == 16);
+    assert!(core::mem::offset_of!(msurface_t, data) == 24);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<msurface_t>() == 16);
+    assert!(core::mem::offset_of!(msurface_t, shader) == 4);
+    assert!(core::mem::offset_of!(msurface_t, fogIndex) == 8);
+    assert!(core::mem::offset_of!(msurface_t, data) == 12);
+};

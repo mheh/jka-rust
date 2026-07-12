@@ -11,6 +11,15 @@ pub struct keywordArray_t {
     pub m_tokenvalue: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<keywordArray_t>() == 16);
 const _: () = assert!(core::mem::offset_of!(keywordArray_t, m_keyword) == 0);
-const _: () = assert!(core::mem::offset_of!(keywordArray_t, m_tokenvalue) == 8);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<keywordArray_t>() == 16);
+    assert!(core::mem::offset_of!(keywordArray_t, m_tokenvalue) == 8);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<keywordArray_t>() == 8);
+    assert!(core::mem::offset_of!(keywordArray_t, m_tokenvalue) == 4);
+};

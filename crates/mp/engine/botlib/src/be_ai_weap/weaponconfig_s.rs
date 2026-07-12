@@ -16,8 +16,20 @@ pub struct weaponconfig_t {
 
 pub type weaponconfig_s = weaponconfig_t;
 
-const _: () = assert!(core::mem::size_of::<weaponconfig_t>() == 24);
-const _: () = assert!(core::mem::offset_of!(weaponconfig_t, numweapons) == 0);
-const _: () = assert!(core::mem::offset_of!(weaponconfig_t, numprojectiles) == 4);
-const _: () = assert!(core::mem::offset_of!(weaponconfig_t, projectileinfo) == 8);
-const _: () = assert!(core::mem::offset_of!(weaponconfig_t, weaponinfo) == 16);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<weaponconfig_t>() == 24);
+    assert!(core::mem::offset_of!(weaponconfig_t, numweapons) == 0);
+    assert!(core::mem::offset_of!(weaponconfig_t, numprojectiles) == 4);
+    assert!(core::mem::offset_of!(weaponconfig_t, projectileinfo) == 8);
+    assert!(core::mem::offset_of!(weaponconfig_t, weaponinfo) == 16);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<weaponconfig_t>() == 16);
+    assert!(core::mem::offset_of!(weaponconfig_t, numweapons) == 0);
+    assert!(core::mem::offset_of!(weaponconfig_t, numprojectiles) == 4);
+    assert!(core::mem::offset_of!(weaponconfig_t, projectileinfo) == 8);
+    assert!(core::mem::offset_of!(weaponconfig_t, weaponinfo) == 12);
+};

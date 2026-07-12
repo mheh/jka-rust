@@ -26,10 +26,24 @@ pub struct SEffectTemplate {
     pub mPrimitives: [*mut c_void; FX_MAX_EFFECT_COMPONENTS],
 }
 
-const _: () = assert!(core::mem::size_of::<SEffectTemplate>() == 272);
-const _: () = assert!(core::mem::offset_of!(SEffectTemplate, mInUse) == 0);
-const _: () = assert!(core::mem::offset_of!(SEffectTemplate, mCopy) == 1);
-const _: () = assert!(core::mem::offset_of!(SEffectTemplate, mEffectName) == 2);
-const _: () = assert!(core::mem::offset_of!(SEffectTemplate, mPrimitiveCount) == 68);
-const _: () = assert!(core::mem::offset_of!(SEffectTemplate, mRepeatDelay) == 72);
-const _: () = assert!(core::mem::offset_of!(SEffectTemplate, mPrimitives) == 80);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<SEffectTemplate>() == 272);
+    assert!(core::mem::offset_of!(SEffectTemplate, mInUse) == 0);
+    assert!(core::mem::offset_of!(SEffectTemplate, mCopy) == 1);
+    assert!(core::mem::offset_of!(SEffectTemplate, mEffectName) == 2);
+    assert!(core::mem::offset_of!(SEffectTemplate, mPrimitiveCount) == 68);
+    assert!(core::mem::offset_of!(SEffectTemplate, mRepeatDelay) == 72);
+    assert!(core::mem::offset_of!(SEffectTemplate, mPrimitives) == 80);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<SEffectTemplate>() == 172);
+    assert!(core::mem::offset_of!(SEffectTemplate, mInUse) == 0);
+    assert!(core::mem::offset_of!(SEffectTemplate, mCopy) == 1);
+    assert!(core::mem::offset_of!(SEffectTemplate, mEffectName) == 2);
+    assert!(core::mem::offset_of!(SEffectTemplate, mPrimitiveCount) == 68);
+    assert!(core::mem::offset_of!(SEffectTemplate, mRepeatDelay) == 72);
+    assert!(core::mem::offset_of!(SEffectTemplate, mPrimitives) == 76);
+};

@@ -14,9 +14,22 @@ pub struct keyname_t {
     pub menukey: bool,
 }
 
-const _: () = assert!(core::mem::size_of::<keyname_t>() == 24);
-const _: () = assert!(core::mem::offset_of!(keyname_t, upper) == 0);
-const _: () = assert!(core::mem::offset_of!(keyname_t, lower) == 2);
-const _: () = assert!(core::mem::offset_of!(keyname_t, name) == 8);
-const _: () = assert!(core::mem::offset_of!(keyname_t, keynum) == 16);
-const _: () = assert!(core::mem::offset_of!(keyname_t, menukey) == 20);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<keyname_t>() == 24);
+    assert!(core::mem::offset_of!(keyname_t, upper) == 0);
+    assert!(core::mem::offset_of!(keyname_t, lower) == 2);
+    assert!(core::mem::offset_of!(keyname_t, name) == 8);
+    assert!(core::mem::offset_of!(keyname_t, keynum) == 16);
+    assert!(core::mem::offset_of!(keyname_t, menukey) == 20);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<keyname_t>() == 16);
+    assert!(core::mem::offset_of!(keyname_t, upper) == 0);
+    assert!(core::mem::offset_of!(keyname_t, lower) == 2);
+    assert!(core::mem::offset_of!(keyname_t, name) == 4);
+    assert!(core::mem::offset_of!(keyname_t, keynum) == 8);
+    assert!(core::mem::offset_of!(keyname_t, menukey) == 12);
+};

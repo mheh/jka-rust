@@ -35,12 +35,28 @@ pub struct keyGlobals_s {
 /// Raven `keyGlobals_t`.
 pub type keyGlobals_t = keyGlobals_s;
 
-const _: () = assert!(core::mem::size_of::<keyGlobals_t>() == 13984);
-const _: () = assert!(core::mem::offset_of!(keyGlobals_t, historyEditLines) == 0);
-const _: () = assert!(core::mem::offset_of!(keyGlobals_t, nextHistoryLine) == 8576);
-const _: () = assert!(core::mem::offset_of!(keyGlobals_t, historyLine) == 8580);
-const _: () = assert!(core::mem::offset_of!(keyGlobals_t, g_consoleField) == 8584);
-const _: () = assert!(core::mem::offset_of!(keyGlobals_t, anykeydown) == 8852);
-const _: () = assert!(core::mem::offset_of!(keyGlobals_t, key_overstrikeMode) == 8856);
-const _: () = assert!(core::mem::offset_of!(keyGlobals_t, keyDownCount) == 8860);
-const _: () = assert!(core::mem::offset_of!(keyGlobals_t, keys) == 8864);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<keyGlobals_t>() == 13984);
+    assert!(core::mem::offset_of!(keyGlobals_t, historyEditLines) == 0);
+    assert!(core::mem::offset_of!(keyGlobals_t, nextHistoryLine) == 8576);
+    assert!(core::mem::offset_of!(keyGlobals_t, historyLine) == 8580);
+    assert!(core::mem::offset_of!(keyGlobals_t, g_consoleField) == 8584);
+    assert!(core::mem::offset_of!(keyGlobals_t, anykeydown) == 8852);
+    assert!(core::mem::offset_of!(keyGlobals_t, key_overstrikeMode) == 8856);
+    assert!(core::mem::offset_of!(keyGlobals_t, keyDownCount) == 8860);
+    assert!(core::mem::offset_of!(keyGlobals_t, keys) == 8864);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<keyGlobals_t>() == 12704);
+    assert!(core::mem::offset_of!(keyGlobals_t, historyEditLines) == 0);
+    assert!(core::mem::offset_of!(keyGlobals_t, nextHistoryLine) == 8576);
+    assert!(core::mem::offset_of!(keyGlobals_t, historyLine) == 8580);
+    assert!(core::mem::offset_of!(keyGlobals_t, g_consoleField) == 8584);
+    assert!(core::mem::offset_of!(keyGlobals_t, anykeydown) == 8852);
+    assert!(core::mem::offset_of!(keyGlobals_t, key_overstrikeMode) == 8856);
+    assert!(core::mem::offset_of!(keyGlobals_t, keyDownCount) == 8860);
+    assert!(core::mem::offset_of!(keyGlobals_t, keys) == 8864);
+};

@@ -50,20 +50,44 @@ pub struct script_t {
 
 pub type script_s = script_t;
 
-const _: () = assert!(core::mem::size_of::<script_t>() == 2200);
 const _: () = assert!(core::mem::offset_of!(script_t, filename) == 0);
 const _: () = assert!(core::mem::offset_of!(script_t, buffer) == 1024);
-const _: () = assert!(core::mem::offset_of!(script_t, script_p) == 1032);
-const _: () = assert!(core::mem::offset_of!(script_t, end_p) == 1040);
-const _: () = assert!(core::mem::offset_of!(script_t, lastscript_p) == 1048);
-const _: () = assert!(core::mem::offset_of!(script_t, whitespace_p) == 1056);
-const _: () = assert!(core::mem::offset_of!(script_t, endwhitespace_p) == 1064);
-const _: () = assert!(core::mem::offset_of!(script_t, length) == 1072);
-const _: () = assert!(core::mem::offset_of!(script_t, line) == 1076);
-const _: () = assert!(core::mem::offset_of!(script_t, lastline) == 1080);
-const _: () = assert!(core::mem::offset_of!(script_t, tokenavailable) == 1084);
-const _: () = assert!(core::mem::offset_of!(script_t, flags) == 1088);
-const _: () = assert!(core::mem::offset_of!(script_t, punctuations) == 1096);
-const _: () = assert!(core::mem::offset_of!(script_t, punctuationtable) == 1104);
-const _: () = assert!(core::mem::offset_of!(script_t, token) == 1112);
-const _: () = assert!(core::mem::offset_of!(script_t, next) == 2192);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<script_t>() == 2200);
+    assert!(core::mem::offset_of!(script_t, script_p) == 1032);
+    assert!(core::mem::offset_of!(script_t, end_p) == 1040);
+    assert!(core::mem::offset_of!(script_t, lastscript_p) == 1048);
+    assert!(core::mem::offset_of!(script_t, whitespace_p) == 1056);
+    assert!(core::mem::offset_of!(script_t, endwhitespace_p) == 1064);
+    assert!(core::mem::offset_of!(script_t, length) == 1072);
+    assert!(core::mem::offset_of!(script_t, line) == 1076);
+    assert!(core::mem::offset_of!(script_t, lastline) == 1080);
+    assert!(core::mem::offset_of!(script_t, tokenavailable) == 1084);
+    assert!(core::mem::offset_of!(script_t, flags) == 1088);
+    assert!(core::mem::offset_of!(script_t, punctuations) == 1096);
+    assert!(core::mem::offset_of!(script_t, punctuationtable) == 1104);
+    assert!(core::mem::offset_of!(script_t, token) == 1112);
+    assert!(core::mem::offset_of!(script_t, next) == 2192);
+};
+// ILP32 twin. Matches clang i386 through `token`; `token`'s interior and the
+// `size`/`next` values shift -4 via the embedded token_t's f64-for-long-double
+// stand-in (see token_s.rs).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<script_t>() == 2144);
+    assert!(core::mem::offset_of!(script_t, script_p) == 1028);
+    assert!(core::mem::offset_of!(script_t, end_p) == 1032);
+    assert!(core::mem::offset_of!(script_t, lastscript_p) == 1036);
+    assert!(core::mem::offset_of!(script_t, whitespace_p) == 1040);
+    assert!(core::mem::offset_of!(script_t, endwhitespace_p) == 1044);
+    assert!(core::mem::offset_of!(script_t, length) == 1048);
+    assert!(core::mem::offset_of!(script_t, line) == 1052);
+    assert!(core::mem::offset_of!(script_t, lastline) == 1056);
+    assert!(core::mem::offset_of!(script_t, tokenavailable) == 1060);
+    assert!(core::mem::offset_of!(script_t, flags) == 1064);
+    assert!(core::mem::offset_of!(script_t, punctuations) == 1068);
+    assert!(core::mem::offset_of!(script_t, punctuationtable) == 1072);
+    assert!(core::mem::offset_of!(script_t, token) == 1076);
+    assert!(core::mem::offset_of!(script_t, next) == 2140);
+};

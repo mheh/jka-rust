@@ -17,10 +17,19 @@ pub struct sysEvent_t {
     pub evPtr: *mut ::core::ffi::c_void, // this must be manually freed if not NULL
 }
 
-const _: () = assert!(core::mem::size_of::<sysEvent_t>() == 32);
 const _: () = assert!(core::mem::offset_of!(sysEvent_t, evTime) == 0);
 const _: () = assert!(core::mem::offset_of!(sysEvent_t, evType) == 4);
 const _: () = assert!(core::mem::offset_of!(sysEvent_t, evValue) == 8);
 const _: () = assert!(core::mem::offset_of!(sysEvent_t, evValue2) == 12);
 const _: () = assert!(core::mem::offset_of!(sysEvent_t, evPtrLength) == 16);
-const _: () = assert!(core::mem::offset_of!(sysEvent_t, evPtr) == 24);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<sysEvent_t>() == 32);
+    assert!(core::mem::offset_of!(sysEvent_t, evPtr) == 24);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<sysEvent_t>() == 24);
+    assert!(core::mem::offset_of!(sysEvent_t, evPtr) == 20);
+};

@@ -35,15 +35,33 @@ pub struct mnode_t {
 
 pub type mnode_s = mnode_t;
 
-const _: () = assert!(core::mem::size_of::<mnode_t>() == 88);
 const _: () = assert!(core::mem::offset_of!(mnode_t, contents) == 0);
-const _: () = assert!(core::mem::offset_of!(mnode_t, visframe) == 4);
-const _: () = assert!(core::mem::offset_of!(mnode_t, mins) == 8);
-const _: () = assert!(core::mem::offset_of!(mnode_t, maxs) == 20);
-const _: () = assert!(core::mem::offset_of!(mnode_t, parent) == 32);
-const _: () = assert!(core::mem::offset_of!(mnode_t, plane) == 40);
-const _: () = assert!(core::mem::offset_of!(mnode_t, children) == 48);
-const _: () = assert!(core::mem::offset_of!(mnode_t, cluster) == 64);
-const _: () = assert!(core::mem::offset_of!(mnode_t, area) == 68);
-const _: () = assert!(core::mem::offset_of!(mnode_t, firstmarksurface) == 72);
-const _: () = assert!(core::mem::offset_of!(mnode_t, nummarksurfaces) == 80);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<mnode_t>() == 88);
+    assert!(core::mem::offset_of!(mnode_t, visframe) == 4);
+    assert!(core::mem::offset_of!(mnode_t, mins) == 8);
+    assert!(core::mem::offset_of!(mnode_t, maxs) == 20);
+    assert!(core::mem::offset_of!(mnode_t, parent) == 32);
+    assert!(core::mem::offset_of!(mnode_t, plane) == 40);
+    assert!(core::mem::offset_of!(mnode_t, children) == 48);
+    assert!(core::mem::offset_of!(mnode_t, cluster) == 64);
+    assert!(core::mem::offset_of!(mnode_t, area) == 68);
+    assert!(core::mem::offset_of!(mnode_t, firstmarksurface) == 72);
+    assert!(core::mem::offset_of!(mnode_t, nummarksurfaces) == 80);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<mnode_t>() == 64);
+    assert!(core::mem::offset_of!(mnode_t, visframe) == 4);
+    assert!(core::mem::offset_of!(mnode_t, mins) == 8);
+    assert!(core::mem::offset_of!(mnode_t, maxs) == 20);
+    assert!(core::mem::offset_of!(mnode_t, parent) == 32);
+    assert!(core::mem::offset_of!(mnode_t, plane) == 36);
+    assert!(core::mem::offset_of!(mnode_t, children) == 40);
+    assert!(core::mem::offset_of!(mnode_t, cluster) == 48);
+    assert!(core::mem::offset_of!(mnode_t, area) == 52);
+    assert!(core::mem::offset_of!(mnode_t, firstmarksurface) == 56);
+    assert!(core::mem::offset_of!(mnode_t, nummarksurfaces) == 60);
+};

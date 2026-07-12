@@ -58,24 +58,51 @@ pub struct shaderCommands_s {
     pub fading: bool,
 }
 
-const _: () = assert!(core::mem::size_of::<shaderCommands_s>() == 128064);
 const _: () = assert!(core::mem::offset_of!(shaderCommands_s, indexes) == 0);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, xyz) == 24000);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, normal) == 40000);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, texCoords) == 56000);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, vertexColors) == 96000);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, vertexAlphas) == 100000);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, vertexDlightBits) == 104000);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, svars) == 108000);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, shader) == 128000);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, shaderTime) == 128008);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, fogNum) == 128012);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, dlightBits) == 128016);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, numIndexes) == 128020);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, numVertexes) == 128024);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, numPasses) == 128028);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, currentStageIteratorFunc) == 128032);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, xstages) == 128040);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, registration) == 128048);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, SSInitializedWind) == 128052);
-const _: () = assert!(core::mem::offset_of!(shaderCommands_s, fading) == 128056);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<shaderCommands_s>() == 128064);
+    assert!(core::mem::offset_of!(shaderCommands_s, xyz) == 24000);
+    assert!(core::mem::offset_of!(shaderCommands_s, normal) == 40000);
+    assert!(core::mem::offset_of!(shaderCommands_s, texCoords) == 56000);
+    assert!(core::mem::offset_of!(shaderCommands_s, vertexColors) == 96000);
+    assert!(core::mem::offset_of!(shaderCommands_s, vertexAlphas) == 100000);
+    assert!(core::mem::offset_of!(shaderCommands_s, vertexDlightBits) == 104000);
+    assert!(core::mem::offset_of!(shaderCommands_s, svars) == 108000);
+    assert!(core::mem::offset_of!(shaderCommands_s, shader) == 128000);
+    assert!(core::mem::offset_of!(shaderCommands_s, shaderTime) == 128008);
+    assert!(core::mem::offset_of!(shaderCommands_s, fogNum) == 128012);
+    assert!(core::mem::offset_of!(shaderCommands_s, dlightBits) == 128016);
+    assert!(core::mem::offset_of!(shaderCommands_s, numIndexes) == 128020);
+    assert!(core::mem::offset_of!(shaderCommands_s, numVertexes) == 128024);
+    assert!(core::mem::offset_of!(shaderCommands_s, numPasses) == 128028);
+    assert!(core::mem::offset_of!(shaderCommands_s, currentStageIteratorFunc) == 128032);
+    assert!(core::mem::offset_of!(shaderCommands_s, xstages) == 128040);
+    assert!(core::mem::offset_of!(shaderCommands_s, registration) == 128048);
+    assert!(core::mem::offset_of!(shaderCommands_s, SSInitializedWind) == 128052);
+    assert!(core::mem::offset_of!(shaderCommands_s, fading) == 128056);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<shaderCommands_s>() == 128048);
+    assert!(core::mem::offset_of!(shaderCommands_s, xyz) == 24000);
+    assert!(core::mem::offset_of!(shaderCommands_s, normal) == 40000);
+    assert!(core::mem::offset_of!(shaderCommands_s, texCoords) == 56000);
+    assert!(core::mem::offset_of!(shaderCommands_s, vertexColors) == 96000);
+    assert!(core::mem::offset_of!(shaderCommands_s, vertexAlphas) == 100000);
+    assert!(core::mem::offset_of!(shaderCommands_s, vertexDlightBits) == 104000);
+    assert!(core::mem::offset_of!(shaderCommands_s, svars) == 108000);
+    assert!(core::mem::offset_of!(shaderCommands_s, shader) == 128000);
+    assert!(core::mem::offset_of!(shaderCommands_s, shaderTime) == 128004);
+    assert!(core::mem::offset_of!(shaderCommands_s, fogNum) == 128008);
+    assert!(core::mem::offset_of!(shaderCommands_s, dlightBits) == 128012);
+    assert!(core::mem::offset_of!(shaderCommands_s, numIndexes) == 128016);
+    assert!(core::mem::offset_of!(shaderCommands_s, numVertexes) == 128020);
+    assert!(core::mem::offset_of!(shaderCommands_s, numPasses) == 128024);
+    assert!(core::mem::offset_of!(shaderCommands_s, currentStageIteratorFunc) == 128028);
+    assert!(core::mem::offset_of!(shaderCommands_s, xstages) == 128032);
+    assert!(core::mem::offset_of!(shaderCommands_s, registration) == 128036);
+    assert!(core::mem::offset_of!(shaderCommands_s, SSInitializedWind) == 128040);
+    assert!(core::mem::offset_of!(shaderCommands_s, fading) == 128044);
+};

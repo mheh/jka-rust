@@ -24,12 +24,28 @@ pub struct aas_routingupdate_t {
 /// `aas_routingupdate_t` is house style for the struct itself.
 pub type aas_routingupdate_s = aas_routingupdate_t;
 
-const _: () = assert!(core::mem::size_of::<aas_routingupdate_t>() == 56);
-const _: () = assert!(core::mem::offset_of!(aas_routingupdate_t, cluster) == 0);
-const _: () = assert!(core::mem::offset_of!(aas_routingupdate_t, areanum) == 4);
-const _: () = assert!(core::mem::offset_of!(aas_routingupdate_t, start) == 8);
-const _: () = assert!(core::mem::offset_of!(aas_routingupdate_t, tmptraveltime) == 20);
-const _: () = assert!(core::mem::offset_of!(aas_routingupdate_t, areatraveltimes) == 24);
-const _: () = assert!(core::mem::offset_of!(aas_routingupdate_t, inlist) == 32);
-const _: () = assert!(core::mem::offset_of!(aas_routingupdate_t, next) == 40);
-const _: () = assert!(core::mem::offset_of!(aas_routingupdate_t, prev) == 48);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_routingupdate_t>() == 56);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, cluster) == 0);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, areanum) == 4);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, start) == 8);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, tmptraveltime) == 20);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, areatraveltimes) == 24);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, inlist) == 32);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, next) == 40);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, prev) == 48);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_routingupdate_t>() == 40);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, cluster) == 0);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, areanum) == 4);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, start) == 8);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, tmptraveltime) == 20);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, areatraveltimes) == 24);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, inlist) == 28);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, next) == 32);
+    assert!(core::mem::offset_of!(aas_routingupdate_t, prev) == 36);
+};

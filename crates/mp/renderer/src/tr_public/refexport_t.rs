@@ -267,6 +267,7 @@ pub struct refexport_t {
         Option<unsafe extern "C" fn(bmodelIndex: c_int, vec: *mut vec3_t, normal: *mut vec3_t)>,
 }
 
+#[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<refexport_t>() == 360);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(refexport_t, Shutdown) == 0);
@@ -358,3 +359,97 @@ const _: () = assert!(core::mem::offset_of!(refexport_t, GetLightStyle) == 336);
 const _: () = assert!(core::mem::offset_of!(refexport_t, SetLightStyle) == 344);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(refexport_t, GetBModelVerts) == 352);
+
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::size_of::<refexport_t>() == 180);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, Shutdown) == 0);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, BeginRegistration) == 4);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, RegisterModel) == 8);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, RegisterSkin) == 12);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, RegisterShader) == 16);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, RegisterShaderNoMip) == 20);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, ShaderNameFromIndex) == 24);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, LoadWorld) == 28);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, SetWorldVisData) == 32);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, EndRegistration) == 36);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, ClearScene) == 40);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, ClearDecals) == 44);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, AddRefEntityToScene) == 48);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, AddMiniRefEntityToScene) == 52);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, AddPolyToScene) == 56);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, AddDecalToScene) == 60);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, LightForPoint) == 64);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, AddLightToScene) == 68);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, AddAdditiveLightToScene) == 72);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, RenderScene) == 76);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, SetColor) == 80);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, DrawStretchPic) == 84);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, DrawRotatePic) == 88);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, DrawRotatePic2) == 92);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, DrawStretchRaw) == 96);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, UploadCinematic) == 100);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, BeginFrame) == 104);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, EndFrame) == 108);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, MarkFragments) == 112);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, LerpTag) == 116);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, ModelBounds) == 120);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, RegisterFont) == 124);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, Font_StrLenPixels) == 128);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, Font_StrLenChars) == 132);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, Font_HeightPixels) == 136);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, Font_DrawString) == 140);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, Language_IsAsian) == 144);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, Language_UsesSpaces) == 148);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, AnyLanguage_ReadCharFromString) == 152);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, RemapShader) == 156);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, GetEntityToken) == 160);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, inPVS) == 164);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, GetLightStyle) == 168);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, SetLightStyle) == 172);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(refexport_t, GetBModelVerts) == 176);

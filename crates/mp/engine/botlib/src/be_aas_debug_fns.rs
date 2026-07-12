@@ -37,7 +37,7 @@
 // is the exact Raven global name per house rule, reached as a field on `bot`
 // — resolved when the aggregate lands.
 
-use core::ffi::c_int;
+use core::ffi::{c_int, c_ulong};
 
 use mp_engine_qcommon::common::Common;
 use mp_game::q_math::{CrossProduct, VectorNormalize};
@@ -742,7 +742,7 @@ pub fn AAS_FloodAreas_r(bot: &mut BotLib, areanum: c_int, cluster: c_int, done: 
 pub fn AAS_FloodAreas(bot: &mut BotLib, origin: vec3_t) {
     let done = GetClearedMemory(
         bot,
-        bot.aasworld.numareas as u64 * core::mem::size_of::<c_int>() as u64,
+        bot.aasworld.numareas as c_ulong * core::mem::size_of::<c_int>() as c_ulong,
     ) as *mut c_int;
     let areanum = AAS_PointAreaNum(bot, origin);
     let cluster = AAS_AreaCluster(bot, areanum);

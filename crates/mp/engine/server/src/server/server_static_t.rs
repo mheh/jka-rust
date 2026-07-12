@@ -47,15 +47,33 @@ pub struct serverStatic_t {
     pub authorizeAddress: netadr_t,
 }
 
-const _: () = assert!(core::mem::size_of::<serverStatic_t>() == 41048);
 const _: () = assert!(core::mem::offset_of!(serverStatic_t, initialized) == 0);
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, time) == 4);
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, snapFlagServerBit) == 8);
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, clients) == 16);
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, numSnapshotEntities) == 24);
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, nextSnapshotEntities) == 28);
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, snapshotEntities) == 32);
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, nextHeartbeatTime) == 40);
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, challenges) == 44);
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, redirectAddress) == 41004);
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, authorizeAddress) == 41024);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<serverStatic_t>() == 41048);
+    assert!(core::mem::offset_of!(serverStatic_t, time) == 4);
+    assert!(core::mem::offset_of!(serverStatic_t, snapFlagServerBit) == 8);
+    assert!(core::mem::offset_of!(serverStatic_t, clients) == 16);
+    assert!(core::mem::offset_of!(serverStatic_t, numSnapshotEntities) == 24);
+    assert!(core::mem::offset_of!(serverStatic_t, nextSnapshotEntities) == 28);
+    assert!(core::mem::offset_of!(serverStatic_t, snapshotEntities) == 32);
+    assert!(core::mem::offset_of!(serverStatic_t, nextHeartbeatTime) == 40);
+    assert!(core::mem::offset_of!(serverStatic_t, challenges) == 44);
+    assert!(core::mem::offset_of!(serverStatic_t, redirectAddress) == 41004);
+    assert!(core::mem::offset_of!(serverStatic_t, authorizeAddress) == 41024);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<serverStatic_t>() == 41032);
+    assert!(core::mem::offset_of!(serverStatic_t, time) == 4);
+    assert!(core::mem::offset_of!(serverStatic_t, snapFlagServerBit) == 8);
+    assert!(core::mem::offset_of!(serverStatic_t, clients) == 12);
+    assert!(core::mem::offset_of!(serverStatic_t, numSnapshotEntities) == 16);
+    assert!(core::mem::offset_of!(serverStatic_t, nextSnapshotEntities) == 20);
+    assert!(core::mem::offset_of!(serverStatic_t, snapshotEntities) == 24);
+    assert!(core::mem::offset_of!(serverStatic_t, nextHeartbeatTime) == 28);
+    assert!(core::mem::offset_of!(serverStatic_t, challenges) == 32);
+    assert!(core::mem::offset_of!(serverStatic_t, redirectAddress) == 40992);
+    assert!(core::mem::offset_of!(serverStatic_t, authorizeAddress) == 41012);
+};

@@ -22,12 +22,20 @@ pub struct patchCollide_s {
 
 pub type patchCollide_t = patchCollide_s;
 
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<patchCollide_t>() == 56);
 const _: () = assert!(core::mem::offset_of!(patchCollide_t, bounds) == 0);
 const _: () = assert!(core::mem::offset_of!(patchCollide_t, numPlanes) == 24);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(patchCollide_t, planes) == 32);
-const _: () = assert!(core::mem::offset_of!(patchCollide_t, numFacets) == 40);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(patchCollide_t, facets) == 48);
+const _: () = {
+    assert!(core::mem::size_of::<patchCollide_t>() == 56);
+    assert!(core::mem::offset_of!(patchCollide_t, planes) == 32);
+    assert!(core::mem::offset_of!(patchCollide_t, numFacets) == 40);
+    assert!(core::mem::offset_of!(patchCollide_t, facets) == 48);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<patchCollide_t>() == 40);
+    assert!(core::mem::offset_of!(patchCollide_t, planes) == 28);
+    assert!(core::mem::offset_of!(patchCollide_t, numFacets) == 32);
+    assert!(core::mem::offset_of!(patchCollide_t, facets) == 36);
+};

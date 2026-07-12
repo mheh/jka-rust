@@ -33,16 +33,32 @@ pub struct svEntity_t {
     pub snapshotCounter: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<svEntity_t>() == 632);
 const _: () = assert!(core::mem::offset_of!(svEntity_t, worldSector) == 0);
-const _: () = assert!(core::mem::offset_of!(svEntity_t, nextEntityInWorldSector) == 8);
-const _: () = assert!(core::mem::offset_of!(svEntity_t, baseline) == 16);
-const _: () = assert!(core::mem::offset_of!(svEntity_t, numClusters) == 548);
-const _: () = assert!(core::mem::offset_of!(svEntity_t, clusternums) == 552);
-const _: () = assert!(core::mem::offset_of!(svEntity_t, lastCluster) == 616);
-const _: () = assert!(core::mem::offset_of!(svEntity_t, areanum) == 620);
-const _: () = assert!(core::mem::offset_of!(svEntity_t, areanum2) == 624);
-const _: () = assert!(core::mem::offset_of!(svEntity_t, snapshotCounter) == 628);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<svEntity_t>() == 632);
+    assert!(core::mem::offset_of!(svEntity_t, nextEntityInWorldSector) == 8);
+    assert!(core::mem::offset_of!(svEntity_t, baseline) == 16);
+    assert!(core::mem::offset_of!(svEntity_t, numClusters) == 548);
+    assert!(core::mem::offset_of!(svEntity_t, clusternums) == 552);
+    assert!(core::mem::offset_of!(svEntity_t, lastCluster) == 616);
+    assert!(core::mem::offset_of!(svEntity_t, areanum) == 620);
+    assert!(core::mem::offset_of!(svEntity_t, areanum2) == 624);
+    assert!(core::mem::offset_of!(svEntity_t, snapshotCounter) == 628);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<svEntity_t>() == 624);
+    assert!(core::mem::offset_of!(svEntity_t, nextEntityInWorldSector) == 4);
+    assert!(core::mem::offset_of!(svEntity_t, baseline) == 8);
+    assert!(core::mem::offset_of!(svEntity_t, numClusters) == 540);
+    assert!(core::mem::offset_of!(svEntity_t, clusternums) == 544);
+    assert!(core::mem::offset_of!(svEntity_t, lastCluster) == 608);
+    assert!(core::mem::offset_of!(svEntity_t, areanum) == 612);
+    assert!(core::mem::offset_of!(svEntity_t, areanum2) == 616);
+    assert!(core::mem::offset_of!(svEntity_t, snapshotCounter) == 620);
+};
 
 /// C tag `svEntity_s` is the same type as the `svEntity_t` typedef.
 pub type svEntity_s = svEntity_t;

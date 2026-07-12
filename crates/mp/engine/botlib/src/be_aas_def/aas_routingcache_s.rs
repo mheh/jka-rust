@@ -44,18 +44,40 @@ pub struct aas_routingcache_t {
 
 pub type aas_routingcache_s = aas_routingcache_t;
 
-const _: () = assert!(core::mem::size_of::<aas_routingcache_t>() == 88);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, r#type) == 0);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, time) == 4);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, size) == 8);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, cluster) == 12);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, areanum) == 16);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, origin) == 20);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, starttraveltime) == 32);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, travelflags) == 36);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, prev) == 40);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, next) == 48);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, time_prev) == 56);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, time_next) == 64);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, reachabilities) == 72);
-const _: () = assert!(core::mem::offset_of!(aas_routingcache_t, traveltimes) == 80);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_routingcache_t>() == 88);
+    assert!(core::mem::offset_of!(aas_routingcache_t, r#type) == 0);
+    assert!(core::mem::offset_of!(aas_routingcache_t, time) == 4);
+    assert!(core::mem::offset_of!(aas_routingcache_t, size) == 8);
+    assert!(core::mem::offset_of!(aas_routingcache_t, cluster) == 12);
+    assert!(core::mem::offset_of!(aas_routingcache_t, areanum) == 16);
+    assert!(core::mem::offset_of!(aas_routingcache_t, origin) == 20);
+    assert!(core::mem::offset_of!(aas_routingcache_t, starttraveltime) == 32);
+    assert!(core::mem::offset_of!(aas_routingcache_t, travelflags) == 36);
+    assert!(core::mem::offset_of!(aas_routingcache_t, prev) == 40);
+    assert!(core::mem::offset_of!(aas_routingcache_t, next) == 48);
+    assert!(core::mem::offset_of!(aas_routingcache_t, time_prev) == 56);
+    assert!(core::mem::offset_of!(aas_routingcache_t, time_next) == 64);
+    assert!(core::mem::offset_of!(aas_routingcache_t, reachabilities) == 72);
+    assert!(core::mem::offset_of!(aas_routingcache_t, traveltimes) == 80);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_routingcache_t>() == 64);
+    assert!(core::mem::offset_of!(aas_routingcache_t, r#type) == 0);
+    assert!(core::mem::offset_of!(aas_routingcache_t, time) == 4);
+    assert!(core::mem::offset_of!(aas_routingcache_t, size) == 8);
+    assert!(core::mem::offset_of!(aas_routingcache_t, cluster) == 12);
+    assert!(core::mem::offset_of!(aas_routingcache_t, areanum) == 16);
+    assert!(core::mem::offset_of!(aas_routingcache_t, origin) == 20);
+    assert!(core::mem::offset_of!(aas_routingcache_t, starttraveltime) == 32);
+    assert!(core::mem::offset_of!(aas_routingcache_t, travelflags) == 36);
+    assert!(core::mem::offset_of!(aas_routingcache_t, prev) == 40);
+    assert!(core::mem::offset_of!(aas_routingcache_t, next) == 44);
+    assert!(core::mem::offset_of!(aas_routingcache_t, time_prev) == 48);
+    assert!(core::mem::offset_of!(aas_routingcache_t, time_next) == 52);
+    assert!(core::mem::offset_of!(aas_routingcache_t, reachabilities) == 56);
+    assert!(core::mem::offset_of!(aas_routingcache_t, traveltimes) == 60);
+};

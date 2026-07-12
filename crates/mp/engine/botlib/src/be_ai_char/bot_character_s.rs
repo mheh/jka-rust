@@ -20,7 +20,18 @@ pub struct bot_character_t {
 
 pub type bot_character_s = bot_character_t;
 
-const _: () = assert!(core::mem::size_of::<bot_character_t>() == 88);
-const _: () = assert!(core::mem::offset_of!(bot_character_t, filename) == 0);
-const _: () = assert!(core::mem::offset_of!(bot_character_t, skill) == 64);
-const _: () = assert!(core::mem::offset_of!(bot_character_t, c) == 72);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_character_t>() == 88);
+    assert!(core::mem::offset_of!(bot_character_t, filename) == 0);
+    assert!(core::mem::offset_of!(bot_character_t, skill) == 64);
+    assert!(core::mem::offset_of!(bot_character_t, c) == 72);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_character_t>() == 76);
+    assert!(core::mem::offset_of!(bot_character_t, filename) == 0);
+    assert!(core::mem::offset_of!(bot_character_t, skill) == 64);
+    assert!(core::mem::offset_of!(bot_character_t, c) == 68);
+};

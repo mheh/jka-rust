@@ -31,16 +31,35 @@ pub struct textureBundle_t {
     pub videoMapHandle: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<textureBundle_t>() == 48);
 const _: () = assert!(core::mem::offset_of!(textureBundle_t, image) == 0);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, tcGen) == 8);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, tcGenVectors) == 16);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, texMods) == 24);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, numTexMods) == 32);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, numImageAnimations) == 34);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, imageAnimationSpeed) == 36);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, isLightmap) == 40);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, oneShotAnimMap) == 41);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, vertexLightmap) == 42);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, isVideoMap) == 43);
-const _: () = assert!(core::mem::offset_of!(textureBundle_t, videoMapHandle) == 44);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<textureBundle_t>() == 48);
+    assert!(core::mem::offset_of!(textureBundle_t, tcGen) == 8);
+    assert!(core::mem::offset_of!(textureBundle_t, tcGenVectors) == 16);
+    assert!(core::mem::offset_of!(textureBundle_t, texMods) == 24);
+    assert!(core::mem::offset_of!(textureBundle_t, numTexMods) == 32);
+    assert!(core::mem::offset_of!(textureBundle_t, numImageAnimations) == 34);
+    assert!(core::mem::offset_of!(textureBundle_t, imageAnimationSpeed) == 36);
+    assert!(core::mem::offset_of!(textureBundle_t, isLightmap) == 40);
+    assert!(core::mem::offset_of!(textureBundle_t, oneShotAnimMap) == 41);
+    assert!(core::mem::offset_of!(textureBundle_t, vertexLightmap) == 42);
+    assert!(core::mem::offset_of!(textureBundle_t, isVideoMap) == 43);
+    assert!(core::mem::offset_of!(textureBundle_t, videoMapHandle) == 44);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<textureBundle_t>() == 32);
+    assert!(core::mem::offset_of!(textureBundle_t, tcGen) == 4);
+    assert!(core::mem::offset_of!(textureBundle_t, tcGenVectors) == 8);
+    assert!(core::mem::offset_of!(textureBundle_t, texMods) == 12);
+    assert!(core::mem::offset_of!(textureBundle_t, numTexMods) == 16);
+    assert!(core::mem::offset_of!(textureBundle_t, numImageAnimations) == 18);
+    assert!(core::mem::offset_of!(textureBundle_t, imageAnimationSpeed) == 20);
+    assert!(core::mem::offset_of!(textureBundle_t, isLightmap) == 24);
+    assert!(core::mem::offset_of!(textureBundle_t, oneShotAnimMap) == 25);
+    assert!(core::mem::offset_of!(textureBundle_t, vertexLightmap) == 26);
+    assert!(core::mem::offset_of!(textureBundle_t, isVideoMap) == 27);
+    assert!(core::mem::offset_of!(textureBundle_t, videoMapHandle) == 28);
+};

@@ -14,7 +14,18 @@ pub struct bot_synonym_t {
 
 pub type bot_synonym_s = bot_synonym_t;
 
-const _: () = assert!(core::mem::size_of::<bot_synonym_t>() == 24);
-const _: () = assert!(core::mem::offset_of!(bot_synonym_t, string) == 0);
-const _: () = assert!(core::mem::offset_of!(bot_synonym_t, weight) == 8);
-const _: () = assert!(core::mem::offset_of!(bot_synonym_t, next) == 16);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_synonym_t>() == 24);
+    assert!(core::mem::offset_of!(bot_synonym_t, string) == 0);
+    assert!(core::mem::offset_of!(bot_synonym_t, weight) == 8);
+    assert!(core::mem::offset_of!(bot_synonym_t, next) == 16);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_synonym_t>() == 12);
+    assert!(core::mem::offset_of!(bot_synonym_t, string) == 0);
+    assert!(core::mem::offset_of!(bot_synonym_t, weight) == 4);
+    assert!(core::mem::offset_of!(bot_synonym_t, next) == 8);
+};

@@ -16,8 +16,19 @@ pub struct hitMatReg_t {
     pub name: [c_char; MAX_QPATH as usize],
 }
 
-const _: () = assert!(core::mem::size_of::<hitMatReg_t>() == 80);
 const _: () = assert!(core::mem::offset_of!(hitMatReg_t, loc) == 0);
-const _: () = assert!(core::mem::offset_of!(hitMatReg_t, width) == 8);
-const _: () = assert!(core::mem::offset_of!(hitMatReg_t, height) == 12);
-const _: () = assert!(core::mem::offset_of!(hitMatReg_t, name) == 16);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<hitMatReg_t>() == 80);
+    assert!(core::mem::offset_of!(hitMatReg_t, width) == 8);
+    assert!(core::mem::offset_of!(hitMatReg_t, height) == 12);
+    assert!(core::mem::offset_of!(hitMatReg_t, name) == 16);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<hitMatReg_t>() == 76);
+    assert!(core::mem::offset_of!(hitMatReg_t, width) == 4);
+    assert!(core::mem::offset_of!(hitMatReg_t, height) == 8);
+    assert!(core::mem::offset_of!(hitMatReg_t, name) == 12);
+};

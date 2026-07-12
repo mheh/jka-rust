@@ -59,7 +59,6 @@ pub struct trRefdef_t {
     pub drawSurfs: *mut drawSurf_t,
 }
 
-const _: () = assert!(core::mem::size_of::<trRefdef_t>() == 448);
 const _: () = assert!(core::mem::offset_of!(trRefdef_t, x) == 0);
 const _: () = assert!(core::mem::offset_of!(trRefdef_t, y) == 4);
 const _: () = assert!(core::mem::offset_of!(trRefdef_t, width) == 8);
@@ -76,11 +75,28 @@ const _: () = assert!(core::mem::offset_of!(trRefdef_t, areamaskModified) == 116
 const _: () = assert!(core::mem::offset_of!(trRefdef_t, floatTime) == 120);
 const _: () = assert!(core::mem::offset_of!(trRefdef_t, text) == 124);
 const _: () = assert!(core::mem::offset_of!(trRefdef_t, num_entities) == 380);
-const _: () = assert!(core::mem::offset_of!(trRefdef_t, entities) == 384);
-const _: () = assert!(core::mem::offset_of!(trRefdef_t, miniEntities) == 392);
-const _: () = assert!(core::mem::offset_of!(trRefdef_t, num_dlights) == 400);
-const _: () = assert!(core::mem::offset_of!(trRefdef_t, dlights) == 408);
-const _: () = assert!(core::mem::offset_of!(trRefdef_t, numPolys) == 416);
-const _: () = assert!(core::mem::offset_of!(trRefdef_t, polys) == 424);
-const _: () = assert!(core::mem::offset_of!(trRefdef_t, numDrawSurfs) == 432);
-const _: () = assert!(core::mem::offset_of!(trRefdef_t, drawSurfs) == 440);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<trRefdef_t>() == 448);
+    assert!(core::mem::offset_of!(trRefdef_t, entities) == 384);
+    assert!(core::mem::offset_of!(trRefdef_t, miniEntities) == 392);
+    assert!(core::mem::offset_of!(trRefdef_t, num_dlights) == 400);
+    assert!(core::mem::offset_of!(trRefdef_t, dlights) == 408);
+    assert!(core::mem::offset_of!(trRefdef_t, numPolys) == 416);
+    assert!(core::mem::offset_of!(trRefdef_t, polys) == 424);
+    assert!(core::mem::offset_of!(trRefdef_t, numDrawSurfs) == 432);
+    assert!(core::mem::offset_of!(trRefdef_t, drawSurfs) == 440);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<trRefdef_t>() == 416);
+    assert!(core::mem::offset_of!(trRefdef_t, entities) == 384);
+    assert!(core::mem::offset_of!(trRefdef_t, miniEntities) == 388);
+    assert!(core::mem::offset_of!(trRefdef_t, num_dlights) == 392);
+    assert!(core::mem::offset_of!(trRefdef_t, dlights) == 396);
+    assert!(core::mem::offset_of!(trRefdef_t, numPolys) == 400);
+    assert!(core::mem::offset_of!(trRefdef_t, polys) == 404);
+    assert!(core::mem::offset_of!(trRefdef_t, numDrawSurfs) == 408);
+    assert!(core::mem::offset_of!(trRefdef_t, drawSurfs) == 412);
+};

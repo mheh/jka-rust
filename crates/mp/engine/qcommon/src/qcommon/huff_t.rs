@@ -21,13 +21,27 @@ pub struct huff_t {
     pub nodePtrs: [*mut node_t; 768],
 }
 
-const _: () = assert!(core::mem::size_of::<huff_t>() == 51248);
 const _: () = assert!(core::mem::offset_of!(huff_t, blocNode) == 0);
 const _: () = assert!(core::mem::offset_of!(huff_t, blocPtrs) == 4);
 const _: () = assert!(core::mem::offset_of!(huff_t, tree) == 8);
-const _: () = assert!(core::mem::offset_of!(huff_t, lhead) == 16);
-const _: () = assert!(core::mem::offset_of!(huff_t, ltail) == 24);
-const _: () = assert!(core::mem::offset_of!(huff_t, loc) == 32);
-const _: () = assert!(core::mem::offset_of!(huff_t, freelist) == 2088);
-const _: () = assert!(core::mem::offset_of!(huff_t, nodeList) == 2096);
-const _: () = assert!(core::mem::offset_of!(huff_t, nodePtrs) == 45104);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<huff_t>() == 51248);
+    assert!(core::mem::offset_of!(huff_t, lhead) == 16);
+    assert!(core::mem::offset_of!(huff_t, ltail) == 24);
+    assert!(core::mem::offset_of!(huff_t, loc) == 32);
+    assert!(core::mem::offset_of!(huff_t, freelist) == 2088);
+    assert!(core::mem::offset_of!(huff_t, nodeList) == 2096);
+    assert!(core::mem::offset_of!(huff_t, nodePtrs) == 45104);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<huff_t>() == 28700);
+    assert!(core::mem::offset_of!(huff_t, lhead) == 12);
+    assert!(core::mem::offset_of!(huff_t, ltail) == 16);
+    assert!(core::mem::offset_of!(huff_t, loc) == 20);
+    assert!(core::mem::offset_of!(huff_t, freelist) == 1048);
+    assert!(core::mem::offset_of!(huff_t, nodeList) == 1052);
+    assert!(core::mem::offset_of!(huff_t, nodePtrs) == 25628);
+};

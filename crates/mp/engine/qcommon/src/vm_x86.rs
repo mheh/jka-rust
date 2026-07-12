@@ -59,6 +59,10 @@ pub extern "C" fn callAsmCall(common: &mut Common) {
 // below is 32-bit-only (`movl`/`%eax`-family mnemonics), so it is gated to
 // `target_arch = "x86"` and stubbed elsewhere rather than compiled unconditionally.
 #[cfg(target_arch = "x86")]
+// The oracle labels (`doAsmCall`/`systemCall`/`doret`) are kept verbatim; the
+// lint guards against duplication under inlining, which a single non-generic
+// fn does not hit.
+#[allow(named_asm_labels)]
 pub extern "C" fn AsmCall(common: &mut Common) {
     // PORT-NOTE(vm-x86-asm): GNU inline asm syntax differs from Rust's; the
     // operand/clobber list is transcribed 1:1 from the oracle block. `callMask`
@@ -97,7 +101,9 @@ pub extern "C" fn AsmCall(common: &mut Common) {
             syscall_out = out(reg) common.call_syscall_num,
             prog_stack_out = out(reg) common.call_program_stack,
             op_stack_out = out(reg) common.call_op_stack,
-            out("eax") _, out("edi") _, out("esi") _, out("ecx") _,
+            // esi is not declared: LLVM reserves it as an i686 operand, and the
+            // block preserves it (push/pop balanced; otherwise read-only).
+            out("eax") _, out("edi") _, out("ecx") _,
             options(att_syntax),
         );
     }

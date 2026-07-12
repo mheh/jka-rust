@@ -20,7 +20,17 @@ pub struct TPatchInfo {
 /// throughout the codebase.
 pub type SPatchInfo = TPatchInfo;
 
-const _: () = assert!(core::mem::size_of::<TPatchInfo>() == 24);
 const _: () = assert!(core::mem::offset_of!(TPatchInfo, mPatch) == 0);
-const _: () = assert!(core::mem::offset_of!(TPatchInfo, mShader) == 8);
-const _: () = assert!(core::mem::offset_of!(TPatchInfo, mPart) == 16);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<TPatchInfo>() == 24);
+    assert!(core::mem::offset_of!(TPatchInfo, mShader) == 8);
+    assert!(core::mem::offset_of!(TPatchInfo, mPart) == 16);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<TPatchInfo>() == 12);
+    assert!(core::mem::offset_of!(TPatchInfo, mShader) == 4);
+    assert!(core::mem::offset_of!(TPatchInfo, mPart) == 8);
+};

@@ -36,13 +36,30 @@ pub struct bot_chatstate_t {
 
 pub type bot_chatstate_s = bot_chatstate_t;
 
-const _: () = assert!(core::mem::size_of::<bot_chatstate_t>() == 336);
-const _: () = assert!(core::mem::offset_of!(bot_chatstate_t, gender) == 0);
-const _: () = assert!(core::mem::offset_of!(bot_chatstate_t, client) == 4);
-const _: () = assert!(core::mem::offset_of!(bot_chatstate_t, name) == 8);
-const _: () = assert!(core::mem::offset_of!(bot_chatstate_t, chatmessage) == 40);
-const _: () = assert!(core::mem::offset_of!(bot_chatstate_t, handle) == 296);
-const _: () = assert!(core::mem::offset_of!(bot_chatstate_t, firstmessage) == 304);
-const _: () = assert!(core::mem::offset_of!(bot_chatstate_t, lastmessage) == 312);
-const _: () = assert!(core::mem::offset_of!(bot_chatstate_t, numconsolemessages) == 320);
-const _: () = assert!(core::mem::offset_of!(bot_chatstate_t, chat) == 328);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_chatstate_t>() == 336);
+    assert!(core::mem::offset_of!(bot_chatstate_t, gender) == 0);
+    assert!(core::mem::offset_of!(bot_chatstate_t, client) == 4);
+    assert!(core::mem::offset_of!(bot_chatstate_t, name) == 8);
+    assert!(core::mem::offset_of!(bot_chatstate_t, chatmessage) == 40);
+    assert!(core::mem::offset_of!(bot_chatstate_t, handle) == 296);
+    assert!(core::mem::offset_of!(bot_chatstate_t, firstmessage) == 304);
+    assert!(core::mem::offset_of!(bot_chatstate_t, lastmessage) == 312);
+    assert!(core::mem::offset_of!(bot_chatstate_t, numconsolemessages) == 320);
+    assert!(core::mem::offset_of!(bot_chatstate_t, chat) == 328);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_chatstate_t>() == 316);
+    assert!(core::mem::offset_of!(bot_chatstate_t, gender) == 0);
+    assert!(core::mem::offset_of!(bot_chatstate_t, client) == 4);
+    assert!(core::mem::offset_of!(bot_chatstate_t, name) == 8);
+    assert!(core::mem::offset_of!(bot_chatstate_t, chatmessage) == 40);
+    assert!(core::mem::offset_of!(bot_chatstate_t, handle) == 296);
+    assert!(core::mem::offset_of!(bot_chatstate_t, firstmessage) == 300);
+    assert!(core::mem::offset_of!(bot_chatstate_t, lastmessage) == 304);
+    assert!(core::mem::offset_of!(bot_chatstate_t, numconsolemessages) == 308);
+    assert!(core::mem::offset_of!(bot_chatstate_t, chat) == 312);
+};

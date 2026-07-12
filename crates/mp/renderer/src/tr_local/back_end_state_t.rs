@@ -32,15 +32,33 @@ pub struct backEndState_t {
     pub entity2D: trRefEntity_t,
 }
 
-const _: () = assert!(core::mem::size_of::<backEndState_t>() == 1416);
 const _: () = assert!(core::mem::offset_of!(backEndState_t, refdef) == 0);
-const _: () = assert!(core::mem::offset_of!(backEndState_t, viewParms) == 448);
-const _: () = assert!(core::mem::offset_of!(backEndState_t, ori) == 940);
-const _: () = assert!(core::mem::offset_of!(backEndState_t, pc) == 1064);
-const _: () = assert!(core::mem::offset_of!(backEndState_t, isHyperspace) == 1112);
-const _: () = assert!(core::mem::offset_of!(backEndState_t, currentEntity) == 1120);
-const _: () = assert!(core::mem::offset_of!(backEndState_t, skyRenderedThisView) == 1128);
-const _: () = assert!(core::mem::offset_of!(backEndState_t, projection2D) == 1132);
-const _: () = assert!(core::mem::offset_of!(backEndState_t, color2D) == 1136);
-const _: () = assert!(core::mem::offset_of!(backEndState_t, vertexes2D) == 1140);
-const _: () = assert!(core::mem::offset_of!(backEndState_t, entity2D) == 1144);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<backEndState_t>() == 1416);
+    assert!(core::mem::offset_of!(backEndState_t, viewParms) == 448);
+    assert!(core::mem::offset_of!(backEndState_t, ori) == 940);
+    assert!(core::mem::offset_of!(backEndState_t, pc) == 1064);
+    assert!(core::mem::offset_of!(backEndState_t, isHyperspace) == 1112);
+    assert!(core::mem::offset_of!(backEndState_t, currentEntity) == 1120);
+    assert!(core::mem::offset_of!(backEndState_t, skyRenderedThisView) == 1128);
+    assert!(core::mem::offset_of!(backEndState_t, projection2D) == 1132);
+    assert!(core::mem::offset_of!(backEndState_t, color2D) == 1136);
+    assert!(core::mem::offset_of!(backEndState_t, vertexes2D) == 1140);
+    assert!(core::mem::offset_of!(backEndState_t, entity2D) == 1144);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<backEndState_t>() == 1372);
+    assert!(core::mem::offset_of!(backEndState_t, viewParms) == 416);
+    assert!(core::mem::offset_of!(backEndState_t, ori) == 908);
+    assert!(core::mem::offset_of!(backEndState_t, pc) == 1032);
+    assert!(core::mem::offset_of!(backEndState_t, isHyperspace) == 1080);
+    assert!(core::mem::offset_of!(backEndState_t, currentEntity) == 1084);
+    assert!(core::mem::offset_of!(backEndState_t, skyRenderedThisView) == 1088);
+    assert!(core::mem::offset_of!(backEndState_t, projection2D) == 1092);
+    assert!(core::mem::offset_of!(backEndState_t, color2D) == 1096);
+    assert!(core::mem::offset_of!(backEndState_t, vertexes2D) == 1100);
+    assert!(core::mem::offset_of!(backEndState_t, entity2D) == 1104);
+};

@@ -15,8 +15,20 @@ pub struct bot_matchpiece_t {
 
 pub type bot_matchpiece_s = bot_matchpiece_t;
 
-const _: () = assert!(core::mem::size_of::<bot_matchpiece_t>() == 32);
-const _: () = assert!(core::mem::offset_of!(bot_matchpiece_t, r#type) == 0);
-const _: () = assert!(core::mem::offset_of!(bot_matchpiece_t, firststring) == 8);
-const _: () = assert!(core::mem::offset_of!(bot_matchpiece_t, variable) == 16);
-const _: () = assert!(core::mem::offset_of!(bot_matchpiece_t, next) == 24);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_matchpiece_t>() == 32);
+    assert!(core::mem::offset_of!(bot_matchpiece_t, r#type) == 0);
+    assert!(core::mem::offset_of!(bot_matchpiece_t, firststring) == 8);
+    assert!(core::mem::offset_of!(bot_matchpiece_t, variable) == 16);
+    assert!(core::mem::offset_of!(bot_matchpiece_t, next) == 24);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_matchpiece_t>() == 16);
+    assert!(core::mem::offset_of!(bot_matchpiece_t, r#type) == 0);
+    assert!(core::mem::offset_of!(bot_matchpiece_t, firststring) == 4);
+    assert!(core::mem::offset_of!(bot_matchpiece_t, variable) == 8);
+    assert!(core::mem::offset_of!(bot_matchpiece_t, next) == 12);
+};

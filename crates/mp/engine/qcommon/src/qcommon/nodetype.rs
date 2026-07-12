@@ -20,12 +20,27 @@ pub struct node_t {
 
 pub type nodetype = node_t;
 
-const _: () = assert!(core::mem::size_of::<node_t>() == 56);
 const _: () = assert!(core::mem::offset_of!(node_t, left) == 0);
-const _: () = assert!(core::mem::offset_of!(node_t, right) == 8);
-const _: () = assert!(core::mem::offset_of!(node_t, parent) == 16);
-const _: () = assert!(core::mem::offset_of!(node_t, next) == 24);
-const _: () = assert!(core::mem::offset_of!(node_t, prev) == 32);
-const _: () = assert!(core::mem::offset_of!(node_t, head) == 40);
-const _: () = assert!(core::mem::offset_of!(node_t, weight) == 48);
-const _: () = assert!(core::mem::offset_of!(node_t, symbol) == 52);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<node_t>() == 56);
+    assert!(core::mem::offset_of!(node_t, right) == 8);
+    assert!(core::mem::offset_of!(node_t, parent) == 16);
+    assert!(core::mem::offset_of!(node_t, next) == 24);
+    assert!(core::mem::offset_of!(node_t, prev) == 32);
+    assert!(core::mem::offset_of!(node_t, head) == 40);
+    assert!(core::mem::offset_of!(node_t, weight) == 48);
+    assert!(core::mem::offset_of!(node_t, symbol) == 52);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<node_t>() == 32);
+    assert!(core::mem::offset_of!(node_t, right) == 4);
+    assert!(core::mem::offset_of!(node_t, parent) == 8);
+    assert!(core::mem::offset_of!(node_t, next) == 12);
+    assert!(core::mem::offset_of!(node_t, prev) == 16);
+    assert!(core::mem::offset_of!(node_t, head) == 20);
+    assert!(core::mem::offset_of!(node_t, weight) == 24);
+    assert!(core::mem::offset_of!(node_t, symbol) == 28);
+};

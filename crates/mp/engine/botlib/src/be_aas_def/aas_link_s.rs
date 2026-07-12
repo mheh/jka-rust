@@ -15,10 +15,24 @@ pub struct aas_link_t {
 
 pub type aas_link_s = aas_link_t;
 
-const _: () = assert!(core::mem::size_of::<aas_link_t>() == 40);
-const _: () = assert!(core::mem::offset_of!(aas_link_t, entnum) == 0);
-const _: () = assert!(core::mem::offset_of!(aas_link_t, areanum) == 4);
-const _: () = assert!(core::mem::offset_of!(aas_link_t, next_ent) == 8);
-const _: () = assert!(core::mem::offset_of!(aas_link_t, prev_ent) == 16);
-const _: () = assert!(core::mem::offset_of!(aas_link_t, next_area) == 24);
-const _: () = assert!(core::mem::offset_of!(aas_link_t, prev_area) == 32);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_link_t>() == 40);
+    assert!(core::mem::offset_of!(aas_link_t, entnum) == 0);
+    assert!(core::mem::offset_of!(aas_link_t, areanum) == 4);
+    assert!(core::mem::offset_of!(aas_link_t, next_ent) == 8);
+    assert!(core::mem::offset_of!(aas_link_t, prev_ent) == 16);
+    assert!(core::mem::offset_of!(aas_link_t, next_area) == 24);
+    assert!(core::mem::offset_of!(aas_link_t, prev_area) == 32);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<aas_link_t>() == 24);
+    assert!(core::mem::offset_of!(aas_link_t, entnum) == 0);
+    assert!(core::mem::offset_of!(aas_link_t, areanum) == 4);
+    assert!(core::mem::offset_of!(aas_link_t, next_ent) == 8);
+    assert!(core::mem::offset_of!(aas_link_t, prev_ent) == 12);
+    assert!(core::mem::offset_of!(aas_link_t, next_area) == 16);
+    assert!(core::mem::offset_of!(aas_link_t, prev_area) == 20);
+};

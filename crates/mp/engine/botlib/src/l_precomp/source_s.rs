@@ -40,14 +40,30 @@ pub struct source_t {
 
 pub type source_s = source_t;
 
-const _: () = assert!(core::mem::size_of::<source_t>() == 3184);
 const _: () = assert!(core::mem::offset_of!(source_t, filename) == 0);
 const _: () = assert!(core::mem::offset_of!(source_t, includepath) == 1024);
 const _: () = assert!(core::mem::offset_of!(source_t, punctuations) == 2048);
-const _: () = assert!(core::mem::offset_of!(source_t, scriptstack) == 2056);
-const _: () = assert!(core::mem::offset_of!(source_t, tokens) == 2064);
-const _: () = assert!(core::mem::offset_of!(source_t, defines) == 2072);
-const _: () = assert!(core::mem::offset_of!(source_t, definehash) == 2080);
-const _: () = assert!(core::mem::offset_of!(source_t, indentstack) == 2088);
-const _: () = assert!(core::mem::offset_of!(source_t, skip) == 2096);
-const _: () = assert!(core::mem::offset_of!(source_t, token) == 2104);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<source_t>() == 3184);
+    assert!(core::mem::offset_of!(source_t, scriptstack) == 2056);
+    assert!(core::mem::offset_of!(source_t, tokens) == 2064);
+    assert!(core::mem::offset_of!(source_t, defines) == 2072);
+    assert!(core::mem::offset_of!(source_t, definehash) == 2080);
+    assert!(core::mem::offset_of!(source_t, indentstack) == 2088);
+    assert!(core::mem::offset_of!(source_t, skip) == 2096);
+    assert!(core::mem::offset_of!(source_t, token) == 2104);
+};
+// ILP32 twin. Matches clang i386 through `token`; `size` shifts -4 via the
+// embedded token_t's f64-for-long-double stand-in (see token_s.rs).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<source_t>() == 3140);
+    assert!(core::mem::offset_of!(source_t, scriptstack) == 2052);
+    assert!(core::mem::offset_of!(source_t, tokens) == 2056);
+    assert!(core::mem::offset_of!(source_t, defines) == 2060);
+    assert!(core::mem::offset_of!(source_t, definehash) == 2064);
+    assert!(core::mem::offset_of!(source_t, indentstack) == 2068);
+    assert!(core::mem::offset_of!(source_t, skip) == 2072);
+    assert!(core::mem::offset_of!(source_t, token) == 2076);
+};

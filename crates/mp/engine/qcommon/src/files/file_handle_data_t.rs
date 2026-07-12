@@ -24,12 +24,27 @@ pub struct fileHandleData_t {
     pub name: [c_char; MAX_ZPATH],
 }
 
-const _: () = assert!(core::mem::size_of::<fileHandleData_t>() == 296);
 const _: () = assert!(core::mem::offset_of!(fileHandleData_t, handleFiles) == 0);
-const _: () = assert!(core::mem::offset_of!(fileHandleData_t, handleSync) == 16);
-const _: () = assert!(core::mem::offset_of!(fileHandleData_t, baseOffset) == 20);
-const _: () = assert!(core::mem::offset_of!(fileHandleData_t, fileSize) == 24);
-const _: () = assert!(core::mem::offset_of!(fileHandleData_t, zipFilePos) == 28);
-const _: () = assert!(core::mem::offset_of!(fileHandleData_t, zipFile) == 32);
-const _: () = assert!(core::mem::offset_of!(fileHandleData_t, streamed) == 36);
-const _: () = assert!(core::mem::offset_of!(fileHandleData_t, name) == 40);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<fileHandleData_t>() == 296);
+    assert!(core::mem::offset_of!(fileHandleData_t, handleSync) == 16);
+    assert!(core::mem::offset_of!(fileHandleData_t, baseOffset) == 20);
+    assert!(core::mem::offset_of!(fileHandleData_t, fileSize) == 24);
+    assert!(core::mem::offset_of!(fileHandleData_t, zipFilePos) == 28);
+    assert!(core::mem::offset_of!(fileHandleData_t, zipFile) == 32);
+    assert!(core::mem::offset_of!(fileHandleData_t, streamed) == 36);
+    assert!(core::mem::offset_of!(fileHandleData_t, name) == 40);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<fileHandleData_t>() == 288);
+    assert!(core::mem::offset_of!(fileHandleData_t, handleSync) == 8);
+    assert!(core::mem::offset_of!(fileHandleData_t, baseOffset) == 12);
+    assert!(core::mem::offset_of!(fileHandleData_t, fileSize) == 16);
+    assert!(core::mem::offset_of!(fileHandleData_t, zipFilePos) == 20);
+    assert!(core::mem::offset_of!(fileHandleData_t, zipFile) == 24);
+    assert!(core::mem::offset_of!(fileHandleData_t, streamed) == 28);
+    assert!(core::mem::offset_of!(fileHandleData_t, name) == 32);
+};

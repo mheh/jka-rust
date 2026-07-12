@@ -36,7 +36,18 @@ pub struct weightconfig_t {
 
 pub type weightconfig_s = weightconfig_t;
 
-const _: () = assert!(core::mem::size_of::<weightconfig_t>() == 2120);
-const _: () = assert!(core::mem::offset_of!(weightconfig_t, numweights) == 0);
-const _: () = assert!(core::mem::offset_of!(weightconfig_t, weights) == 8);
-const _: () = assert!(core::mem::offset_of!(weightconfig_t, filename) == 2056);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<weightconfig_t>() == 2120);
+    assert!(core::mem::offset_of!(weightconfig_t, numweights) == 0);
+    assert!(core::mem::offset_of!(weightconfig_t, weights) == 8);
+    assert!(core::mem::offset_of!(weightconfig_t, filename) == 2056);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<weightconfig_t>() == 1092);
+    assert!(core::mem::offset_of!(weightconfig_t, numweights) == 0);
+    assert!(core::mem::offset_of!(weightconfig_t, weights) == 4);
+    assert!(core::mem::offset_of!(weightconfig_t, filename) == 1028);
+};

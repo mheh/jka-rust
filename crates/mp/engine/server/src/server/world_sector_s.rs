@@ -31,11 +31,22 @@ pub struct worldSector_t {
     pub entities: *mut svEntity_t,
 }
 
-const _: () = assert!(core::mem::size_of::<worldSector_t>() == 32);
 const _: () = assert!(core::mem::offset_of!(worldSector_t, axis) == 0);
-const _: () = assert!(core::mem::offset_of!(worldSector_t, dist) == 4);
-const _: () = assert!(core::mem::offset_of!(worldSector_t, children) == 8);
-const _: () = assert!(core::mem::offset_of!(worldSector_t, entities) == 24);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<worldSector_t>() == 32);
+    assert!(core::mem::offset_of!(worldSector_t, dist) == 4);
+    assert!(core::mem::offset_of!(worldSector_t, children) == 8);
+    assert!(core::mem::offset_of!(worldSector_t, entities) == 24);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<worldSector_t>() == 20);
+    assert!(core::mem::offset_of!(worldSector_t, dist) == 4);
+    assert!(core::mem::offset_of!(worldSector_t, children) == 8);
+    assert!(core::mem::offset_of!(worldSector_t, entities) == 16);
+};
 
 /// C tag `worldSector_s` is the same type as the `worldSector_t` typedef.
 pub type worldSector_s = worldSector_t;

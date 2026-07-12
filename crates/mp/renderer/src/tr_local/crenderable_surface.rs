@@ -30,12 +30,27 @@ pub struct CRenderableSurface {
     pub impactTime: f32,
 }
 
-const _: () = assert!(core::mem::size_of::<CRenderableSurface>() == 56);
 const _: () = assert!(core::mem::offset_of!(CRenderableSurface, ident) == 0);
-const _: () = assert!(core::mem::offset_of!(CRenderableSurface, boneCache) == 8);
-const _: () = assert!(core::mem::offset_of!(CRenderableSurface, surfaceData) == 16);
-const _: () = assert!(core::mem::offset_of!(CRenderableSurface, alternateTex) == 24);
-const _: () = assert!(core::mem::offset_of!(CRenderableSurface, goreChain) == 32);
-const _: () = assert!(core::mem::offset_of!(CRenderableSurface, scale) == 40);
-const _: () = assert!(core::mem::offset_of!(CRenderableSurface, fade) == 44);
-const _: () = assert!(core::mem::offset_of!(CRenderableSurface, impactTime) == 48);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<CRenderableSurface>() == 56);
+    assert!(core::mem::offset_of!(CRenderableSurface, boneCache) == 8);
+    assert!(core::mem::offset_of!(CRenderableSurface, surfaceData) == 16);
+    assert!(core::mem::offset_of!(CRenderableSurface, alternateTex) == 24);
+    assert!(core::mem::offset_of!(CRenderableSurface, goreChain) == 32);
+    assert!(core::mem::offset_of!(CRenderableSurface, scale) == 40);
+    assert!(core::mem::offset_of!(CRenderableSurface, fade) == 44);
+    assert!(core::mem::offset_of!(CRenderableSurface, impactTime) == 48);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<CRenderableSurface>() == 32);
+    assert!(core::mem::offset_of!(CRenderableSurface, boneCache) == 4);
+    assert!(core::mem::offset_of!(CRenderableSurface, surfaceData) == 8);
+    assert!(core::mem::offset_of!(CRenderableSurface, alternateTex) == 12);
+    assert!(core::mem::offset_of!(CRenderableSurface, goreChain) == 16);
+    assert!(core::mem::offset_of!(CRenderableSurface, scale) == 20);
+    assert!(core::mem::offset_of!(CRenderableSurface, fade) == 24);
+    assert!(core::mem::offset_of!(CRenderableSurface, impactTime) == 28);
+};

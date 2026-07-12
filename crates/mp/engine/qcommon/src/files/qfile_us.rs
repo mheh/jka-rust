@@ -16,6 +16,15 @@ pub struct qfile_ut {
 /// Raven's C tag name for `qfile_ut`.
 pub type qfile_us = qfile_ut;
 
-const _: () = assert!(core::mem::size_of::<qfile_ut>() == 16);
 const _: () = assert!(core::mem::offset_of!(qfile_ut, file) == 0);
-const _: () = assert!(core::mem::offset_of!(qfile_ut, unique) == 8);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<qfile_ut>() == 16);
+    assert!(core::mem::offset_of!(qfile_ut, unique) == 8);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<qfile_ut>() == 8);
+    assert!(core::mem::offset_of!(qfile_ut, unique) == 4);
+};

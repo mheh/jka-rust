@@ -15,6 +15,16 @@ pub struct bot_weaponstate_t {
 
 pub type bot_weaponstate_s = bot_weaponstate_t;
 
-const _: () = assert!(core::mem::size_of::<bot_weaponstate_t>() == 16);
-const _: () = assert!(core::mem::offset_of!(bot_weaponstate_t, weaponweightconfig) == 0);
-const _: () = assert!(core::mem::offset_of!(bot_weaponstate_t, weaponweightindex) == 8);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_weaponstate_t>() == 16);
+    assert!(core::mem::offset_of!(bot_weaponstate_t, weaponweightconfig) == 0);
+    assert!(core::mem::offset_of!(bot_weaponstate_t, weaponweightindex) == 8);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_weaponstate_t>() == 8);
+    assert!(core::mem::offset_of!(bot_weaponstate_t, weaponweightconfig) == 0);
+    assert!(core::mem::offset_of!(bot_weaponstate_t, weaponweightindex) == 4);
+};

@@ -13,6 +13,16 @@ pub struct bot_stringlist_t {
 
 pub type bot_stringlist_s = bot_stringlist_t;
 
-const _: () = assert!(core::mem::size_of::<bot_stringlist_t>() == 16);
-const _: () = assert!(core::mem::offset_of!(bot_stringlist_t, string) == 0);
-const _: () = assert!(core::mem::offset_of!(bot_stringlist_t, next) == 8);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_stringlist_t>() == 16);
+    assert!(core::mem::offset_of!(bot_stringlist_t, string) == 0);
+    assert!(core::mem::offset_of!(bot_stringlist_t, next) == 8);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_stringlist_t>() == 8);
+    assert!(core::mem::offset_of!(bot_stringlist_t, string) == 0);
+    assert!(core::mem::offset_of!(bot_stringlist_t, next) == 4);
+};

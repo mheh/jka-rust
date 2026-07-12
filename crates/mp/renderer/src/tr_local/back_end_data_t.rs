@@ -17,7 +17,7 @@ use super::tr_ref_entity_t::trRefEntity_t;
 ///
 /// Raven: none.
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:2263-2273`
-#[repr(C, align(8))]
+#[repr(C)]
 pub struct backEndData_t {
     pub drawSurfs: [drawSurf_t; 65536],
     pub dlights: [dlight_t; 32],
@@ -30,11 +30,25 @@ pub struct backEndData_t {
     pub commands: renderCommandList_t,
 }
 
-const _: () = assert!(core::mem::size_of::<backEndData_t>() == 1983128);
 const _: () = assert!(core::mem::offset_of!(backEndData_t, drawSurfs) == 0);
-const _: () = assert!(core::mem::offset_of!(backEndData_t, dlights) == 1048576);
-const _: () = assert!(core::mem::offset_of!(backEndData_t, entities) == 1053312);
-const _: () = assert!(core::mem::offset_of!(backEndData_t, miniEntities) == 1610368);
-const _: () = assert!(core::mem::offset_of!(backEndData_t, polys) == 1720960);
-const _: () = assert!(core::mem::offset_of!(backEndData_t, polyVerts) == 1720968);
-const _: () = assert!(core::mem::offset_of!(backEndData_t, commands) == 1720976);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<backEndData_t>() == 1983128);
+    assert!(core::mem::offset_of!(backEndData_t, dlights) == 1048576);
+    assert!(core::mem::offset_of!(backEndData_t, entities) == 1053312);
+    assert!(core::mem::offset_of!(backEndData_t, miniEntities) == 1610368);
+    assert!(core::mem::offset_of!(backEndData_t, polys) == 1720960);
+    assert!(core::mem::offset_of!(backEndData_t, polyVerts) == 1720968);
+    assert!(core::mem::offset_of!(backEndData_t, commands) == 1720976);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<backEndData_t>() == 1450636);
+    assert!(core::mem::offset_of!(backEndData_t, dlights) == 524288);
+    assert!(core::mem::offset_of!(backEndData_t, entities) == 529024);
+    assert!(core::mem::offset_of!(backEndData_t, miniEntities) == 1077888);
+    assert!(core::mem::offset_of!(backEndData_t, polys) == 1188480);
+    assert!(core::mem::offset_of!(backEndData_t, polyVerts) == 1188484);
+    assert!(core::mem::offset_of!(backEndData_t, commands) == 1188488);
+};

@@ -17,9 +17,19 @@ pub struct zoneHeader_t {
 
 pub type zoneHeader_s = zoneHeader_t;
 
-const _: () = assert!(core::mem::size_of::<zoneHeader_t>() == 32);
 const _: () = assert!(core::mem::offset_of!(zoneHeader_t, iMagic) == 0);
 const _: () = assert!(core::mem::offset_of!(zoneHeader_t, eTag) == 4);
 const _: () = assert!(core::mem::offset_of!(zoneHeader_t, iSize) == 8);
-const _: () = assert!(core::mem::offset_of!(zoneHeader_t, pNext) == 16);
-const _: () = assert!(core::mem::offset_of!(zoneHeader_t, pPrev) == 24);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<zoneHeader_t>() == 32);
+    assert!(core::mem::offset_of!(zoneHeader_t, pNext) == 16);
+    assert!(core::mem::offset_of!(zoneHeader_t, pPrev) == 24);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<zoneHeader_t>() == 20);
+    assert!(core::mem::offset_of!(zoneHeader_t, pNext) == 12);
+    assert!(core::mem::offset_of!(zoneHeader_t, pPrev) == 16);
+};

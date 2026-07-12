@@ -25,16 +25,35 @@ pub struct moveclip_t {
     pub trace: trace_t,
 }
 
-const _: () = assert!(core::mem::size_of::<moveclip_t>() == 136);
 const _: () = assert!(core::mem::offset_of!(moveclip_t, boxmins) == 0);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, boxmaxs) == 12);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, mins) == 24);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, maxs) == 32);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, start) == 40);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, end) == 52);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, passEntityNum) == 64);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, contentmask) == 68);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, capsule) == 72);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, traceFlags) == 76);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, useLod) == 80);
-const _: () = assert!(core::mem::offset_of!(moveclip_t, trace) == 84);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<moveclip_t>() == 136);
+    assert!(core::mem::offset_of!(moveclip_t, boxmaxs) == 12);
+    assert!(core::mem::offset_of!(moveclip_t, mins) == 24);
+    assert!(core::mem::offset_of!(moveclip_t, maxs) == 32);
+    assert!(core::mem::offset_of!(moveclip_t, start) == 40);
+    assert!(core::mem::offset_of!(moveclip_t, end) == 52);
+    assert!(core::mem::offset_of!(moveclip_t, passEntityNum) == 64);
+    assert!(core::mem::offset_of!(moveclip_t, contentmask) == 68);
+    assert!(core::mem::offset_of!(moveclip_t, capsule) == 72);
+    assert!(core::mem::offset_of!(moveclip_t, traceFlags) == 76);
+    assert!(core::mem::offset_of!(moveclip_t, useLod) == 80);
+    assert!(core::mem::offset_of!(moveclip_t, trace) == 84);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<moveclip_t>() == 124);
+    assert!(core::mem::offset_of!(moveclip_t, boxmaxs) == 12);
+    assert!(core::mem::offset_of!(moveclip_t, mins) == 24);
+    assert!(core::mem::offset_of!(moveclip_t, maxs) == 28);
+    assert!(core::mem::offset_of!(moveclip_t, start) == 32);
+    assert!(core::mem::offset_of!(moveclip_t, end) == 44);
+    assert!(core::mem::offset_of!(moveclip_t, passEntityNum) == 56);
+    assert!(core::mem::offset_of!(moveclip_t, contentmask) == 60);
+    assert!(core::mem::offset_of!(moveclip_t, capsule) == 64);
+    assert!(core::mem::offset_of!(moveclip_t, traceFlags) == 68);
+    assert!(core::mem::offset_of!(moveclip_t, useLod) == 72);
+    assert!(core::mem::offset_of!(moveclip_t, trace) == 76);
+};

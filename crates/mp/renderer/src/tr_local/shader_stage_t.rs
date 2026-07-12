@@ -49,19 +49,38 @@ pub struct shaderStage_t {
     pub glow: bool,
 }
 
-const _: () = assert!(core::mem::size_of::<shaderStage_t>() == 184);
 const _: () = assert!(core::mem::offset_of!(shaderStage_t, active) == 0);
 const _: () = assert!(core::mem::offset_of!(shaderStage_t, isDetail) == 1);
 const _: () = assert!(core::mem::offset_of!(shaderStage_t, index) == 2);
 const _: () = assert!(core::mem::offset_of!(shaderStage_t, lightmapStyle) == 3);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, bundle) == 8);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, rgbWave) == 104);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, rgbGen) == 124);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, alphaWave) == 128);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, alphaGen) == 148);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, constantColor) == 152);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, stateBits) == 156);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, adjustColorsForFog) == 160);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, mGLFogColorOverride) == 164);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, ss) == 168);
-const _: () = assert!(core::mem::offset_of!(shaderStage_t, glow) == 176);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<shaderStage_t>() == 184);
+    assert!(core::mem::offset_of!(shaderStage_t, bundle) == 8);
+    assert!(core::mem::offset_of!(shaderStage_t, rgbWave) == 104);
+    assert!(core::mem::offset_of!(shaderStage_t, rgbGen) == 124);
+    assert!(core::mem::offset_of!(shaderStage_t, alphaWave) == 128);
+    assert!(core::mem::offset_of!(shaderStage_t, alphaGen) == 148);
+    assert!(core::mem::offset_of!(shaderStage_t, constantColor) == 152);
+    assert!(core::mem::offset_of!(shaderStage_t, stateBits) == 156);
+    assert!(core::mem::offset_of!(shaderStage_t, adjustColorsForFog) == 160);
+    assert!(core::mem::offset_of!(shaderStage_t, mGLFogColorOverride) == 164);
+    assert!(core::mem::offset_of!(shaderStage_t, ss) == 168);
+    assert!(core::mem::offset_of!(shaderStage_t, glow) == 176);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<shaderStage_t>() == 140);
+    assert!(core::mem::offset_of!(shaderStage_t, bundle) == 4);
+    assert!(core::mem::offset_of!(shaderStage_t, rgbWave) == 68);
+    assert!(core::mem::offset_of!(shaderStage_t, rgbGen) == 88);
+    assert!(core::mem::offset_of!(shaderStage_t, alphaWave) == 92);
+    assert!(core::mem::offset_of!(shaderStage_t, alphaGen) == 112);
+    assert!(core::mem::offset_of!(shaderStage_t, constantColor) == 116);
+    assert!(core::mem::offset_of!(shaderStage_t, stateBits) == 120);
+    assert!(core::mem::offset_of!(shaderStage_t, adjustColorsForFog) == 124);
+    assert!(core::mem::offset_of!(shaderStage_t, mGLFogColorOverride) == 128);
+    assert!(core::mem::offset_of!(shaderStage_t, ss) == 132);
+    assert!(core::mem::offset_of!(shaderStage_t, glow) == 136);
+};

@@ -21,11 +21,26 @@ pub struct fielddef_t {
 
 pub type fielddef_s = fielddef_t;
 
-const _: () = assert!(core::mem::size_of::<fielddef_t>() == 40);
-const _: () = assert!(core::mem::offset_of!(fielddef_t, name) == 0);
-const _: () = assert!(core::mem::offset_of!(fielddef_t, offset) == 8);
-const _: () = assert!(core::mem::offset_of!(fielddef_t, r#type) == 12);
-const _: () = assert!(core::mem::offset_of!(fielddef_t, maxarray) == 16);
-const _: () = assert!(core::mem::offset_of!(fielddef_t, floatmin) == 20);
-const _: () = assert!(core::mem::offset_of!(fielddef_t, floatmax) == 24);
-const _: () = assert!(core::mem::offset_of!(fielddef_t, substruct) == 32);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<fielddef_t>() == 40);
+    assert!(core::mem::offset_of!(fielddef_t, name) == 0);
+    assert!(core::mem::offset_of!(fielddef_t, offset) == 8);
+    assert!(core::mem::offset_of!(fielddef_t, r#type) == 12);
+    assert!(core::mem::offset_of!(fielddef_t, maxarray) == 16);
+    assert!(core::mem::offset_of!(fielddef_t, floatmin) == 20);
+    assert!(core::mem::offset_of!(fielddef_t, floatmax) == 24);
+    assert!(core::mem::offset_of!(fielddef_t, substruct) == 32);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<fielddef_t>() == 28);
+    assert!(core::mem::offset_of!(fielddef_t, name) == 0);
+    assert!(core::mem::offset_of!(fielddef_t, offset) == 4);
+    assert!(core::mem::offset_of!(fielddef_t, r#type) == 8);
+    assert!(core::mem::offset_of!(fielddef_t, maxarray) == 12);
+    assert!(core::mem::offset_of!(fielddef_t, floatmin) == 16);
+    assert!(core::mem::offset_of!(fielddef_t, floatmax) == 20);
+    assert!(core::mem::offset_of!(fielddef_t, substruct) == 24);
+};

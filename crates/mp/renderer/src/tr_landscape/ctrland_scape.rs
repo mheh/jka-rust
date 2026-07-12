@@ -59,21 +59,45 @@ pub struct CTRLandScape {
     pub mHeightDetails: [CTRHeightDetails; HEIGHT_RESOLUTION],
 }
 
-const _: () = assert!(core::mem::size_of::<CTRLandScape>() == 1120);
 const _: () = assert!(core::mem::offset_of!(CTRLandScape, common) == 0);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mTRPatches) == 8);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mSortedPatches) == 16);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mPatchMinx) == 24);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mPatchMaxx) == 28);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mPatchMiny) == 32);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mPatchMaxy) == 36);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mMaxNode) == 40);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mSortedCount) == 44);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mPatchSize) == 48);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mShader) == 56);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mRenderMap) == 64);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mTextureScale) == 72);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mScalarSize) == 76);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mWaterShader) == 80);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mFlatShader) == 88);
-const _: () = assert!(core::mem::offset_of!(CTRLandScape, mHeightDetails) == 92);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<CTRLandScape>() == 1120);
+    assert!(core::mem::offset_of!(CTRLandScape, mTRPatches) == 8);
+    assert!(core::mem::offset_of!(CTRLandScape, mSortedPatches) == 16);
+    assert!(core::mem::offset_of!(CTRLandScape, mPatchMinx) == 24);
+    assert!(core::mem::offset_of!(CTRLandScape, mPatchMaxx) == 28);
+    assert!(core::mem::offset_of!(CTRLandScape, mPatchMiny) == 32);
+    assert!(core::mem::offset_of!(CTRLandScape, mPatchMaxy) == 36);
+    assert!(core::mem::offset_of!(CTRLandScape, mMaxNode) == 40);
+    assert!(core::mem::offset_of!(CTRLandScape, mSortedCount) == 44);
+    assert!(core::mem::offset_of!(CTRLandScape, mPatchSize) == 48);
+    assert!(core::mem::offset_of!(CTRLandScape, mShader) == 56);
+    assert!(core::mem::offset_of!(CTRLandScape, mRenderMap) == 64);
+    assert!(core::mem::offset_of!(CTRLandScape, mTextureScale) == 72);
+    assert!(core::mem::offset_of!(CTRLandScape, mScalarSize) == 76);
+    assert!(core::mem::offset_of!(CTRLandScape, mWaterShader) == 80);
+    assert!(core::mem::offset_of!(CTRLandScape, mFlatShader) == 88);
+    assert!(core::mem::offset_of!(CTRLandScape, mHeightDetails) == 92);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<CTRLandScape>() == 1088);
+    assert!(core::mem::offset_of!(CTRLandScape, mTRPatches) == 4);
+    assert!(core::mem::offset_of!(CTRLandScape, mSortedPatches) == 8);
+    assert!(core::mem::offset_of!(CTRLandScape, mPatchMinx) == 12);
+    assert!(core::mem::offset_of!(CTRLandScape, mPatchMaxx) == 16);
+    assert!(core::mem::offset_of!(CTRLandScape, mPatchMiny) == 20);
+    assert!(core::mem::offset_of!(CTRLandScape, mPatchMaxy) == 24);
+    assert!(core::mem::offset_of!(CTRLandScape, mMaxNode) == 28);
+    assert!(core::mem::offset_of!(CTRLandScape, mSortedCount) == 32);
+    assert!(core::mem::offset_of!(CTRLandScape, mPatchSize) == 36);
+    assert!(core::mem::offset_of!(CTRLandScape, mShader) == 40);
+    assert!(core::mem::offset_of!(CTRLandScape, mRenderMap) == 44);
+    assert!(core::mem::offset_of!(CTRLandScape, mTextureScale) == 48);
+    assert!(core::mem::offset_of!(CTRLandScape, mScalarSize) == 52);
+    assert!(core::mem::offset_of!(CTRLandScape, mWaterShader) == 56);
+    assert!(core::mem::offset_of!(CTRLandScape, mFlatShader) == 60);
+    assert!(core::mem::offset_of!(CTRLandScape, mHeightDetails) == 64);
+};

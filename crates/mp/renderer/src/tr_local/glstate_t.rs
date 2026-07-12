@@ -1,5 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
+use core::ffi::c_ulong;
+
 use mp_qshared::shared::qboolean;
 
 /// Raven `glstate_t` — cached OpenGL bind/state to avoid redundant GL calls.
@@ -12,13 +14,27 @@ pub struct glstate_t {
     pub finishCalled: qboolean,
     pub texEnv: [i32; 2],
     pub faceCulling: i32,
-    pub glStateBits: u64,
+    // Raven `unsigned long` — platform-width, 4 bytes on ILP32.
+    pub glStateBits: c_ulong,
 }
 
-const _: () = assert!(core::mem::size_of::<glstate_t>() == 40);
 const _: () = assert!(core::mem::offset_of!(glstate_t, currenttextures) == 0);
-const _: () = assert!(core::mem::offset_of!(glstate_t, currenttmu) == 8);
-const _: () = assert!(core::mem::offset_of!(glstate_t, finishCalled) == 12);
-const _: () = assert!(core::mem::offset_of!(glstate_t, texEnv) == 16);
-const _: () = assert!(core::mem::offset_of!(glstate_t, faceCulling) == 24);
-const _: () = assert!(core::mem::offset_of!(glstate_t, glStateBits) == 32);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<glstate_t>() == 40);
+    assert!(core::mem::offset_of!(glstate_t, currenttmu) == 8);
+    assert!(core::mem::offset_of!(glstate_t, finishCalled) == 12);
+    assert!(core::mem::offset_of!(glstate_t, texEnv) == 16);
+    assert!(core::mem::offset_of!(glstate_t, faceCulling) == 24);
+    assert!(core::mem::offset_of!(glstate_t, glStateBits) == 32);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<glstate_t>() == 32);
+    assert!(core::mem::offset_of!(glstate_t, currenttmu) == 8);
+    assert!(core::mem::offset_of!(glstate_t, finishCalled) == 12);
+    assert!(core::mem::offset_of!(glstate_t, texEnv) == 16);
+    assert!(core::mem::offset_of!(glstate_t, faceCulling) == 24);
+    assert!(core::mem::offset_of!(glstate_t, glStateBits) == 28);
+};

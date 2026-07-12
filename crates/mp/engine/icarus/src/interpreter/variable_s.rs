@@ -15,7 +15,16 @@ pub struct variable_t {
 /// Raven tag name for `variable_t`.
 pub type variable_s = variable_t;
 
-const _: () = assert!(core::mem::size_of::<variable_t>() == 80);
 const _: () = assert!(core::mem::offset_of!(variable_t, name) == 0);
 const _: () = assert!(core::mem::offset_of!(variable_t, r#type) == 64);
-const _: () = assert!(core::mem::offset_of!(variable_t, data) == 72);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<variable_t>() == 80);
+    assert!(core::mem::offset_of!(variable_t, data) == 72);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<variable_t>() == 72);
+    assert!(core::mem::offset_of!(variable_t, data) == 68);
+};

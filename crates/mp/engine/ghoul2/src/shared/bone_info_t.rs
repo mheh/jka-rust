@@ -127,7 +127,6 @@ pub struct boneInfo_t {
     // rww - RAGDOLL_END
 }
 
-const _: () = assert!(core::mem::size_of::<boneInfo_t>() == 768);
 const _: () = assert!(core::mem::offset_of!(boneInfo_t, boneNumber) == 0);
 const _: () = assert!(core::mem::offset_of!(boneInfo_t, matrix) == 4);
 const _: () = assert!(core::mem::offset_of!(boneInfo_t, flags) == 52);
@@ -171,52 +170,61 @@ const _: () = assert!(core::mem::offset_of!(boneInfo_t, originalOrigin) == 448);
 const _: () = assert!(core::mem::offset_of!(boneInfo_t, originalAngles) == 460);
 const _: () = assert!(core::mem::offset_of!(boneInfo_t, lastShotDir) == 472);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, basepose) == 488);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, baseposeInv) == 496);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, baseposeParent) == 504);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, baseposeInvParent) == 512);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, parentRawBoneIndex) == 520);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, ragOverrideMatrix) == 524);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, extraMatrix) == 572);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, extraVec1) == 620);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, extraFloat1) == 632);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, extraInt1) == 636);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, ikPosition) == 640);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, ikSpeed) == 652);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, epVelocity) == 656);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, epGravFactor) == 668);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, solidCount) == 672);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, physicsSettled) == 676);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, snapped) == 677);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, parentBoneIndex) == 680);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, offsetRotation) == 684);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, overGradSpeed) == 688);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, overGoalSpot) == 692);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, hasOverGoal) == 704);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, animFrameMatrix) == 708);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, hasAnimFrameMatrix) == 756);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(boneInfo_t, airTime) == 760);
+const _: () = {
+    assert!(core::mem::size_of::<boneInfo_t>() == 768);
+    assert!(core::mem::offset_of!(boneInfo_t, basepose) == 488);
+    assert!(core::mem::offset_of!(boneInfo_t, baseposeInv) == 496);
+    assert!(core::mem::offset_of!(boneInfo_t, baseposeParent) == 504);
+    assert!(core::mem::offset_of!(boneInfo_t, baseposeInvParent) == 512);
+    assert!(core::mem::offset_of!(boneInfo_t, parentRawBoneIndex) == 520);
+    assert!(core::mem::offset_of!(boneInfo_t, ragOverrideMatrix) == 524);
+    assert!(core::mem::offset_of!(boneInfo_t, extraMatrix) == 572);
+    assert!(core::mem::offset_of!(boneInfo_t, extraVec1) == 620);
+    assert!(core::mem::offset_of!(boneInfo_t, extraFloat1) == 632);
+    assert!(core::mem::offset_of!(boneInfo_t, extraInt1) == 636);
+    assert!(core::mem::offset_of!(boneInfo_t, ikPosition) == 640);
+    assert!(core::mem::offset_of!(boneInfo_t, ikSpeed) == 652);
+    assert!(core::mem::offset_of!(boneInfo_t, epVelocity) == 656);
+    assert!(core::mem::offset_of!(boneInfo_t, epGravFactor) == 668);
+    assert!(core::mem::offset_of!(boneInfo_t, solidCount) == 672);
+    assert!(core::mem::offset_of!(boneInfo_t, physicsSettled) == 676);
+    assert!(core::mem::offset_of!(boneInfo_t, snapped) == 677);
+    assert!(core::mem::offset_of!(boneInfo_t, parentBoneIndex) == 680);
+    assert!(core::mem::offset_of!(boneInfo_t, offsetRotation) == 684);
+    assert!(core::mem::offset_of!(boneInfo_t, overGradSpeed) == 688);
+    assert!(core::mem::offset_of!(boneInfo_t, overGoalSpot) == 692);
+    assert!(core::mem::offset_of!(boneInfo_t, hasOverGoal) == 704);
+    assert!(core::mem::offset_of!(boneInfo_t, animFrameMatrix) == 708);
+    assert!(core::mem::offset_of!(boneInfo_t, hasAnimFrameMatrix) == 756);
+    assert!(core::mem::offset_of!(boneInfo_t, airTime) == 760);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<boneInfo_t>() == 744);
+    assert!(core::mem::offset_of!(boneInfo_t, basepose) == 484);
+    assert!(core::mem::offset_of!(boneInfo_t, baseposeInv) == 488);
+    assert!(core::mem::offset_of!(boneInfo_t, baseposeParent) == 492);
+    assert!(core::mem::offset_of!(boneInfo_t, baseposeInvParent) == 496);
+    assert!(core::mem::offset_of!(boneInfo_t, parentRawBoneIndex) == 500);
+    assert!(core::mem::offset_of!(boneInfo_t, ragOverrideMatrix) == 504);
+    assert!(core::mem::offset_of!(boneInfo_t, extraMatrix) == 552);
+    assert!(core::mem::offset_of!(boneInfo_t, extraVec1) == 600);
+    assert!(core::mem::offset_of!(boneInfo_t, extraFloat1) == 612);
+    assert!(core::mem::offset_of!(boneInfo_t, extraInt1) == 616);
+    assert!(core::mem::offset_of!(boneInfo_t, ikPosition) == 620);
+    assert!(core::mem::offset_of!(boneInfo_t, ikSpeed) == 632);
+    assert!(core::mem::offset_of!(boneInfo_t, epVelocity) == 636);
+    assert!(core::mem::offset_of!(boneInfo_t, epGravFactor) == 648);
+    assert!(core::mem::offset_of!(boneInfo_t, solidCount) == 652);
+    assert!(core::mem::offset_of!(boneInfo_t, physicsSettled) == 656);
+    assert!(core::mem::offset_of!(boneInfo_t, snapped) == 657);
+    assert!(core::mem::offset_of!(boneInfo_t, parentBoneIndex) == 660);
+    assert!(core::mem::offset_of!(boneInfo_t, offsetRotation) == 664);
+    assert!(core::mem::offset_of!(boneInfo_t, overGradSpeed) == 668);
+    assert!(core::mem::offset_of!(boneInfo_t, overGoalSpot) == 672);
+    assert!(core::mem::offset_of!(boneInfo_t, hasOverGoal) == 684);
+    assert!(core::mem::offset_of!(boneInfo_t, animFrameMatrix) == 688);
+    assert!(core::mem::offset_of!(boneInfo_t, hasAnimFrameMatrix) == 736);
+    assert!(core::mem::offset_of!(boneInfo_t, airTime) == 740);
+};

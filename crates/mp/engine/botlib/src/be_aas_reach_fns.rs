@@ -23,7 +23,7 @@
 //! PORT-NOTE(unsafe): the AAS arena is a graph of raw pointers (`aasworld.*`);
 //! bodies deref explicitly inside `unsafe` per porting-rules §D11.
 
-use core::ffi::{c_char, c_int, c_ushort};
+use core::ffi::{c_char, c_int, c_ulong, c_ushort};
 use core::ptr;
 
 use crate::aasfile::aas_area_s::aas_area_t;
@@ -819,7 +819,8 @@ pub fn AAS_SetupReachabilityHeap(bot: &mut BotLib) {
     unsafe {
         bot.reachabilityheap = GetClearedMemory(
             bot,
-            AAS_MAX_REACHABILITYSIZE as u64 * core::mem::size_of::<aas_lreachability_t>() as u64,
+            AAS_MAX_REACHABILITYSIZE as c_ulong
+                * core::mem::size_of::<aas_lreachability_t>() as c_ulong,
         ) as *mut aas_lreachability_t;
         let mut i = 0;
         while i < AAS_MAX_REACHABILITYSIZE - 1 {
@@ -1319,8 +1320,8 @@ pub fn AAS_StoreReachability(bot: &mut BotLib) {
         }
         bot.aasworld.reachability = GetClearedMemory(
             bot,
-            (bot.numlreachabilities + 10) as u64
-                * core::mem::size_of::<aas_reachability_t>() as u64,
+            (bot.numlreachabilities + 10) as c_ulong
+                * core::mem::size_of::<aas_reachability_t>() as c_ulong,
         ) as *mut aas_reachability_t;
         bot.aasworld.reachabilitysize = 1;
         let mut i = 0;
@@ -3914,7 +3915,8 @@ pub fn AAS_InitReachability(bot: &mut BotLib) {
     //allocate area reachability link array
     bot.areareachability = GetClearedMemory(
         bot,
-        bot.aasworld.numareas as u64 * core::mem::size_of::<*mut aas_lreachability_t>() as u64,
+        bot.aasworld.numareas as c_ulong
+            * core::mem::size_of::<*mut aas_lreachability_t>() as c_ulong,
     ) as *mut *mut aas_lreachability_t;
     //
     AAS_SetWeaponJumpAreaFlags(bot);

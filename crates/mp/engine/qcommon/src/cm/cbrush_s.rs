@@ -19,10 +19,20 @@ pub struct cbrush_s {
 
 pub type cbrush_t = cbrush_s;
 
-const _: () = assert!(core::mem::size_of::<cbrush_t>() == 48);
 const _: () = assert!(core::mem::offset_of!(cbrush_t, shaderNum) == 0);
 const _: () = assert!(core::mem::offset_of!(cbrush_t, contents) == 4);
 const _: () = assert!(core::mem::offset_of!(cbrush_t, bounds) == 8);
 const _: () = assert!(core::mem::offset_of!(cbrush_t, sides) == 32);
-const _: () = assert!(core::mem::offset_of!(cbrush_t, numsides) == 40);
-const _: () = assert!(core::mem::offset_of!(cbrush_t, checkcount) == 42);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<cbrush_t>() == 48);
+    assert!(core::mem::offset_of!(cbrush_t, numsides) == 40);
+    assert!(core::mem::offset_of!(cbrush_t, checkcount) == 42);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<cbrush_t>() == 40);
+    assert!(core::mem::offset_of!(cbrush_t, numsides) == 36);
+    assert!(core::mem::offset_of!(cbrush_t, checkcount) == 38);
+};

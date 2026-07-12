@@ -67,26 +67,55 @@ pub struct server_t {
 
     pub mSharedMemory: *mut c_char,
 }
-const _: () = assert!(core::mem::size_of::<server_t>() == 664960);
 const _: () = assert!(core::mem::offset_of!(server_t, state) == 0);
-const _: () = assert!(core::mem::offset_of!(server_t, restarting) == 4);
-const _: () = assert!(core::mem::offset_of!(server_t, serverId) == 8);
-const _: () = assert!(core::mem::offset_of!(server_t, restartedServerId) == 12);
-const _: () = assert!(core::mem::offset_of!(server_t, checksumFeed) == 16);
-const _: () = assert!(core::mem::offset_of!(server_t, snapshotCounter) == 20);
-const _: () = assert!(core::mem::offset_of!(server_t, timeResidual) == 24);
-const _: () = assert!(core::mem::offset_of!(server_t, nextFrameTime) == 28);
-const _: () = assert!(core::mem::offset_of!(server_t, models) == 32);
-const _: () = assert!(core::mem::offset_of!(server_t, configstrings) == 4128);
-const _: () = assert!(core::mem::offset_of!(server_t, svEntities) == 17728);
-const _: () = assert!(core::mem::offset_of!(server_t, entityParsePoint) == 664896);
-const _: () = assert!(core::mem::offset_of!(server_t, gentities) == 664904);
-const _: () = assert!(core::mem::offset_of!(server_t, gentitySize) == 664912);
-const _: () = assert!(core::mem::offset_of!(server_t, num_entities) == 664916);
-const _: () = assert!(core::mem::offset_of!(server_t, gameClients) == 664920);
-const _: () = assert!(core::mem::offset_of!(server_t, gameClientSize) == 664928);
-const _: () = assert!(core::mem::offset_of!(server_t, restartTime) == 664932);
-const _: () = assert!(core::mem::offset_of!(server_t, mLocalSubBSPIndex) == 664936);
-const _: () = assert!(core::mem::offset_of!(server_t, mLocalSubBSPModelOffset) == 664940);
-const _: () = assert!(core::mem::offset_of!(server_t, mLocalSubBSPEntityParsePoint) == 664944);
-const _: () = assert!(core::mem::offset_of!(server_t, mSharedMemory) == 664952);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<server_t>() == 664960);
+    assert!(core::mem::offset_of!(server_t, restarting) == 4);
+    assert!(core::mem::offset_of!(server_t, serverId) == 8);
+    assert!(core::mem::offset_of!(server_t, restartedServerId) == 12);
+    assert!(core::mem::offset_of!(server_t, checksumFeed) == 16);
+    assert!(core::mem::offset_of!(server_t, snapshotCounter) == 20);
+    assert!(core::mem::offset_of!(server_t, timeResidual) == 24);
+    assert!(core::mem::offset_of!(server_t, nextFrameTime) == 28);
+    assert!(core::mem::offset_of!(server_t, models) == 32);
+    assert!(core::mem::offset_of!(server_t, configstrings) == 4128);
+    assert!(core::mem::offset_of!(server_t, svEntities) == 17728);
+    assert!(core::mem::offset_of!(server_t, entityParsePoint) == 664896);
+    assert!(core::mem::offset_of!(server_t, gentities) == 664904);
+    assert!(core::mem::offset_of!(server_t, gentitySize) == 664912);
+    assert!(core::mem::offset_of!(server_t, num_entities) == 664916);
+    assert!(core::mem::offset_of!(server_t, gameClients) == 664920);
+    assert!(core::mem::offset_of!(server_t, gameClientSize) == 664928);
+    assert!(core::mem::offset_of!(server_t, restartTime) == 664932);
+    assert!(core::mem::offset_of!(server_t, mLocalSubBSPIndex) == 664936);
+    assert!(core::mem::offset_of!(server_t, mLocalSubBSPModelOffset) == 664940);
+    assert!(core::mem::offset_of!(server_t, mLocalSubBSPEntityParsePoint) == 664944);
+    assert!(core::mem::offset_of!(server_t, mSharedMemory) == 664952);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<server_t>() == 647900);
+    assert!(core::mem::offset_of!(server_t, restarting) == 4);
+    assert!(core::mem::offset_of!(server_t, serverId) == 8);
+    assert!(core::mem::offset_of!(server_t, restartedServerId) == 12);
+    assert!(core::mem::offset_of!(server_t, checksumFeed) == 16);
+    assert!(core::mem::offset_of!(server_t, snapshotCounter) == 20);
+    assert!(core::mem::offset_of!(server_t, timeResidual) == 24);
+    assert!(core::mem::offset_of!(server_t, nextFrameTime) == 28);
+    assert!(core::mem::offset_of!(server_t, models) == 32);
+    assert!(core::mem::offset_of!(server_t, configstrings) == 2080);
+    assert!(core::mem::offset_of!(server_t, svEntities) == 8880);
+    assert!(core::mem::offset_of!(server_t, entityParsePoint) == 647856);
+    assert!(core::mem::offset_of!(server_t, gentities) == 647860);
+    assert!(core::mem::offset_of!(server_t, gentitySize) == 647864);
+    assert!(core::mem::offset_of!(server_t, num_entities) == 647868);
+    assert!(core::mem::offset_of!(server_t, gameClients) == 647872);
+    assert!(core::mem::offset_of!(server_t, gameClientSize) == 647876);
+    assert!(core::mem::offset_of!(server_t, restartTime) == 647880);
+    assert!(core::mem::offset_of!(server_t, mLocalSubBSPIndex) == 647884);
+    assert!(core::mem::offset_of!(server_t, mLocalSubBSPModelOffset) == 647888);
+    assert!(core::mem::offset_of!(server_t, mLocalSubBSPEntityParsePoint) == 647892);
+    assert!(core::mem::offset_of!(server_t, mSharedMemory) == 647896);
+};

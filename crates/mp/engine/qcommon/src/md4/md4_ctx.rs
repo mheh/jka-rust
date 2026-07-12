@@ -17,7 +17,17 @@ pub struct MD4_CTX {
     pub buffer: [c_uchar; 64],
 }
 
-const _: () = assert!(core::mem::size_of::<MD4_CTX>() == 112);
 const _: () = assert!(core::mem::offset_of!(MD4_CTX, state) == 0);
-const _: () = assert!(core::mem::offset_of!(MD4_CTX, count) == 32);
-const _: () = assert!(core::mem::offset_of!(MD4_CTX, buffer) == 48);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<MD4_CTX>() == 112);
+    assert!(core::mem::offset_of!(MD4_CTX, count) == 32);
+    assert!(core::mem::offset_of!(MD4_CTX, buffer) == 48);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<MD4_CTX>() == 88);
+    assert!(core::mem::offset_of!(MD4_CTX, count) == 16);
+    assert!(core::mem::offset_of!(MD4_CTX, buffer) == 24);
+};

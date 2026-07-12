@@ -39,12 +39,28 @@ pub struct bot_goalstate_t {
 
 pub type bot_goalstate_s = bot_goalstate_t;
 
-const _: () = assert!(core::mem::size_of::<bot_goalstate_t>() == 2528);
-const _: () = assert!(core::mem::offset_of!(bot_goalstate_t, itemweightconfig) == 0);
-const _: () = assert!(core::mem::offset_of!(bot_goalstate_t, itemweightindex) == 8);
-const _: () = assert!(core::mem::offset_of!(bot_goalstate_t, client) == 16);
-const _: () = assert!(core::mem::offset_of!(bot_goalstate_t, lastreachabilityarea) == 20);
-const _: () = assert!(core::mem::offset_of!(bot_goalstate_t, goalstack) == 24);
-const _: () = assert!(core::mem::offset_of!(bot_goalstate_t, goalstacktop) == 472);
-const _: () = assert!(core::mem::offset_of!(bot_goalstate_t, avoidgoals) == 476);
-const _: () = assert!(core::mem::offset_of!(bot_goalstate_t, avoidgoaltimes) == 1500);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_goalstate_t>() == 2528);
+    assert!(core::mem::offset_of!(bot_goalstate_t, itemweightconfig) == 0);
+    assert!(core::mem::offset_of!(bot_goalstate_t, itemweightindex) == 8);
+    assert!(core::mem::offset_of!(bot_goalstate_t, client) == 16);
+    assert!(core::mem::offset_of!(bot_goalstate_t, lastreachabilityarea) == 20);
+    assert!(core::mem::offset_of!(bot_goalstate_t, goalstack) == 24);
+    assert!(core::mem::offset_of!(bot_goalstate_t, goalstacktop) == 472);
+    assert!(core::mem::offset_of!(bot_goalstate_t, avoidgoals) == 476);
+    assert!(core::mem::offset_of!(bot_goalstate_t, avoidgoaltimes) == 1500);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_goalstate_t>() == 2516);
+    assert!(core::mem::offset_of!(bot_goalstate_t, itemweightconfig) == 0);
+    assert!(core::mem::offset_of!(bot_goalstate_t, itemweightindex) == 4);
+    assert!(core::mem::offset_of!(bot_goalstate_t, client) == 8);
+    assert!(core::mem::offset_of!(bot_goalstate_t, lastreachabilityarea) == 12);
+    assert!(core::mem::offset_of!(bot_goalstate_t, goalstack) == 16);
+    assert!(core::mem::offset_of!(bot_goalstate_t, goalstacktop) == 464);
+    assert!(core::mem::offset_of!(bot_goalstate_t, avoidgoals) == 468);
+    assert!(core::mem::offset_of!(bot_goalstate_t, avoidgoaltimes) == 1492);
+};

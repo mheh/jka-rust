@@ -29,9 +29,18 @@ pub struct shaderState_t {
 /// Raven manifest tag name; the typedef is `shaderState_t`.
 pub type shaderState_s = shaderState_t;
 
-const _: () = assert!(core::mem::size_of::<shaderState_t>() == 176);
 const _: () = assert!(core::mem::offset_of!(shaderState_t, shaderName) == 0);
 const _: () = assert!(core::mem::offset_of!(shaderState_t, name) == 64);
 const _: () = assert!(core::mem::offset_of!(shaderState_t, stateShader) == 96);
 const _: () = assert!(core::mem::offset_of!(shaderState_t, cycleTime) == 160);
-const _: () = assert!(core::mem::offset_of!(shaderState_t, shader) == 168);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<shaderState_t>() == 176);
+    assert!(core::mem::offset_of!(shaderState_t, shader) == 168);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<shaderState_t>() == 168);
+    assert!(core::mem::offset_of!(shaderState_t, shader) == 164);
+};

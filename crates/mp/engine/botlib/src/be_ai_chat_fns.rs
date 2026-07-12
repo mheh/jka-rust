@@ -1323,7 +1323,7 @@ pub fn BotCheckChatMessageIntegrety(
                             let tlen = libc::strlen(temp.as_ptr());
                             let s = GetClearedMemory(
                                 bot,
-                                (core::mem::size_of::<bot_stringlist_t>() + tlen + 1) as u64,
+                                (core::mem::size_of::<bot_stringlist_t>() + tlen + 1) as c_ulong,
                             ) as *mut bot_stringlist_t;
                             (*s).string =
                                 (s as *mut c_char).add(core::mem::size_of::<bot_stringlist_t>());
@@ -1444,7 +1444,7 @@ pub fn BotAllocChatState(bot: &mut BotLib) -> c_int {
     for i in 1..=MAX_CLIENTS {
         if bot.botchatstates[i].is_null() {
             bot.botchatstates[i] = {
-                GetClearedMemory(bot, (core::mem::size_of::<bot_chatstate_t>()) as u64)
+                GetClearedMemory(bot, (core::mem::size_of::<bot_chatstate_t>()) as c_ulong)
                     as *mut bot_chatstate_t
             };
             return i as c_int;
@@ -1724,7 +1724,7 @@ pub fn InitConsoleMessageHeap(bot: &mut BotLib) {
         ) as isize;
         bot.consolemessageheap = GetClearedHunkMemory(
             bot,
-            (max_messages as usize * core::mem::size_of::<bot_consolemessage_t>()) as u64,
+            (max_messages as usize * core::mem::size_of::<bot_consolemessage_t>()) as c_ulong,
         ) as *mut bot_consolemessage_t;
         (*bot.consolemessageheap.offset(0)).prev = core::ptr::null_mut();
         (*bot.consolemessageheap.offset(0)).next = bot.consolemessageheap.offset(1);
@@ -2046,7 +2046,7 @@ pub fn BotLoadSynonyms(bot: &mut BotLib, filename: *mut c_char) -> *mut bot_syno
         let mut ptr: *mut c_char = core::ptr::null_mut();
         for pass in 0..2 {
             if pass != 0 && size != 0 {
-                ptr = GetClearedHunkMemory(bot, (size) as u64) as *mut c_char;
+                ptr = GetClearedHunkMemory(bot, (size) as c_ulong) as *mut c_char;
             }
             PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
             let source = LoadSourceFile(bot, filename);
@@ -2274,9 +2274,10 @@ pub fn BotLoadMatchPieces(
                     return core::ptr::null_mut();
                 }
                 lastwasvariable = true;
-                let matchpiece =
-                    GetClearedHunkMemory(bot, (core::mem::size_of::<bot_matchpiece_t>()) as u64)
-                        as *mut bot_matchpiece_t;
+                let matchpiece = GetClearedHunkMemory(
+                    bot,
+                    (core::mem::size_of::<bot_matchpiece_t>()) as c_ulong,
+                ) as *mut bot_matchpiece_t;
                 (*matchpiece).r#type = MT_VARIABLE;
                 (*matchpiece).variable = token.intvalue as c_int;
                 (*matchpiece).next = core::ptr::null_mut();
@@ -2287,9 +2288,10 @@ pub fn BotLoadMatchPieces(
                 }
                 lastpiece = matchpiece;
             } else if token.r#type == TT_STRING {
-                let matchpiece =
-                    GetClearedHunkMemory(bot, (core::mem::size_of::<bot_matchpiece_t>()) as u64)
-                        as *mut bot_matchpiece_t;
+                let matchpiece = GetClearedHunkMemory(
+                    bot,
+                    (core::mem::size_of::<bot_matchpiece_t>()) as c_ulong,
+                ) as *mut bot_matchpiece_t;
                 (*matchpiece).firststring = core::ptr::null_mut();
                 (*matchpiece).r#type = MT_STRING;
                 (*matchpiece).variable = 0;
@@ -2314,7 +2316,7 @@ pub fn BotLoadMatchPieces(
                     let tlen = libc::strlen(token.string.as_ptr());
                     let matchstring = GetClearedHunkMemory(
                         bot,
-                        (core::mem::size_of::<bot_matchstring_t>() + tlen + 1) as u64,
+                        (core::mem::size_of::<bot_matchstring_t>() + tlen + 1) as c_ulong,
                     ) as *mut bot_matchstring_t;
                     (*matchstring).string =
                         (matchstring as *mut c_char).add(core::mem::size_of::<bot_matchstring_t>());
@@ -2365,7 +2367,7 @@ pub fn BotLoadRandomStrings(bot: &mut BotLib, filename: *mut c_char) -> *mut bot
         let mut randomlist: *mut bot_randomlist_t = core::ptr::null_mut();
         for pass in 0..2 {
             if pass != 0 && size != 0 {
-                ptr = GetClearedHunkMemory(bot, (size) as u64) as *mut c_char;
+                ptr = GetClearedHunkMemory(bot, (size) as c_ulong) as *mut c_char;
             }
             PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
             let source = LoadSourceFile(bot, filename);
@@ -2467,9 +2469,10 @@ pub fn BotLoadMatchTemplates(bot: &mut BotLib, matchfile: *mut c_char) -> *mut b
                     break;
                 }
                 PC_UnreadLastToken(bot, source);
-                let matchtemplate =
-                    GetClearedHunkMemory(bot, (core::mem::size_of::<bot_matchtemplate_t>()) as u64)
-                        as *mut bot_matchtemplate_t;
+                let matchtemplate = GetClearedHunkMemory(
+                    bot,
+                    (core::mem::size_of::<bot_matchtemplate_t>()) as c_ulong,
+                ) as *mut bot_matchtemplate_t;
                 (*matchtemplate).context = context;
                 (*matchtemplate).next = core::ptr::null_mut();
                 if !lastmatch.is_null() {
@@ -2542,15 +2545,16 @@ pub fn BotLoadReplyChat(
                 return core::ptr::null_mut();
             }
             let replychat =
-                GetClearedHunkMemory(bot, (core::mem::size_of::<bot_replychat_t>()) as u64)
+                GetClearedHunkMemory(bot, (core::mem::size_of::<bot_replychat_t>()) as c_ulong)
                     as *mut bot_replychat_t;
             (*replychat).keys = core::ptr::null_mut();
             (*replychat).next = replychatlist;
             replychatlist = replychat;
             loop {
-                let key =
-                    GetClearedHunkMemory(bot, (core::mem::size_of::<bot_replychatkey_t>()) as u64)
-                        as *mut bot_replychatkey_t;
+                let key = GetClearedHunkMemory(
+                    bot,
+                    (core::mem::size_of::<bot_replychatkey_t>()) as c_ulong,
+                ) as *mut bot_replychatkey_t;
                 (*key).flags = 0;
                 (*key).string = core::ptr::null_mut();
                 (*key).r#match = core::ptr::null_mut();
@@ -2600,7 +2604,7 @@ pub fn BotLoadReplyChat(
                         return core::ptr::null_mut();
                     }
                     let nlen = libc::strlen(namebuffer.as_ptr());
-                    (*key).string = GetClearedHunkMemory(bot, (nlen + 1) as u64) as *mut c_char;
+                    (*key).string = GetClearedHunkMemory(bot, (nlen + 1) as c_ulong) as *mut c_char;
                     libc::strcpy((*key).string, namebuffer.as_ptr());
                 } else {
                     (*key).flags |= RCKFL_STRING;
@@ -2611,7 +2615,7 @@ pub fn BotLoadReplyChat(
                     }
                     StripDoubleQuotes(token.string.as_mut_ptr());
                     let tlen = libc::strlen(token.string.as_ptr());
-                    (*key).string = GetClearedHunkMemory(bot, (tlen + 1) as u64) as *mut c_char;
+                    (*key).string = GetClearedHunkMemory(bot, (tlen + 1) as c_ulong) as *mut c_char;
                     libc::strcpy((*key).string, token.string.as_ptr());
                 }
                 PC_CheckTokenString(bot, source, c",".as_ptr() as *mut c_char);
@@ -2643,7 +2647,7 @@ pub fn BotLoadReplyChat(
                 let clen = libc::strlen(chatmessagestring.as_ptr());
                 let chatmessage = GetClearedHunkMemory(
                     bot,
-                    (core::mem::size_of::<bot_chatmessage_t>() + clen + 1) as u64,
+                    (core::mem::size_of::<bot_chatmessage_t>() + clen + 1) as c_ulong,
                 ) as *mut bot_chatmessage_t;
                 (*chatmessage).chatmessage =
                     (chatmessage as *mut c_char).add(core::mem::size_of::<bot_chatmessage_t>());
@@ -2684,7 +2688,7 @@ pub fn BotLoadInitialChat(
         size = 0;
         for pass in 0..2 {
             if pass != 0 && size != 0 {
-                ptr = GetClearedMemory(bot, (size) as u64) as *mut c_char;
+                ptr = GetClearedMemory(bot, (size) as c_ulong) as *mut c_char;
             }
             PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
             let source = LoadSourceFile(bot, chatfile);
@@ -2859,7 +2863,8 @@ pub fn BotLoadChatFile(
             // per naming convention. Reported in missing_symbols.
             bot.ichatdata[avail as usize] = GetClearedMemory(
                 bot,
-                core::mem::size_of::<crate::be_ai_chat::bot_ichatdata_s::bot_ichatdata_t>() as u64,
+                core::mem::size_of::<crate::be_ai_chat::bot_ichatdata_s::bot_ichatdata_t>()
+                    as c_ulong,
             )
                 as *mut crate::be_ai_chat::bot_ichatdata_s::bot_ichatdata_t;
             (*bot.ichatdata[avail as usize]).chat = (*cs).chat;

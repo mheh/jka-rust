@@ -17,8 +17,20 @@ pub struct bot_replychatkey_t {
 
 pub type bot_replychatkey_s = bot_replychatkey_t;
 
-const _: () = assert!(core::mem::size_of::<bot_replychatkey_t>() == 32);
-const _: () = assert!(core::mem::offset_of!(bot_replychatkey_t, flags) == 0);
-const _: () = assert!(core::mem::offset_of!(bot_replychatkey_t, string) == 8);
-const _: () = assert!(core::mem::offset_of!(bot_replychatkey_t, r#match) == 16);
-const _: () = assert!(core::mem::offset_of!(bot_replychatkey_t, next) == 24);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_replychatkey_t>() == 32);
+    assert!(core::mem::offset_of!(bot_replychatkey_t, flags) == 0);
+    assert!(core::mem::offset_of!(bot_replychatkey_t, string) == 8);
+    assert!(core::mem::offset_of!(bot_replychatkey_t, r#match) == 16);
+    assert!(core::mem::offset_of!(bot_replychatkey_t, next) == 24);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_replychatkey_t>() == 16);
+    assert!(core::mem::offset_of!(bot_replychatkey_t, flags) == 0);
+    assert!(core::mem::offset_of!(bot_replychatkey_t, string) == 4);
+    assert!(core::mem::offset_of!(bot_replychatkey_t, r#match) == 8);
+    assert!(core::mem::offset_of!(bot_replychatkey_t, next) == 12);
+};

@@ -17,7 +17,18 @@ pub struct punctuation_t {
 
 pub type punctuation_s = punctuation_t;
 
-const _: () = assert!(core::mem::size_of::<punctuation_t>() == 24);
-const _: () = assert!(core::mem::offset_of!(punctuation_t, p) == 0);
-const _: () = assert!(core::mem::offset_of!(punctuation_t, n) == 8);
-const _: () = assert!(core::mem::offset_of!(punctuation_t, next) == 16);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<punctuation_t>() == 24);
+    assert!(core::mem::offset_of!(punctuation_t, p) == 0);
+    assert!(core::mem::offset_of!(punctuation_t, n) == 8);
+    assert!(core::mem::offset_of!(punctuation_t, next) == 16);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<punctuation_t>() == 12);
+    assert!(core::mem::offset_of!(punctuation_t, p) == 0);
+    assert!(core::mem::offset_of!(punctuation_t, n) == 4);
+    assert!(core::mem::offset_of!(punctuation_t, next) == 8);
+};

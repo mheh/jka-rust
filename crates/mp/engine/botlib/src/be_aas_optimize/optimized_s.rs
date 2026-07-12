@@ -31,19 +31,42 @@ pub struct optimized_t {
 
 pub type optimized_s = optimized_t;
 
-const _: () = assert!(core::mem::size_of::<optimized_t>() == 120);
-const _: () = assert!(core::mem::offset_of!(optimized_t, numvertexes) == 0);
-const _: () = assert!(core::mem::offset_of!(optimized_t, vertexes) == 8);
-const _: () = assert!(core::mem::offset_of!(optimized_t, numedges) == 16);
-const _: () = assert!(core::mem::offset_of!(optimized_t, edges) == 24);
-const _: () = assert!(core::mem::offset_of!(optimized_t, edgeindexsize) == 32);
-const _: () = assert!(core::mem::offset_of!(optimized_t, edgeindex) == 40);
-const _: () = assert!(core::mem::offset_of!(optimized_t, numfaces) == 48);
-const _: () = assert!(core::mem::offset_of!(optimized_t, faces) == 56);
-const _: () = assert!(core::mem::offset_of!(optimized_t, faceindexsize) == 64);
-const _: () = assert!(core::mem::offset_of!(optimized_t, faceindex) == 72);
-const _: () = assert!(core::mem::offset_of!(optimized_t, numareas) == 80);
-const _: () = assert!(core::mem::offset_of!(optimized_t, areas) == 88);
-const _: () = assert!(core::mem::offset_of!(optimized_t, vertexoptimizeindex) == 96);
-const _: () = assert!(core::mem::offset_of!(optimized_t, edgeoptimizeindex) == 104);
-const _: () = assert!(core::mem::offset_of!(optimized_t, faceoptimizeindex) == 112);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<optimized_t>() == 120);
+    assert!(core::mem::offset_of!(optimized_t, numvertexes) == 0);
+    assert!(core::mem::offset_of!(optimized_t, vertexes) == 8);
+    assert!(core::mem::offset_of!(optimized_t, numedges) == 16);
+    assert!(core::mem::offset_of!(optimized_t, edges) == 24);
+    assert!(core::mem::offset_of!(optimized_t, edgeindexsize) == 32);
+    assert!(core::mem::offset_of!(optimized_t, edgeindex) == 40);
+    assert!(core::mem::offset_of!(optimized_t, numfaces) == 48);
+    assert!(core::mem::offset_of!(optimized_t, faces) == 56);
+    assert!(core::mem::offset_of!(optimized_t, faceindexsize) == 64);
+    assert!(core::mem::offset_of!(optimized_t, faceindex) == 72);
+    assert!(core::mem::offset_of!(optimized_t, numareas) == 80);
+    assert!(core::mem::offset_of!(optimized_t, areas) == 88);
+    assert!(core::mem::offset_of!(optimized_t, vertexoptimizeindex) == 96);
+    assert!(core::mem::offset_of!(optimized_t, edgeoptimizeindex) == 104);
+    assert!(core::mem::offset_of!(optimized_t, faceoptimizeindex) == 112);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<optimized_t>() == 60);
+    assert!(core::mem::offset_of!(optimized_t, numvertexes) == 0);
+    assert!(core::mem::offset_of!(optimized_t, vertexes) == 4);
+    assert!(core::mem::offset_of!(optimized_t, numedges) == 8);
+    assert!(core::mem::offset_of!(optimized_t, edges) == 12);
+    assert!(core::mem::offset_of!(optimized_t, edgeindexsize) == 16);
+    assert!(core::mem::offset_of!(optimized_t, edgeindex) == 20);
+    assert!(core::mem::offset_of!(optimized_t, numfaces) == 24);
+    assert!(core::mem::offset_of!(optimized_t, faces) == 28);
+    assert!(core::mem::offset_of!(optimized_t, faceindexsize) == 32);
+    assert!(core::mem::offset_of!(optimized_t, faceindex) == 36);
+    assert!(core::mem::offset_of!(optimized_t, numareas) == 40);
+    assert!(core::mem::offset_of!(optimized_t, areas) == 44);
+    assert!(core::mem::offset_of!(optimized_t, vertexoptimizeindex) == 48);
+    assert!(core::mem::offset_of!(optimized_t, edgeoptimizeindex) == 52);
+    assert!(core::mem::offset_of!(optimized_t, faceoptimizeindex) == 56);
+};

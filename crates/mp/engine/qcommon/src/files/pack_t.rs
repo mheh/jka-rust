@@ -33,15 +33,30 @@ pub struct pack_t {
     pub buildBuffer: *mut fileInPack_t,
 }
 
-const _: () = assert!(core::mem::size_of::<pack_t>() == 3120);
 const _: () = assert!(core::mem::offset_of!(pack_t, pakFilename) == 0);
 const _: () = assert!(core::mem::offset_of!(pack_t, pakBasename) == 1024);
 const _: () = assert!(core::mem::offset_of!(pack_t, pakGamename) == 2048);
 const _: () = assert!(core::mem::offset_of!(pack_t, handle) == 3072);
-const _: () = assert!(core::mem::offset_of!(pack_t, checksum) == 3080);
-const _: () = assert!(core::mem::offset_of!(pack_t, pure_checksum) == 3084);
-const _: () = assert!(core::mem::offset_of!(pack_t, numfiles) == 3088);
-const _: () = assert!(core::mem::offset_of!(pack_t, referenced) == 3092);
-const _: () = assert!(core::mem::offset_of!(pack_t, hashSize) == 3096);
-const _: () = assert!(core::mem::offset_of!(pack_t, hashTable) == 3104);
-const _: () = assert!(core::mem::offset_of!(pack_t, buildBuffer) == 3112);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<pack_t>() == 3120);
+    assert!(core::mem::offset_of!(pack_t, checksum) == 3080);
+    assert!(core::mem::offset_of!(pack_t, pure_checksum) == 3084);
+    assert!(core::mem::offset_of!(pack_t, numfiles) == 3088);
+    assert!(core::mem::offset_of!(pack_t, referenced) == 3092);
+    assert!(core::mem::offset_of!(pack_t, hashSize) == 3096);
+    assert!(core::mem::offset_of!(pack_t, hashTable) == 3104);
+    assert!(core::mem::offset_of!(pack_t, buildBuffer) == 3112);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<pack_t>() == 3104);
+    assert!(core::mem::offset_of!(pack_t, checksum) == 3076);
+    assert!(core::mem::offset_of!(pack_t, pure_checksum) == 3080);
+    assert!(core::mem::offset_of!(pack_t, numfiles) == 3084);
+    assert!(core::mem::offset_of!(pack_t, referenced) == 3088);
+    assert!(core::mem::offset_of!(pack_t, hashSize) == 3092);
+    assert!(core::mem::offset_of!(pack_t, hashTable) == 3096);
+    assert!(core::mem::offset_of!(pack_t, buildBuffer) == 3100);
+};

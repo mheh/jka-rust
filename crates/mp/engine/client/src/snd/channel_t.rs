@@ -69,26 +69,56 @@ pub struct channel_t {
     pub lSlotID: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<channel_t>() == 76808);
-const _: () = assert!(core::mem::offset_of!(channel_t, startSample) == 0);
-const _: () = assert!(core::mem::offset_of!(channel_t, entnum) == 4);
-const _: () = assert!(core::mem::offset_of!(channel_t, entchannel) == 8);
-const _: () = assert!(core::mem::offset_of!(channel_t, leftvol) == 12);
-const _: () = assert!(core::mem::offset_of!(channel_t, rightvol) == 16);
-const _: () = assert!(core::mem::offset_of!(channel_t, master_vol) == 20);
-const _: () = assert!(core::mem::offset_of!(channel_t, origin) == 24);
-const _: () = assert!(core::mem::offset_of!(channel_t, fixed_origin) == 36);
-const _: () = assert!(core::mem::offset_of!(channel_t, thesfx) == 40);
-const _: () = assert!(core::mem::offset_of!(channel_t, loopSound) == 48);
-const _: () = assert!(core::mem::offset_of!(channel_t, MP3StreamHeader) == 56);
-const _: () = assert!(core::mem::offset_of!(channel_t, MP3SlidingDecodeBuffer) == 26712);
-const _: () = assert!(core::mem::offset_of!(channel_t, iMP3SlidingDecodeWritePos) == 76712);
-const _: () = assert!(core::mem::offset_of!(channel_t, iMP3SlidingDecodeWindowPos) == 76716);
-const _: () = assert!(core::mem::offset_of!(channel_t, bLooping) == 76720);
-const _: () = assert!(core::mem::offset_of!(channel_t, bProcessed) == 76721);
-const _: () = assert!(core::mem::offset_of!(channel_t, bStreaming) == 76722);
-const _: () = assert!(core::mem::offset_of!(channel_t, buffers) == 76728);
-const _: () = assert!(core::mem::offset_of!(channel_t, alSource) == 76792);
-const _: () = assert!(core::mem::offset_of!(channel_t, bPlaying) == 76796);
-const _: () = assert!(core::mem::offset_of!(channel_t, iStartTime) == 76800);
-const _: () = assert!(core::mem::offset_of!(channel_t, lSlotID) == 76804);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<channel_t>() == 76808);
+    assert!(core::mem::offset_of!(channel_t, startSample) == 0);
+    assert!(core::mem::offset_of!(channel_t, entnum) == 4);
+    assert!(core::mem::offset_of!(channel_t, entchannel) == 8);
+    assert!(core::mem::offset_of!(channel_t, leftvol) == 12);
+    assert!(core::mem::offset_of!(channel_t, rightvol) == 16);
+    assert!(core::mem::offset_of!(channel_t, master_vol) == 20);
+    assert!(core::mem::offset_of!(channel_t, origin) == 24);
+    assert!(core::mem::offset_of!(channel_t, fixed_origin) == 36);
+    assert!(core::mem::offset_of!(channel_t, thesfx) == 40);
+    assert!(core::mem::offset_of!(channel_t, loopSound) == 48);
+    assert!(core::mem::offset_of!(channel_t, MP3StreamHeader) == 56);
+    assert!(core::mem::offset_of!(channel_t, MP3SlidingDecodeBuffer) == 26712);
+    assert!(core::mem::offset_of!(channel_t, iMP3SlidingDecodeWritePos) == 76712);
+    assert!(core::mem::offset_of!(channel_t, iMP3SlidingDecodeWindowPos) == 76716);
+    assert!(core::mem::offset_of!(channel_t, bLooping) == 76720);
+    assert!(core::mem::offset_of!(channel_t, bProcessed) == 76721);
+    assert!(core::mem::offset_of!(channel_t, bStreaming) == 76722);
+    assert!(core::mem::offset_of!(channel_t, buffers) == 76728);
+    assert!(core::mem::offset_of!(channel_t, alSource) == 76792);
+    assert!(core::mem::offset_of!(channel_t, bPlaying) == 76796);
+    assert!(core::mem::offset_of!(channel_t, iStartTime) == 76800);
+    assert!(core::mem::offset_of!(channel_t, lSlotID) == 76804);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<channel_t>() == 76760);
+    assert!(core::mem::offset_of!(channel_t, startSample) == 0);
+    assert!(core::mem::offset_of!(channel_t, entnum) == 4);
+    assert!(core::mem::offset_of!(channel_t, entchannel) == 8);
+    assert!(core::mem::offset_of!(channel_t, leftvol) == 12);
+    assert!(core::mem::offset_of!(channel_t, rightvol) == 16);
+    assert!(core::mem::offset_of!(channel_t, master_vol) == 20);
+    assert!(core::mem::offset_of!(channel_t, origin) == 24);
+    assert!(core::mem::offset_of!(channel_t, fixed_origin) == 36);
+    assert!(core::mem::offset_of!(channel_t, thesfx) == 40);
+    assert!(core::mem::offset_of!(channel_t, loopSound) == 44);
+    assert!(core::mem::offset_of!(channel_t, MP3StreamHeader) == 48);
+    assert!(core::mem::offset_of!(channel_t, MP3SlidingDecodeBuffer) == 26684);
+    assert!(core::mem::offset_of!(channel_t, iMP3SlidingDecodeWritePos) == 76684);
+    assert!(core::mem::offset_of!(channel_t, iMP3SlidingDecodeWindowPos) == 76688);
+    assert!(core::mem::offset_of!(channel_t, bLooping) == 76692);
+    assert!(core::mem::offset_of!(channel_t, bProcessed) == 76693);
+    assert!(core::mem::offset_of!(channel_t, bStreaming) == 76694);
+    assert!(core::mem::offset_of!(channel_t, buffers) == 76696);
+    assert!(core::mem::offset_of!(channel_t, alSource) == 76744);
+    assert!(core::mem::offset_of!(channel_t, bPlaying) == 76748);
+    assert!(core::mem::offset_of!(channel_t, iStartTime) == 76752);
+    assert!(core::mem::offset_of!(channel_t, lSlotID) == 76756);
+};

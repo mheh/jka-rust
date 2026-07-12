@@ -18,9 +18,21 @@ pub struct drawSurfsCommand_t {
     pub numDrawSurfs: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<drawSurfsCommand_t>() == 968);
 const _: () = assert!(core::mem::offset_of!(drawSurfsCommand_t, commandId) == 0);
-const _: () = assert!(core::mem::offset_of!(drawSurfsCommand_t, refdef) == 8);
-const _: () = assert!(core::mem::offset_of!(drawSurfsCommand_t, viewParms) == 456);
-const _: () = assert!(core::mem::offset_of!(drawSurfsCommand_t, drawSurfs) == 952);
-const _: () = assert!(core::mem::offset_of!(drawSurfsCommand_t, numDrawSurfs) == 960);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<drawSurfsCommand_t>() == 968);
+    assert!(core::mem::offset_of!(drawSurfsCommand_t, refdef) == 8);
+    assert!(core::mem::offset_of!(drawSurfsCommand_t, viewParms) == 456);
+    assert!(core::mem::offset_of!(drawSurfsCommand_t, drawSurfs) == 952);
+    assert!(core::mem::offset_of!(drawSurfsCommand_t, numDrawSurfs) == 960);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<drawSurfsCommand_t>() == 920);
+    assert!(core::mem::offset_of!(drawSurfsCommand_t, refdef) == 4);
+    assert!(core::mem::offset_of!(drawSurfsCommand_t, viewParms) == 420);
+    assert!(core::mem::offset_of!(drawSurfsCommand_t, drawSurfs) == 912);
+    assert!(core::mem::offset_of!(drawSurfsCommand_t, numDrawSurfs) == 916);
+};

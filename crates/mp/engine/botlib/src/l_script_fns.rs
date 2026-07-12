@@ -753,7 +753,7 @@ pub fn PS_ReadNumber(bot: &mut BotLib, script: *mut script_t, token: *mut token_
         NumberValue(
             (*token).string.as_mut_ptr(),
             (*token).subtype,
-            &mut (*token).intvalue as *mut u64 as *mut c_ulong,
+            &mut (*token).intvalue as *mut c_ulong,
             &mut (*token).floatvalue as *mut f64 as *mut long_double,
         );
         if (*token).subtype & TT_FLOAT == 0 {

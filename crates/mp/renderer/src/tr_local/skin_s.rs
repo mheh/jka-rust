@@ -19,7 +19,16 @@ pub struct skin_t {
 
 pub type skin_s = skin_t;
 
-const _: () = assert!(core::mem::size_of::<skin_t>() == 1096);
 const _: () = assert!(core::mem::offset_of!(skin_t, name) == 0);
 const _: () = assert!(core::mem::offset_of!(skin_t, numSurfaces) == 64);
-const _: () = assert!(core::mem::offset_of!(skin_t, surfaces) == 72);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<skin_t>() == 1096);
+    assert!(core::mem::offset_of!(skin_t, surfaces) == 72);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<skin_t>() == 580);
+    assert!(core::mem::offset_of!(skin_t, surfaces) == 68);
+};
