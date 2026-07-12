@@ -15,6 +15,7 @@ use std::time::Duration;
 use mp_engine_core::{
     com_frame, com_init, engine_host_view, install_engine_hooks, sys_milliseconds, Engine,
 };
+use mp_engine_qcommon::common::ComError;
 use mp_engine_qcommon::sys_net::NET_Init;
 
 /// App-bin helper joining process argv into the single command string
@@ -26,6 +27,21 @@ fn command_line() -> String {
 }
 
 fn main() {
+    // `ComError` panics are Raven's `throw` — control flow, not bugs (DEC-08):
+    // keep std's hook for real panics, silence the payload echo for ComError
+    // (the catch side prints Raven's own banner/literal).
+    let default_hook = std::panic::take_hook();
+    let debug_comerror = std::env::var_os("JKA_DEBUG_COMERROR").is_some();
+    std::panic::set_hook(Box::new(move |info| {
+        match info.payload().downcast_ref::<ComError>() {
+            Some(e) if debug_comerror => {
+                eprintln!("[com_error debug] {:?}: {}", e.level, e.msg);
+            }
+            Some(_) => {}
+            None => default_hook(info),
+        }
+    }));
+
     // Construct first (captures the Instant base, LIFE-D4b), install the
     // SV_*/renderer hook tables (Raven's link-time symbol resolution, DEC-23),
     // then the warm-up read and the boot contract.

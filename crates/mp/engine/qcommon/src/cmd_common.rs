@@ -340,11 +340,14 @@ pub fn Cmd_Exec_f(view: &mut EngineHostView) {
 
     let mut f: *mut c_char = core::ptr::null_mut();
     let _len = FS_ReadFile(view, filename.as_ptr(), &mut f as *mut _ as *mut *mut ());
+    let name = unsafe { core::ffi::CStr::from_ptr(filename.as_ptr()) }
+        .to_string_lossy()
+        .into_owned();
     if f.is_null() {
-        com_printf(view.common, "couldn't exec %s\n");
+        com_printf(view.common, &format!("couldn't exec {name}\n"));
         return;
     }
-    com_printf(view.common, "execing %s\n");
+    com_printf(view.common, &format!("execing {name}\n"));
 
     Cbuf_InsertText(view.common, f as *const c_char);
 

@@ -44,7 +44,9 @@ use crate::cm::facet_t::facet_t;
 use crate::cm::patch_collide_s::{patchCollide_s, patchCollide_t};
 use crate::cm::patch_plane_t::patchPlane_t;
 use crate::cm::trace_work_s::traceWork_t;
-use crate::cm_polylib::{BaseWindingForPlane, ChopWindingInPlace, CopyWinding, FreeWinding};
+use crate::cm_polylib::{
+    winding_p, BaseWindingForPlane, ChopWindingInPlace, CopyWinding, FreeWinding,
+};
 use crate::collision_world::CollisionWorld;
 use crate::common::engine_host_view::EngineHostView;
 use crate::common::{com_error, com_printf, Common};
@@ -727,7 +729,7 @@ fn CM_ValidateFacet(view: &mut EngineHostView, facet: *mut facet_t) -> qboolean 
         let mut maxs: vec3_t = [-(MAX_MAP_BOUNDS as f32); 3];
         for p in 0..(*w).numpoints {
             for c in 0..3usize {
-                let v = (*w).p[p as usize][c];
+                let v = (*winding_p(w, p as usize))[c];
                 if v < mins[c] {
                     mins[c] = v;
                 }
@@ -785,7 +787,7 @@ fn CM_AddFacetBevels(view: &mut EngineHostView, facet: *mut facet_t) {
         let mut maxs: vec3_t = [-(MAX_MAP_BOUNDS as f32); 3];
         for p in 0..(*w).numpoints {
             for c in 0..3usize {
-                let v = (*w).p[p as usize][c];
+                let v = (*winding_p(w, p as usize))[c];
                 if v < mins[c] {
                     mins[c] = v;
                 }
@@ -855,7 +857,11 @@ fn CM_AddFacetBevels(view: &mut EngineHostView, facet: *mut facet_t) {
         while j < (*w).numpoints {
             let k = (j + 1) % (*w).numpoints;
             let mut vec: vec3_t = [0.0; 3];
-            VectorSubtract((*w).p[j as usize], (*w).p[k as usize], &mut vec);
+            VectorSubtract(
+                *winding_p(w, j as usize),
+                *winding_p(w, k as usize),
+                &mut vec,
+            );
             // if it's a degenerate edge
             if VectorNormalize(&mut vec) < 0.5 {
                 j += 1;
@@ -891,13 +897,13 @@ fn CM_AddFacetBevels(view: &mut EngineHostView, facet: *mut facet_t) {
                     eplane[0] = n[0];
                     eplane[1] = n[1];
                     eplane[2] = n[2];
-                    eplane[3] = DotProduct((*w).p[j as usize], n);
+                    eplane[3] = DotProduct(*winding_p(w, j as usize), n);
 
                     // if all the points of the facet winding are
                     // behind this plane, it is a proper edge bevel
                     let mut l = 0;
                     while l < (*w).numpoints {
-                        let d = DotProduct((*w).p[l as usize], n) - eplane[3];
+                        let d = DotProduct(*winding_p(w, l as usize), n) - eplane[3];
                         if d > 0.1 {
                             break; // point in front
                         }

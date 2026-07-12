@@ -46,6 +46,9 @@ use crate::cvar_fns::Cvar_Get;
 /// Raven `ZoneTailFromHeader`.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:45-48`
+// §19: Raven never rounds `iSize`, so the returned tail pointer is UNALIGNED
+// for odd sizes (an unaligned int x86 tolerates); every deref goes through
+// read_unaligned/write_unaligned — the one defined behavior.
 pub fn ZoneTailFromHeader(pHeader: *mut zoneHeader_t) -> *mut zoneTail_t {
     unsafe {
         ((pHeader as *mut u8).add(core::mem::size_of::<zoneHeader_t>() + (*pHeader).iSize as usize))
@@ -183,7 +186,7 @@ pub fn Z_Validate(common: &Common) {
                 );
             }
 
-            if (*ZoneTailFromHeader(pMemory)).iMagic != ZONE_MAGIC {
+            if ZoneTailFromHeader(pMemory).read_unaligned().iMagic != ZONE_MAGIC {
                 crate::common::error::com_error(
                     errorParm_t::ERR_FATAL,
                     "Z_Validate(): Corrupt zone tail!".to_string(),
@@ -331,7 +334,7 @@ pub fn Z_Malloc(
         //
         // add tail...
         //
-        (*ZoneTailFromHeader(pMemory)).iMagic = ZONE_MAGIC;
+        ZoneTailFromHeader(pMemory).write_unaligned(zoneTail_t { iMagic: ZONE_MAGIC });
 
         // Update stats...
         //
@@ -376,7 +379,7 @@ pub fn Z_Free(common: &mut Common, pvAddress: *mut ()) {
                 "Z_Free(): Corrupt zone header!".to_string(),
             );
         }
-        if (*ZoneTailFromHeader(pMemory)).iMagic != ZONE_MAGIC {
+        if ZoneTailFromHeader(pMemory).read_unaligned().iMagic != ZONE_MAGIC {
             crate::common::error::com_error(
                 errorParm_t::ERR_FATAL,
                 "Z_Free(): Corrupt zone tail!".to_string(),

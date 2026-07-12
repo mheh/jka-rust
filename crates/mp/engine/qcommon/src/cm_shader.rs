@@ -20,6 +20,7 @@ use crate::cm::cm_shader_consts::MAX_SHADER_FILES;
 use crate::collision_world::CollisionWorld;
 use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
+use crate::common_fns::Com_DPrintf;
 
 // Raven `S_COLOR_YELLOW` — not reachable from this crate (icarus/game keep
 // their own private copies of this same literal; qshared has no public
@@ -188,7 +189,13 @@ pub fn CM_LoadShaderFiles(view: &mut EngineHostView) {
                 ),
             )
         };
-        crate::common::com_printf(view.common, &format!("...loading '{}'\n", "filename"));
+        Com_DPrintf(
+            view.common,
+            &format!(
+                "...loading '{}'\n",
+                unsafe { core::ffi::CStr::from_ptr(filename.as_ptr()) }.to_string_lossy()
+            ),
+        );
         sum += unsafe {
             FS_ReadFile(
                 view,
@@ -199,19 +206,34 @@ pub fn CM_LoadShaderFiles(view: &mut EngineHostView) {
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
             com_error(
                 errorParm_t::ERR_FATAL,
-                format!("Couldn't load {}", "filename"),
+                format!(
+                    "Couldn't load {}",
+                    unsafe { core::ffi::CStr::from_ptr(filename.as_ptr()) }.to_string_lossy()
+                ),
             );
         }
         i += 1;
     }
     while i < numShaders {
         let mut filename: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-        Com_sprintf(
-            filename.as_mut_ptr(),
-            core::mem::size_of_val(&filename) as c_int,
-            &format!("shaders/test/{}", "shaderFiles2[i - numShaders1]"),
+        unsafe {
+            Com_sprintf(
+                filename.as_mut_ptr(),
+                core::mem::size_of_val(&filename) as c_int,
+                &format!(
+                    "shaders/test/{}",
+                    core::ffi::CStr::from_ptr(*shaderFiles2.add((i - numShaders1) as usize))
+                        .to_string_lossy()
+                ),
+            )
+        };
+        Com_DPrintf(
+            view.common,
+            &format!(
+                "...loading '{}'\n",
+                unsafe { core::ffi::CStr::from_ptr(filename.as_ptr()) }.to_string_lossy()
+            ),
         );
-        crate::common::com_printf(view.common, &format!("...loading '{}'\n", "filename"));
         sum += unsafe {
             FS_ReadFile(
                 view,
@@ -222,7 +244,10 @@ pub fn CM_LoadShaderFiles(view: &mut EngineHostView) {
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
             com_error(
                 errorParm_t::ERR_DROP,
-                format!("Couldn't load {}", "filename"),
+                format!(
+                    "Couldn't load {}",
+                    unsafe { core::ffi::CStr::from_ptr(filename.as_ptr()) }.to_string_lossy()
+                ),
             );
         }
         i += 1;

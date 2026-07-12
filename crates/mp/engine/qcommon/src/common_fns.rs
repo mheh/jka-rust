@@ -250,8 +250,12 @@ pub fn Com_Crash_f() {
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1815-1818`
 pub fn Com_Memcpy(dest: *mut (), src: *const (), count: usize) {
+    // §19: Raven calls memcpy with src == dest (FS_FOpenFileRead's
+    // `Com_Memcpy(zfi, pak->handle, …)` when the handle aliases the pak) —
+    // overlap UB every libc tolerates; `ptr::copy` (memmove) is the defined
+    // equivalent and identical for all non-overlapping calls.
     unsafe {
-        core::ptr::copy_nonoverlapping(src as *const u8, dest as *mut u8, count);
+        core::ptr::copy(src as *const u8, dest as *mut u8, count);
     }
 }
 
