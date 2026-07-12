@@ -24,6 +24,24 @@ pub struct ErrorState {
     pub error_count: i32,
 }
 
+impl ErrorState {
+    /// Read the NUL-terminated `com_errorMessage` buffer as owned text (the
+    /// standard mechanical C-string read at a print boundary).
+    pub fn message_str(&self) -> String {
+        let end = self.message.iter().position(|&b| b == 0).unwrap_or(0);
+        String::from_utf8_lossy(&self.message[..end]).into_owned()
+    }
+
+    /// Raven's `vsprintf(com_errorMessage, fmt, argptr)` (`common.cpp:293-295`):
+    /// store the formatted payload, truncated to the buffer with a NUL.
+    pub fn set_message(&mut self, msg: &str) {
+        let bytes = msg.as_bytes();
+        let n = bytes.len().min(self.message.len() - 1);
+        self.message[..n].copy_from_slice(&bytes[..n]);
+        self.message[n] = 0;
+    }
+}
+
 /// `Com_Error`'s typed panic payload (STATE-Q4). `{level, msg}` is exhaustive
 /// (the whole payload the catch-side recovery reads); needs no derive — a
 /// `panic_any`/`downcast` payload only requires `Any + Send + 'static`.

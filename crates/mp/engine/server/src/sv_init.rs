@@ -1262,7 +1262,7 @@ pub fn SV_Shutdown(view: &mut EngineHostView, finalmsg: &str) {
         return;
     }
 
-    if !sv.svs.clients.is_null() && view.common.com_errorEntered == qboolean::from(0) {
+    if !sv.svs.clients.is_null() && !view.common.error.entered {
         SV_FinalMessage(view, sv, finalmsg);
     }
 

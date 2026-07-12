@@ -19,8 +19,10 @@ use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
 use mp_qshared::shared::{qboolean, qfalse, qtrue, FS_READ, MAX_QPATH};
 
 use crate::collision_world::CollisionWorld;
+use crate::common::com_printf;
 use crate::common::common_consts::{MAX_CONSOLE_LINES, MAX_PUSHED_EVENTS};
 use crate::common::engine_host_view::EngineHostView;
+use crate::common::ComError;
 use crate::common::Common;
 use crate::gp2::generic_parser2::GenericParser2;
 use crate::qcommon::net_limits::MAX_MSGLEN;
@@ -44,7 +46,8 @@ use crate::cm_load::CM_ClearMap;
 use crate::cmd::Cmd_AddCommand;
 use crate::cvar_fns::{Cvar_Get, Cvar_Init, Cvar_Set, Cvar_WriteVariables};
 use crate::files_common::{
-    FS_FCloseFile, FS_FOpenFileRead, FS_FOpenFileWrite, FS_Read, FS_Shutdown, FS_Write,
+    FS_FCloseFile, FS_FOpenFileRead, FS_FOpenFileWrite, FS_PureServerSetLoadedPaks, FS_Read,
+    FS_Shutdown, FS_Write,
 };
 use crate::msg::{MSG_Init, MSG_shutdownHuffman};
 use crate::stringed::api::SE_Init;
@@ -446,7 +449,7 @@ pub fn Com_ParseTextFileDestroy(parser: &mut GenericParser2) {
 /// Source: `oracle/codemp/qcommon/common.cpp:356-365`
 pub fn Com_Quit_f(view: &mut EngineHostView) {
     // don't try to shutdown if we are in a recursive error
-    if view.common.com_errorEntered == qfalse {
+    if !view.common.error.entered {
         let sv_shutdown = view
             .common
             .hooks
@@ -1090,6 +1093,157 @@ pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
 /// `Com_Frame`.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1593-1777`
+
+/// Raven `Com_Error`'s PRE-THROW work (`common.cpp:249-345`), relocated
+/// catch-side (LIFE-D3/STATE-Q4: `com_error` is receiverless and only
+/// panics). Runs the escalations, guard/bookkeeping, and per-level shutdown
+/// sequence in oracle print order, and returns the thrown level literal for a
+/// recoverable level; `ERR_FATAL` (direct or escalated) runs the fatal chain
+/// and never returns. A recursive error (guard already set on entry) exits via
+/// `Sys_Error` reading the FIRST error's saved message — the nested throw
+/// never overwrote it (`common.cpp:288`).
+///
+/// The win32 `_DEBUG` `int 3` breakpoint block is debugger-only and dropped.
+///
+/// Source: `oracle/codemp/qcommon/common.cpp:249-345`
+pub fn com_error_recover(view: &mut EngineHostView, err: &ComError) -> &'static str {
+    let mut code = err.level;
+
+    // when we are running automated scripts, make sure we
+    // know if anything failed
+    unsafe {
+        if !view.common.com_buildScript.is_null() && (*view.common.com_buildScript).integer != 0 {
+            code = errorParm_t::ERR_FATAL;
+        }
+    }
+
+    // make sure we can get at our local stuff
+    FS_PureServerSetLoadedPaks(view, c"".as_ptr(), c"".as_ptr());
+
+    // if we are getting a solid stream of ERR_DROP, do an ERR_FATAL
+    let current_time = crate::timing::sys_milliseconds(view.common);
+    if current_time - view.common.error.last_error_time < 100 {
+        view.common.error.error_count += 1;
+        if view.common.error.error_count > 3 {
+            code = errorParm_t::ERR_FATAL;
+        }
+    } else {
+        view.common.error.error_count = 0;
+    }
+    view.common.error.last_error_time = current_time;
+
+    if view.common.error.entered {
+        let saved = view.common.error.message_str();
+        view.sys_error(&format!("recursive error after: {saved}"));
+    }
+    view.common.error.entered = true;
+
+    // `vsprintf(com_errorMessage, fmt, argptr)` — the payload arrives
+    // pre-formatted (STATE-Q4); store it in the saved-message buffer.
+    view.common.error.set_message(&err.msg);
+
+    if code != errorParm_t::ERR_DISCONNECT {
+        // give com_errorMessage a default so it won't come back to life after
+        // a resetDefaults
+        Cvar_Get(
+            view,
+            c"com_errorMessage".as_ptr(),
+            c"".as_ptr(),
+            mp_qshared::shared::cvar::CVAR_ROM,
+        );
+        let cmsg = std::ffi::CString::new(err.msg.as_str()).unwrap_or_default();
+        Cvar_Set(view, c"com_errorMessage".as_ptr(), cmsg.as_ptr());
+    }
+
+    if code == errorParm_t::ERR_SERVERDISCONNECT {
+        let cl_disconnect = view
+            .common
+            .hooks
+            .CL_Disconnect
+            .expect("CL_Disconnect hook (null-build default)");
+        cl_disconnect(view, qtrue);
+        let cl_flush = view
+            .common
+            .hooks
+            .CL_FlushMemory
+            .expect("CL_FlushMemory hook (null-build default)");
+        cl_flush(view);
+        view.common.error.entered = false;
+        "DISCONNECTED\n"
+    } else if code == errorParm_t::ERR_DROP || code == errorParm_t::ERR_DISCONNECT {
+        com_printf(
+            view.common,
+            &format!(
+                "********************\nERROR: {}\n********************\n",
+                err.msg
+            ),
+        );
+        let sv_shutdown = view
+            .common
+            .hooks
+            .SV_Shutdown
+            .expect("SV_Shutdown hook — installed by mp_engine_server at boot");
+        sv_shutdown(view, &format!("Server crashed: {}\n", err.msg));
+        let cl_disconnect = view
+            .common
+            .hooks
+            .CL_Disconnect
+            .expect("CL_Disconnect hook (null-build default)");
+        cl_disconnect(view, qtrue);
+        let cl_flush = view
+            .common
+            .hooks
+            .CL_FlushMemory
+            .expect("CL_FlushMemory hook (null-build default)");
+        cl_flush(view);
+        view.common.error.entered = false;
+        "DROPPED\n"
+    } else if code == errorParm_t::ERR_NEED_CD {
+        let sv_shutdown = view
+            .common
+            .hooks
+            .SV_Shutdown
+            .expect("SV_Shutdown hook — installed by mp_engine_server at boot");
+        sv_shutdown(view, "Server didn't have CD\n");
+        let cl_running = unsafe {
+            !view.common.com_cl_running.is_null() && (*view.common.com_cl_running).integer != 0
+        };
+        if cl_running {
+            let cl_disconnect = view
+                .common
+                .hooks
+                .CL_Disconnect
+                .expect("CL_Disconnect hook (null-build default)");
+            cl_disconnect(view, qtrue);
+            let cl_flush = view
+                .common
+                .hooks
+                .CL_FlushMemory
+                .expect("CL_FlushMemory hook (null-build default)");
+            cl_flush(view);
+            view.common.error.entered = false;
+        } else {
+            com_printf(view.common, "Server didn't have CD\n");
+        }
+        "NEED CD\n"
+    } else {
+        let cl_shutdown = view
+            .common
+            .hooks
+            .CL_Shutdown
+            .expect("CL_Shutdown hook (null-build default)");
+        cl_shutdown(view);
+        let sv_shutdown = view
+            .common
+            .hooks
+            .SV_Shutdown
+            .expect("SV_Shutdown hook — installed by mp_engine_server at boot");
+        sv_shutdown(view, &format!("Server fatal crashed: {}\n", err.msg));
+        Com_Shutdown(view.common, view.cm, &mut view.rmg);
+        view.sys_error(&err.msg)
+    }
+}
+
 pub fn Com_Frame(view: &mut EngineHostView) {
     // Raven's `try`/`catch (const char* reason)` around an ERR_DROP-class
     // Com_Error is the setjmp/longjmp analogue this fn owns (ruling 1) —
@@ -1256,14 +1410,36 @@ pub fn Com_Frame(view: &mut EngineHostView) {
         view.common.com_frameNumber += 1;
     }));
 
-    if let Err(reason) = result {
-        let msg = reason
-            .downcast_ref::<String>()
-            .cloned()
-            .or_else(|| reason.downcast_ref::<&str>().map(|s| s.to_string()))
-            .unwrap_or_default();
-        crate::common::com_printf(view.common, &msg);
-        return; // an ERR_DROP was thrown
+    if let Err(payload) = result {
+        match payload.downcast::<ComError>() {
+            // The ERR_DROP recovery point (Raven's catch, common.cpp:1762):
+            // `com_error` only panicked — the catch runs ALL of Raven's
+            // pre-throw work (`com_error_recover`), then prints the thrown
+            // level literal exactly as Raven's `Com_Printf(reason)` does
+            // (common.cpp:1763). Recovery runs in its OWN catch_unwind: a
+            // `com_error` raised DURING recovery while the guard is set is
+            // Raven's recursive-error exit (common.cpp:288), reading the
+            // FIRST error's saved message.
+            Ok(err) => {
+                let recovered = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    com_error_recover(view, &err)
+                }));
+                match recovered {
+                    Ok(literal) => com_printf(view.common, literal),
+                    Err(second) => {
+                        if second.is::<ComError>() && view.common.error.entered {
+                            let saved = view.common.error.message_str();
+                            view.sys_error(&format!("recursive error after: {saved}"));
+                        }
+                        // A non-ComError panic is a real Rust bug — fatal.
+                        std::panic::resume_unwind(second);
+                    }
+                }
+            }
+            // A non-ComError panic is a real Rust bug — fatal (LIFE-D3).
+            Err(other) => std::panic::resume_unwind(other),
+        }
+        return; // an ERR_DROP was thrown; the frame returns and the loop continues
     }
 
     // G2_PERFORMANCE_ANALYSIS is a build-time-off diagnostics path (unresolved
@@ -1790,13 +1966,32 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         crate::common::com_printf(view.common, "--- Common Initialization Complete ---\n");
     }));
 
-    if let Err(reason) = result {
-        let msg = reason
-            .downcast_ref::<String>()
-            .cloned()
-            .or_else(|| reason.downcast_ref::<&str>().map(|s| s.to_string()))
-            .unwrap_or_default();
-        view.sys_error(&format!("Error during initialization: {msg}"));
+    if let Err(payload) = result {
+        match payload.downcast::<ComError>() {
+            // Init-time errors are always fatal (Raven's init catch ->
+            // `Sys_Error("Error during initialization: %s", reason)`,
+            // common.cpp:1439): run the same catch-side recovery, then
+            // escalate the recoverable level literal through Sys_Error with
+            // the wrapper (ERR_FATAL never returns from the recovery itself).
+            Ok(err) => {
+                let recovered = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    com_error_recover(view, &err)
+                }));
+                match recovered {
+                    Ok(literal) => {
+                        view.sys_error(&format!("Error during initialization: {literal}"))
+                    }
+                    Err(second) => {
+                        if second.is::<ComError>() && view.common.error.entered {
+                            let saved = view.common.error.message_str();
+                            view.sys_error(&format!("recursive error after: {saved}"));
+                        }
+                        std::panic::resume_unwind(second);
+                    }
+                }
+            }
+            Err(other) => std::panic::resume_unwind(other),
+        }
     }
 }
 

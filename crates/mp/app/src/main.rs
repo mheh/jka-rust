@@ -1,16 +1,21 @@
 //! `mp_app` — the MP dedicated host binary (the `jampded`-shaped thin bin
-//! shell, workspace-architecture `mp/app`): `Engine::new()` → warm-up read →
-//! `com_init` → (Slice-0 acceptance driver) → exit.
+//! shell, workspace-architecture `mp/app`): `Engine::new()` → hook install →
+//! warm-up read → `com_init` → `NET_Init` → the dedicated OS loop.
 //!
-//! The frozen lifecycle skeleton's dedicated OS loop
-//! (`sleep_ms(5)`/`console_poll`/`net_poll`/`com_frame`) is NOT yet run — its
-//! `com_frame` body is unported:
-//! //TODO: Port Com_Frame dedicated loop wiring
-//! // Source: oracle/codemp/null/win_main.cpp:1478-1493
+//! Mirrors Raven's dedicated `main` (`oracle/codemp/null/win_main.cpp:1410`):
+//! merge argv (`:1425`), timer warm-up (`:1447`), `Com_Init` (`:1457`),
+//! `NET_Init` (`:1459` — the entry point calls it, NOT `Com_Init`), then
+//! `while(1)`: `Sleep(5)` every iteration (`:1478`), `IN_Frame` (null input
+//! stub, `:1490` — no-op here), `Com_Frame` (`:1493`). Never returns; exit is
+//! via `Sys_Quit`/`Sys_Error` inside the frame (the `quit` command path).
 
-use mp_abi::game::exports::MpGameExport;
-use mp_engine_core::{com_init, sv_init_game_progs, sys_milliseconds, Engine};
-use native_platform::module_loader::{ModuleNaming, ModuleSearchPolicy, SearchStep};
+use std::thread::sleep;
+use std::time::Duration;
+
+use mp_engine_core::{
+    com_frame, com_init, engine_host_view, install_engine_hooks, sys_milliseconds, Engine,
+};
+use mp_engine_qcommon::sys_net::NET_Init;
 
 /// App-bin helper joining process argv into the single command string
 /// `Com_ParseCommandLine` splits — Raven's merge-argv step (jampded
@@ -20,75 +25,30 @@ fn command_line() -> String {
     std::env::args().skip(1).collect::<Vec<_>>().join(" ")
 }
 
-/// Slice-0 DEV-GLUE module search policy for the acceptance run on the dev
-/// host (macOS): resolves the freshly built `libjampgame.dylib` beside the
-/// executable. This is NOT the frozen Win32 (`Some("x86.dll")`) / Unix
-/// (`Some("i386.so")`) policy value and does NOT resolve LOAD-Q1 (the
-/// canonical macOS suffix for a Raven-parity host stays open) — the cargo
-/// artifact is staged under the bare `jampgame` + `.dylib` synthesis so the
-/// frozen naming mechanism itself is exercised unchanged.
-//TODO: Port <macOS module suffix> (LOAD-Q1) — this dev-glue value is not it
-// Source: docs/architecture/module-loading.md § Open questions (LOAD-Q1)
-fn slice0_dev_policy() -> ModuleSearchPolicy {
-    let exe_dir = std::env::current_exe()
-        .expect("current_exe")
-        .parent()
-        .expect("exe dir")
-        .to_path_buf();
-    // Stage the cargo cdylib (`libjampgame.dylib`) under the loader's
-    // synthesized name (`jampgame` + `.dylib`) so name synthesis stays frozen.
-    let built = exe_dir.join("libjampgame.dylib");
-    let staged = exe_dir.join("jampgame.dylib");
-    if built.exists() {
-        let _ = std::fs::copy(&built, &staged);
-    }
-    ModuleSearchPolicy {
-        naming: ModuleNaming {
-            suffix: Some(".dylib"),
-        },
-        // Unix-shaped: no direct probe (unix_main.c:361-373 `#if 0`).
-        direct_first: false,
-        steps: vec![SearchStep::FsPath {
-            base: exe_dir,
-            gamedir: String::new(),
-        }],
-    }
-}
-
 fn main() {
-    // The frozen jampded main skeleton (lifecycle.md § Slice hooks): construct
-    // first (captures the Instant base), warm-up read, then com_init.
+    // Construct first (captures the Instant base, LIFE-D4b), install the
+    // SV_*/renderer hook tables (Raven's link-time symbol resolution, DEC-23),
+    // then the warm-up read and the boot contract.
     let mut engine: Box<Engine> = Engine::new();
+    install_engine_hooks(&mut engine);
     // Raven's warm-up read (base already captured); base-relative → `false`
     // (null/win_main.cpp:1447 → qcommon.h:978).
     let _ = sys_milliseconds(&engine, false);
     com_init(&mut engine, &command_line());
 
-    // ---- Slice-0 acceptance driver (provisional) ----
-    // The settled load trigger is map spawn (SV_SpawnServer → SV_InitGameProgs,
-    // post-Slice-0; LOAD-Q12); this driver invokes the equiv directly so the
-    // GAME_INIT round-trip is exercised end-to-end (porting-rules §E16).
-    let policy = slice0_dev_policy();
-    let slot = sv_init_game_progs(&mut engine, &policy);
+    // NET_Init is called from the entry point, not Com_Init (lifecycle.md
+    // Raven-ground-truth #2; null/win_main.cpp:1459).
+    {
+        let mut view = engine_host_view(&mut engine);
+        NET_Init(&mut view);
+    }
 
-    // GAME_INIT round-trip: `VM_Call( gvm, GAME_INIT, svs.time,
-    // Com_Milliseconds(), restart )` (sv_game.cpp:1690). svs.time and the
-    // journaled Com_Milliseconds reader are unported — zeros stand in:
-    //TODO: Port SV_InitGameVM GAME_INIT args (svs.time, Com_Milliseconds)
-    // Source: oracle/codemp/server/sv_game.cpp:1680-1691
-    let _ = engine
-        .common
-        .modules
-        .vm_call(&slot, MpGameExport::GAME_INIT as i32, [0; 12]);
-
-    // SV_ShutdownGameProgs dual: `VM_Call( gvm, GAME_SHUTDOWN, qfalse );
-    // VM_Free( gvm )` (sv_game.cpp:1666-1673).
-    let _ = engine
-        .common
-        .modules
-        .vm_call(&slot, MpGameExport::GAME_SHUTDOWN as i32, [0; 12]);
-    engine.common.modules.unload(slot);
-
-    //TODO: Port the dedicated OS loop (sleep/console_poll/net_poll/com_frame)
-    // Source: oracle/codemp/null/win_main.cpp:1478-1493 (com_frame body pending)
+    loop {
+        // run the game: Sleep(5) every dedicated iteration
+        // (null/win_main.cpp:1478).
+        sleep(Duration::from_millis(5));
+        // IN_Frame (null/win_main.cpp:1490) is the dedicated null-input stub —
+        // nothing to pump here.
+        com_frame(&mut engine);
+    }
 }

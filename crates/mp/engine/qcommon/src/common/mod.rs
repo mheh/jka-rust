@@ -4,7 +4,6 @@
 //! `ErrorState`/`ComError`/`com_error` (error.rs), `SysEventQueue`
 //! (sys_event_queue.rs), `Journal` (journal.rs).
 
-pub mod boot_stubs;
 pub mod common;
 pub mod common_consts;
 pub mod engine_hooks;
@@ -15,7 +14,6 @@ pub mod opaque_slots;
 pub mod qrand;
 pub mod sys_event_queue;
 
-pub use boot_stubs::{cbuf_init, cmd_init, cvar_init, fs_init_filesystem};
 pub use common::{com_printf, Common};
 pub use engine_hooks::EngineHooks;
 pub use engine_host_view::EngineHostView;

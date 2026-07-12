@@ -219,10 +219,10 @@ pub struct Common {
     pub com_frameTime: c_int,
     pub com_frameMsec: c_int,
     pub com_frameNumber: c_int,
-    /// Raven `com_errorEntered` / `com_fullyInitialized`.
+    /// Raven `com_fullyInitialized` (`com_errorEntered` lives in the
+    /// `Common.error` `ErrorState` group, its single home).
     ///
     /// Source: `oracle/codemp/qcommon/common.cpp:83-84`
-    pub com_errorEntered: qboolean,
     pub com_fullyInitialized: bool,
     /// Raven `com_journalFile` / `com_journalDataFile` (config/event journal).
     ///

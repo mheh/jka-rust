@@ -37,13 +37,14 @@ unsafe fn sv_from_view<'a>(view: &mut EngineHostView) -> &'a mut Server {
     &mut *(view.sv.as_raw() as *mut Server)
 }
 
-/// Install the server tier's hook fields: the lifecycle upcalls whose bodies
-/// exist (the `SV_Frame`/`SV_PacketEvent` frame path lands with the boot
-/// slice and stays `None` here until then) plus every server-backed
+/// Install the server tier's hook fields: the lifecycle upcalls (including the
+/// `SV_Frame`/`SV_PacketEvent` frame path) plus every server-backed
 /// `EngineHost` accessor.
 pub fn install_engine_hooks(hooks: &mut EngineHooks) {
     hooks.SV_Init = Some(crate::sv_init::SV_Init);
     hooks.SV_Shutdown = Some(crate::sv_init::SV_Shutdown);
+    hooks.SV_Frame = Some(crate::sv_main::SV_Frame);
+    hooks.SV_PacketEvent = Some(crate::sv_main::SV_PacketEvent);
     hooks.SV_GameCommand = Some(crate::sv_game::SV_GameCommand);
     hooks.SV_ShutdownGameProgs = Some(crate::sv_game::SV_ShutdownGameProgs);
     hooks.SV_Trace = Some(sv_trace_hook);

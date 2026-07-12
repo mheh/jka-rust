@@ -1,7 +1,7 @@
 //! `Server` (the `Engine.sv` island host) + `ServerGame` (the game dispatcher's
 //! reborrowed host state) + `sv_game_system_calls` (the MP game dispatcher).
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, c_uint};
 use mp_abi::game::imports::MpGameImport;
 use std::io::Write;
 
@@ -180,6 +180,22 @@ pub struct Server {
     ///
     /// Source: `oracle/codemp/server/sv_main.cpp:60`
     pub sv_expand_newlines_string: [c_char; 1024],
+    /// Raven `SVC_RemoteCommand::lasttime` (`static unsigned int`, init `0`) —
+    /// the 500 ms rcon rate-limit timestamp; a function-scope static whose value
+    /// persists across frames, so it lives as `Server` state (fork-3 kind 3).
+    ///
+    /// Source: `oracle/codemp/server/sv_main.cpp:496`
+    pub svc_remote_command_lasttime: c_uint,
+    /// Raven `SV_CheckCvars::lastMod` (`static int`, init `-1`) — the last
+    /// observed `sv_hostname->modificationCount`; a function-scope static
+    /// persisting across frames, so it lives as `Server` state (fork-3 kind 3).
+    /// The `Engine::new` zeroed-alloc default (`0`) is behaviorally identical to
+    /// Raven's `-1`: `sv_hostname` is registered with `modificationCount = 1`
+    /// (`cvar_fns.rs:287`) before the first `SV_CheckCvars`, so the initial `!=`
+    /// fires either way.
+    ///
+    /// Source: `oracle/codemp/server/sv_main.cpp:792`
+    pub sv_check_cvars_last_mod: c_int,
 }
 
 /// Wrap a live `&mut Server` into qcommon's type-erased command slot for

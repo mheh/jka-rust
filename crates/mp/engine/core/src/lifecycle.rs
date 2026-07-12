@@ -1,129 +1,60 @@
-//! `com_init`/`com_frame`/`com_shutdown` + `sys_error` + `sys_milliseconds`
-//! (LIFE-D2/D3/D4b). Ported per-mode into `mp_engine_core` — `com_frame` must
-//! call `SV_Frame`/`CL_Frame`, which qcommon cannot reach. No shared trait.
+//! The `com_*` lifecycle surface (LIFE-D2): thin `&mut Engine` wrappers over
+//! the qcommon-transcribed `Com_Init`/`Com_Frame`/`Com_Quit_f` bodies
+//! (`common_fns.rs`), plus `sys_error`/`sys_milliseconds` (LIFE-D3/D4b).
 //!
-//! `com_error`/`ComError`/`ErrorLevel` live one tier below in
-//! `mp_engine_qcommon` (STATE-Q4) so leaf throw sites reach them.
+//! Post-DEC-23 shape: the engine world crosses into qcommon as the
+//! `EngineHostView` bundle, so each wrapper split-borrows the view
+//! (`host_view::engine_host_view`) and delegates. The `catch_unwind` error
+//! boundary and the catch-side `com_error_recover` per-level recovery live
+//! WITH the transcribed bodies in `mp_engine_qcommon::common_fns` (they need
+//! only the view); nothing below duplicates them.
 
-use mp_engine_qcommon::common::ComError;
+use mp_engine_qcommon::common_fns::{Com_Frame, Com_Init, Com_Quit_f};
 
 use crate::engine::Engine;
+use crate::host_view::engine_host_view;
 
-/// Raven `Com_Init` (MP `common.cpp:1216` / SP `:950`). Runs the boot contract;
-/// a `ComError` panic during init is caught here and escalated to fatal
-/// (mirrors `catch → Sys_Error`, MP `:1439`, LIFE-D3).
+/// Raven `Com_Init` (MP `common.cpp:1216`) — the 42-step boot contract,
+/// delegated to the qcommon transcription (its own `catch_unwind` escalates a
+/// boot-time `ComError` to `Sys_Error("Error during initialization: …")`).
+///
+/// The command line is leaked to process lifetime: `Com_ParseCommandLine`
+/// stores `com_consoleLines[]` pointers INTO the buffer, exactly as Raven's
+/// `WinMain` `lpCmdLine` persists for the process (`win_main.cpp:1524`).
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1216`
 pub fn com_init(engine: &mut Engine, command_line: &str) {
-    use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
-    match catch_unwind(AssertUnwindSafe(|| {
-        com_init_body(&mut *engine, command_line)
-    })) {
-        Ok(()) => {}
-        Err(p) => match p.downcast::<ComError>() {
-            // Init-time errors are always fatal: Raven's init catch →
-            // `Sys_Error ("Error during initialization: %s", reason)`
-            // (common.cpp:1439-1441, LIFE-D3).
-            Ok(e) => sys_error(engine, &format!("Error during initialization: {}", e.msg)),
-            Err(other) => resume_unwind(other),
-        },
-    }
+    let cmdline: &'static mut std::ffi::CString = Box::leak(Box::new(
+        std::ffi::CString::new(command_line).unwrap_or_default(),
+    ));
+    let mut view = engine_host_view(engine);
+    Com_Init(&mut view, cmdline.as_ptr() as *mut core::ffi::c_char);
 }
 
-/// The 42-step MP boot contract body (`common.cpp:1216-1442`), Slice-0 subset:
-/// steps 3/5/7/12 are the LIFE-Q8 boot-success no-op stubs; unported steps
-/// carry `//TODO: Port` markers in step order so the transcript diff (DEC-09.2)
-/// can activate step-by-step as B1/B2 land.
-fn com_init_body(engine: &mut Engine, command_line: &str) {
-    use mp_engine_qcommon::common::{
-        cbuf_init, cmd_init, com_printf, cvar_init, fs_init_filesystem,
-    };
-    let _ = command_line;
-
-    // 1. Version banner (common.cpp:1219): Com_Printf("%s %s %s\n", Q3_VERSION,
-    //    CPUSTRING, __DATE__); Q3_VERSION = "JAmp: v1.0.1.0" (game_version.h:9).
-    //TODO: Port CPUSTRING/__DATE__ banner fields
-    // Source: oracle/codemp/qcommon/common.cpp:1219
-    com_printf(
-        &mut engine.common,
-        "JAmp: v1.0.1.0 (jka-rust slice 0)
-",
-    );
-    //TODO: Port Com_InitPushEvent — step 2
-    // Source: oracle/codemp/qcommon/common.cpp:1224
-    cvar_init(); // step 3 (LIFE-Q8 stub; common.cpp:1226)
-                 //TODO: Port Com_ParseCommandLine — step 4
-                 // Source: oracle/codemp/qcommon/common.cpp:1230
-    cbuf_init(); // step 5 (LIFE-Q8 stub; common.cpp:1233)
-                 // step 6 Com_InitZoneMemory: dropped — Rust ownership replaces TheZone (§C9).
-    cmd_init(); // step 7 (LIFE-Q8 stub; common.cpp:1242)
-                //TODO: Port Com_StartupVariable/Rand_Init/CL_InitKeyCommands — steps 8-11
-                // Source: oracle/codemp/qcommon/common.cpp:1245-1254
-    fs_init_filesystem(); // step 12 (LIFE-Q8 stub; common.cpp:1266)
-                          //TODO: Port Com_InitJournaling + config execs + cvar block — steps 13-29
-                          // Source: oracle/codemp/qcommon/common.cpp:1268-1383
-                          // 30. VM_Init: the empty ModuleRegistry — already default-constructed into
-                          //     Engine.common.modules by Engine::new (LIFE-Q9); nothing to do here.
-                          //TODO: Port SV_Init + the dedicated/client-init tail — steps 31-39
-                          // Source: oracle/codemp/qcommon/common.cpp:1385-1431
-                          // 40. com_fullyInitialized = qtrue (common.cpp:1434).
-    engine.common.fully_initialized = true;
-    // 41. Completion banner (common.cpp:1435).
-    com_printf(
-        &mut engine.common,
-        "--- Common Initialization Complete ---
-",
-    );
-}
-
-/// Raven `Com_Frame` (MP `common.cpp:1593` / SP `:1269`). One frame; the
-/// `catch_unwind` boundary (DEC-08 / SEAM-D10) wraps the body. A caught
-/// `ComError` runs the full per-level recovery catch-side then prints the level
-/// literal; any non-`ComError` panic is re-raised as fatal (LIFE-D3).
-///
-/// Round-4 amendment (LIFE-D3, group-a-regate4): the catch arm wraps
-/// `com_error_recover` in its OWN `catch_unwind`; if recovery itself panics
-/// while the `errorEntered` guard is set, route to `sys_error("recursive error
-/// after: {saved msg}")` — reproducing Raven's recursive-error banner + exit
-/// (MP `common.cpp:288`, `Sys_Error("recursive error after: %s", …)`).
+/// Raven `Com_Frame` (MP `common.cpp:1593`) — one frame, delegated to the
+/// qcommon transcription (the `catch_unwind` ERR_DROP recovery point lives
+/// there, DEC-08/LIFE-D3).
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1593`
 pub fn com_frame(engine: &mut Engine) {
-    use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
-    match catch_unwind(AssertUnwindSafe(|| com_frame_body(&mut *engine))) {
-        Ok(()) => {}
-        Err(p) => match p.downcast::<ComError>() {
-            // ERR_DROP recovery point. `com_error` only panicked; the catch runs
-            // ALL of Raven's pre-throw work in oracle print order (LIFE-D2).
-            Ok(e) => {
-                let saved = e.msg.clone();
-                let err = *e;
-                let recovered =
-                    catch_unwind(AssertUnwindSafe(|| com_error_recover(&mut *engine, err)));
-                if recovered.is_err() {
-                    // Recovery panicked while `errorEntered` is set → recursive
-                    // error fatal path (round-4 LIFE-D3; MP common.cpp:288).
-                    sys_error(engine, &format!("recursive error after: {saved}"));
-                }
-            }
-            // Real Rust bug → fatal (LIFE-D3).
-            Err(other) => resume_unwind(other),
-        },
-    }
+    let mut view = engine_host_view(engine);
+    Com_Frame(&mut view);
 }
 
-/// Raven `Com_Shutdown` + `Com_Quit_f` orchestration (MP `common.cpp:356,1785`).
+/// Raven `Com_Quit_f` orchestration (MP `common.cpp:356`): `SV_Shutdown` →
+/// `CL_Shutdown` → `Com_Shutdown` → `FS_Shutdown` → `Sys_Quit`. Never returns
+/// (the quit path exits the process, as Raven's does).
 ///
-/// Source: `oracle/codemp/qcommon/common.cpp:1785`
-pub fn com_shutdown(engine: &mut Engine) {
-    let _ = engine;
-    todo!("Port Com_Shutdown — oracle/codemp/qcommon/common.cpp:1785")
+/// Source: `oracle/codemp/qcommon/common.cpp:356`
+pub fn com_shutdown(engine: &mut Engine) -> ! {
+    let mut view = engine_host_view(engine);
+    Com_Quit_f(&mut view);
+    unreachable!("Com_Quit_f exits the process (Sys_Quit)");
 }
 
 /// Raven `Sys_Error` (`win32/win_main.cpp:350`; dedicated `null/win_main.cpp:324`).
-/// Noreturn — the fatal escalation point for `com_init`'s init-catch and the
-/// recursive-error path. Ported INTO `mp_engine_core` (LIFE-D3, LIFE-Q2 closed),
-/// delegating print+exit to `native/platform` (a downhill call).
+/// Noreturn — the fatal escalation point. Ported INTO `mp_engine_core`
+/// (LIFE-D3, LIFE-Q2 closed), delegating print+exit to `native/platform`.
 ///
 /// Source: `oracle/codemp/win32/win_main.cpp:350`
 pub fn sys_error(engine: &mut Engine, msg: &str) -> ! {
@@ -152,19 +83,4 @@ pub fn sys_milliseconds(engine: &Engine, base_time: bool) -> i32 {
     // Base-relative: the one implementation lives in qcommon (Common owns the
     // time base; timing is not a host service) — delegate to it (LIFE-D4b).
     mp_engine_qcommon::timing::sys_milliseconds(&engine.common)
-}
-
-/// The one-frame body wrapped by `com_frame`'s `catch_unwind` boundary. Private
-/// (not part of the frozen surface); a mechanical §C port of `Com_Frame`'s body.
-fn com_frame_body(engine: &mut Engine) {
-    let _ = engine;
-    todo!("Port Com_Frame body — oracle/codemp/qcommon/common.cpp:1593")
-}
-
-/// Catch-side recovery helper (private, `&mut Engine` in hand): the per-level
-/// sequence of § Error recovery, run in Raven's pre-throw order, ending in the
-/// level literal print (LIFE-D2) or, for `ERR_FATAL`/escalated, `sys_error`.
-fn com_error_recover(engine: &mut Engine, err: ComError) {
-    let _ = (engine, err);
-    todo!("Port Com_Error catch-side recovery — oracle/codemp/qcommon/common.cpp:249-345")
 }

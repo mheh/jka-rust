@@ -52,6 +52,10 @@ pub struct EngineHooks {
     // ---- client tier (null-build defaults; `null_client.cpp`) ----
     /// Source: `oracle/codemp/null/null_client.cpp:9-10`
     pub CL_Shutdown: Option<fn(&mut EngineHostView)>,
+    /// Source: `oracle/codemp/null/null_client.cpp:31-32`
+    pub CL_Disconnect: Option<fn(&mut EngineHostView, qboolean)>,
+    /// Source: `oracle/codemp/null/null_client.cpp:63-64`
+    pub CL_FlushMemory: Option<fn(&mut EngineHostView)>,
     /// Source: `oracle/codemp/null/null_client.cpp:12-14`
     pub CL_Init: Option<fn(&mut EngineHostView)>,
     /// Source: `oracle/codemp/null/null_client.cpp:66-67`
@@ -162,6 +166,8 @@ impl EngineHooks {
     pub fn null_dedicated() -> EngineHooks {
         EngineHooks {
             CL_Shutdown: Some(CL_Shutdown_null),
+            CL_Disconnect: Some(CL_Disconnect_null),
+            CL_FlushMemory: Some(CL_FlushMemory_null),
             CL_Init: Some(CL_Init_null),
             CL_StartHunkUsers: Some(CL_StartHunkUsers_null),
             CL_MapLoading: Some(CL_MapLoading_null),
@@ -213,6 +219,14 @@ fn CL_Shutdown_null(_view: &mut EngineHostView) {}
 fn CL_Init_null(view: &mut EngineHostView) {
     Cvar_Get(view, c"cl_shownet".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
 }
+
+/// Raven null `CL_Disconnect`. Source: `oracle/codemp/null/null_client.cpp:31-32`
+#[allow(non_snake_case)]
+fn CL_Disconnect_null(_view: &mut EngineHostView, _show_main_menu: qboolean) {}
+
+/// Raven null `CL_FlushMemory`. Source: `oracle/codemp/null/null_client.cpp:63-64`
+#[allow(non_snake_case)]
+fn CL_FlushMemory_null(_view: &mut EngineHostView) {}
 
 /// Raven null `CL_StartHunkUsers`. Source: `oracle/codemp/null/null_client.cpp:66-67`
 #[allow(non_snake_case)]

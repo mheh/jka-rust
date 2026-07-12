@@ -9,17 +9,18 @@
 //! here and the bare OS calls are delegated downward (per §B state is threaded,
 //! not reached). Behavior source: `oracle/codemp/unix/unix_net.c`.
 //!
-//! The UDP socket itself is never opened yet: nothing in qcommon calls
-//! `NET_Init`/`NET_OpenIP`, so `native_platform::net::ip_socket()` stays 0 and
-//! every send/recv here short-circuits exactly as the oracle does on an
-//! unopened socket. Wiring `NET_OpenIP` is deferred to the server/client boot.
+//! `NET_Init`/`NET_OpenIP`/`NET_IPSocket` live here (the socket bring-up);
+//! the dedicated entry point (`mp_app::main`) calls `NET_Init` right after
+//! `Com_Init`, exactly as Raven's does (`null/win_main.cpp:1459`).
 
 #![allow(non_snake_case)]
 
 use core::ffi::c_int;
+use std::ffi::{CStr, CString};
 
 use native_platform::net::{
-    ip_socket, ipx_socket, net_is_lan_ip, net_recvfrom, net_sendto, NetRecvResult,
+    ip_socket, ipx_socket, net_collect_local_addresses, net_ip_socket, net_is_lan_ip, net_recvfrom,
+    net_select_sleep, net_sendto, set_ip_socket, NetRecvResult,
 };
 
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
@@ -27,8 +28,11 @@ use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::{com_error, com_printf, Common};
+use crate::cvar_fns::{Cvar_Get, Cvar_SetValue};
 use crate::net_chan::NET_AdrToString;
+use crate::qcommon::protocol::PORT_SERVER;
 
 /// `NET_AdrToString` renders into a `Common`-owned buffer and returns a pointer
 /// into it; copy it out as an owned `String` so the follow-on `com_printf`
@@ -174,4 +178,71 @@ pub fn Sys_IsLANAddress(adr: &netadr_t) -> bool {
         return false;
     }
     net_is_lan_ip(adr.ip)
+}
+
+/// Raven `NET_OpenIP` — register `net_ip`/`net_port`, then try
+/// `PORT_SERVER`..`+9` through `NET_IPSocket` until one binds; publish the fd,
+/// pin `net_port` to the winning port, and collect the local addresses. A full
+/// sweep with no free port is Raven's fatal error.
+///
+/// Source: `oracle/codemp/unix/unix_net.c:457-476`
+pub fn NET_OpenIP(view: &mut EngineHostView) {
+    // ip = Cvar_Get("net_ip", "localhost", 0);
+    let ip = Cvar_Get(view, c"net_ip".as_ptr(), c"localhost".as_ptr(), 0);
+    // port = Cvar_Get("net_port", va("%i", PORT_SERVER), 0)->value;
+    let port_default = CString::new(format!("{PORT_SERVER}")).unwrap();
+    let port_cvar = Cvar_Get(view, c"net_port".as_ptr(), port_default.as_ptr(), 0);
+    // SAFETY: Cvar_Get returns a live cvar node; read its numeric value/string.
+    let port = unsafe { (*port_cvar).value } as i32;
+    let ip_string = unsafe { CStr::from_ptr((*ip).string) }
+        .to_string_lossy()
+        .into_owned();
+
+    for i in 0..10 {
+        let fd = {
+            let print = &mut |s: &str| com_printf(view.common, s);
+            net_ip_socket(Some(&ip_string), port + i, print)
+        };
+        set_ip_socket(fd);
+        if fd != 0 {
+            Cvar_SetValue(view, c"net_port".as_ptr(), (port + i) as f32);
+            // NET_GetLocalAddress().
+            let print = &mut |s: &str| com_printf(view.common, s);
+            net_collect_local_addresses(print);
+            return;
+        }
+    }
+    com_error(
+        errorParm_t::ERR_FATAL,
+        "Couldn't allocate IP port".to_string(),
+    );
+}
+
+/// Raven `NET_Init` — register `net_noudp` and, unless it is set, open the IP
+/// socket.
+///
+/// Source: `oracle/codemp/unix/unix_net.c:484-491`
+pub fn NET_Init(view: &mut EngineHostView) {
+    // noudp = Cvar_Get("net_noudp", "0", 0);
+    let noudp = Cvar_Get(view, c"net_noudp".as_ptr(), c"0".as_ptr(), 0);
+    // open sockets
+    // SAFETY: Cvar_Get returns a live cvar node; read its numeric value.
+    if unsafe { (*noudp).value } == 0.0 {
+        NET_OpenIP(view);
+    }
+}
+
+/// Raven `NET_Sleep` (unix) — sleep up to `msec` ms or until the net socket is
+/// ready. A non-server (no socket, or `com_dedicated` clear) runs full speed;
+/// otherwise `select` on the socket and stdin. The raw `select` lives in
+/// `native_platform`.
+///
+/// Source: `oracle/codemp/unix/unix_net.c:582-598`
+pub fn NET_Sleep(common: &mut Common, msec: c_int) {
+    // if (!ip_socket || !com_dedicated->integer) return; — not a server.
+    // SAFETY: com_dedicated is the live cvar registered at Com_Init.
+    if ip_socket() == 0 || unsafe { (*common.com_dedicated).integer } == 0 {
+        return; // we're not a server, just run full speed
+    }
+    net_select_sleep(ip_socket(), msec);
 }
