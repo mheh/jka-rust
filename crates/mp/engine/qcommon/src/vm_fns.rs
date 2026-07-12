@@ -204,6 +204,30 @@ pub fn VM_ArgPtr(common: &Common, intValue: c_int) -> *mut () {
     }
 }
 
+/// `VM_ArgPtr` at the AbiWord-widened width — the inbound dispatcher's `VMA(n)`
+/// resolves arg words as `isize` (state-ownership.md, vmMain pair), so the
+/// value is used at full width instead of being truncated to `c_int`. The
+/// narrow [`VM_ArgPtr`] original is kept untouched for its other callers.
+///
+/// Source: `oracle/codemp/qcommon/vm.cpp:640-654`
+pub fn VM_ArgPtrWord(common: &Common, value: isize) -> *mut () {
+    if value == 0 {
+        return core::ptr::null_mut();
+    }
+    // bk001220 - currentVM is missing on reconnect
+    if common.currentVM.is_null() {
+        return core::ptr::null_mut();
+    }
+    unsafe {
+        if !(*common.currentVM).entryPoint.is_none() {
+            ((*common.currentVM).dataBase as isize + value) as *mut ()
+        } else {
+            ((*common.currentVM).dataBase as isize
+                + (value & (*common.currentVM).dataMask as isize)) as *mut ()
+        }
+    }
+}
+
 /// `BotVMShift`.
 ///
 /// Raven: `gvm` — "always using the game vm here."

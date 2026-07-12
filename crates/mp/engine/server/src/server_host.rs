@@ -1,12 +1,16 @@
 //! `Server` (the `Engine.sv` island host) + `ServerGame` (the game dispatcher's
-//! reborrowed host state) + `sv_game_system_calls` (the MP game dispatcher).
+//! reborrowed host state) + `game_system_calls_shim` (the armed game-slot
+//! syscall target, reading the boot-built `GameDispatchCtx` note).
 
 use core::ffi::{c_char, c_int, c_uint};
-use mp_abi::game::imports::MpGameImport;
-use std::io::Write;
 
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
+use mp_engine_qcommon::common::opaque_slots;
 use mp_engine_qcommon::vm::game_syscall_trampoline_words;
 use mp_qshared::shared::error_parm::errorParm_t;
+
+use crate::game_dispatch_ctx::GameDispatchCtx;
+use crate::sv_game::SV_GameSystemCalls;
 
 use mp_engine_botlib::be_interface::botlib_export_s::botlib_export_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
@@ -299,86 +303,54 @@ pub unsafe fn rm_from_slot(slot: &mut CmRenderModelsSlot) -> &mut RealRenderMode
 /// amendment, 2026-07-05).
 pub type ServerGame = Server;
 
-/// The MP game outbound dispatcher — our `SV_GameSystemCalls` equivalent
-/// (SEAM-D3). A hand-written exhaustive `match` over `MpGameImport`; `args[0]` =
-/// syscall number decoded via `TryFrom<i32>`; return is the C `intptr_t` word.
-/// An unknown trap number reproduces Raven's `Com_Error(ERR_DROP, "Bad game
-/// system trap: %i")` faithfully (`sv_game.cpp:1654`).
+/// The injected `SlotSyscall` target (LOAD-D8 injection): the module's
+/// variadic syscall lands here (via `game_syscall_trampoline`'s 16-word
+/// frame) with the game slot's armed `ctx` — the [`GameDispatchCtx`] note
+/// `mp_engine_core::install_engine_hooks` built at boot. Rebuild the
+/// `EngineHostView` + sidecars from the note and enter the exhaustive
+/// dispatcher (`sv_game.rs::SV_GameSystemCalls`), our `SV_GameSystemCalls`
+/// routing dual of Raven's `currentVM->systemCall( args )`.
 ///
-/// Source: `oracle/codemp/server/sv_game.cpp:458`
-pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize {
-    let _ = engine;
-
-    // Minimal ctx-less dispatch: only the traps this SEAM-D3 shim decodes
-    // without the full receiver set (`G_PRINT`). The exhaustive receiver-rich
-    // dispatcher is `sv_game.rs::SV_GameSystemCalls`; wiring it as the slot
-    // target awaits the full engine-state capture. Any other trap falls through
-    // to Raven's own default (`Com_Error(ERR_DROP, "Bad game system trap: %i")`,
-    // sv_game.cpp:1654).
-    let trap = args[0] as i32;
-    if trap == MpGameImport::G_PRINT as i32 {
-        // `case G_PRINT: Com_Printf( "%s", VMA(1) );` (sv_game.cpp:503-505;
-        // VMA is a native-DLL identity cast, vm.cpp:648-649).
-        let msg = unsafe { core::ffi::CStr::from_ptr(args[1] as *const core::ffi::c_char) };
-        print!("{}", msg.to_string_lossy());
-        let _ = std::io::stdout().flush();
-        return 0;
-    }
-    mp_engine_qcommon::common::com_error(
-        errorParm_t::ERR_DROP,
-        format!("Bad game system trap: {trap}"),
-    )
-}
-
-/// The injected `SlotSyscall` target (LOAD-D8 injection): unpacks the
-/// trampoline's 16-word frame and enters the typed dispatcher above — the
-/// inbound dual of `CEngine::raw_syscall_words`'s frame.
-///
-/// `ServerGame`'s concrete shape is now pinned (`type ServerGame = Server`,
-/// STATE-Q7 residual CLOSED, user ruling 2026-07-05), so a non-null `ctx` is
-/// reborrowed as `&mut ServerGame` and enters the typed dispatcher — the real
-/// path, ready for when `sv_init_game_progs`
-/// (`crates/mp/engine/core/src/sv_init_game_progs.rs`) stops injecting
-/// `core::ptr::null_mut()`. On the null path NO reference is created and no
-/// stand-in `Server` is fabricated (a silent fake, porting-rules #14): the
-/// Slice-0 G_PRINT case — which needs no host state — is handled inline, and
-/// every other trap panics loudly.
-///
-/// Source: `oracle/codemp/qcommon/vm.cpp:377` (`currentVM->systemCall( args )`).
+/// Source: `oracle/codemp/qcommon/vm.cpp:377`;
+/// `oracle/codemp/server/sv_game.cpp:458` (the dispatcher itself).
 pub extern "C-unwind" fn game_system_calls_shim(
     ctx: *mut core::ffi::c_void,
     args: *const isize,
 ) -> isize {
-    // SAFETY: the trampoline shim always forwards its full 16-word frame.
-    let frame = unsafe { core::slice::from_raw_parts(args, 16) };
-
-    if !ctx.is_null() {
-        // SAFETY: the LOAD-D8 injection passes the `&mut Engine.sv` reborrow
-        // (`ServerGame` = `Server`, engine-seam § Engine-side dispatchers) as
-        // `ctx`; module dispatch is single-threaded, so the exclusive reborrow
-        // holds for the duration of this call.
-        let server_game = unsafe { &mut *(ctx as *mut ServerGame) };
-        return sv_game_system_calls(server_game, frame);
+    if ctx.is_null() {
+        // A syscall before the boot arming would read a fabricated world — a
+        // silent fake (porting-rules #14); die loudly instead.
+        mp_engine_qcommon::common::com_error(
+            errorParm_t::ERR_FATAL,
+            "game syscall with no dispatch context armed".to_string(),
+        );
     }
-
-    // Null-ctx path: a slot armed without a `&mut ServerGame` (the core-crate
-    // Slice-0 loader arms `ctx = null`). G_PRINT needs no host state; every
-    // other trap falls through to Raven's own default rather than reading fake
-    // state (`Com_Error(ERR_DROP, "Bad game system trap: %i")`,
-    // sv_game.cpp:1654).
-    let trap = frame[0] as i32;
-    if trap == MpGameImport::G_PRINT as i32 {
-        // `case G_PRINT: Com_Printf( "%s", VMA(1) );` (sv_game.cpp:503-505;
-        // VMA is a native-DLL identity cast, vm.cpp:648-649).
-        let msg = unsafe { core::ffi::CStr::from_ptr(frame[1] as *const core::ffi::c_char) };
-        print!("{}", msg.to_string_lossy());
-        let _ = std::io::stdout().flush();
-        return 0;
+    // SAFETY: `ctx` is the boot-built GameDispatchCtx (leaked, process
+    // lifetime; every pointer is a field of the one boxed Engine, addresses
+    // stable). The engine caller that entered the module sits suspended in
+    // VM_Call for this whole dispatch (single-threaded synchronous traps), so
+    // its borrows of these same objects are dormant — the DEC-23 slot-cast
+    // discipline at the module seam. `args` is the trampoline's 16-word frame.
+    unsafe {
+        let c = &*(ctx as *const GameDispatchCtx);
+        let mut view = EngineHostView {
+            common: &mut *c.common,
+            cm: &mut *c.cm,
+            sv: opaque_slots::Server::from_raw(c.sv),
+            cl: opaque_slots::Client::from_raw(c.cl),
+            bot: opaque_slots::BotLib::from_raw(c.bot),
+            rm: opaque_slots::RenderModels::from_raw(c.rm),
+            rmg: opaque_slots::RmManager::from_raw(c.rmg),
+            g2: opaque_slots::Ghoul2System::from_raw(c.g2),
+        };
+        SV_GameSystemCalls(
+            &mut view,
+            &mut *c.icarus,
+            &mut *c.nav,
+            &mut *c.roff,
+            args as *mut isize,
+        )
     }
-    mp_engine_qcommon::common::com_error(
-        errorParm_t::ERR_DROP,
-        format!("Bad game system trap: {trap}"),
-    )
 }
 
 /// The `int (*)(int*)` C-ABI adapter handed to `VM_Create` as `systemCalls`

@@ -5,6 +5,8 @@
 
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::opaque_slots;
+use mp_engine_qcommon::vm::arm_game_slot;
+use mp_engine_server::{game_system_calls_shim, GameDispatchCtx};
 
 use crate::engine::Engine;
 
@@ -34,7 +36,36 @@ pub fn engine_host_view(engine: &mut Engine) -> EngineHostView<'_> {
 /// null-build defaults from `EngineHooks::null_dedicated()`; the server and
 /// renderer tiers install here. Runs in `main()` right after `Engine::new()`,
 /// before `com_init`.
+///
+/// Also arms the game syscall slot with the [`GameDispatchCtx`] note (user
+/// ruling 2026-07-12) — the engine-side `currentVM` dual: every pointer is a
+/// field address of the one boxed `Engine` (stable for the process lifetime),
+/// written once here and read by `game_system_calls_shim` on every module
+/// trap. The note is leaked to process lifetime, exactly like Raven's
+/// file-scope statics it replaces.
 pub fn install_engine_hooks(engine: &mut Engine) {
     mp_engine_server::hook_install::install_engine_hooks(&mut engine.common.hooks);
     mp_renderer::hook_install::install_engine_hooks(&mut engine.common.hooks);
+
+    let cl_raw = match engine.cl.as_mut() {
+        Some(cl) => cl as *mut _ as *mut (),
+        None => core::ptr::null_mut(),
+    };
+    let note: &'static mut GameDispatchCtx = Box::leak(Box::new(GameDispatchCtx {
+        common: &mut engine.common as *mut _,
+        cm: &mut engine.cm as *mut _,
+        sv: &mut engine.sv as *mut _ as *mut (),
+        cl: cl_raw,
+        bot: &mut engine.bot as *mut _ as *mut (),
+        rm: &mut engine.render_models as *mut _ as *mut (),
+        rmg: &mut engine.rmg as *mut _ as *mut (),
+        g2: &mut engine.g2 as *mut _ as *mut (),
+        icarus: &mut engine.icarus as *mut _,
+        nav: &mut engine.nav as *mut _,
+        roff: &mut engine.roff as *mut _,
+    }));
+    arm_game_slot(
+        note as *mut GameDispatchCtx as *mut core::ffi::c_void,
+        game_system_calls_shim,
+    );
 }
