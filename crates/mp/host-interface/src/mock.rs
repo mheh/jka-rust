@@ -194,6 +194,10 @@ pub struct MockHost {
     /// Loader model-memory fixtures, animation half: model handle → `.gla`
     /// block bytes served by [`EngineHost::model_mdxa`].
     pub mdxa_blocks: BTreeMap<qhandle_t, Vec<u8>>,
+    /// Skin fixtures served by [`EngineHost::skin_surfaces`]: skin handle →
+    /// `(surface-name, shader-name)` rows. A missing handle reads as no
+    /// surfaces (the skin analogue of "missing handle = NULL").
+    pub skins: BTreeMap<qhandle_t, Vec<(String, String)>>,
     /// Byte arena strided by `size_of::<sharedEntity_t>()` behind `gentity`.
     gentities: Vec<u8>,
     /// The `sv.mSharedMemory` window.
@@ -229,6 +233,7 @@ impl MockHost {
             written_files: BTreeMap::new(),
             mdxm_blocks: BTreeMap::new(),
             mdxa_blocks: BTreeMap::new(),
+            skins: BTreeMap::new(),
             gentities: vec![0u8; MAX_GENTITIES * stride],
             shared_mem: vec![0u8; Self::SHARED_MEM_BYTES],
             rng: HoldrandLcg::new(),
@@ -421,6 +426,11 @@ impl EngineHost for MockHost {
             .get_mut(&model)
             .map(|b| b.as_mut_ptr() as *mut c_void)
             .unwrap_or(core::ptr::null_mut())
+    }
+
+    fn skin_surfaces(&mut self, h_skin: qhandle_t) -> Vec<(String, String)> {
+        // No surfaces where the fixture is missing (see the `skins` field doc).
+        self.skins.get(&h_skin).cloned().unwrap_or_default()
     }
 
     fn cvar_register(&mut self, name: &str, default: &str, flags: i32) {

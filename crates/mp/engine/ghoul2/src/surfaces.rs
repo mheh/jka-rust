@@ -79,16 +79,13 @@
 //!    `G2_IsSurfaceRendered`/the private `G2_FindSurface` all walk
 //!    `mod->mdxm`'s surface hierarchy live. The citation's line number is wrong;
 //!    the classification is right.
-//! 2. `G2_SetSurfaceOnOffFromSkin` (`:201-226`) calls `R_GetSkinByHandle`
-//!    (`:204`) to resolve `renderSkin`'s surface/shader-name table — the frozen
-//!    15-method `EngineHost` (`## Seam definition`) has no skin-lookup accessor,
-//!    same gap class `api_models.rs`'s module doc-comment already reports for
-//!    `g2api_set_skin` (which calls this fn). Not fixed here (§A1: the stub
-//!    still takes `host` per the nearest frozen parameter shape; only the
-//!    skin-lookup line itself has no host method to call yet) — diverges via
-//!    the frozen, real `host.error(...)` service (never invented), matching
-//!    `api_models.rs`'s `register_server_model`/`register_model` treatment of
-//!    the same missing-service class.
+//! 2. CLOSED — `G2_SetSurfaceOnOffFromSkin` (`:201-226`) calls
+//!    `R_GetSkinByHandle` (`:204`) to resolve `renderSkin`'s
+//!    surface/shader-name table; originally a frozen-`EngineHost` gap (no
+//!    skin-lookup accessor), it is now served by `EngineHost::skin_surfaces`,
+//!    the flattened `R_GetSkinByHandle` read backed by
+//!    `RenderModels::skin_surfaces` (user ruling 2026-07-12, server skins
+//!    name-pool).
 //! 3. `G2_SetRootSurface`'s live body (`:379-385`) builds a `CConstructBoneList`
 //!    and calls `extern void G2_ConstructUsedBoneList(CConstructBoneList&)`
 //!    (`:41`, defined `oracle/codemp/renderer/tr_ghoul2.cpp:2796`, unguarded by
@@ -105,7 +102,7 @@
 use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
-use mp_qshared::shared::{errorParm_t, qhandle_t, MAX_QPATH};
+use mp_qshared::shared::{qhandle_t, MAX_QPATH};
 
 use crate::ghoul2_system::Ghoul2System;
 use crate::shared::cghoul2_info::CGhoul2Info;
@@ -387,29 +384,15 @@ pub fn g2_set_surface_on_off(
     false
 }
 
-/// `R_GetSkinByHandle` has no `EngineHost` equivalent (module doc-comment gap
-/// #2 — the same missing-service class `api_models.rs`'s
-/// `register_server_model`/`register_model` already report for
-/// `RE_RegisterServerModel`/`RE_RegisterModel`). Diverges via the frozen,
-/// real `host.error` service rather than inventing a skin surface table.
-fn get_skin_by_handle(host: &mut impl EngineHost, render_skin: qhandle_t) -> ! {
-    host.error(
-        errorParm_t::ERR_DROP,
-        &format!(
-            "G2_Surfaces: EngineHost has no R_GetSkinByHandle({render_skin}) equivalent yet \
-             (docs/subsystems/ghoul2-server.md gap note #2, G2_surfaces.cpp:204)"
-        ),
-    )
-}
-
 /// Raven `void G2_SetSurfaceOnOffFromSkin(CGhoul2Info *ghlInfo, qhandle_t
 /// renderSkin)` — clears `ghlInfo->mSlist` and `mMeshFrameNum`, then for every
-/// surface in the resolved skin (`R_GetSkinByHandle`, module doc-comment gap
-/// #2) forwards to [`g2_set_surface_on_off`]: surfaces shaded `"*off"` are
-/// turned off, all others turned on (skipping ones already `_off` by name,
-/// `:219-220`). Not header-declared (`G2_local.h`) but forward-declared and
-/// called ad hoc from `G2API_SetSkin` (`G2_API.cpp:680,688`,
-/// `api_models.rs`'s `g2api_set_skin`) — kept `pub` for that cross-file edge.
+/// surface in the resolved skin (`R_GetSkinByHandle`, served by
+/// `EngineHost::skin_surfaces` — module doc-comment gap #2, closed) forwards
+/// to [`g2_set_surface_on_off`]: surfaces shaded `"*off"` are turned off, all
+/// others turned on (skipping ones already `_off` by name, `:219-220`). Not
+/// header-declared (`G2_local.h`) but forward-declared and called ad hoc from
+/// `G2API_SetSkin` (`G2_API.cpp:680,688`, `api_models.rs`'s `g2api_set_skin`)
+/// — kept `pub` for that cross-file edge.
 ///
 /// Source: `oracle/codemp/ghoul2/G2_surfaces.cpp:201-226`
 pub fn g2_set_surface_on_off_from_skin(
@@ -417,12 +400,28 @@ pub fn g2_set_surface_on_off_from_skin(
     ghl_info: &mut CGhoul2Info,
     render_skin: qhandle_t,
 ) {
+    let skin = host.skin_surfaces(render_skin); // R_GetSkinByHandle( renderSkin )
+
     ghl_info.slist.clear(); // remove any overrides we had before.
     ghl_info.mesh_frame_num = 0;
 
-    // The skin's per-surface shader-name table has no `EngineHost` accessor
-    // yet (module doc-comment gap #2) — diverges loudly rather than guessing.
-    get_skin_by_handle(host, render_skin);
+    for (surf_name, shader_name) in &skin {
+        // the names have both been lowercased
+        if shader_name == "*off" {
+            g2_set_surface_on_off(host, ghl_info, surf_name, G2SURFACEFLAG_OFF);
+        } else if !host.model_mdxm(ghl_info.model).is_null() {
+            // (a null `mdxm` here is Raven's unchecked `mod->mdxm` deref in
+            // `G2_IsSurfaceLegal` — skipped instead, §19)
+            // `Some` is Raven's `surfaceNum != -1`
+            match g2_is_surface_legal(host, ghl_info.model, surf_name) {
+                // only turn on if it's not an "_off" surface
+                Some((_, flags)) if flags & G2SURFACEFLAG_OFF == 0 => {
+                    g2_set_surface_on_off(host, ghl_info, surf_name, 0);
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 /// Raven `int G2_IsSurfaceOff (CGhoul2Info *ghlInfo, surfaceInfo_v &slist,
@@ -1170,15 +1169,42 @@ mod tests {
     }
 
     #[test]
-    fn g2_set_surface_on_off_from_skin_diverges_via_host_error() {
+    fn g2_set_surface_on_off_from_skin_applies_off_and_on_rows() {
+        // model 1: surfaces "hood" and "cape", both on by default. (One skin
+        // row per invocation: a populated slist would route later rows through
+        // `misc::g2_find_surface`'s LOD walk, which this header-only fixture
+        // cannot back.)
+        let mut buf = build_mdxm_header(1, 2, MDXM_HEADER_SIZE as i32, 0);
+        push_surf_hier_entry(&mut buf, "hood", 0, -1, &[]);
+        push_surf_hier_entry(&mut buf, "cape", 0, -1, &[]);
+
         let mut host = MockHost::new();
+        host.mdxm_blocks.insert(1, buf);
+        host.skins
+            .insert(5, vec![("hood".to_owned(), "*off".to_owned())]);
+        host.skins.insert(
+            6,
+            vec![("cape".to_owned(), "models/players/test/cape".to_owned())],
+        );
+
         let mut ghl_info = CGhoul2Info::default();
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            g2_set_surface_on_off_from_skin(&mut host, &mut ghl_info, 1)
-        }));
-        assert!(result.is_err());
-        assert_eq!(host.errors.len(), 1);
-        assert_eq!(host.errors[0].0, errorParm_t::ERR_DROP);
+        ghl_info.model = 1;
+
+        // a "*off"-shaded row lands an OFF override
+        g2_set_surface_on_off_from_skin(&mut host, &mut ghl_info, 5);
+        assert_eq!(ghl_info.slist.len(), 1);
+        assert_eq!(ghl_info.slist[0].surface, 0);
+        assert_eq!(ghl_info.slist[0].offFlags, G2SURFACEFLAG_OFF);
+        assert_eq!(ghl_info.mesh_frame_num, 0);
+
+        // an on row matching the model's default flags adds no override, and
+        // the previous skin's overrides are cleared first
+        g2_set_surface_on_off_from_skin(&mut host, &mut ghl_info, 6);
+        assert!(ghl_info.slist.is_empty());
+
+        // an unknown skin handle reads as no surfaces: overrides just clear
+        g2_set_surface_on_off_from_skin(&mut host, &mut ghl_info, 99);
+        assert!(ghl_info.slist.is_empty());
     }
 
     #[test]

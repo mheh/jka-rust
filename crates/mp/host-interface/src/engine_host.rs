@@ -22,8 +22,9 @@ use crate::vm_slot::VmSlot;
 /// The method set is fixed by ruling 24 (trace, FS read/free, print/error,
 /// `VM_Call`, shared-memory window, `flrand`/`irand`, gentity), extended by
 /// ruling 36 (cvar read, `svs.time`, FS write, loader model memory),
-/// ruling 55 (cvar register/string/take-modified, VFS file listing), and
-/// ruling 59a (pak membership).
+/// ruling 55 (cvar register/string/take-modified, VFS file listing),
+/// ruling 59a (pak membership), and user ruling 2026-07-12 (server skins
+/// name-pool: the skin-surface read).
 pub trait EngineHost {
     /// Raven `SV_Trace` — sweep a box through the collision world, writing the
     /// result into `results` (kept as an out-param to transcribe the NPCNav
@@ -155,6 +156,16 @@ pub trait EngineHost {
     /// Source: `oracle/codemp/renderer/tr_local.h:1129` (`model_t.mdxa`);
     /// chain: `oracle/codemp/ghoul2/G2_API.cpp:2735-2739`
     fn model_mdxa(&mut self, model: qhandle_t) -> *mut c_void;
+
+    /// Raven `R_GetSkinByHandle( hSkin )`, flattened to the one read the
+    /// ghoul2 server consumer makes (`G2_SetSurfaceOnOffFromSkin`,
+    /// `G2_surfaces.cpp:204-226`): the resolved skin's per-surface
+    /// `(surface-name, shader-name)` rows (surface names lowercased at parse).
+    /// Out-of-range handles resolve to the default skin, as
+    /// `R_GetSkinByHandle` does. Backed by `RenderModels::skin_surfaces`
+    /// (user ruling 2026-07-12, server skins name-pool).
+    /// Source: `oracle/codemp/renderer/tr_image.cpp:3342-3347`
+    fn skin_surfaces(&mut self, h_skin: qhandle_t) -> Vec<(String, String)>;
 
     /// Raven `Cvar_Get`'s registration side (ruling 55) — establish the cvar
     /// with `default` exactly once (creation sets string=default, integer=
@@ -333,6 +344,10 @@ impl<T: EngineHost + ?Sized> EngineHost for &mut T {
 
     fn model_mdxa(&mut self, model: qhandle_t) -> *mut c_void {
         (**self).model_mdxa(model)
+    }
+
+    fn skin_surfaces(&mut self, h_skin: qhandle_t) -> Vec<(String, String)> {
+        (**self).skin_surfaces(h_skin)
     }
 
     fn cvar_register(&mut self, name: &str, default: &str, flags: i32) {

@@ -16,7 +16,7 @@
 use core::ffi::c_char;
 
 use mp_qshared::shared::force_reload::ForceReload_e;
-use mp_qshared::shared::qboolean;
+use mp_qshared::shared::{qboolean, qhandle_t};
 
 use mp_engine_qcommon::cm_load::RenderModels;
 use mp_host_interface::engine_host::EngineHost;
@@ -67,13 +67,41 @@ pub fn RE_RegisterMedia_LevelLoadBegin(
 /// body reduces to `Com_Memset(hashTable, 0)` + `deferLoad = qfalse` — both are
 /// `tr_shader.cpp` file statics; the `#ifndef DEDICATED` load branch
 /// (`CreateInternalShaders`/`ScanAndLoadShaderFiles`/`CreateExternalShaders`)
-/// compiles out entirely. `tr_shader.cpp` is §20-dropped on this dedicated
-/// slice (no shader parse/compile surface — same treatment as `tr-model.md`
-/// drops `KillTheShaderHashTable`), so the shader hash table has no ported
-/// parity state and this entry is an empty dedicated body.
+/// compiles out entirely. The hash table's server-skin rows live on as the
+/// `RenderModels` server-shader name pool (user ruling 2026-07-12, server
+/// skins name-pool), reset by `init_skins`/`hunk_clear` — `SV_SpawnServer`
+/// always runs those and this back-to-back — so nothing is left for this
+/// entry; the rest of `tr_shader.cpp` stays §20-dropped.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:4265-4280`.
 pub fn R_InitShaders(_rm: &mut RenderModels, _host: &mut dyn EngineHost, _server: qboolean) {
-    // `Com_Memset(hashTable, 0)` + `deferLoad = qfalse` act on §20-dropped
-    // `tr_shader` statics with no parity surface on the dedicated build.
+    // `Com_Memset(hashTable, 0)` — covered by `init_skins`'s pool reset (see
+    // doc comment); `deferLoad = qfalse` is a §20-dropped client static.
+}
+
+/// Raven `R_InitSkins` — reset the skin registry to the single default skin.
+/// Forwards to `RenderModels::init_skins`, the server-skins name-pool home
+/// (user ruling 2026-07-12, amending `tr-model.md`).
+///
+/// Source: `oracle/codemp/renderer/tr_image.cpp:3324-3334`.
+pub fn R_InitSkins(rm: &mut RenderModels, _host: &mut dyn EngineHost) {
+    // SAFETY: as `R_SVModelInit`.
+    let rm = unsafe { rm_from_slot(rm) };
+    rm.init_skins();
+}
+
+/// Raven `RE_RegisterServerSkin` — the `G_R_REGISTERSKIN` vmcall target
+/// ("Mangled version of the above function to load .skin files on the
+/// server"). Forwards to `RenderModels::register_server_skin` (user ruling
+/// 2026-07-12, server skins name-pool).
+///
+/// Source: `oracle/codemp/renderer/tr_image.cpp:3301-3318`.
+pub fn RE_RegisterServerSkin(
+    rm: &mut RenderModels,
+    mut host: &mut dyn EngineHost,
+    name: &str,
+) -> qhandle_t {
+    // SAFETY: as `R_SVModelInit`.
+    let rm = unsafe { rm_from_slot(rm) };
+    rm.register_server_skin(&mut host, name)
 }

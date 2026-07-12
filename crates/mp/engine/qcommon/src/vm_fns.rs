@@ -184,8 +184,12 @@ pub fn VM_DllSyscall(common: &mut Common, arg: c_int) -> c_int {
 
 /// `VM_ArgPtr`.
 ///
+/// `common` is a shared borrow: the body only reads `currentVM` (Raven's
+/// file-scope global), and the dispatcher call sites resolve `VMA(n)` args
+/// while `common` is reserved mutably for the outer call.
+///
 /// Source: `oracle/codemp/qcommon/vm.cpp:640-654`
-pub fn VM_ArgPtr(common: &mut Common, intValue: c_int) -> *mut () {
+pub fn VM_ArgPtr(common: &Common, intValue: c_int) -> *mut () {
     if intValue == 0 {
         return core::ptr::null_mut();
     }

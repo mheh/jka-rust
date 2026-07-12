@@ -33,6 +33,7 @@ use crate::{SV_BotAllocateClient, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_
 use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::svEntity_t;
 use crate::server_host::{ghoul2_slot, server_slot, sv_game_system_call};
+use crate::sv_renderer::RE_RegisterServerSkin;
 use crate::game_system_calls_shim;
 use crate::Server;
 use mp_engine_qcommon::vm::{arm_game_slot, VM_Call};
@@ -625,11 +626,13 @@ pub fn SV_SetBrushModel(
 
 /// Reads `args[n]` as a VM-relative offset and resolves it to an engine
 /// pointer — Raven's `VMA(n)` macro (`vm.cpp:648-649`; a native-DLL identity
-/// cast since our module is a native dylib, not a bytecode VM).
+/// cast since our module is a native dylib, not a bytecode VM). `common` is a
+/// shared borrow (see `VM_ArgPtr`) so `VMA(n)` args resolve inside calls that
+/// already reserve `common` mutably.
 ///
 /// Source: `oracle/codemp/qcommon/vm_local.h` (`VMA`/`VMF` macros)
 #[inline]
-unsafe fn vma(common: &mut Common, args: *mut c_int, n: isize) -> *mut c_void {
+unsafe fn vma(common: &Common, args: *mut c_int, n: isize) -> *mut c_void {
     mp_engine_qcommon::vm_fns::VM_ArgPtr(common, *args.offset(n)) as *mut c_void
 }
 

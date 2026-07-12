@@ -482,9 +482,9 @@ pub fn g2api_set_lod_bias(
 /// qhandle_t renderSkin)` — sets `mCustomSkin`; when `renderSkin` is non-null
 /// also runs `G2_SetSurfaceOnOffFromSkin` (`G2_surfaces.cpp:201`, `surfaces.rs`
 /// roster item) to set each surface on/off per the skin file, which itself
-/// reads the skin via `R_GetSkinByHandle` — another loader-model-adjacent
-/// accessor the frozen `EngineHost` trait does not expose (same gap class as
-/// the module doc-comment's `RE_RegisterModel` note).
+/// reads the skin via `R_GetSkinByHandle` — served by
+/// `EngineHost::skin_surfaces` (user ruling 2026-07-12, server skins
+/// name-pool; formerly a frozen-trait gap).
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:681-693`
 pub fn g2api_set_skin(

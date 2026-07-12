@@ -34,7 +34,9 @@ use mp_host_interface::engine_host::EngineHost;
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
 use crate::server_host::{ghoul2_slot, server_slot};
-use crate::sv_renderer::{R_InitShaders, R_SVModelInit, RE_RegisterMedia_LevelLoadBegin};
+use crate::sv_renderer::{
+    R_InitShaders, R_InitSkins, R_SVModelInit, RE_RegisterMedia_LevelLoadBegin,
+};
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use crate::sv_game::{SV_GentityNum, SV_InitGameProgs, SV_ShutdownGameProgs};
 use crate::sv_bot::{SV_BotFrame, SV_BotInitBotLib, SV_BotInitCvars};
@@ -633,7 +635,7 @@ pub fn SV_SpawnServer(
     eForceReload: ForceReload_e,
 ) {
     let mut checksum: c_int = 0;
-    let isBot: qboolean;
+    let mut isBot: qboolean;
     let mut systemInfo = [0 as c_char; 16384];
     let mut p: *const c_char;
 
@@ -775,13 +777,9 @@ pub fn SV_SpawnServer(
 
     // get a new checksum feed and restart the file system
     //
-    // PORT-NOTE(engine-lcg): `srand`/`rand` route through the engine's own
-    // `QRand` LCG field on `common` (ruling 21); the field is unnamed until
-    // `QRand` itself lands — referenced as `common.qrand` verbatim per the
-    // preamble's naming convention, escalated in missing_symbols.
-    common
-        .qrand
-        .srand(Com_Milliseconds(common, cm, rm, host) as u32);
+    // `srand`/`rand` are the engine's own `QRand` LCG on `common` (ruling 21).
+    let seed_ms = Com_Milliseconds(common, cm, rm, host);
+    common.qrand.srand(seed_ms as u32);
     sv.sv.checksumFeed = ((common.qrand.rand() as c_int) << 16 ^ common.qrand.rand() as c_int)
         ^ Com_Milliseconds(common, cm, rm, host);
     FS_Restart(common, cm, rm, host, sv.sv.checksumFeed);
@@ -883,16 +881,13 @@ pub fn SV_SpawnServer(
                 }
 
                 // connect the client again
-                let denied = VM_ExplicitArgPtr(
+                let connect_ret = VM_Call(
                     common,
                     sv.gvm,
-                    VM_Call(
-                        common,
-                        sv.gvm,
-                        MpGameExport::GAME_CLIENT_CONNECT as i32,
-                        &[i, 0, isBot as c_int],
-                    ),
-                ) as *mut c_char;
+                    MpGameExport::GAME_CLIENT_CONNECT as i32,
+                    &[i, 0, isBot as c_int],
+                );
+                let denied = VM_ExplicitArgPtr(common, sv.gvm, connect_ret) as *mut c_char;
                 if !denied.is_null() {
                     // this generally shouldn't happen, because the client
                     // was connected before the level change
@@ -983,6 +978,7 @@ pub fn SV_SpawnServer(
         systemInfo.as_ptr()
     });
 
+    let serverinfo = Cvar_InfoString(common, mp_qshared::shared::cvar::CVAR_SERVERINFO);
     SV_SetConfigstring(
         common,
         cm,
@@ -990,7 +986,7 @@ pub fn SV_SpawnServer(
         rm,
         host,
         mp_bg::public::configstring::CS_SERVERINFO,
-        Cvar_InfoString(common, mp_qshared::shared::cvar::CVAR_SERVERINFO),
+        serverinfo,
     );
     common.cvar_modifiedFlags &= !mp_qshared::shared::cvar::CVAR_SERVERINFO;
 

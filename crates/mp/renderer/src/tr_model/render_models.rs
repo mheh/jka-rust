@@ -21,6 +21,7 @@ use crate::tr_local::model_s::model_t;
 use crate::tr_local::modtype_t::modtype_t;
 
 use super::cached_model_binary::CachedEndianedModelBinary;
+use super::server_skin::ServerSkin;
 
 /// Raven `MAX_MOD_KNOWN` — the `tr.models[]` pool cap; `R_AllocModel` returns
 /// `None` (Raven `NULL`) at it.
@@ -106,6 +107,23 @@ pub struct RenderModels {
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:541,1231`
     pub(crate) num_bsp_models: i32,
+
+    /// `tr.skins[MAX_SKINS]` + `tr.numSkins` — the skin registry, homed here
+    /// per user ruling 2026-07-12 (server skins name-pool), joining the model
+    /// registry this struct already owns. `qhandle_t` = index; slot 0 is the
+    /// default skin `init_skins` seeds (`server_skins.rs`).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1409-1410`
+    pub(crate) skins: Vec<ServerSkin>,
+
+    /// The server-shader name pool — `R_FindServerShader`'s hash-table rows
+    /// flattened to bare names (user ruling 2026-07-12): server shader objects
+    /// carry only the name, the sole field the dedicated path ever reads
+    /// (`G2_surfaces.cpp:212`). Slot 0 stands in for `tr.defaultShader`
+    /// (`server_skins.rs`).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:3560-3596`
+    pub(crate) server_shaders: Vec<String>,
 }
 
 impl Default for RenderModels {
@@ -124,6 +142,8 @@ impl Default for RenderModels {
             prev_map_name: String::new(),
             inside_register_model: false,
             num_bsp_models: 0,
+            skins: Vec::new(),
+            server_shaders: Vec::new(),
         }
     }
 }
@@ -170,22 +190,24 @@ impl RenderModels {
         self.re_register_models_delete_all();
     }
 
-    /// Raven `R_HunkClearCrap` — a Hunk-reset teardown: calls the §20
-    /// `tr_shader.cpp` `KillTheShaderHashTable` cross-ref (out of scope here,
-    /// host-free), then zeros `tr.numModels`/`mhHashTable`/`tr.numShaders`/
-    /// `tr.numSkins`. Only the model-registry portion (`num_models`/`hash`)
-    /// is this struct's concern; the shader/skin counters are §20 `tr_shader`
-    /// state, not ported.
+    /// Raven `R_HunkClearCrap` — a Hunk-reset teardown: calls the `tr_shader.cpp`
+    /// `KillTheShaderHashTable` cross-ref, then zeros `tr.numModels`/
+    /// `mhHashTable`/`tr.numShaders`/`tr.numSkins`. The skin registry and the
+    /// server-shader name pool (the slice's flattened shader hash table, user
+    /// ruling 2026-07-12 (server skins name-pool)) are this struct's fields
+    /// now; only `tr.numShaders` stays §20 (client shader-compile counter).
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:1682-1690`
     pub fn hunk_clear(&mut self) {
-        // `KillTheShaderHashTable()` is a §20 `tr_shader.cpp` cross-ref (host-
-        // free, no model state); not ported in this dedicated slice.
+        // `KillTheShaderHashTable()` — the name pool is this slice's flattened
+        // server-shader hash table.
+        self.server_shaders.clear();
         // `tr.numModels = 0; memset(mhHashTable, 0, ...)`.
         self.num_models = 0;
         self.hash.clear();
-        // `tr.numShaders = 0; tr.numSkins = 0;` are §20 `tr_shader` counters,
-        // not fields of this struct.
+        // `tr.numSkins = 0` (the skin memory itself lived on the just-reset
+        // hunk); `tr.numShaders = 0` stays §20, not a field of this struct.
+        self.skins.clear();
     }
 
     /// Raven `R_GetModelByHandle` — out-of-range `index` (`< 1` or
