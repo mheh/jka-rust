@@ -1,13 +1,19 @@
 // PORT-COMPLETE: g_active.c 31/5
 //! Port of `oracle/codemp/game/g_active.c` (jampgame pass 2).
 //!
-//! State reached through `ctx.world` (STATE-D6 leaf reborrows), traps through
-//! `trap::X(ctx.engine, …)`, file-scope globals/cvars via the pre-merged
-//! `GameWorld` fields. Five functions remain parked: the three
-//! entity-`touch` fn-pointer callers (`ClientImpacts`, `G_TouchTriggers`,
-//! `G_MoverTouchPushTriggers`) and the two `Pmove` drivers (`SpectatorThink`,
-//! `ClientThink_real`) — both blocked on storing engine-bearing/ctx-carrying
-//! handlers in the frozen ABI struct's raw `Option<extern "C" fn>` fields.
+//! Safe-state migration **Stage 1**. Entity params crossing this file's ABI
+//! seam are `EntityId`/`Option<EntityId>` handles (§B5) instead of raw
+//! `gentity_t*`, and `gclient_t*` params become their owning entity's
+//! `EntityId` (or a `&mut gclient_t`/`&gentity_t` borrow for the ctx-free
+//! leaves); the pilot is `crate::g_object`. These bodies are saturated with
+//! still-raw seam derefs (gclient/`ps` walks, vehicle chases, `pm`/ucmd
+//! traffic), so per the landed-shard "mega-fn" precedent they convert at the
+//! **signature only**: each fn re-derives its raw pointer(s) at the top of the
+//! body (`let ent: *mut gentity_t = ctx.entity_mut(id);`) and leaves the
+//! referee-verified body verbatim. The remaining raw bodies are Stage-2 debt.
+//! Behavior is byte-identical — a mechanical reshape, referee-verified.
+//! Unconverted callers bridge their raw pointer at the boundary with
+//! `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, non_camel_case_types, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -116,7 +122,10 @@ use mp_bg::public::dm_flags::DF_NO_FOOTSTEPS;
 /// Raven `P_SetTwitchInfo`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:20-24`
-pub fn P_SetTwitchInfo(ctx: GameContext<'_>, client: *mut gclient_t) {
+pub fn P_SetTwitchInfo(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: gclient param reshaped to its owning entity's EntityId; raw
+    // client re-derived verbatim (Stage-2 debt).
+    let client: *mut gclient_t = ctx.entity_mut(ent).client as *mut gclient_t;
     unsafe {
         (*client).ps.painTime = (*ctx.world).level.time;
         (*client).ps.painDirection ^= 1;
@@ -126,7 +135,9 @@ pub fn P_SetTwitchInfo(ctx: GameContext<'_>, client: *mut gclient_t) {
 /// Raven `P_DamageFeedback` — send the damage-blend/pain feedback for a frame.
 ///
 /// Source: `oracle/codemp/game/g_active.c:36-118`
-pub fn P_DamageFeedback(ctx: GameContext<'_>, player: *mut gentity_t) {
+pub fn P_DamageFeedback(ctx: GameContext<'_>, player: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let player: *mut gentity_t = ctx.entity_mut(player);
     unsafe {
         let client = (*player).client as *mut gclient_t;
         if (*client).ps.pm_type == PM_DEAD as c_int {
@@ -175,7 +186,7 @@ pub fn P_DamageFeedback(ctx: GameContext<'_>, player: *mut gentity_t) {
             if (*ctx.world).level.time - (*client).ps.painTime < 500 || count < 10.0 {
                 return;
             }
-            P_SetTwitchInfo(ctx, client);
+            P_SetTwitchInfo(ctx, ctx.entity_id_of(player).unwrap());
             (*player).pain_debounce_time = (*ctx.world).level.time + 700;
 
             G_AddEvent(player, EV_PAIN as c_int, (*player).health);
@@ -202,7 +213,9 @@ pub fn P_DamageFeedback(ctx: GameContext<'_>, player: *mut gentity_t) {
 /// Raven `P_WorldEffects` — drowning + lava/slime sizzle damage.
 ///
 /// Source: `oracle/codemp/game/g_active.c:129-205`
-pub fn P_WorldEffects(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn P_WorldEffects(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         if (*client).noclip != 0 {
@@ -320,12 +333,10 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `DoImpact` — collision impact damage (crush/fall).
 ///
 /// Source: `oracle/codemp/game/g_active.c:213-405`
-pub fn DoImpact(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    damageSelf: qboolean,
-) {
+pub fn DoImpact(ctx: GameContext<'_>, self_: EntityId, other: EntityId, damageSelf: qboolean) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = ctx.entity_mut(other);
     unsafe {
         let mut velocity: vec3_t = [0.0; 3];
         let mut my_mass: f32;
@@ -488,9 +499,14 @@ pub fn DoImpact(
 /// Source: `oracle/codemp/game/g_active.c:407-436`
 pub fn Client_CheckImpactBBrush(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: Option<EntityId>,
+    other: Option<EntityId>,
 ) {
+    // STAGE-1: Option params (body null-checks both), raw re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), self_) };
+    let other: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
     unsafe {
         if other.is_null() || (*other).inuse == 0 {
             return;
@@ -518,7 +534,12 @@ pub fn Client_CheckImpactBBrush(
             || ((*other).r.svFlags & SVF_GLASS_BRUSH) != 0
         {
             //clients only do impact damage against easy-break breakables
-            DoImpact(ctx, self_, other, qfalse);
+            DoImpact(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(other).unwrap(),
+                qfalse,
+            );
         }
     }
 }
@@ -526,7 +547,9 @@ pub fn Client_CheckImpactBBrush(
 /// Raven `G_SetClientSound` — loop-sound selection (hack/heal/supply/lava).
 ///
 /// Source: `oracle/codemp/game/g_active.c:444-467`
-pub fn G_SetClientSound(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn G_SetClientSound(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
@@ -560,7 +583,9 @@ pub fn G_SetClientSound(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `ClientImpacts` — bot/other touch dispatch over `pm->touchents`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:478-506`
-pub fn ClientImpacts(ctx: GameContext<'_>, ent: *mut gentity_t, pm: *mut pmove_t) {
+pub fn ClientImpacts(ctx: GameContext<'_>, ent: EntityId, pm: *mut pmove_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut trace: trace_t = core::mem::zeroed();
         let mut i = 0;
@@ -615,7 +640,9 @@ pub fn ClientImpacts(ctx: GameContext<'_>, ent: *mut gentity_t, pm: *mut pmove_t
 /// Raven `G_TouchTriggers` — check nearby trigger volumes against `ent`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:516-590`
-pub fn G_TouchTriggers(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn G_TouchTriggers(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         if (*ent).client.is_null() {
             return;
@@ -733,7 +760,9 @@ pub fn G_TouchTriggers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `G_MoverTouchPushTriggers` — sweep a mover's motion against push triggers.
 ///
 /// Source: `oracle/codemp/game/g_active.c:601-671`
-pub fn G_MoverTouchPushTriggers(ctx: GameContext<'_>, ent: *mut gentity_t, oldOrg: vec3_t) {
+pub fn G_MoverTouchPushTriggers(ctx: GameContext<'_>, ent: EntityId, oldOrg: vec3_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // non-moving movers don't hit triggers!
         if VectorLengthSquared((*ent).s.pos.trDelta) == 0.0 {
@@ -838,7 +867,9 @@ pub fn G_MoverTouchPushTriggers(ctx: GameContext<'_>, ent: *mut gentity_t, oldOr
 /// Raven `SpectatorThink`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:678-740`
-pub fn SpectatorThink(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut usercmd_t) {
+pub fn SpectatorThink(ctx: GameContext<'_>, ent: EntityId, ucmd: *mut usercmd_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
 
@@ -888,7 +919,7 @@ pub fn SpectatorThink(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut user
             crate::q_math::_VectorCopy((*client).ps.origin, &mut (*ent).s.origin);
 
             if (*client).tempSpectate < (*ctx.world).level.time {
-                G_TouchTriggers(ctx, ent);
+                G_TouchTriggers(ctx, ctx.entity_id_of(ent).unwrap());
             }
             trap::UnlinkEntity(
                 ctx.engine,
@@ -916,7 +947,10 @@ pub fn SpectatorThink(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut user
 /// Raven `ClientInactivityTimer`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:751-774`
-pub fn ClientInactivityTimer(ctx: GameContext<'_>, client: *mut gclient_t) -> qboolean {
+pub fn ClientInactivityTimer(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: gclient param reshaped to its owning entity's EntityId; raw
+    // client re-derived verbatim (Stage-2 debt).
+    let client: *mut gclient_t = ctx.entity_mut(ent).client as *mut gclient_t;
     unsafe {
         let level_time = (*ctx.world).level.time;
         let clients = (*ctx.world).level.clients;
@@ -962,7 +996,9 @@ pub fn ClientInactivityTimer(ctx: GameContext<'_>, client: *mut gclient_t) -> qb
 /// Raven `ClientTimerActions` — once-a-second health/armor decay over max.
 ///
 /// Source: `oracle/codemp/game/g_active.c:783-803`
-pub fn ClientTimerActions(ent: *mut gentity_t, msec: c_int) {
+pub fn ClientTimerActions(ent: &mut gentity_t, msec: c_int) {
+    // STAGE-1: ctx-free gentity leaf borrows &mut gentity_t; raw re-derived (Stage-2 debt).
+    let ent: *mut gentity_t = ent;
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         (*client).timeResidual += msec;
@@ -988,7 +1024,9 @@ pub fn ClientTimerActions(ent: *mut gentity_t, msec: c_int) {
 /// Raven `ClientIntermissionThink`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:810-823`
-pub fn ClientIntermissionThink(client: *mut gclient_t) {
+pub fn ClientIntermissionThink(client: &mut gclient_t) {
+    // STAGE-1: ctx-free gclient leaf borrows &mut gclient_t; raw re-derived (Stage-2 debt).
+    let client: *mut gclient_t = client;
     unsafe {
         (*client).ps.eFlags &= !EF_TALK;
         (*client).ps.eFlags &= !EF_FIRING;
@@ -1010,7 +1048,10 @@ pub fn ClientIntermissionThink(client: *mut gclient_t) {
 /// Raven `G_VehicleAttachDroidUnit` — snap a droid unit to its vehicle bolt.
 ///
 /// Source: `oracle/codemp/game/g_active.c:826-854`
-pub fn G_VehicleAttachDroidUnit(ctx: GameContext<'_>, vehEnt: *mut gentity_t) {
+pub fn G_VehicleAttachDroidUnit(ctx: GameContext<'_>, vehEnt: EntityId) {
+    // STAGE-1: EntityId param (Raven's post-deref null-check is vacuous), raw
+    // body re-derived verbatim (Stage-2 debt).
+    let vehEnt: *mut gentity_t = ctx.entity_mut(vehEnt);
     unsafe {
         let veh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
         if !vehEnt.is_null() && !veh.is_null() && !(*veh).m_pDroidUnit.is_null() {
@@ -1115,7 +1156,9 @@ pub fn G_CheapWeaponFire(ctx: GameContext<'_>, entNum: c_int, ev: c_int) {
 /// Raven `ClientEvents` — process predictable client events for the frame.
 ///
 /// Source: `oracle/codemp/game/g_active.c:909-1052`
-pub fn ClientEvents(ctx: GameContext<'_>, ent: *mut gentity_t, oldEventSequence: c_int) {
+pub fn ClientEvents(ctx: GameContext<'_>, ent: EntityId, oldEventSequence: c_int) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let mut oldEventSequence = oldEventSequence;
@@ -1277,7 +1320,9 @@ pub fn SendPendingPredictableEvents(ctx: GameContext<'_>, ps: *mut playerState_t
 /// Raven `G_UpdateForceSightBroadcasts` — broadcast this client to force-sight viewers.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1103-1147`
-pub fn G_UpdateForceSightBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn G_UpdateForceSightBroadcasts(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         // Any clients with force sight on should see this client
         let numConnectedClients = (*ctx.world).level.numConnectedClients;
@@ -1329,7 +1374,9 @@ pub fn G_UpdateForceSightBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t)
 /// Raven `G_UpdateJediMasterBroadcasts` — broadcast the Jedi Master to nearby clients.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1149-1197`
-pub fn G_UpdateJediMasterBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn G_UpdateJediMasterBroadcasts(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let selfCl = (*self_).client as *mut gclient_t;
 
@@ -1385,23 +1432,27 @@ pub fn G_UpdateJediMasterBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t)
 /// Raven `G_UpdateClientBroadcasts`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1199-1209`
-pub fn G_UpdateClientBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn G_UpdateClientBroadcasts(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         // Clear all the broadcast bits for this client
         (*self_).r.broadcastClients = [0; 2];
 
         // The jedi master is broadcast to everyone in range
-        G_UpdateJediMasterBroadcasts(ctx, self_);
+        G_UpdateJediMasterBroadcasts(ctx, ctx.entity_id_of(self_).unwrap());
 
         // Anyone with force sight on should see this client
-        G_UpdateForceSightBroadcasts(ctx, self_);
+        G_UpdateForceSightBroadcasts(ctx, ctx.entity_id_of(self_).unwrap());
     }
 }
 
 /// Raven `G_AddPushVecToUcmd` — fold a client's push vector into its ucmd.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1211-1244`
-pub fn G_AddPushVecToUcmd(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut usercmd_t) {
+pub fn G_AddPushVecToUcmd(ctx: GameContext<'_>, self_: EntityId, ucmd: *mut usercmd_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let mut forward: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
@@ -1493,7 +1544,10 @@ pub fn G_ActionButtonPressed(buttons: c_int) -> qboolean {
 /// Raven `G_CheckClientIdle` — enter/exit idle animations after inactivity.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1302-1430`
-pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut usercmd_t) {
+pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: Option<EntityId>, ucmd: *mut usercmd_t) {
+    // STAGE-1: Option param (body null-checks ent), raw re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), ent) };
     unsafe {
         let mut viewChange: vec3_t = [0.0; 3];
         let actionPressed: qboolean;
@@ -1648,7 +1702,9 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
 /// Raven `NPC_Accelerate`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1432-1486`
-pub fn NPC_Accelerate(ent: *mut gentity_t, fullWalkAcc: qboolean, fullRunAcc: qboolean) {
+pub fn NPC_Accelerate(ent: &gentity_t, fullWalkAcc: qboolean, fullRunAcc: qboolean) {
+    // STAGE-1: ctx-free gentity leaf borrows &gentity_t; raw re-derived (Stage-2 debt).
+    let ent: *const gentity_t = ent;
     unsafe {
         if (*ent).client.is_null() || (*ent).NPC.is_null() {
             return;
@@ -1699,7 +1755,9 @@ pub fn NPC_Accelerate(ent: *mut gentity_t, fullWalkAcc: qboolean, fullRunAcc: qb
 /// Raven `NPC_GetWalkSpeed`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1494-1510`
-pub fn NPC_GetWalkSpeed(ent: *mut gentity_t) -> c_int {
+pub fn NPC_GetWalkSpeed(ent: &gentity_t) -> c_int {
+    // STAGE-1: ctx-free gentity leaf borrows &gentity_t; raw re-derived (Stage-2 debt).
+    let ent: *const gentity_t = ent;
     unsafe {
         if (*ent).client.is_null() || (*ent).NPC.is_null() {
             return 0;
@@ -1714,7 +1772,9 @@ pub fn NPC_GetWalkSpeed(ent: *mut gentity_t) -> c_int {
 /// Raven `NPC_GetRunSpeed`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1517-1573`
-pub fn NPC_GetRunSpeed(ent: *mut gentity_t) -> c_int {
+pub fn NPC_GetRunSpeed(ent: &gentity_t) -> c_int {
+    // STAGE-1: ctx-free gentity leaf borrows &gentity_t; raw re-derived (Stage-2 debt).
+    let ent: *const gentity_t = ent;
     unsafe {
         if (*ent).client.is_null() || (*ent).NPC.is_null() {
             return 0;
@@ -1738,7 +1798,9 @@ pub fn NPC_GetRunSpeed(ent: *mut gentity_t) -> c_int {
 /// Raven `G_CheckMovingLoopingSounds` — NPC movement loop-sounds.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1577-1614`
-pub fn G_CheckMovingLoopingSounds(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut usercmd_t) {
+pub fn G_CheckMovingLoopingSounds(ctx: GameContext<'_>, ent: EntityId, ucmd: *mut usercmd_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let cl = (*ent).client as *mut gclient_t;
         if !cl.is_null() {
@@ -1792,7 +1854,10 @@ pub fn G_CheckMovingLoopingSounds(ctx: GameContext<'_>, ent: *mut gentity_t, ucm
 /// Raven `G_HeldByMonster` — clamp a player being held by a monster (Rancor).
 ///
 /// Source: `oracle/codemp/game/g_active.c:1616-1651`
-pub fn G_HeldByMonster(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut *mut usercmd_t) {
+pub fn G_HeldByMonster(ctx: GameContext<'_>, ent: Option<EntityId>, ucmd: *mut *mut usercmd_t) {
+    // STAGE-1: Option param (body null-checks ent), raw re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), ent) };
     unsafe {
         let cl = if ent.is_null() {
             core::ptr::null_mut()
@@ -1845,7 +1910,9 @@ pub fn G_HeldByMonster(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut *mu
 /// Raven `G_SetTauntAnim` — play a taunt/bow/meditate/flourish/gloat animation.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1662-1926`
-pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: *mut gentity_t, taunt: c_int) {
+pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: EntityId, taunt: c_int) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let cl = (*ent).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
@@ -2045,8 +2112,10 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: *mut gentity_t, taunt: c_int) {
 /// Raven `ClientThink_real` — the per-client server-side think/Pmove driver.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1939-3611`
-pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
     use mp_qshared::shared::gen_cmds::genCmds_t::{self, *};
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let mut isNPC = qfalse;
@@ -2181,7 +2250,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let mut ucmd: *mut usercmd_t = &mut (*client).pers.cmd as *mut usercmd_t;
 
         if (*client).ps.eFlags2 & EF2_HELD_BY_MONSTER != 0 {
-            G_HeldByMonster(ctx, ent, &mut ucmd as *mut *mut usercmd_t);
+            G_HeldByMonster(ctx, ctx.entity_id_of(ent), &mut ucmd as *mut *mut usercmd_t);
         }
 
         // sanity check the command time to prevent speedup cheating
@@ -2235,7 +2304,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ctx.world).level.intermissiontime != 0 {
             if (*ent).s.number < MAX_CLIENTS as c_int || (*client).NPC_class == CLASS_VEHICLE {
                 // players and vehicles do nothing in intermissions
-                ClientIntermissionThink(client);
+                ClientIntermissionThink(&mut *client);
                 return;
             }
         }
@@ -2247,7 +2316,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if (*client).sess.spectatorState == SPECTATOR_SCOREBOARD {
                 return;
             }
-            SpectatorThink(ctx, ent, ucmd);
+            SpectatorThink(ctx, ctx.entity_id_of(ent).unwrap(), ucmd);
             return;
         }
 
@@ -2260,7 +2329,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if (*ent).s.eType != ET_NPC as c_int {
             // check for inactivity timer, but never drop the local client of a non-dedicated server
-            if ClientInactivityTimer(ctx, client) == qfalse {
+            if ClientInactivityTimer(ctx, ctx.entity_id_of(ent).unwrap()) == qfalse {
                 return;
             }
         }
@@ -2384,10 +2453,10 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*ucmd).forwardmove != 0 || (*ucmd).rightmove != 0 || Flying {
                     // In-Formation NPCs set thier desiredSpeed themselves
                     if (*ucmd).buttons & BUTTON_WALKING != 0 {
-                        (*npc).desiredSpeed = NPC_GetWalkSpeed(ent);
+                        (*npc).desiredSpeed = NPC_GetWalkSpeed(&*ent);
                     } else {
                         // running
-                        (*npc).desiredSpeed = NPC_GetRunSpeed(ent);
+                        (*npc).desiredSpeed = NPC_GetRunSpeed(&*ent);
                     }
 
                     if (*npc).currentSpeed >= 80 && controlledByPlayer == qfalse {
@@ -2416,7 +2485,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     (*npc).desiredSpeed = 0;
                 }
 
-                NPC_Accelerate(ent, qfalse, qfalse);
+                NPC_Accelerate(&*ent, qfalse, qfalse);
 
                 if (*npc).currentSpeed <= 24 && (*npc).desiredSpeed < (*npc).currentSpeed {
                     // No-one walks this slow
@@ -2469,9 +2538,9 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 }
             } else {
                 (*npc).desiredSpeed = if (*ucmd).buttons & BUTTON_WALKING != 0 {
-                    NPC_GetWalkSpeed(ent)
+                    NPC_GetWalkSpeed(&*ent)
                 } else {
-                    NPC_GetRunSpeed(ent)
+                    NPC_GetRunSpeed(&*ent)
                 };
 
                 (*client).ps.speed = (*npc).desiredSpeed as f32;
@@ -2986,10 +3055,10 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         // FIXME: need to do this before check to avoid walls and cliffs (or just cliffs?)
-        G_AddPushVecToUcmd(ctx, ent, ucmd);
+        G_AddPushVecToUcmd(ctx, ctx.entity_id_of(ent).unwrap(), ucmd);
 
         // play/stop any looping sounds tied to controlled movement
-        G_CheckMovingLoopingSounds(ctx, ent, ucmd);
+        G_CheckMovingLoopingSounds(ctx, ctx.entity_id_of(ent).unwrap(), ucmd);
 
         pm.ps = &mut (*client).ps as *mut playerState_t;
         pm.cmd = *ucmd;
@@ -3498,15 +3567,15 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             } else if gc == GENCMD_SABERATTACKCYCLE as c_int {
                 Cmd_SaberAttackCycle_f(ctx, ent);
             } else if gc == GENCMD_TAUNT as c_int {
-                G_SetTauntAnim(ctx, ent, TAUNT_TAUNT);
+                G_SetTauntAnim(ctx, ctx.entity_id_of(ent).unwrap(), TAUNT_TAUNT);
             } else if gc == GENCMD_BOW as c_int {
-                G_SetTauntAnim(ctx, ent, TAUNT_BOW);
+                G_SetTauntAnim(ctx, ctx.entity_id_of(ent).unwrap(), TAUNT_BOW);
             } else if gc == GENCMD_MEDITATE as c_int {
-                G_SetTauntAnim(ctx, ent, TAUNT_MEDITATE);
+                G_SetTauntAnim(ctx, ctx.entity_id_of(ent).unwrap(), TAUNT_MEDITATE);
             } else if gc == GENCMD_FLOURISH as c_int {
-                G_SetTauntAnim(ctx, ent, TAUNT_FLOURISH);
+                G_SetTauntAnim(ctx, ctx.entity_id_of(ent).unwrap(), TAUNT_FLOURISH);
             } else if gc == GENCMD_GLOAT as c_int {
-                G_SetTauntAnim(ctx, ent, TAUNT_GLOAT);
+                G_SetTauntAnim(ctx, ctx.entity_id_of(ent).unwrap(), TAUNT_GLOAT);
             }
         }
 
@@ -3554,7 +3623,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).watertype = pm.watertype;
 
         // execute client events
-        ClientEvents(ctx, ent, oldEventSequence);
+        ClientEvents(ctx, ctx.entity_id_of(ent).unwrap(), oldEventSequence);
 
         if pm.useEvent != 0 {
             //TODO: Use
@@ -3573,14 +3642,14 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
         );
         if (*client).noclip == qfalse {
-            G_TouchTriggers(ctx, ent);
+            G_TouchTriggers(ctx, ctx.entity_id_of(ent).unwrap());
         }
 
         // NOTE: now copy the exact origin over otherwise clients can be snapped into solid
         crate::q_math::_VectorCopy((*client).ps.origin, &mut (*ent).r.currentOrigin);
 
         // touch other objects
-        ClientImpacts(ctx, ent, &mut pm as *mut pmove_t);
+        ClientImpacts(ctx, ctx.entity_id_of(ent).unwrap(), &mut pm as *mut pmove_t);
 
         // save results of triggers and client events
         if (*client).ps.eventSequence != oldEventSequence {
@@ -3725,12 +3794,12 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         // perform once-a-second actions
-        ClientTimerActions(ent, msec);
+        ClientTimerActions(&mut *ent, msec);
 
-        G_UpdateClientBroadcasts(ctx, ent);
+        G_UpdateClientBroadcasts(ctx, ctx.entity_id_of(ent).unwrap());
 
         // try some idle anims on ent if getting no input and not moving for some time
-        G_CheckClientIdle(ctx, ent, ucmd);
+        G_CheckClientIdle(ctx, ctx.entity_id_of(ent), ucmd);
 
         // This code was moved here from clientThink to fix a problem with
         // g_synchronousClients being set to 1 when in vehicles.
@@ -3757,7 +3826,9 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `G_CheckClientTimeouts` — force idle clients to spectator.
 ///
 /// Source: `oracle/codemp/game/g_active.c:3620-3640`
-pub fn G_CheckClientTimeouts(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn G_CheckClientTimeouts(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let cl = (*ent).client as *mut gclient_t;
         // Only timeout supported right now is the timeout to spectator mode
@@ -3808,12 +3879,12 @@ pub fn ClientThink(ctx: GameContext<'_>, clientNum: c_int, ucmd: *mut usercmd_t)
         }
 
         if (*ent).r.svFlags & SVF_BOT == 0 && (*ctx.world).cvars.g_synchronousClients.integer == 0 {
-            ClientThink_real(ctx, ent);
+            ClientThink_real(ctx, ctx.entity_id_of(ent).unwrap());
         }
         // vehicles are clients and when running synchronous they still need to
         // think here so special case them.
         else if clientNum >= (MAX_CLIENTS) as i32 {
-            ClientThink_real(ctx, ent);
+            ClientThink_real(ctx, ctx.entity_id_of(ent).unwrap());
         }
     }
 }
@@ -3821,21 +3892,25 @@ pub fn ClientThink(ctx: GameContext<'_>, clientNum: c_int, ucmd: *mut usercmd_t)
 /// Raven `G_RunClient`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:3723-3729`
-pub fn G_RunClient(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn G_RunClient(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         if (*ent).r.svFlags & SVF_BOT == 0 && (*ctx.world).cvars.g_synchronousClients.integer == 0 {
             return;
         }
         let cl = (*ent).client as *mut gclient_t;
         (*cl).pers.cmd.serverTime = (*ctx.world).level.time;
-        ClientThink_real(ctx, ent);
+        ClientThink_real(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }
 
 /// Raven `SpectatorClientEndFrame` — follow-cam / scoreboard bookkeeping.
 ///
 /// Source: `oracle/codemp/game/g_active.c:3738-3783`
-pub fn SpectatorClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SpectatorClientEndFrame(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let entCl = (*ent).client as *mut gclient_t;
 
@@ -3885,7 +3960,9 @@ pub fn SpectatorClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `ClientEndFrame` — end-of-frame per-client fixups.
 ///
 /// Source: `oracle/codemp/game/g_active.c:3794-3874`
-pub fn ClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ClientEndFrame(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut isNPC: qboolean = qfalse;
 
@@ -3896,7 +3973,7 @@ pub fn ClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let entCl = (*ent).client as *mut gclient_t;
 
         if (*entCl).sess.sessionTeam == TEAM_SPECTATOR {
-            SpectatorClientEndFrame(ctx, ent);
+            SpectatorClientEndFrame(ctx, ctx.entity_id_of(ent).unwrap());
             return;
         }
 
@@ -3917,10 +3994,10 @@ pub fn ClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         // burn from lava, etc
-        P_WorldEffects(ctx, ent);
+        P_WorldEffects(ctx, ctx.entity_id_of(ent).unwrap());
 
         // apply all the damage taken this frame
-        P_DamageFeedback(ctx, ent);
+        P_DamageFeedback(ctx, ctx.entity_id_of(ent).unwrap());
 
         // add the EF_CONNECTION flag if we haven't gotten commands recently
         if (*ctx.world).level.time - (*entCl).lastCmdTime > 1000 {
@@ -3931,7 +4008,7 @@ pub fn ClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         (*entCl).ps.stats[STAT_HEALTH as usize] = (*ent).health; // FIXME: get rid of ent->health...
 
-        G_SetClientSound(ctx, ent);
+        G_SetClientSound(ctx, ctx.entity_id_of(ent).unwrap());
 
         // set the latest infor
         if (*ctx.world).cvars.g_smoothClients.integer != 0 {

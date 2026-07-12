@@ -3327,7 +3327,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         // run the presend to set anything else
-        crate::g_active::ClientEndFrame(ctx, ent);
+        crate::g_active::ClientEndFrame(ctx, ctx.entity_id_of(ent).unwrap());
 
         // clear entity state values
         BG_PlayerStateToEntityState(&mut (*client).ps, &mut (*ent).s, qtrue);

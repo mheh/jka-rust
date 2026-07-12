@@ -155,7 +155,7 @@ pub fn G_RunObject(ctx: GameContext<'_>, id: EntityId) {
         tr.fraction = 0.0f32;
     }
 
-    crate::g_active::G_MoverTouchPushTriggers(ctx, &mut *ent, old_org);
+    crate::g_active::G_MoverTouchPushTriggers(ctx, id, old_org);
 
     if tr.fraction == 1.0f32 {
         if world.cvars.g_gravity.value <= 0.0f32 {
@@ -203,7 +203,7 @@ pub fn G_RunObject(ctx: GameContext<'_>, id: EntityId) {
         }
 
         if ent.s.weapon != WP_SABER {
-            crate::g_active::DoImpact(ctx, &mut *ent, ctx.entity_mut(trace_ent), qtrue);
+            crate::g_active::DoImpact(ctx, id, trace_ent, qtrue);
         }
     }
 

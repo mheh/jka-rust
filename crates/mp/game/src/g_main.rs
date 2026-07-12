@@ -3698,7 +3698,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
             }
 
             if (i as usize) < MAX_CLIENTS {
-                G_CheckClientTimeouts(ctx, ent);
+                G_CheckClientTimeouts(ctx, ctx.entity_id_of(ent).unwrap());
 
                 let client = (*ent).client as *mut crate::client::gclient_t;
                 if (*client).inSpaceIndex != 0 && (*client).inSpaceIndex != ENTITYNUM_NONE {
@@ -3889,7 +3889,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                     mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*ent).s.number),
                 );
 
-                G_RunClient(ctx, ent);
+                G_RunClient(ctx, ctx.entity_id_of(ent).unwrap());
                 i += 1;
                 continue;
             } else if (*ent).s.eType == entityType_t::ET_NPC as c_int {
@@ -3928,7 +3928,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
         while i < world.level.maxclients {
             let ent = world.g_entities.as_mut_ptr().add(i as usize);
             if (*ent).inuse != qfalse {
-                ClientEndFrame(ctx, ent);
+                ClientEndFrame(ctx, ctx.entity_id_of(ent).unwrap());
             }
             i += 1;
         }

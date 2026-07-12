@@ -619,7 +619,11 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let self_ = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
             let other = &mut (*self.world).g_entities[impactNum as usize] as *mut gentity_t;
-            crate::g_active::Client_CheckImpactBBrush(ctx, self_, other);
+            crate::g_active::Client_CheckImpactBBrush(
+                ctx,
+                ctx.entity_id_of(self_),
+                ctx.entity_id_of(other),
+            );
         }
     }
     fn flyveh_surface_destruction(
