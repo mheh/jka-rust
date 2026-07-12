@@ -93,27 +93,58 @@ pub struct sharedEntity_t {
     pub next_roff_time: c_int,
 }
 
-const _: () = assert!(core::mem::size_of::<sharedEntity_t>() == 976);
 const _: () = assert!(core::mem::offset_of!(sharedEntity_t, s) == 0);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, playerState) == 536);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, m_pVehicle) == 544);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, ghoul2) == 552);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, localAnimIndex) == 560);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, modelScale) == 564);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, r) == 576);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, taskID) == 688);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, parms) == 728);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, behaviorSet) == 736);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, script_targetname) == 872);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, delayScriptTime) == 880);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, fullName) == 888);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, targetname) == 896);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, classname) == 904);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, waypoint) == 912);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, lastWaypoint) == 916);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, lastValidWaypoint) == 920);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, noWaypointTime) == 924);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, combatPoint) == 928);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, failedWaypoints) == 932);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, failedWaypointCheckTime) == 964);
-const _: () = assert!(core::mem::offset_of!(sharedEntity_t, next_roff_time) == 968);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<sharedEntity_t>() == 976);
+    assert!(core::mem::offset_of!(sharedEntity_t, playerState) == 536);
+    assert!(core::mem::offset_of!(sharedEntity_t, m_pVehicle) == 544);
+    assert!(core::mem::offset_of!(sharedEntity_t, ghoul2) == 552);
+    assert!(core::mem::offset_of!(sharedEntity_t, localAnimIndex) == 560);
+    assert!(core::mem::offset_of!(sharedEntity_t, modelScale) == 564);
+    assert!(core::mem::offset_of!(sharedEntity_t, r) == 576);
+    assert!(core::mem::offset_of!(sharedEntity_t, taskID) == 688);
+    assert!(core::mem::offset_of!(sharedEntity_t, parms) == 728);
+    assert!(core::mem::offset_of!(sharedEntity_t, behaviorSet) == 736);
+    assert!(core::mem::offset_of!(sharedEntity_t, script_targetname) == 872);
+    assert!(core::mem::offset_of!(sharedEntity_t, delayScriptTime) == 880);
+    assert!(core::mem::offset_of!(sharedEntity_t, fullName) == 888);
+    assert!(core::mem::offset_of!(sharedEntity_t, targetname) == 896);
+    assert!(core::mem::offset_of!(sharedEntity_t, classname) == 904);
+    assert!(core::mem::offset_of!(sharedEntity_t, waypoint) == 912);
+    assert!(core::mem::offset_of!(sharedEntity_t, lastWaypoint) == 916);
+    assert!(core::mem::offset_of!(sharedEntity_t, lastValidWaypoint) == 920);
+    assert!(core::mem::offset_of!(sharedEntity_t, noWaypointTime) == 924);
+    assert!(core::mem::offset_of!(sharedEntity_t, combatPoint) == 928);
+    assert!(core::mem::offset_of!(sharedEntity_t, failedWaypoints) == 932);
+    assert!(core::mem::offset_of!(sharedEntity_t, failedWaypointCheckTime) == 964);
+    assert!(core::mem::offset_of!(sharedEntity_t, next_roff_time) == 968);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree) — the retail
+// 32-bit module ABI.
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<sharedEntity_t>() == 864);
+    assert!(core::mem::offset_of!(sharedEntity_t, playerState) == 532);
+    assert!(core::mem::offset_of!(sharedEntity_t, m_pVehicle) == 536);
+    assert!(core::mem::offset_of!(sharedEntity_t, ghoul2) == 540);
+    assert!(core::mem::offset_of!(sharedEntity_t, localAnimIndex) == 544);
+    assert!(core::mem::offset_of!(sharedEntity_t, modelScale) == 548);
+    assert!(core::mem::offset_of!(sharedEntity_t, r) == 560);
+    assert!(core::mem::offset_of!(sharedEntity_t, taskID) == 672);
+    assert!(core::mem::offset_of!(sharedEntity_t, parms) == 712);
+    assert!(core::mem::offset_of!(sharedEntity_t, behaviorSet) == 716);
+    assert!(core::mem::offset_of!(sharedEntity_t, script_targetname) == 784);
+    assert!(core::mem::offset_of!(sharedEntity_t, delayScriptTime) == 788);
+    assert!(core::mem::offset_of!(sharedEntity_t, fullName) == 792);
+    assert!(core::mem::offset_of!(sharedEntity_t, targetname) == 796);
+    assert!(core::mem::offset_of!(sharedEntity_t, classname) == 800);
+    assert!(core::mem::offset_of!(sharedEntity_t, waypoint) == 804);
+    assert!(core::mem::offset_of!(sharedEntity_t, lastWaypoint) == 808);
+    assert!(core::mem::offset_of!(sharedEntity_t, lastValidWaypoint) == 812);
+    assert!(core::mem::offset_of!(sharedEntity_t, noWaypointTime) == 816);
+    assert!(core::mem::offset_of!(sharedEntity_t, combatPoint) == 820);
+    assert!(core::mem::offset_of!(sharedEntity_t, failedWaypoints) == 824);
+    assert!(core::mem::offset_of!(sharedEntity_t, failedWaypointCheckTime) == 856);
+    assert!(core::mem::offset_of!(sharedEntity_t, next_roff_time) == 860);
+};

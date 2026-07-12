@@ -24,7 +24,13 @@ pub struct stringID_table_t {
 unsafe impl Sync for stringID_table_t {}
 
 // Pointer-width dependent: 8-byte `name` + 4-byte `id` + 4-byte tail padding on
-// 64-bit targets.
+// 64-bit targets; packed 4+4 on ILP32 (clang i386 ground truth).
+#[cfg(target_pointer_width = "64")]
 const _: () = {
     assert!(core::mem::size_of::<stringID_table_t>() == 16);
+};
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<stringID_table_t>() == 8);
+    assert!(core::mem::offset_of!(stringID_table_t, id) == 4);
 };

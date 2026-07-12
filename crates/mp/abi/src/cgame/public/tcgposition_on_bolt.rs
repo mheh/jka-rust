@@ -19,11 +19,25 @@ pub struct TCGPositionOnBolt {
     pub modelScale: vec3_t,  // input
 }
 
-const _: () = assert!(core::mem::size_of::<TCGPositionOnBolt>() == 272);
 const _: () = assert!(core::mem::offset_of!(TCGPositionOnBolt, ent) == 0);
-const _: () = assert!(core::mem::offset_of!(TCGPositionOnBolt, ghoul2) == 216);
-const _: () = assert!(core::mem::offset_of!(TCGPositionOnBolt, modelIndex) == 224);
-const _: () = assert!(core::mem::offset_of!(TCGPositionOnBolt, boltIndex) == 228);
-const _: () = assert!(core::mem::offset_of!(TCGPositionOnBolt, origin) == 232);
-const _: () = assert!(core::mem::offset_of!(TCGPositionOnBolt, angles) == 244);
-const _: () = assert!(core::mem::offset_of!(TCGPositionOnBolt, modelScale) == 256);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<TCGPositionOnBolt>() == 272);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, ghoul2) == 216);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, modelIndex) == 224);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, boltIndex) == 228);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, origin) == 232);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, angles) == 244);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, modelScale) == 256);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<TCGPositionOnBolt>() == 260);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, ghoul2) == 212);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, modelIndex) == 216);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, boltIndex) == 220);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, origin) == 224);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, angles) == 236);
+    assert!(core::mem::offset_of!(TCGPositionOnBolt, modelScale) == 248);
+};

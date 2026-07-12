@@ -60,8 +60,18 @@ pub struct siegeTeam_t {
     pub friendlyShader: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<siegeTeam_t>() == 648);
 const _: () = assert!(core::mem::offset_of!(siegeTeam_t, name) == 0);
 const _: () = assert!(core::mem::offset_of!(siegeTeam_t, classes) == 512);
-const _: () = assert!(core::mem::offset_of!(siegeTeam_t, numClasses) == 640);
-const _: () = assert!(core::mem::offset_of!(siegeTeam_t, friendlyShader) == 644);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<siegeTeam_t>() == 648);
+    assert!(core::mem::offset_of!(siegeTeam_t, numClasses) == 640);
+    assert!(core::mem::offset_of!(siegeTeam_t, friendlyShader) == 644);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<siegeTeam_t>() == 584);
+    assert!(core::mem::offset_of!(siegeTeam_t, numClasses) == 576);
+    assert!(core::mem::offset_of!(siegeTeam_t, friendlyShader) == 580);
+};

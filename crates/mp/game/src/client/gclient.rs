@@ -239,15 +239,12 @@ const _: () = assert!(core::mem::offset_of!(gclient_t, pers) == 1552);
 const _: () = assert!(core::mem::offset_of!(gclient_t, sess) == 1708);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gclient_t, saber) == 1992);
-#[cfg(target_pointer_width = "64")]
 // This struct's stored `gentity_t*` fields are ported as `Option<EntityId>`
 // (align 4 vs a pointer's align 8), so the private tail's byte offsets shift. This struct is
 // game-internal / not ABI-fixed beyond its prefix — the engine learns the full
 // stride at runtime via `trap_LocateGameData`. The `size_of` assert and every
 // `offset_of` assert at/after the first flipped field are therefore dropped;
 // only the fixed-prefix asserts above (declared before the first flip) remain.
-#[cfg(target_pointer_width = "64")]
-#[cfg(target_pointer_width = "64")]
 
 // The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
 // all-zero bytes are a valid gclient_t — the same property the layout asserts above
