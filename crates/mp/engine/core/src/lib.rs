@@ -7,9 +7,11 @@
 
 pub mod engine;
 pub mod game_version_consts;
+pub mod host_view;
 pub mod lifecycle;
 pub mod sv_init_game_progs;
 
 pub use engine::Engine;
+pub use host_view::{engine_host_view, install_engine_hooks};
 pub use lifecycle::{com_frame, com_init, com_shutdown, sys_error, sys_milliseconds};
 pub use sv_init_game_progs::sv_init_game_progs;

@@ -25,7 +25,8 @@ use native_types::fileHandle_t;
 use crate::cm_load::RenderModels;
 use crate::collision_world::CollisionWorld;
 use crate::common::{com_error, com_printf, Common, MASK_QUED_EVENTS, MAX_QUED_EVENTS};
-use crate::cvar_fns::Cvar_VariableString;
+use crate::common::engine_host_view::EngineHostView;
+use crate::cvar_fns::{Cvar_Set, Cvar_VariableString};
 use crate::files_common::{FS_BuildOSPath4, FS_Read};
 use crate::files_pc::FS_Seek;
 use crate::msg::MSG_Init;
@@ -312,4 +313,30 @@ pub fn Sys_GetEvent(
     let mut ev: sysEvent_t = unsafe { core::mem::zeroed() };
     ev.evTime = sys_milliseconds(common);
     ev
+}
+
+/// Raven's unix `arch` cvar value (`Sys_Init`'s `#if` chain): only the linux
+/// i386 build has a specific string; every other target this port builds for
+/// falls to Raven's own `#else` arms (`"linux unknown"` / `"unknown"`).
+///
+/// Source: `oracle/codemp/unix/unix_main.c:164-200`
+#[cfg(all(target_os = "linux", target_arch = "x86"))]
+const SYS_ARCH: &str = "linux i386";
+#[cfg(all(target_os = "linux", not(target_arch = "x86")))]
+const SYS_ARCH: &str = "linux unknown";
+#[cfg(not(target_os = "linux"))]
+const SYS_ARCH: &str = "unknown";
+
+/// Raven unix `Sys_Init` — the `arch`/`username` cvar writes. The input-layer
+/// tail is client-shell slice work:
+//TODO: Port Sys_In_Restart_f + IN_Init (client-shell slice)
+// Source: oracle/codemp/unix/unix_main.c:162,204
+///
+/// Source: `oracle/codemp/unix/unix_main.c:160-206`
+pub fn Sys_Init(view: &mut EngineHostView) {
+    let arch = std::ffi::CString::new(SYS_ARCH).unwrap();
+    Cvar_Set(view, c"arch".as_ptr(), arch.as_ptr());
+    let username = std::ffi::CString::new(native_platform::sys_main::Sys_GetCurrentUser())
+        .unwrap_or_else(|_| std::ffi::CString::new("player").unwrap());
+    Cvar_Set(view, c"username".as_ptr(), username.as_ptr());
 }

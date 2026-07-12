@@ -6,6 +6,7 @@
 
 pub mod botlib_import;
 pub mod gameCallbacks;
+pub mod hook_install;
 pub mod npcnav;
 pub mod server;
 pub mod server_host;

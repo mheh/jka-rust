@@ -2,29 +2,16 @@
 
 use core::ffi::c_char;
 
-use mp_host_interface::engine_host::EngineHost;
-
-use crate::cm_load::RmManager;
-use crate::cmd_pc::{RenderModels, Server};
-use crate::collision_world::CollisionWorld;
-use crate::common::Common;
-use crate::z_memman_pc::Ghoul2System;
+use crate::common::engine_host_view::EngineHostView;
 
 /// Console-command handler slot. Receiver-threaded in place of Raven's
-/// global-reaching `void (*xcommand_t)(void)` (user ruling 2026-07-11): the
-/// dispatch site (`Cmd_ExecuteString`) threads the receivers in scope there
-/// (`common`/`cm`/`sv`/`rm`/`rmg`/`g2`/`host`, pinned to match the
-/// `EngineHooks::SV_Frame` order), so every registered command reaches real
-/// engine state instead of a no-op shim.
-pub type CmdFunction = fn(
-    &mut Common,
-    &mut CollisionWorld,
-    &mut Server,
-    &mut RenderModels,
-    &mut RmManager,
-    &mut Ghoul2System,
-    &mut dyn EngineHost,
-);
+/// global-reaching `void (*xcommand_t)(void)` (user ruling 2026-07-11); the
+/// receiver list collapsed to the single `EngineHostView` world bundle in the
+/// host-seam restructure (user ruling 2026-07-11 pt. 2, amending the pinned
+/// receiver order): the dispatch site (`Cmd_ExecuteString`) passes the view in
+/// scope there, and a handler that needs its island's real state casts the
+/// view's type-erased slot at its boundary.
+pub type CmdFunction = fn(&mut EngineHostView);
 
 /// Raven `cmd_function_t` — a node in the registered-command linked list
 /// (`Cmd_AddCommand`/`Cmd_ExecuteString`). `Common::cmd_functions` walks it as a
