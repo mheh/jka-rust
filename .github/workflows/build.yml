@@ -36,7 +36,7 @@ name: Build modules
 
 on:
   push:
-    branches: [master, skeleton]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -57,7 +57,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -127,7 +127,7 @@ jobs:
           sudo apt-get install -y gcc-multilib
 
       - name: Cache cargo
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -163,7 +163,7 @@ jobs:
           ls -l dist
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.ZIP_NAME }}
           path: dist/${{ env.ZIP_NAME }}
@@ -172,13 +172,12 @@ jobs:
   release:
     name: Update rolling release
     needs: build
-    # `needs.build` is satisfied even when only the allowed-failure 32-bit
-    # lanes failed; publish whatever built. Master-only (see `build`'s `if`).
+    # Master-only (see `build`'s `if`).
     if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -187,7 +186,7 @@ jobs:
         run: ls -lR dist
 
       - name: Publish rolling `latest` release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: latest
           name: Rolling build (master)
@@ -197,7 +196,6 @@ jobs:
 
             Each zip contains the module under the exact filename the engine
             loads (`jampgamex86_64.dll`, `jampgamex86_64.so`, …). Asset URLs
-            are stable across builds. 32-bit zips appear once the ILP32
-            layout-assert pass lands.
+            are stable across builds.
           files: dist/*.zip
           fail_on_unmatched_files: false
