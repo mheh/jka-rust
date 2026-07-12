@@ -581,6 +581,49 @@ pub fn CMod_LoadSubmodels(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut 
             com_error(errorParm_t::ERR_DROP, "MAX_SUBMODELS exceeded".into());
         }
 
+        // §19: Raven stores `indexes - cm.leafbrushes` — a pointer difference
+        // between two SEPARATE Hunk_Alloc blocks — into the i32
+        // `leaf.firstLeafBrush`, relying on its contiguous hunk to keep the
+        // diff small. Our hunk is malloc-backed (blocks arbitrarily far
+        // apart), so the diff truncates and the reconstruction reads wild
+        // memory (live SIGBUS on mp/duel1's func_bobbing). The one defined
+        // behavior with identical semantics: grow the leafbrushes/leafsurfaces
+        // arrays and APPEND each submodel's index block, so the stored value
+        // is a genuine index. `numLeafBrushes`/`numLeafSurfaces` keep the map
+        // lump's counts, exactly as Raven's do.
+        let mut extra_brushes: usize = 0;
+        let mut extra_surfaces: usize = 0;
+        {
+            let mut probe = r#in;
+            for i in 0..count {
+                if !(i == 0
+                    && core::ptr::eq(cmap as *const clipMap_t, &view.cm.cmg as *const clipMap_t))
+                {
+                    extra_brushes += (*probe).numBrushes.max(0) as usize;
+                    extra_surfaces += (*probe).numSurfaces.max(0) as usize;
+                }
+                probe = probe.offset(1);
+            }
+        }
+        let old_lb = cmap.numLeafBrushes.max(0) as usize;
+        let new_lb = Hunk_Alloc(
+            view,
+            ((old_lb + extra_brushes) * 4) as c_int,
+            ha_pref::h_high,
+        ) as *mut c_int;
+        core::ptr::copy_nonoverlapping(cmap.leafbrushes, new_lb, old_lb);
+        cmap.leafbrushes = new_lb;
+        let mut next_lb = old_lb;
+        let old_ls = cmap.numLeafSurfaces.max(0) as usize;
+        let new_ls = Hunk_Alloc(
+            view,
+            ((old_ls + extra_surfaces) * 4) as c_int,
+            ha_pref::h_high,
+        ) as *mut c_int;
+        core::ptr::copy_nonoverlapping(cmap.leafsurfaces, new_ls, old_ls);
+        cmap.leafsurfaces = new_ls;
+        let mut next_ls = old_ls;
+
         for i in 0..count {
             let out = cmap.cmodels.offset(i as isize);
 
@@ -604,26 +647,20 @@ pub fn CMod_LoadSubmodels(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut 
             (*out).firstNode = -1;
 
             (*out).leaf.numLeafBrushes = (*r#in).numBrushes;
-            let indexes = Hunk_Alloc(
-                view,
-                ((*out).leaf.numLeafBrushes as usize * 4) as c_int,
-                ha_pref::h_high,
-            ) as *mut c_int;
-            (*out).leaf.firstLeafBrush = (indexes.offset_from(cmap.leafbrushes)) as c_int;
+            let indexes = cmap.leafbrushes.add(next_lb);
+            (*out).leaf.firstLeafBrush = next_lb as c_int;
             for j in 0..(*out).leaf.numLeafBrushes {
                 *indexes.offset(j as isize) = (*r#in).firstBrush + j;
             }
+            next_lb += (*out).leaf.numLeafBrushes.max(0) as usize;
 
             (*out).leaf.numLeafSurfaces = (*r#in).numSurfaces;
-            let indexes = Hunk_Alloc(
-                view,
-                ((*out).leaf.numLeafSurfaces as usize * 4) as c_int,
-                ha_pref::h_high,
-            ) as *mut c_int;
-            (*out).leaf.firstLeafSurface = (indexes.offset_from(cmap.leafsurfaces)) as c_int;
+            let indexes = cmap.leafsurfaces.add(next_ls);
+            (*out).leaf.firstLeafSurface = next_ls as c_int;
             for j in 0..(*out).leaf.numLeafSurfaces {
                 *indexes.offset(j as isize) = (*r#in).firstSurface + j;
             }
+            next_ls += (*out).leaf.numLeafSurfaces.max(0) as usize;
 
             r#in = r#in.offset(1);
         }

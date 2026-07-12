@@ -732,7 +732,7 @@ pub fn SV_SpawnServer(
     );
 
     // serverid should be different each time
-    sv.sv.serverId = view.common.frame_time;
+    sv.sv.serverId = view.common.com_frameTime;
     sv.sv.restartedServerId = sv.sv.serverId;
     Cvar_Set(
         view,

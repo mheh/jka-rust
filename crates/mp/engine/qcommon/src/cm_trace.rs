@@ -833,7 +833,7 @@ pub fn CM_TestInLeaf(
                 continue;
             }
 
-            if (*view.cm.cm_terrainPhysics).integer != 0
+            if (*view.common.com_terrainPhysics).integer != 0
                 && !view.cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
@@ -1213,7 +1213,7 @@ pub fn CM_TraceThroughLeaf(
                 continue;
             }
 
-            if (*view.cm.cm_terrainPhysics).integer != 0
+            if (*view.common.com_terrainPhysics).integer != 0
                 && !view.cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
@@ -1288,7 +1288,7 @@ pub fn CM_TraceToLeaf(
                 continue;
             }
 
-            if (*view.cm.cm_terrainPhysics).integer != 0
+            if (*view.common.com_terrainPhysics).integer != 0
                 && !view.cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {

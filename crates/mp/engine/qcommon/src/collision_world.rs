@@ -163,8 +163,6 @@ pub struct CollisionWorld {
     /// `CollisionWorld` call sites (`cm_trace.rs`) rather than the Raven
     /// global's own `com_` prefix.
     ///
-    /// Source: `oracle/codemp/qcommon/cm_landscape.h:267`
-    pub cm_terrainPhysics: *mut cvar_t,
 
     /// Raven `void *gpvCachedMapDiskImage` / `char gsCachedMapDiskImage[MAX_QPATH]`
     /// / `qboolean gbUsingCachedMapDataRightNow` — the cached-map-diskimage

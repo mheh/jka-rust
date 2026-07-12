@@ -880,14 +880,16 @@ pub fn VM_Call(common: &mut Common, vm: *mut vm_t, callnum: c_int, args: &[c_int
 
         // if we have a dll loaded, call it directly (native arm, vm.cpp:806-816)
         let r = if let Some(entry) = (*vm).entryPoint {
-            let mut a = [0 as c_int; 16];
-            for (i, v) in args.iter().take(16).enumerate() {
-                a[i] = *v;
+            // Fixed-arity RawVmMain (the widened vmMain dual): command stays
+            // c_int, the 12 arg words widen to AbiWord — matching the module
+            // export register-for-register.
+            let mut a = [0 as isize; 12];
+            for (i, v) in args.iter().take(12).enumerate() {
+                a[i] = *v as isize;
             }
             entry(
                 callnum, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11],
-                a[12], a[13], a[14], a[15],
-            )
+            ) as c_int
         } else {
             // The QVM `VM_CallCompiled`/`VM_CallInterpreted` arms are dead
             // surface in the native-dll build (§20): no bytecode VM is ever

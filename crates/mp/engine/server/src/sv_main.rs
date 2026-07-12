@@ -1118,7 +1118,6 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
                 &[sv.svs.time],
             );
         }
-
         //rww - RAGDOLL_BEGIN
         let time = sv.svs.time;
         // SAFETY: view-constructor slot, single-threaded, no other live cast

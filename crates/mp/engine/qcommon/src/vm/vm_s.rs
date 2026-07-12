@@ -18,7 +18,14 @@ pub struct vm_t {
 
     // for dynamic linked modules
     pub dllHandle: *mut core::ffi::c_void,
-    pub entryPoint: Option<unsafe extern "C" fn(callNum: i32, ...) -> i32>,
+    // Raven's `int (QDECL *entryPoint)( int callNum, ... )` is the 32-bit
+    // C-variadic shape; our module exports the fixed-arity widened dual
+    // (`RawVmMain`: command + 12 AbiWord args — the vmMain pair ruling). The
+    // types MUST match exactly: on Darwin arm64 variadic args travel on the
+    // stack while fixed-arity args are in registers, so calling the module
+    // through a variadic type delivers garbage args (live boot bug,
+    // 2026-07-12: frozen level.time / commandTime=200).
+    pub entryPoint: Option<native_platform::entrypoints::RawVmMain>,
 
     // for interpreted modules
     pub currentlyInterpreting: qboolean,

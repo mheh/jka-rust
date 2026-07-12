@@ -112,14 +112,12 @@ pub struct loopback_t {
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:22-94`
 pub struct Common {
-    /// `com_frameTime`/`com_frameMsec`/`com_frameNumber` (`common.cpp:79-81`).
-    pub frame_time: i32,
-    pub frame_msec: i32,
-    pub frame_number: i32,
+    // (The frame clocks live in the Raven-named `com_frameTime`/`com_frameMsec`/
+    // `com_frameNumber` fields below — the skeleton-era duplicates were
+    // consolidated 2026-07-12 after the serverId=0 live-connect bug: two homes
+    // for one Raven global is the bug class, ErrorState precedent.)
     /// `Com_Frame` `static int lastTime` (`common.cpp:1601`; §B3 fn-static hoist).
     pub frame_last_time: i32,
-    /// `com_fullyInitialized` (`common.cpp:84`).
-    pub fully_initialized: bool,
     /// `com_errorEntered`/`com_errorMessage` + MP rapid-error statics.
     pub error: ErrorState,
     /// `com_journalFile`/`com_journalDataFile` + `journal` mode (MP only).

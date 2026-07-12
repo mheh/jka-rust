@@ -69,7 +69,7 @@ fn dlerror_string() -> String {
 pub unsafe fn Sys_LoadDll(
     common: &mut Common,
     name: *const c_char,
-    entryPoint: &mut Option<unsafe extern "C" fn(i32, ...) -> i32>,
+    entryPoint: &mut Option<native_platform::entrypoints::RawVmMain>,
     systemcalls: Option<unsafe extern "C-unwind" fn(isize, ...) -> isize>,
 ) -> *mut c_void {
     // Raven fills `curpath` via `getcwd` only for the dead `#if 0` install-dir
@@ -151,7 +151,7 @@ pub unsafe fn Sys_LoadDll(
     } else {
         Some(core::mem::transmute::<
             *mut c_void,
-            unsafe extern "C" fn(i32, ...) -> i32,
+            native_platform::entrypoints::RawVmMain,
         >(vm_main))
     };
     if entryPoint.is_none() || dll_entry.is_null() {
