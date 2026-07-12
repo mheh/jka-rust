@@ -513,7 +513,20 @@ unsafe fn c_str(ptr: isize) -> String {
 }
 
 /// Write `value` (NUL-terminated, truncated to `size`) into a C char buffer.
+///
+/// The trap ABI declares `bufferSize` as a 32-bit `int` (e.g.
+/// `trap_GetEntityToken( char *buffer, int bufferSize )`, g_public.h:221). On
+/// this 64-bit host the C-variadic trampoline widens every arg to `intptr_t`
+/// via `va_arg(ap, intptr_t)` (vm/game_syscall_trampoline.c:37), but an `int`
+/// variadic arg is NOT promoted past 32 bits — the high 32 bits of the slot are
+/// whatever garbage the module's register/stack held at the call. Reading the
+/// full `isize` therefore sometimes yields a huge or NEGATIVE size (codegen- and
+/// layout-dependent), and a negative one used to make this fn skip the write,
+/// leaving the module's `com_token` buffer stale — the source of the flaky
+/// `G_ParseSpawnVars: found 0 when expecting {` / `G_FindConfigstringIndex:
+/// overflow` oracle crashes. Read only the ABI-defined low 32 bits.
 unsafe fn write_c_buffer(buf: isize, size: isize, value: &str) {
+    let size = size as c_int;
     if buf == 0 || size <= 0 {
         return;
     }
