@@ -8,8 +8,11 @@
 # artifact builds and our mock-engine harness can drive its full lifecycle.
 #
 # The oracle tree (oracle/**) is NEVER edited. Every game/*.c is compiled
-# straight from a throwaway COPY under build/src/ whose only change is a one-line
-# activation of Raven's OWN `#define qboolean int` (see the patch step below).
+# straight from a throwaway COPY under build/src/, patched in-place by the
+# python step below: Raven's OWN `#define qboolean int` is activated, SnapVector
+# is retargeted to retail-rounding rint(), and float-arg libm calls (atan2f,
+# sqrtf, ...) are forced back to the double family MSVC's C compile promoted
+# them to, so this C++-compiled oracle matches retail/our f64 parity bar.
 #
 # Requires a real GCC (Homebrew `gcc`): the unmodified 32-bit-era C++ source needs
 # `-fpermissive` to accept its `FOFS` pointer->int casts on a 64-bit host, which
@@ -61,7 +64,68 @@ new = ("typedef enum {qfalse, qtrue}\tqboolean;\n"
        "#if 1 /* referee-oracle: activate Raven's own XBOX qboolean=int (ABI-identical) */\n"
        "#define\tqboolean\tint")
 assert old in s, "q_shared.h qboolean block not found — oracle changed?"
-open(p, "w").write(s.replace(old, new, 1))
+s = s.replace(old, new, 1)
+
+# retail-win32 SnapVector (x87 fld/fistp) is the port's parity bar — see
+# crates/mp/game/src/bg_misc.rs's round_ties_even. The ONLY place -D__linux__
+# diverges from that is this macro: it TRUNCATES via (int) casts instead of
+# rounding. Patch the harness copy's __linux__ branch to rint(), which under
+# the default FP environment is round-to-nearest-even — exactly fistp's
+# semantics — so the oracle dylib built here matches retail-win32 rounding
+# instead of the Linux-only truncation. (math.h is already included above.)
+old_snap = ("#ifdef __linux__\n"
+            "#define\tSnapVector(v) {v[0]=((int)(v[0]));v[1]=((int)(v[1]));v[2]=((int)(v[2]));}\n")
+new_snap = ("#ifdef __linux__\n"
+            "#define\tSnapVector(v) {v[0]=(float)rint(v[0]);v[1]=(float)rint(v[1]);v[2]=(float)rint(v[2]);}\n")
+assert old_snap in s, "q_shared.h __linux__ SnapVector macro not found — oracle changed?"
+s = s.replace(old_snap, new_snap, 1)
+
+# retail (MSVC, compiled as C) promotes float args to double and calls the
+# double libm family; compiling this tree as C++ instead resolves the float
+# overloads (atan2f, sqrtf, ...), a 1-ULP-class divergence from the retail
+# parity bar our Rust port targets (see docs/decisions.md). Force the double
+# path with function-like macros immediately after <math.h> — the macro name
+# is not re-expanded inside its own expansion, so these are safe self-refs.
+old_mathinc = "#include <math.h>\n"
+new_mathinc = (
+    "#include <math.h>\n"
+    "/* referee-oracle: retail (MSVC, compiled as C) promotes float args to double\n"
+    "   and calls double libm; compiling as C++ resolves float overloads (atan2f,\n"
+    "   sqrtf, ...) instead — a 1-ULP-class divergence from the retail parity bar.\n"
+    "   Function-like macros force the double path; the macro name is not\n"
+    "   re-expanded inside its own expansion, so these are safe self-references. */\n"
+    "#define sqrt(x) sqrt((double)(x))\n"
+    "#define sin(x) sin((double)(x))\n"
+    "#define cos(x) cos((double)(x))\n"
+    "#define tan(x) tan((double)(x))\n"
+    "#define asin(x) asin((double)(x))\n"
+    "#define acos(x) acos((double)(x))\n"
+    "#define atan(x) atan((double)(x))\n"
+    "#define atan2(y,x) atan2((double)(y),(double)(x))\n"
+    "#define pow(x,y) pow((double)(x),(double)(y))\n"
+    "#define fmod(x,y) fmod((double)(x),(double)(y))\n"
+    "#define exp(x) exp((double)(x))\n"
+    "#define log(x) log((double)(x))\n"
+)
+assert old_mathinc in s, "q_shared.h '#include <math.h>' not found — oracle changed?"
+s = s.replace(old_mathinc, new_mathinc, 1)
+
+# Caveat: q_shared.h separately re-declares `double fmod(double,double);` as its
+# own prototype (line ~1603) — the fmod(...) macro above expands that
+# declarator too ("fmod" followed by "(" is enough), producing an illegal
+# `fmod((double)(double x), ...)` redeclaration. Bracket just this one
+# declaration with #undef/#define so the macro stays live for every actual
+# call site but not for this redundant prototype.
+old_fmodproto = "double\tfmod( double x, double y );\n"
+new_fmodproto = (
+    "#undef fmod /* referee-oracle: shield this prototype from the double-promotion macro above */\n"
+    "double\tfmod( double x, double y );\n"
+    "#define fmod(x,y) fmod((double)(x),(double)(y))\n"
+)
+assert old_fmodproto in s, "q_shared.h fmod() prototype not found — oracle changed?"
+s = s.replace(old_fmodproto, new_fmodproto, 1)
+
+open(p, "w").write(s)
 PY
 
 C=build/src/codemp
