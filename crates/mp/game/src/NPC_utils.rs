@@ -246,7 +246,7 @@ pub fn CalcEntitySpot(
                 }
                 crate::g_weapon::CalcMuzzlePoint(
                     ctx,
-                    ent as *mut gentity_t,
+                    ctx.entity_id_of(ent).unwrap(),
                     forward,
                     right,
                     up,

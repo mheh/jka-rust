@@ -1356,7 +1356,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             // Find the desired angles
             let clearshot = crate::g_weapon::WP_LobFire(
                 ctx,
-                npc_ent,
+                ctx.entity_id_of(npc_ent).unwrap(),
                 muzzle,
                 target,
                 mins,

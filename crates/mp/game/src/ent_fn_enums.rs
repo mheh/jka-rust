@@ -122,10 +122,12 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::BodyRid => BodyRid(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::BodySink => BodySink(ctx, self_),
         EntThink::CreateShield => CreateShield(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::DEMP2_AltDetonate => DEMP2_AltDetonate(ctx, self_),
-        EntThink::DEMP2_AltRadiusDamage => DEMP2_AltRadiusDamage(ctx, self_),
+        EntThink::DEMP2_AltDetonate => DEMP2_AltDetonate(ctx, ctx.entity_id_of(self_).unwrap()),
+        EntThink::DEMP2_AltRadiusDamage => {
+            DEMP2_AltRadiusDamage(ctx, ctx.entity_id_of(self_).unwrap())
+        }
         EntThink::DeadSaberThink => DeadSaberThink(ctx, self_),
-        EntThink::DetPackBlow => DetPackBlow(ctx, self_),
+        EntThink::DetPackBlow => DetPackBlow(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::Disappear => Disappear(self_),
         EntThink::DownedSaberThink => DownedSaberThink(ctx, self_),
         EntThink::EWebThink => EWebThink(ctx, ctx.entity_id_of(self_).unwrap()),
@@ -164,10 +166,14 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         }
         EntThink::Think_Strike => Think_Strike(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::Think_Target_Delay => Think_Target_Delay(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::TrapThink => TrapThink(ctx, self_),
+        EntThink::TrapThink => TrapThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::Use_BinaryMover_Go => Use_BinaryMover_Go(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::WP_VehWeapSetSolidToOwner => WP_VehWeapSetSolidToOwner(ctx, self_),
-        EntThink::WP_flechette_alt_blow => WP_flechette_alt_blow(ctx, self_),
+        EntThink::WP_VehWeapSetSolidToOwner => {
+            WP_VehWeapSetSolidToOwner(ctx, ctx.entity_id_of(self_).unwrap())
+        }
+        EntThink::WP_flechette_alt_blow => {
+            WP_flechette_alt_blow(ctx, ctx.entity_id_of(self_).unwrap())
+        }
         EntThink::anglerCallback => anglerCallback(ctx, self_),
         EntThink::asteroid_field_think => {
             asteroid_field_think(ctx, ctx.entity_id_of(self_).unwrap())
@@ -176,7 +182,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
             asteroid_move_to_start(ctx, ctx.entity_id_of(self_).unwrap())
         }
         EntThink::check_recharge => check_recharge(ctx, self_),
-        EntThink::emplaced_gun_update => emplaced_gun_update(ctx, self_),
+        EntThink::emplaced_gun_update => emplaced_gun_update(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::faller_think => faller_think(ctx, self_),
         EntThink::funcBBrushDieGo => funcBBrushDieGo(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::func_timer_think => func_timer_think(ctx, ctx.entity_id_of(self_).unwrap()),
@@ -188,8 +194,8 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         }
         EntThink::fx_runner_link => fx_runner_link(ctx, self_),
         EntThink::fx_runner_think => fx_runner_think(ctx, self_),
-        EntThink::laserTrapExplode => laserTrapExplode(ctx, self_),
-        EntThink::laserTrapThink => laserTrapThink(ctx, self_),
+        EntThink::laserTrapExplode => laserTrapExplode(ctx, ctx.entity_id_of(self_).unwrap()),
+        EntThink::laserTrapThink => laserTrapThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::locateCamera => locateCamera(ctx, self_),
         EntThink::maglock_link => maglock_link(ctx, self_),
         EntThink::misc_faller_think => misc_faller_think(ctx, self_),
@@ -197,9 +203,9 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::misc_weapon_shooter_fire => misc_weapon_shooter_fire(ctx, self_),
         EntThink::multi_trigger_run => multi_trigger_run(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::pas_think => pas_think(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::proxMineThink => proxMineThink(ctx, self_),
+        EntThink::proxMineThink => proxMineThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::ref_link => ref_link(ctx, self_),
-        EntThink::rocketThink => rocketThink(ctx, self_),
+        EntThink::rocketThink => rocketThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::saberBackToOwner => saberBackToOwner(ctx, self_),
         EntThink::saberFirstThrown => saberFirstThrown(ctx, self_),
         EntThink::scriptrunner_run => scriptrunner_run(ctx, ctx.entity_id_of(self_).unwrap()),
@@ -210,8 +216,12 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::target_location_linkup => {
             target_location_linkup(ctx, ctx.entity_id_of(self_).unwrap())
         }
-        EntThink::thermalDetonatorExplode => thermalDetonatorExplode(ctx, self_),
-        EntThink::thermalThinkStandard => thermalThinkStandard(ctx, self_),
+        EntThink::thermalDetonatorExplode => {
+            thermalDetonatorExplode(ctx, ctx.entity_id_of(self_).unwrap())
+        }
+        EntThink::thermalThinkStandard => {
+            thermalThinkStandard(ctx, ctx.entity_id_of(self_).unwrap())
+        }
         EntThink::trigger_always_think => {
             trigger_always_think(ctx, ctx.entity_id_of(self_).unwrap())
         }
@@ -325,8 +335,18 @@ pub fn dispatch_touch(
             ctx.entity_id_of(other),
             trace,
         ),
-        EntTouch::WP_TouchVehMissile => WP_TouchVehMissile(ctx, self_, other, trace),
-        EntTouch::charge_stick => charge_stick(ctx, self_, other, trace),
+        EntTouch::WP_TouchVehMissile => WP_TouchVehMissile(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
+        EntTouch::charge_stick => charge_stick(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::faller_touch => faller_touch(ctx, self_, other, trace),
         EntTouch::funcBBrushTouch => funcBBrushTouch(
             ctx.entity_id_of(self_).unwrap(),
@@ -358,8 +378,17 @@ pub fn dispatch_touch(
             trace,
         ),
         EntTouch::thrownSaberTouch => thrownSaberTouch(ctx, self_, other, trace),
-        EntTouch::touchLaserTrap => touchLaserTrap(ctx, self_, other, trace),
-        EntTouch::touch_NULL => touch_NULL(self_, other, trace),
+        EntTouch::touchLaserTrap => touchLaserTrap(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
+        EntTouch::touch_NULL => touch_NULL(
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::trigger_push_touch => trigger_push_touch(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -472,7 +501,12 @@ pub fn dispatch_use(
         }
         EntUse::ammo_power_converter_use => ammo_power_converter_use(ctx, self_, other, activator),
         EntUse::decompTriggerUse => decompTriggerUse(ctx, self_, other, activator),
-        EntUse::emplaced_gun_realuse => emplaced_gun_realuse(ctx, self_, other, activator),
+        EntUse::emplaced_gun_realuse => emplaced_gun_realuse(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::funcBBrushUse => funcBBrushUse(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -604,7 +638,12 @@ pub fn dispatch_pain(
     damage: c_int,
 ) {
     match id {
-        EntPain::DetPackPain => DetPackPain(ctx, self_, attacker, damage),
+        EntPain::DetPackPain => DetPackPain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
         EntPain::EWebPain => EWebPain(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -642,7 +681,12 @@ pub fn dispatch_pain(
         EntPain::TurretBasePain => TurretBasePain(ctx, self_, attacker, damage),
         EntPain::TurretG2Pain => TurretG2Pain(ctx, self_, attacker, damage),
         EntPain::TurretPain => TurretPain(ctx, self_, attacker, damage),
-        EntPain::emplaced_gun_pain => emplaced_gun_pain(ctx, self_, attacker, damage),
+        EntPain::emplaced_gun_pain => emplaced_gun_pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
         EntPain::funcBBrushPain => funcBBrushPain(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -671,7 +715,14 @@ pub fn dispatch_die(
     r#mod: c_int,
 ) {
     match id {
-        EntDie::DetPackDie => DetPackDie(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::DetPackDie => DetPackDie(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::EWebDie => EWebDie(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -688,7 +739,14 @@ pub fn dispatch_die(
             damage,
             r#mod,
         ),
-        EntDie::RocketDie => RocketDie(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::RocketDie => RocketDie(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::ShieldDie => ShieldDie(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -708,9 +766,14 @@ pub fn dispatch_die(
             r#mod,
         ),
         EntDie::bottom_die => bottom_die(ctx, self_, inflictor, attacker, damage, r#mod),
-        EntDie::emplaced_gun_die => {
-            emplaced_gun_die(ctx, self_, inflictor, attacker, damage, r#mod)
-        }
+        EntDie::emplaced_gun_die => emplaced_gun_die(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::funcBBrushDie => funcBBrushDie(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -727,9 +790,14 @@ pub fn dispatch_die(
             damage,
             r#mod,
         ),
-        EntDie::laserTrapDelayedExplode => {
-            laserTrapDelayedExplode(ctx, self_, inflictor, attacker, damage, r#mod)
-        }
+        EntDie::laserTrapDelayedExplode => laserTrapDelayedExplode(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::maglock_die => maglock_die(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::player_die => player_die(
             ctx,
@@ -1546,7 +1614,7 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         EntSpawn::team_CTF_redspawn => SP_team_CTF_redspawn(ent),
         EntSpawn::team_CTF_bluespawn => SP_team_CTF_bluespawn(ent),
         EntSpawn::item_botroam => SP_item_botroam(ctx.entity_mut(ctx.entity_id_of(ent).unwrap())),
-        EntSpawn::emplaced_gun => SP_emplaced_gun(ctx, ent),
+        EntSpawn::emplaced_gun => SP_emplaced_gun(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::misc_turret => SP_misc_turret(ctx, ent),
         EntSpawn::misc_turretG2 => SP_misc_turretG2(ctx, ent),
     }

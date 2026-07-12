@@ -863,14 +863,14 @@ pub fn pas_fire(ctx: GameContext<'_>, ent: EntityId) {
         let target = &mut (*ctx.world).g_entities[(*ent).genericValue3 as usize] as *mut gentity_t;
         WP_FireTurretMissile(
             ctx,
-            target,
+            ctx.entity_id_of(target).unwrap(),
             myOrg,
             fwd,
             qfalse,
             10,
             2300,
             MOD_SENTRY as c_int,
-            ent,
+            ctx.entity_id_of(ent),
         );
 
         G_RunObject(ctx, ctx.entity_id_of(ent).unwrap());

@@ -1360,7 +1360,13 @@ pub fn Use_Shooter(
 
         match (*ent).s.weapon {
             w if w == mp_bg::weapons::weapon_t::WP_BLASTER => {
-                crate::g_weapon::WP_FireBlasterMissile(ctx, ent, (*ent).s.origin, dir, qfalse);
+                crate::g_weapon::WP_FireBlasterMissile(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    (*ent).s.origin,
+                    dir,
+                    qfalse,
+                );
             }
             _ => {}
         }
@@ -3494,7 +3500,11 @@ pub fn G_FreeClientForShooter(ctx: GameContext<'_>, cl: *mut gclient_t) {
 pub fn misc_weapon_shooter_fire(ctx: GameContext<'_>, self_: *mut gentity_t) {
     use crate::g_weapon::FireWeapon;
     unsafe {
-        FireWeapon(ctx, self_, (((*self_).spawnflags & 1) != 0) as qboolean);
+        FireWeapon(
+            ctx,
+            ctx.entity_id_of(self_),
+            (((*self_).spawnflags & 1) != 0) as qboolean,
+        );
         if (*self_).spawnflags & 2 != 0 {
             (*self_).think = Some(EntThink::misc_weapon_shooter_fire).into();
             (*self_).nextthink = (*ctx.world).level.time + (*self_).wait as c_int;

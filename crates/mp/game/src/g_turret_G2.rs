@@ -490,7 +490,7 @@ pub fn turretG2_fire(ctx: GameContext<'_>, ent: *mut gentity_t, start: vec3_t, d
         if (*ent).spawnflags & SPF_TURRETG2_TURBO != 0 {
             // Turbo laser: fire with muzzle flash and special missile
             G_PlayEffectID((*ent).genericValue13, org, ang);
-            WP_FireTurboLaserMissile(ctx, ent, start, *dir);
+            WP_FireTurboLaserMissile(ctx, ctx.entity_id_of(ent).unwrap(), start, *dir);
             if (*ent).alt_fire != 0 {
                 TurboLaser_SetBoneAnim(ctx, ent, 2, 3);
             } else {

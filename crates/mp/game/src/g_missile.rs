@@ -894,7 +894,12 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
 
         // Sticky missiles
         if (*other).takedamage == 0 && (((*ent).s.eFlags & EF_MISSILE_STICK) != 0) {
-            laserTrapStick(ctx, ent, tr.endpos, tr.plane.normal);
+            laserTrapStick(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                tr.endpos,
+                tr.plane.normal,
+            );
             G_AddEvent(ent, EV_MISSILE_STICK as c_int, 0);
             return;
         }
@@ -905,10 +910,12 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 let mut velocity: vec3_t = [0.0; 3];
                 let mut didDmg = qfalse;
 
+                let owner_ent =
+                    &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize] as *mut gentity_t;
                 if LogAccuracyHit(
                     ctx,
-                    other,
-                    &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize],
+                    ctx.entity_id_of(other).unwrap(),
+                    ctx.entity_id_of(owner_ent),
                 ) != 0
                 {
                     (*((*ctx.world).g_entities[(*ent).r.ownerNum as usize].client

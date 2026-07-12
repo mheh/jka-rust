@@ -69,12 +69,12 @@ pub fn VEH_TurretCheckFire(
         let mut nextMuzzle: c_int = 0;
         let muzzlesFired: c_int = 1 << curMuzzle;
         let missile: *mut gentity_t;
-        WP_CalcVehMuzzle(ctx, parent, curMuzzle);
+        WP_CalcVehMuzzle(ctx, ctx.entity_id_of(parent).unwrap(), curMuzzle);
 
         // FIXME: some variation in fire dir
         missile = WP_FireVehicleWeapon(
             ctx,
-            parent,
+            ctx.entity_id_of(parent).unwrap(),
             (*pVeh).m_vMuzzlePos[curMuzzle as usize],
             (*pVeh).m_vMuzzleDir[curMuzzle as usize],
             vehWeapon,
@@ -83,7 +83,12 @@ pub fn VEH_TurretCheckFire(
         );
 
         // play the weapon's muzzle effect if we have one
-        G_VehMuzzleFireFX(ctx, parent, missile, muzzlesFired);
+        G_VehMuzzleFireFX(
+            ctx,
+            ctx.entity_id_of(parent).unwrap(),
+            ctx.entity_id_of(missile),
+            muzzlesFired,
+        );
 
         // take the ammo away
         (*pVeh).turretStatus[turretNum as usize].ammo -= (*vehWeapon).iAmmoPerShot;
@@ -166,7 +171,7 @@ pub fn VEH_TurretAim(
         let mut pitchAngles = [0f32; 3];
         let mut aimCorrect: qboolean = qfalse;
 
-        WP_CalcVehMuzzle(ctx, parent, curMuzzle);
+        WP_CalcVehMuzzle(ctx, ctx.entity_id_of(parent).unwrap(), curMuzzle);
         // get the current absolute angles of the turret right now
         vectoangles((*pVeh).m_vMuzzleDir[curMuzzle as usize], &mut curAngles);
         // subtract out the vehicle's angles to get the relative alignment
@@ -305,7 +310,7 @@ pub fn VEH_TurretFindEnemies(
         let mut target: *mut gentity_t;
         let mut bestTarget: *mut gentity_t = core::ptr::null_mut();
 
-        WP_CalcVehMuzzle(ctx, parent, curMuzzle);
+        WP_CalcVehMuzzle(ctx, ctx.entity_id_of(parent).unwrap(), curMuzzle);
         _VectorCopy((*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut org2);
 
         count = G_RadiusList(
@@ -603,7 +608,7 @@ pub fn VEH_TurretThink(
         if !turretEnemy.is_null() {
             if (*turretEnemy).health > 0 {
                 // enemy is alive
-                WP_CalcVehMuzzle(ctx, parent, curMuzzle);
+                WP_CalcVehMuzzle(ctx, ctx.entity_id_of(parent).unwrap(), curMuzzle);
                 _VectorSubtract(
                     (*turretEnemy).r.currentOrigin,
                     (*pVeh).m_vMuzzlePos[curMuzzle as usize],

@@ -178,7 +178,8 @@ const TEAM_SPECTATOR: c_int = 3;
 /// Raven `touch_NULL`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:165-168`
-pub fn touch_NULL(ent: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn touch_NULL(ent: EntityId, other: Option<EntityId>, trace: *mut trace_t) {
+    // STAGE-1: touch-dispatch EntityId/Option params (unused).
     // Raven: empty body — deliberate no-op touch callback.
 }
 
@@ -199,11 +200,13 @@ pub fn WP_SpeedOfMissileForWeapon(wp: c_int, alt_fire: qboolean) -> f32 {
 // (`VectorCopy(tr.endpos, start)`); return it so callers pick up the adjustment.
 pub fn W_TraceSetStart(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     start: vec3_t,
     mins: vec3_t,
     maxs: vec3_t,
 ) -> vec3_t {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     let mut start = start;
     unsafe {
         let mut entMins: vec3_t = [0.0; 3];
@@ -253,7 +256,9 @@ pub fn W_TraceSetStart(
 /// Raven `WP_FireBryarPistol`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:236-293`
-pub fn WP_FireBryarPistol(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireBryarPistol(ctx: GameContext<'_>, ent: EntityId, altFire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     // PORT-NOTE(file-static-globals): Raven's `forward`/`muzzle` are file-static
     // globals computed by the (unported) `WP_FireWeapon` dispatcher before
     // calling into this fn; no ctx-threaded home exists yet, so they're
@@ -322,15 +327,19 @@ pub fn WP_FireBryarPistol(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qb
 /// Source: `oracle/codemp/game/g_weapon.c:304-326`
 pub fn WP_FireTurretMissile(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     start: vec3_t,
     dir: vec3_t,
     altFire: qboolean,
     damage: c_int,
     velocity: c_int,
     r#mod: c_int,
-    ignore: *mut gentity_t,
+    ignore: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let ignore: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), ignore) };
     unsafe {
         let missile = crate::g_missile::CreateMissile(
             ctx,
@@ -367,7 +376,7 @@ pub fn WP_FireTurretMissile(
 /// Source: `oracle/codemp/game/g_weapon.c:331-348`
 pub fn WP_FireGenericBlasterMissile(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     start: vec3_t,
     dir: vec3_t,
     altFire: qboolean,
@@ -375,6 +384,8 @@ pub fn WP_FireGenericBlasterMissile(
     velocity: c_int,
     r#mod: c_int,
 ) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let missile = crate::g_missile::CreateMissile(
             ctx,
@@ -404,11 +415,13 @@ pub fn WP_FireGenericBlasterMissile(
 /// Source: `oracle/codemp/game/g_weapon.c:359-383`
 pub fn WP_FireBlasterMissile(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     start: vec3_t,
     dir: vec3_t,
     altFire: qboolean,
 ) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let velocity: c_int = BLASTER_VELOCITY;
         let mut damage: c_int = BLASTER_DAMAGE;
@@ -444,12 +457,9 @@ pub fn WP_FireBlasterMissile(
 /// Raven `WP_FireTurboLaserMissile`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:386-419`
-pub fn WP_FireTurboLaserMissile(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    start: vec3_t,
-    dir: vec3_t,
-) {
+pub fn WP_FireTurboLaserMissile(ctx: GameContext<'_>, ent: EntityId, start: vec3_t, dir: vec3_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // FIXME (Raven): velocity/damage/splash externalized off the shooter ent.
         let velocity: c_int = (*ent).mass as c_int;
@@ -495,12 +505,16 @@ pub fn WP_FireTurboLaserMissile(
 /// Source: `oracle/codemp/game/g_weapon.c:422-448`
 pub fn WP_FireEmplacedMissile(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     start: vec3_t,
     dir: vec3_t,
     altFire: qboolean,
-    ignore: *mut gentity_t,
+    ignore: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let ignore: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), ignore) };
     unsafe {
         let velocity: c_int = BLASTER_VELOCITY;
         let damage: c_int = BLASTER_DAMAGE;
@@ -542,7 +556,9 @@ pub fn WP_FireEmplacedMissile(
 /// Raven `WP_FireBlaster`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:451-469`
-pub fn WP_FireBlaster(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireBlaster(ctx: GameContext<'_>, ent: EntityId, altFire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut dir: vec3_t = [0.0; 3];
         let mut angs: vec3_t = [0.0; 3];
@@ -558,7 +574,13 @@ pub fn WP_FireBlaster(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboole
         crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
 
         // FIXME: if temp_org does not have clear trace to inside the bbox, don't shoot!
-        WP_FireBlasterMissile(ctx, ent, (*ctx.world).globals.muzzle, dir, altFire);
+        WP_FireBlasterMissile(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            (*ctx.world).globals.muzzle,
+            dir,
+            altFire,
+        );
     }
 }
 
@@ -566,7 +588,9 @@ pub fn WP_FireBlaster(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboole
 /// Raven `WP_DisruptorMainFire`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:483-621`
-pub fn WP_DisruptorMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_DisruptorMainFire(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut damage: c_int = DISRUPTOR_MAIN_DAMAGE;
         let mut render_impact = qtrue;
@@ -743,7 +767,13 @@ pub fn WP_DisruptorMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if render_impact != qfalse {
             if tr.entityNum < ENTITYNUM_WORLD as i16 && (*traceEnt).takedamage != 0 {
-                if !(*traceEnt).client.is_null() && LogAccuracyHit(ctx, traceEnt, ent) != qfalse {
+                if !(*traceEnt).client.is_null()
+                    && LogAccuracyHit(
+                        ctx,
+                        ctx.entity_id_of(traceEnt).unwrap(),
+                        ctx.entity_id_of(ent),
+                    ) != qfalse
+                {
                     (*((*ent).client as *mut gclient_t)).accuracy_hits += 1;
                 }
 
@@ -779,7 +809,11 @@ pub fn WP_DisruptorMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `G_CanDisruptify`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:624-639`
-pub fn G_CanDisruptify(ent: *mut gentity_t) -> qboolean {
+pub fn G_CanDisruptify(ent: Option<&gentity_t>) -> qboolean {
+    // STAGE-1: ctx-free leaf Option<&gentity_t> borrow; raw re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ent.map_or(core::ptr::null_mut(), |r| {
+        r as *const gentity_t as *mut gentity_t
+    });
     unsafe {
         if ent.is_null()
             || (*ent).inuse == 0
@@ -807,7 +841,9 @@ pub fn G_CanDisruptify(ent: *mut gentity_t) -> qboolean {
 /// Raven `WP_DisruptorAltFire`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:642-886`
-pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     // PORT-NOTE(file-static-globals): `forward`/`muzzle` are the unported
     // file-static globals set by `FireWeapon` before dispatch;
     // referenced bare, reported as missing symbols.
@@ -1007,7 +1043,13 @@ pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
                     (*tent).s.eFlags |= EF_ALT_FIRING;
 
-                    if LogAccuracyHit(ctx, traceEnt, ent) != qfalse && !(*ent).client.is_null() {
+                    if LogAccuracyHit(
+                        ctx,
+                        ctx.entity_id_of(traceEnt).unwrap(),
+                        ctx.entity_id_of(ent),
+                    ) != qfalse
+                        && !(*ent).client.is_null()
+                    {
                         (*((*ent).client as *mut gclient_t)).accuracy_hits += 1;
                     }
                 } else {
@@ -1078,7 +1120,7 @@ pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         && preHealth > 0
                         && (*traceEnt).health <= 0
                         && fullCharge != qfalse
-                        && G_CanDisruptify(traceEnt) != qfalse
+                        && G_CanDisruptify(traceEnt.as_ref()) != qfalse
                     {
                         (*((*traceEnt).client as *mut gclient_t)).ps.viewangles = preAng;
                         (*((*traceEnt).client as *mut gclient_t)).ps.eFlags |= EF_DISINTEGRATION;
@@ -1111,7 +1153,10 @@ pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `WP_FireDisruptor`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:890-912`
-pub fn WP_FireDisruptor(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireDisruptor(ctx: GameContext<'_>, ent: Option<EntityId>, altFire: qboolean) {
+    // STAGE-1: Option param (body null-checks ent), raw re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), ent) };
     unsafe {
         let mut altFire = altFire;
         let client = if ent.is_null() {
@@ -1126,14 +1171,14 @@ pub fn WP_FireDisruptor(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboo
 
         if !ent.is_null() && (*ent).s.eType == entityType_t::ET_NPC as c_int && client.is_null() {
             // special case for animents
-            WP_DisruptorAltFire(ctx, ent);
+            WP_DisruptorAltFire(ctx, ctx.entity_id_of(ent).unwrap());
             return;
         }
 
         if altFire != qfalse {
-            WP_DisruptorAltFire(ctx, ent);
+            WP_DisruptorAltFire(ctx, ctx.entity_id_of(ent).unwrap());
         } else {
-            WP_DisruptorMainFire(ctx, ent);
+            WP_DisruptorMainFire(ctx, ctx.entity_id_of(ent).unwrap());
         }
     }
 }
@@ -1142,7 +1187,9 @@ pub fn WP_FireDisruptor(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboo
 /// Raven `WP_BowcasterAltFire`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:923-942`
-pub fn WP_BowcasterAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_BowcasterAltFire(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let damage: c_int = BOWCASTER_DAMAGE;
 
@@ -1182,7 +1229,9 @@ pub fn WP_BowcasterAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `WP_BowcasterMainFire`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:945-1029`
-pub fn WP_BowcasterMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_BowcasterMainFire(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut damage: c_int = BOWCASTER_DAMAGE;
         let mut count: c_int;
@@ -1270,11 +1319,13 @@ pub fn WP_BowcasterMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `WP_FireBowcaster`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1032-1043`
-pub fn WP_FireBowcaster(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireBowcaster(ctx: GameContext<'_>, ent: EntityId, altFire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     if altFire != qfalse {
-        WP_BowcasterAltFire(ctx, ent);
+        WP_BowcasterAltFire(ctx, ctx.entity_id_of(ent).unwrap());
     } else {
-        WP_BowcasterMainFire(ctx, ent);
+        WP_BowcasterMainFire(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }
 
@@ -1282,7 +1333,9 @@ pub fn WP_FireBowcaster(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboo
 /// Raven `WP_RepeaterMainFire`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1056-1073`
-pub fn WP_RepeaterMainFire(ctx: GameContext<'_>, ent: *mut gentity_t, dir: vec3_t) {
+pub fn WP_RepeaterMainFire(ctx: GameContext<'_>, ent: EntityId, dir: vec3_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let damage: c_int = REPEATER_DAMAGE;
 
@@ -1313,7 +1366,9 @@ pub fn WP_RepeaterMainFire(ctx: GameContext<'_>, ent: *mut gentity_t, dir: vec3_
 /// Raven `WP_RepeaterAltFire`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1076-1107`
-pub fn WP_RepeaterAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_RepeaterAltFire(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let damage: c_int = REPEATER_ALT_DAMAGE;
 
@@ -1362,7 +1417,9 @@ pub fn WP_RepeaterAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `WP_FireRepeater`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1110-1131`
-pub fn WP_FireRepeater(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireRepeater(ctx: GameContext<'_>, ent: EntityId, altFire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut dir: vec3_t = [0.0; 3];
         let mut angs: vec3_t = [0.0; 3];
@@ -1370,7 +1427,7 @@ pub fn WP_FireRepeater(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qbool
         crate::q_math::vectoangles((*ctx.world).globals.forward, &mut angs);
 
         if altFire != qfalse {
-            WP_RepeaterAltFire(ctx, ent);
+            WP_RepeaterAltFire(ctx, ctx.entity_id_of(ent).unwrap());
         } else {
             // add some slop to the alt-fire direction
             angs[PITCH] += (*ctx.world).bg_state.rng.crandom() * REPEATER_SPREAD;
@@ -1378,7 +1435,7 @@ pub fn WP_FireRepeater(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qbool
 
             crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
 
-            WP_RepeaterMainFire(ctx, ent, dir);
+            WP_RepeaterMainFire(ctx, ctx.entity_id_of(ent).unwrap(), dir);
         }
     }
 }
@@ -1387,7 +1444,9 @@ pub fn WP_FireRepeater(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qbool
 /// Raven `WP_DEMP2_MainFire`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1142-1160`
-pub fn WP_DEMP2_MainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_DEMP2_MainFire(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let damage: c_int = DEMP2_DAMAGE;
 
@@ -1426,7 +1485,9 @@ pub fn WP_DEMP2_MainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `DEMP2_AltRadiusDamage`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1164-1307`
-pub fn DEMP2_AltRadiusDamage(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn DEMP2_AltRadiusDamage(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut frac: f32 = ((*ctx.world).level.time - (*ent).genericValue5) as f32 / 800.0;
         let mut dist: f32;
@@ -1593,7 +1654,9 @@ pub fn DEMP2_AltRadiusDamage(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `DEMP2_AltDetonate`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1310-1333`
-pub fn DEMP2_AltDetonate(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn DEMP2_AltDetonate(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         crate::g_utils::G_SetOrigin(ent, (*ent).r.currentOrigin);
         if (*ent).pos1[0] == 0.0 && (*ent).pos1[1] == 0.0 && (*ent).pos1[2] == 0.0 {
@@ -1623,7 +1686,9 @@ pub fn DEMP2_AltDetonate(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `WP_DEMP2_AltFire`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1336-1403`
-pub fn WP_DEMP2_AltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_DEMP2_AltFire(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut damage: c_int = DEMP2_ALT_DAMAGE;
         let mut count: c_int;
@@ -1709,11 +1774,13 @@ pub fn WP_DEMP2_AltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `WP_FireDEMP2`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1406-1417`
-pub fn WP_FireDEMP2(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireDEMP2(ctx: GameContext<'_>, ent: EntityId, altFire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     if altFire != qfalse {
-        WP_DEMP2_AltFire(ctx, ent);
+        WP_DEMP2_AltFire(ctx, ctx.entity_id_of(ent).unwrap());
     } else {
-        WP_DEMP2_MainFire(ctx, ent);
+        WP_DEMP2_MainFire(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }
 
@@ -1721,7 +1788,9 @@ pub fn WP_FireDEMP2(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean
 /// Raven `WP_FlechetteMainFire`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1430-1467`
-pub fn WP_FlechetteMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_FlechetteMainFire(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut fwd: vec3_t = [0.0; 3];
         let mut angs: vec3_t = [0.0; 3];
@@ -1777,7 +1846,9 @@ pub fn WP_FlechetteMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `prox_mine_think`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1470-1506`
-pub fn prox_mine_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn prox_mine_think(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut blow = qfalse;
 
@@ -1831,11 +1902,13 @@ pub fn prox_mine_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
 // (`VectorCopy(tr.endpos, start)`); return it so callers pick up the adjustment.
 pub fn WP_TraceSetStart(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     start: vec3_t,
     mins: vec3_t,
     maxs: vec3_t,
 ) -> vec3_t {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     let mut start = start;
     unsafe {
         let mut entMins: vec3_t = [0.0; 3];
@@ -1883,26 +1956,29 @@ pub fn WP_TraceSetStart(
 /// Source: `oracle/codemp/game/g_weapon.c:1543-1546`
 pub fn WP_ExplosiveDie(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     r#mod: c_int,
 ) {
+    // STAGE-1: EntityId/Option params (inflictor/attacker unused by body).
     laserTrapExplode(ctx, self_);
 }
 
 /// Raven `WP_flechette_alt_blow`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1549-1557`
-pub fn WP_flechette_alt_blow(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_flechette_alt_blow(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         (*ent).s.pos.trDelta[0] = 1.0;
         (*ent).s.pos.trDelta[1] = 0.0;
         (*ent).s.pos.trDelta[2] = 0.0;
     }
 
-    laserTrapExplode(ctx, ent);
+    laserTrapExplode(ctx, ctx.entity_id_of(ent).unwrap());
 }
 
 // PORT-NOTE(rng-threading): faithful skeleton signature carries no threaded Rng (the `random()`/Q_flrand LCG is bg-shared and threaded), but `random()` is used for the missile speed/life here — how is the Rng reached from this context-free signature?
@@ -1913,8 +1989,10 @@ pub fn WP_CreateFlechetteBouncyThing(
     ctx: GameContext<'_>,
     start: vec3_t,
     fwd: vec3_t,
-    self_: *mut gentity_t,
+    self_: EntityId,
 ) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let vel = 700.0 + (*ctx.world).bg_state.rng.random() * 700.0;
         let life = 1500.0 + (*ctx.world).bg_state.rng.random() * 2000.0;
@@ -1969,7 +2047,9 @@ pub fn WP_CreateFlechetteBouncyThing(
 /// Raven `WP_FlechetteAltFire`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1602-1623`
-pub fn WP_FlechetteAltFire(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn WP_FlechetteAltFire(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let mut dir: vec3_t;
         let mut fwd: vec3_t = [0.0; 3];
@@ -1978,7 +2058,13 @@ pub fn WP_FlechetteAltFire(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         crate::q_math::vectoangles((*ctx.world).globals.forward, &mut angs);
 
-        start = WP_TraceSetStart(ctx, self_, start, vec3_origin, vec3_origin); // make sure our start point isn't on the other side of a wall
+        start = WP_TraceSetStart(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            start,
+            vec3_origin,
+            vec3_origin,
+        ); // make sure our start point isn't on the other side of a wall
 
         for _i in 0..2 {
             dir = angs;
@@ -1987,7 +2073,7 @@ pub fn WP_FlechetteAltFire(ctx: GameContext<'_>, self_: *mut gentity_t) {
             dir[YAW] += (*ctx.world).bg_state.rng.crandom() * 2.0;
             crate::q_math::AngleVectors(dir, Some(&mut fwd), None, None);
 
-            WP_CreateFlechetteBouncyThing(ctx, start, fwd, self_);
+            WP_CreateFlechetteBouncyThing(ctx, start, fwd, ctx.entity_id_of(self_).unwrap());
         }
     }
 }
@@ -1995,12 +2081,14 @@ pub fn WP_FlechetteAltFire(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `WP_FireFlechette`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1626-1638`
-pub fn WP_FireFlechette(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireFlechette(ctx: GameContext<'_>, ent: EntityId, altFire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     if altFire != qfalse {
         // WP_FlechetteProxMine( ent );
-        WP_FlechetteAltFire(ctx, ent);
+        WP_FlechetteAltFire(ctx, ctx.entity_id_of(ent).unwrap());
     } else {
-        WP_FlechetteMainFire(ctx, ent);
+        WP_FlechetteMainFire(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }
 
@@ -2008,7 +2096,9 @@ pub fn WP_FireFlechette(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboo
 /// Raven `rocketThink`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1651-1811`
-pub fn rocketThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn rocketThink(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let up: vec3_t = [0.0, 0.0, 1.0];
         let mut right: vec3_t = [0.0; 3];
@@ -2029,7 +2119,14 @@ pub fn rocketThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 // explode when die
                 let owner =
                     &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize] as *mut gentity_t;
-                RocketDie(ctx, ent, owner, owner, 0, MOD_UNKNOWN as c_int);
+                RocketDie(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(owner),
+                    ctx.entity_id_of(owner),
+                    0,
+                    MOD_UNKNOWN as c_int,
+                );
             } else {
                 // just remove when die
                 crate::g_utils::G_FreeEntity(ctx, ent);
@@ -2171,12 +2268,15 @@ pub fn rocketThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_weapon.c:1814-1823`
 pub fn RocketDie(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     r#mod: c_int,
 ) {
+    // STAGE-1: EntityId/Option params (inflictor/attacker unused by body), raw
+    // self_ re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         (*self_).die = FnId::NONE;
         (*self_).r.contents = 0;
@@ -2192,7 +2292,9 @@ pub fn RocketDie(
 /// Raven `WP_FireRocket`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1826-1908`
-pub fn WP_FireRocket(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireRocket(ctx: GameContext<'_>, ent: EntityId, altFire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let damage: c_int = ROCKET_DAMAGE;
         let mut vel: f32 = ROCKET_VELOCITY as f32;
@@ -2298,7 +2400,9 @@ pub fn WP_FireRocket(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolea
 /// Raven `thermalDetonatorExplode`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1936-1970`
-pub fn thermalDetonatorExplode(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn thermalDetonatorExplode(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         if (*ent).count == 0 {
             crate::g_utils::G_Sound(
@@ -2364,7 +2468,9 @@ pub fn thermalDetonatorExplode(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `thermalThinkStandard`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1972-1983`
-pub fn thermalThinkStandard(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn thermalThinkStandard(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         if (*ent).genericValue5 < (*ctx.world).level.time {
             (*ent).think = Some(EntThink::thermalDetonatorExplode).into();
@@ -2384,9 +2490,12 @@ pub fn thermalThinkStandard(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_weapon.c:1986-2072`
 pub fn WP_FireThermalDetonator(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     altFire: qboolean,
 ) -> *mut gentity_t {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    // Return stays raw `*mut gentity_t` (return conversion is a later pass).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let dir: vec3_t = (*ctx.world).globals.forward;
         let mut start: vec3_t = (*ctx.world).globals.muzzle;
@@ -2406,7 +2515,13 @@ pub fn WP_FireThermalDetonator(
         (*bolt).r.maxs = [3.0, 3.0, 3.0];
         (*bolt).clipmask = MASK_SHOT;
 
-        start = W_TraceSetStart(ctx, ent, start, (*bolt).r.mins, (*bolt).r.maxs); // make sure our start point isn't on the other side of a wall
+        start = W_TraceSetStart(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            start,
+            (*bolt).r.mins,
+            (*bolt).r.maxs,
+        ); // make sure our start point isn't on the other side of a wall
 
         if !(*ent).client.is_null() {
             chargeAmount = ((*ctx.world).level.time
@@ -2479,7 +2594,10 @@ pub fn WP_FireThermalDetonator(
 /// Raven `WP_DropThermal`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2074-2078`
-pub fn WP_DropThermal(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t {
+pub fn WP_DropThermal(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    // Return stays raw `*mut gentity_t` (return conversion is a later pass).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     // PORT-NOTE(file-static-globals): `forward`/`vright`/`up` are the unported
     // file-static globals; referenced bare, reported missing.
     unsafe {
@@ -2489,7 +2607,7 @@ pub fn WP_DropThermal(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity
             Some(&mut (*ctx.world).globals.vright),
             Some(&mut (*ctx.world).globals.up),
         );
-        WP_FireThermalDetonator(ctx, ent, qfalse)
+        WP_FireThermalDetonator(ctx, ctx.entity_id_of(ent).unwrap(), qfalse)
     }
 }
 
@@ -2499,7 +2617,7 @@ pub fn WP_DropThermal(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity
 /// Source: `oracle/codemp/game/g_weapon.c:2082-2226`
 pub fn WP_LobFire(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
+    self_: EntityId,
     start: vec3_t,
     target: vec3_t,
     mins: vec3_t,
@@ -2514,6 +2632,8 @@ pub fn WP_LobFire(
     idealSpeed: f32,
     mustHit: qboolean,
 ) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     // for the galak mech NPC
     unsafe {
         let mut idealSpeed = idealSpeed;
@@ -2687,7 +2807,9 @@ pub fn WP_LobFire(
 /// Raven `laserTrapExplode`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2244-2280`
-pub fn laserTrapExplode(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn laserTrapExplode(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let mut v: vec3_t;
         (*self_).takedamage = qfalse;
@@ -2742,12 +2864,17 @@ pub fn laserTrapExplode(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_weapon.c:2282-2294`
 pub fn laserTrapDelayedExplode(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     meansOfDeath: c_int,
 ) {
+    // STAGE-1: EntityId/Option params (inflictor unused by body), raw self_/
+    // attacker re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), attacker) };
     unsafe {
         (*self_).enemy = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), attacker));
         (*self_).think = Some(EntThink::laserTrapExplode).into();
@@ -2777,10 +2904,15 @@ const LT_DELAY_TIME: c_int = 50;
 /// Source: `oracle/codemp/game/g_weapon.c:2296-2318`
 pub fn touchLaserTrap(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
+    // STAGE-1: EntityId/Option params (body null-checks other), raw re-derived
+    // verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
     unsafe {
         if !other.is_null() && ((*other).s.number as u32) < (ENTITYNUM_WORLD) as u32 {
             // just explode if we hit any entity. This way we don't have things
@@ -2800,7 +2932,12 @@ pub fn touchLaserTrap(
                     &mut (*ctx.world).g_entities[(*trace).entityNum as usize] as *mut gentity_t,
                 ));
             }
-            laserTrapStick(ctx, ent, (*trace).endpos, (*trace).plane.normal);
+            laserTrapStick(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                (*trace).endpos,
+                (*trace).plane.normal,
+            );
         }
     }
 }
@@ -2809,7 +2946,9 @@ pub fn touchLaserTrap(
 /// Raven `proxMineThink`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2320-2365`
-pub fn proxMineThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn proxMineThink(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let world = &mut *ctx.world;
         let mut owner: *mut gentity_t = std::ptr::null_mut();
@@ -2871,7 +3010,9 @@ pub fn proxMineThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `laserTrapThink`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2367-2400`
-pub fn laserTrapThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn laserTrapThink(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // just relink it every think
         trap::LinkEntity(
@@ -2927,7 +3068,9 @@ pub fn laserTrapThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `laserTrapStick`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2402-2469`
-pub fn laserTrapStick(ctx: GameContext<'_>, ent: *mut gentity_t, endpos: vec3_t, normal: vec3_t) {
+pub fn laserTrapStick(ctx: GameContext<'_>, ent: EntityId, endpos: vec3_t, normal: vec3_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         crate::g_utils::G_SetOrigin(ent, endpos);
         (*ent).pos1 = normal;
@@ -3008,7 +3151,9 @@ pub fn laserTrapStick(ctx: GameContext<'_>, ent: *mut gentity_t, endpos: vec3_t,
 ///
 /// Raven: "laser trap think".
 /// Source: `oracle/codemp/game/g_weapon.c:2471-2475`
-pub fn TrapThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn TrapThink(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     // laser trap think
     unsafe {
         (*ent).nextthink = (*ctx.world).level.time + 50;
@@ -3020,12 +3165,10 @@ pub fn TrapThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `CreateLaserTrap`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2477-2531`
-pub fn CreateLaserTrap(
-    ctx: GameContext<'_>,
-    laserTrap: *mut gentity_t,
-    start: vec3_t,
-    owner: *mut gentity_t,
-) {
+pub fn CreateLaserTrap(ctx: GameContext<'_>, laserTrap: EntityId, start: vec3_t, owner: EntityId) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let laserTrap: *mut gentity_t = ctx.entity_mut(laserTrap);
+    let owner: *mut gentity_t = ctx.entity_mut(owner);
     unsafe {
         // create a laser trap entity
         (*laserTrap).classname = c"laserTrap".as_ptr() as *mut c_char;
@@ -3097,7 +3240,9 @@ pub fn CreateLaserTrap(
 /// Raven `WP_PlaceLaserTrap`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2533-2626`
-pub fn WP_PlaceLaserTrap(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qboolean) {
+pub fn WP_PlaceLaserTrap(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let dir: vec3_t = (*ctx.world).globals.forward;
         let start: vec3_t = (*ctx.world).globals.muzzle;
@@ -3154,7 +3299,12 @@ pub fn WP_PlaceLaserTrap(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
         }
 
         // now make the new one
-        CreateLaserTrap(ctx, laserTrap, start, ent);
+        CreateLaserTrap(
+            ctx,
+            ctx.entity_id_of(laserTrap).unwrap(),
+            start,
+            ctx.entity_id_of(ent).unwrap(),
+        );
 
         // set player-created-specific fields
         (*laserTrap).setTime = (*ctx.world).level.time; // remember when we placed it
@@ -3197,10 +3347,15 @@ pub fn VectorNPos(r#in: vec3_t, out: vec3_t) -> vec3_t {
 /// Source: `oracle/codemp/game/g_weapon.c:2645-2738`
 pub fn charge_stick(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
+    // STAGE-1: EntityId/Option params (body null-checks other), raw re-derived
+    // verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
     unsafe {
         if !other.is_null()
             && ((*other).flags & FL_BBRUSH) != 0
@@ -3325,7 +3480,9 @@ pub fn charge_stick(
 /// Raven `DetPackBlow`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2740-2766`
-pub fn DetPackBlow(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn DetPackBlow(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let mut v: vec3_t;
 
@@ -3386,10 +3543,13 @@ pub fn DetPackBlow(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_weapon.c:2768-2773`
 pub fn DetPackPain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId/Option params (attacker unused by body), raw self_
+    // re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         (*self_).think = Some(EntThink::DetPackBlow).into();
         (*self_).nextthink = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(50, 100);
@@ -3402,12 +3562,15 @@ pub fn DetPackPain(
 /// Source: `oracle/codemp/game/g_weapon.c:2775-2780`
 pub fn DetPackDie(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     r#mod: c_int,
 ) {
+    // STAGE-1: EntityId/Option params (inflictor/attacker unused by body), raw
+    // self_ re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         (*self_).think = Some(EntThink::DetPackBlow).into();
         (*self_).nextthink = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(50, 100);
@@ -3419,7 +3582,9 @@ pub fn DetPackDie(
 /// Raven `drop_charge`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2782-2849`
-pub fn drop_charge(ctx: GameContext<'_>, self_: *mut gentity_t, start: vec3_t, dir: vec3_t) {
+pub fn drop_charge(ctx: GameContext<'_>, self_: EntityId, start: vec3_t, dir: vec3_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let mut dir = dir;
         crate::q_math::VectorNormalize(&mut dir);
@@ -3497,7 +3662,9 @@ pub fn drop_charge(ctx: GameContext<'_>, self_: *mut gentity_t, start: vec3_t, d
 /// Raven `BlowDetpacks`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2851-2869`
-pub fn BlowDetpacks(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn BlowDetpacks(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let fofs_classname = core::mem::offset_of!(gentity_t, classname) as c_int;
         if (*((*ent).client as *mut gclient_t)).ps.hasDetPackPlanted != qfalse {
@@ -3543,7 +3710,10 @@ pub fn CheatsOn(ctx: GameContext<'_>) -> qboolean {
 /// Raven `WP_DropDetPack`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2880-2964`
-pub fn WP_DropDetPack(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qboolean) {
+pub fn WP_DropDetPack(ctx: GameContext<'_>, ent: Option<EntityId>, alt_fire: qboolean) {
+    // STAGE-1: Option param (body null-checks ent), raw re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
             return;
@@ -3601,7 +3771,7 @@ pub fn WP_DropDetPack(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qbool
         }
 
         if alt_fire != qfalse {
-            BlowDetpacks(ctx, ent);
+            BlowDetpacks(ctx, ctx.entity_id_of(ent).unwrap());
         } else {
             crate::q_math::AngleVectors(
                 (*((*ent).client as *mut gclient_t)).ps.viewangles,
@@ -3612,7 +3782,7 @@ pub fn WP_DropDetPack(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qbool
 
             CalcMuzzlePoint(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent).unwrap(),
                 (*ctx.world).globals.forward,
                 (*ctx.world).globals.vright,
                 (*ctx.world).globals.up,
@@ -3628,7 +3798,7 @@ pub fn WP_DropDetPack(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qbool
             );
             drop_charge(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent).unwrap(),
                 (*ctx.world).globals.muzzle,
                 (*ctx.world).globals.forward,
             );
@@ -3642,7 +3812,9 @@ pub fn WP_DropDetPack(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qbool
 /// Raven `WP_FireConcussionAlt`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2967-3229`
-pub fn WP_FireConcussionAlt(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_FireConcussionAlt(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     // a rail-gun-like beam
     unsafe {
         let damage: c_int = CONC_ALT_DAMAGE;
@@ -3677,7 +3849,13 @@ pub fn WP_FireConcussionAlt(ctx: GameContext<'_>, ent: *mut gentity_t) {
         muzzle2 = (*ctx.world).globals.muzzle; // making a backup copy
 
         start = (*ctx.world).globals.muzzle;
-        start = W_TraceSetStart(ctx, ent, start, [0.0; 3], [0.0; 3]);
+        start = W_TraceSetStart(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            start,
+            [0.0; 3],
+            [0.0; 3],
+        );
 
         let mut skip: c_int = (*ent).s.number;
 
@@ -3765,7 +3943,11 @@ pub fn WP_FireConcussionAlt(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     {
                         // Create a simple impact type mark that doesn't last long in the world
                         if !(*traceEnt).client.is_null()
-                            && LogAccuracyHit(ctx, traceEnt, ent) != qfalse
+                            && LogAccuracyHit(
+                                ctx,
+                                ctx.entity_id_of(traceEnt).unwrap(),
+                                ctx.entity_id_of(ent),
+                            ) != qfalse
                         {
                             // NOTE: hitting multiple ents can still get you over 100% accuracy
                             (*((*ent).client as *mut gclient_t)).accuracy_hits += 1;
@@ -3908,14 +4090,22 @@ pub fn WP_FireConcussionAlt(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `WP_FireConcussion`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:3232-3276`
-pub fn WP_FireConcussion(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn WP_FireConcussion(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     // a fast rocket-like projectile
     unsafe {
         let damage: c_int = CONC_DAMAGE;
         let vel: f32 = CONC_VELOCITY as f32;
 
         let mut start: vec3_t = (*ctx.world).globals.muzzle;
-        start = W_TraceSetStart(ctx, ent, start, [0.0; 3], [0.0; 3]); // make sure our start point isn't on the other side of a wall
+        start = W_TraceSetStart(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            start,
+            [0.0; 3],
+            [0.0; 3],
+        ); // make sure our start point isn't on the other side of a wall
 
         let missile = crate::g_missile::CreateMissile(
             ctx,
@@ -3960,7 +4150,9 @@ pub fn WP_FireConcussion(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `WP_FireStunBaton`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:3282-3357`
-pub fn WP_FireStunBaton(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qboolean) {
+pub fn WP_FireStunBaton(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut muzzleStun: vec3_t;
 
@@ -4080,7 +4272,9 @@ pub fn WP_FireStunBaton(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qbo
 /// Raven `WP_FireMelee`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:3363-3445`
-pub fn WP_FireMelee(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qboolean) {
+pub fn WP_FireMelee(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         if !(*ent).client.is_null()
             && (*((*ent).client as *mut gclient_t)).ps.torsoAnim == (BOTH_MELEE2) as i32
@@ -4225,9 +4419,14 @@ pub fn SnapVectorTowards(v: vec3_t, to: vec3_t) -> vec3_t {
 /// Source: `oracle/codemp/game/g_weapon.c:3485-3516`
 pub fn LogAccuracyHit(
     ctx: GameContext<'_>,
-    target: *mut gentity_t,
-    attacker: *mut gentity_t,
+    target: EntityId,
+    attacker: Option<EntityId>,
 ) -> qboolean {
+    // STAGE-1: EntityId/Option params (body null-checks attacker), raw re-derived
+    // verbatim (Stage-2 debt).
+    let target: *mut gentity_t = ctx.entity_mut(target);
+    let attacker: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), attacker) };
     unsafe {
         if (*target).takedamage == 0 {
             return qfalse;
@@ -4267,12 +4466,14 @@ pub fn LogAccuracyHit(
 /// Source: `oracle/codemp/game/g_weapon.c:3530-3551`
 pub fn CalcMuzzlePoint(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     forward: vec3_t,
     right: vec3_t,
     up: vec3_t,
     muzzlePoint: &mut vec3_t,
 ) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let weapontype: c_int = (*ent).s.weapon;
         *muzzlePoint = (*ent).s.pos.trBase;
@@ -4304,13 +4505,16 @@ pub fn CalcMuzzlePoint(
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:3560-3566`
 pub fn CalcMuzzlePointOrigin(
-    ent: *mut gentity_t,
+    ent: &gentity_t,
     origin: vec3_t,
     forward: vec3_t,
     right: vec3_t,
     up: vec3_t,
     muzzlePoint: vec3_t,
 ) -> vec3_t {
+    // STAGE-1: ctx-free leaf &gentity_t borrow (read-only); raw re-derived
+    // verbatim (Stage-2 debt).
+    let ent: *const gentity_t = ent;
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let mut muzzlePoint = (*ent).s.pos.trBase;
@@ -4335,10 +4539,15 @@ pub fn CalcMuzzlePointOrigin(
 /// Source: `oracle/codemp/game/g_weapon.c:3569-3578`
 pub fn WP_TouchVehMissile(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
+    // STAGE-1: EntityId/Option params (body null-checks other), raw re-derived
+    // verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
     unsafe {
         let mut myTrace: trace_t = *trace;
         if !other.is_null() {
@@ -4352,7 +4561,9 @@ pub fn WP_TouchVehMissile(
 /// Raven `WP_CalcVehMuzzle`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:3580-3608`
-pub fn WP_CalcVehMuzzle(ctx: GameContext<'_>, ent: *mut gentity_t, muzzleNum: c_int) {
+pub fn WP_CalcVehMuzzle(ctx: GameContext<'_>, ent: EntityId, muzzleNum: c_int) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
         let mut boltMatrix: mdxaBone_t = std::mem::zeroed();
@@ -4412,7 +4623,9 @@ pub fn WP_CalcVehMuzzle(ctx: GameContext<'_>, ent: *mut gentity_t, muzzleNum: c_
 /// Raven `WP_VehWeapSetSolidToOwner`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:3610-3625`
-pub fn WP_VehWeapSetSolidToOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn WP_VehWeapSetSolidToOwner(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         (*self_).r.svFlags |= SVF_OWNERNOTSHARED;
         if (*self_).genericValue1 != 0 {
@@ -4435,13 +4648,17 @@ pub fn WP_VehWeapSetSolidToOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_weapon.c:3628-3848`
 pub fn WP_FireVehicleWeapon(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     start: vec3_t,
     dir: vec3_t,
     vehWeapon: *mut vehWeaponInfo_t,
     alt_fire: qboolean,
     isTurretWeap: qboolean,
 ) -> *mut gentity_t {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    // Return stays raw `*mut gentity_t` (return conversion is a later pass);
+    // `vehWeapon` is not a gentity handle so it stays raw.
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut missile: *mut gentity_t = std::ptr::null_mut();
 
@@ -4461,7 +4678,7 @@ pub fn WP_FireVehicleWeapon(
             crate::q_math::_VectorScale(maxs, -1.0, &mut mins);
 
             // make sure our start point isn't on the other side of a wall
-            start = W_TraceSetStart(ctx, ent, start, mins, maxs);
+            start = W_TraceSetStart(ctx, ctx.entity_id_of(ent).unwrap(), start, mins, maxs);
 
             // FIXME: CUSTOM MODEL?
             // QUERY: alt_fire true or not?  Does it matter?
@@ -4677,10 +4894,15 @@ pub fn WP_FireVehicleWeapon(
 /// Source: `oracle/codemp/game/g_weapon.c:3851-3881`
 pub fn G_VehMuzzleFireFX(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    broadcaster: *mut gentity_t,
+    ent: EntityId,
+    broadcaster: Option<EntityId>,
     muzzlesFired: c_int,
 ) {
+    // STAGE-1: EntityId/Option params (body null-checks broadcaster), raw
+    // re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let broadcaster: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), broadcaster) };
     unsafe {
         let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
 
@@ -4845,10 +5067,13 @@ pub fn G_EstimateCamPos(
 /// Source: `oracle/codemp/game/g_weapon.c:3961-4020`
 pub fn WP_GetVehicleCamPos(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    pilot: *mut gentity_t,
+    ent: EntityId,
+    pilot: EntityId,
     camPos: &mut [f32; 3],
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let pilot: *mut gentity_t = ctx.entity_mut(pilot);
     // PORT-NOTE(unported-type): `vehicleInfo_t` (`Vehicle_t::m_pVehicleInfo`)
     // isn't ported yet; fields referenced through it exactly as the oracle
     // cites them, reported as missing symbols.
@@ -4918,12 +5143,16 @@ pub fn WP_GetVehicleCamPos(
 /// Source: `oracle/codemp/game/g_weapon.c:4022-4047`
 pub fn WP_VehLeadCrosshairVeh(
     ctx: GameContext<'_>,
-    camTraceEnt: *mut gentity_t,
+    camTraceEnt: Option<EntityId>,
     newEnd: &mut [f32; 3],
     dir: [f32; 3],
     shotStart: [f32; 3],
     shotDir: &mut [f32; 3],
 ) {
+    // STAGE-1: Option param (body null-checks camTraceEnt), raw re-derived
+    // verbatim (Stage-2 debt).
+    let camTraceEnt: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), camTraceEnt) };
     unsafe {
         if (*ctx.world).cvars.g_vehAutoAimLead.integer != 0 {
             if !camTraceEnt.is_null()
@@ -4965,10 +5194,13 @@ pub fn WP_VehLeadCrosshairVeh(
 /// Source: `oracle/codemp/game/g_weapon.c:4052-4113`
 pub fn WP_VehCheckTraceFromCamPos(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: Option<EntityId>,
     shotStart: [f32; 3],
     shotDir: &mut [f32; 3],
 ) -> qboolean {
+    // STAGE-1: Option param (body null-checks ent), raw re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), ent) };
     unsafe {
         let mut shotDir = shotDir;
         // FIXME: only if dynamicCrosshair and dynamicCrosshairPrecision is on!
@@ -5065,7 +5297,14 @@ pub fn WP_VehCheckTraceFromCamPos(
                 if camTraceEntNum != 0 {
                     let camTraceEnt = &mut (*ctx.world).g_entities[(camTraceEntNum - 1) as usize]
                         as *mut gentity_t;
-                    WP_VehLeadCrosshairVeh(ctx, camTraceEnt, &mut newEnd, dir, shotStart, shotDir);
+                    WP_VehLeadCrosshairVeh(
+                        ctx,
+                        ctx.entity_id_of(camTraceEnt),
+                        &mut newEnd,
+                        dir,
+                        shotStart,
+                        shotDir,
+                    );
                     return qtrue;
                 }
             }
@@ -5077,7 +5316,9 @@ pub fn WP_VehCheckTraceFromCamPos(
 /// Raven `FireVehicleWeapon`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:4116-4413`
-pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qboolean) {
+pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: EntityId, alt_fire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
         if pVeh.is_null() {
@@ -5247,10 +5488,16 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
                                 }
                             }
                         } else {
-                            WP_CalcVehMuzzle(ctx, ent, i);
+                            WP_CalcVehMuzzle(ctx, ctx.entity_id_of(ent).unwrap(), i);
                             let mut start = pVeh.m_vMuzzlePos[i as usize];
                             let mut dir = pVeh.m_vMuzzleDir[i as usize];
-                            if WP_VehCheckTraceFromCamPos(ctx, ent, start, &mut dir) != 0 {
+                            if WP_VehCheckTraceFromCamPos(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                start,
+                                &mut dir,
+                            ) != 0
+                            {
                             } else if aimCorrect != 0 {
                                 let mut trace: trace_t = std::mem::zeroed();
                                 let mut end = [0.0f32; 3];
@@ -5297,8 +5544,7 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
                                     crate::q_math::_VectorCopy(trace.endpos, &mut newEnd);
                                     WP_VehLeadCrosshairVeh(
                                         ctx,
-                                        &mut (*ctx.world).g_entities[trace.entityNum as usize]
-                                            as *mut gentity_t,
+                                        EntityId::from_num(trace.entityNum as c_int),
                                         &mut newEnd,
                                         fixedDir,
                                         start,
@@ -5311,7 +5557,7 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
 
                             missile = WP_FireVehicleWeapon(
                                 ctx,
-                                ent,
+                                ctx.entity_id_of(ent).unwrap(),
                                 start,
                                 dir,
                                 vehWeapon as *mut _,
@@ -5404,7 +5650,12 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
             }
 
             if !vehWeapon.is_null() && muzzlesFired > 0 {
-                G_VehMuzzleFireFX(ctx, ent, missile, muzzlesFired);
+                G_VehMuzzleFireFX(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(missile),
+                    muzzlesFired,
+                );
             }
         }
     }
@@ -5413,7 +5664,10 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
 /// Raven `FireWeapon`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:4424-4608`
-pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+pub fn FireWeapon(ctx: GameContext<'_>, ent: Option<EntityId>, altFire: qboolean) {
+    // STAGE-1: Option param (body null-checks ent), raw re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), ent) };
     unsafe {
         if (*((*ent).client as *mut gclient_t)).ps.powerups[PW_QUAD as usize] != 0 {
             (*ctx.world).globals.s_quadFactor = (*ctx.world).cvars.g_quadfactor.value;
@@ -5436,7 +5690,7 @@ pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) 
             && !(*ent).client.is_null()
             && (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE
         {
-            FireVehicleWeapon(ctx, ent, altFire);
+            FireVehicleWeapon(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             return;
         }
 
@@ -5538,7 +5792,7 @@ pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) 
 
         CalcMuzzlePoint(
             ctx,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             (*ctx.world).globals.forward,
             (*ctx.world).globals.vright,
             (*ctx.world).globals.up,
@@ -5547,59 +5801,59 @@ pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) 
 
         match (*ent).s.weapon {
             WP_STUN_BATON => {
-                WP_FireStunBaton(ctx, ent, altFire);
+                WP_FireStunBaton(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_MELEE => {
-                WP_FireMelee(ctx, ent, altFire);
+                WP_FireMelee(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_SABER => {}
             WP_BRYAR_PISTOL => {
-                WP_FireBryarPistol(ctx, ent, altFire);
+                WP_FireBryarPistol(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_CONCUSSION => {
                 if altFire != 0 {
-                    WP_FireConcussionAlt(ctx, ent);
+                    WP_FireConcussionAlt(ctx, ctx.entity_id_of(ent).unwrap());
                 } else {
-                    WP_FireConcussion(ctx, ent);
+                    WP_FireConcussion(ctx, ctx.entity_id_of(ent).unwrap());
                 }
             }
             WP_BRYAR_OLD => {
-                WP_FireBryarPistol(ctx, ent, altFire);
+                WP_FireBryarPistol(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_BLASTER => {
-                WP_FireBlaster(ctx, ent, altFire);
+                WP_FireBlaster(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_DISRUPTOR => {
-                WP_FireDisruptor(ctx, ent, altFire);
+                WP_FireDisruptor(ctx, ctx.entity_id_of(ent), altFire);
             }
             WP_BOWCASTER => {
-                WP_FireBowcaster(ctx, ent, altFire);
+                WP_FireBowcaster(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_REPEATER => {
-                WP_FireRepeater(ctx, ent, altFire);
+                WP_FireRepeater(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_DEMP2 => {
-                WP_FireDEMP2(ctx, ent, altFire);
+                WP_FireDEMP2(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_FLECHETTE => {
-                WP_FireFlechette(ctx, ent, altFire);
+                WP_FireFlechette(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_ROCKET_LAUNCHER => {
-                WP_FireRocket(ctx, ent, altFire);
+                WP_FireRocket(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_THERMAL => {
-                WP_FireThermalDetonator(ctx, ent, altFire);
+                WP_FireThermalDetonator(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_TRIP_MINE => {
-                WP_PlaceLaserTrap(ctx, ent, altFire);
+                WP_PlaceLaserTrap(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             }
             WP_DET_PACK => {
-                WP_DropDetPack(ctx, ent, altFire);
+                WP_DropDetPack(ctx, ctx.entity_id_of(ent), altFire);
             }
             WP_EMPLACED_GUN => {
                 if !(*ent).client.is_null() && (*((*ent).client as *mut gclient_t)).ewebIndex != 0 {
                 } else {
-                    WP_FireEmplaced(ctx, ent, altFire);
+                    WP_FireEmplaced(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
                 }
             }
             _ => {}
@@ -5612,7 +5866,9 @@ pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) 
 /// Raven `WP_FireEmplaced`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:4611-4660`
-pub fn WP_FireEmplaced(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireEmplaced(ctx: GameContext<'_>, ent: EntityId, altFire: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         if (*ent).client.is_null() {
             return;
@@ -5661,7 +5917,14 @@ pub fn WP_FireEmplaced(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qbool
         crate::q_math::vectoangles((*ctx.world).globals.forward, &mut angs);
         crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
 
-        WP_FireEmplacedMissile(ctx, gun, gunpoint, dir, altFire, ent);
+        WP_FireEmplacedMissile(
+            ctx,
+            ctx.entity_id_of(gun).unwrap(),
+            gunpoint,
+            dir,
+            altFire,
+            ctx.entity_id_of(ent),
+        );
     }
 }
 
@@ -5670,10 +5933,14 @@ pub fn WP_FireEmplaced(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qbool
 /// Source: `oracle/codemp/game/g_weapon.c:4691-4802`
 pub fn emplaced_gun_use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t =
+        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
     unsafe {
         if (*self_).health <= 0 {
             return;
@@ -5795,10 +6062,11 @@ pub fn emplaced_gun_use(
 /// Source: `oracle/codemp/game/g_weapon.c:4804-4807`
 pub fn emplaced_gun_realuse(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId/Option params (activator unused by body).
     emplaced_gun_use(ctx, self_, other, std::ptr::null_mut());
 }
 
@@ -5807,10 +6075,13 @@ pub fn emplaced_gun_realuse(
 /// Source: `oracle/codemp/game/g_weapon.c:4810-4823`
 pub fn emplaced_gun_pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId/Option params (attacker unused by body), raw self_
+    // re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         (*self_).s.health = (*self_).health;
 
@@ -5826,7 +6097,9 @@ pub fn emplaced_gun_pain(
 /// Raven `emplaced_gun_update`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:4828-4927`
-pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).health < 1 && (*self_).genericValue5 == 0 {
             if ((*self_).spawnflags & (EMPLACED_CANRESPAWN as u32) as i32) != 0 {
@@ -5959,12 +6232,15 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_weapon.c:4930-4942`
 pub fn emplaced_gun_die(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     r#mod: c_int,
 ) {
+    // STAGE-1: EntityId/Option params (inflictor/attacker unused by body), raw
+    // self_ re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).genericValue4 != 0 {
             return;
@@ -5981,7 +6257,9 @@ pub fn emplaced_gun_die(
 /// Raven `SP_emplaced_gun`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:4944-5027`
-pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let name = c"models/map_objects/mp/turret_chair.glm";
 

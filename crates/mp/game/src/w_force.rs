@@ -5258,7 +5258,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
                     WP_FireGenericBlasterMissile(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_).unwrap(),
                         org,
                         endir,
                         0,

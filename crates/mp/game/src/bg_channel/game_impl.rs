@@ -710,7 +710,12 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let ent = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pilot = &mut (*self.world).g_entities[pilotEntNum as usize] as *mut gentity_t;
-            crate::g_weapon::WP_GetVehicleCamPos(ctx, ent, pilot, &mut *camPos);
+            crate::g_weapon::WP_GetVehicleCamPos(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                ctx.entity_id_of(pilot).unwrap(),
+                &mut *camPos,
+            );
         }
     }
     fn can_be_enemy(&mut self, entNum: c_int, otherNum: c_int) -> qboolean {

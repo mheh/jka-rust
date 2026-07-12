@@ -2306,7 +2306,7 @@ pub fn player_die(
         // if he was charging or anything else, kill the sound
         crate::g_utils::G_MuteSound(ctx, (*self_).s.number, CHAN_WEAPON);
 
-        crate::g_weapon::BlowDetpacks(ctx, self_); // blow detpacks if they're planted
+        crate::g_weapon::BlowDetpacks(ctx, ctx.entity_id_of(self_).unwrap()); // blow detpacks if they're planted
 
         (*cl).ps.fd.forceDeactivateAll = 1;
 
@@ -6234,7 +6234,12 @@ pub fn G_RadiusDamage(
             let points = (damage as f64 * (1.0 - (dist / radius) as f64)) as f32;
 
             if CanDamage(ctx, ctx.entity_id_of(ent).unwrap(), origin) != qfalse {
-                if crate::g_weapon::LogAccuracyHit(ctx, ent, attacker) != qfalse {
+                if crate::g_weapon::LogAccuracyHit(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(attacker),
+                ) != qfalse
+                {
                     hitClient = qtrue;
                 }
                 crate::q_math::_VectorSubtract((*ent).r.currentOrigin, origin, &mut dir);
