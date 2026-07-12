@@ -29,8 +29,8 @@ pub use server_host::{game_system_calls_shim, server_from_slot, server_slot, Ser
 // reach as `crate::SV_*` (matching Raven's flat global namespace at the seam).
 pub use sv_bot::{
     BotImport_DebugPolygonCreate, BotImport_DebugPolygonDelete, SV_BotAllocateClient,
-    SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity, SV_BotLibSetup,
-    SV_BotLibShutdown,
+    SV_BotCalculatePaths, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity,
+    SV_BotLibSetup, SV_BotLibShutdown, SV_BotWaypointReception,
 };
 pub use sv_ccmds::SV_GetStringEdString_str;
 pub use sv_client::{SV_CloseDownload, SV_DropClient};

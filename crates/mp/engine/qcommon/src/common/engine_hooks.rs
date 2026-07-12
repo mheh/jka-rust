@@ -156,6 +156,9 @@ pub struct EngineHooks {
     /// (server skins name-pool ruling, 2026-07-12).
     /// Source: `oracle/codemp/renderer/tr_image.cpp:3342-3347`
     pub R_SkinSurfaces: Option<fn(&mut EngineHostView, qhandle_t) -> Vec<(String, String)>>,
+    /// Backs `EngineHost::model_register` — Raven `RE_RegisterServerModel`.
+    /// Source: `oracle/codemp/renderer/tr_model.cpp:588`
+    pub R_RegisterServerModel: Option<fn(&mut EngineHostView, &str) -> qhandle_t>,
 }
 
 impl EngineHooks {
@@ -201,6 +204,7 @@ impl EngineHooks {
             R_ModelMdxm: None,
             R_ModelMdxa: None,
             R_SkinSurfaces: None,
+            R_RegisterServerModel: None,
         }
     }
 }

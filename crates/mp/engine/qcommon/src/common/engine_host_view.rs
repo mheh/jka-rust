@@ -364,6 +364,18 @@ impl EngineHost for EngineHostView<'_> {
         f(self, number)
     }
 
+    /// Raven `RE_RegisterServerModel` — renderer-installed accessor (the
+    /// ghoul2-server.md gap closed, user ruling 2026-07-12).
+    /// Source: `oracle/codemp/renderer/tr_model.cpp:588`
+    fn model_register(&mut self, name: &str) -> qhandle_t {
+        let f = self
+            .common
+            .hooks
+            .R_RegisterServerModel
+            .expect("R_RegisterServerModel hook — installed by the renderer at boot");
+        f(self, name)
+    }
+
     /// Raven unix `Sys_Init` — arch/username cvars; the input-layer tail
     /// (`in_restart`, `IN_Init`) is client-shell slice work.
     /// Source: `oracle/codemp/unix/unix_main.c:160`

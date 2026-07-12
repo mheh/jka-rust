@@ -357,16 +357,12 @@ fn g2_should_register_server(host: &mut impl EngineHost) -> bool {
     true
 }
 
-/// `RE_RegisterServerModel` has no `EngineHost` equivalent (module-doc gap
-/// note); diverges via the frozen, real `host.error` service.
+/// Raven `RE_RegisterServerModel( fileName )` through the
+/// `EngineHost::model_register` seam (the former ghoul2-server.md gap, closed
+/// by user ruling 2026-07-12).
+/// Source: `oracle/codemp/renderer/tr_model.cpp:588`
 fn register_server_model(host: &mut impl EngineHost, file_name: &str) -> qhandle_t {
-    host.error(
-        errorParm_t::ERR_DROP,
-        &format!(
-            "G2_Misc internal: EngineHost has no RE_RegisterServerModel(\"{file_name}\") \
-             equivalent yet (docs/subsystems/ghoul2-server.md gap note, G2_API.cpp:2710)"
-        ),
-    )
+    host.model_register(file_name)
 }
 
 /// `RE_RegisterModel`'s client-path twin of [`register_server_model`]; same

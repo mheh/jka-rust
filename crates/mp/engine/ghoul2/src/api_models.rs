@@ -251,20 +251,12 @@ fn g2_should_register_server(host: &mut impl EngineHost) -> bool {
     true
 }
 
-/// `RE_RegisterServerModel` has no `EngineHost` equivalent (module doc-comment
-/// gap note): no method resolves a filename to a `qhandle_t`, only the
-/// reverse (`model_mdxm`/`model_mdxa` take an already-resolved handle).
-/// Diverges via the frozen, real `host.error` service rather than inventing a
-/// fake handle; every call site downstream of this one is written so only
-/// this line needs to change once the gap closes.
+/// Raven `RE_RegisterServerModel( fileName )` through the
+/// `EngineHost::model_register` seam (the former ghoul2-server.md gap, closed
+/// by user ruling 2026-07-12).
+/// Source: `oracle/codemp/renderer/tr_model.cpp:588`
 fn register_server_model(host: &mut impl EngineHost, file_name: &str) -> qhandle_t {
-    host.error(
-        errorParm_t::ERR_DROP,
-        &format!(
-            "G2API models: EngineHost has no RE_RegisterServerModel(\"{file_name}\") equivalent yet \
-             (docs/subsystems/ghoul2-server.md gap note, G2_API.cpp:589)"
-        ),
-    )
+    host.model_register(file_name)
 }
 
 /// `RE_RegisterModel`'s client-path twin of [`register_server_model`]; same
@@ -1020,14 +1012,15 @@ mod tests {
     }
 
     #[test]
-    fn register_server_model_diverges_via_host_error() {
+    fn register_server_model_routes_through_the_host_seam() {
+        // The former gap divergence (host.error) closed 2026-07-12:
+        // registration flows through EngineHost::model_register and returns
+        // the resolved handle (MockHost: 1-based, dedup by name).
         let mut host = MockHost::new();
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            register_server_model(&mut host, "models/x.glm")
-        }));
-        assert!(result.is_err());
-        assert_eq!(host.errors.len(), 1);
-        assert_eq!(host.errors[0].0, errorParm_t::ERR_DROP);
+        assert_eq!(register_server_model(&mut host, "models/x.glm"), 1);
+        assert_eq!(register_server_model(&mut host, "models/y.glm"), 2);
+        assert_eq!(register_server_model(&mut host, "models/x.glm"), 1);
+        assert_eq!(host.model_registers, ["models/x.glm", "models/y.glm"]);
     }
 
     #[test]

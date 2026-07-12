@@ -230,6 +230,16 @@ pub trait EngineHost {
     /// (`SV_GentityNum`: `oracle/codemp/server/sv_game.cpp:58`)
     fn sv_shownet_entity_classname(&mut self, number: i32) -> Option<String>;
 
+    /// Raven `RE_RegisterServerModel( name )` — the dedicated-path model
+    /// register (filename → `qhandle_t`; 0 = failed load), closing the
+    /// ghoul2-server.md gap note (user ruling 2026-07-12; the rulings-36/55
+    /// method-extension precedent). `G2_RegisterModel`'s server branch reaches
+    /// it; the client-path `RE_RegisterModel` twin stays out — dead under
+    /// DEDICATED (`G2_ShouldRegisterServer` is always true there).
+    /// Source: `oracle/codemp/renderer/tr_model.cpp:588` (decl `tr_local.h`);
+    /// chain: `oracle/codemp/ghoul2/G2_API.cpp:2710`
+    fn model_register(&mut self, name: &str) -> qhandle_t;
+
     /// Raven `Sys_Init` — one-time platform-layer init (`Com_Init` calls it late,
     /// `common.cpp:1287`). No-op in a test mock.
     /// Source: `oracle/codemp/win32/win_main.cpp:834`
@@ -372,6 +382,10 @@ impl<T: EngineHost + ?Sized> EngineHost for &mut T {
 
     fn sv_shownet_entity_classname(&mut self, number: i32) -> Option<String> {
         (**self).sv_shownet_entity_classname(number)
+    }
+
+    fn model_register(&mut self, name: &str) -> qhandle_t {
+        (**self).model_register(name)
     }
 
     fn sys_init(&mut self) {

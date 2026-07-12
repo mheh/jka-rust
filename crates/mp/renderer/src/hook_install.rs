@@ -37,6 +37,7 @@ pub fn install_engine_hooks(hooks: &mut EngineHooks) {
     hooks.R_ModelMdxm = Some(r_model_mdxm_hook);
     hooks.R_ModelMdxa = Some(r_model_mdxa_hook);
     hooks.R_SkinSurfaces = Some(r_skin_surfaces_hook);
+    hooks.R_RegisterServerModel = Some(r_register_server_model_hook);
 }
 
 /// Raven `RE_RegisterModels_LevelLoadEnd` — the live eviction path.
@@ -82,4 +83,13 @@ fn r_skin_surfaces_hook(view: &mut EngineHostView, h_skin: qhandle_t) -> Vec<(St
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let rm = unsafe { rm_from_view(view) };
     rm.skin_surfaces(h_skin)
+}
+
+/// `EngineHost::model_register` backing — Raven `RE_RegisterServerModel`.
+/// Source: `oracle/codemp/renderer/tr_model.cpp:588`
+fn r_register_server_model_hook(view: &mut EngineHostView, name: &str) -> qhandle_t {
+    // SAFETY: view-constructor slot, single-threaded; register_server_model's
+    // host calls (fs/pak/print) never touch this slot (per-slot rule).
+    let rm = unsafe { rm_from_view(view) };
+    rm.register_server_model(&mut *view, name)
 }

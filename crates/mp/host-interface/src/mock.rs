@@ -191,6 +191,8 @@ pub struct MockHost {
     /// Loader model-memory fixtures, mesh half: model handle → `.glm` block
     /// bytes served by [`EngineHost::model_mdxm`].
     pub mdxm_blocks: BTreeMap<qhandle_t, Vec<u8>>,
+    /// `model_register` fixture log; index+1 is the returned handle.
+    pub model_registers: Vec<String>,
     /// Loader model-memory fixtures, animation half: model handle → `.gla`
     /// block bytes served by [`EngineHost::model_mdxa`].
     pub mdxa_blocks: BTreeMap<qhandle_t, Vec<u8>>,
@@ -232,6 +234,7 @@ impl MockHost {
             sv_time: 0,
             written_files: BTreeMap::new(),
             mdxm_blocks: BTreeMap::new(),
+            model_registers: Vec::new(),
             mdxa_blocks: BTreeMap::new(),
             skins: BTreeMap::new(),
             gentities: vec![0u8; MAX_GENTITIES * stride],
@@ -408,6 +411,17 @@ impl EngineHost for MockHost {
     fn fs_write_file(&mut self, qpath: &str, data: &[u8]) -> bool {
         self.written_files.insert(qpath.to_string(), data.to_vec());
         true
+    }
+
+    fn model_register(&mut self, name: &str) -> qhandle_t {
+        // Fixture rule: a name registers once and keeps its 1-based handle
+        // (mirroring the renderer's dedup-by-name pool); the log doubles as
+        // the handle table.
+        if let Some(i) = self.model_registers.iter().position(|n| n == name) {
+            return (i + 1) as qhandle_t;
+        }
+        self.model_registers.push(name.to_string());
+        self.model_registers.len() as qhandle_t
     }
 
     fn model_mdxm(&mut self, model: qhandle_t) -> *mut c_void {

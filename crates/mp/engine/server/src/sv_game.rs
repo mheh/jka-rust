@@ -24,6 +24,7 @@ use mp_qshared::shared::q_math::{
     AngleVectors, MatrixMultiply, PerpendicularVector, Sys_SnapVector,
 };
 use mp_qshared::shared::surface_flags::CONTENTS_LIGHTSABER;
+use mp_qshared::shared::wpobject::wpobject_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use native_math::vector::vec3_t;
 use native_platform::Sys_CheckCD;
@@ -35,8 +36,9 @@ use crate::server_host::sv_game_system_call;
 use crate::sv_renderer::RE_RegisterServerSkin;
 use crate::Server;
 use crate::{
-    SV_BotAllocateClient, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity,
-    SV_BotLibSetup, SV_BotLibShutdown, SV_DropClient, SV_SendServerCommand, SV_SetUserinfo,
+    SV_BotAllocateClient, SV_BotCalculatePaths, SV_BotFreeClient, SV_BotGetConsoleMessage,
+    SV_BotGetSnapshotEntity, SV_BotLibSetup, SV_BotLibShutdown, SV_BotWaypointReception,
+    SV_DropClient, SV_SendServerCommand, SV_SetUserinfo,
 };
 use mp_abi::game::imports::MpGameImport as G;
 use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
@@ -110,6 +112,8 @@ use mp_engine_ghoul2::ragdoll_update_params::{RagDollUpdateKind, RagDollUpdatePa
 use mp_engine_ghoul2::shared::cghoul2_info::CGhoul2Info;
 use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 use mp_engine_qcommon::cm_terrain::register_terrain;
+use mp_engine_qcommon::terrain_handle::TerrainHandle;
+use mp_engine_rmg::rm_manager::RmManager;
 
 use mp_qshared::common::mp::botlib::aas_altroutegoal_s::aas_altroutegoal_t;
 use mp_qshared::common::mp::botlib::aas_clientmove_s::aas_clientmove_s;
@@ -3541,21 +3545,35 @@ pub fn SV_GameSystemCalls(
             SV_SetActiveSubBSP(view.cm, sv, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::G_RMG_INIT as isize {
-            // Raven guards RMG mission generation behind `com_RMG` (`sv_game.cpp:
-            // 1624-1638`). RMG generation is dead under DEDICATED (rmg-terrain.md
-            // §20) and the ported `CRMManager` is an opaque placeholder with no
-            // `SetLandScape`/`LoadMission`/`SpawnMission` — so the generation
-            // body is unported; the common dedicated path (`com_RMG` unset) is a
-            // no-op return.
+            // Raven: `TheRandomMissionManager` (the one `CRMManager`, lazily
+            // `new`'d) is the owned `Engine.rmg` here (`view.rmg` opaque slot,
+            // always present) — the lazy `if (!TheRandomMissionManager) new
+            // CRMManager` collapses to that owned instance. `cmg.landScape` is
+            // `view.cm.land_scape`; its terrain id is always `0` (`GetTerrainId`,
+            // ruling 28), so the handle passed to `set_landscape` is
+            // `TerrainHandle(0)`.
+            //
+            // The whole body is gated on `com_RMG` (`sv_game.cpp:1624-1638`).
+            // Under DEDICATED `load_mission` always early-outs `false` (RMG-D1 /
+            // ruling 25: `mTerrain` is always NULL, `GetRandomTerrain() == 0`),
+            // so `SpawnMission(qtrue)` is unreachable and §20-dropped — the whole
+            // generation subtree is dead code on the dedicated server.
             let com_rmg = view.common.com_RMG;
             if !com_rmg.is_null() && (*com_rmg).integer != 0 {
-                //TODO: Port G_RMG_INIT (CRMManager mission generation)
-                // Source: oracle/codemp/server/sv_game.cpp:1624-1638
-                mp_engine_qcommon::common::com_error(
-                    errorParm_t::ERR_DROP,
-                    "G_RMG_INIT: RMG mission generation unported (dead under dedicated)"
-                        .to_string(),
-                );
+                // SAFETY: view-constructor slots, single-threaded, no other live
+                // cast. `load_mission`'s host calls (print/error) never touch
+                // `view.cm` or `view.rmg`, so the DEC-23 per-slot raw reborrows of
+                // `view`/`view.cm` (register_terrain-arm precedent) do not alias in
+                // practice.
+                let rmg = &mut *(view.rmg.as_raw() as *mut RmManager);
+                rmg.set_landscape(TerrainHandle(0));
+                let cm = &mut *(view.cm as *mut CollisionWorld);
+                if rmg.load_mission(cm, &mut *view, qtrue != 0) {
+                    // `SpawnMission(qtrue)` — dead under DEDICATED (RMG-D1 /
+                    // ruling 25); `load_mission` never returns `true`, so this arm
+                    // is unreachable and the mission-generation body is §20-dropped.
+                    // Source: oracle/codemp/server/sv_game.cpp:1632-1634
+                }
             }
             return 0;
         } else if trap == G::G_CM_REGISTER_TERRAIN as isize {
@@ -3567,24 +3585,22 @@ pub fn SV_GameSystemCalls(
             let cm = &mut *(view.cm as *mut CollisionWorld);
             return register_terrain(cm, &mut *view, config_str, qtrue != 0).0 as isize;
         } else if trap == G::G_BOT_UPDATEWAYPOINTS as isize {
-            //TODO: Port SV_BotWaypointReception
-            // Source: oracle/codemp/server/sv_bot.cpp:63-75
-            // The `gWPArray`/`gWPNum` waypoint-reception + path-calc functions are
-            // not yet ported in this crate (sv_bot.rs); RMG/bot-route only, so the
-            // arm is unreached during boot.
-            mp_engine_qcommon::common::com_error(
-                errorParm_t::ERR_DROP,
-                "G_BOT_UPDATEWAYPOINTS: SV_BotWaypointReception unported".to_string(),
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            SV_BotWaypointReception(
+                view.common,
+                sv,
+                *args.offset(1) as c_int,
+                vma(view.common, args, 2) as *mut *mut wpobject_t,
             );
+            return 0;
         } else if trap == G::G_BOT_CALCULATEPATHS as isize {
-            //TODO: Port SV_BotCalculatePaths
-            // Source: oracle/codemp/server/sv_bot.cpp:81-...
-            // Callee not yet ported in this crate (sv_bot.rs); see
-            // G_BOT_UPDATEWAYPOINTS.
-            mp_engine_qcommon::common::com_error(
-                errorParm_t::ERR_DROP,
-                "G_BOT_CALCULATEPATHS: SV_BotCalculatePaths unported".to_string(),
-            );
+            // SAFETY: view-constructor slot, single-threaded, no other live cast;
+            // `SV_BotCalculatePaths` reaches `sv.bot.gWP*` and `SV_Trace(view, …)`
+            // exactly as `SV_SetBrushModel(view, sv, …)` does (SEAM-D11).
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            SV_BotCalculatePaths(view, sv, *args.offset(1) as c_int);
+            return 0;
         } else if trap == G::G_GET_ENTITY_TOKEN as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
             let sv = &mut *(view.sv.as_raw() as *mut Server);

@@ -15,23 +15,30 @@ use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_VariableIntegerValue};
 use mp_engine_qcommon::qcommon::net_limits::{MAX_RELIABLE_COMMANDS, PACKET_MASK};
 use mp_engine_qcommon::vm::VM_Call;
+use mp_engine_qcommon::vm_fns::BotVMShift;
 use mp_engine_qcommon::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::common::mp::botlib::botlib_misc::BOTLIB_API_VERSION;
 use mp_qshared::common::mp::game::g_public::SVF_BOT;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
+use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::cvar::CVAR_CHEAT;
 use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::limits::ENTITYNUM_NONE;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorMA, _VectorSubtract, CrossProduct, VectorNormalize, VectorSet,
+    _DotProduct, _VectorMA, _VectorSubtract, vec3_origin, CrossProduct, VectorLength,
+    VectorNormalize, VectorSet,
 };
+use mp_qshared::shared::surface_flags::MASK_SOLID;
 use mp_qshared::shared::vec3_t;
+use mp_qshared::shared::wpobject::{wpobject_t, MAX_NEIGHBOR_SIZE};
 use mp_qshared::shared::{qfalse, qtrue};
 
 use crate::botlib_import::{arm_botlib_slot, botlib_import_table};
 use crate::server::bot_debugpoly_t::bot_debugpoly_t;
 use crate::server::client_state_t::clientState_t;
 use crate::sv_game::SV_GentityNum;
+use crate::sv_world::SV_Trace;
 use crate::Server;
 use mp_engine_botlib::be_interface_fns::GetBotLibAPI;
 use mp_engine_botlib::BotLib;
@@ -269,6 +276,208 @@ pub fn SV_BotGetSnapshotEntity(sv: &mut Server, client: c_int, sequence: c_int) 
             .snapshotEntities
             .offset(((frame.first_entity + sequence) % sv.svs.numSnapshotEntities) as isize))
         .number
+    }
+}
+
+/// Raven `MAX_NEIGHBOR_LINK_DISTANCE` — waypoint neighbor-link cutoff distance.
+/// Ported locally here (its sole server-side use is [`SV_BotCalculatePaths`]);
+/// `mp_game::ai_wpnav` owns the game-side copy of the same `q_shared.h` `#define`.
+///
+/// Source: `oracle/codemp/game/q_shared.h:996`
+const MAX_NEIGHBOR_LINK_DISTANCE: c_int = 128;
+
+/// Raven `DEFAULT_GRID_SPACING` — RMG waypoint grid spacing (see above).
+///
+/// Source: `oracle/codemp/game/q_shared.h:999`
+const DEFAULT_GRID_SPACING: c_int = 400;
+
+/// Raven `NotWithinRange` — file-static waypoint-index proximity test used by
+/// [`SV_BotCalculatePaths`] to skip immediate neighbors in the pool ordering.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:25-38`
+fn NotWithinRange(base: c_int, extent: c_int) -> c_int {
+    if extent > base && base + 5 >= extent {
+        return 0;
+    }
+    if extent < base && base - 5 <= extent {
+        return 0;
+    }
+    1
+}
+
+/// Raven `SV_OrgVisibleBox` — trace `org1`→`org2` (a point trace under `rmg`,
+/// else a `mins`/`maxs` box trace) and report whether the segment is
+/// unobstructed by `MASK_SOLID` world/entities.
+///
+/// Raven passes `NULL` for `mins`/`maxs` in the `rmg` branch; the by-value
+/// `SV_Trace` seam (`sv_world.rs`) can no longer receive `NULL`, so the
+/// `vec3_origin` substitution Raven's `SV_Trace` applies for a `NULL` box
+/// (`sv_world.cpp:810-812`) is spelled explicitly here — identical behavior.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:40-58`
+pub fn SV_OrgVisibleBox(
+    view: &mut EngineHostView,
+    org1: vec3_t,
+    mins: vec3_t,
+    maxs: vec3_t,
+    org2: vec3_t,
+    ignore: c_int,
+    rmg: c_int,
+) -> c_int {
+    let mut tr: trace_t = unsafe { core::mem::zeroed() };
+    if rmg != 0 {
+        SV_Trace(
+            view,
+            &mut tr,
+            org1,
+            vec3_origin,
+            vec3_origin,
+            org2,
+            ignore,
+            MASK_SOLID,
+            0,
+            0,
+            10,
+        );
+    } else {
+        SV_Trace(
+            view, &mut tr, org1, mins, maxs, org2, ignore, MASK_SOLID, 0, 0, 10,
+        );
+    }
+
+    if tr.fraction == 1.0 && tr.startsolid == 0 && tr.allsolid == 0 {
+        return 1;
+    }
+    0
+}
+
+/// Raven `SV_BotWaypointReception` — receive the game VM's `gWPNum` waypoint
+/// objects and cache their (VM-shifted) pointers into the `gWPArray` table for
+/// [`SV_BotCalculatePaths`].
+///
+/// Each `wps[i]` is a game-VM `wpobject_t*`; Raven truncates it to `int` and
+/// runs it through `BotVMShift` (always the game VM, `vm.cpp:657-677`),
+/// transcribed faithfully (`(int)wps[i]` → `as usize as c_int`, the low-word
+/// truncation Raven relies on).
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:63-75`
+pub fn SV_BotWaypointReception(
+    common: &mut Common,
+    sv: &mut Server,
+    wpnum: c_int,
+    wps: *mut *mut wpobject_t,
+) {
+    sv.bot.gWPNum = wpnum;
+
+    let mut i: c_int = 0;
+    while i < sv.bot.gWPNum {
+        let wp = unsafe { *wps.offset(i as isize) };
+        sv.bot.gWPArray[i as usize] = BotVMShift(common, wp as usize as c_int) as *mut wpobject_t;
+        i += 1;
+    }
+}
+
+/// Raven `SV_BotCalculatePaths` — rebuild every cached waypoint's neighbor list:
+/// clear the old links, then link each pair within `maxNeighborDist`, on the
+/// same integer height, and mutually visible (`SV_OrgVisibleBox`).
+///
+/// `forceJumpable` is Raven's hard-coded `qfalse` (the `CanForceJumpTo` call is
+/// commented out at `:139`), so its dependent branches are dead but transcribed
+/// verbatim.
+///
+/// The neighbor-clear loop indexes `neighbors[neighbornum]` with the pool-
+/// supplied `neighbornum`, which the build loop can leave at `MAX_NEIGHBOR_SIZE`
+/// (the `>= MAX_NEIGHBOR_SIZE` break fires *after* the post-increment); Raven's
+/// unchecked C indexing is reproduced with raw-pointer arithmetic (§19) so the
+/// in-range cases match byte-for-byte rather than diverging into a bounds panic.
+///
+/// Source: `oracle/codemp/server/sv_bot.cpp:81-169`
+pub fn SV_BotCalculatePaths(view: &mut EngineHostView, sv: &mut Server, rmg: c_int) {
+    if sv.bot.gWPNum == 0 {
+        return;
+    }
+
+    let mut max_neighbor_dist: c_int = MAX_NEIGHBOR_LINK_DISTANCE;
+    if rmg != 0 {
+        max_neighbor_dist = DEFAULT_GRID_SPACING + (DEFAULT_GRID_SPACING as f32 * 0.5) as c_int;
+    }
+
+    let mins: vec3_t = [-15.0, -15.0, -15.0]; //-1
+    let maxs: vec3_t = [15.0, 15.0, 15.0]; //1
+
+    unsafe {
+        // now clear out all the neighbor data before we recalculate
+        let mut i: c_int = 0;
+        while i < sv.bot.gWPNum {
+            let wp = sv.bot.gWPArray[i as usize];
+            if !wp.is_null() && (*wp).inuse != qfalse && (*wp).neighbornum != 0 {
+                let neighbors = (*wp).neighbors.as_mut_ptr();
+                while (*wp).neighbornum >= 0 {
+                    let n = neighbors.offset((*wp).neighbornum as isize);
+                    (*n).num = 0;
+                    (*n).forceJumpTo = 0;
+                    (*wp).neighbornum -= 1;
+                }
+                (*wp).neighbornum = 0;
+            }
+            i += 1;
+        }
+
+        i = 0;
+        while i < sv.bot.gWPNum {
+            let wp_i = sv.bot.gWPArray[i as usize];
+            if !wp_i.is_null() && (*wp_i).inuse != qfalse {
+                let mut c: c_int = 0;
+                while c < sv.bot.gWPNum {
+                    let wp_c = sv.bot.gWPArray[c as usize];
+                    if !wp_c.is_null()
+                        && (*wp_c).inuse != qfalse
+                        && i != c
+                        && NotWithinRange(i, c) != 0
+                    {
+                        let mut a: vec3_t = [0.0; 3];
+                        _VectorSubtract((*wp_i).origin, (*wp_c).origin, &mut a);
+
+                        let n_l_dist = VectorLength(a);
+                        let force_jumpable: c_int = qfalse as c_int; //CanForceJumpTo(i, c, nLDist);
+
+                        if (n_l_dist < max_neighbor_dist as f32 || force_jumpable != 0)
+                            && ((*wp_i).origin[2] as c_int == (*wp_c).origin[2] as c_int
+                                || force_jumpable != 0)
+                            && (SV_OrgVisibleBox(
+                                view,
+                                (*wp_i).origin,
+                                mins,
+                                maxs,
+                                (*wp_c).origin,
+                                ENTITYNUM_NONE,
+                                rmg,
+                            ) != 0
+                                || force_jumpable != 0)
+                        {
+                            let neighbors = (*wp_i).neighbors.as_mut_ptr();
+                            let slot = neighbors.offset((*wp_i).neighbornum as isize);
+                            (*slot).num = c;
+                            if force_jumpable != 0
+                                && ((*wp_i).origin[2] as c_int != (*wp_c).origin[2] as c_int
+                                    || n_l_dist < max_neighbor_dist as f32)
+                            {
+                                (*slot).forceJumpTo = 999; //forceJumpable; //FJSR
+                            } else {
+                                (*slot).forceJumpTo = 0;
+                            }
+                            (*wp_i).neighbornum += 1;
+                        }
+
+                        if (*wp_i).neighbornum >= MAX_NEIGHBOR_SIZE as c_int {
+                            break;
+                        }
+                    }
+                    c += 1;
+                }
+            }
+            i += 1;
+        }
     }
 }
 
