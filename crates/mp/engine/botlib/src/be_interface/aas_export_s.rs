@@ -54,7 +54,8 @@ pub struct aas_export_s {
             maxareas: c_int,
         ) -> c_int,
     >,
-    pub AAS_AreaInfo: Option<fn(bot: &mut BotLib, areanum: c_int, info: *mut aas_areainfo_t) -> c_int>,
+    pub AAS_AreaInfo:
+        Option<fn(bot: &mut BotLib, areanum: c_int, info: *mut aas_areainfo_t) -> c_int>,
     //--------------------------------------------
     // be_aas_bspq3.c
     //--------------------------------------------

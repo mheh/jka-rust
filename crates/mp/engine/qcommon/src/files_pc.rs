@@ -5,7 +5,6 @@
 
 use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void};
 
-use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fs_origin::fsOrigin_t;
 use mp_qshared::shared::limits::MAX_STRING_TOKENS;
@@ -13,7 +12,7 @@ use mp_qshared::shared::qboolean;
 use mp_qshared::shared::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
 use native_types::fileHandle_t;
 
-use crate::collision_world::CollisionWorld;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
 use crate::files::file_in_pack_s::fileInPack_t;
 use crate::files::files_consts::{BASEGAME, MAX_SEARCH_PATHS};
@@ -22,7 +21,6 @@ use crate::files::searchpath_s::searchpath_t;
 use crate::qcommon::filesystem_limits::{
     FS_CGAME_REF, FS_GENERAL_REF, FS_QAGAME_REF, FS_UI_REF, NUM_ID_PAKS,
 };
-use crate::cm_load::RenderModels;
 
 // Raven `S_ClearSoundBuffer` (Raven: `return;` in the null/no-sound build) is
 // canonically ported at `mp_engine_client::null::null_snddma::S_ClearSoundBuffer`,
@@ -41,12 +39,12 @@ mod null {
 // `z_memman_pc`. All genuinely unported; reported.
 use crate::files::unz_file::unzOpenCurrentFile;
 use crate::files_common::{
-    FS_AddGameDirectory, FS_CopyFile, FS_CreatePath, FS_FCloseFile, FS_FileForHandle,
-    FS_FOpenFileRead, FS_FOpenFileWrite, FS_FreeFileList, FS_HandleForFile, FS_ListFiles, FS_Read,
+    FS_AddGameDirectory, FS_CopyFile, FS_CreatePath, FS_FCloseFile, FS_FOpenFileRead,
+    FS_FOpenFileWrite, FS_FileForHandle, FS_FreeFileList, FS_HandleForFile, FS_ListFiles, FS_Read,
     FS_Restart, FS_SV_FOpenFileRead,
 };
+use crate::sys_engine::{Sys_StreamSeek, Sys_StreamedRead};
 use crate::z_memman_pc::{CopyString, Z_Free};
-use crate::sys_engine::{Sys_StreamedRead, Sys_StreamSeek};
 use native_platform::{Sys_BeginStreamedFile, Sys_FreeFileList, Sys_ListFiles};
 
 /// Raven `FS_PakIsPure`.
@@ -932,54 +930,46 @@ pub fn FS_Read2(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_
 /// Raven `FS_Seek`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:1131-1181`
-pub fn FS_Seek(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    f: fileHandle_t,
-    offset: c_long,
-    origin: c_int,
-) -> c_int {
+pub fn FS_Seek(view: &mut EngineHostView, f: fileHandle_t, offset: c_long, origin: c_int) -> c_int {
     // §19: `foo[65536]` is read-before-write only through FS_Read (which
     // fills it) — zero-init to be safe.
     let mut foo = [0u8; 65536];
 
-    if common.fs_searchpaths.is_null() {
+    if view.common.fs_searchpaths.is_null() {
         crate::common::com_error(
             errorParm_t::ERR_FATAL,
             "Filesystem call made without initialization\n".to_string(),
         );
     }
 
-    if common.fsh[f as usize].streamed != mp_qshared::shared::qfalse {
-        common.fsh[f as usize].streamed = mp_qshared::shared::qfalse;
-        Sys_StreamSeek(common, cm, rm, host, f, offset, origin);
-        common.fsh[f as usize].streamed = mp_qshared::shared::qtrue;
+    if view.common.fsh[f as usize].streamed != mp_qshared::shared::qfalse {
+        view.common.fsh[f as usize].streamed = mp_qshared::shared::qfalse;
+        Sys_StreamSeek(view, f, offset, origin);
+        view.common.fsh[f as usize].streamed = mp_qshared::shared::qtrue;
     }
 
-    if common.fsh[f as usize].zipFile == mp_qshared::shared::qtrue {
+    if view.common.fsh[f as usize].zipFile == mp_qshared::shared::qtrue {
         if offset == 0 && origin == fsOrigin_t::FS_SEEK_SET as c_int {
             // set the file position in the zip file (also sets the current file info)
             unsafe {
                 crate::unzip::unzSetCurrentFileInfoPosition(
-                    common.fsh[f as usize].handleFiles.file.z,
-                    common.fsh[f as usize].zipFilePos as c_ulong,
+                    view.common.fsh[f as usize].handleFiles.file.z,
+                    view.common.fsh[f as usize].zipFilePos as c_ulong,
                 );
             }
-            unsafe { unzOpenCurrentFile(common.fsh[f as usize].handleFiles.file.z) }
+            unsafe { unzOpenCurrentFile(view.common.fsh[f as usize].handleFiles.file.z) }
         } else if offset < 65536 {
             // set the file position in the zip file (also sets the current file info)
             unsafe {
                 crate::unzip::unzSetCurrentFileInfoPosition(
-                    common.fsh[f as usize].handleFiles.file.z,
-                    common.fsh[f as usize].zipFilePos as c_ulong,
+                    view.common.fsh[f as usize].handleFiles.file.z,
+                    view.common.fsh[f as usize].zipFilePos as c_ulong,
                 );
             }
             unsafe {
-                unzOpenCurrentFile(common.fsh[f as usize].handleFiles.file.z);
+                unzOpenCurrentFile(view.common.fsh[f as usize].handleFiles.file.z);
             }
-            FS_Read(common, foo.as_mut_ptr() as *mut (), offset as c_int, f)
+            FS_Read(view.common, foo.as_mut_ptr() as *mut (), offset as c_int, f)
         } else {
             crate::common::com_error(
                 errorParm_t::ERR_FATAL,
@@ -987,7 +977,7 @@ pub fn FS_Seek(
             )
         }
     } else {
-        let file = FS_FileForHandle(common, f);
+        let file = FS_FileForHandle(view.common, f);
         let _origin = match origin {
             x if x == fsOrigin_t::FS_SEEK_CUR as c_int => libc::SEEK_CUR,
             x if x == fsOrigin_t::FS_SEEK_END as c_int => libc::SEEK_END,
@@ -1086,10 +1076,7 @@ pub fn FS_FileIsInPAK(
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:1818-1854`
 pub fn Sys_ConcatenateFileLists(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     list0: *mut *mut c_char,
     list1: *mut *mut c_char,
     list2: *mut *mut c_char,
@@ -1103,9 +1090,8 @@ pub fn Sys_ConcatenateFileLists(
     // Create new list.
     // Raven's chain is Z_Malloc/Z_Free end-to-end; the lists come from the
     // libc-malloc'd native Sys_ListFiles here, so the whole chain uses libc.
-    let cat = unsafe {
-        libc::calloc(total_length + 1, core::mem::size_of::<*mut c_char>())
-    } as *mut *mut c_char;
+    let cat = unsafe { libc::calloc(total_length + 1, core::mem::size_of::<*mut c_char>()) }
+        as *mut *mut c_char;
     let mut dst = cat;
 
     unsafe {
@@ -1157,46 +1143,32 @@ pub fn Sys_ConcatenateFileLists(
 /// Raven `FS_UpdateGamedir`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2419-2436`
-pub fn FS_UpdateGamedir(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn FS_UpdateGamedir(view: &mut EngineHostView) {
     unsafe {
-        let gamedirvar_str = c_str_to_string((*common.fs_gamedirvar).string);
+        let gamedirvar_str = c_str_to_string((*view.common.fs_gamedirvar).string);
         if !gamedirvar_str.is_empty() && !gamedirvar_str.eq_ignore_ascii_case(BASEGAME) {
-            let cdpath_str = c_str_to_string((*common.fs_cdpath).string);
+            let cdpath_str = c_str_to_string((*view.common.fs_cdpath).string);
             if !cdpath_str.is_empty() {
                 FS_AddGameDirectory(
-                    common,
-                    cm,
-                    rm,
-                    host,
-                    (*common.fs_cdpath).string,
-                    (*common.fs_gamedirvar).string,
+                    view,
+                    (*view.common.fs_cdpath).string,
+                    (*view.common.fs_gamedirvar).string,
                 );
             }
-            let basepath_str = c_str_to_string((*common.fs_basepath).string);
+            let basepath_str = c_str_to_string((*view.common.fs_basepath).string);
             if !basepath_str.is_empty() {
                 FS_AddGameDirectory(
-                    common,
-                    cm,
-                    rm,
-                    host,
-                    (*common.fs_basepath).string,
-                    (*common.fs_gamedirvar).string,
+                    view,
+                    (*view.common.fs_basepath).string,
+                    (*view.common.fs_gamedirvar).string,
                 );
             }
-            let homepath_str = c_str_to_string((*common.fs_homepath).string);
+            let homepath_str = c_str_to_string((*view.common.fs_homepath).string);
             if !homepath_str.is_empty() && !homepath_str.eq_ignore_ascii_case(&basepath_str) {
                 FS_AddGameDirectory(
-                    common,
-                    cm,
-                    rm,
-                    host,
-                    (*common.fs_homepath).string,
-                    (*common.fs_gamedirvar).string,
+                    view,
+                    (*view.common.fs_homepath).string,
+                    (*view.common.fs_gamedirvar).string,
                 );
             }
         }
@@ -1207,32 +1179,32 @@ pub fn FS_UpdateGamedir(
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2947-2981`
 pub fn FS_PureServerSetReferencedPaks(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     pakSums: *const c_char,
     pakNames: *const c_char,
 ) {
-    crate::cmd_common::Cmd_TokenizeString(common, pakSums);
+    crate::cmd_common::Cmd_TokenizeString(view.common, pakSums);
 
-    let mut c = crate::cmd_common::Cmd_Argc(common);
+    let mut c = crate::cmd_common::Cmd_Argc(view.common);
     if c > MAX_SEARCH_PATHS as c_int {
         c = MAX_SEARCH_PATHS as c_int;
     }
 
-    common.fs_numServerReferencedPaks = c;
+    view.common.fs_numServerReferencedPaks = c;
 
     for i in 0..c as usize {
-        let arg = crate::cmd_common::Cmd_Argv(common, i as c_int);
-        common.fs_serverReferencedPaks[i] = unsafe { libc::atoi(arg) };
+        let arg = crate::cmd_common::Cmd_Argv(view.common, i as c_int);
+        view.common.fs_serverReferencedPaks[i] = unsafe { libc::atoi(arg) };
     }
 
     for i in 0..c as usize {
-        if !common.fs_serverReferencedPakNames[i].is_null() {
-            Z_Free(common, common.fs_serverReferencedPakNames[i] as *mut ());
+        if !view.common.fs_serverReferencedPakNames[i].is_null() {
+            Z_Free(
+                view.common,
+                view.common.fs_serverReferencedPakNames[i] as *mut (),
+            );
         }
-        common.fs_serverReferencedPakNames[i] = core::ptr::null_mut();
+        view.common.fs_serverReferencedPakNames[i] = core::ptr::null_mut();
     }
     let names_str = unsafe {
         if pakNames.is_null() {
@@ -1242,17 +1214,16 @@ pub fn FS_PureServerSetReferencedPaks(
         }
     };
     if !names_str.is_empty() {
-        crate::cmd_common::Cmd_TokenizeString(common, pakNames);
+        crate::cmd_common::Cmd_TokenizeString(view.common, pakNames);
 
-        let mut d = crate::cmd_common::Cmd_Argc(common);
+        let mut d = crate::cmd_common::Cmd_Argc(view.common);
         if d > MAX_SEARCH_PATHS as c_int {
             d = MAX_SEARCH_PATHS as c_int;
         }
 
         for i in 0..d as usize {
-            let arg = crate::cmd_common::Cmd_Argv(common, i as c_int);
-            common.fs_serverReferencedPakNames[i] =
-                CopyString(common, cm, rm, host, arg);
+            let arg = crate::cmd_common::Cmd_Argv(view.common, i as c_int);
+            view.common.fs_serverReferencedPakNames[i] = CopyString(view, arg);
         }
     }
 }
@@ -1260,16 +1231,11 @@ pub fn FS_PureServerSetReferencedPaks(
 /// Raven `FS_ConditionalRestart`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:3048-3054`
-pub fn FS_ConditionalRestart(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    checksumFeed: c_int,
-) -> qboolean {
+pub fn FS_ConditionalRestart(view: &mut EngineHostView, checksumFeed: c_int) -> qboolean {
     unsafe {
-        if (*common.fs_gamedirvar).modified != 0 || checksumFeed != common.fs_checksumFeed {
-            FS_Restart(common, cm, rm, host, checksumFeed);
+        if (*view.common.fs_gamedirvar).modified != 0 || checksumFeed != view.common.fs_checksumFeed
+        {
+            FS_Restart(view, checksumFeed);
             return mp_qshared::shared::qtrue;
         }
     }
@@ -1279,14 +1245,7 @@ pub fn FS_ConditionalRestart(
 /// Raven `FS_GetModList`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:1866-1977`
-pub fn FS_GetModList(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    listbuf: *mut c_char,
-    bufsize: c_int,
-) -> c_int {
+pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c_int) -> c_int {
     let mut n_mods: c_int = 0;
     let mut n_total: c_int = 0;
 
@@ -1295,21 +1254,21 @@ pub fn FS_GetModList(
 
         let mut dummy: c_int = 0;
         let p_files0 = Sys_ListFiles(
-            (*common.fs_homepath).string,
+            (*view.common.fs_homepath).string,
             core::ptr::null(),
             core::ptr::null_mut(),
             &mut dummy,
             mp_qshared::shared::qtrue,
         );
         let p_files1 = Sys_ListFiles(
-            (*common.fs_basepath).string,
+            (*view.common.fs_basepath).string,
             core::ptr::null(),
             core::ptr::null_mut(),
             &mut dummy,
             mp_qshared::shared::qtrue,
         );
         let p_files2 = Sys_ListFiles(
-            (*common.fs_cdpath).string,
+            (*view.common.fs_cdpath).string,
             core::ptr::null(),
             core::ptr::null_mut(),
             &mut dummy,
@@ -1317,7 +1276,7 @@ pub fn FS_GetModList(
         );
         // we searched for mods in the three paths
         // it is likely that we have duplicate names now, which we will cleanup below
-        let p_files = Sys_ConcatenateFileLists(common, cm, rm, host, p_files0, p_files1, p_files2);
+        let p_files = Sys_ConcatenateFileLists(view, p_files0, p_files1, p_files2);
         let n_potential = Sys_CountFileList(p_files);
 
         for i in 0..n_potential as isize {
@@ -1342,8 +1301,8 @@ pub fn FS_GetModList(
             if !name_str.eq_ignore_ascii_case(BASEGAME) && !name_str.starts_with('.') {
                 // now we need to find some .pk3 files to validate the mod
                 let mut path = crate::files_common::FS_BuildOSPath4(
-                    common,
-                    (*common.fs_basepath).string,
+                    view.common,
+                    (*view.common.fs_basepath).string,
                     name,
                     c"".as_ptr(),
                 );
@@ -1360,8 +1319,8 @@ pub fn FS_GetModList(
                 // Try on cd path
                 if n_paks <= 0 {
                     path = crate::files_common::FS_BuildOSPath4(
-                        common,
-                        (*common.fs_cdpath).string,
+                        view.common,
+                        (*view.common.fs_cdpath).string,
                         name,
                         c"".as_ptr(),
                     );
@@ -1379,8 +1338,8 @@ pub fn FS_GetModList(
                 // try on home path
                 if n_paks <= 0 {
                     path = crate::files_common::FS_BuildOSPath4(
-                        common,
-                        (*common.fs_homepath).string,
+                        view.common,
+                        (*view.common.fs_homepath).string,
                         name,
                         c"".as_ptr(),
                     );
@@ -1403,16 +1362,16 @@ pub fn FS_GetModList(
                     let desc_path_c = std::ffi::CString::new(desc_path_str).unwrap();
                     let mut desc_handle: fileHandle_t = 0;
                     let mut n_desc_len =
-                        FS_SV_FOpenFileRead(common, desc_path_c.as_ptr(), &mut desc_handle);
+                        FS_SV_FOpenFileRead(view.common, desc_path_c.as_ptr(), &mut desc_handle);
                     let desc_str: String;
                     if n_desc_len > 0 && desc_handle != 0 {
-                        let file = FS_FileForHandle(common, desc_handle);
+                        let file = FS_FileForHandle(view.common, desc_handle);
                         let mut buf = [0u8; 49];
                         n_desc_len = libc::fread(buf.as_mut_ptr() as *mut _, 1, 48, file) as c_int;
                         if n_desc_len >= 0 {
                             buf[n_desc_len as usize] = 0;
                         }
-                        FS_FCloseFile(common, desc_handle);
+                        FS_FCloseFile(view.common, desc_handle);
                         desc_str = c_str_to_string(buf.as_ptr() as *const c_char);
                     } else {
                         desc_str = name_str.clone();
@@ -1442,10 +1401,7 @@ pub fn FS_GetModList(
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:3064-3116`
 pub fn FS_FOpenFileByMode(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     qpath: *const c_char,
     f: *mut fileHandle_t,
     mode: fsMode_t,
@@ -1455,10 +1411,10 @@ pub fn FS_FOpenFileByMode(
     let r;
     match mode {
         m if m == FS_READ => {
-            r = FS_FOpenFileRead(common, cm, rm, host, qpath, f, mp_qshared::shared::qtrue);
-        },
+            r = FS_FOpenFileRead(view, qpath, f, mp_qshared::shared::qtrue);
+        }
         m if m == FS_WRITE => unsafe {
-            *f = FS_FOpenFileWrite(common, qpath);
+            *f = FS_FOpenFileWrite(view.common, qpath);
             r = if *f == 0 { -1 } else { 0 };
         },
         m if m == FS_APPEND_SYNC || m == FS_APPEND => unsafe {
@@ -1467,7 +1423,7 @@ pub fn FS_FOpenFileByMode(
             } else {
                 sync
             };
-            *f = FS_FOpenFileAppend(common, qpath);
+            *f = FS_FOpenFileAppend(view.common, qpath);
             r = if *f == 0 { -1 } else { 0 };
         },
         _ => {
@@ -1484,23 +1440,23 @@ pub fn FS_FOpenFileByMode(
 
     unsafe {
         if *f != 0 {
-            if common.fsh[*f as usize].zipFile == mp_qshared::shared::qtrue {
-                common.fsh[*f as usize].baseOffset =
-                    crate::unzip::unztell(common.fsh[*f as usize].handleFiles.file.z) as c_int;
+            if view.common.fsh[*f as usize].zipFile == mp_qshared::shared::qtrue {
+                view.common.fsh[*f as usize].baseOffset =
+                    crate::unzip::unztell(view.common.fsh[*f as usize].handleFiles.file.z) as c_int;
             } else {
-                common.fsh[*f as usize].baseOffset =
-                    libc::ftell(common.fsh[*f as usize].handleFiles.file.o as *mut libc::FILE)
+                view.common.fsh[*f as usize].baseOffset =
+                    libc::ftell(view.common.fsh[*f as usize].handleFiles.file.o as *mut libc::FILE)
                         as c_int;
             }
-            common.fsh[*f as usize].fileSize = r;
-            common.fsh[*f as usize].streamed = mp_qshared::shared::qfalse;
+            view.common.fsh[*f as usize].fileSize = r;
+            view.common.fsh[*f as usize].streamed = mp_qshared::shared::qfalse;
 
             if mode == FS_READ {
                 Sys_BeginStreamedFile(*f, 0x4000);
-                common.fsh[*f as usize].streamed = mp_qshared::shared::qtrue;
+                view.common.fsh[*f as usize].streamed = mp_qshared::shared::qtrue;
             }
         }
-        common.fsh[*f as usize].handleSync = sync;
+        view.common.fsh[*f as usize].handleSync = sync;
     }
 
     r
@@ -1510,10 +1466,7 @@ pub fn FS_FOpenFileByMode(
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:1758-1788`
 pub fn FS_GetFileList(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     path: *const c_char,
     extension: *const c_char,
     listbuf: *mut c_char,
@@ -1525,11 +1478,11 @@ pub fn FS_GetFileList(
         *listbuf = 0;
 
         if c_str_to_string(path) == "$modlist" {
-            return FS_GetModList(common, cm, rm, host, listbuf, bufsize);
+            return FS_GetModList(view, listbuf, bufsize);
         }
 
         let mut n_files: c_int = 0;
-        let p_files = FS_ListFiles(common, cm, rm, host, path, extension, &mut n_files);
+        let p_files = FS_ListFiles(view, path, extension, &mut n_files);
 
         let mut i = 0;
         let mut listbuf = listbuf;
@@ -1547,7 +1500,7 @@ pub fn FS_GetFileList(
             i += 1;
         }
 
-        FS_FreeFileList(common, p_files);
+        FS_FreeFileList(view.common, p_files);
 
         n_files
     }

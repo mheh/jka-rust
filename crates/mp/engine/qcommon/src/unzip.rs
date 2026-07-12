@@ -10,8 +10,8 @@ use libc::{SEEK_CUR, SEEK_END, SEEK_SET};
 use crate::files::unz_file::unzFile;
 use crate::files::unz_types::{
     file_in_zip_read_info_s, tm_unz, uInt, uLong, unz_file_info, unz_file_info_internal,
-    unz_global_info, unz_s, z_stream, Z_BUF_ERROR, Z_DATA_ERROR, Z_OK, Z_STREAM_END, ZF_DEFLATED,
-    FILE,
+    unz_global_info, unz_s, z_stream, FILE, ZF_DEFLATED, Z_BUF_ERROR, Z_DATA_ERROR, Z_OK,
+    Z_STREAM_END,
 };
 use crate::files::unzip_consts::{
     BUFREADCOMMENT, CASESENSITIVITYDEFAULTVALUE, SIZECENTRALDIRITEM, SIZEZIPLOCALHEADER,
@@ -1007,7 +1007,10 @@ fn unzlocal_SearchCentralDir(fin: *mut FILE) -> uLong {
                 old > 0
             } {
                 let bi = i as usize;
-                if buf[bi] == 0x50 && buf[bi + 1] == 0x4b && buf[bi + 2] == 0x05 && buf[bi + 3] == 0x06
+                if buf[bi] == 0x50
+                    && buf[bi + 1] == 0x4b
+                    && buf[bi + 2] == 0x05
+                    && buf[bi + 3] == 0x06
                 {
                     uPosFound = uReadPos + i as uLong;
                     break;

@@ -1867,13 +1867,16 @@ round-7 gate's two Slice-0 stamping blockers are **CLOSED** (user, 2026-07-03, i
   The fields land with each subsystem's port waves (the struct types do
   not exist before their §F work). `Engine` implements `EngineHost` for
   subsystem calls through the pinned split-borrow view (ruling 43):
-  `pub struct EngineHostView<'a>` in `mp_engine_core`, holding `&mut`
-  borrows of the Common/Server/CollisionWorld/loader fields `EngineHost`
-  needs; `Engine` gains per-subsystem split constructors
-  (`fn nav_call(&mut self) -> (EngineHostView<'_>, &mut Navigator)`
-  pattern) that split-borrow disjoint fields — plain field-level
-  reborrowing, no unsafe. The trait impl lands at wave 20 with the
-  `SV_GameSystemCalls` arms that consume it.
+  `pub struct EngineHostView<'a>` — AMENDED by DEC-23 (host-seam
+  restructure, 2026-07-11): the view lives in **`mp_engine_qcommon`**
+  (`common/engine_host_view.rs`), holds `&mut Common` + `&mut
+  CollisionWorld` plus the six type-erased slots (`sv`/`cl`/`bot`/`rm`/
+  `rmg`/`g2`), and is the single world parameter of every host-consuming
+  C-track function (the receiver-list convention collapsed into it). The
+  split constructor is `mp_engine_core::engine_host_view(&mut Engine)`
+  (plain field reborrows + slot wraps); Server/RenderModels-touching
+  trait methods route through `Common.hooks` accessor fields installed
+  at boot. See `docs/decisions.md` DEC-23.
 
 - **STATE-Q7 — Freeze-ordering — CLOSED 2026-07-03 (whole-set freeze, user
   sign-off).** All four architecture docs advanced REVIEWED → FROZEN together,

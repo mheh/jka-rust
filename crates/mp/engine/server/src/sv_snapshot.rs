@@ -3,11 +3,14 @@
 use core::ffi::c_int;
 
 use mp_bg::public::entity_flags::EF_PERMANENT;
-use mp_engine_qcommon::cm_load::{RenderModels, CM_LeafArea, CM_LeafCluster};
-use mp_engine_qcommon::cm_test::{CM_AreasConnected, CM_ClusterPVS, CM_PointLeafnum, CM_WriteAreaBits};
+use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
+use mp_engine_qcommon::cm_test::{
+    CM_AreasConnected, CM_ClusterPVS, CM_PointLeafnum, CM_WriteAreaBits,
+};
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::com_error;
 use mp_engine_qcommon::common::common::{com_printf, Common};
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Memset};
 use mp_engine_qcommon::cvar_fns::Cvar_Set;
 use mp_engine_qcommon::msg::{
@@ -32,7 +35,7 @@ use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::shared::errorParm_t;
 use mp_qshared::shared::limits::{GENTITYNUM_BITS, SNAPFLAG_NOT_ACTIVE, SNAPFLAG_RATE_DELAYED};
 use mp_qshared::shared::q_math::{
-    VectorLength, VectorLengthSquared, _VectorAdd, _VectorCopy, _VectorScale, _VectorSubtract,
+    _VectorAdd, _VectorCopy, _VectorScale, _VectorSubtract, VectorLength, VectorLengthSquared,
 };
 use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t, MAX_GENTITIES};
 
@@ -75,15 +78,9 @@ pub fn SV_AddEntToSnapshot(
 /// Raven `SV_SendClientMessages`.
 ///
 /// Source: `oracle/codemp/server/sv_snapshot.cpp:806-832`
-pub fn SV_SendClientMessages(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn SV_SendClientMessages(view: &mut EngineHostView, sv: &mut Server) {
     // send a message to each connected client
-    let max_clients = unsafe { (*common.sv_maxclients).integer };
+    let max_clients = unsafe { (*view.common.sv_maxclients).integer };
     for i in 0..max_clients {
         let c = unsafe { sv.svs.clients.offset(i as isize) };
         unsafe {
@@ -100,20 +97,17 @@ pub fn SV_SendClientMessages(
             if (*c).netchan.unsentFragments != 0 {
                 (*c).nextSnapshotTime = sv.svs.time
                     + SV_RateMsec(
-                        common,
-                        cm,
+                        view,
                         sv,
-                        rm,
-                        host,
                         c,
                         (*c).netchan.unsentLength - (*c).netchan.unsentFragmentStart,
                     );
-                SV_Netchan_TransmitNextFragment(common, cm, rm, host, &mut (*c).netchan);
+                SV_Netchan_TransmitNextFragment(view, &mut (*c).netchan);
                 continue;
             }
 
             // generate and send a new message
-            SV_SendClientSnapshot(common, cm, sv, rm, host, c);
+            SV_SendClientSnapshot(view, sv, c);
         }
     }
 }
@@ -128,11 +122,8 @@ const HEADER_RATE_BYTES: c_int = 48;
 ///
 /// Source: `oracle/codemp/server/sv_snapshot.cpp:623-643`
 pub fn SV_RateMsec(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     _sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
     client: *mut client_t,
     mut messageSize: c_int,
 ) -> c_int {
@@ -142,12 +133,12 @@ pub fn SV_RateMsec(
             messageSize = 1500;
         }
         let mut rate = (*client).rate;
-        if (*common.sv_maxRate).integer != 0 {
-            if (*common.sv_maxRate).integer < 1000 {
-                Cvar_Set(common, cm, rm, host, c"sv_MaxRate".as_ptr(), c"1000".as_ptr());
+        if (*view.common.sv_maxRate).integer != 0 {
+            if (*view.common.sv_maxRate).integer < 1000 {
+                Cvar_Set(view, c"sv_MaxRate".as_ptr(), c"1000".as_ptr());
             }
-            if (*common.sv_maxRate).integer < rate {
-                rate = (*common.sv_maxRate).integer;
+            if (*view.common.sv_maxRate).integer < rate {
+                rate = (*view.common.sv_maxRate).integer;
             }
         }
         (messageSize + HEADER_RATE_BYTES) * 1000 / rate
@@ -158,7 +149,11 @@ pub fn SV_RateMsec(
 /// client hasn't acknowledged yet.
 ///
 /// Source: `oracle/codemp/server/sv_snapshot.cpp:225-235`
-pub fn SV_UpdateServerCommandsToClient(common: &mut Common, client: *mut client_t, msg: *mut msg_t) {
+pub fn SV_UpdateServerCommandsToClient(
+    common: &mut Common,
+    client: *mut client_t,
+    msg: *mut msg_t,
+) {
     unsafe {
         // write any unacknowledged serverCommands
         let mut i = (*client).reliableAcknowledge + 1;
@@ -186,11 +181,8 @@ pub fn SV_UpdateServerCommandsToClient(common: &mut Common, client: *mut client_
 ///
 /// Source: `oracle/codemp/server/sv_snapshot.cpp:652-707`
 pub fn SV_SendMessageToClient(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
     msg: *mut msg_t,
     client: *mut client_t,
 ) {
@@ -201,13 +193,13 @@ pub fn SV_SendMessageToClient(
             // send additional message fragments if the last message
             // was too large to send at once
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "[ISM]SV_SendClientGameState() [1] for {}, writing out old fragments\n",
                     core::ffi::CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
                 ),
             );
-            SV_Netchan_TransmitNextFragment(common, cm, rm, host, &mut (*client).netchan);
+            SV_Netchan_TransmitNextFragment(view, &mut (*client).netchan);
         }
 
         // record information about the message
@@ -217,20 +209,20 @@ pub fn SV_SendMessageToClient(
         (*client).frames[idx].messageAcked = -1;
 
         // send the datagram
-        SV_Netchan_Transmit(common, cm, rm, host, client, msg);
+        SV_Netchan_Transmit(view, client, msg);
 
         // set nextSnapshotTime based on rate and requested number of updates
 
         // local clients get snapshots every frame
         if (*client).netchan.remoteAddress.r#type == netadrtype_t::NA_LOOPBACK
-            || host.is_lan_address(&(*client).netchan.remoteAddress)
+            || view.is_lan_address(&(*client).netchan.remoteAddress)
         {
             (*client).nextSnapshotTime = sv.svs.time - 1;
             return;
         }
 
         // normal rate / snapshotMsec calculation
-        let mut rateMsec = SV_RateMsec(common, cm, sv, rm, host, client, (*msg).cursize);
+        let mut rateMsec = SV_RateMsec(view, sv, client, (*msg).cursize);
 
         if rateMsec < (*client).snapshotMsec {
             // never send more packets than this, no matter what the rate is at
@@ -257,14 +249,7 @@ pub fn SV_SendMessageToClient(
 /// Raven `SV_SendClientSnapshot` — also called by `SV_FinalMessage`.
 ///
 /// Source: `oracle/codemp/server/sv_snapshot.cpp:719-798`
-pub fn SV_SendClientSnapshot(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    client: *mut client_t,
-) {
+pub fn SV_SendClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client: *mut client_t) {
     unsafe {
         let mut msg_buf = [0u8; MAX_MSGLEN as usize];
         let mut msg: msg_t = core::mem::zeroed();
@@ -275,41 +260,46 @@ pub fn SV_SendClientSnapshot(
             let mut i = 0;
 
             mp_engine_qcommon::msg::MSG_Init(
-                common,
-                cm,
-                rm,
-                host,
+                view,
                 &mut msg,
                 msg_buf.as_mut_ptr(),
                 msg_buf.len() as c_int,
             );
 
             // have to include this for each message.
-            mp_engine_qcommon::msg::MSG_WriteLong(common, &mut msg, (*client).lastClientCommand);
+            mp_engine_qcommon::msg::MSG_WriteLong(
+                view.common,
+                &mut msg,
+                (*client).lastClientCommand,
+            );
 
-            mp_engine_qcommon::msg::MSG_WriteByte(common, &mut msg, svc_ops_e::svc_setgame as c_int);
+            mp_engine_qcommon::msg::MSG_WriteByte(
+                view.common,
+                &mut msg,
+                svc_ops_e::svc_setgame as c_int,
+            );
 
-            while *(*common.fs_gamedirvar).string.offset(i) != 0 {
+            while *(*view.common.fs_gamedirvar).string.offset(i) != 0 {
                 mp_engine_qcommon::msg::MSG_WriteByte(
-                    common,
+                    view.common,
                     &mut msg,
-                    *(*common.fs_gamedirvar).string.offset(i) as c_int,
+                    *(*view.common.fs_gamedirvar).string.offset(i) as c_int,
                 );
                 i += 1;
             }
-            mp_engine_qcommon::msg::MSG_WriteByte(common, &mut msg, 0);
+            mp_engine_qcommon::msg::MSG_WriteByte(view.common, &mut msg, 0);
 
             // MW - my attempt to fix illegible server message errors caused by
             // packet fragmentation of initial snapshot. rww - reusing this here
             while (*client).state as c_int != 0 && (*client).netchan.unsentFragments != 0 {
                 com_printf(
-                    common,
+                    view.common,
                     &format!(
                         "[ISM]SV_SendClientGameState() [1] for {}, writing out old fragments\n",
                         core::ffi::CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
                     ),
                 );
-                SV_Netchan_TransmitNextFragment(common, cm, rm, host, &mut (*client).netchan);
+                SV_Netchan_TransmitNextFragment(view, &mut (*client).netchan);
             }
 
             // record information about the message
@@ -319,13 +309,13 @@ pub fn SV_SendClientSnapshot(
             (*client).frames[idx].messageAcked = -1;
 
             // send the datagram
-            SV_Netchan_Transmit(common, cm, rm, host, client, &mut msg);
+            SV_Netchan_Transmit(view, client, &mut msg);
 
             (*client).sentGamedir = qtrue;
         }
 
         // build the snapshot
-        SV_BuildClientSnapshot(common, cm, sv, rm, host, client);
+        SV_BuildClientSnapshot(view, sv, client);
 
         // bots need to have their snapshots build, but the query them directly
         // without needing to be sent
@@ -334,10 +324,7 @@ pub fn SV_SendClientSnapshot(
         }
 
         mp_engine_qcommon::msg::MSG_Init(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             &mut msg,
             msg_buf.as_mut_ptr(),
             msg_buf.len() as c_int,
@@ -346,21 +333,21 @@ pub fn SV_SendClientSnapshot(
 
         // NOTE, MRE: all server->client messages now acknowledge
         // let the client know which reliable clientCommands we have received
-        mp_engine_qcommon::msg::MSG_WriteLong(common, &mut msg, (*client).lastClientCommand);
+        mp_engine_qcommon::msg::MSG_WriteLong(view.common, &mut msg, (*client).lastClientCommand);
 
         // (re)send any reliable server commands
-        SV_UpdateServerCommandsToClient(common, client, &mut msg);
+        SV_UpdateServerCommandsToClient(view.common, client, &mut msg);
 
         // send over all the relevant entityState_t and the playerState_t
-        SV_WriteSnapshotToClient(common, cm, sv, rm, host, client, &mut msg);
+        SV_WriteSnapshotToClient(view, sv, client, &mut msg);
 
         // Add any download data if the client is downloading
-        crate::sv_client::SV_WriteDownloadToClient(common, cm, sv, rm, host, client, &mut msg);
+        crate::sv_client::SV_WriteDownloadToClient(view, sv, client, &mut msg);
 
         // check for overflow
         if msg.overflowed != qfalse {
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "WARNING: msg overflowed for {}\n",
                     core::ffi::CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
@@ -369,7 +356,7 @@ pub fn SV_SendClientSnapshot(
             mp_engine_qcommon::msg::MSG_Clear(&mut msg);
         }
 
-        SV_SendMessageToClient(common, cm, sv, rm, host, &mut msg, client);
+        SV_SendMessageToClient(view, sv, &mut msg, client);
     }
 }
 
@@ -386,7 +373,11 @@ fn SV_EmitPacketEntities(
 ) {
     unsafe {
         // generate the delta update
-        let from_num_entities = if from.is_null() { 0 } else { (*from).num_entities };
+        let from_num_entities = if from.is_null() {
+            0
+        } else {
+            (*from).num_entities
+        };
 
         let mut newent: *mut entityState_t = core::ptr::null_mut();
         let mut oldent: *mut entityState_t = core::ptr::null_mut();
@@ -444,7 +435,8 @@ fn SV_EmitPacketEntities(
             }
         }
 
-        MSG_WriteBits(common, msg, MAX_GENTITIES as c_int - 1, GENTITYNUM_BITS); // end of packetentities
+        MSG_WriteBits(common, msg, MAX_GENTITIES as c_int - 1, GENTITYNUM_BITS);
+        // end of packetentities
     }
 }
 
@@ -454,14 +446,14 @@ fn SV_EmitPacketEntities(
 ///
 /// Source: `oracle/codemp/server/sv_snapshot.cpp:100-208`
 pub fn SV_WriteSnapshotToClient(
-    common: &mut Common,
-    _cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    _rm: &mut RenderModels,
-    _host: &mut dyn EngineHost,
     client: *mut client_t,
     msg: *mut msg_t,
 ) {
+    // This function reaches the host only for `common`-tier services (MSG/Com);
+    // reborrow it once from the view (no slot cast needed).
+    let common = &mut *view.common;
     unsafe {
         // this is the snapshot we are creating
         let frame = &mut (*client).frames
@@ -490,8 +482,7 @@ pub fn SV_WriteSnapshotToClient(
             lastframe = 0;
         } else {
             // we have a valid snapshot to delta from
-            let of = &mut (*client).frames
-                [((*client).deltaMessage & PACKET_MASK as c_int) as usize]
+            let of = &mut (*client).frames[((*client).deltaMessage & PACKET_MASK as c_int) as usize]
                 as *mut clientSnapshot_t;
             // the snapshot's entities may still have rolled off the buffer, though
             if (*of).first_entity <= sv.svs.nextSnapshotEntities - sv.svs.numSnapshotEntities {
@@ -795,14 +786,11 @@ fn SV_AddEntitiesVisibleFromPoint(
 /// portals. `rm`/`host` are threaded for the shared signature but unused here.
 ///
 /// Source: `oracle/codemp/server/sv_snapshot.cpp:507-620`
-pub fn SV_BuildClientSnapshot(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    _rm: &mut RenderModels,
-    _host: &mut dyn EngineHost,
-    client: *mut client_t,
-) {
+pub fn SV_BuildClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client: *mut client_t) {
+    // Reaches the host only for `common`/`cm`-tier services; reborrow both once
+    // from the view (disjoint fields, no slot cast needed).
+    let common = &mut *view.common;
+    let cm = &mut *view.cm;
     unsafe {
         let mut org: vec3_t = [0.0; 3];
         let mut entityNumbers: snapshotEntityNumbers_t = core::mem::zeroed();
@@ -854,7 +842,10 @@ pub fn SV_BuildClientSnapshot(
         // be regenerated from the playerstate
         let clientNum = (*frame).ps.clientNum;
         if clientNum < 0 || clientNum >= MAX_GENTITIES as c_int {
-            com_error(errorParm_t::ERR_DROP, "SV_SvEntityForGentity: bad gEnt".to_string());
+            com_error(
+                errorParm_t::ERR_DROP,
+                "SV_SvEntityForGentity: bad gEnt".to_string(),
+            );
         }
         let svEnt = &mut sv.sv.svEntities[clientNum as usize] as *mut svEntity_t;
         (*svEnt).snapshotCounter = sv.sv.snapshotCounter;
@@ -906,7 +897,10 @@ pub fn SV_BuildClientSnapshot(
             sv.svs.nextSnapshotEntities += 1;
             // this should never hit, map should always be restarted first in SV_Frame
             if sv.svs.nextSnapshotEntities >= 0x7FFF_FFFE {
-                com_error(errorParm_t::ERR_FATAL, "svs.nextSnapshotEntities wrapped".to_string());
+                com_error(
+                    errorParm_t::ERR_FATAL,
+                    "svs.nextSnapshotEntities wrapped".to_string(),
+                );
             }
             (*frame).num_entities += 1;
         }

@@ -20,8 +20,7 @@ use crate::qcommon::net_field_t::netField_t;
 use mp_host_interface::engine_host::EngineHost;
 use native_types::byte;
 
-use crate::cm_load::RenderModels;
-use crate::collision_world::CollisionWorld;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
 
 // Sweep: extern forward-declares eliminated. Real qshared/in-crate callees
@@ -119,7 +118,12 @@ pub const MSG_H_DATA: [i32; 256] = [
 /// `offsetof` (`offset`); array subscripts add `index * 4` (every indexed field
 /// is a 4-byte `int`/`float`).
 fn nf(name: &'static str, offset: usize, bits: c_int) -> netField_t {
-    netField_t { name, offset: offset as c_int, bits, mCount: 0 }
+    netField_t {
+        name,
+        offset: offset as c_int,
+        bits,
+        mCount: 0,
+    }
 }
 
 /// Raven `entityStateFields[]` — the entity-state delta-coder field table
@@ -130,16 +134,48 @@ fn nf(name: &'static str, offset: usize, bits: c_int) -> netField_t {
 fn build_entity_state_fields() -> Vec<netField_t> {
     vec![
         nf("pos.trTime", offset_of!(entityState_t, pos.trTime), 32),
-        nf("pos.trBase[1]", offset_of!(entityState_t, pos.trBase) + 1 * 4, 0),
-        nf("pos.trBase[0]", offset_of!(entityState_t, pos.trBase) + 0 * 4, 0),
-        nf("apos.trBase[1]", offset_of!(entityState_t, apos.trBase) + 1 * 4, 0),
-        nf("pos.trBase[2]", offset_of!(entityState_t, pos.trBase) + 2 * 4, 0),
-        nf("apos.trBase[0]", offset_of!(entityState_t, apos.trBase) + 0 * 4, 0),
-        nf("pos.trDelta[0]", offset_of!(entityState_t, pos.trDelta) + 0 * 4, 0),
-        nf("pos.trDelta[1]", offset_of!(entityState_t, pos.trDelta) + 1 * 4, 0),
+        nf(
+            "pos.trBase[1]",
+            offset_of!(entityState_t, pos.trBase) + 1 * 4,
+            0,
+        ),
+        nf(
+            "pos.trBase[0]",
+            offset_of!(entityState_t, pos.trBase) + 0 * 4,
+            0,
+        ),
+        nf(
+            "apos.trBase[1]",
+            offset_of!(entityState_t, apos.trBase) + 1 * 4,
+            0,
+        ),
+        nf(
+            "pos.trBase[2]",
+            offset_of!(entityState_t, pos.trBase) + 2 * 4,
+            0,
+        ),
+        nf(
+            "apos.trBase[0]",
+            offset_of!(entityState_t, apos.trBase) + 0 * 4,
+            0,
+        ),
+        nf(
+            "pos.trDelta[0]",
+            offset_of!(entityState_t, pos.trDelta) + 0 * 4,
+            0,
+        ),
+        nf(
+            "pos.trDelta[1]",
+            offset_of!(entityState_t, pos.trDelta) + 1 * 4,
+            0,
+        ),
         nf("eType", offset_of!(entityState_t, eType), 8),
         nf("angles[1]", offset_of!(entityState_t, angles) + 1 * 4, 0),
-        nf("pos.trDelta[2]", offset_of!(entityState_t, pos.trDelta) + 2 * 4, 0),
+        nf(
+            "pos.trDelta[2]",
+            offset_of!(entityState_t, pos.trDelta) + 2 * 4,
+            0,
+        ),
         nf("origin[0]", offset_of!(entityState_t, origin) + 0 * 4, 0),
         nf("origin[1]", offset_of!(entityState_t, origin) + 1 * 4, 0),
         nf("origin[2]", offset_of!(entityState_t, origin) + 2 * 4, 0),
@@ -147,64 +183,168 @@ fn build_entity_state_fields() -> Vec<netField_t> {
         nf("apos.trType", offset_of!(entityState_t, apos.trType), 8),
         nf("legsAnim", offset_of!(entityState_t, legsAnim), 16),
         nf("torsoAnim", offset_of!(entityState_t, torsoAnim), 16),
-        nf("genericenemyindex", offset_of!(entityState_t, genericenemyindex), 32),
+        nf(
+            "genericenemyindex",
+            offset_of!(entityState_t, genericenemyindex),
+            32,
+        ),
         nf("eFlags", offset_of!(entityState_t, eFlags), 32),
-        nf("pos.trDuration", offset_of!(entityState_t, pos.trDuration), 32),
+        nf(
+            "pos.trDuration",
+            offset_of!(entityState_t, pos.trDuration),
+            32,
+        ),
         nf("teamowner", offset_of!(entityState_t, teamowner), 8),
-        nf("groundEntityNum", offset_of!(entityState_t, groundEntityNum), GENTITYNUM_BITS),
+        nf(
+            "groundEntityNum",
+            offset_of!(entityState_t, groundEntityNum),
+            GENTITYNUM_BITS,
+        ),
         nf("pos.trType", offset_of!(entityState_t, pos.trType), 8),
         nf("angles[2]", offset_of!(entityState_t, angles) + 2 * 4, 0),
         nf("angles[0]", offset_of!(entityState_t, angles) + 0 * 4, 0),
         nf("solid", offset_of!(entityState_t, solid), 24),
         nf("fireflag", offset_of!(entityState_t, fireflag), 2),
         nf("event", offset_of!(entityState_t, event), 10),
-        nf("customRGBA[3]", offset_of!(entityState_t, customRGBA) + 3 * 4, 8),
-        nf("customRGBA[0]", offset_of!(entityState_t, customRGBA) + 0 * 4, 8),
+        nf(
+            "customRGBA[3]",
+            offset_of!(entityState_t, customRGBA) + 3 * 4,
+            8,
+        ),
+        nf(
+            "customRGBA[0]",
+            offset_of!(entityState_t, customRGBA) + 0 * 4,
+            8,
+        ),
         nf("speed", offset_of!(entityState_t, speed), 0),
-        nf("clientNum", offset_of!(entityState_t, clientNum), GENTITYNUM_BITS),
-        nf("apos.trBase[2]", offset_of!(entityState_t, apos.trBase) + 2 * 4, 0),
+        nf(
+            "clientNum",
+            offset_of!(entityState_t, clientNum),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "apos.trBase[2]",
+            offset_of!(entityState_t, apos.trBase) + 2 * 4,
+            0,
+        ),
         nf("apos.trTime", offset_of!(entityState_t, apos.trTime), 32),
-        nf("customRGBA[1]", offset_of!(entityState_t, customRGBA) + 1 * 4, 8),
-        nf("customRGBA[2]", offset_of!(entityState_t, customRGBA) + 2 * 4, 8),
-        nf("saberEntityNum", offset_of!(entityState_t, saberEntityNum), GENTITYNUM_BITS),
+        nf(
+            "customRGBA[1]",
+            offset_of!(entityState_t, customRGBA) + 1 * 4,
+            8,
+        ),
+        nf(
+            "customRGBA[2]",
+            offset_of!(entityState_t, customRGBA) + 2 * 4,
+            8,
+        ),
+        nf(
+            "saberEntityNum",
+            offset_of!(entityState_t, saberEntityNum),
+            GENTITYNUM_BITS,
+        ),
         nf("g2radius", offset_of!(entityState_t, g2radius), 8),
-        nf("otherEntityNum2", offset_of!(entityState_t, otherEntityNum2), GENTITYNUM_BITS),
+        nf(
+            "otherEntityNum2",
+            offset_of!(entityState_t, otherEntityNum2),
+            GENTITYNUM_BITS,
+        ),
         nf("owner", offset_of!(entityState_t, owner), GENTITYNUM_BITS),
         nf("modelindex2", offset_of!(entityState_t, modelindex2), 8),
         nf("eventParm", offset_of!(entityState_t, eventParm), 8),
         nf("saberMove", offset_of!(entityState_t, saberMove), 8),
-        nf("apos.trDelta[1]", offset_of!(entityState_t, apos.trDelta) + 1 * 4, 0),
-        nf("boneAngles1[1]", offset_of!(entityState_t, boneAngles1) + 1 * 4, 0),
+        nf(
+            "apos.trDelta[1]",
+            offset_of!(entityState_t, apos.trDelta) + 1 * 4,
+            0,
+        ),
+        nf(
+            "boneAngles1[1]",
+            offset_of!(entityState_t, boneAngles1) + 1 * 4,
+            0,
+        ),
         nf("modelindex", offset_of!(entityState_t, modelindex), -16),
-        nf("emplacedOwner", offset_of!(entityState_t, emplacedOwner), 32),
-        nf("apos.trDelta[0]", offset_of!(entityState_t, apos.trDelta) + 0 * 4, 0),
-        nf("apos.trDelta[2]", offset_of!(entityState_t, apos.trDelta) + 2 * 4, 0),
+        nf(
+            "emplacedOwner",
+            offset_of!(entityState_t, emplacedOwner),
+            32,
+        ),
+        nf(
+            "apos.trDelta[0]",
+            offset_of!(entityState_t, apos.trDelta) + 0 * 4,
+            0,
+        ),
+        nf(
+            "apos.trDelta[2]",
+            offset_of!(entityState_t, apos.trDelta) + 2 * 4,
+            0,
+        ),
         nf("torsoFlip", offset_of!(entityState_t, torsoFlip), 1),
         nf("angles2[1]", offset_of!(entityState_t, angles2) + 1 * 4, 0),
-        nf("lookTarget", offset_of!(entityState_t, lookTarget), GENTITYNUM_BITS),
+        nf(
+            "lookTarget",
+            offset_of!(entityState_t, lookTarget),
+            GENTITYNUM_BITS,
+        ),
         nf("origin2[2]", offset_of!(entityState_t, origin2) + 2 * 4, 0),
         nf("modelGhoul2", offset_of!(entityState_t, modelGhoul2), 8),
         nf("loopSound", offset_of!(entityState_t, loopSound), 8),
         nf("origin2[0]", offset_of!(entityState_t, origin2) + 0 * 4, 0),
         nf("shouldtarget", offset_of!(entityState_t, shouldtarget), 1),
-        nf("trickedentindex", offset_of!(entityState_t, trickedentindex), 16),
-        nf("otherEntityNum", offset_of!(entityState_t, otherEntityNum), GENTITYNUM_BITS),
+        nf(
+            "trickedentindex",
+            offset_of!(entityState_t, trickedentindex),
+            16,
+        ),
+        nf(
+            "otherEntityNum",
+            offset_of!(entityState_t, otherEntityNum),
+            GENTITYNUM_BITS,
+        ),
         nf("origin2[1]", offset_of!(entityState_t, origin2) + 1 * 4, 0),
         nf("time2", offset_of!(entityState_t, time2), 32),
         nf("legsFlip", offset_of!(entityState_t, legsFlip), 1),
         nf("bolt2", offset_of!(entityState_t, bolt2), GENTITYNUM_BITS),
-        nf("constantLight", offset_of!(entityState_t, constantLight), 32),
+        nf(
+            "constantLight",
+            offset_of!(entityState_t, constantLight),
+            32,
+        ),
         nf("time", offset_of!(entityState_t, time), 32),
         nf("hasLookTarget", offset_of!(entityState_t, hasLookTarget), 1),
-        nf("boneAngles1[2]", offset_of!(entityState_t, boneAngles1) + 2 * 4, 0),
-        nf("activeForcePass", offset_of!(entityState_t, activeForcePass), 6),
+        nf(
+            "boneAngles1[2]",
+            offset_of!(entityState_t, boneAngles1) + 2 * 4,
+            0,
+        ),
+        nf(
+            "activeForcePass",
+            offset_of!(entityState_t, activeForcePass),
+            6,
+        ),
         nf("health", offset_of!(entityState_t, health), 10),
-        nf("loopIsSoundset", offset_of!(entityState_t, loopIsSoundset), 1),
-        nf("saberHolstered", offset_of!(entityState_t, saberHolstered), 2),
+        nf(
+            "loopIsSoundset",
+            offset_of!(entityState_t, loopIsSoundset),
+            1,
+        ),
+        nf(
+            "saberHolstered",
+            offset_of!(entityState_t, saberHolstered),
+            2,
+        ),
         nf("npcSaber1", offset_of!(entityState_t, npcSaber1), 9),
         nf("maxhealth", offset_of!(entityState_t, maxhealth), 10),
-        nf("trickedentindex2", offset_of!(entityState_t, trickedentindex2), 16),
-        nf("forcePowersActive", offset_of!(entityState_t, forcePowersActive), 32),
+        nf(
+            "trickedentindex2",
+            offset_of!(entityState_t, trickedentindex2),
+            16,
+        ),
+        nf(
+            "forcePowersActive",
+            offset_of!(entityState_t, forcePowersActive),
+            32,
+        ),
         nf("iModelScale", offset_of!(entityState_t, iModelScale), 10),
         nf("powerups", offset_of!(entityState_t, powerups), 16),
         nf("soundSetIndex", offset_of!(entityState_t, soundSetIndex), 8),
@@ -218,49 +358,141 @@ fn build_entity_state_fields() -> Vec<netField_t> {
         nf("generic1", offset_of!(entityState_t, generic1), 8),
         nf("boneIndex1", offset_of!(entityState_t, boneIndex1), 6),
         nf("NPC_class", offset_of!(entityState_t, NPC_class), 8),
-        nf("apos.trDuration", offset_of!(entityState_t, apos.trDuration), 32),
+        nf(
+            "apos.trDuration",
+            offset_of!(entityState_t, apos.trDuration),
+            32,
+        ),
         nf("boneOrient", offset_of!(entityState_t, boneOrient), 9),
         nf("bolt1", offset_of!(entityState_t, bolt1), 8),
-        nf("trickedentindex3", offset_of!(entityState_t, trickedentindex3), 16),
-        nf("m_iVehicleNum", offset_of!(entityState_t, m_iVehicleNum), GENTITYNUM_BITS),
-        nf("trickedentindex4", offset_of!(entityState_t, trickedentindex4), 16),
+        nf(
+            "trickedentindex3",
+            offset_of!(entityState_t, trickedentindex3),
+            16,
+        ),
+        nf(
+            "m_iVehicleNum",
+            offset_of!(entityState_t, m_iVehicleNum),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "trickedentindex4",
+            offset_of!(entityState_t, trickedentindex4),
+            16,
+        ),
         nf("surfacesOff", offset_of!(entityState_t, surfacesOff), 32),
         nf("eFlags2", offset_of!(entityState_t, eFlags2), 10),
         nf("isJediMaster", offset_of!(entityState_t, isJediMaster), 1),
         nf("isPortalEnt", offset_of!(entityState_t, isPortalEnt), 1),
         nf("heldByClient", offset_of!(entityState_t, heldByClient), 6),
-        nf("ragAttach", offset_of!(entityState_t, ragAttach), GENTITYNUM_BITS),
+        nf(
+            "ragAttach",
+            offset_of!(entityState_t, ragAttach),
+            GENTITYNUM_BITS,
+        ),
         nf("boltToPlayer", offset_of!(entityState_t, boltToPlayer), 6),
         nf("npcSaber2", offset_of!(entityState_t, npcSaber2), 9),
-        nf("csSounds_Combat", offset_of!(entityState_t, csSounds_Combat), 8),
-        nf("csSounds_Extra", offset_of!(entityState_t, csSounds_Extra), 8),
+        nf(
+            "csSounds_Combat",
+            offset_of!(entityState_t, csSounds_Combat),
+            8,
+        ),
+        nf(
+            "csSounds_Extra",
+            offset_of!(entityState_t, csSounds_Extra),
+            8,
+        ),
         nf("csSounds_Jedi", offset_of!(entityState_t, csSounds_Jedi), 8),
         nf("surfacesOn", offset_of!(entityState_t, surfacesOn), 32),
         nf("boneIndex2", offset_of!(entityState_t, boneIndex2), 6),
         nf("boneIndex3", offset_of!(entityState_t, boneIndex3), 6),
         nf("boneIndex4", offset_of!(entityState_t, boneIndex4), 6),
-        nf("boneAngles1[0]", offset_of!(entityState_t, boneAngles1) + 0 * 4, 0),
-        nf("boneAngles2[0]", offset_of!(entityState_t, boneAngles2) + 0 * 4, 0),
-        nf("boneAngles2[1]", offset_of!(entityState_t, boneAngles2) + 1 * 4, 0),
-        nf("boneAngles2[2]", offset_of!(entityState_t, boneAngles2) + 2 * 4, 0),
-        nf("boneAngles3[0]", offset_of!(entityState_t, boneAngles3) + 0 * 4, 0),
-        nf("boneAngles3[1]", offset_of!(entityState_t, boneAngles3) + 1 * 4, 0),
-        nf("boneAngles3[2]", offset_of!(entityState_t, boneAngles3) + 2 * 4, 0),
-        nf("boneAngles4[0]", offset_of!(entityState_t, boneAngles4) + 0 * 4, 0),
-        nf("boneAngles4[1]", offset_of!(entityState_t, boneAngles4) + 1 * 4, 0),
-        nf("boneAngles4[2]", offset_of!(entityState_t, boneAngles4) + 2 * 4, 0),
+        nf(
+            "boneAngles1[0]",
+            offset_of!(entityState_t, boneAngles1) + 0 * 4,
+            0,
+        ),
+        nf(
+            "boneAngles2[0]",
+            offset_of!(entityState_t, boneAngles2) + 0 * 4,
+            0,
+        ),
+        nf(
+            "boneAngles2[1]",
+            offset_of!(entityState_t, boneAngles2) + 1 * 4,
+            0,
+        ),
+        nf(
+            "boneAngles2[2]",
+            offset_of!(entityState_t, boneAngles2) + 2 * 4,
+            0,
+        ),
+        nf(
+            "boneAngles3[0]",
+            offset_of!(entityState_t, boneAngles3) + 0 * 4,
+            0,
+        ),
+        nf(
+            "boneAngles3[1]",
+            offset_of!(entityState_t, boneAngles3) + 1 * 4,
+            0,
+        ),
+        nf(
+            "boneAngles3[2]",
+            offset_of!(entityState_t, boneAngles3) + 2 * 4,
+            0,
+        ),
+        nf(
+            "boneAngles4[0]",
+            offset_of!(entityState_t, boneAngles4) + 0 * 4,
+            0,
+        ),
+        nf(
+            "boneAngles4[1]",
+            offset_of!(entityState_t, boneAngles4) + 1 * 4,
+            0,
+        ),
+        nf(
+            "boneAngles4[2]",
+            offset_of!(entityState_t, boneAngles4) + 2 * 4,
+            0,
+        ),
         nf("userInt1", offset_of!(entityState_t, userInt1), 1),
         nf("userInt2", offset_of!(entityState_t, userInt2), 1),
         nf("userInt3", offset_of!(entityState_t, userInt3), 1),
         nf("userFloat1", offset_of!(entityState_t, userFloat1), 1),
         nf("userFloat2", offset_of!(entityState_t, userFloat2), 1),
         nf("userFloat3", offset_of!(entityState_t, userFloat3), 1),
-        nf("userVec1[0]", offset_of!(entityState_t, userVec1) + 0 * 4, 1),
-        nf("userVec1[1]", offset_of!(entityState_t, userVec1) + 1 * 4, 1),
-        nf("userVec1[2]", offset_of!(entityState_t, userVec1) + 2 * 4, 1),
-        nf("userVec2[0]", offset_of!(entityState_t, userVec2) + 0 * 4, 1),
-        nf("userVec2[1]", offset_of!(entityState_t, userVec2) + 1 * 4, 1),
-        nf("userVec2[2]", offset_of!(entityState_t, userVec2) + 2 * 4, 1),
+        nf(
+            "userVec1[0]",
+            offset_of!(entityState_t, userVec1) + 0 * 4,
+            1,
+        ),
+        nf(
+            "userVec1[1]",
+            offset_of!(entityState_t, userVec1) + 1 * 4,
+            1,
+        ),
+        nf(
+            "userVec1[2]",
+            offset_of!(entityState_t, userVec1) + 2 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[0]",
+            offset_of!(entityState_t, userVec2) + 0 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[1]",
+            offset_of!(entityState_t, userVec2) + 1 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[2]",
+            offset_of!(entityState_t, userVec2) + 2 * 4,
+            1,
+        ),
     ]
 }
 
@@ -277,36 +509,100 @@ fn build_player_state_fields() -> Vec<netField_t> {
         nf("commandTime", offset_of!(playerState_t, commandTime), 32),
         nf("origin[1]", offset_of!(playerState_t, origin) + 1 * 4, 0),
         nf("origin[0]", offset_of!(playerState_t, origin) + 0 * 4, 0),
-        nf("viewangles[1]", offset_of!(playerState_t, viewangles) + 1 * 4, 0),
-        nf("viewangles[0]", offset_of!(playerState_t, viewangles) + 0 * 4, 0),
+        nf(
+            "viewangles[1]",
+            offset_of!(playerState_t, viewangles) + 1 * 4,
+            0,
+        ),
+        nf(
+            "viewangles[0]",
+            offset_of!(playerState_t, viewangles) + 0 * 4,
+            0,
+        ),
         nf("origin[2]", offset_of!(playerState_t, origin) + 2 * 4, 0),
-        nf("velocity[0]", offset_of!(playerState_t, velocity) + 0 * 4, 0),
-        nf("velocity[1]", offset_of!(playerState_t, velocity) + 1 * 4, 0),
-        nf("velocity[2]", offset_of!(playerState_t, velocity) + 2 * 4, 0),
+        nf(
+            "velocity[0]",
+            offset_of!(playerState_t, velocity) + 0 * 4,
+            0,
+        ),
+        nf(
+            "velocity[1]",
+            offset_of!(playerState_t, velocity) + 1 * 4,
+            0,
+        ),
+        nf(
+            "velocity[2]",
+            offset_of!(playerState_t, velocity) + 2 * 4,
+            0,
+        ),
         nf("bobCycle", offset_of!(playerState_t, bobCycle), 8),
         nf("weaponTime", offset_of!(playerState_t, weaponTime), -16),
-        nf("delta_angles[1]", offset_of!(playerState_t, delta_angles) + 1 * 4, 16),
+        nf(
+            "delta_angles[1]",
+            offset_of!(playerState_t, delta_angles) + 1 * 4,
+            16,
+        ),
         nf("speed", offset_of!(playerState_t, speed), 0),
         nf("legsAnim", offset_of!(playerState_t, legsAnim), 16),
-        nf("delta_angles[0]", offset_of!(playerState_t, delta_angles) + 0 * 4, 16),
+        nf(
+            "delta_angles[0]",
+            offset_of!(playerState_t, delta_angles) + 0 * 4,
+            16,
+        ),
         nf("torsoAnim", offset_of!(playerState_t, torsoAnim), 16),
-        nf("groundEntityNum", offset_of!(playerState_t, groundEntityNum), GENTITYNUM_BITS),
+        nf(
+            "groundEntityNum",
+            offset_of!(playerState_t, groundEntityNum),
+            GENTITYNUM_BITS,
+        ),
         nf("eFlags", offset_of!(playerState_t, eFlags), 32),
         nf("fd.forcePower", offset_of!(playerState_t, fd.forcePower), 8),
-        nf("eventSequence", offset_of!(playerState_t, eventSequence), 16),
+        nf(
+            "eventSequence",
+            offset_of!(playerState_t, eventSequence),
+            16,
+        ),
         nf("torsoTimer", offset_of!(playerState_t, torsoTimer), 16),
         nf("legsTimer", offset_of!(playerState_t, legsTimer), 16),
         nf("viewheight", offset_of!(playerState_t, viewheight), -8),
-        nf("fd.saberAnimLevel", offset_of!(playerState_t, fd.saberAnimLevel), 4),
-        nf("rocketLockIndex", offset_of!(playerState_t, rocketLockIndex), GENTITYNUM_BITS),
-        nf("fd.saberDrawAnimLevel", offset_of!(playerState_t, fd.saberDrawAnimLevel), 4),
-        nf("genericEnemyIndex", offset_of!(playerState_t, genericEnemyIndex), 32),
+        nf(
+            "fd.saberAnimLevel",
+            offset_of!(playerState_t, fd.saberAnimLevel),
+            4,
+        ),
+        nf(
+            "rocketLockIndex",
+            offset_of!(playerState_t, rocketLockIndex),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "fd.saberDrawAnimLevel",
+            offset_of!(playerState_t, fd.saberDrawAnimLevel),
+            4,
+        ),
+        nf(
+            "genericEnemyIndex",
+            offset_of!(playerState_t, genericEnemyIndex),
+            32,
+        ),
         nf("events[0]", offset_of!(playerState_t, events) + 0 * 4, 10),
         nf("events[1]", offset_of!(playerState_t, events) + 1 * 4, 10),
-        nf("customRGBA[0]", offset_of!(playerState_t, customRGBA) + 0 * 4, 8),
+        nf(
+            "customRGBA[0]",
+            offset_of!(playerState_t, customRGBA) + 0 * 4,
+            8,
+        ),
         nf("movementDir", offset_of!(playerState_t, movementDir), 4),
-        nf("saberEntityNum", offset_of!(playerState_t, saberEntityNum), GENTITYNUM_BITS),
-        nf("customRGBA[3]", offset_of!(playerState_t, customRGBA) + 3 * 4, 8),
+        nf(
+            "saberEntityNum",
+            offset_of!(playerState_t, saberEntityNum),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "customRGBA[3]",
+            offset_of!(playerState_t, customRGBA) + 3 * 4,
+            8,
+        ),
         nf("weaponstate", offset_of!(playerState_t, weaponstate), 4),
         nf("saberMove", offset_of!(playerState_t, saberMove), 32),
         nf("standheight", offset_of!(playerState_t, standheight), 10),
@@ -316,16 +612,44 @@ fn build_player_state_fields() -> Vec<netField_t> {
         nf("jetpackFuel", offset_of!(playerState_t, jetpackFuel), 8),
         nf("cloakFuel", offset_of!(playerState_t, cloakFuel), 8),
         nf("pm_time", offset_of!(playerState_t, pm_time), -16),
-        nf("customRGBA[1]", offset_of!(playerState_t, customRGBA) + 1 * 4, 8),
-        nf("clientNum", offset_of!(playerState_t, clientNum), GENTITYNUM_BITS),
-        nf("duelIndex", offset_of!(playerState_t, duelIndex), GENTITYNUM_BITS),
-        nf("customRGBA[2]", offset_of!(playerState_t, customRGBA) + 2 * 4, 8),
+        nf(
+            "customRGBA[1]",
+            offset_of!(playerState_t, customRGBA) + 1 * 4,
+            8,
+        ),
+        nf(
+            "clientNum",
+            offset_of!(playerState_t, clientNum),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "duelIndex",
+            offset_of!(playerState_t, duelIndex),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "customRGBA[2]",
+            offset_of!(playerState_t, customRGBA) + 2 * 4,
+            8,
+        ),
         nf("gravity", offset_of!(playerState_t, gravity), 16),
         nf("weapon", offset_of!(playerState_t, weapon), 8),
-        nf("delta_angles[2]", offset_of!(playerState_t, delta_angles) + 2 * 4, 16),
+        nf(
+            "delta_angles[2]",
+            offset_of!(playerState_t, delta_angles) + 2 * 4,
+            16,
+        ),
         nf("saberCanThrow", offset_of!(playerState_t, saberCanThrow), 1),
-        nf("viewangles[2]", offset_of!(playerState_t, viewangles) + 2 * 4, 0),
-        nf("fd.forcePowersKnown", offset_of!(playerState_t, fd.forcePowersKnown), 32),
+        nf(
+            "viewangles[2]",
+            offset_of!(playerState_t, viewangles) + 2 * 4,
+            0,
+        ),
+        nf(
+            "fd.forcePowersKnown",
+            offset_of!(playerState_t, fd.forcePowersKnown),
+            32,
+        ),
         nf(
             "fd.forcePowerLevel[FP_LEVITATION]",
             offset_of!(playerState_t, fd.forcePowerLevel) + FP_LEVITATION as usize * 4,
@@ -336,50 +660,138 @@ fn build_player_state_fields() -> Vec<netField_t> {
             offset_of!(playerState_t, fd.forcePowerDebounce) + FP_LEVITATION as usize * 4,
             32,
         ),
-        nf("fd.forcePowerSelected", offset_of!(playerState_t, fd.forcePowerSelected), 8),
+        nf(
+            "fd.forcePowerSelected",
+            offset_of!(playerState_t, fd.forcePowerSelected),
+            8,
+        ),
         nf("torsoFlip", offset_of!(playerState_t, torsoFlip), 1),
-        nf("externalEvent", offset_of!(playerState_t, externalEvent), 10),
+        nf(
+            "externalEvent",
+            offset_of!(playerState_t, externalEvent),
+            10,
+        ),
         nf("damageYaw", offset_of!(playerState_t, damageYaw), 8),
         nf("damageCount", offset_of!(playerState_t, damageCount), 8),
         nf("inAirAnim", offset_of!(playerState_t, inAirAnim), 1),
-        nf("eventParms[1]", offset_of!(playerState_t, eventParms) + 1 * 4, 8),
+        nf(
+            "eventParms[1]",
+            offset_of!(playerState_t, eventParms) + 1 * 4,
+            8,
+        ),
         nf("fd.forceSide", offset_of!(playerState_t, fd.forceSide), 2),
-        nf("saberAttackChainCount", offset_of!(playerState_t, saberAttackChainCount), 4),
+        nf(
+            "saberAttackChainCount",
+            offset_of!(playerState_t, saberAttackChainCount),
+            4,
+        ),
         nf("pm_type", offset_of!(playerState_t, pm_type), 8),
-        nf("externalEventParm", offset_of!(playerState_t, externalEventParm), 8),
-        nf("eventParms[0]", offset_of!(playerState_t, eventParms) + 0 * 4, -16),
-        nf("lookTarget", offset_of!(playerState_t, lookTarget), GENTITYNUM_BITS),
-        nf("weaponChargeSubtractTime", offset_of!(playerState_t, weaponChargeSubtractTime), 32),
-        nf("weaponChargeTime", offset_of!(playerState_t, weaponChargeTime), 32),
+        nf(
+            "externalEventParm",
+            offset_of!(playerState_t, externalEventParm),
+            8,
+        ),
+        nf(
+            "eventParms[0]",
+            offset_of!(playerState_t, eventParms) + 0 * 4,
+            -16,
+        ),
+        nf(
+            "lookTarget",
+            offset_of!(playerState_t, lookTarget),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "weaponChargeSubtractTime",
+            offset_of!(playerState_t, weaponChargeSubtractTime),
+            32,
+        ),
+        nf(
+            "weaponChargeTime",
+            offset_of!(playerState_t, weaponChargeTime),
+            32,
+        ),
         nf("legsFlip", offset_of!(playerState_t, legsFlip), 1),
         nf("damageEvent", offset_of!(playerState_t, damageEvent), 8),
-        nf("rocketTargetTime", offset_of!(playerState_t, rocketTargetTime), 32),
-        nf("activeForcePass", offset_of!(playerState_t, activeForcePass), 6),
-        nf("electrifyTime", offset_of!(playerState_t, electrifyTime), 32),
-        nf("fd.forceJumpZStart", offset_of!(playerState_t, fd.forceJumpZStart), 0),
+        nf(
+            "rocketTargetTime",
+            offset_of!(playerState_t, rocketTargetTime),
+            32,
+        ),
+        nf(
+            "activeForcePass",
+            offset_of!(playerState_t, activeForcePass),
+            6,
+        ),
+        nf(
+            "electrifyTime",
+            offset_of!(playerState_t, electrifyTime),
+            32,
+        ),
+        nf(
+            "fd.forceJumpZStart",
+            offset_of!(playerState_t, fd.forceJumpZStart),
+            0,
+        ),
         nf("loopSound", offset_of!(playerState_t, loopSound), 16),
         nf("hasLookTarget", offset_of!(playerState_t, hasLookTarget), 1),
         nf("saberBlocked", offset_of!(playerState_t, saberBlocked), 8),
         nf("damageType", offset_of!(playerState_t, damageType), 2),
-        nf("rocketLockTime", offset_of!(playerState_t, rocketLockTime), 32),
-        nf("forceHandExtend", offset_of!(playerState_t, forceHandExtend), 8),
-        nf("saberHolstered", offset_of!(playerState_t, saberHolstered), 2),
-        nf("fd.forcePowersActive", offset_of!(playerState_t, fd.forcePowersActive), 32),
+        nf(
+            "rocketLockTime",
+            offset_of!(playerState_t, rocketLockTime),
+            32,
+        ),
+        nf(
+            "forceHandExtend",
+            offset_of!(playerState_t, forceHandExtend),
+            8,
+        ),
+        nf(
+            "saberHolstered",
+            offset_of!(playerState_t, saberHolstered),
+            2,
+        ),
+        nf(
+            "fd.forcePowersActive",
+            offset_of!(playerState_t, fd.forcePowersActive),
+            32,
+        ),
         nf("damagePitch", offset_of!(playerState_t, damagePitch), 8),
-        nf("m_iVehicleNum", offset_of!(playerState_t, m_iVehicleNum), GENTITYNUM_BITS),
+        nf(
+            "m_iVehicleNum",
+            offset_of!(playerState_t, m_iVehicleNum),
+            GENTITYNUM_BITS,
+        ),
         nf("generic1", offset_of!(playerState_t, generic1), 8),
         nf("jumppad_ent", offset_of!(playerState_t, jumppad_ent), 10),
-        nf("hasDetPackPlanted", offset_of!(playerState_t, hasDetPackPlanted), 1),
+        nf(
+            "hasDetPackPlanted",
+            offset_of!(playerState_t, hasDetPackPlanted),
+            1,
+        ),
         nf("saberInFlight", offset_of!(playerState_t, saberInFlight), 1),
-        nf("forceDodgeAnim", offset_of!(playerState_t, forceDodgeAnim), 16),
+        nf(
+            "forceDodgeAnim",
+            offset_of!(playerState_t, forceDodgeAnim),
+            16,
+        ),
         nf("zoomMode", offset_of!(playerState_t, zoomMode), 2),
         nf("hackingTime", offset_of!(playerState_t, hackingTime), 32),
         nf("zoomTime", offset_of!(playerState_t, zoomTime), 32),
         nf("brokenLimbs", offset_of!(playerState_t, brokenLimbs), 8),
         nf("zoomLocked", offset_of!(playerState_t, zoomLocked), 1),
         nf("zoomFov", offset_of!(playerState_t, zoomFov), 0),
-        nf("fd.forceRageRecoveryTime", offset_of!(playerState_t, fd.forceRageRecoveryTime), 32),
-        nf("fallingToDeath", offset_of!(playerState_t, fallingToDeath), 32),
+        nf(
+            "fd.forceRageRecoveryTime",
+            offset_of!(playerState_t, fd.forceRageRecoveryTime),
+            32,
+        ),
+        nf(
+            "fallingToDeath",
+            offset_of!(playerState_t, fallingToDeath),
+            32,
+        ),
         nf(
             "fd.forceMindtrickTargetIndex",
             offset_of!(playerState_t, fd.forceMindtrickTargetIndex),
@@ -390,55 +802,135 @@ fn build_player_state_fields() -> Vec<netField_t> {
             offset_of!(playerState_t, fd.forceMindtrickTargetIndex2),
             16,
         ),
-        nf("lastHitLoc[2]", offset_of!(playerState_t, lastHitLoc) + 2 * 4, 0),
+        nf(
+            "lastHitLoc[2]",
+            offset_of!(playerState_t, lastHitLoc) + 2 * 4,
+            0,
+        ),
         nf(
             "fd.forceMindtrickTargetIndex3",
             offset_of!(playerState_t, fd.forceMindtrickTargetIndex3),
             16,
         ),
-        nf("lastHitLoc[0]", offset_of!(playerState_t, lastHitLoc) + 0 * 4, 0),
+        nf(
+            "lastHitLoc[0]",
+            offset_of!(playerState_t, lastHitLoc) + 0 * 4,
+            0,
+        ),
         nf("eFlags2", offset_of!(playerState_t, eFlags2), 10),
         nf(
             "fd.forceMindtrickTargetIndex4",
             offset_of!(playerState_t, fd.forceMindtrickTargetIndex4),
             16,
         ),
-        nf("lastHitLoc[1]", offset_of!(playerState_t, lastHitLoc) + 1 * 4, 0),
-        nf("fd.sentryDeployed", offset_of!(playerState_t, fd.sentryDeployed), 1),
-        nf("saberLockTime", offset_of!(playerState_t, saberLockTime), 32),
-        nf("saberLockFrame", offset_of!(playerState_t, saberLockFrame), 16),
+        nf(
+            "lastHitLoc[1]",
+            offset_of!(playerState_t, lastHitLoc) + 1 * 4,
+            0,
+        ),
+        nf(
+            "fd.sentryDeployed",
+            offset_of!(playerState_t, fd.sentryDeployed),
+            1,
+        ),
+        nf(
+            "saberLockTime",
+            offset_of!(playerState_t, saberLockTime),
+            32,
+        ),
+        nf(
+            "saberLockFrame",
+            offset_of!(playerState_t, saberLockFrame),
+            16,
+        ),
         nf(
             "fd.forcePowerLevel[FP_SEE]",
             offset_of!(playerState_t, fd.forcePowerLevel) + FP_SEE as usize * 4,
             2,
         ),
-        nf("saberLockEnemy", offset_of!(playerState_t, saberLockEnemy), GENTITYNUM_BITS),
-        nf("fd.forceGripCripple", offset_of!(playerState_t, fd.forceGripCripple), 1),
-        nf("emplacedIndex", offset_of!(playerState_t, emplacedIndex), GENTITYNUM_BITS),
+        nf(
+            "saberLockEnemy",
+            offset_of!(playerState_t, saberLockEnemy),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "fd.forceGripCripple",
+            offset_of!(playerState_t, fd.forceGripCripple),
+            1,
+        ),
+        nf(
+            "emplacedIndex",
+            offset_of!(playerState_t, emplacedIndex),
+            GENTITYNUM_BITS,
+        ),
         nf("holocronBits", offset_of!(playerState_t, holocronBits), 32),
         nf("isJediMaster", offset_of!(playerState_t, isJediMaster), 1),
-        nf("forceRestricted", offset_of!(playerState_t, forceRestricted), 1),
+        nf(
+            "forceRestricted",
+            offset_of!(playerState_t, forceRestricted),
+            1,
+        ),
         nf("trueJedi", offset_of!(playerState_t, trueJedi), 1),
         nf("trueNonJedi", offset_of!(playerState_t, trueNonJedi), 1),
         nf("duelTime", offset_of!(playerState_t, duelTime), 32),
-        nf("duelInProgress", offset_of!(playerState_t, duelInProgress), 1),
-        nf("saberLockAdvance", offset_of!(playerState_t, saberLockAdvance), 1),
+        nf(
+            "duelInProgress",
+            offset_of!(playerState_t, duelInProgress),
+            1,
+        ),
+        nf(
+            "saberLockAdvance",
+            offset_of!(playerState_t, saberLockAdvance),
+            1,
+        ),
         nf("heldByClient", offset_of!(playerState_t, heldByClient), 6),
-        nf("ragAttach", offset_of!(playerState_t, ragAttach), GENTITYNUM_BITS),
+        nf(
+            "ragAttach",
+            offset_of!(playerState_t, ragAttach),
+            GENTITYNUM_BITS,
+        ),
         nf("iModelScale", offset_of!(playerState_t, iModelScale), 10),
-        nf("hackingBaseTime", offset_of!(playerState_t, hackingBaseTime), 16),
+        nf(
+            "hackingBaseTime",
+            offset_of!(playerState_t, hackingBaseTime),
+            16,
+        ),
         nf("userInt1", offset_of!(playerState_t, userInt1), 1),
         nf("userInt2", offset_of!(playerState_t, userInt2), 1),
         nf("userInt3", offset_of!(playerState_t, userInt3), 1),
         nf("userFloat1", offset_of!(playerState_t, userFloat1), 1),
         nf("userFloat2", offset_of!(playerState_t, userFloat2), 1),
         nf("userFloat3", offset_of!(playerState_t, userFloat3), 1),
-        nf("userVec1[0]", offset_of!(playerState_t, userVec1) + 0 * 4, 1),
-        nf("userVec1[1]", offset_of!(playerState_t, userVec1) + 1 * 4, 1),
-        nf("userVec1[2]", offset_of!(playerState_t, userVec1) + 2 * 4, 1),
-        nf("userVec2[0]", offset_of!(playerState_t, userVec2) + 0 * 4, 1),
-        nf("userVec2[1]", offset_of!(playerState_t, userVec2) + 1 * 4, 1),
-        nf("userVec2[2]", offset_of!(playerState_t, userVec2) + 2 * 4, 1),
+        nf(
+            "userVec1[0]",
+            offset_of!(playerState_t, userVec1) + 0 * 4,
+            1,
+        ),
+        nf(
+            "userVec1[1]",
+            offset_of!(playerState_t, userVec1) + 1 * 4,
+            1,
+        ),
+        nf(
+            "userVec1[2]",
+            offset_of!(playerState_t, userVec1) + 2 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[0]",
+            offset_of!(playerState_t, userVec2) + 0 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[1]",
+            offset_of!(playerState_t, userVec2) + 1 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[2]",
+            offset_of!(playerState_t, userVec2) + 2 * 4,
+            1,
+        ),
     ]
 }
 
@@ -455,35 +947,111 @@ fn build_pilot_player_state_fields() -> Vec<netField_t> {
         nf("commandTime", offset_of!(playerState_t, commandTime), 32),
         nf("origin[1]", offset_of!(playerState_t, origin) + 1 * 4, 0),
         nf("origin[0]", offset_of!(playerState_t, origin) + 0 * 4, 0),
-        nf("viewangles[1]", offset_of!(playerState_t, viewangles) + 1 * 4, 0),
-        nf("viewangles[0]", offset_of!(playerState_t, viewangles) + 0 * 4, 0),
+        nf(
+            "viewangles[1]",
+            offset_of!(playerState_t, viewangles) + 1 * 4,
+            0,
+        ),
+        nf(
+            "viewangles[0]",
+            offset_of!(playerState_t, viewangles) + 0 * 4,
+            0,
+        ),
         nf("origin[2]", offset_of!(playerState_t, origin) + 2 * 4, 0),
         nf("weaponTime", offset_of!(playerState_t, weaponTime), -16),
-        nf("delta_angles[1]", offset_of!(playerState_t, delta_angles) + 1 * 4, 16),
-        nf("delta_angles[0]", offset_of!(playerState_t, delta_angles) + 0 * 4, 16),
+        nf(
+            "delta_angles[1]",
+            offset_of!(playerState_t, delta_angles) + 1 * 4,
+            16,
+        ),
+        nf(
+            "delta_angles[0]",
+            offset_of!(playerState_t, delta_angles) + 0 * 4,
+            16,
+        ),
         nf("eFlags", offset_of!(playerState_t, eFlags), 32),
-        nf("eventSequence", offset_of!(playerState_t, eventSequence), 16),
-        nf("rocketLockIndex", offset_of!(playerState_t, rocketLockIndex), GENTITYNUM_BITS),
+        nf(
+            "eventSequence",
+            offset_of!(playerState_t, eventSequence),
+            16,
+        ),
+        nf(
+            "rocketLockIndex",
+            offset_of!(playerState_t, rocketLockIndex),
+            GENTITYNUM_BITS,
+        ),
         nf("events[0]", offset_of!(playerState_t, events) + 0 * 4, 10),
         nf("events[1]", offset_of!(playerState_t, events) + 1 * 4, 10),
         nf("weaponstate", offset_of!(playerState_t, weaponstate), 4),
         nf("pm_flags", offset_of!(playerState_t, pm_flags), 16),
         nf("pm_time", offset_of!(playerState_t, pm_time), -16),
-        nf("clientNum", offset_of!(playerState_t, clientNum), GENTITYNUM_BITS),
+        nf(
+            "clientNum",
+            offset_of!(playerState_t, clientNum),
+            GENTITYNUM_BITS,
+        ),
         nf("weapon", offset_of!(playerState_t, weapon), 8),
-        nf("delta_angles[2]", offset_of!(playerState_t, delta_angles) + 2 * 4, 16),
-        nf("viewangles[2]", offset_of!(playerState_t, viewangles) + 2 * 4, 0),
-        nf("externalEvent", offset_of!(playerState_t, externalEvent), 10),
-        nf("eventParms[1]", offset_of!(playerState_t, eventParms) + 1 * 4, 8),
+        nf(
+            "delta_angles[2]",
+            offset_of!(playerState_t, delta_angles) + 2 * 4,
+            16,
+        ),
+        nf(
+            "viewangles[2]",
+            offset_of!(playerState_t, viewangles) + 2 * 4,
+            0,
+        ),
+        nf(
+            "externalEvent",
+            offset_of!(playerState_t, externalEvent),
+            10,
+        ),
+        nf(
+            "eventParms[1]",
+            offset_of!(playerState_t, eventParms) + 1 * 4,
+            8,
+        ),
         nf("pm_type", offset_of!(playerState_t, pm_type), 8),
-        nf("externalEventParm", offset_of!(playerState_t, externalEventParm), 8),
-        nf("eventParms[0]", offset_of!(playerState_t, eventParms) + 0 * 4, -16),
-        nf("weaponChargeSubtractTime", offset_of!(playerState_t, weaponChargeSubtractTime), 32),
-        nf("weaponChargeTime", offset_of!(playerState_t, weaponChargeTime), 32),
-        nf("rocketTargetTime", offset_of!(playerState_t, rocketTargetTime), 32),
-        nf("fd.forceJumpZStart", offset_of!(playerState_t, fd.forceJumpZStart), 0),
-        nf("rocketLockTime", offset_of!(playerState_t, rocketLockTime), 32),
-        nf("m_iVehicleNum", offset_of!(playerState_t, m_iVehicleNum), GENTITYNUM_BITS),
+        nf(
+            "externalEventParm",
+            offset_of!(playerState_t, externalEventParm),
+            8,
+        ),
+        nf(
+            "eventParms[0]",
+            offset_of!(playerState_t, eventParms) + 0 * 4,
+            -16,
+        ),
+        nf(
+            "weaponChargeSubtractTime",
+            offset_of!(playerState_t, weaponChargeSubtractTime),
+            32,
+        ),
+        nf(
+            "weaponChargeTime",
+            offset_of!(playerState_t, weaponChargeTime),
+            32,
+        ),
+        nf(
+            "rocketTargetTime",
+            offset_of!(playerState_t, rocketTargetTime),
+            32,
+        ),
+        nf(
+            "fd.forceJumpZStart",
+            offset_of!(playerState_t, fd.forceJumpZStart),
+            0,
+        ),
+        nf(
+            "rocketLockTime",
+            offset_of!(playerState_t, rocketLockTime),
+            32,
+        ),
+        nf(
+            "m_iVehicleNum",
+            offset_of!(playerState_t, m_iVehicleNum),
+            GENTITYNUM_BITS,
+        ),
         nf("generic1", offset_of!(playerState_t, generic1), 8),
         nf("eFlags2", offset_of!(playerState_t, eFlags2), 10),
         //===THESE SHOULD NOT BE CHANGING OFTEN====================================================================
@@ -501,9 +1069,21 @@ fn build_pilot_player_state_fields() -> Vec<netField_t> {
         ),
         nf("torsoFlip", offset_of!(playerState_t, torsoFlip), 1),
         nf("legsFlip", offset_of!(playerState_t, legsFlip), 1),
-        nf("fd.forcePowersActive", offset_of!(playerState_t, fd.forcePowersActive), 32),
-        nf("hasDetPackPlanted", offset_of!(playerState_t, hasDetPackPlanted), 1),
-        nf("fd.forceRageRecoveryTime", offset_of!(playerState_t, fd.forceRageRecoveryTime), 32),
+        nf(
+            "fd.forcePowersActive",
+            offset_of!(playerState_t, fd.forcePowersActive),
+            32,
+        ),
+        nf(
+            "hasDetPackPlanted",
+            offset_of!(playerState_t, hasDetPackPlanted),
+            1,
+        ),
+        nf(
+            "fd.forceRageRecoveryTime",
+            offset_of!(playerState_t, fd.forceRageRecoveryTime),
+            32,
+        ),
         nf("saberInFlight", offset_of!(playerState_t, saberInFlight), 1),
         nf(
             "fd.forceMindtrickTargetIndex",
@@ -525,7 +1105,11 @@ fn build_pilot_player_state_fields() -> Vec<netField_t> {
             offset_of!(playerState_t, fd.forceMindtrickTargetIndex4),
             16,
         ),
-        nf("fd.sentryDeployed", offset_of!(playerState_t, fd.sentryDeployed), 1),
+        nf(
+            "fd.sentryDeployed",
+            offset_of!(playerState_t, fd.sentryDeployed),
+            1,
+        ),
         nf(
             "fd.forcePowerLevel[FP_SEE]",
             offset_of!(playerState_t, fd.forcePowerLevel) + FP_SEE as usize * 4,
@@ -534,82 +1118,226 @@ fn build_pilot_player_state_fields() -> Vec<netField_t> {
         nf("holocronBits", offset_of!(playerState_t, holocronBits), 32),
         nf("fd.forcePower", offset_of!(playerState_t, fd.forcePower), 8),
         //===THE REST OF THESE SHOULD NOT BE RELEVANT, BUT, FOR SAFETY, INCLUDE THEM ANYWAY, JUST AT THE BOTTOM===============================================================
-        nf("velocity[0]", offset_of!(playerState_t, velocity) + 0 * 4, 0),
-        nf("velocity[1]", offset_of!(playerState_t, velocity) + 1 * 4, 0),
-        nf("velocity[2]", offset_of!(playerState_t, velocity) + 2 * 4, 0),
+        nf(
+            "velocity[0]",
+            offset_of!(playerState_t, velocity) + 0 * 4,
+            0,
+        ),
+        nf(
+            "velocity[1]",
+            offset_of!(playerState_t, velocity) + 1 * 4,
+            0,
+        ),
+        nf(
+            "velocity[2]",
+            offset_of!(playerState_t, velocity) + 2 * 4,
+            0,
+        ),
         nf("bobCycle", offset_of!(playerState_t, bobCycle), 8),
         nf("speed", offset_of!(playerState_t, speed), 0),
-        nf("groundEntityNum", offset_of!(playerState_t, groundEntityNum), GENTITYNUM_BITS),
+        nf(
+            "groundEntityNum",
+            offset_of!(playerState_t, groundEntityNum),
+            GENTITYNUM_BITS,
+        ),
         nf("viewheight", offset_of!(playerState_t, viewheight), -8),
-        nf("fd.saberAnimLevel", offset_of!(playerState_t, fd.saberAnimLevel), 4),
-        nf("fd.saberDrawAnimLevel", offset_of!(playerState_t, fd.saberDrawAnimLevel), 4),
-        nf("genericEnemyIndex", offset_of!(playerState_t, genericEnemyIndex), 32),
-        nf("customRGBA[0]", offset_of!(playerState_t, customRGBA) + 0 * 4, 8),
+        nf(
+            "fd.saberAnimLevel",
+            offset_of!(playerState_t, fd.saberAnimLevel),
+            4,
+        ),
+        nf(
+            "fd.saberDrawAnimLevel",
+            offset_of!(playerState_t, fd.saberDrawAnimLevel),
+            4,
+        ),
+        nf(
+            "genericEnemyIndex",
+            offset_of!(playerState_t, genericEnemyIndex),
+            32,
+        ),
+        nf(
+            "customRGBA[0]",
+            offset_of!(playerState_t, customRGBA) + 0 * 4,
+            8,
+        ),
         nf("movementDir", offset_of!(playerState_t, movementDir), 4),
-        nf("saberEntityNum", offset_of!(playerState_t, saberEntityNum), GENTITYNUM_BITS),
-        nf("customRGBA[3]", offset_of!(playerState_t, customRGBA) + 3 * 4, 8),
+        nf(
+            "saberEntityNum",
+            offset_of!(playerState_t, saberEntityNum),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "customRGBA[3]",
+            offset_of!(playerState_t, customRGBA) + 3 * 4,
+            8,
+        ),
         nf("saberMove", offset_of!(playerState_t, saberMove), 32),
         nf("standheight", offset_of!(playerState_t, standheight), 10),
         nf("crouchheight", offset_of!(playerState_t, crouchheight), 10),
         nf("basespeed", offset_of!(playerState_t, basespeed), -16),
-        nf("customRGBA[1]", offset_of!(playerState_t, customRGBA) + 1 * 4, 8),
-        nf("duelIndex", offset_of!(playerState_t, duelIndex), GENTITYNUM_BITS),
-        nf("customRGBA[2]", offset_of!(playerState_t, customRGBA) + 2 * 4, 8),
+        nf(
+            "customRGBA[1]",
+            offset_of!(playerState_t, customRGBA) + 1 * 4,
+            8,
+        ),
+        nf(
+            "duelIndex",
+            offset_of!(playerState_t, duelIndex),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "customRGBA[2]",
+            offset_of!(playerState_t, customRGBA) + 2 * 4,
+            8,
+        ),
         nf("gravity", offset_of!(playerState_t, gravity), 16),
-        nf("fd.forcePowersKnown", offset_of!(playerState_t, fd.forcePowersKnown), 32),
+        nf(
+            "fd.forcePowersKnown",
+            offset_of!(playerState_t, fd.forcePowersKnown),
+            32,
+        ),
         nf(
             "fd.forcePowerLevel[FP_LEVITATION]",
             offset_of!(playerState_t, fd.forcePowerLevel) + FP_LEVITATION as usize * 4,
             2,
         ),
-        nf("fd.forcePowerSelected", offset_of!(playerState_t, fd.forcePowerSelected), 8),
+        nf(
+            "fd.forcePowerSelected",
+            offset_of!(playerState_t, fd.forcePowerSelected),
+            8,
+        ),
         nf("damageYaw", offset_of!(playerState_t, damageYaw), 8),
         nf("damageCount", offset_of!(playerState_t, damageCount), 8),
         nf("inAirAnim", offset_of!(playerState_t, inAirAnim), 1),
         nf("fd.forceSide", offset_of!(playerState_t, fd.forceSide), 2),
-        nf("saberAttackChainCount", offset_of!(playerState_t, saberAttackChainCount), 4),
-        nf("lookTarget", offset_of!(playerState_t, lookTarget), GENTITYNUM_BITS),
+        nf(
+            "saberAttackChainCount",
+            offset_of!(playerState_t, saberAttackChainCount),
+            4,
+        ),
+        nf(
+            "lookTarget",
+            offset_of!(playerState_t, lookTarget),
+            GENTITYNUM_BITS,
+        ),
         nf("moveDir[1]", offset_of!(playerState_t, moveDir) + 1 * 4, 0),
         nf("moveDir[0]", offset_of!(playerState_t, moveDir) + 0 * 4, 0),
         nf("damageEvent", offset_of!(playerState_t, damageEvent), 8),
         nf("moveDir[2]", offset_of!(playerState_t, moveDir) + 2 * 4, 0),
-        nf("activeForcePass", offset_of!(playerState_t, activeForcePass), 6),
-        nf("electrifyTime", offset_of!(playerState_t, electrifyTime), 32),
+        nf(
+            "activeForcePass",
+            offset_of!(playerState_t, activeForcePass),
+            6,
+        ),
+        nf(
+            "electrifyTime",
+            offset_of!(playerState_t, electrifyTime),
+            32,
+        ),
         nf("damageType", offset_of!(playerState_t, damageType), 2),
         nf("loopSound", offset_of!(playerState_t, loopSound), 16),
         nf("hasLookTarget", offset_of!(playerState_t, hasLookTarget), 1),
         nf("saberBlocked", offset_of!(playerState_t, saberBlocked), 8),
-        nf("forceHandExtend", offset_of!(playerState_t, forceHandExtend), 8),
-        nf("saberHolstered", offset_of!(playerState_t, saberHolstered), 2),
+        nf(
+            "forceHandExtend",
+            offset_of!(playerState_t, forceHandExtend),
+            8,
+        ),
+        nf(
+            "saberHolstered",
+            offset_of!(playerState_t, saberHolstered),
+            2,
+        ),
         nf("damagePitch", offset_of!(playerState_t, damagePitch), 8),
         nf("jumppad_ent", offset_of!(playerState_t, jumppad_ent), 10),
-        nf("forceDodgeAnim", offset_of!(playerState_t, forceDodgeAnim), 16),
+        nf(
+            "forceDodgeAnim",
+            offset_of!(playerState_t, forceDodgeAnim),
+            16,
+        ),
         nf("zoomMode", offset_of!(playerState_t, zoomMode), 2),
         nf("hackingTime", offset_of!(playerState_t, hackingTime), 32),
         nf("zoomTime", offset_of!(playerState_t, zoomTime), 32),
         nf("brokenLimbs", offset_of!(playerState_t, brokenLimbs), 8),
         nf("zoomLocked", offset_of!(playerState_t, zoomLocked), 1),
         nf("zoomFov", offset_of!(playerState_t, zoomFov), 0),
-        nf("fallingToDeath", offset_of!(playerState_t, fallingToDeath), 32),
-        nf("lastHitLoc[2]", offset_of!(playerState_t, lastHitLoc) + 2 * 4, 0),
-        nf("lastHitLoc[0]", offset_of!(playerState_t, lastHitLoc) + 0 * 4, 0),
-        nf("lastHitLoc[1]", offset_of!(playerState_t, lastHitLoc) + 1 * 4, 0),
-        nf("saberLockTime", offset_of!(playerState_t, saberLockTime), 32),
-        nf("saberLockFrame", offset_of!(playerState_t, saberLockFrame), 16),
-        nf("saberLockEnemy", offset_of!(playerState_t, saberLockEnemy), GENTITYNUM_BITS),
-        nf("fd.forceGripCripple", offset_of!(playerState_t, fd.forceGripCripple), 1),
-        nf("emplacedIndex", offset_of!(playerState_t, emplacedIndex), GENTITYNUM_BITS),
+        nf(
+            "fallingToDeath",
+            offset_of!(playerState_t, fallingToDeath),
+            32,
+        ),
+        nf(
+            "lastHitLoc[2]",
+            offset_of!(playerState_t, lastHitLoc) + 2 * 4,
+            0,
+        ),
+        nf(
+            "lastHitLoc[0]",
+            offset_of!(playerState_t, lastHitLoc) + 0 * 4,
+            0,
+        ),
+        nf(
+            "lastHitLoc[1]",
+            offset_of!(playerState_t, lastHitLoc) + 1 * 4,
+            0,
+        ),
+        nf(
+            "saberLockTime",
+            offset_of!(playerState_t, saberLockTime),
+            32,
+        ),
+        nf(
+            "saberLockFrame",
+            offset_of!(playerState_t, saberLockFrame),
+            16,
+        ),
+        nf(
+            "saberLockEnemy",
+            offset_of!(playerState_t, saberLockEnemy),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "fd.forceGripCripple",
+            offset_of!(playerState_t, fd.forceGripCripple),
+            1,
+        ),
+        nf(
+            "emplacedIndex",
+            offset_of!(playerState_t, emplacedIndex),
+            GENTITYNUM_BITS,
+        ),
         nf("isJediMaster", offset_of!(playerState_t, isJediMaster), 1),
-        nf("forceRestricted", offset_of!(playerState_t, forceRestricted), 1),
+        nf(
+            "forceRestricted",
+            offset_of!(playerState_t, forceRestricted),
+            1,
+        ),
         nf("trueJedi", offset_of!(playerState_t, trueJedi), 1),
         nf("trueNonJedi", offset_of!(playerState_t, trueNonJedi), 1),
         nf("duelTime", offset_of!(playerState_t, duelTime), 32),
-        nf("duelInProgress", offset_of!(playerState_t, duelInProgress), 1),
-        nf("saberLockAdvance", offset_of!(playerState_t, saberLockAdvance), 1),
+        nf(
+            "duelInProgress",
+            offset_of!(playerState_t, duelInProgress),
+            1,
+        ),
+        nf(
+            "saberLockAdvance",
+            offset_of!(playerState_t, saberLockAdvance),
+            1,
+        ),
         nf("heldByClient", offset_of!(playerState_t, heldByClient), 6),
-        nf("ragAttach", offset_of!(playerState_t, ragAttach), GENTITYNUM_BITS),
+        nf(
+            "ragAttach",
+            offset_of!(playerState_t, ragAttach),
+            GENTITYNUM_BITS,
+        ),
         nf("iModelScale", offset_of!(playerState_t, iModelScale), 10),
-        nf("hackingBaseTime", offset_of!(playerState_t, hackingBaseTime), 16),
+        nf(
+            "hackingBaseTime",
+            offset_of!(playerState_t, hackingBaseTime),
+            16,
+        ),
         //===NEVER SEND THESE, ONLY USED BY VEHICLES============================
         // (Raven's veh* entries here are commented out in the oracle.)
         nf("userInt1", offset_of!(playerState_t, userInt1), 1),
@@ -618,12 +1346,36 @@ fn build_pilot_player_state_fields() -> Vec<netField_t> {
         nf("userFloat1", offset_of!(playerState_t, userFloat1), 1),
         nf("userFloat2", offset_of!(playerState_t, userFloat2), 1),
         nf("userFloat3", offset_of!(playerState_t, userFloat3), 1),
-        nf("userVec1[0]", offset_of!(playerState_t, userVec1) + 0 * 4, 1),
-        nf("userVec1[1]", offset_of!(playerState_t, userVec1) + 1 * 4, 1),
-        nf("userVec1[2]", offset_of!(playerState_t, userVec1) + 2 * 4, 1),
-        nf("userVec2[0]", offset_of!(playerState_t, userVec2) + 0 * 4, 1),
-        nf("userVec2[1]", offset_of!(playerState_t, userVec2) + 1 * 4, 1),
-        nf("userVec2[2]", offset_of!(playerState_t, userVec2) + 2 * 4, 1),
+        nf(
+            "userVec1[0]",
+            offset_of!(playerState_t, userVec1) + 0 * 4,
+            1,
+        ),
+        nf(
+            "userVec1[1]",
+            offset_of!(playerState_t, userVec1) + 1 * 4,
+            1,
+        ),
+        nf(
+            "userVec1[2]",
+            offset_of!(playerState_t, userVec1) + 2 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[0]",
+            offset_of!(playerState_t, userVec2) + 0 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[1]",
+            offset_of!(playerState_t, userVec2) + 1 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[2]",
+            offset_of!(playerState_t, userVec2) + 2 * 4,
+            1,
+        ),
     ]
 }
 
@@ -637,72 +1389,220 @@ fn build_veh_player_state_fields() -> Vec<netField_t> {
         nf("commandTime", offset_of!(playerState_t, commandTime), 32),
         nf("origin[1]", offset_of!(playerState_t, origin) + 1 * 4, 0),
         nf("origin[0]", offset_of!(playerState_t, origin) + 0 * 4, 0),
-        nf("viewangles[1]", offset_of!(playerState_t, viewangles) + 1 * 4, 0),
-        nf("viewangles[0]", offset_of!(playerState_t, viewangles) + 0 * 4, 0),
+        nf(
+            "viewangles[1]",
+            offset_of!(playerState_t, viewangles) + 1 * 4,
+            0,
+        ),
+        nf(
+            "viewangles[0]",
+            offset_of!(playerState_t, viewangles) + 0 * 4,
+            0,
+        ),
         nf("origin[2]", offset_of!(playerState_t, origin) + 2 * 4, 0),
-        nf("velocity[0]", offset_of!(playerState_t, velocity) + 0 * 4, 0),
-        nf("velocity[1]", offset_of!(playerState_t, velocity) + 1 * 4, 0),
-        nf("velocity[2]", offset_of!(playerState_t, velocity) + 2 * 4, 0),
+        nf(
+            "velocity[0]",
+            offset_of!(playerState_t, velocity) + 0 * 4,
+            0,
+        ),
+        nf(
+            "velocity[1]",
+            offset_of!(playerState_t, velocity) + 1 * 4,
+            0,
+        ),
+        nf(
+            "velocity[2]",
+            offset_of!(playerState_t, velocity) + 2 * 4,
+            0,
+        ),
         nf("weaponTime", offset_of!(playerState_t, weaponTime), -16),
-        nf("delta_angles[1]", offset_of!(playerState_t, delta_angles) + 1 * 4, 16),
+        nf(
+            "delta_angles[1]",
+            offset_of!(playerState_t, delta_angles) + 1 * 4,
+            16,
+        ),
         nf("speed", offset_of!(playerState_t, speed), 0),
         nf("legsAnim", offset_of!(playerState_t, legsAnim), 16),
-        nf("delta_angles[0]", offset_of!(playerState_t, delta_angles) + 0 * 4, 16),
-        nf("groundEntityNum", offset_of!(playerState_t, groundEntityNum), GENTITYNUM_BITS),
+        nf(
+            "delta_angles[0]",
+            offset_of!(playerState_t, delta_angles) + 0 * 4,
+            16,
+        ),
+        nf(
+            "groundEntityNum",
+            offset_of!(playerState_t, groundEntityNum),
+            GENTITYNUM_BITS,
+        ),
         nf("eFlags", offset_of!(playerState_t, eFlags), 32),
-        nf("eventSequence", offset_of!(playerState_t, eventSequence), 16),
+        nf(
+            "eventSequence",
+            offset_of!(playerState_t, eventSequence),
+            16,
+        ),
         nf("legsTimer", offset_of!(playerState_t, legsTimer), 16),
-        nf("rocketLockIndex", offset_of!(playerState_t, rocketLockIndex), GENTITYNUM_BITS),
+        nf(
+            "rocketLockIndex",
+            offset_of!(playerState_t, rocketLockIndex),
+            GENTITYNUM_BITS,
+        ),
         nf("events[0]", offset_of!(playerState_t, events) + 0 * 4, 10),
         nf("events[1]", offset_of!(playerState_t, events) + 1 * 4, 10),
         nf("weaponstate", offset_of!(playerState_t, weaponstate), 4),
         nf("pm_flags", offset_of!(playerState_t, pm_flags), 16),
         nf("pm_time", offset_of!(playerState_t, pm_time), -16),
-        nf("clientNum", offset_of!(playerState_t, clientNum), GENTITYNUM_BITS),
+        nf(
+            "clientNum",
+            offset_of!(playerState_t, clientNum),
+            GENTITYNUM_BITS,
+        ),
         nf("gravity", offset_of!(playerState_t, gravity), 16),
         nf("weapon", offset_of!(playerState_t, weapon), 8),
-        nf("delta_angles[2]", offset_of!(playerState_t, delta_angles) + 2 * 4, 16),
-        nf("viewangles[2]", offset_of!(playerState_t, viewangles) + 2 * 4, 0),
-        nf("externalEvent", offset_of!(playerState_t, externalEvent), 10),
-        nf("eventParms[1]", offset_of!(playerState_t, eventParms) + 1 * 4, 8),
+        nf(
+            "delta_angles[2]",
+            offset_of!(playerState_t, delta_angles) + 2 * 4,
+            16,
+        ),
+        nf(
+            "viewangles[2]",
+            offset_of!(playerState_t, viewangles) + 2 * 4,
+            0,
+        ),
+        nf(
+            "externalEvent",
+            offset_of!(playerState_t, externalEvent),
+            10,
+        ),
+        nf(
+            "eventParms[1]",
+            offset_of!(playerState_t, eventParms) + 1 * 4,
+            8,
+        ),
         nf("pm_type", offset_of!(playerState_t, pm_type), 8),
-        nf("externalEventParm", offset_of!(playerState_t, externalEventParm), 8),
-        nf("eventParms[0]", offset_of!(playerState_t, eventParms) + 0 * 4, -16),
-        nf("vehOrientation[0]", offset_of!(playerState_t, vehOrientation) + 0 * 4, 0),
-        nf("vehOrientation[1]", offset_of!(playerState_t, vehOrientation) + 1 * 4, 0),
+        nf(
+            "externalEventParm",
+            offset_of!(playerState_t, externalEventParm),
+            8,
+        ),
+        nf(
+            "eventParms[0]",
+            offset_of!(playerState_t, eventParms) + 0 * 4,
+            -16,
+        ),
+        nf(
+            "vehOrientation[0]",
+            offset_of!(playerState_t, vehOrientation) + 0 * 4,
+            0,
+        ),
+        nf(
+            "vehOrientation[1]",
+            offset_of!(playerState_t, vehOrientation) + 1 * 4,
+            0,
+        ),
         nf("moveDir[1]", offset_of!(playerState_t, moveDir) + 1 * 4, 0),
         nf("moveDir[0]", offset_of!(playerState_t, moveDir) + 0 * 4, 0),
-        nf("vehOrientation[2]", offset_of!(playerState_t, vehOrientation) + 2 * 4, 0),
+        nf(
+            "vehOrientation[2]",
+            offset_of!(playerState_t, vehOrientation) + 2 * 4,
+            0,
+        ),
         nf("moveDir[2]", offset_of!(playerState_t, moveDir) + 2 * 4, 0),
-        nf("rocketTargetTime", offset_of!(playerState_t, rocketTargetTime), 32),
-        nf("electrifyTime", offset_of!(playerState_t, electrifyTime), 32),
+        nf(
+            "rocketTargetTime",
+            offset_of!(playerState_t, rocketTargetTime),
+            32,
+        ),
+        nf(
+            "electrifyTime",
+            offset_of!(playerState_t, electrifyTime),
+            32,
+        ),
         nf("loopSound", offset_of!(playerState_t, loopSound), 16),
-        nf("rocketLockTime", offset_of!(playerState_t, rocketLockTime), 32),
-        nf("m_iVehicleNum", offset_of!(playerState_t, m_iVehicleNum), GENTITYNUM_BITS),
-        nf("vehTurnaroundTime", offset_of!(playerState_t, vehTurnaroundTime), 32),
+        nf(
+            "rocketLockTime",
+            offset_of!(playerState_t, rocketLockTime),
+            32,
+        ),
+        nf(
+            "m_iVehicleNum",
+            offset_of!(playerState_t, m_iVehicleNum),
+            GENTITYNUM_BITS,
+        ),
+        nf(
+            "vehTurnaroundTime",
+            offset_of!(playerState_t, vehTurnaroundTime),
+            32,
+        ),
         nf("hackingTime", offset_of!(playerState_t, hackingTime), 32),
         nf("brokenLimbs", offset_of!(playerState_t, brokenLimbs), 8),
-        nf("vehWeaponsLinked", offset_of!(playerState_t, vehWeaponsLinked), 1),
-        nf("hyperSpaceTime", offset_of!(playerState_t, hyperSpaceTime), 32),
+        nf(
+            "vehWeaponsLinked",
+            offset_of!(playerState_t, vehWeaponsLinked),
+            1,
+        ),
+        nf(
+            "hyperSpaceTime",
+            offset_of!(playerState_t, hyperSpaceTime),
+            32,
+        ),
         nf("eFlags2", offset_of!(playerState_t, eFlags2), 10),
-        nf("hyperSpaceAngles[1]", offset_of!(playerState_t, hyperSpaceAngles) + 1 * 4, 0),
+        nf(
+            "hyperSpaceAngles[1]",
+            offset_of!(playerState_t, hyperSpaceAngles) + 1 * 4,
+            0,
+        ),
         nf("vehBoarding", offset_of!(playerState_t, vehBoarding), 1),
-        nf("vehTurnaroundIndex", offset_of!(playerState_t, vehTurnaroundIndex), GENTITYNUM_BITS),
+        nf(
+            "vehTurnaroundIndex",
+            offset_of!(playerState_t, vehTurnaroundIndex),
+            GENTITYNUM_BITS,
+        ),
         nf("vehSurfaces", offset_of!(playerState_t, vehSurfaces), 16),
-        nf("hyperSpaceAngles[0]", offset_of!(playerState_t, hyperSpaceAngles) + 0 * 4, 0),
-        nf("hyperSpaceAngles[2]", offset_of!(playerState_t, hyperSpaceAngles) + 2 * 4, 0),
+        nf(
+            "hyperSpaceAngles[0]",
+            offset_of!(playerState_t, hyperSpaceAngles) + 0 * 4,
+            0,
+        ),
+        nf(
+            "hyperSpaceAngles[2]",
+            offset_of!(playerState_t, hyperSpaceAngles) + 2 * 4,
+            0,
+        ),
         nf("userInt1", offset_of!(playerState_t, userInt1), 1),
         nf("userInt2", offset_of!(playerState_t, userInt2), 1),
         nf("userInt3", offset_of!(playerState_t, userInt3), 1),
         nf("userFloat1", offset_of!(playerState_t, userFloat1), 1),
         nf("userFloat2", offset_of!(playerState_t, userFloat2), 1),
         nf("userFloat3", offset_of!(playerState_t, userFloat3), 1),
-        nf("userVec1[0]", offset_of!(playerState_t, userVec1) + 0 * 4, 1),
-        nf("userVec1[1]", offset_of!(playerState_t, userVec1) + 1 * 4, 1),
-        nf("userVec1[2]", offset_of!(playerState_t, userVec1) + 2 * 4, 1),
-        nf("userVec2[0]", offset_of!(playerState_t, userVec2) + 0 * 4, 1),
-        nf("userVec2[1]", offset_of!(playerState_t, userVec2) + 1 * 4, 1),
-        nf("userVec2[2]", offset_of!(playerState_t, userVec2) + 2 * 4, 1),
+        nf(
+            "userVec1[0]",
+            offset_of!(playerState_t, userVec1) + 0 * 4,
+            1,
+        ),
+        nf(
+            "userVec1[1]",
+            offset_of!(playerState_t, userVec1) + 1 * 4,
+            1,
+        ),
+        nf(
+            "userVec1[2]",
+            offset_of!(playerState_t, userVec1) + 2 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[0]",
+            offset_of!(playerState_t, userVec2) + 0 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[1]",
+            offset_of!(playerState_t, userVec2) + 1 * 4,
+            1,
+        ),
+        nf(
+            "userVec2[2]",
+            offset_of!(playerState_t, userVec2) + 2 * 4,
+            1,
+        ),
     ]
 }
 
@@ -741,41 +1641,33 @@ fn psf_fields_mut(common: &mut Common, table: PsfTable) -> &mut [netField_t] {
 /// override-check block is live.)
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:46-68`
-pub fn MSG_Init(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    buf: *mut msg_t,
-    data: *mut byte,
-    length: c_int,
-) {
+pub fn MSG_Init(view: &mut EngineHostView, buf: *mut msg_t, data: *mut byte, length: c_int) {
     // The delta-coder field tables are file-scope statics in Raven; here they
     // live on `Common` and are populated lazily so the override check below sees
     // them filled.
-    if common.entity_state_fields.is_empty() {
-        common.entity_state_fields = build_entity_state_fields();
+    if view.common.entity_state_fields.is_empty() {
+        view.common.entity_state_fields = build_entity_state_fields();
     }
-    if common.player_state_fields.is_empty() {
-        common.player_state_fields = build_player_state_fields();
+    if view.common.player_state_fields.is_empty() {
+        view.common.player_state_fields = build_player_state_fields();
     }
-    if common.pilot_player_state_fields.is_empty() {
-        common.pilot_player_state_fields = build_pilot_player_state_fields();
+    if view.common.pilot_player_state_fields.is_empty() {
+        view.common.pilot_player_state_fields = build_pilot_player_state_fields();
     }
-    if common.veh_player_state_fields.is_empty() {
-        common.veh_player_state_fields = build_veh_player_state_fields();
+    if view.common.veh_player_state_fields.is_empty() {
+        view.common.veh_player_state_fields = build_veh_player_state_fields();
     }
 
-    if !common.g_nOverrideChecked {
+    if !view.common.g_nOverrideChecked {
         // Check for netf overrides, then for psf overrides.
-        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qfalse);
-        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qtrue);
+        MSG_CheckNETFPSFOverrides(view, qfalse);
+        MSG_CheckNETFPSFOverrides(view, qtrue);
 
-        common.g_nOverrideChecked = true;
+        view.common.g_nOverrideChecked = true;
     }
 
-    if common.msg_init == qfalse {
-        MSG_initHuffman(common);
+    if view.common.msg_init == qfalse {
+        MSG_initHuffman(view.common);
     }
 
     unsafe {
@@ -791,38 +1683,30 @@ pub fn MSG_Init(
 /// (`_XBOX` is not defined, so the override-check block is live.)
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:70-92`
-pub fn MSG_InitOOB(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    buf: *mut msg_t,
-    data: *mut byte,
-    length: c_int,
-) {
-    if common.entity_state_fields.is_empty() {
-        common.entity_state_fields = build_entity_state_fields();
+pub fn MSG_InitOOB(view: &mut EngineHostView, buf: *mut msg_t, data: *mut byte, length: c_int) {
+    if view.common.entity_state_fields.is_empty() {
+        view.common.entity_state_fields = build_entity_state_fields();
     }
-    if common.player_state_fields.is_empty() {
-        common.player_state_fields = build_player_state_fields();
+    if view.common.player_state_fields.is_empty() {
+        view.common.player_state_fields = build_player_state_fields();
     }
-    if common.pilot_player_state_fields.is_empty() {
-        common.pilot_player_state_fields = build_pilot_player_state_fields();
+    if view.common.pilot_player_state_fields.is_empty() {
+        view.common.pilot_player_state_fields = build_pilot_player_state_fields();
     }
-    if common.veh_player_state_fields.is_empty() {
-        common.veh_player_state_fields = build_veh_player_state_fields();
+    if view.common.veh_player_state_fields.is_empty() {
+        view.common.veh_player_state_fields = build_veh_player_state_fields();
     }
 
-    if !common.g_nOverrideChecked {
+    if !view.common.g_nOverrideChecked {
         // Check for netf overrides, then for psf overrides.
-        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qfalse);
-        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qtrue);
+        MSG_CheckNETFPSFOverrides(view, qfalse);
+        MSG_CheckNETFPSFOverrides(view, qtrue);
 
-        common.g_nOverrideChecked = true;
+        view.common.g_nOverrideChecked = true;
     }
 
-    if common.msg_init == qfalse {
-        MSG_initHuffman(common);
+    if view.common.msg_init == qfalse {
+        MSG_initHuffman(view.common);
     }
 
     unsafe {
@@ -863,13 +1747,7 @@ fn msg_override_cstr_str(cbuf: &[c_char]) -> String {
 /// re-applying the file's `name, bits` lines. Live only under `!_XBOX`.
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:2005-2197`
-pub fn MSG_CheckNETFPSFOverrides(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    psfOverrides: qboolean,
-) {
+pub fn MSG_CheckNETFPSFOverrides(view: &mut EngineHostView, psfOverrides: qboolean) {
     let mut overrideFile: [c_char; 4096] = [0; 4096];
     let mut entryName: [c_char; 4096] = [0; 4096];
     let mut bits: [c_char; 4096] = [0; 4096];
@@ -886,12 +1764,12 @@ pub fn MSG_CheckNETFPSFOverrides(
     if psfOverrides != qfalse {
         //do PSF overrides instead of NETF
         fileName = "psf_overrides.txt";
-        bitStorage = &mut common.g_psfBitStorage;
-        numFields = common.player_state_fields.len() as c_int;
+        bitStorage = &mut view.common.g_psfBitStorage;
+        numFields = view.common.player_state_fields.len() as c_int;
     } else {
         fileName = "netf_overrides.txt";
-        bitStorage = &mut common.g_netfBitStorage;
-        numFields = common.entity_state_fields.len() as c_int;
+        bitStorage = &mut view.common.g_netfBitStorage;
+        numFields = view.common.entity_state_fields.len() as c_int;
     }
 
     if !unsafe { *bitStorage }.is_null() {
@@ -903,9 +1781,9 @@ pub fn MSG_CheckNETFPSFOverrides(
             // a defaults list shorter than `numFields` would null-deref, matching C.
             unsafe {
                 if psfOverrides != qfalse {
-                    common.player_state_fields[i as usize].bits = (*restore).bits;
+                    view.common.player_state_fields[i as usize].bits = (*restore).bits;
                 } else {
-                    common.entity_state_fields[i as usize].bits = (*restore).bits;
+                    view.common.entity_state_fields[i as usize].bits = (*restore).bits;
                 }
                 i += 1;
                 restore = (*restore).next;
@@ -914,7 +1792,7 @@ pub fn MSG_CheckNETFPSFOverrides(
     }
 
     let path = std::ffi::CString::new(format!("ext_data/MP/{}", fileName)).unwrap();
-    len = FS_FOpenFileRead(common, cm, rm, host, path.as_ptr(), &mut f, qfalse);
+    len = FS_FOpenFileRead(view, path.as_ptr(), &mut f, qfalse);
 
     if f == 0 {
         //silently exit since this file is not needed to proceed.
@@ -923,16 +1801,19 @@ pub fn MSG_CheckNETFPSFOverrides(
 
     if len >= 4096 {
         com_printf(
-            common,
-            &format!("WARNING: {} is >= 4096 bytes and is being ignored\n", fileName),
+            view.common,
+            &format!(
+                "WARNING: {} is >= 4096 bytes and is being ignored\n",
+                fileName
+            ),
         );
-        FS_FCloseFile(common, f);
+        FS_FCloseFile(view.common, f);
         return;
     }
 
     //Get contents of the file
-    FS_Read(common, overrideFile.as_mut_ptr() as *mut (), len, f);
-    FS_FCloseFile(common, f);
+    FS_Read(view.common, overrideFile.as_mut_ptr() as *mut (), len, f);
+    FS_FCloseFile(view.common, f);
 
     //because FS_Read does not do this for us.
     overrideFile[len as usize] = 0;
@@ -945,10 +1826,7 @@ pub fn MSG_CheckNETFPSFOverrides(
         while i < numFields {
             //Alloc memory for this new ptr
             let node = Z_Malloc(
-                common,
-                cm,
-                rm,
-                host,
+                view,
                 core::mem::size_of::<bitStorage_t>() as c_int,
                 memtag_t::TAG_GENERAL,
                 qtrue,
@@ -959,9 +1837,9 @@ pub fn MSG_CheckNETFPSFOverrides(
                 *bitStorage = node;
 
                 if psfOverrides != qfalse {
-                    (*node).bits = common.player_state_fields[i as usize].bits;
+                    (*node).bits = view.common.player_state_fields[i as usize].bits;
                 } else {
-                    (*node).bits = common.entity_state_fields[i as usize].bits;
+                    (*node).bits = view.common.entity_state_fields[i as usize].bits;
                 }
 
                 //Point to the ->next of the existing current ptr
@@ -1000,7 +1878,10 @@ pub fn MSG_CheckNETFPSFOverrides(
 
             if overrideFile[i as usize] == 0 {
                 //just give up, this shouldn't happen
-                com_printf(common, &format!("WARNING: Parsing error for {}\n", fileName));
+                com_printf(
+                    view.common,
+                    &format!("WARNING: Parsing error for {}\n", fileName),
+                );
                 return;
             }
 
@@ -1037,18 +1918,22 @@ pub fn MSG_CheckNETFPSFOverrides(
                 while j < numFields {
                     if psfOverrides != qfalse {
                         //check psf fields
-                        if msg_override_cstr_eq(&entryName, common.player_state_fields[j as usize].name)
-                        {
+                        if msg_override_cstr_eq(
+                            &entryName,
+                            view.common.player_state_fields[j as usize].name,
+                        ) {
                             //found it, set the bits
-                            common.player_state_fields[j as usize].bits = ibits;
+                            view.common.player_state_fields[j as usize].bits = ibits;
                             break;
                         }
                     } else {
                         //otherwise check netf fields
-                        if msg_override_cstr_eq(&entryName, common.entity_state_fields[j as usize].name)
-                        {
+                        if msg_override_cstr_eq(
+                            &entryName,
+                            view.common.entity_state_fields[j as usize].name,
+                        ) {
                             //found it, set the bits
-                            common.entity_state_fields[j as usize].bits = ibits;
+                            view.common.entity_state_fields[j as usize].bits = ibits;
                             break;
                         }
                     }
@@ -1058,7 +1943,7 @@ pub fn MSG_CheckNETFPSFOverrides(
                 if j == numFields {
                     //failed to find the value
                     com_printf(
-                        common,
+                        view.common,
                         &format!(
                             "WARNING: Value '{}' from {} is not valid\n",
                             msg_override_cstr_str(&entryName),
@@ -1068,7 +1953,10 @@ pub fn MSG_CheckNETFPSFOverrides(
                 }
             } else {
                 //also should not happen
-                com_printf(common, &format!("WARNING: Parsing error for {}\n", fileName));
+                com_printf(
+                    view.common,
+                    &format!("WARNING: Parsing error for {}\n", fileName),
+                );
                 return;
             }
         }
@@ -1109,7 +1997,10 @@ pub fn MSG_WriteBits(common: &mut Common, msg: *mut msg_t, mut value: c_int, mut
             return;
         }
         if bits == 0 || bits < -31 || bits > 32 {
-            com_error(errorParm_t::ERR_DROP, format!("MSG_WriteBits: bad bits {bits}"));
+            com_error(
+                errorParm_t::ERR_DROP,
+                format!("MSG_WriteBits: bad bits {bits}"),
+            );
         }
         // check for overflows: the oracle only bumps the dead `overflows` counter.
         if bits < 0 {
@@ -2033,8 +2924,7 @@ pub fn MSG_WriteDeltaEntity(
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:1228-1383`
 pub fn MSG_ReadDeltaEntity(
-    common: &mut Common,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     msg: *mut msg_t,
     from: *mut entityState_t,
     to: *mut entityState_t,
@@ -2044,20 +2934,23 @@ pub fn MSG_ReadDeltaEntity(
         if !(0..mp_qshared::shared::limits::MAX_GENTITIES as c_int).contains(&number) {
             //TODO: Port Com_Error
             // Source: oracle/codemp/qcommon/msg.cpp:1239 (ruling 1: receiverless panic)
-            com_error(errorParm_t::ERR_DROP, format!("Bad delta entity number: {number}"));
+            com_error(
+                errorParm_t::ERR_DROP,
+                format!("Bad delta entity number: {number}"),
+            );
         }
 
         let startBit = (*msg).bit;
 
         // check for a remove
-        if MSG_ReadBits(common, msg, 1) == 1 {
+        if MSG_ReadBits(view.common, msg, 1) == 1 {
             crate::common_fns::Com_Memset(to as *mut (), 0, core::mem::size_of::<entityState_t>());
             (*to).number = mp_qshared::shared::limits::MAX_GENTITIES as c_int - 1;
             //TODO: Port cl_shownet
             // Source: oracle/codemp/qcommon/msg.cpp:12
-            if common.cl_shownet >= 2 || common.cl_shownet == -1 {
+            if view.common.cl_shownet >= 2 || view.common.cl_shownet == -1 {
                 crate::common::com_printf(
-                    common,
+                    view.common,
                     &format!("{:3}: #{:<3} remove\n", (*msg).readcount, number),
                 );
             }
@@ -2065,26 +2958,31 @@ pub fn MSG_ReadDeltaEntity(
         }
 
         // check for no delta
-        if MSG_ReadBits(common, msg, 1) == 0 {
+        if MSG_ReadBits(view.common, msg, 1) == 0 {
             *to = *from;
             (*to).number = number;
             return;
         }
 
-        let num_fields = common.entity_state_fields.len();
-        let lc = MSG_ReadByte(common, msg);
+        let num_fields = view.common.entity_state_fields.len();
+        let lc = MSG_ReadByte(view.common, msg);
 
         // shownet 2/3 will interleave with other printed info, -1 will
         // just print the delta records`
-        let print = if common.cl_shownet >= 2 || common.cl_shownet == -1 {
-            if let Some(classname) = host.sv_shownet_entity_classname(number) {
+        let print = if view.common.cl_shownet >= 2 || view.common.cl_shownet == -1 {
+            // Bind the host probe to an owned local first: the returned
+            // `Option<String>` holds no borrow of `view`, so `view.common` is
+            // free inside the branches (an `if let` scrutinee would otherwise
+            // extend the `&mut view` receiver borrow across the block).
+            let classname = view.sv_shownet_entity_classname(number);
+            if let Some(classname) = classname {
                 crate::common::com_printf(
-                    common,
+                    view.common,
                     &format!("{:3}: #{:<3} ({}) ", (*msg).readcount, number, classname),
                 );
             } else {
                 crate::common::com_printf(
-                    common,
+                    view.common,
                     &format!("{:3}: #{:<3} ", (*msg).readcount, number),
                 );
             }
@@ -2099,51 +2997,54 @@ pub fn MSG_ReadDeltaEntity(
             // Copy the field's data out (all `Copy`/`'static`) so no borrow of
             // `common.entity_state_fields` is held across the `MSG_Read*`/
             // `com_printf` calls below, which need `&mut common`.
-            let field_offset = common.entity_state_fields[i as usize].offset;
-            let field_bits = common.entity_state_fields[i as usize].bits;
-            let field_name = common.entity_state_fields[i as usize].name;
+            let field_offset = view.common.entity_state_fields[i as usize].offset;
+            let field_bits = view.common.entity_state_fields[i as usize].bits;
+            let field_name = view.common.entity_state_fields[i as usize].name;
             let fromF = (from as *const u8).add(field_offset as usize) as *const c_int;
             let toF = (to as *mut u8).add(field_offset as usize) as *mut c_int;
 
-            if MSG_ReadBits(common, msg, 1) == 0 {
+            if MSG_ReadBits(view.common, msg, 1) == 0 {
                 // no change
                 *toF = *fromF;
             } else if field_bits == 0 {
                 // float
-                if MSG_ReadBits(common, msg, 1) == 0 {
+                if MSG_ReadBits(view.common, msg, 1) == 0 {
                     *(toF as *mut f32) = 0.0f32;
-                } else if MSG_ReadBits(common, msg, 1) == 0 {
+                } else if MSG_ReadBits(view.common, msg, 1) == 0 {
                     // integral float
                     let mut trunc =
-                        MSG_ReadBits(common, msg, crate::qcommon::msg_consts::FLOAT_INT_BITS);
+                        MSG_ReadBits(view.common, msg, crate::qcommon::msg_consts::FLOAT_INT_BITS);
                     // bias to allow equal parts positive and negative
                     trunc -= crate::qcommon::msg_consts::FLOAT_INT_BIAS;
                     *(toF as *mut f32) = trunc as f32;
                     if print {
-                        crate::common::com_printf(common, &format!("{}:{} ", field_name, trunc));
+                        crate::common::com_printf(
+                            view.common,
+                            &format!("{}:{} ", field_name, trunc),
+                        );
                     }
                 } else {
                     // full floating point value
-                    *toF = MSG_ReadBits(common, msg, 32);
+                    *toF = MSG_ReadBits(view.common, msg, 32);
                     if print {
                         crate::common::com_printf(
-                            common,
+                            view.common,
                             &format!("{}:{} ", field_name, *(toF as *mut f32)),
                         );
                     }
                 }
-            } else if MSG_ReadBits(common, msg, 1) == 0 {
+            } else if MSG_ReadBits(view.common, msg, 1) == 0 {
                 *toF = 0;
             } else {
                 // integer
-                *toF = MSG_ReadBits(common, msg, field_bits);
+                *toF = MSG_ReadBits(view.common, msg, field_bits);
                 if print {
-                    crate::common::com_printf(common, &format!("{}:{} ", field_name, *toF));
+                    crate::common::com_printf(view.common, &format!("{}:{} ", field_name, *toF));
                 }
             }
         }
         for i in lc..(num_fields as c_int) {
-            let field = &common.entity_state_fields[i as usize];
+            let field = &view.common.entity_state_fields[i as usize];
             let fromF = (from as *const u8).add(field.offset as usize) as *const c_int;
             let toF = (to as *mut u8).add(field.offset as usize) as *mut c_int;
             // no change
@@ -2152,7 +3053,7 @@ pub fn MSG_ReadDeltaEntity(
 
         if print {
             let endBit = (*msg).bit;
-            crate::common::com_printf(common, &format!(" ({} bits)\n", endBit - startBit));
+            crate::common::com_printf(view.common, &format!(" ({} bits)\n", endBit - startBit));
         }
     }
 }

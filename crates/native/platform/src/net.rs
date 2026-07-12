@@ -162,7 +162,9 @@ pub fn net_recvfrom(sock: i32, buf: &mut [u8]) -> NetRecvResult {
     if ret == -1 {
         let err = std::io::Error::last_os_error();
         return match err.raw_os_error() {
-            Some(e) if e == libc::EWOULDBLOCK || e == libc::ECONNREFUSED => NetRecvResult::WouldBlock,
+            Some(e) if e == libc::EWOULDBLOCK || e == libc::ECONNREFUSED => {
+                NetRecvResult::WouldBlock
+            }
             _ => NetRecvResult::Error(err.to_string()),
         };
     }
@@ -227,4 +229,52 @@ pub fn sys_console_input() -> Option<String> {
     // text[len-1] = 0: rip off the '\n' and terminate.
     let line = &text[..(len as usize - 1)];
     Some(String::from_utf8_lossy(line).into_owned())
+}
+
+/// Raven `MAX_IPS` — capacity of the local-interface address table.
+///
+/// Source: `oracle/codemp/unix/unix_net.c:34`
+pub const MAX_IPS: usize = 16;
+
+/// Raven `numIP`/`localIP[MAX_IPS][4]` (unix file statics) — the local
+/// interface addresses `NET_GetLocalAddress` collects at `NET_Init`, read by
+/// `Sys_IsLANAddress`'s class-C comparison. Owned here behind a `Mutex` (the
+/// crate's file-static convention); empty until `NET_GetLocalAddress` fills it,
+/// during which window `Sys_IsLANAddress`'s table loop matches nothing —
+/// exactly the oracle's pre-`NET_Init` behavior.
+///
+/// Source: `oracle/codemp/unix/unix_net.c:35-36`
+static LOCAL_IP: std::sync::Mutex<Vec<[u8; 4]>> = std::sync::Mutex::new(Vec::new());
+
+/// `NET_GetLocalAddress`'s table write (the interface walk itself lives with
+/// the boot-slice `NET_Init` port): record a local interface address, capped
+/// at Raven's `MAX_IPS`.
+///
+/// Source: `oracle/codemp/unix/unix_net.c:305-341`
+pub fn net_add_local_address(ip: [u8; 4]) {
+    let mut t = LOCAL_IP.lock().unwrap();
+    if t.len() < MAX_IPS {
+        t.push(ip);
+    }
+}
+
+/// The `NA_IP` arm of Raven `Sys_IsLANAddress` (unix): the class-C octet
+/// comparison against `localIP[]` plus the RFC1918 192.168 block check. (The
+/// class-A/B comparisons are commented out in the oracle; the loopback/IPX
+/// type branches live with the `netadr_t`-shaped wrapper one tier up.)
+///
+/// Source: `oracle/codemp/unix/unix_net.c:255-289`
+pub fn net_is_lan_ip(ip: [u8; 4]) -> bool {
+    let t = LOCAL_IP.lock().unwrap();
+    for local in t.iter() {
+        // Class C
+        if ip[0] == local[0] && ip[1] == local[1] && ip[2] == local[2] {
+            return true;
+        }
+        // also check against the RFC1918 class c blocks
+        if ip[0] == 192 && local[0] == 192 && ip[1] == 168 && local[1] == 168 {
+            return true;
+        }
+    }
+    false
 }

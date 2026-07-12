@@ -10,6 +10,7 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::common::mp::gentity::{NUM_BSETS, NUM_TIDS};
 use mp_qshared::common::mp::qcommon::failedEdge_t;
 use mp_qshared::common::mp::qcommon::parms::parms_t;
@@ -17,25 +18,29 @@ use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
-use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::pc_token_t;
+use mp_qshared::shared::q_math::{
+    AngleVectors, MatrixMultiply, PerpendicularVector, Sys_SnapVector,
+};
 use mp_qshared::shared::surface_flags::CONTENTS_LIGHTSABER;
-use mp_qshared::shared::q_math::{AngleVectors, MatrixMultiply, PerpendicularVector, Sys_SnapVector};
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
-use native_platform::Sys_CheckCD;
 use native_math::vector::vec3_t;
+use native_platform::Sys_CheckCD;
 use native_types::clipHandle_t;
 
-use mp_abi::game::imports::MpGameImport as G;
-use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
-use crate::{SV_BotAllocateClient, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity, SV_BotLibSetup, SV_BotLibShutdown, SV_DropClient, SV_SendServerCommand, SV_SetUserinfo};
+use crate::game_system_calls_shim;
 use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::svEntity_t;
-use crate::server_host::{ghoul2_slot, server_slot, sv_game_system_call};
+use crate::server_host::sv_game_system_call;
 use crate::sv_renderer::RE_RegisterServerSkin;
-use crate::game_system_calls_shim;
 use crate::Server;
+use crate::{
+    SV_BotAllocateClient, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity,
+    SV_BotLibSetup, SV_BotLibShutdown, SV_DropClient, SV_SendServerCommand, SV_SetUserinfo,
+};
+use mp_abi::game::imports::MpGameImport as G;
+use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
 use mp_engine_qcommon::vm::{arm_game_slot, VM_Call};
 
 // PORT-NOTE(engine-host-state): `CollisionWorld`, `Common`, and `EngineHost`
@@ -46,8 +51,6 @@ use mp_engine_qcommon::vm::{arm_game_slot, VM_Call};
 // by their preamble-table decl-home crate; genuinely missing, escalated in
 // missing_symbols rather than stubbed (ZERO-PARK).
 use mp_engine_botlib::BotLib;
-use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
-use mp_engine_icarus::Icarus;
 use mp_engine_icarus::game_interface::{
     icarus_associate_ent, icarus_free_ent, icarus_init, icarus_init_ent, icarus_is_initialized,
     icarus_is_running, icarus_maintain_task_manager, icarus_register_script, icarus_run_script,
@@ -59,15 +62,14 @@ use mp_engine_icarus::q3_interface::{
 use mp_engine_icarus::q3_registers::{
     q3_get_float_variable, q3_get_string_variable, q3_get_vector_variable, q3_variable_declared,
 };
-use mp_engine_qcommon::collision_world::CollisionWorld;
-use mp_engine_qcommon::common::common::Common;
-use mp_engine_qcommon::roff::RoffSystem;
-use mp_engine_qcommon::stringed::SE_GetString;
-use mp_engine_qcommon::cm_load::RenderModels;
-use mp_engine_qcommon::cm_load::RmManager;
+use mp_engine_icarus::Icarus;
 use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_engine_qcommon::cm_test::CM_AreasConnected;
-use mp_host_interface::engine_host::EngineHost;
+use mp_engine_qcommon::collision_world::CollisionWorld;
+use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
+use mp_engine_qcommon::roff::RoffSystem;
+use mp_engine_qcommon::stringed::SE_GetString;
 
 use crate::npcnav::Navigator;
 
@@ -402,25 +404,18 @@ pub fn SV_GetUsercmd(common: &mut Common, sv: &mut Server, clientNum: c_int, cmd
 /// Raven `SV_InitGameVM`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:1682-1697`
-pub fn SV_InitGameVM(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    restart: qboolean,
-) {
-    sv.sv.entityParsePoint = mp_engine_qcommon::cm_load::CM_EntityString(cm);
+pub fn SV_InitGameVM(view: &mut EngineHostView, sv: &mut Server, restart: qboolean) {
+    sv.sv.entityParsePoint = mp_engine_qcommon::cm_load::CM_EntityString(view.cm);
 
-    let ms = Com_Milliseconds(common, cm, rm, host);
+    let ms = Com_Milliseconds(view);
     VM_Call(
-        common,
+        view.common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_INIT as c_int,
         &[sv.svs.time, ms, restart as c_int],
     );
 
-    let max_clients = unsafe { (*common.sv_maxclients).integer };
+    let max_clients = unsafe { (*view.common.sv_maxclients).integer };
     for i in 0..max_clients {
         unsafe {
             (*sv.svs.clients.offset(i as isize)).gentity = core::ptr::null_mut();
@@ -431,12 +426,16 @@ pub fn SV_InitGameVM(
 /// Raven `SV_GameCommand`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:1766-1772`
-pub fn SV_GameCommand(common: &mut Common, sv: &mut Server) -> qboolean {
+pub fn SV_GameCommand(view: &mut EngineHostView) -> qboolean {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast of this
+    // slot for the borrow's duration; `VM_Call` reads `sv.gvm` and never
+    // re-casts `view.sv` (rule 7).
+    let sv = unsafe { &mut *(view.sv.as_raw() as *mut Server) };
     if sv.sv.state as c_int != serverState_t::SS_GAME as c_int {
         return qfalse;
     }
     let r = VM_Call(
-        common,
+        view.common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_CONSOLE_COMMAND as c_int,
         &[],
@@ -470,25 +469,19 @@ pub fn SV_AdjustAreaPortalState(
 /// Raven `SV_RestartGameProgs`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:1708-1721`
-pub fn SV_RestartGameProgs(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn SV_RestartGameProgs(view: &mut EngineHostView, sv: &mut Server) {
     if sv.gvm.is_null() {
         return;
     }
     VM_Call(
-        common,
+        view.common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_SHUTDOWN as c_int,
         &[qtrue as c_int],
     );
 
     // do a restart instead of a free
-    sv.gvm = mp_engine_qcommon::vm_fns::VM_Restart(common, cm, rm, host, sv.gvm);
+    sv.gvm = mp_engine_qcommon::vm_fns::VM_Restart(view, sv.gvm);
     if sv.gvm.is_null() {
         // bk001212 - as done below
         mp_engine_qcommon::common::com_error(
@@ -497,18 +490,14 @@ pub fn SV_RestartGameProgs(
         );
     }
 
-    SV_InitGameVM(common, cm, sv, rm, host, qtrue);
+    SV_InitGameVM(view, sv, qtrue);
 }
 
 /// Raven `SV_EntityContact`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:291-305`
 pub fn SV_EntityContact(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     mins: vec3_t,
     maxs: vec3_t,
     gEnt: *const sharedEntity_t,
@@ -518,14 +507,10 @@ pub fn SV_EntityContact(
         let origin = (*gEnt).r.currentOrigin;
         let angles = (*gEnt).r.currentAngles;
 
-        let ch: clipHandle_t = crate::sv_world::SV_ClipHandleForEntity(cm, gEnt);
+        let ch: clipHandle_t = crate::sv_world::SV_ClipHandleForEntity(view.cm, gEnt);
         let mut trace = core::mem::zeroed();
         mp_engine_qcommon::cm_trace::CM_TransformedBoxTrace(
-            common,
-            cm,
-            rm,
-            rmg,
-            host,
+            view,
             &mut trace,
             mp_qshared::shared::q_math::vec3_origin,
             mp_qshared::shared::q_math::vec3_origin,
@@ -546,12 +531,8 @@ pub fn SV_EntityContact(
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:128-183`
 pub fn SV_SetBrushModel(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
     ent: *mut sharedEntity_t,
     name: *const c_char,
 ) {
@@ -574,33 +555,32 @@ pub fn SV_SetBrushModel(
                 (*ent).s.modelindex += sv.sv.mLocalSubBSPModelOffset;
             }
 
-            let h = mp_engine_qcommon::cm_load::CM_InlineModel(cm, (*ent).s.modelindex);
+            let h = mp_engine_qcommon::cm_load::CM_InlineModel(view.cm, (*ent).s.modelindex);
 
-            mp_engine_qcommon::cm_load::CM_ModelBounds(cm, h, mins, maxs);
+            mp_engine_qcommon::cm_load::CM_ModelBounds(view.cm, h, mins, maxs);
 
             (*ent).r.mins = mins;
             (*ent).r.maxs = maxs;
             (*ent).r.bmodel = qtrue;
 
-            let com_rmg = common.com_RMG;
+            let com_rmg = view.common.com_RMG;
             if !com_rmg.is_null() && (*com_rmg).integer != 0 {
-                (*ent).r.contents =
-                    mp_engine_qcommon::cm_load::CM_ModelContents(cm, h, sv.sv.mLocalSubBSPIndex);
+                (*ent).r.contents = mp_engine_qcommon::cm_load::CM_ModelContents(
+                    view.cm,
+                    h,
+                    sv.sv.mLocalSubBSPIndex,
+                );
             } else {
-                (*ent).r.contents = mp_engine_qcommon::cm_load::CM_ModelContents(cm, h, -1);
+                (*ent).r.contents = mp_engine_qcommon::cm_load::CM_ModelContents(view.cm, h, -1);
             }
         } else if *name == b'#' as c_char {
             let bsp_name = format!("maps/{}.bsp\0", &name_str[1..]);
             (*ent).s.modelindex = mp_engine_qcommon::cm_load::CM_LoadSubBSP(
-                common,
-                cm,
-                rm,
-                rmg,
-                host,
+                view,
                 bsp_name.as_ptr() as *const c_char,
                 qfalse,
             );
-            mp_engine_qcommon::cm_load::CM_ModelBounds(cm, (*ent).s.modelindex, mins, maxs);
+            mp_engine_qcommon::cm_load::CM_ModelBounds(view.cm, (*ent).s.modelindex, mins, maxs);
 
             (*ent).r.mins = mins;
             (*ent).r.maxs = maxs;
@@ -610,9 +590,9 @@ pub fn SV_SetBrushModel(
             //Lots of stuff will explode if there's a brush with CONTENTS_LIGHTSABER that isn't attached to a client owner.
             //ent->contents = -1;		// we don't know exactly what is in the brushes
             let _ = CONTENTS_LIGHTSABER;
-            let h = mp_engine_qcommon::cm_load::CM_InlineModel(cm, (*ent).s.modelindex);
-            let sub_bsp = mp_engine_qcommon::cm_load::CM_FindSubBSP(cm, (*ent).s.modelindex);
-            (*ent).r.contents = mp_engine_qcommon::cm_load::CM_ModelContents(cm, h, sub_bsp);
+            let h = mp_engine_qcommon::cm_load::CM_InlineModel(view.cm, (*ent).s.modelindex);
+            let sub_bsp = mp_engine_qcommon::cm_load::CM_FindSubBSP(view.cm, (*ent).s.modelindex);
+            (*ent).r.contents = mp_engine_qcommon::cm_load::CM_ModelContents(view.cm, h, sub_bsp);
         } else {
             mp_engine_qcommon::common::com_error(
                 errorParm_t::ERR_DROP,
@@ -673,20 +653,12 @@ fn task_id_from_word(word: c_int) -> Option<taskID_t> {
 /// Source: `oracle/codemp/server/sv_game.cpp:458-1657`
 #[allow(clippy::too_many_arguments, unused_variables)]
 pub fn SV_GameSystemCalls(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    bot: &mut BotLib,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
+    view: &mut EngineHostView,
     icarus: &mut Icarus,
     nav: &mut Navigator,
-    g2: &mut Ghoul2System,
     roff: &mut RoffSystem,
-    mut host: &mut dyn EngineHost,
     args: *mut c_int,
 ) -> c_int {
-
     // SAFETY: `args` is the trampoline's raw syscall word array (seam
     // pointer, porting-rules §D11); every arm reads only the words its trap
     // number defines, exactly as Raven's `int *args` does.
@@ -699,22 +671,22 @@ pub fn SV_GameSystemCalls(
         // in the same order, and start at 100.
         if trap == T::TRAP_MEMSET as c_int {
             mp_engine_qcommon::common_fns::Com_Memset(
-                vma(common, args, 1) as *mut (),
+                vma(view.common, args, 1) as *mut (),
                 *args.offset(2),
                 *args.offset(3) as usize,
             );
             return 0;
         } else if trap == T::TRAP_MEMCPY as c_int {
             mp_engine_qcommon::common_fns::Com_Memcpy(
-                vma(common, args, 1) as *mut (),
-                vma(common, args, 2) as *const (),
+                vma(view.common, args, 1) as *mut (),
+                vma(view.common, args, 2) as *const (),
                 *args.offset(3) as usize,
             );
             return 0;
         } else if trap == T::TRAP_STRNCPY as c_int {
             return strncpy(
-                vma(common, args, 1) as *mut c_char,
-                vma(common, args, 2) as *const c_char,
+                vma(view.common, args, 1) as *mut c_char,
+                vma(view.common, args, 2) as *const c_char,
                 *args.offset(3) as usize,
             ) as isize as c_int;
         } else if trap == T::TRAP_SIN as c_int {
@@ -727,23 +699,23 @@ pub fn SV_GameSystemCalls(
             return FloatAsInt(vmf(args, 1).sqrt());
         } else if trap == T::TRAP_MATRIXMULTIPLY as c_int {
             MatrixMultiply(
-                &*(vma(common, args, 1) as *const [[f32; 3]; 3]),
-                &*(vma(common, args, 2) as *const [[f32; 3]; 3]),
-                &mut *(vma(common, args, 3) as *mut [[f32; 3]; 3]),
+                &*(vma(view.common, args, 1) as *const [[f32; 3]; 3]),
+                &*(vma(view.common, args, 2) as *const [[f32; 3]; 3]),
+                &mut *(vma(view.common, args, 3) as *mut [[f32; 3]; 3]),
             );
             return 0;
         } else if trap == T::TRAP_ANGLEVECTORS as c_int {
             AngleVectors(
-                *(vma(common, args, 1) as *const vec3_t),
-                (vma(common, args, 2) as *mut vec3_t).as_mut(),
-                (vma(common, args, 3) as *mut vec3_t).as_mut(),
-                (vma(common, args, 4) as *mut vec3_t).as_mut(),
+                *(vma(view.common, args, 1) as *const vec3_t),
+                (vma(view.common, args, 2) as *mut vec3_t).as_mut(),
+                (vma(view.common, args, 3) as *mut vec3_t).as_mut(),
+                (vma(view.common, args, 4) as *mut vec3_t).as_mut(),
             );
             return 0;
         } else if trap == T::TRAP_PERPENDICULARVECTOR as c_int {
             PerpendicularVector(
-                &mut *(vma(common, args, 1) as *mut vec3_t),
-                *(vma(common, args, 2) as *const vec3_t),
+                &mut *(vma(view.common, args, 1) as *mut vec3_t),
+                *(vma(view.common, args, 2) as *const vec3_t),
             );
             return 0;
         } else if trap == T::TRAP_FLOOR as c_int {
@@ -757,22 +729,22 @@ pub fn SV_GameSystemCalls(
         } else if trap == T::TRAP_ASIN as c_int {
             return FloatAsInt(mp_engine_qcommon::common_fns::Q_asin(vmf(args, 1)));
         } else if trap == G::G_PRINT as c_int {
-            let s =
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char).to_string_lossy();
-            mp_engine_qcommon::common::common::com_printf(common, &s);
+            let s = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                .to_string_lossy();
+            mp_engine_qcommon::common::common::com_printf(view.common, &s);
             return 0;
         } else if trap == G::G_ERROR as c_int {
-            let s = core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+            let s = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
                 .to_string_lossy()
                 .into_owned();
             mp_engine_qcommon::common::com_error(errorParm_t::ERR_DROP, s);
         } else if trap == G::G_MILLISECONDS as c_int {
-            return mp_engine_qcommon::timing::sys_milliseconds(common);
+            return mp_engine_qcommon::timing::sys_milliseconds(view.common);
         } else if trap == G::G_PRECISIONTIMER_START as c_int {
             // rww - precision timer funcs. -ALWAYS- call end after start with
             // supplied ptr, or you'll get a nasty memory leak. Not that you
             // should be using these outside of debug anyway.
-            let supplied_ptr = vma(common, args, 1) as *mut *mut c_void;
+            let supplied_ptr = vma(view.common, args, 1) as *mut *mut c_void;
             let new_timer = Box::new(mp_engine_qcommon::timing::timing_c::timing_c::default());
             *supplied_ptr = Box::into_raw(new_timer) as *mut c_void;
             (**(supplied_ptr as *mut *mut mp_engine_qcommon::timing::timing_c::timing_c)).Start();
@@ -784,193 +756,176 @@ pub fn SV_GameSystemCalls(
             return r;
         } else if trap == G::G_CVAR_REGISTER as c_int {
             Cvar_Register(
-                common,
-                cm,
-                rm,
-                host,
-                vma(common, args, 1) as *mut mp_qshared::shared::cvar::vmCvar_t,
-                vma(common, args, 2) as *const c_char,
-                vma(common, args, 3) as *const c_char,
+                view,
+                vma(view.common, args, 1) as *mut mp_qshared::shared::cvar::vmCvar_t,
+                vma(view.common, args, 2) as *const c_char,
+                vma(view.common, args, 3) as *const c_char,
                 *args.offset(4),
             );
             return 0;
         } else if trap == G::G_CVAR_UPDATE as c_int {
             Cvar_Update(
-                common,
-                vma(common, args, 1) as *mut mp_qshared::shared::cvar::vmCvar_t,
+                view.common,
+                vma(view.common, args, 1) as *mut mp_qshared::shared::cvar::vmCvar_t,
             );
             return 0;
         } else if trap == G::G_CVAR_SET as c_int {
             Cvar_Set(
-                common,
-                cm,
-                rm,
-                host,
-                vma(common, args, 1) as *const c_char,
-                vma(common, args, 2) as *const c_char,
+                view,
+                vma(view.common, args, 1) as *const c_char,
+                vma(view.common, args, 2) as *const c_char,
             );
             return 0;
         } else if trap == G::G_CVAR_VARIABLE_INTEGER_VALUE as c_int {
-            return Cvar_VariableIntegerValue(common, vma(common, args, 1) as *const c_char);
+            return Cvar_VariableIntegerValue(
+                view.common,
+                vma(view.common, args, 1) as *const c_char,
+            );
         } else if trap == G::G_CVAR_VARIABLE_STRING_BUFFER as c_int {
             Cvar_VariableStringBuffer(
-                common,
-                vma(common, args, 1) as *const c_char,
-                vma(common, args, 2) as *mut c_char,
+                view.common,
+                vma(view.common, args, 1) as *const c_char,
+                vma(view.common, args, 2) as *mut c_char,
                 *args.offset(3),
             );
             return 0;
         } else if trap == G::G_ARGC as c_int {
-            return mp_engine_qcommon::cmd_common::Cmd_Argc(common);
+            return mp_engine_qcommon::cmd_common::Cmd_Argc(view.common);
         } else if trap == G::G_ARGV as c_int {
             mp_engine_qcommon::cmd_common::Cmd_ArgvBuffer(
-                common,
+                view.common,
                 *args.offset(1),
-                vma(common, args, 2) as *mut c_char,
+                vma(view.common, args, 2) as *mut c_char,
                 *args.offset(3),
             );
             return 0;
         } else if trap == G::G_SEND_CONSOLE_COMMAND as c_int {
             mp_engine_qcommon::cmd_common::Cbuf_ExecuteText(
-                common,
-                cm,
-                &mut server_slot(sv),
-                rm,
-                rmg,
-                &mut ghoul2_slot(g2),
-                host,
+                view,
                 *args.offset(1),
-                vma(common, args, 2) as *const c_char,
+                vma(view.common, args, 2) as *const c_char,
             );
             return 0;
         } else if trap == G::G_FS_FOPEN_FILE as c_int {
             return mp_engine_qcommon::files_pc::FS_FOpenFileByMode(
-                common,
-                cm,
-                rm,
-                host,
-                vma(common, args, 1) as *const c_char,
-                vma(common, args, 2) as *mut c_int,
+                view,
+                vma(view.common, args, 1) as *const c_char,
+                vma(view.common, args, 2) as *mut c_int,
                 core::mem::transmute(*args.offset(3)),
             );
         } else if trap == G::G_FS_READ as c_int {
             mp_engine_qcommon::files_pc::FS_Read2(
-                common,
-                vma(common, args, 1) as *mut (),
+                view.common,
+                vma(view.common, args, 1) as *mut (),
                 *args.offset(2),
                 *args.offset(3),
             );
             return 0;
         } else if trap == G::G_FS_WRITE as c_int {
             FS_Write(
-                common,
-                vma(common, args, 1) as *const (),
+                view.common,
+                vma(view.common, args, 1) as *const (),
                 *args.offset(2),
                 *args.offset(3),
             );
             return 0;
         } else if trap == G::G_FS_FCLOSE_FILE as c_int {
-            FS_FCloseFile(common, *args.offset(1));
+            FS_FCloseFile(view.common, *args.offset(1));
             return 0;
         } else if trap == G::G_FS_GETFILELIST as c_int {
             return mp_engine_qcommon::files_pc::FS_GetFileList(
-                common,
-                cm,
-                rm,
-                host,
-                vma(common, args, 1) as *const c_char,
-                vma(common, args, 2) as *const c_char,
-                vma(common, args, 3) as *mut c_char,
+                view,
+                vma(view.common, args, 1) as *const c_char,
+                vma(view.common, args, 2) as *const c_char,
+                vma(view.common, args, 3) as *mut c_char,
                 *args.offset(4),
             );
         } else if trap == G::G_LOCATE_GAME_DATA as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             SV_LocateGameData(
                 sv,
-                vma(common, args, 1) as *mut sharedEntity_t,
+                vma(view.common, args, 1) as *mut sharedEntity_t,
                 *args.offset(2),
                 *args.offset(3),
-                vma(common, args, 4) as *mut playerState_t,
+                vma(view.common, args, 4) as *mut playerState_t,
                 *args.offset(5),
             );
             return 0;
         } else if trap == G::G_DROP_CLIENT as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             SV_GameDropClient(
-                common,
+                view.common,
                 sv,
                 *args.offset(1),
-                vma(common, args, 2) as *const c_char,
+                vma(view.common, args, 2) as *const c_char,
             );
             return 0;
         } else if trap == G::G_SEND_SERVER_COMMAND as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             SV_GameSendServerCommand(
-                common,
+                view.common,
                 sv,
                 *args.offset(1),
-                vma(common, args, 2) as *const c_char,
+                vma(view.common, args, 2) as *const c_char,
             );
             return 0;
         } else if trap == G::G_LINKENTITY as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             crate::sv_world::SV_LinkEntity(
-                common,
-                cm,
+                view.common,
+                view.cm,
                 sv,
-                vma(common, args, 1) as *mut sharedEntity_t,
+                vma(view.common, args, 1) as *mut sharedEntity_t,
             );
             return 0;
         } else if trap == G::G_UNLINKENTITY as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             crate::sv_world::SV_UnlinkEntity(
-                common,
+                view.common,
                 sv,
-                vma(common, args, 1) as *mut sharedEntity_t,
+                vma(view.common, args, 1) as *mut sharedEntity_t,
             );
             return 0;
         } else if trap == G::G_ENTITIES_IN_BOX as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             return crate::sv_world::SV_AreaEntities(
-                common,
+                view.common,
                 sv,
-                *(vma(common, args, 1) as *const vec3_t),
-                *(vma(common, args, 2) as *const vec3_t),
-                vma(common, args, 3) as *mut c_int,
+                *(vma(view.common, args, 1) as *const vec3_t),
+                *(vma(view.common, args, 2) as *const vec3_t),
+                vma(view.common, args, 3) as *mut c_int,
                 *args.offset(4),
             );
         } else if trap == G::G_ENTITY_CONTACT as c_int {
             return SV_EntityContact(
-                common,
-                cm,
-                rm,
-                rmg,
-                host,
-                *(vma(common, args, 1) as *const vec3_t),
-                *(vma(common, args, 2) as *const vec3_t),
-                vma(common, args, 3) as *const sharedEntity_t,
+                view,
+                *(vma(view.common, args, 1) as *const vec3_t),
+                *(vma(view.common, args, 2) as *const vec3_t),
+                vma(view.common, args, 3) as *const sharedEntity_t,
                 qfalse as c_int,
             ) as c_int;
         } else if trap == G::G_ENTITY_CONTACTCAPSULE as c_int {
             return SV_EntityContact(
-                common,
-                cm,
-                rm,
-                rmg,
-                host,
-                *(vma(common, args, 1) as *const vec3_t),
-                *(vma(common, args, 2) as *const vec3_t),
-                vma(common, args, 3) as *const sharedEntity_t,
+                view,
+                *(vma(view.common, args, 1) as *const vec3_t),
+                *(vma(view.common, args, 2) as *const vec3_t),
+                vma(view.common, args, 3) as *const sharedEntity_t,
                 qtrue as c_int,
             ) as c_int;
         } else if trap == G::G_TRACE as c_int {
             crate::sv_world::SV_Trace(
-                common,
-                cm,
-                sv,
-                rm,
-                rmg,
-                g2,
-                host,
-                vma(common, args, 1) as *mut mp_qshared::common::mp::trace_t::trace_t,
-                *(vma(common, args, 2) as *const vec3_t),
-                *(vma(common, args, 3) as *const vec3_t),
-                *(vma(common, args, 4) as *const vec3_t),
-                *(vma(common, args, 5) as *const vec3_t),
+                view,
+                vma(view.common, args, 1) as *mut mp_qshared::common::mp::trace_t::trace_t,
+                *(vma(view.common, args, 2) as *const vec3_t),
+                *(vma(view.common, args, 3) as *const vec3_t),
+                *(vma(view.common, args, 4) as *const vec3_t),
+                *(vma(view.common, args, 5) as *const vec3_t),
                 *args.offset(6),
                 *args.offset(7),
                 qfalse as c_int,
@@ -980,18 +935,12 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_G2TRACE as c_int {
             crate::sv_world::SV_Trace(
-                common,
-                cm,
-                sv,
-                rm,
-                rmg,
-                g2,
-                host,
-                vma(common, args, 1) as *mut mp_qshared::common::mp::trace_t::trace_t,
-                *(vma(common, args, 2) as *const vec3_t),
-                *(vma(common, args, 3) as *const vec3_t),
-                *(vma(common, args, 4) as *const vec3_t),
-                *(vma(common, args, 5) as *const vec3_t),
+                view,
+                vma(view.common, args, 1) as *mut mp_qshared::common::mp::trace_t::trace_t,
+                *(vma(view.common, args, 2) as *const vec3_t),
+                *(vma(view.common, args, 3) as *const vec3_t),
+                *(vma(view.common, args, 4) as *const vec3_t),
+                *(vma(view.common, args, 5) as *const vec3_t),
                 *args.offset(6),
                 *args.offset(7),
                 qfalse as c_int,
@@ -1001,18 +950,12 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_TRACECAPSULE as c_int {
             crate::sv_world::SV_Trace(
-                common,
-                cm,
-                sv,
-                rm,
-                rmg,
-                g2,
-                host,
-                vma(common, args, 1) as *mut mp_qshared::common::mp::trace_t::trace_t,
-                *(vma(common, args, 2) as *const vec3_t),
-                *(vma(common, args, 3) as *const vec3_t),
-                *(vma(common, args, 4) as *const vec3_t),
-                *(vma(common, args, 5) as *const vec3_t),
+                view,
+                vma(view.common, args, 1) as *mut mp_qshared::common::mp::trace_t::trace_t,
+                *(vma(view.common, args, 2) as *const vec3_t),
+                *(vma(view.common, args, 3) as *const vec3_t),
+                *(vma(view.common, args, 4) as *const vec3_t),
+                *(vma(view.common, args, 5) as *const vec3_t),
                 *args.offset(6),
                 *args.offset(7),
                 qtrue as c_int,
@@ -1021,103 +964,131 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_POINT_CONTENTS as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             return crate::sv_world::SV_PointContents(
-                common,
-                cm,
+                view.common,
+                view.cm,
                 sv,
-                *(vma(common, args, 1) as *const vec3_t),
+                *(vma(view.common, args, 1) as *const vec3_t),
                 *args.offset(2),
             );
         } else if trap == G::G_SET_SERVER_CULL as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             sv.g_svCullDist = vmf(args, 1);
             return 0;
         } else if trap == G::G_SET_BRUSH_MODEL as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             SV_SetBrushModel(
-                common,
-                cm,
+                view,
                 sv,
-                rm,
-                rmg,
-                host,
-                vma(common, args, 1) as *mut sharedEntity_t,
-                vma(common, args, 2) as *const c_char,
+                vma(view.common, args, 1) as *mut sharedEntity_t,
+                vma(view.common, args, 2) as *const c_char,
             );
             return 0;
         } else if trap == G::G_IN_PVS as c_int {
             return SV_inPVS(
-                cm,
-                *(vma(common, args, 1) as *const vec3_t),
-                *(vma(common, args, 2) as *const vec3_t),
+                view.cm,
+                *(vma(view.common, args, 1) as *const vec3_t),
+                *(vma(view.common, args, 2) as *const vec3_t),
             ) as c_int;
         } else if trap == G::G_IN_PVS_IGNORE_PORTALS as c_int {
             return SV_inPVSIgnorePortals(
-                cm,
-                *(vma(common, args, 1) as *const vec3_t),
-                *(vma(common, args, 2) as *const vec3_t),
+                view.cm,
+                *(vma(view.common, args, 1) as *const vec3_t),
+                *(vma(view.common, args, 2) as *const vec3_t),
             ) as c_int;
         } else if trap == G::G_SET_CONFIGSTRING as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             crate::sv_init::SV_SetConfigstring(
-                common,
-                cm,
+                view,
                 sv,
-                rm,
-                host,
                 *args.offset(1),
-                vma(common, args, 2) as *const c_char,
+                vma(view.common, args, 2) as *const c_char,
             );
             return 0;
         } else if trap == G::G_GET_CONFIGSTRING as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             crate::sv_init::SV_GetConfigstring(
                 sv,
                 *args.offset(1),
-                vma(common, args, 2) as *mut c_char,
+                vma(view.common, args, 2) as *mut c_char,
                 *args.offset(3),
             );
             return 0;
         } else if trap == G::G_SET_USERINFO as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             SV_SetUserinfo(
-                common,
+                view.common,
                 sv,
                 *args.offset(1),
-                vma(common, args, 2) as *const c_char,
+                vma(view.common, args, 2) as *const c_char,
             );
             return 0;
         } else if trap == G::G_GET_USERINFO as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             crate::sv_init::SV_GetUserinfo(
-                common,
+                view.common,
                 sv,
                 *args.offset(1),
-                vma(common, args, 2) as *mut c_char,
+                vma(view.common, args, 2) as *mut c_char,
                 *args.offset(3),
             );
             return 0;
         } else if trap == G::G_GET_SERVERINFO as c_int {
-            SV_GetServerinfo(common, vma(common, args, 1) as *mut c_char, *args.offset(2));
+            SV_GetServerinfo(
+                view.common,
+                vma(view.common, args, 1) as *mut c_char,
+                *args.offset(2),
+            );
             return 0;
         } else if trap == G::G_ADJUST_AREA_PORTAL_STATE as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             SV_AdjustAreaPortalState(
-                cm,
+                view.cm,
                 sv,
-                vma(common, args, 1) as *mut sharedEntity_t,
+                vma(view.common, args, 1) as *mut sharedEntity_t,
                 core::mem::transmute(*args.offset(2)),
             );
             return 0;
         } else if trap == G::G_AREAS_CONNECTED as c_int {
-            return CM_AreasConnected(cm, *args.offset(1), *args.offset(2)) as c_int;
+            return CM_AreasConnected(view.cm, *args.offset(1), *args.offset(2)) as c_int;
         } else if trap == G::G_BOT_ALLOCATE_CLIENT as c_int {
-            return SV_BotAllocateClient(common, sv);
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            return SV_BotAllocateClient(view.common, sv);
         } else if trap == G::G_BOT_FREE_CLIENT as c_int {
-            SV_BotFreeClient(common, sv, *args.offset(1));
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            SV_BotFreeClient(view.common, sv, *args.offset(1));
             return 0;
         } else if trap == G::G_GET_USERCMD as c_int {
-            SV_GetUsercmd(common, sv, *args.offset(1), vma(common, args, 2) as *mut usercmd_t);
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            SV_GetUsercmd(
+                view.common,
+                sv,
+                *args.offset(1),
+                vma(view.common, args, 2) as *mut usercmd_t,
+            );
             return 0;
         } else if trap == G::G_SIEGEPERSSET as c_int {
-            sv.sv_siegePersData = *(vma(common, args, 1)
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            sv.sv_siegePersData = *(vma(view.common, args, 1)
                 as *const mp_qshared::common::mp::qcommon::siege_pers::siegePers_t);
             return 0;
         } else if trap == G::G_SIEGEPERSGET as c_int {
-            *(vma(common, args, 1)
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            *(vma(view.common, args, 1)
                 as *mut mp_qshared::common::mp::qcommon::siege_pers::siegePers_t) =
                 sv.sv_siegePersData;
             return 0;
@@ -1125,42 +1096,45 @@ pub fn SV_GameSystemCalls(
         // rwwRMG - G_GET_ENTITY_TOKEN and G_BOT_GET_MEMORY/G_BOT_FREE_MEMORY
         // stay commented out in Raven (sv_game.cpp:648-672) — not transcribed.
         else if trap == G::G_DEBUG_POLYGON_CREATE as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             return crate::BotImport_DebugPolygonCreate(
                 sv,
                 *args.offset(1),
                 *args.offset(2),
-                vma(common, args, 3) as *const [f32; 3],
+                vma(view.common, args, 3) as *const [f32; 3],
             );
         } else if trap == G::G_DEBUG_POLYGON_DELETE as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             crate::BotImport_DebugPolygonDelete(sv, *args.offset(1));
             return 0;
         } else if trap == G::G_REAL_TIME as c_int {
             return mp_engine_qcommon::common_fns::Com_RealTime(
-                vma(common, args, 1) as *mut mp_qshared::common::mp::qcommon::qtime::qtime_t
+                vma(view.common, args, 1) as *mut mp_qshared::common::mp::qcommon::qtime::qtime_t
             );
         } else if trap == G::G_SNAPVECTOR as c_int {
-            Sys_SnapVector(vma(common, args, 1) as *mut f32);
+            Sys_SnapVector(vma(view.common, args, 1) as *mut f32);
             return 0;
         } else if trap == G::SP_GETSTRINGTEXTSTRING as c_int {
-            assert!(!vma(common, args, 1).is_null());
-            assert!(!vma(common, args, 2).is_null());
+            assert!(!vma(view.common, args, 1).is_null());
+            assert!(!vma(view.common, args, 2).is_null());
             let text = SE_GetString(
-                common,
-                host,
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+                view,
+                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
             );
             if !text.is_empty() {
                 Q_strncpyz(
-                    vma(common, args, 2) as *mut c_char,
+                    vma(view.common, args, 2) as *mut c_char,
                     text.as_ptr() as *const c_char,
                     *args.offset(3),
                 );
                 return qtrue as c_int;
             } else {
                 Q_strncpyz(
-                    vma(common, args, 2) as *mut c_char,
+                    vma(view.common, args, 2) as *mut c_char,
                     c"??".as_ptr(),
                     *args.offset(3),
                 );
@@ -1169,15 +1143,15 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_ROFF_CLEAN as c_int {
             return roff.clean(false) as c_int;
         } else if trap == G::G_ROFF_UPDATE_ENTITIES as c_int {
-            roff.update_entities(false, &mut host);
+            roff.update_entities(false, view);
             return 0;
         } else if trap == G::G_ROFF_CACHE as c_int {
             return roff.cache(
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
                 false,
-                &mut host,
+                view,
             );
         } else if trap == G::G_ROFF_PLAY as c_int {
             return roff.play(
@@ -1185,147 +1159,159 @@ pub fn SV_GameSystemCalls(
                 *args.offset(2),
                 *args.offset(3) != 0,
                 false,
-                &mut host,
+                view,
             ) as c_int;
         } else if trap == G::G_ROFF_PURGE_ENT as c_int {
-            return roff.purge_ent(*args.offset(1), false, &mut host) as c_int;
+            return roff.purge_ent(*args.offset(1), false, view) as c_int;
         } else if trap == G::G_TRUEMALLOC as c_int {
             mp_engine_qcommon::vm_fns::VM_Shifted_Alloc(
-                common,
-                cm,
-                rm,
-                host,
-                vma(common, args, 1) as *mut *mut (),
+                view,
+                vma(view.common, args, 1) as *mut *mut (),
                 *args.offset(2),
             );
             return 0;
         } else if trap == G::G_TRUEFREE as c_int {
             mp_engine_qcommon::vm_fns::VM_Shifted_Free(
-                common,
-                vma(common, args, 1) as *mut *mut (),
+                view.common,
+                vma(view.common, args, 1) as *mut *mut (),
             );
             return 0;
         } else if trap == G::G_ICARUS_RUNSCRIPT as c_int {
-            return icarus_run_script(
-                icarus,
-                host,
-                ConvertedEntity(common, sv, vma(common, args, 1) as *mut sharedEntity_t),
-                core::ffi::CStr::from_ptr(vma(common, args, 2) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
-            ) as c_int;
+            // SAFETY: view-constructor slot, single-threaded; the `sv` cast is
+            // dropped before `icarus_run_script` (which may reach sv-touching
+            // host methods) so no other cast of this slot is live (rule 7).
+            let ent = {
+                let sv = &mut *(view.sv.as_raw() as *mut Server);
+                ConvertedEntity(
+                    view.common,
+                    sv,
+                    vma(view.common, args, 1) as *mut sharedEntity_t,
+                )
+            };
+            let script = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
+                .to_str()
+                .unwrap_or("");
+            return icarus_run_script(icarus, view, ent, script) as c_int;
         } else if trap == G::G_ICARUS_REGISTERSCRIPT as c_int {
-            return icarus_register_script(
-                icarus,
-                host,
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
-                *args.offset(2) != 0,
-            ) as c_int;
+            let script = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                .to_str()
+                .unwrap_or("");
+            return icarus_register_script(icarus, view, script, *args.offset(2) != 0) as c_int;
         } else if trap == G::G_ICARUS_INIT as c_int {
-            icarus_init(icarus, host);
+            icarus_init(icarus, view);
             return 0;
         } else if trap == G::G_ICARUS_VALIDENT as c_int {
-            return icarus_valid_ent(
-                icarus,
-                host,
-                ConvertedEntity(common, sv, vma(common, args, 1) as *mut sharedEntity_t),
-            ) as c_int;
+            // SAFETY: view-constructor slot, single-threaded; `sv` cast dropped
+            // before the icarus call (rule 7).
+            let ent = {
+                let sv = &mut *(view.sv.as_raw() as *mut Server);
+                ConvertedEntity(
+                    view.common,
+                    sv,
+                    vma(view.common, args, 1) as *mut sharedEntity_t,
+                )
+            };
+            return icarus_valid_ent(icarus, view, ent) as c_int;
         } else if trap == G::G_ICARUS_ISINITIALIZED as c_int {
-            return icarus_is_initialized(icarus, host, *args.offset(1)) as c_int;
+            return icarus_is_initialized(icarus, view, *args.offset(1)) as c_int;
         } else if trap == G::G_ICARUS_MAINTAINTASKMANAGER as c_int {
-            return icarus_maintain_task_manager(icarus, host, *args.offset(1)) as c_int;
+            return icarus_maintain_task_manager(icarus, view, *args.offset(1)) as c_int;
         } else if trap == G::G_ICARUS_ISRUNNING as c_int {
-            return icarus_is_running(icarus, host, *args.offset(1)) as c_int;
+            return icarus_is_running(icarus, view, *args.offset(1)) as c_int;
         } else if trap == G::G_ICARUS_TASKIDPENDING as c_int {
             return match task_id_from_word(*args.offset(2)) {
-                Some(task_type) => q3_task_id_pending(
-                    icarus,
-                    host,
-                    vma(common, args, 1) as *mut sharedEntity_t,
-                    task_type,
-                ) as c_int,
+                Some(task_type) => {
+                    let ent = vma(view.common, args, 1) as *mut sharedEntity_t;
+                    q3_task_id_pending(icarus, view, ent, task_type) as c_int
+                }
                 None => 0,
             };
         } else if trap == G::G_ICARUS_INITENT as c_int {
-            icarus_init_ent(
-                icarus,
-                host,
-                ConvertedEntity(common, sv, vma(common, args, 1) as *mut sharedEntity_t),
-            );
+            // SAFETY: view-constructor slot, single-threaded; `sv` cast dropped
+            // before the icarus call (rule 7).
+            let ent = {
+                let sv = &mut *(view.sv.as_raw() as *mut Server);
+                ConvertedEntity(
+                    view.common,
+                    sv,
+                    vma(view.common, args, 1) as *mut sharedEntity_t,
+                )
+            };
+            icarus_init_ent(icarus, view, ent);
             return 0;
         } else if trap == G::G_ICARUS_FREEENT as c_int {
-            icarus_free_ent(
-                icarus,
-                host,
-                ConvertedEntity(common, sv, vma(common, args, 1) as *mut sharedEntity_t),
-            );
+            // SAFETY: view-constructor slot, single-threaded; `sv` cast dropped
+            // before the icarus call (rule 7).
+            let ent = {
+                let sv = &mut *(view.sv.as_raw() as *mut Server);
+                ConvertedEntity(
+                    view.common,
+                    sv,
+                    vma(view.common, args, 1) as *mut sharedEntity_t,
+                )
+            };
+            icarus_free_ent(icarus, view, ent);
             return 0;
         } else if trap == G::G_ICARUS_ASSOCIATEENT as c_int {
-            icarus_associate_ent(
-                icarus,
-                host,
-                ConvertedEntity(common, sv, vma(common, args, 1) as *mut sharedEntity_t),
-            );
+            // SAFETY: view-constructor slot, single-threaded; `sv` cast dropped
+            // before the icarus call (rule 7).
+            let ent = {
+                let sv = &mut *(view.sv.as_raw() as *mut Server);
+                ConvertedEntity(
+                    view.common,
+                    sv,
+                    vma(view.common, args, 1) as *mut sharedEntity_t,
+                )
+            };
+            icarus_associate_ent(icarus, view, ent);
             return 0;
         } else if trap == G::G_ICARUS_SHUTDOWN as c_int {
-            icarus_shutdown(icarus, host);
+            icarus_shutdown(icarus, view);
             return 0;
         } else if trap == G::G_ICARUS_TASKIDSET as c_int {
             // rww - note that we are passing in the true entity here. This is
             // because we allow modification of certain non-pointer values,
             // which is valid.
             if let Some(task_type) = task_id_from_word(*args.offset(2)) {
-                q3_task_id_set(
-                    icarus,
-                    host,
-                    vma(common, args, 1) as *mut sharedEntity_t,
-                    task_type,
-                    *args.offset(3),
-                );
+                let ent = vma(view.common, args, 1) as *mut sharedEntity_t;
+                q3_task_id_set(icarus, view, ent, task_type, *args.offset(3));
             }
             return 0;
         } else if trap == G::G_ICARUS_TASKIDCOMPLETE as c_int {
             // same as above.
             if let Some(task_type) = task_id_from_word(*args.offset(2)) {
-                q3_task_id_complete(
-                    icarus,
-                    host,
-                    vma(common, args, 1) as *mut sharedEntity_t,
-                    task_type,
-                );
+                let ent = vma(view.common, args, 1) as *mut sharedEntity_t;
+                q3_task_id_complete(icarus, view, ent, task_type);
             }
             return 0;
         } else if trap == G::G_ICARUS_SETVAR as c_int {
+            let var_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
+                .to_str()
+                .unwrap_or("");
+            let var_value = core::ffi::CStr::from_ptr(vma(view.common, args, 4) as *const c_char)
+                .to_str()
+                .unwrap_or("");
             q3_set_var(
                 icarus,
-                host,
+                view,
                 *args.offset(1),
                 *args.offset(2),
-                core::ffi::CStr::from_ptr(vma(common, args, 3) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
-                core::ffi::CStr::from_ptr(vma(common, args, 4) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
+                var_name,
+                var_value,
             );
             return 0;
         } else if trap == G::G_ICARUS_VARIABLEDECLARED as c_int {
-            return q3_variable_declared(
-                icarus,
-                host,
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
-                    .to_str()
-                    .unwrap_or(""),
-            );
-        } else if trap == G::G_ICARUS_GETFLOATVARIABLE as c_int {
-            let name = core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+            let name = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
                 .to_str()
                 .unwrap_or("");
-            match q3_get_float_variable(icarus, host, name) {
+            return q3_variable_declared(icarus, view, name);
+        } else if trap == G::G_ICARUS_GETFLOATVARIABLE as c_int {
+            let name = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                .to_str()
+                .unwrap_or("");
+            match q3_get_float_variable(icarus, view, name) {
                 Some(value) => {
-                    *(vma(common, args, 2) as *mut f32) = value;
+                    *(vma(view.common, args, 2) as *mut f32) = value;
                     return 1;
                 }
                 None => return 0,
@@ -1334,17 +1320,17 @@ pub fn SV_GameSystemCalls(
             // Raven writes the found `c_str()` pointer into a discarded local
             // `rec` (`sv_game.cpp:826-829`) — the string never reaches the game
             // module, so only the found/not-found int is observable.
-            let name = core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+            let name = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
                 .to_str()
                 .unwrap_or("");
-            return q3_get_string_variable(icarus, host, name).is_some() as c_int;
+            return q3_get_string_variable(icarus, view, name).is_some() as c_int;
         } else if trap == G::G_ICARUS_GETVECTORVARIABLE as c_int {
-            let name = core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+            let name = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
                 .to_str()
                 .unwrap_or("");
-            match q3_get_vector_variable(icarus, host, name) {
+            match q3_get_vector_variable(icarus, view, name) {
                 Some(value) => {
-                    let out = vma(common, args, 2) as *mut f32;
+                    let out = vma(view.common, args, 2) as *mut f32;
                     *out = value[0];
                     *out.add(1) = value[1];
                     *out.add(2) = value[2];
@@ -1362,46 +1348,46 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_NAV_LOAD as c_int {
             return nav.load(
-                &mut host,
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+                view,
+                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
                 *args.offset(2),
             ) as c_int;
         } else if trap == G::G_NAV_SAVE as c_int {
             return nav.save(
-                &mut host,
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+                view,
+                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
                 *args.offset(2),
             ) as c_int;
         } else if trap == G::G_NAV_ADDRAWPOINT as c_int {
             return nav.add_raw_point(
-                &mut host,
-                *(vma(common, args, 1) as *const vec3_t),
+                view,
+                *(vma(view.common, args, 1) as *const vec3_t),
                 *args.offset(2),
                 *args.offset(3),
             );
         } else if trap == G::G_NAV_CALCULATEPATHS as c_int {
-            nav.calculate_paths(&mut host, core::mem::transmute(*args.offset(1)));
+            nav.calculate_paths(view, core::mem::transmute(*args.offset(1)));
             return 0;
         } else if trap == G::G_NAV_HARDCONNECT as c_int {
-            nav.hard_connect(&mut host, *args.offset(1), *args.offset(2));
+            nav.hard_connect(view, *args.offset(1), *args.offset(2));
             return 0;
         } else if trap == G::G_NAV_SHOWNODES as c_int {
-            nav.show_nodes(&mut host);
+            nav.show_nodes(view);
             return 0;
         } else if trap == G::G_NAV_SHOWEDGES as c_int {
-            nav.show_edges(&mut host);
+            nav.show_edges(view);
             return 0;
         } else if trap == G::G_NAV_SHOWPATH as c_int {
-            nav.show_path(&mut host, *args.offset(1), *args.offset(2));
+            nav.show_path(view, *args.offset(1), *args.offset(2));
             return 0;
         } else if trap == G::G_NAV_GETNEARESTNODE as c_int {
             return nav.get_nearest_node(
-                &mut host,
-                vma(common, args, 1) as *mut sharedEntity_t,
+                view,
+                vma(view.common, args, 1) as *mut sharedEntity_t,
                 *args.offset(2),
                 *args.offset(3),
                 *args.offset(4),
@@ -1411,7 +1397,7 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_NAV_GETNODEPOSITION as c_int {
             return nav.get_node_position(
                 *args.offset(1),
-                &mut *(vma(common, args, 2) as *mut vec3_t),
+                &mut *(vma(view.common, args, 2) as *mut vec3_t),
             );
         } else if trap == G::G_NAV_GETNODENUMEDGES as c_int {
             return nav.get_node_num_edges(*args.offset(1));
@@ -1424,31 +1410,31 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_NAV_GETPATHCOST as c_int {
             return nav.get_path_cost(*args.offset(1), *args.offset(2)) as c_int;
         } else if trap == G::G_NAV_GETEDGECOST as c_int {
-            return nav.get_edge_cost(&mut host, *args.offset(1), *args.offset(2)) as c_int;
+            return nav.get_edge_cost(view, *args.offset(1), *args.offset(2)) as c_int;
         } else if trap == G::G_NAV_GETPROJECTEDNODE as c_int {
             return nav.get_projected_node(
-                *(vma(common, args, 1) as *const vec3_t),
+                *(vma(view.common, args, 1) as *const vec3_t),
                 *args.offset(2),
             );
         } else if trap == G::G_NAV_CHECKFAILEDNODES as c_int {
-            nav.check_failed_nodes(&mut host, vma(common, args, 1) as *mut sharedEntity_t);
+            nav.check_failed_nodes(view, vma(view.common, args, 1) as *mut sharedEntity_t);
             return 0;
         } else if trap == G::G_NAV_ADDFAILEDNODE as c_int {
             nav.add_failed_node(
-                &mut host,
-                vma(common, args, 1) as *mut sharedEntity_t,
+                view,
+                vma(view.common, args, 1) as *mut sharedEntity_t,
                 *args.offset(2),
             );
             return 0;
         } else if trap == G::G_NAV_NODEFAILED as c_int {
             return nav.node_failed(
-                vma(common, args, 1) as *mut sharedEntity_t,
+                vma(view.common, args, 1) as *mut sharedEntity_t,
                 *args.offset(2),
             );
         } else if trap == G::G_NAV_NODESARENEIGHBORS as c_int {
             return nav.nodes_are_neighbors(*args.offset(1), *args.offset(2));
         } else if trap == G::G_NAV_CLEARFAILEDEDGE as c_int {
-            nav.clear_failed_edge(&mut *(vma(common, args, 1) as *mut failedEdge_t));
+            nav.clear_failed_edge(&mut *(vma(view.common, args, 1) as *mut failedEdge_t));
             return 0;
         } else if trap == G::G_NAV_CLEARALLFAILEDEDGES as c_int {
             nav.clear_all_failed_edges();
@@ -1456,15 +1442,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_NAV_EDGEFAILED as c_int {
             return nav.edge_failed(*args.offset(1), *args.offset(2));
         } else if trap == G::G_NAV_ADDFAILEDEDGE as c_int {
-            nav.add_failed_edge(&mut host, *args.offset(1), *args.offset(2), *args.offset(3));
+            nav.add_failed_edge(view, *args.offset(1), *args.offset(2), *args.offset(3));
             return 0;
         } else if trap == G::G_NAV_CHECKFAILEDEDGE as c_int {
-            return nav.check_failed_edge(
-                &mut host,
-                &mut *(vma(common, args, 1) as *mut failedEdge_t),
-            );
+            return nav
+                .check_failed_edge(view, &mut *(vma(view.common, args, 1) as *mut failedEdge_t));
         } else if trap == G::G_NAV_CHECKALLFAILEDEDGES as c_int {
-            nav.check_all_failed_edges(&mut host);
+            nav.check_all_failed_edges(view);
             return 0;
         } else if trap == G::G_NAV_ROUTEBLOCKED as c_int {
             return nav.route_blocked(
@@ -1475,30 +1459,30 @@ pub fn SV_GameSystemCalls(
             );
         } else if trap == G::G_NAV_GETBESTNODEALTROUTE as c_int {
             return nav.get_best_node_alt_route(
-                &mut host,
+                view,
                 *args.offset(1),
                 *args.offset(2),
-                &mut *(vma(common, args, 3) as *mut c_int),
+                &mut *(vma(view.common, args, 3) as *mut c_int),
                 *args.offset(4),
             );
         } else if trap == G::G_NAV_GETBESTNODEALT2 as c_int {
             return nav.get_best_node_alt_route2(
-                &mut host,
+                view,
                 *args.offset(1),
                 *args.offset(2),
                 *args.offset(3),
             );
         } else if trap == G::G_NAV_GETBESTPATHBETWEENENTS as c_int {
             return nav.get_best_path_between_ents(
-                &mut host,
-                vma(common, args, 1) as *mut sharedEntity_t,
-                vma(common, args, 2) as *mut sharedEntity_t,
+                view,
+                vma(view.common, args, 1) as *mut sharedEntity_t,
+                vma(view.common, args, 2) as *mut sharedEntity_t,
                 *args.offset(3),
             );
         } else if trap == G::G_NAV_GETNODERADIUS as c_int {
             return nav.get_node_radius(*args.offset(1));
         } else if trap == G::G_NAV_CHECKBLOCKEDEDGES as c_int {
-            nav.check_blocked_edges(&mut host);
+            nav.check_blocked_edges(view);
             return 0;
         } else if trap == G::G_NAV_CLEARCHECKEDNODES as c_int {
             nav.clear_checked_nodes();
@@ -1520,89 +1504,134 @@ pub fn SV_GameSystemCalls(
         }
         // rww - END NPC NAV TRAPS
         else if trap == G::G_SET_SHARED_BUFFER as c_int {
-            sv.sv.mSharedMemory = vma(common, args, 1) as *mut c_char;
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            sv.sv.mSharedMemory = vma(view.common, args, 1) as *mut c_char;
             return 0;
         } else if trap == G::BOTLIB_SETUP as c_int {
-            return SV_BotLibSetup(common, sv, bot);
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
+            return SV_BotLibSetup(view.common, sv, bot);
         } else if trap == G::BOTLIB_SHUTDOWN as c_int {
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return SV_BotLibShutdown(sv, bot);
         }
         // Raven's `botlib_export` global is homed on `Server` (`sv.botlib_export`,
         // set by `SV_BotInitBotLib`); its ported fn-ptr fields carry the `bot:
         // &mut BotLib` receiver, threaded through each arm.
         else if trap == G::BOTLIB_LIBVAR_SET as c_int {
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).BotLibVarSet.unwrap())(
                 bot,
-                vma(common, args, 1) as *mut c_char,
-                vma(common, args, 2) as *mut c_char,
+                vma(view.common, args, 1) as *mut c_char,
+                vma(view.common, args, 2) as *mut c_char,
             );
         } else if trap == G::BOTLIB_LIBVAR_GET as c_int {
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).BotLibVarGet.unwrap())(
                 bot,
-                vma(common, args, 1) as *mut c_char,
-                vma(common, args, 2) as *mut c_char,
+                vma(view.common, args, 1) as *mut c_char,
+                vma(view.common, args, 2) as *mut c_char,
                 *args.offset(3),
             );
         } else if trap == G::BOTLIB_PC_ADD_GLOBAL_DEFINE as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             return ((*sv.botlib_export).PC_AddGlobalDefine.unwrap())(
-                vma(common, args, 1) as *mut c_char,
+                vma(view.common, args, 1) as *mut c_char
             );
         } else if trap == G::BOTLIB_PC_LOAD_SOURCE as c_int {
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).PC_LoadSourceHandle.unwrap())(
                 bot,
-                vma(common, args, 1) as *const c_char,
+                vma(view.common, args, 1) as *const c_char,
             );
         } else if trap == G::BOTLIB_PC_FREE_SOURCE as c_int {
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).PC_FreeSourceHandle.unwrap())(bot, *args.offset(1));
         } else if trap == G::BOTLIB_PC_READ_TOKEN as c_int {
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).PC_ReadTokenHandle.unwrap())(
                 bot,
                 *args.offset(1),
-                vma(common, args, 2) as *mut pc_token_t,
+                vma(view.common, args, 2) as *mut pc_token_t,
             );
         } else if trap == G::BOTLIB_PC_SOURCE_FILE_AND_LINE as c_int {
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).PC_SourceFileAndLine.unwrap())(
                 bot,
                 *args.offset(1),
-                vma(common, args, 2) as *mut c_char,
-                vma(common, args, 3) as *mut c_int,
+                vma(view.common, args, 2) as *mut c_char,
+                vma(view.common, args, 3) as *mut c_int,
             );
         } else if trap == G::BOTLIB_START_FRAME as c_int {
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).BotLibStartFrame.unwrap())(bot, vmf(args, 1));
         } else if trap == G::BOTLIB_LOAD_MAP as c_int {
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).BotLibLoadMap.unwrap())(
                 bot,
-                vma(common, args, 1) as *const c_char,
+                vma(view.common, args, 1) as *const c_char,
             );
         } else if trap == G::BOTLIB_UPDATENTITY as c_int {
+            // SAFETY: view-constructor slots, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).BotLibUpdateEntity.unwrap())(
                 bot,
                 *args.offset(1),
-                vma(common, args, 2) as *mut bot_entitystate_t,
+                vma(view.common, args, 2) as *mut bot_entitystate_t,
             );
         } else if trap == G::BOTLIB_TEST as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             // Ported `Test` takes `vec3_t` by value; read Raven's `(float*)VMA(n)` through.
             return ((*sv.botlib_export).Test.unwrap())(
                 *args.offset(1),
-                vma(common, args, 2) as *mut c_char,
-                *(vma(common, args, 3) as *const vec3_t),
-                *(vma(common, args, 4) as *const vec3_t),
+                vma(view.common, args, 2) as *mut c_char,
+                *(vma(view.common, args, 3) as *const vec3_t),
+                *(vma(view.common, args, 4) as *const vec3_t),
             );
         } else if trap == G::BOTLIB_GET_SNAPSHOT_ENTITY as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             return SV_BotGetSnapshotEntity(sv, *args.offset(1), *args.offset(2));
         } else if trap == G::BOTLIB_GET_CONSOLE_MESSAGE as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             return SV_BotGetConsoleMessage(
                 sv,
                 *args.offset(1),
-                vma(common, args, 2) as *mut c_char,
+                vma(view.common, args, 2) as *mut c_char,
                 *args.offset(3),
             );
         } else if trap == G::BOTLIB_USER_COMMAND as c_int {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
             crate::sv_client::SV_ClientThink(
-                common,
+                view.common,
                 sv,
                 sv.svs.clients.offset(*args.offset(1) as isize),
-                vma(common, args, 2) as *mut usercmd_t,
+                vma(view.common, args, 2) as *mut usercmd_t,
             );
             return 0;
         }
@@ -1618,18 +1647,24 @@ pub fn SV_GameSystemCalls(
         // same pattern.
         else if trap == G::G_R_REGISTERSKIN as c_int {
             return RE_RegisterServerSkin(
-                rm,
-                host,
-                core::ffi::CStr::from_ptr(vma(common, args, 1) as *const c_char)
+                view,
+                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
                     .to_str()
                     .unwrap_or(""),
             );
         } else if trap == G::G_SET_ACTIVE_SUBBSP as c_int {
-            SV_SetActiveSubBSP(cm, sv, *args.offset(1));
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            SV_SetActiveSubBSP(view.cm, sv, *args.offset(1));
             return 0;
         } else if trap == G::G_GET_ENTITY_TOKEN as c_int {
-            return SV_GetEntityToken(sv, vma(common, args, 1) as *mut c_char, *args.offset(2))
-                as c_int;
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            return SV_GetEntityToken(
+                sv,
+                vma(view.common, args, 1) as *mut c_char,
+                *args.offset(2),
+            ) as c_int;
         } else {
             mp_engine_qcommon::common::com_error(
                 errorParm_t::ERR_DROP,
@@ -1643,18 +1678,9 @@ pub fn SV_GameSystemCalls(
 /// Raven `SV_InitGameProgs`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:1731-1756`
-pub fn SV_InitGameProgs(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn SV_InitGameProgs(view: &mut EngineHostView, sv: &mut Server) {
     let var = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"bot_enable".as_ptr(),
         c"1".as_ptr(),
         mp_qshared::shared::cvar::CVAR_LATCH,
@@ -1662,22 +1688,22 @@ pub fn SV_InitGameProgs(
     // PORT-NOTE(bot_enable): the file-scope `extern int bot_enable` threads
     // as a `Common` field per ruling 3; the field doesn't exist yet, escalated.
     if !var.is_null() {
-        common.bot_enable = unsafe { (*var).integer };
+        view.common.bot_enable = unsafe { (*var).integer };
     } else {
-        common.bot_enable = 0;
+        view.common.bot_enable = 0;
     }
 
-    if Cvar_VariableValue(common, cm, rm, host, c"fs_restrict".as_ptr()) == 0.0
-        && unsafe { (*common.com_dedicated).integer } == 0
+    if Cvar_VariableValue(view, c"fs_restrict".as_ptr()) == 0.0
+        && unsafe { (*view.common.com_dedicated).integer } == 0
         && Sys_CheckCD() == qfalse
     {
-        let need_cd = SE_GetString(common, host, "CON_TEXT_NEED_CD");
+        let need_cd = SE_GetString(view, "CON_TEXT_NEED_CD");
         mp_engine_qcommon::common::com_error(errorParm_t::ERR_NEED_CD, need_cd);
         //"Game CD not in drive" );
     }
 
     // load the dll or bytecode
-    let vm_game = Cvar_VariableValue(common, cm, rm, host, c"vm_game".as_ptr());
+    let vm_game = Cvar_VariableValue(view, c"vm_game".as_ptr());
     // SEAM-D11 slot arming: the module reaches the engine through
     // `game_syscall_trampoline` → the armed `GAME_SLOT`, so before the module
     // is loaded (and its `GAME_INIT` round-trip runs) arm the game slot with
@@ -1687,10 +1713,7 @@ pub fn SV_InitGameProgs(
     // `VM_DllSyscall` path to the same slot.
     arm_game_slot(sv as *mut Server as *mut c_void, game_system_calls_shim);
     sv.gvm = mp_engine_qcommon::vm_fns::VM_Create(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"jampgame".as_ptr(),
         Some(sv_game_system_call),
         unsafe { core::mem::transmute(vm_game as c_int) },
@@ -1702,13 +1725,24 @@ pub fn SV_InitGameProgs(
         );
     }
 
-    SV_InitGameVM(common, cm, sv, rm, host, qfalse);
+    SV_InitGameVM(view, sv, qfalse);
 }
 
-/// Raven `SV_ShutdownGameProgs` — called every time a map changes.
+/// Raven `SV_ShutdownGameProgs` — called every time a map changes. The hook
+/// target (view signature); callers already holding the real `&mut Server`
+/// (SV_SpawnServer / the SV_Shutdown body) use [`SV_ShutdownGameProgs_body`]
+/// directly so no second cast of the `sv` slot is ever created.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:1665-1673`
-pub fn SV_ShutdownGameProgs(common: &mut Common, sv: &mut Server) {
+pub fn SV_ShutdownGameProgs(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast of this
+    // slot for the borrow's duration (rule 7).
+    let sv = unsafe { &mut *(view.sv.as_raw() as *mut Server) };
+    SV_ShutdownGameProgs_body(view.common, sv);
+}
+
+/// [`SV_ShutdownGameProgs`]'s body over the already-cast receivers.
+pub fn SV_ShutdownGameProgs_body(common: &mut Common, sv: &mut Server) {
     if sv.gvm.is_null() {
         return;
     }

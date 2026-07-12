@@ -8,19 +8,15 @@
 
 use core::ffi::{c_char, c_int};
 
-use mp_host_interface::engine_host::EngineHost;
-
 use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 
 use crate::cmd::cmd_consts::{MAX_CMD_BUFFER, MAX_CMD_LINE};
-use crate::cm_load::RmManager;
-use crate::cmd_pc::{Cmd_ExecuteString, Cmd_List_f, RenderModels, Server};
-use crate::collision_world::CollisionWorld;
+use crate::cmd_pc::{Cmd_ExecuteString, Cmd_List_f};
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
-use crate::z_memman_pc::Ghoul2System;
 use crate::common_fns::Com_Memcpy;
 
 // Sweep: extern forward-declares eliminated. libc byte helpers (rule 3),
@@ -322,23 +318,18 @@ pub fn Cmd_Echo_f(common: &mut Common) {
 /// `Cmd_Exec_f`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:219-241`
-pub fn Cmd_Exec_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn Cmd_Exec_f(view: &mut EngineHostView) {
     let mut filename: [c_char; native_types::MAX_QPATH as usize] =
         [0; native_types::MAX_QPATH as usize];
 
-    if Cmd_Argc(common) != 2 {
-        com_printf(common, "exec <filename> : execute a script file\n");
+    if Cmd_Argc(view.common) != 2 {
+        com_printf(view.common, "exec <filename> : execute a script file\n");
         return;
     }
 
     Q_strncpyz(
         filename.as_mut_ptr(),
-        Cmd_Argv(common, 1),
+        Cmd_Argv(view.common, 1),
         core::mem::size_of_val(&filename) as c_int,
     );
     COM_DefaultExtension(
@@ -348,23 +339,16 @@ pub fn Cmd_Exec_f(
     );
 
     let mut f: *mut c_char = core::ptr::null_mut();
-    let _len = FS_ReadFile(
-        common,
-        cm,
-        rm,
-        host,
-        filename.as_ptr(),
-        &mut f as *mut _ as *mut *mut (),
-    );
+    let _len = FS_ReadFile(view, filename.as_ptr(), &mut f as *mut _ as *mut *mut ());
     if f.is_null() {
-        com_printf(common, "couldn't exec %s\n");
+        com_printf(view.common, "couldn't exec %s\n");
         return;
     }
-    com_printf(common, "execing %s\n");
+    com_printf(view.common, "execing %s\n");
 
-    Cbuf_InsertText(common, f as *const c_char);
+    Cbuf_InsertText(view.common, f as *const c_char);
 
-    FS_FreeFile(common, f as *mut ());
+    FS_FreeFile(view.common, f as *mut ());
 }
 
 /// `Cmd_Vstr_f`.
@@ -389,32 +373,24 @@ pub fn Cmd_Vstr_f(common: &mut Common) {
 /// `Cbuf_Execute`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:148-202`
-pub fn Cbuf_Execute(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    g2: &mut Ghoul2System,
-    host: &mut dyn EngineHost,
-) {
+pub fn Cbuf_Execute(view: &mut EngineHostView) {
     let mut line: [c_char; MAX_CMD_LINE as usize] = [0; MAX_CMD_LINE as usize];
 
-    while common.cmd_text.cursize != 0 {
-        if common.cmd_wait != 0 {
+    while view.common.cmd_text.cursize != 0 {
+        if view.common.cmd_wait != 0 {
             // skip out while text still remains in buffer, leaving it
             // for next frame
-            common.cmd_wait -= 1;
+            view.common.cmd_wait -= 1;
             break;
         }
 
         // find a \n or ; line break
-        let text = common.cmd_text.data;
+        let text = view.common.cmd_text.data;
 
         let mut quotes = 0;
         let mut i: c_int = 0;
         unsafe {
-            while i < common.cmd_text.cursize {
+            while i < view.common.cmd_text.cursize {
                 let c = *text.add(i as usize);
                 if c == b'"' {
                     quotes += 1;
@@ -439,105 +415,78 @@ pub fn Cbuf_Execute(
             // this is necessary because commands (exec) can insert data at the
             // beginning of the text buffer
 
-            if i == common.cmd_text.cursize {
-                common.cmd_text.cursize = 0;
+            if i == view.common.cmd_text.cursize {
+                view.common.cmd_text.cursize = 0;
             } else {
                 i += 1;
-                common.cmd_text.cursize -= i;
+                view.common.cmd_text.cursize -= i;
                 memmove(
                     text as *mut core::ffi::c_void,
                     text.add(i as usize) as *const core::ffi::c_void,
-                    common.cmd_text.cursize as usize,
+                    view.common.cmd_text.cursize as usize,
                 );
             }
         }
 
         // execute the command line
-        Cmd_ExecuteString(common, cm, sv, rm, rmg, g2, host, line.as_ptr() as *const c_char);
+        Cmd_ExecuteString(view, line.as_ptr() as *const c_char);
     }
 }
 
 /// `Cmd_Init`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:501-507`
-pub fn Cmd_Init(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn Cmd_Init(view: &mut EngineHostView) {
     Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         b"cmdlist\0".as_ptr() as *const c_char,
-        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_List_f(common)),
+        Some(|view| Cmd_List_f(view.common)),
     );
     Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         b"exec\0".as_ptr() as *const c_char,
-        Some(|common, cm, _sv, rm, _rmg, _g2, host| Cmd_Exec_f(common, cm, rm, host)),
+        Some(|view| Cmd_Exec_f(view)),
     );
     Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         b"vstr\0".as_ptr() as *const c_char,
-        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Vstr_f(common)),
+        Some(|view| Cmd_Vstr_f(view.common)),
     );
     Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         b"echo\0".as_ptr() as *const c_char,
-        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Echo_f(common)),
+        Some(|view| Cmd_Echo_f(view.common)),
     );
     Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         b"wait\0".as_ptr() as *const c_char,
-        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Wait_f(common)),
+        Some(|view| Cmd_Wait_f(view.common)),
     );
 }
 
 /// `Cbuf_ExecuteText`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:121-141`
-pub fn Cbuf_ExecuteText(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    g2: &mut Ghoul2System,
-    host: &mut dyn EngineHost,
-    exec_when: c_int,
-    text: *const c_char,
-) {
+pub fn Cbuf_ExecuteText(view: &mut EngineHostView, exec_when: c_int, text: *const c_char) {
     match exec_when {
         x if x == cbufExec_t::EXEC_NOW as c_int => {
             if !text.is_null() && unsafe { strlen(text) } > 0 {
-                Cmd_ExecuteString(common, cm, sv, rm, rmg, g2, host, text);
+                Cmd_ExecuteString(view, text);
             } else {
-                Cbuf_Execute(common, cm, sv, rm, rmg, g2, host);
+                Cbuf_Execute(view);
             }
         }
         x if x == cbufExec_t::EXEC_INSERT as c_int => {
-            Cbuf_InsertText(common, text);
+            Cbuf_InsertText(view.common, text);
         }
         x if x == cbufExec_t::EXEC_APPEND as c_int => {
-            Cbuf_AddText(common, text);
+            Cbuf_AddText(view.common, text);
         }
         _ => {
-            com_error(errorParm_t::ERR_FATAL, "Cbuf_ExecuteText: bad exec_when".to_string());
-        },
+            com_error(
+                errorParm_t::ERR_FATAL,
+                "Cbuf_ExecuteText: bad exec_when".to_string(),
+            );
+        }
     }
 }

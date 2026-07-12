@@ -18,18 +18,11 @@
 
 use core::ffi::{c_char, c_int};
 
-use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::cvar_fns::Cvar_VariableValue;
 use mp_engine_qcommon::qcommon::net_limits::{MAX_DOWNLOAD_BLKSIZE, MAX_DOWNLOAD_WINDOW};
 use mp_host_interface::engine_host::EngineHost;
-// PORT-NOTE(engine-host-state, matches sv_game.rs's identical note): `RmManager`
-// and `RenderModels` do not exist anywhere in the tree yet (only enum/type
-// homes under `mp_engine_rmg`/type-only `mp_renderer`) — imported by their
-// rosetta decl-home crate/path per ZERO-PARK; escalated in `missing_symbols`
-// rather than stubbed.
-use mp_engine_qcommon::cm_load::RenderModels;
-use mp_engine_qcommon::cm_load::RmManager;
 use mp_qshared::common::mp::game::g_public::SVF_BOT;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
@@ -63,15 +56,15 @@ pub fn SV_ResetPureClient_f(cl: *mut client_t) {
 /// Raven `SV_UserinfoChanged`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:1452-1500`
-pub fn SV_UserinfoChanged(common: &mut Common, host: &mut dyn EngineHost, cl: *mut client_t) {
+pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
     unsafe {
         let name = Info_ValueForKey((*cl).userinfo.as_mut_ptr(), c"name".as_ptr() as *mut c_char);
         Q_strncpyz((*cl).name.as_mut_ptr(), name, (*cl).name.len() as c_int);
 
         // if the client is on the same subnet as the server and we aren't running an
         // internet public server, assume they don't need a rate choke
-        if host.is_lan_address(&(*cl).netchan.remoteAddress)
-            && (*common.com_dedicated).integer != 2
+        if view.is_lan_address(&(*cl).netchan.remoteAddress)
+            && (*view.common.com_dedicated).integer != 2
         {
             // lans should not rate limit
             (*cl).rate = 99999;
@@ -128,22 +121,8 @@ pub fn SV_UserinfoChanged(common: &mut Common, host: &mut dyn EngineHost, cl: *m
 /// Raven `SV_GetChallenge`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:31-130`
-pub fn SV_GetChallenge(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    from: netadr_t,
-) {
-    if Cvar_VariableValue(
-        common,
-        cm,
-        rm,
-        host,
-        c"ui_singlePlayerActive".as_ptr() as *const c_char,
-    ) != 0.0
-    {
+pub fn SV_GetChallenge(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
+    if Cvar_VariableValue(view, c"ui_singlePlayerActive".as_ptr() as *const c_char) != 0.0 {
         return;
     }
 
@@ -155,7 +134,8 @@ pub fn SV_GetChallenge(
     while i < MAX_CHALLENGES {
         let challenge = &mut sv.svs.challenges[i];
         if challenge.connected == qfalse
-            && mp_engine_qcommon::net_chan::NET_CompareAdr(common, from, challenge.adr) == qtrue
+            && mp_engine_qcommon::net_chan::NET_CompareAdr(view.common, from, challenge.adr)
+                == qtrue
         {
             break;
         }
@@ -173,8 +153,9 @@ pub fn SV_GetChallenge(
         // PORT-NOTE(qrand-field, ruling 21): `common`'s `QRand` field name is
         // pinned when the `QRand` type lands; `common.qrand` is a placeholder
         // reference, escalated in `missing_symbols`.
-        challenge.challenge =
-            ((common.qrand.irand(0, 0x7fff) << 16) ^ common.qrand.irand(0, 0x7fff)) ^ sv.svs.time;
+        challenge.challenge = ((view.common.qrand.irand(0, 0x7fff) << 16)
+            ^ view.common.qrand.irand(0, 0x7fff))
+            ^ sv.svs.time;
         challenge.adr = from;
         challenge.firstTime = sv.svs.time;
         challenge.time = sv.svs.time;
@@ -185,10 +166,10 @@ pub fn SV_GetChallenge(
     let challenge = &mut sv.svs.challenges[i];
 
     // if they are on a lan address, send the challengeResponse immediately
-    if host.is_lan_address(&from) {
+    if view.is_lan_address(&from) {
         challenge.pingTime = sv.svs.time;
         mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-            common,
+            view.common,
             netsrc_t::NS_SERVER,
             from,
             format!("challengeResponse {}\n", challenge.challenge),
@@ -201,7 +182,7 @@ pub fn SV_GetChallenge(
     // path.
     challenge.pingTime = sv.svs.time;
     mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-        common,
+        view.common,
         netsrc_t::NS_SERVER,
         challenge.adr,
         format!("challengeResponse {}\n", challenge.challenge),
@@ -211,26 +192,21 @@ pub fn SV_GetChallenge(
 /// Raven `SV_WriteRMGAutomapSymbols`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:668-684`
-pub fn SV_WriteRMGAutomapSymbols(
-    common: &mut Common,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
-    msg: *mut msg_t,
-) {
-    // SAFETY: `rmg` is the opaque `cm_load::RmManager` slot; cast it back to the
-    // real `mp_engine_rmg::RmManager` at the server boundary (opaque-slot ruling).
-    let rmg = unsafe { crate::server_host::rmg_from_slot(rmg) };
-    let _ = host;
+pub fn SV_WriteRMGAutomapSymbols(view: &mut EngineHostView, msg: *mut msg_t) {
+    // SAFETY: view-constructor slot; `view.rmg` casts back to the real
+    // `mp_engine_rmg::RmManager` at the server boundary (opaque-slot ruling).
+    // Held disjoint from `view.common` used for the MSG writes.
+    let rmg = unsafe { crate::server_host::rmg_from_slot(&mut view.rmg) };
     let count = rmg.automap_symbol_count();
 
-    mp_engine_qcommon::msg::MSG_WriteShort(common, msg, count);
+    mp_engine_qcommon::msg::MSG_WriteShort(view.common, msg, count);
 
     for i in 0..count {
         if let Some(symbol) = rmg.automap_symbol(i) {
-            mp_engine_qcommon::msg::MSG_WriteByte(common, msg, symbol.mType as c_int);
-            mp_engine_qcommon::msg::MSG_WriteByte(common, msg, symbol.mSide as c_int);
-            mp_engine_qcommon::msg::MSG_WriteLong(common, msg, symbol.mOrigin[0] as c_int);
-            mp_engine_qcommon::msg::MSG_WriteLong(common, msg, symbol.mOrigin[1] as c_int);
+            mp_engine_qcommon::msg::MSG_WriteByte(view.common, msg, symbol.mType as c_int);
+            mp_engine_qcommon::msg::MSG_WriteByte(view.common, msg, symbol.mSide as c_int);
+            mp_engine_qcommon::msg::MSG_WriteLong(view.common, msg, symbol.mOrigin[0] as c_int);
+            mp_engine_qcommon::msg::MSG_WriteLong(view.common, msg, symbol.mOrigin[1] as c_int);
         }
     }
 }
@@ -238,21 +214,11 @@ pub fn SV_WriteRMGAutomapSymbols(
 /// Raven `SV_SendClientMapChange`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:820-842`
-pub fn SV_SendClientMapChange(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    client: *mut client_t,
-) {
+pub fn SV_SendClientMapChange(view: &mut EngineHostView, sv: &mut Server, client: *mut client_t) {
     let mut msg_buffer = [0u8; mp_engine_qcommon::qcommon::net_limits::MAX_MSGLEN as usize];
     let mut msg: msg_t = unsafe { core::mem::zeroed() };
     mp_engine_qcommon::msg::MSG_Init(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         &mut msg,
         msg_buffer.as_mut_ptr(),
         msg_buffer.len() as c_int,
@@ -261,24 +227,24 @@ pub fn SV_SendClientMapChange(
     // NOTE, MRE: all server->client messages now acknowledge
     // let the client know which reliable clientCommands we have received
     unsafe {
-        mp_engine_qcommon::msg::MSG_WriteLong(common, &mut msg, (*client).lastClientCommand);
+        mp_engine_qcommon::msg::MSG_WriteLong(view.common, &mut msg, (*client).lastClientCommand);
     }
 
     // send any server commands waiting to be sent first.
     // we have to do this cause we send the client->reliableSequence
     // with a gamestate and it sets the clc.serverCommandSequence at
     // the client side
-    crate::SV_UpdateServerCommandsToClient(common, client, &mut msg);
+    crate::SV_UpdateServerCommandsToClient(view.common, client, &mut msg);
 
     // send the gamestate
     mp_engine_qcommon::msg::MSG_WriteByte(
-        common,
+        view.common,
         &mut msg,
         mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_mapchange as c_int,
     );
 
     // deliver this to the client
-    crate::SV_SendMessageToClient(common, cm, sv, rm, host, &mut msg, client);
+    crate::SV_SendMessageToClient(view, sv, &mut msg, client);
 }
 
 /// Raven `SV_ClientEnterWorld`.
@@ -388,12 +354,7 @@ pub fn SV_NextDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
         // We aren't getting an acknowledge for the correct block, drop the client
         // FIXME: this is bad... the client will never parse the disconnect message
         //			because the cgame isn't loaded yet
-        crate::SV_DropClient(
-            common,
-            sv,
-            cl,
-            c"broken download".as_ptr() as *const c_char,
-        );
+        crate::SV_DropClient(common, sv, cl, c"broken download".as_ptr() as *const c_char);
     }
 }
 
@@ -431,16 +392,11 @@ pub fn SV_Disconnect_f(common: &mut Common, sv: &mut Server, cl: *mut client_t) 
 /// Raven `SV_UpdateUserinfo_f`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:1510-1535`
-pub fn SV_UpdateUserinfo_f(
-    common: &mut Common,
-    sv: &mut Server,
-    host: &mut dyn EngineHost,
-    cl: *mut client_t,
-) {
+pub fn SV_UpdateUserinfo_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut client_t) {
     unsafe {
         Q_strncpyz(
             (*cl).userinfo.as_mut_ptr(),
-            mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
+            mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1),
             (*cl).userinfo.len() as c_int,
         );
 
@@ -450,14 +406,17 @@ pub fn SV_UpdateUserinfo_f(
         (*cl).lastUserInfoChange =
             sv.svs.time + crate::server::sv_client_userinfo::INFO_CHANGE_MIN_INTERVAL;
 
-        SV_UserinfoChanged(common, host, cl);
+        SV_UserinfoChanged(view, cl);
         // call prog code to allow overrides
         let client_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
-        host.vm_call(
-            mp_host_interface::VmSlot::Gvm,
+        // Real `&mut Server` in scope — reach the game VM directly (`sv.gvm`)
+        // rather than through the sv-touching `vm_call` view method (rule 7).
+        mp_engine_qcommon::vm::VM_Call(
+            view.common,
+            sv.gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_USERINFO_CHANGED as c_int,
-            &[client_num as isize],
+            &[client_num],
         );
     }
 }
@@ -481,34 +440,31 @@ pub struct ucmd_t {
 /// referenced here even though they are not bound in this fn's scope
 /// (integration-time shape conflict, reported in `shape_mismatches`).
 pub fn SV_ExecuteClientCommand(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
     cl: *mut client_t,
     s: *const c_char,
     clientOK: qboolean,
 ) {
-    mp_engine_qcommon::cmd_common::Cmd_TokenizeString(common, s);
+    mp_engine_qcommon::cmd_common::Cmd_TokenizeString(view.common, s);
 
     // see if it is a server level command
-    let name =
-        unsafe { core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 0)) }
-            .to_string_lossy();
+    let name = unsafe {
+        core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 0))
+    }
+    .to_string_lossy();
     let mut matched = false;
     match name.as_ref() {
         "userinfo" => {
-            SV_UpdateUserinfo_f(common, sv, host, cl);
+            SV_UpdateUserinfo_f(view, sv, cl);
             matched = true;
         }
         "disconnect" => {
-            SV_Disconnect_f(common, sv, cl);
+            SV_Disconnect_f(view.common, sv, cl);
             matched = true;
         }
         "cp" => {
-            SV_VerifyPaks_f(common, cm, sv, rm, host, cl);
+            SV_VerifyPaks_f(view, sv, cl);
             matched = true;
         }
         "vdr" => {
@@ -516,19 +472,19 @@ pub fn SV_ExecuteClientCommand(
             matched = true;
         }
         "download" => {
-            SV_BeginDownload_f(common, cl);
+            SV_BeginDownload_f(view.common, cl);
             matched = true;
         }
         "nextdl" => {
-            SV_NextDownload_f(common, sv, cl);
+            SV_NextDownload_f(view.common, sv, cl);
             matched = true;
         }
         "stopdl" => {
-            SV_StopDownload_f(common, sv, cl);
+            SV_StopDownload_f(view.common, sv, cl);
             matched = true;
         }
         "donedl" => {
-            SV_DoneDownload_f(common, cm, sv, rm, rmg, host, cl);
+            SV_DoneDownload_f(view, sv, cl);
             matched = true;
         }
         _ => {}
@@ -541,10 +497,12 @@ pub fn SV_ExecuteClientCommand(
                 ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
                     / core::mem::size_of::<client_t>() as isize) as c_int
             };
-            host.vm_call(
-                mp_host_interface::VmSlot::Gvm,
+            // Real `&mut Server` in scope — reach the game VM directly (rule 7).
+            mp_engine_qcommon::vm::VM_Call(
+                view.common,
+                sv.gvm,
                 mp_abi::game::exports::MpGameExport::GAME_CLIENT_COMMAND as c_int,
-                &[client_num as isize],
+                &[client_num],
             );
         }
     }
@@ -581,25 +539,18 @@ pub fn SV_ClientThink(
 /// Raven `SV_AuthorizeIpPacket`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:142-211`
-pub fn SV_AuthorizeIpPacket(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    from: netadr_t,
-) {
-    if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(common, from, sv.svs.authorizeAddress)
+pub fn SV_AuthorizeIpPacket(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
+    if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(view.common, from, sv.svs.authorizeAddress)
         == qfalse
     {
         mp_engine_qcommon::common::common::com_printf(
-            common,
+            view.common,
             "SV_AuthorizeIpPacket: not from authorize server\n",
         );
         return;
     }
 
-    let challenge = unsafe { atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1)) };
+    let challenge = unsafe { atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1)) };
 
     let mut i: usize = 0;
     while i < MAX_CHALLENGES {
@@ -610,7 +561,7 @@ pub fn SV_AuthorizeIpPacket(
     }
     if i == MAX_CHALLENGES {
         mp_engine_qcommon::common::common::com_printf(
-            common,
+            view.common,
             "SV_AuthorizeIpPacket: challenge not found\n",
         );
         return;
@@ -618,11 +569,12 @@ pub fn SV_AuthorizeIpPacket(
 
     // send a packet back to the original client
     sv.svs.challenges[i].pingTime = sv.svs.time;
-    let s =
-        unsafe { core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 2)) }
-            .to_string_lossy()
-            .into_owned();
-    let r = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 3); // reason
+    let s = unsafe {
+        core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 2))
+    }
+    .to_string_lossy()
+    .into_owned();
+    let r = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 3); // reason
 
     if {
         Q_stricmp(
@@ -631,17 +583,10 @@ pub fn SV_AuthorizeIpPacket(
         )
     } == 0
     {
-        if Cvar_VariableValue(
-            common,
-            cm,
-            rm,
-            host,
-            c"fs_restrict".as_ptr() as *const c_char,
-        ) != 0.0
-        {
+        if Cvar_VariableValue(view, c"fs_restrict".as_ptr() as *const c_char) != 0.0 {
             // a demo client connecting to a demo server
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                common,
+                view.common,
                 netsrc_t::NS_SERVER,
                 sv.svs.challenges[i].adr,
                 format!("challengeResponse {}", sv.svs.challenges[i].challenge),
@@ -650,7 +595,7 @@ pub fn SV_AuthorizeIpPacket(
         }
         // they are a demo client trying to connect to a real server
         mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-            common,
+            view.common,
             netsrc_t::NS_SERVER,
             sv.svs.challenges[i].adr,
             "print\nServer is not a demo server\n".to_string(),
@@ -667,7 +612,7 @@ pub fn SV_AuthorizeIpPacket(
     } == 0
     {
         mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-            common,
+            view.common,
             netsrc_t::NS_SERVER,
             sv.svs.challenges[i].adr,
             format!("challengeResponse {}", sv.svs.challenges[i].challenge),
@@ -683,7 +628,7 @@ pub fn SV_AuthorizeIpPacket(
     {
         if r.is_null() {
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                common,
+                view.common,
                 netsrc_t::NS_SERVER,
                 sv.svs.challenges[i].adr,
                 "print\nAwaiting CD key authorization\n".to_string(),
@@ -691,7 +636,7 @@ pub fn SV_AuthorizeIpPacket(
         } else {
             let r_str = unsafe { core::ffi::CStr::from_ptr(r) }.to_string_lossy();
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                common,
+                view.common,
                 netsrc_t::NS_SERVER,
                 sv.svs.challenges[i].adr,
                 format!("print\n{}\n", r_str),
@@ -705,7 +650,7 @@ pub fn SV_AuthorizeIpPacket(
     // authorization failed
     if r.is_null() {
         mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-            common,
+            view.common,
             netsrc_t::NS_SERVER,
             sv.svs.challenges[i].adr,
             "print\nSomeone is using this CD Key\n".to_string(),
@@ -713,7 +658,7 @@ pub fn SV_AuthorizeIpPacket(
     } else {
         let r_str = unsafe { core::ffi::CStr::from_ptr(r) }.to_string_lossy();
         mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-            common,
+            view.common,
             netsrc_t::NS_SERVER,
             sv.svs.challenges[i].adr,
             format!("print\n{}\n", r_str),
@@ -732,16 +677,11 @@ pub fn SV_AuthorizeIpPacket(
 /// (sv_client.cpp:408-500 — XboxOnlineInfo player-list sync) is dead under the
 /// dedicated/non-XBOX build this workspace targets; not transcribed, matching
 /// the codebase's existing convention of dropping platform-ifdef'd dead code.
-pub fn SV_DirectConnect(
-    common: &mut Common,
-    sv: &mut Server,
-    host: &mut dyn EngineHost,
-    from: netadr_t,
-) {
+pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
     unsafe {
-        mp_engine_qcommon::common::common::com_printf(common, "SVC_DirectConnect ()\n");
+        mp_engine_qcommon::common::common::com_printf(view.common, "SVC_DirectConnect ()\n");
 
-        let userinfo_ptr = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1);
+        let userinfo_ptr = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1);
         let mut userinfo = [0 as c_char; mp_qshared::shared::limits::MAX_INFO_STRING as usize];
         Q_strncpyz(userinfo.as_mut_ptr(), userinfo_ptr, userinfo.len() as c_int);
 
@@ -751,7 +691,7 @@ pub fn SV_DirectConnect(
         ));
         if version != mp_engine_qcommon::qcommon::protocol::PROTOCOL_VERSION {
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                common,
+                view.common,
                 netsrc_t::NS_SERVER,
                 from,
                 format!(
@@ -760,7 +700,7 @@ pub fn SV_DirectConnect(
                 ),
             );
             mp_engine_qcommon::common::common::com_printf(
-                common,
+                view.common,
                 &format!("    rejected connect from version {}\n", version),
             );
             return;
@@ -775,7 +715,7 @@ pub fn SV_DirectConnect(
             c"qport".as_ptr() as *mut c_char,
         ));
 
-        let max_clients = (*common.sv_maxclients).integer;
+        let max_clients = (*view.common.sv_maxclients).integer;
 
         // quick reject
         let mut reconnect_cl: *mut client_t = core::ptr::null_mut();
@@ -784,7 +724,7 @@ pub fn SV_DirectConnect(
             while i < max_clients {
                 let cl = sv.svs.clients.offset(i as isize);
                 if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(
-                    common,
+                    view.common,
                     from,
                     (*cl).netchan.remoteAddress,
                 ) == qtrue
@@ -792,17 +732,17 @@ pub fn SV_DirectConnect(
                         || from.port == (*cl).netchan.remoteAddress.port)
                 {
                     if (sv.svs.time - (*cl).lastConnectTime)
-                        < ((*common.sv_reconnectlimit).integer * 1000)
+                        < ((*view.common.sv_reconnectlimit).integer * 1000)
                     {
                         mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                            common,
+                            view.common,
                             netsrc_t::NS_SERVER,
                             from,
                             "print\nReconnect rejected : too soon\n".to_string(),
                         );
-                        let adr = mp_engine_qcommon::net_chan::NET_AdrToString(common, from);
+                        let adr = mp_engine_qcommon::net_chan::NET_AdrToString(view.common, from);
                         mp_engine_qcommon::common::common::com_printf(
-                            common,
+                            view.common,
                             &format!(
                                 "{}:reconnect rejected : too soon\n",
                                 core::ffi::CStr::from_ptr(adr).to_string_lossy()
@@ -821,7 +761,7 @@ pub fn SV_DirectConnect(
             let mut i: usize = 0;
             while i < MAX_CHALLENGES {
                 if mp_engine_qcommon::net_chan::NET_CompareAdr(
-                    common,
+                    view.common,
                     from,
                     sv.svs.challenges[i].adr,
                 ) == qtrue
@@ -834,7 +774,7 @@ pub fn SV_DirectConnect(
             }
             if i == MAX_CHALLENGES {
                 mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                    common,
+                    view.common,
                     netsrc_t::NS_SERVER,
                     from,
                     "print\nNo or bad challenge for address.\n".to_string(),
@@ -845,73 +785,68 @@ pub fn SV_DirectConnect(
             Info_SetValueForKey(
                 userinfo.as_mut_ptr(),
                 c"ip".as_ptr() as *mut c_char,
-                mp_engine_qcommon::net_chan::NET_AdrToString(common, from) as *mut c_char,
+                mp_engine_qcommon::net_chan::NET_AdrToString(view.common, from) as *mut c_char,
             );
 
             let ping = sv.svs.time - sv.svs.challenges[i].pingTime;
             let conn_msg = mp_engine_qcommon::stringed::SE_GetString2(
-                common,
-                host,
+                view,
                 "MP_SVGAME",
                 "CLIENT_CONN_WITH_PING",
             )
             .replace("%i", &i.to_string())
             .replacen("%i", &ping.to_string(), 1);
-            mp_engine_qcommon::common::common::com_printf(common, &conn_msg);
+            mp_engine_qcommon::common::common::com_printf(view.common, &conn_msg);
             sv.svs.challenges[i].connected = qtrue;
 
             // never reject a LAN client based on ping
-            if !host.is_lan_address(&from) {
-                let min_ping = (*common.sv_minPing).value;
+            if !view.is_lan_address(&from) {
+                let min_ping = (*view.common.sv_minPing).value;
                 if min_ping != 0.0 && (ping as f32) < min_ping {
                     // don't let them keep trying until they get a big delay
                     let high_ping_msg = mp_engine_qcommon::stringed::SE_GetString2(
-                        common,
-                        host,
+                        view,
                         "MP_SVGAME",
                         "SERVER_FOR_HIGH_PING",
                     );
                     mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                        common,
+                        view.common,
                         netsrc_t::NS_SERVER,
                         from,
                         format!("print\n{}\n", high_ping_msg),
                     );
                     let rejected_msg = mp_engine_qcommon::stringed::SE_GetString2(
-                        common,
-                        host,
+                        view,
                         "MP_SVGAME",
                         "CLIENT_REJECTED_LOW_PING",
                     )
                     .replace("%i", &i.to_string());
-                    mp_engine_qcommon::common::common::com_printf(common, &rejected_msg);
+                    mp_engine_qcommon::common::common::com_printf(view.common, &rejected_msg);
                     // reset the address otherwise their ping will keep increasing
                     // with each connect message and they'd eventually be able to connect
                     sv.svs.challenges[i].adr.port = 0;
                     return;
                 }
-                let max_ping = (*common.sv_maxPing).value;
+                let max_ping = (*view.common.sv_maxPing).value;
                 if max_ping != 0.0 && (ping as f32) > max_ping {
                     let low_ping_msg = mp_engine_qcommon::stringed::SE_GetString2(
-                        common,
-                        host,
+                        view,
                         "MP_SVGAME",
                         "SERVER_FOR_LOW_PING",
                     );
                     mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                        common,
+                        view.common,
                         netsrc_t::NS_SERVER,
                         from,
                         format!("print\n{}\n", low_ping_msg),
                     );
                     let rejected_msg = mp_engine_qcommon::stringed::SE_GetString2(
-                        common,
-                        host,
+                        view,
                         "MP_SVGAME",
                         "CLIENT_REJECTED_HIGH_PING",
                     )
                     .replace("%i", &i.to_string());
-                    mp_engine_qcommon::common::common::com_printf(common, &rejected_msg);
+                    mp_engine_qcommon::common::common::com_printf(view.common, &rejected_msg);
                     return;
                 }
             }
@@ -939,16 +874,16 @@ pub fn SV_DirectConnect(
                     continue;
                 }
                 if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(
-                    common,
+                    view.common,
                     from,
                     (*cl).netchan.remoteAddress,
                 ) == qtrue
                     && ((*cl).netchan.qport == qport
                         || from.port == (*cl).netchan.remoteAddress.port)
                 {
-                    let adr = mp_engine_qcommon::net_chan::NET_AdrToString(common, from);
+                    let adr = mp_engine_qcommon::net_chan::NET_AdrToString(view.common, from);
                     mp_engine_qcommon::common::common::com_printf(
-                        common,
+                        view.common,
                         &format!(
                             "{}:reconnect\n",
                             core::ffi::CStr::from_ptr(adr).to_string_lossy()
@@ -962,10 +897,12 @@ pub fn SV_DirectConnect(
                     let cl_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
                         / core::mem::size_of::<client_t>() as isize)
                         as c_int;
-                    host.vm_call(
-                        mp_host_interface::VmSlot::Gvm,
+                    // Real `&mut Server` in scope — reach the game VM directly (rule 7).
+                    mp_engine_qcommon::vm::VM_Call(
+                        view.common,
+                        sv.gvm,
                         mp_abi::game::exports::MpGameExport::GAME_CLIENT_DISCONNECT as c_int,
-                        &[cl_num as isize],
+                        &[cl_num],
                     );
                     found = true;
                     break;
@@ -981,15 +918,12 @@ pub fn SV_DirectConnect(
                 // have "password" set to the value of "sv_privatePassword"
                 let password =
                     Info_ValueForKey(userinfo.as_mut_ptr(), c"password".as_ptr() as *mut c_char);
-                let start_index: c_int = if strcmp(
-                    password,
-                    (*common.sv_privatePassword).string,
-                ) == 0
-                {
-                    0
-                } else {
-                    (*common.sv_privateClients).integer
-                };
+                let start_index: c_int =
+                    if strcmp(password, (*view.common.sv_privatePassword).string) == 0 {
+                        0
+                    } else {
+                        (*view.common.sv_privateClients).integer
+                    };
 
                 let mut new_slot: *mut client_t = core::ptr::null_mut();
                 {
@@ -1019,7 +953,7 @@ pub fn SV_DirectConnect(
                         if count >= max_clients - start_index {
                             let last = sv.svs.clients.offset((max_clients - 1) as isize);
                             crate::SV_DropClient(
-                                common,
+                                view.common,
                                 sv,
                                 last,
                                 c"only bots on server".as_ptr() as *const c_char,
@@ -1033,20 +967,16 @@ pub fn SV_DirectConnect(
                         }
                     } else {
                         mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                            common,
+                            view.common,
                             netsrc_t::NS_SERVER,
                             from,
                             format!(
                                 "print\n{}\n",
-                                crate::SV_GetStringEdString_str(
-                                    sv,
-                                    "MP_SVGAME",
-                                    "SERVER_IS_FULL"
-                                )
+                                crate::SV_GetStringEdString_str(sv, "MP_SVGAME", "SERVER_IS_FULL")
                             ),
                         );
                         mp_engine_qcommon::common::common::com_printf(
-                            common,
+                            view.common,
                             "Rejected a connection.\n",
                         );
                         return;
@@ -1088,23 +1018,24 @@ pub fn SV_DirectConnect(
         );
 
         // get the game a chance to reject this connection or modify the userinfo
-        let denied = host.vm_call(
-            mp_host_interface::VmSlot::Gvm,
+        // Real `&mut Server` in scope — reach the game VM directly (rule 7).
+        let denied = mp_engine_qcommon::vm::VM_Call(
+            view.common,
+            sv.gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_CONNECT as c_int,
-            &[client_num as isize, qtrue as isize, qfalse as isize], // firstTime = qtrue
+            &[client_num, qtrue as c_int, qfalse as c_int], // firstTime = qtrue
         );
         if denied != 0 {
             // we can't just use VM_ArgPtr, because that is only valid inside a VM_Call
             //TODO: Port VM_ExplicitArgPtr
-            // Source: oracle/codemp/qcommon/vm.cpp — EngineHost has no VM
-            // shared-memory arg-ptr accessor yet (only vm_call's isize
-            // return); resolving the denied-connect reason string needs
-            // that seam, escalated rather than guessed.
+            // Source: oracle/codemp/qcommon/vm.cpp — the denied-connect reason
+            // string is resolved through the direct `VM_ExplicitArgPtr` call
+            // below (the game VM's shifted arg block), not an `EngineHost` seam.
             let denied_ptr =
-                mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr(common, sv.gvm, denied as c_int)
+                mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr(view.common, sv.gvm, denied)
                     as *const c_char;
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                common,
+                view.common,
                 netsrc_t::NS_SERVER,
                 from,
                 format!(
@@ -1113,7 +1044,7 @@ pub fn SV_DirectConnect(
                 ),
             );
             mp_engine_qcommon::common::common::com_printf(
-                common,
+                view.common,
                 &format!(
                     "Game rejected a connection: {}.\n",
                     core::ffi::CStr::from_ptr(denied_ptr).to_string_lossy()
@@ -1122,18 +1053,18 @@ pub fn SV_DirectConnect(
             return;
         }
 
-        SV_UserinfoChanged(common, host, cl_ptr);
+        SV_UserinfoChanged(view, cl_ptr);
 
         // send the connect packet to the client
         mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-            common,
+            view.common,
             netsrc_t::NS_SERVER,
             from,
             "connectResponse".to_string(),
         );
 
         mp_engine_qcommon::common::common::com_printf(
-            common,
+            view.common,
             &format!(
                 "Going from CS_FREE to CS_CONNECTED for {:?}\n",
                 (*cl_ptr).name
@@ -1177,15 +1108,7 @@ pub fn SV_DirectConnect(
 /// Raven `SV_SendClientGameState`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:697-817`
-pub fn SV_SendClientGameState(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
-    client: *mut client_t,
-) {
+pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client: *mut client_t) {
     unsafe {
         // MW - my attempt to fix illegible server message errors caused by
         // packet fragmentation of initial snapshot.
@@ -1195,27 +1118,21 @@ pub fn SV_SendClientGameState(
             // send additional message fragments if the last message
             // was too large to send at once
             mp_engine_qcommon::common::common::com_printf(
-                common,
+                view.common,
                 &format!(
                     "[ISM]SV_SendClientGameState() [2] for {:?}, writing out old fragments\n",
                     (*client).name
                 ),
             );
-            mp_engine_qcommon::net_chan::Netchan_TransmitNextFragment(
-                common,
-                cm,
-                rm,
-                host,
-                &mut (*client).netchan,
-            );
+            mp_engine_qcommon::net_chan::Netchan_TransmitNextFragment(view, &mut (*client).netchan);
         }
 
         mp_engine_qcommon::common::common::com_printf(
-            common,
+            view.common,
             &format!("SV_SendClientGameState() for {:?}\n", (*client).name),
         );
         mp_engine_qcommon::common::common::com_printf(
-            common,
+            view.common,
             &format!(
                 "Going from CS_CONNECTED to CS_PRIMED for {:?}\n",
                 (*client).name
@@ -1232,10 +1149,7 @@ pub fn SV_SendClientGameState(
         let mut msg_buffer = [0u8; mp_engine_qcommon::qcommon::net_limits::MAX_MSGLEN as usize];
         let mut msg: msg_t = core::mem::zeroed();
         mp_engine_qcommon::msg::MSG_Init(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             &mut msg,
             msg_buffer.as_mut_ptr(),
             msg_buffer.len() as c_int,
@@ -1243,30 +1157,30 @@ pub fn SV_SendClientGameState(
 
         // NOTE, MRE: all server->client messages now acknowledge
         // let the client know which reliable clientCommands we have received
-        mp_engine_qcommon::msg::MSG_WriteLong(common, &mut msg, (*client).lastClientCommand);
+        mp_engine_qcommon::msg::MSG_WriteLong(view.common, &mut msg, (*client).lastClientCommand);
 
         // send any server commands waiting to be sent first.
-        crate::SV_UpdateServerCommandsToClient(common, client, &mut msg);
+        crate::SV_UpdateServerCommandsToClient(view.common, client, &mut msg);
 
         // send the gamestate
         mp_engine_qcommon::msg::MSG_WriteByte(
-            common,
+            view.common,
             &mut msg,
             mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_gamestate as c_int,
         );
-        mp_engine_qcommon::msg::MSG_WriteLong(common, &mut msg, (*client).reliableSequence);
+        mp_engine_qcommon::msg::MSG_WriteLong(view.common, &mut msg, (*client).reliableSequence);
 
         // write the configstrings
         for start in 0..mp_qshared::shared::game_state::MAX_CONFIGSTRINGS {
             let cs = sv.sv.configstrings[start as usize];
             if !cs.is_null() && *cs != 0 {
                 mp_engine_qcommon::msg::MSG_WriteByte(
-                    common,
+                    view.common,
                     &mut msg,
                     mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_configstring as c_int,
                 );
-                mp_engine_qcommon::msg::MSG_WriteShort(common, &mut msg, start as c_int);
-                mp_engine_qcommon::msg::MSG_WriteBigString(common, &mut msg, cs);
+                mp_engine_qcommon::msg::MSG_WriteShort(view.common, &mut msg, start as c_int);
+                mp_engine_qcommon::msg::MSG_WriteBigString(view.common, &mut msg, cs);
             }
         }
 
@@ -1279,12 +1193,12 @@ pub fn SV_SendClientGameState(
                 continue;
             }
             mp_engine_qcommon::msg::MSG_WriteByte(
-                common,
+                view.common,
                 &mut msg,
                 mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_baseline as c_int,
             );
             mp_engine_qcommon::msg::MSG_WriteDeltaEntity(
-                common,
+                view.common,
                 &mut msg,
                 &mut nullstate,
                 base,
@@ -1293,23 +1207,28 @@ pub fn SV_SendClientGameState(
         }
 
         mp_engine_qcommon::msg::MSG_WriteByte(
-            common,
+            view.common,
             &mut msg,
             mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_EOF as c_int,
         );
 
         let client_num = ((client as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
-        mp_engine_qcommon::msg::MSG_WriteLong(common, &mut msg, client_num);
+        mp_engine_qcommon::msg::MSG_WriteLong(view.common, &mut msg, client_num);
 
         // write the checksum feed
-        mp_engine_qcommon::msg::MSG_WriteLong(common, &mut msg, sv.sv.checksumFeed);
+        mp_engine_qcommon::msg::MSG_WriteLong(view.common, &mut msg, sv.sv.checksumFeed);
 
         // rwwRMG - send info for the terrain
         // Raven's `if (TheRandomMissionManager)` NULL test → the `cm.land_scape`
         // Option presence (RmManager is a non-optional Engine field per ruling
         // 12; the landscape lives on the CollisionWorld per rmg-terrain RMG-D1).
-        if let Some(land) = cm.land_scape.as_ref() {
+        //
+        // `land` holds a shared borrow of `view.cm`; the MSG writes below reach
+        // only the disjoint `view.common` field. `land`'s last use is
+        // `get_rand_seed()`, so the `view.cm` borrow is released before the
+        // whole-`view` `SV_WriteRMGAutomapSymbols` call (NLL).
+        if let Some(land) = view.cm.land_scape.as_ref() {
             let mut heightmap = [0u8; 15000];
             let height_src = land.height_map().as_ptr();
             let real_area = land.real_area();
@@ -1318,10 +1237,10 @@ pub fn SV_SendClientGameState(
                 real_area,
                 &mut heightmap,
             );
-            mp_engine_qcommon::msg::MSG_WriteShort(common, &mut msg, total_out_h as c_int);
-            mp_engine_qcommon::msg::MSG_WriteBits(common, &mut msg, 1, 1);
+            mp_engine_qcommon::msg::MSG_WriteShort(view.common, &mut msg, total_out_h as c_int);
+            mp_engine_qcommon::msg::MSG_WriteBits(view.common, &mut msg, 1, 1);
             mp_engine_qcommon::msg::MSG_WriteData(
-                common,
+                view.common,
                 &mut msg,
                 heightmap.as_ptr() as *const (),
                 total_out_h as c_int,
@@ -1333,10 +1252,10 @@ pub fn SV_SendClientGameState(
                 real_area,
                 &mut heightmap,
             );
-            mp_engine_qcommon::msg::MSG_WriteShort(common, &mut msg, total_out_f as c_int);
-            mp_engine_qcommon::msg::MSG_WriteBits(common, &mut msg, 1, 1);
+            mp_engine_qcommon::msg::MSG_WriteShort(view.common, &mut msg, total_out_f as c_int);
+            mp_engine_qcommon::msg::MSG_WriteBits(view.common, &mut msg, 1, 1);
             mp_engine_qcommon::msg::MSG_WriteData(
-                common,
+                view.common,
                 &mut msg,
                 heightmap.as_ptr() as *const (),
                 total_out_f as c_int,
@@ -1344,34 +1263,27 @@ pub fn SV_SendClientGameState(
 
             // Seed is needed for misc ents and noise
             mp_engine_qcommon::msg::MSG_WriteLong(
-                common,
+                view.common,
                 &mut msg,
                 land.get_rand_seed() as c_int,
             );
 
-            SV_WriteRMGAutomapSymbols(common, rmg, host, &mut msg);
+            SV_WriteRMGAutomapSymbols(view, &mut msg);
         } else {
-            mp_engine_qcommon::msg::MSG_WriteShort(common, &mut msg, 0);
+            mp_engine_qcommon::msg::MSG_WriteShort(view.common, &mut msg, 0);
         }
 
         // deliver this to the client
-        crate::SV_SendMessageToClient(common, cm, sv, rm, host, &mut msg, client);
+        crate::SV_SendMessageToClient(view, sv, &mut msg, client);
     }
 }
 
 /// Raven `SV_VerifyPaks_f`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:1283-1433`
-pub fn SV_VerifyPaks_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    cl: *mut client_t,
-) {
+pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut client_t) {
     // _XBOX is not defined in this build — the whole body is live.
-    if unsafe { (*common.sv_pure).integer } == 0 {
+    if unsafe { (*view.common.sv_pure).integer } == 0 {
         return;
     }
 
@@ -1379,17 +1291,12 @@ pub fn SV_VerifyPaks_f(
     let mut n_chk_sum2: c_int = 0;
     let mut b_good;
 
-    if mp_engine_qcommon::cvar_fns::Cvar_VariableValue(
-        common,
-        cm,
-        rm,
-        host,
-        c"vm_cgame".as_ptr() as *const c_char,
-    ) != 0.0
+    if mp_engine_qcommon::cvar_fns::Cvar_VariableValue(view, c"vm_cgame".as_ptr() as *const c_char)
+        != 0.0
     {
         let mut cs1 = 0;
         b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
-            common,
+            view.common,
             c"vm/cgame.qvm".as_ptr() as *const c_char,
             &mut cs1,
         ) == 1;
@@ -1397,7 +1304,7 @@ pub fn SV_VerifyPaks_f(
     } else {
         let mut cs1 = 0;
         b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
-            common,
+            view.common,
             c"cgamex86.dll".as_ptr() as *const c_char,
             &mut cs1,
         ) == 1;
@@ -1405,17 +1312,12 @@ pub fn SV_VerifyPaks_f(
     }
 
     if b_good {
-        if mp_engine_qcommon::cvar_fns::Cvar_VariableValue(
-            common,
-            cm,
-            rm,
-            host,
-            c"vm_ui".as_ptr() as *const c_char,
-        ) != 0.0
+        if mp_engine_qcommon::cvar_fns::Cvar_VariableValue(view, c"vm_ui".as_ptr() as *const c_char)
+            != 0.0
         {
             let mut cs2 = 0;
             b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
-                common,
+                view.common,
                 c"vm/ui.qvm".as_ptr() as *const c_char,
                 &mut cs2,
             ) == 1;
@@ -1423,7 +1325,7 @@ pub fn SV_VerifyPaks_f(
         } else {
             let mut cs2 = 0;
             b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
-                common,
+                view.common,
                 c"uix86.dll".as_ptr() as *const c_char,
                 &mut cs2,
             ) == 1;
@@ -1431,7 +1333,7 @@ pub fn SV_VerifyPaks_f(
         }
     }
 
-    let mut n_client_paks = mp_engine_qcommon::cmd_common::Cmd_Argc(common);
+    let mut n_client_paks = mp_engine_qcommon::cmd_common::Cmd_Argc(view.common);
     // start at arg 1 (skip cl_paks)
     let mut n_cur_arg: c_int = 1;
 
@@ -1446,7 +1348,7 @@ pub fn SV_VerifyPaks_f(
             break;
         }
         // verify first to be the cgame checksum
-        let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(common, n_cur_arg);
+        let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, n_cur_arg);
         n_cur_arg += 1;
         if p_arg.is_null()
             || unsafe { *p_arg } == b'@' as c_char
@@ -1456,7 +1358,7 @@ pub fn SV_VerifyPaks_f(
             break;
         }
         // verify the second to be the ui checksum
-        let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(common, n_cur_arg);
+        let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, n_cur_arg);
         n_cur_arg += 1;
         if p_arg.is_null()
             || unsafe { *p_arg } == b'@' as c_char
@@ -1466,7 +1368,7 @@ pub fn SV_VerifyPaks_f(
             break;
         }
         // should be sitting at the delimeter now
-        let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(common, n_cur_arg);
+        let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, n_cur_arg);
         n_cur_arg += 1;
         if unsafe { *p_arg } != b'@' as c_char {
             b_good = false;
@@ -1475,8 +1377,12 @@ pub fn SV_VerifyPaks_f(
         // store checksums since tokenization is not re-entrant
         let mut i: usize = 0;
         while n_cur_arg < n_client_paks {
-            n_client_chk_sum[i] =
-                unsafe { atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(common, n_cur_arg)) };
+            n_client_chk_sum[i] = unsafe {
+                atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(
+                    view.common,
+                    n_cur_arg,
+                ))
+            };
             n_cur_arg += 1;
             i += 1;
         }
@@ -1507,9 +1413,9 @@ pub fn SV_VerifyPaks_f(
         }
 
         // get the pure checksums of the pk3 files loaded by the server
-        let p_paks = mp_engine_qcommon::files_pc::FS_LoadedPakPureChecksums(common);
-        mp_engine_qcommon::cmd_common::Cmd_TokenizeString(common, p_paks);
-        let mut n_server_paks = mp_engine_qcommon::cmd_common::Cmd_Argc(common);
+        let p_paks = mp_engine_qcommon::files_pc::FS_LoadedPakPureChecksums(view.common);
+        mp_engine_qcommon::cmd_common::Cmd_TokenizeString(view.common, p_paks);
+        let mut n_server_paks = mp_engine_qcommon::cmd_common::Cmd_Argc(view.common);
         if n_server_paks > 1024 {
             n_server_paks = 1024;
         }
@@ -1517,7 +1423,7 @@ pub fn SV_VerifyPaks_f(
         let mut i: c_int = 0;
         while i < n_server_paks {
             n_server_chk_sum[i as usize] =
-                unsafe { atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(common, i)) };
+                unsafe { atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, i)) };
             i += 1;
         }
 
@@ -1570,9 +1476,9 @@ pub fn SV_VerifyPaks_f(
             (*cl).nextSnapshotTime = -1;
             (*cl).state = clientState_t::CS_ACTIVE;
         }
-        crate::SV_SendClientSnapshot(common, cm, sv, rm, host, cl);
+        crate::SV_SendClientSnapshot(view, sv, cl);
         crate::SV_DropClient(
-            common,
+            view.common,
             sv,
             cl,
             c"Unpure client detected. Invalid .PK3 files referenced!".as_ptr() as *const c_char,
@@ -1583,41 +1489,29 @@ pub fn SV_VerifyPaks_f(
 /// Raven `SV_DoneDownload_f`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:1029-1033`
-pub fn SV_DoneDownload_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
-    cl: *mut client_t,
-) {
+pub fn SV_DoneDownload_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut client_t) {
     unsafe {
         mp_engine_qcommon::common::common::com_printf(
-            common,
+            view.common,
             &format!("clientDownload: {:?} Done\n", (*cl).name),
         );
     }
     // resend the game state to update any clients that entered during the download
-    SV_SendClientGameState(common, cm, sv, rm, rmg, host, cl);
+    SV_SendClientGameState(view, sv, cl);
 }
 
 /// Raven `SV_ClientCommand`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:1590-1639`
 pub fn SV_ClientCommand(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
     cl: *mut client_t,
     msg: *mut msg_t,
 ) -> qboolean {
     unsafe {
-        let seq = mp_engine_qcommon::msg::MSG_ReadLong(common, msg);
-        let s = mp_engine_qcommon::msg::MSG_ReadString(common, msg);
+        let seq = mp_engine_qcommon::msg::MSG_ReadLong(view.common, msg);
+        let s = mp_engine_qcommon::msg::MSG_ReadString(view.common, msg);
         let mut client_ok = qtrue;
 
         // see if we have already executed it
@@ -1626,7 +1520,7 @@ pub fn SV_ClientCommand(
         }
 
         mp_engine_qcommon::common::common::com_printf(
-            common,
+            view.common,
             &format!(
                 "clientCommand: {:?} : {} : {:?}\n",
                 (*cl).name,
@@ -1638,7 +1532,7 @@ pub fn SV_ClientCommand(
         // drop the connection if we have somehow lost commands
         if seq > (*cl).lastClientCommand + 1 {
             mp_engine_qcommon::common::common::com_printf(
-                common,
+                view.common,
                 &format!(
                     "Client {:?} lost {} clientCommands\n",
                     (*cl).name,
@@ -1646,7 +1540,7 @@ pub fn SV_ClientCommand(
                 ),
             );
             crate::SV_DropClient(
-                common,
+                view.common,
                 sv,
                 cl,
                 c"Lost reliable commands".as_ptr() as *const c_char,
@@ -1661,15 +1555,15 @@ pub fn SV_ClientCommand(
         // but not other people
         // We don't do this when the client hasn't been active yet since its
         // normal to spam a lot of commands when downloading
-        if (*common.com_cl_running).integer == 0
+        if (*view.common.com_cl_running).integer == 0
             && (*cl).state as c_int >= clientState_t::CS_ACTIVE as c_int
-            && (*common.sv_floodProtect).integer != 0
+            && (*view.common.sv_floodProtect).integer != 0
             && sv.svs.time < (*cl).nextReliableTime
         {
             // ignore any other text messages from this client but let them keep playing
             client_ok = qfalse;
             mp_engine_qcommon::common::common::com_printf(
-                common,
+                view.common,
                 &format!("client text ignored for {:?}\n", (*cl).name),
             );
         }
@@ -1677,7 +1571,7 @@ pub fn SV_ClientCommand(
         // don't allow another command for one second
         (*cl).nextReliableTime = sv.svs.time + 1000;
 
-        SV_ExecuteClientCommand(common, cm, sv, rm, rmg, host, cl, s, client_ok);
+        SV_ExecuteClientCommand(view, sv, cl, s, client_ok);
 
         (*cl).lastClientCommand = seq;
         let s_str = core::ffi::CStr::from_ptr(s).to_string_lossy();
@@ -1750,7 +1644,8 @@ pub fn SV_UserMove(
 
         // save time for ping calculation
         let pmask_idx = ((*cl).messageAcknowledge
-            & mp_engine_qcommon::qcommon::net_limits::PACKET_MASK as c_int) as usize;
+            & mp_engine_qcommon::qcommon::net_limits::PACKET_MASK as c_int)
+            as usize;
         (*cl).frames[pmask_idx].messageAcked = sv.svs.time;
 
         // if this is the first usercmd we have received
@@ -1802,20 +1697,16 @@ pub fn SV_UserMove(
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:1773-1854`
 pub fn SV_ExecuteClientMessage(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
     cl: *mut client_t,
     msg: *mut msg_t,
 ) {
     unsafe {
         mp_engine_qcommon::msg::MSG_Bitstream(msg);
 
-        let server_id = mp_engine_qcommon::msg::MSG_ReadLong(common, msg);
-        (*cl).messageAcknowledge = mp_engine_qcommon::msg::MSG_ReadLong(common, msg);
+        let server_id = mp_engine_qcommon::msg::MSG_ReadLong(view.common, msg);
+        (*cl).messageAcknowledge = mp_engine_qcommon::msg::MSG_ReadLong(view.common, msg);
 
         if (*cl).messageAcknowledge < 0 {
             // usually only hackers create messages like this
@@ -1824,7 +1715,7 @@ pub fn SV_ExecuteClientMessage(
             return;
         }
 
-        (*cl).reliableAcknowledge = mp_engine_qcommon::msg::MSG_ReadLong(common, msg);
+        (*cl).reliableAcknowledge = mp_engine_qcommon::msg::MSG_ReadLong(view.common, msg);
 
         // NOTE: when the client message is fux0red the acknowledgement numbers
         // can be out of range, this could cause the server to send thousands of server
@@ -1858,10 +1749,10 @@ pub fn SV_ExecuteClientMessage(
             // gamestate we sent them, resend it
             if (*cl).messageAcknowledge > (*cl).gamestateMessageNum {
                 mp_engine_qcommon::common::common::com_printf(
-                    common,
+                    view.common,
                     &format!("{:?} : dropped gamestate, resending\n", (*cl).name),
                 );
-                SV_SendClientGameState(common, cm, sv, rm, rmg, host, cl);
+                SV_SendClientGameState(view, sv, cl);
             }
             return;
         }
@@ -1869,14 +1760,14 @@ pub fn SV_ExecuteClientMessage(
         // read optional clientCommand strings
         let mut c: c_int;
         loop {
-            c = mp_engine_qcommon::msg::MSG_ReadByte(common, msg);
+            c = mp_engine_qcommon::msg::MSG_ReadByte(view.common, msg);
             if c == mp_engine_qcommon::qcommon::clc_ops_e::clc_ops_e::clc_EOF as c_int {
                 break;
             }
             if c != mp_engine_qcommon::qcommon::clc_ops_e::clc_ops_e::clc_clientCommand as c_int {
                 break;
             }
-            if SV_ClientCommand(common, cm, sv, rm, rmg, host, cl, msg) == qfalse {
+            if SV_ClientCommand(view, sv, cl, msg) == qfalse {
                 return; // we couldn't execute it because of the flood protection
             }
             if (*cl).state == clientState_t::CS_ZOMBIE {
@@ -1886,14 +1777,14 @@ pub fn SV_ExecuteClientMessage(
 
         // read the usercmd_t
         if c == mp_engine_qcommon::qcommon::clc_ops_e::clc_ops_e::clc_move as c_int {
-            SV_UserMove(common, sv, cl, msg, qtrue);
+            SV_UserMove(view.common, sv, cl, msg, qtrue);
         } else if c == mp_engine_qcommon::qcommon::clc_ops_e::clc_ops_e::clc_moveNoDelta as c_int {
-            SV_UserMove(common, sv, cl, msg, qfalse);
+            SV_UserMove(view.common, sv, cl, msg, qfalse);
         } else if c != mp_engine_qcommon::qcommon::clc_ops_e::clc_ops_e::clc_EOF as c_int {
             let client_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
                 / core::mem::size_of::<client_t>() as isize) as c_int;
             mp_engine_qcommon::common::common::com_printf(
-                common,
+                view.common,
                 &format!("WARNING: bad command byte for client {}\n", client_num),
             );
         }
@@ -1949,7 +1840,10 @@ pub fn SV_DropClient(
             &format!("print \"{}^7 {}\n\"", name, reason_str),
         );
 
-        mp_engine_qcommon::common_fns::Com_DPrintf(common, &format!("Going to CS_ZOMBIE for {}\n", name));
+        mp_engine_qcommon::common_fns::Com_DPrintf(
+            common,
+            &format!("Going to CS_ZOMBIE for {}\n", name),
+        );
         (*drop).state = clientState_t::CS_ZOMBIE; // become free in a few seconds
 
         if (*drop).download != 0 {
@@ -2019,11 +1913,8 @@ pub fn SV_CloseDownload(common: &mut Common, cl: *mut client_t) {
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:1090-1253`
 pub fn SV_WriteDownloadToClient(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
     cl: *mut client_t,
     msg: *mut msg_t,
 ) {
@@ -2038,7 +1929,7 @@ pub fn SV_WriteDownloadToClient(
         if (*cl).download == 0 {
             // We open the file here
             mp_engine_qcommon::common::common::com_printf(
-                common,
+                view.common,
                 &format!(
                     "clientDownload: {} : begining \"{}\"\n",
                     client_index,
@@ -2057,11 +1948,11 @@ pub fn SV_WriteDownloadToClient(
                 ) != qfalse;
 
             let mut downloadOpenFailed = false;
-            if (*common.sv_allowDownload).integer == 0 || idPack {
+            if (*view.common.sv_allowDownload).integer == 0 || idPack {
                 downloadOpenFailed = true;
             } else {
                 (*cl).downloadSize = mp_engine_qcommon::files_common::FS_SV_FOpenFileRead(
-                    common,
+                    view.common,
                     (*cl).downloadName.as_ptr(),
                     &mut (*cl).download,
                 );
@@ -2075,11 +1966,12 @@ pub fn SV_WriteDownloadToClient(
                 let mut errorMessage: [c_char; 1024] = [0; 1024];
                 if idPack {
                     mp_engine_qcommon::common::common::com_printf(
-                        common,
+                        view.common,
                         &format!(
                             "clientDownload: {} : \"{}\" cannot download id pk3 files\n",
                             client_index,
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                                .to_string_lossy()
                         ),
                     );
                     if missionPack != qfalse {
@@ -2097,20 +1989,22 @@ pub fn SV_WriteDownloadToClient(
                             errorMessage.len() as c_int,
                             &format!(
                                 "Cannot autodownload id pk3 file \"{}\"",
-                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                                    .to_string_lossy()
                             ),
                         );
                     }
-                } else if (*common.sv_allowDownload).integer == 0 {
+                } else if (*view.common.sv_allowDownload).integer == 0 {
                     mp_engine_qcommon::common::common::com_printf(
-                        common,
+                        view.common,
                         &format!(
                             "clientDownload: {} : \"{}\" download disabled",
                             client_index,
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                                .to_string_lossy()
                         ),
                     );
-                    if (*common.sv_pure).integer != 0 {
+                    if (*view.common.sv_pure).integer != 0 {
                         Com_sprintf(
                             errorMessage.as_mut_ptr(),
                             errorMessage.len() as c_int,
@@ -2131,11 +2025,12 @@ pub fn SV_WriteDownloadToClient(
                     }
                 } else {
                     mp_engine_qcommon::common::common::com_printf(
-                        common,
+                        view.common,
                         &format!(
                             "clientDownload: {} : \"{}\" file not found on server\n",
                             client_index,
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                                .to_string_lossy()
                         ),
                     );
                     Com_sprintf(
@@ -2143,18 +2038,19 @@ pub fn SV_WriteDownloadToClient(
                         errorMessage.len() as c_int,
                         &format!(
                             "File \"{}\" not found on server for autodownloading.\n",
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                                .to_string_lossy()
                         ),
                     );
                 }
                 mp_engine_qcommon::msg::MSG_WriteByte(
-                    common,
+                    view.common,
                     msg,
                     mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_download as c_int,
                 );
-                mp_engine_qcommon::msg::MSG_WriteShort(common, msg, 0); // client is expecting block zero
-                mp_engine_qcommon::msg::MSG_WriteLong(common, msg, -1); // illegal file size
-                mp_engine_qcommon::msg::MSG_WriteString(common, msg, errorMessage.as_ptr());
+                mp_engine_qcommon::msg::MSG_WriteShort(view.common, msg, 0); // client is expecting block zero
+                mp_engine_qcommon::msg::MSG_WriteLong(view.common, msg, -1); // illegal file size
+                mp_engine_qcommon::msg::MSG_WriteString(view.common, msg, errorMessage.as_ptr());
 
                 (*cl).downloadName[0] = 0;
                 return;
@@ -2176,10 +2072,7 @@ pub fn SV_WriteDownloadToClient(
 
             if (*cl).downloadBlocks[curindex].is_null() {
                 (*cl).downloadBlocks[curindex] = mp_engine_qcommon::z_memman_pc::Z_Malloc(
-                    common,
-                    cm,
-                    rm,
-                    host,
+                    view,
                     MAX_DOWNLOAD_BLKSIZE as c_int,
                     mp_qshared::common::mp::qcommon::tags::memtag_t::TAG_DOWNLOAD,
                     qtrue,
@@ -2188,7 +2081,7 @@ pub fn SV_WriteDownloadToClient(
             }
 
             (*cl).downloadBlockSize[curindex] = mp_engine_qcommon::files_common::FS_Read(
-                common,
+                view.common,
                 (*cl).downloadBlocks[curindex] as *mut (),
                 MAX_DOWNLOAD_BLKSIZE as c_int,
                 (*cl).download,
@@ -2224,19 +2117,16 @@ pub fn SV_WriteDownloadToClient(
         // based on the rate, how many bytes can we fit in the snapMsec time of the client
         // normal rate / snapshotMsec calculation
         let mut rate = (*cl).rate;
-        if (*common.sv_maxRate).integer != 0 {
-            if (*common.sv_maxRate).integer < 1000 {
+        if (*view.common.sv_maxRate).integer != 0 {
+            if (*view.common.sv_maxRate).integer < 1000 {
                 mp_engine_qcommon::cvar_fns::Cvar_Set(
-                    common,
-                    cm,
-                    rm,
-                    host,
+                    view,
                     c"sv_MaxRate".as_ptr(),
                     c"1000".as_ptr(),
                 );
             }
-            if (*common.sv_maxRate).integer < rate {
-                rate = (*common.sv_maxRate).integer;
+            if (*view.common.sv_maxRate).integer < rate {
+                rate = (*view.common.sv_maxRate).integer;
             }
         }
 
@@ -2274,23 +2164,27 @@ pub fn SV_WriteDownloadToClient(
             let curindex = ((*cl).downloadXmitBlock % MAX_DOWNLOAD_WINDOW as c_int) as usize;
 
             mp_engine_qcommon::msg::MSG_WriteByte(
-                common,
+                view.common,
                 msg,
                 mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_download as c_int,
             );
-            mp_engine_qcommon::msg::MSG_WriteShort(common, msg, (*cl).downloadXmitBlock);
+            mp_engine_qcommon::msg::MSG_WriteShort(view.common, msg, (*cl).downloadXmitBlock);
 
             // block zero is special, contains file size
             if (*cl).downloadXmitBlock == 0 {
-                mp_engine_qcommon::msg::MSG_WriteLong(common, msg, (*cl).downloadSize);
+                mp_engine_qcommon::msg::MSG_WriteLong(view.common, msg, (*cl).downloadSize);
             }
 
-            mp_engine_qcommon::msg::MSG_WriteShort(common, msg, (*cl).downloadBlockSize[curindex]);
+            mp_engine_qcommon::msg::MSG_WriteShort(
+                view.common,
+                msg,
+                (*cl).downloadBlockSize[curindex],
+            );
 
             // Write the block
             if (*cl).downloadBlockSize[curindex] != 0 {
                 mp_engine_qcommon::msg::MSG_WriteData(
-                    common,
+                    view.common,
                     msg,
                     (*cl).downloadBlocks[curindex] as *const (),
                     (*cl).downloadBlockSize[curindex],
@@ -2298,7 +2192,7 @@ pub fn SV_WriteDownloadToClient(
             }
 
             mp_engine_qcommon::common_fns::Com_DPrintf(
-                common,
+                view.common,
                 &format!(
                     "clientDownload: {} : writing block {}\n",
                     client_index,

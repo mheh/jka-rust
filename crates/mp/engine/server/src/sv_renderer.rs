@@ -18,8 +18,8 @@ use core::ffi::c_char;
 use mp_qshared::shared::force_reload::ForceReload_e;
 use mp_qshared::shared::{qboolean, qhandle_t};
 
-use mp_engine_qcommon::cm_load::RenderModels;
-use mp_host_interface::engine_host::EngineHost;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
+use mp_engine_renderer::tr_model::render_models::RenderModels as RealRenderModels;
 
 use crate::server_host::rm_from_slot;
 
@@ -31,10 +31,10 @@ use crate::server_host::rm_from_slot;
 ///
 /// Source: `oracle/codemp/renderer/tr_model.cpp:1655-1657` (`R_SVModelInit`);
 /// body `:1662-1679` (`R_ModelInit`).
-pub fn R_SVModelInit(rm: &mut RenderModels, _host: &mut dyn EngineHost) {
-    // SAFETY: `rm` is the `cm_load::RenderModels` slot armed by the caller from
-    // the live `Engine.render_models`; `rm_from_slot`'s contract holds.
-    let rm = unsafe { rm_from_slot(rm) };
+pub fn R_SVModelInit(view: &mut EngineHostView) {
+    // SAFETY: `view.rm` is the `cm_load::RenderModels` slot armed by the caller
+    // from the live `Engine.render_models`; `rm_from_slot`'s contract holds.
+    let rm = unsafe { rm_from_slot(&mut view.rm) };
     rm.model_init();
 }
 
@@ -47,20 +47,21 @@ pub fn R_SVModelInit(rm: &mut RenderModels, _host: &mut dyn EngineHost) {
 ///
 /// Source: `oracle/codemp/renderer/tr_model.cpp:522-566`.
 pub fn RE_RegisterMedia_LevelLoadBegin(
-    rm: &mut RenderModels,
-    mut host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     ps_map_name: *mut c_char,
     e_force_reload: ForceReload_e,
 ) {
-    // SAFETY: as `R_SVModelInit`.
-    let rm = unsafe { rm_from_slot(rm) };
+    // SAFETY: view-constructor slot, single-threaded, no other live cast of
+    // this slot for the borrow's duration (`view.rm` casts back to the live
+    // `Engine.render_models`).
+    let rm = unsafe { &mut *(view.rm.as_raw() as *mut RealRenderModels) };
     // Raven's `const char *psMapName` is a NUL-terminated map name.
     let map_name = unsafe {
         core::ffi::CStr::from_ptr(ps_map_name)
             .to_str()
             .unwrap_or("")
     };
-    rm.media_level_load_begin(&mut host, map_name, e_force_reload);
+    rm.media_level_load_begin(view, map_name, e_force_reload);
 }
 
 /// Raven `R_InitShaders(qboolean server)`. On the WinDed DEDICATED build the
@@ -74,7 +75,7 @@ pub fn RE_RegisterMedia_LevelLoadBegin(
 /// entry; the rest of `tr_shader.cpp` stays §20-dropped.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:4265-4280`.
-pub fn R_InitShaders(_rm: &mut RenderModels, _host: &mut dyn EngineHost, _server: qboolean) {
+pub fn R_InitShaders(_view: &mut EngineHostView, _server: qboolean) {
     // `Com_Memset(hashTable, 0)` — covered by `init_skins`'s pool reset (see
     // doc comment); `deferLoad = qfalse` is a §20-dropped client static.
 }
@@ -84,9 +85,9 @@ pub fn R_InitShaders(_rm: &mut RenderModels, _host: &mut dyn EngineHost, _server
 /// (user ruling 2026-07-12, amending `tr-model.md`).
 ///
 /// Source: `oracle/codemp/renderer/tr_image.cpp:3324-3334`.
-pub fn R_InitSkins(rm: &mut RenderModels, _host: &mut dyn EngineHost) {
+pub fn R_InitSkins(view: &mut EngineHostView) {
     // SAFETY: as `R_SVModelInit`.
-    let rm = unsafe { rm_from_slot(rm) };
+    let rm = unsafe { rm_from_slot(&mut view.rm) };
     rm.init_skins();
 }
 
@@ -96,12 +97,9 @@ pub fn R_InitSkins(rm: &mut RenderModels, _host: &mut dyn EngineHost) {
 /// 2026-07-12, server skins name-pool).
 ///
 /// Source: `oracle/codemp/renderer/tr_image.cpp:3301-3318`.
-pub fn RE_RegisterServerSkin(
-    rm: &mut RenderModels,
-    mut host: &mut dyn EngineHost,
-    name: &str,
-) -> qhandle_t {
-    // SAFETY: as `R_SVModelInit`.
-    let rm = unsafe { rm_from_slot(rm) };
-    rm.register_server_skin(&mut host, name)
+pub fn RE_RegisterServerSkin(view: &mut EngineHostView, name: &str) -> qhandle_t {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast of
+    // this slot for the borrow's duration.
+    let rm = unsafe { &mut *(view.rm.as_raw() as *mut RealRenderModels) };
+    rm.register_server_skin(view, name)
 }

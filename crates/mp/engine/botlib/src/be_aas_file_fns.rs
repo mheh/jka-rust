@@ -334,8 +334,11 @@ pub fn AAS_LoadAASLump(
                 PRT_WARNING,
                 c"AAS file not sequentially read\n".as_ptr() as *mut c_char,
             );
-            if (bot.botimport.FS_Seek.unwrap())(fp, offset as c_long, fsOrigin_t::FS_SEEK_SET as c_int)
-                != 0
+            if (bot.botimport.FS_Seek.unwrap())(
+                fp,
+                offset as c_long,
+                fsOrigin_t::FS_SEEK_SET as c_int,
+            ) != 0
             {
                 AAS_Error(bot, c"can't seek to aas lump\n".as_ptr() as *mut c_char);
                 AAS_DumpAASData(bot);
@@ -425,8 +428,10 @@ pub fn AAS_LoadAASFile(bot: &mut BotLib, filename: *mut c_char) -> c_int {
             );
         }
         //
-        bot.aasworld.bspchecksum =
-            libc::atoi(LibVarGetString(bot, c"sv_mapChecksum".as_ptr() as *mut c_char));
+        bot.aasworld.bspchecksum = libc::atoi(LibVarGetString(
+            bot,
+            c"sv_mapChecksum".as_ptr() as *mut c_char,
+        ));
         if LittleLong(header.bspchecksum) != bot.aasworld.bspchecksum {
             let msg = std::ffi::CString::new(format!(
                 "aas file {} is out of date\n",
@@ -569,8 +574,7 @@ pub fn AAS_LoadAASFile(bot: &mut BotLib, filename: *mut c_char) -> c_int {
             &mut lastoffset,
             core::mem::size_of::<aas_areasettings_t>() as c_int,
         ) as *mut aas_areasettings_t;
-        bot.aasworld.numareasettings =
-            length / core::mem::size_of::<aas_areasettings_t>() as c_int;
+        bot.aasworld.numareasettings = length / core::mem::size_of::<aas_areasettings_t>() as c_int;
         if bot.aasworld.numareasettings != 0 && bot.aasworld.areasettings.is_null() {
             return BLERR_CANNOTREADAASLUMP;
         }
@@ -631,8 +635,7 @@ pub fn AAS_LoadAASFile(bot: &mut BotLib, filename: *mut c_char) -> c_int {
             &mut lastoffset,
             core::mem::size_of::<aas_portalindex_t>() as c_int,
         ) as *mut aas_portalindex_t;
-        bot.aasworld.portalindexsize =
-            length / core::mem::size_of::<aas_portalindex_t>() as c_int;
+        bot.aasworld.portalindexsize = length / core::mem::size_of::<aas_portalindex_t>() as c_int;
         if bot.aasworld.portalindexsize != 0 && bot.aasworld.portalindex.is_null() {
             return BLERR_CANNOTREADAASLUMP;
         }

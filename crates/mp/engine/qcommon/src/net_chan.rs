@@ -14,9 +14,9 @@ use mp_qshared::common::mp::qcommon::netsrc_t::netsrc_t;
 use mp_qshared::shared::limits::MAX_STRING_CHARS;
 use mp_qshared::shared::{errorParm_t, qboolean, qfalse, qtrue};
 
-use crate::collision_world::CollisionWorld;
 use crate::common::com_error;
 use crate::common::common::Common;
+use crate::common::engine_host_view::EngineHostView;
 use crate::msg::{MSG_InitOOB, MSG_WriteData, MSG_WriteLong, MSG_WriteShort};
 use crate::qcommon::net_chan_cpp_consts::{
     FRAGMENT_BIT, FRAGMENT_SIZE, MAX_LOOPBACK, MAX_PACKETLEN,
@@ -24,12 +24,6 @@ use crate::qcommon::net_chan_cpp_consts::{
 use crate::qcommon::net_limits::MAX_MSGLEN;
 use crate::qcommon::netchan_t::netchan_t;
 use crate::qcommon::protocol::PORT_SERVER;
-
-use mp_host_interface::engine_host::EngineHost;
-
-// `RenderModels` here is a local placeholder: `mp_renderer` depends on this crate, so importing the real type would cycle (matches cm_load.rs's precedent).
-#[allow(dead_code)]
-use crate::cm_load::RenderModels;
 
 /// Raven `CVAR_INIT`.
 /// Source: `oracle/codemp/game/q_shared.h:1788`
@@ -286,45 +280,28 @@ pub fn NET_StringToAdr(s: *const c_char, a: *mut netadr_t) -> qboolean {
 /// Raven `Netchan_Init`.
 ///
 /// Source: `oracle/codemp/qcommon/net_chan.cpp:56-62`
-pub fn Netchan_Init(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    port: c_int,
-) {
+pub fn Netchan_Init(view: &mut EngineHostView, port: c_int) {
     let port = port & 0xffff;
 
     unsafe {
         // `->integer` is cached into a plain `i32` field once here, not re-read live like Raven's `cvar_t*` — a runtime `/set` won't be reflected after init.
-        let showpackets_cvar = Cvar_Get(common, cm, rm, host, c"showpackets".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
-        common.showpackets = (*showpackets_cvar).integer;
+        let showpackets_cvar = Cvar_Get(view, c"showpackets".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
+        view.common.showpackets = (*showpackets_cvar).integer;
 
-        let showdrop_cvar = Cvar_Get(common, cm, rm, host, c"showdrop".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
-        common.showdrop = (*showdrop_cvar).integer;
+        let showdrop_cvar = Cvar_Get(view, c"showdrop".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
+        view.common.showdrop = (*showdrop_cvar).integer;
 
         let qport_val = std::ffi::CString::new(format!("{port}")).unwrap();
-        let qport_cvar = Cvar_Get(
-            common,
-            cm,
-            rm,
-            host,
-            c"net_qport".as_ptr(),
-            qport_val.as_ptr(),
-            CVAR_INIT,
-        );
-        common.net_qport = (*qport_cvar).integer;
+        let qport_cvar = Cvar_Get(view, c"net_qport".as_ptr(), qport_val.as_ptr(), CVAR_INIT);
+        view.common.net_qport = (*qport_cvar).integer;
 
         let killdropped_cvar = Cvar_Get(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             c"net_killdroppedfragments".as_ptr(),
             c"0".as_ptr(),
             CVAR_TEMP,
         );
-        common.net_killdroppedfragments = (*killdropped_cvar).integer;
+        view.common.net_killdroppedfragments = (*killdropped_cvar).integer;
     }
 }
 
@@ -442,7 +419,13 @@ pub fn NET_OutOfBandPrint(common: &mut Common, sock: netsrc_t, adr: netadr_t, s:
     let len = 4 + bytes.len();
 
     // send the datagram
-    NET_SendPacket(common, sock, len as c_int, string.as_ptr() as *const (), adr);
+    NET_SendPacket(
+        common,
+        sock,
+        len as c_int,
+        string.as_ptr() as *const (),
+        adr,
+    );
 }
 
 /// Raven `NET_OutOfBandData`.
@@ -495,26 +478,29 @@ pub fn NET_OutOfBandData(
 /// is cached on `Common` (`net_qport`); `showpackets->integer` likewise.
 ///
 /// Source: `oracle/codemp/qcommon/net_chan.cpp:80-134`
-pub fn Netchan_TransmitNextFragment(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    chan: *mut netchan_t,
-) {
+pub fn Netchan_TransmitNextFragment(view: &mut EngineHostView, chan: *mut netchan_t) {
     unsafe {
         let mut send_buf = [0u8; MAX_PACKETLEN as usize];
         let mut send: msg_t = core::mem::zeroed();
 
         // write the packet header
-        MSG_InitOOB(common, cm, rm, host, &mut send, send_buf.as_mut_ptr(), send_buf.len() as c_int); // <-- only do the oob here
+        MSG_InitOOB(
+            view,
+            &mut send,
+            send_buf.as_mut_ptr(),
+            send_buf.len() as c_int,
+        ); // <-- only do the oob here
 
-        MSG_WriteLong(common, &mut send, (*chan).outgoingSequence | FRAGMENT_BIT);
+        MSG_WriteLong(
+            view.common,
+            &mut send,
+            (*chan).outgoingSequence | FRAGMENT_BIT,
+        );
 
         // send the qport if we are a client
         if matches!((*chan).sock, netsrc_t::NS_CLIENT) {
-            let qport = common.net_qport;
-            MSG_WriteShort(common, &mut send, qport);
+            let qport = view.common.net_qport;
+            MSG_WriteShort(view.common, &mut send, qport);
         }
 
         // copy the reliable message to the packet first
@@ -523,27 +509,30 @@ pub fn Netchan_TransmitNextFragment(
             fragmentLength = (*chan).unsentLength - (*chan).unsentFragmentStart;
         }
 
-        MSG_WriteShort(common, &mut send, (*chan).unsentFragmentStart);
-        MSG_WriteShort(common, &mut send, fragmentLength);
+        MSG_WriteShort(view.common, &mut send, (*chan).unsentFragmentStart);
+        MSG_WriteShort(view.common, &mut send, fragmentLength);
         MSG_WriteData(
-            common,
+            view.common,
             &mut send,
-            (*chan).unsentBuffer.as_ptr().add((*chan).unsentFragmentStart as usize) as *const (),
+            (*chan)
+                .unsentBuffer
+                .as_ptr()
+                .add((*chan).unsentFragmentStart as usize) as *const (),
             fragmentLength,
         );
 
         // send the datagram
         NET_SendPacket(
-            common,
+            view.common,
             (*chan).sock,
             send.cursize,
             send.data as *const (),
             (*chan).remoteAddress,
         );
 
-        if common.showpackets != 0 {
+        if view.common.showpackets != 0 {
             crate::common::common::com_printf(
-                common,
+                view.common,
                 &format!(
                     "{} send {:4} : s={} fragment={},{}\n",
                     NETSRC_STRING[(*chan).sock as usize],
@@ -574,10 +563,7 @@ pub fn Netchan_TransmitNextFragment(
 ///
 /// Source: `oracle/codemp/qcommon/net_chan.cpp:143-191`
 pub fn Netchan_Transmit(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     chan: *mut netchan_t,
     length: c_int,
     data: *const native_types::byte,
@@ -587,14 +573,20 @@ pub fn Netchan_Transmit(
         let mut send: msg_t = core::mem::zeroed();
 
         if length > MAX_MSGLEN as c_int {
-            com_error(errorParm_t::ERR_DROP, format!("Netchan_Transmit: length = {length}"));
+            com_error(
+                errorParm_t::ERR_DROP,
+                format!("Netchan_Transmit: length = {length}"),
+            );
         }
         (*chan).unsentFragmentStart = 0;
 
         if (*chan).unsentFragments != qfalse {
             crate::common::common::com_printf(
-                common,
-                &format!("[ISM] Stomping Unsent Fragments {}\n", NETSRC_STRING[(*chan).sock as usize]),
+                view.common,
+                &format!(
+                    "[ISM] Stomping Unsent Fragments {}\n",
+                    NETSRC_STRING[(*chan).sock as usize]
+                ),
             );
         }
 
@@ -609,37 +601,42 @@ pub fn Netchan_Transmit(
             );
 
             // only send the first fragment now
-            Netchan_TransmitNextFragment(common, cm, rm, host, chan);
+            Netchan_TransmitNextFragment(view, chan);
 
             return;
         }
 
         // write the packet header
-        MSG_InitOOB(common, cm, rm, host, &mut send, send_buf.as_mut_ptr(), send_buf.len() as c_int);
+        MSG_InitOOB(
+            view,
+            &mut send,
+            send_buf.as_mut_ptr(),
+            send_buf.len() as c_int,
+        );
 
-        MSG_WriteLong(common, &mut send, (*chan).outgoingSequence);
+        MSG_WriteLong(view.common, &mut send, (*chan).outgoingSequence);
         (*chan).outgoingSequence += 1;
 
         // send the qport if we are a client
         if matches!((*chan).sock, netsrc_t::NS_CLIENT) {
-            let qport = common.net_qport;
-            MSG_WriteShort(common, &mut send, qport);
+            let qport = view.common.net_qport;
+            MSG_WriteShort(view.common, &mut send, qport);
         }
 
-        MSG_WriteData(common, &mut send, data as *const (), length);
+        MSG_WriteData(view.common, &mut send, data as *const (), length);
 
         // send the datagram
         NET_SendPacket(
-            common,
+            view.common,
             (*chan).sock,
             send.cursize,
             send.data as *const (),
             (*chan).remoteAddress,
         );
 
-        if common.showpackets != 0 {
+        if view.common.showpackets != 0 {
             crate::common::common::com_printf(
-                common,
+                view.common,
                 &format!(
                     "{} send {:4} : s={} ack={}\n",
                     NETSRC_STRING[(*chan).sock as usize],

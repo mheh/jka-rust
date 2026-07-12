@@ -3905,8 +3905,7 @@ pub fn AAS_InitReachability(bot: &mut BotLib) {
             return;
         }
     }
-    bot.calcgrapplereach =
-        LibVarGetValue(bot, c"grapplereach".as_ptr() as *mut c_char) as c_int;
+    bot.calcgrapplereach = LibVarGetValue(bot, c"grapplereach".as_ptr() as *mut c_char) as c_int;
     bot.aasworld.savefile = qtrue;
     //start with area 1 because area zero is a dummy
     bot.aasworld.numreachabilityareas = 1;

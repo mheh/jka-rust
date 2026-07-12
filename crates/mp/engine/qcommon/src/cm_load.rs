@@ -28,7 +28,7 @@ use mp_qshared::shared::limits::MAX_SUB_BSP;
 use mp_qshared::shared::{qboolean, vec3_t, MAX_QPATH};
 use native_types::{clipHandle_t, fileHandle_t, thandle_t};
 
-use mp_host_interface::engine_host::EngineHost;
+use crate::common::engine_host_view::EngineHostView;
 
 use crate::cm::c_area_t::cArea_t;
 use crate::cm::c_leaf_t::cLeaf_t;
@@ -116,7 +116,6 @@ use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::shared::q_math::{PlaneTypeForNormal, SetPlaneSignbits};
 use native_platform::Sys_LowPhysicalMemory;
 
-
 /// Raven `CM_BoundBrush`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:211-220`
@@ -165,7 +164,10 @@ pub fn CM_EntityString(cm: &mut CollisionWorld) -> *mut c_char {
 pub fn CM_LeafCluster(cm: &mut CollisionWorld, leafnum: c_int) -> c_int {
     unsafe {
         if leafnum < 0 || leafnum >= cm.cmg.numLeafs {
-            com_error(errorParm_t::ERR_DROP, "CM_LeafCluster: bad number".to_string());
+            com_error(
+                errorParm_t::ERR_DROP,
+                "CM_LeafCluster: bad number".to_string(),
+            );
         }
         (*cm.cmg.leafs.offset(leafnum as isize)).cluster
     }
@@ -515,16 +517,9 @@ pub fn CM_InlineModel(cm: &mut CollisionWorld, index: c_int) -> clipHandle_t {
 /// Raven `CMod_LoadShaders`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:76-101`
-pub fn CMod_LoadShaders(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadShaders(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
-        let mut r#in = cm.cmod_base.offset((*l).fileofs as isize) as *mut dshader_t;
+        let mut r#in = view.cm.cmod_base.offset((*l).fileofs as isize) as *mut dshader_t;
         if (*l).filelen as usize % core::mem::size_of::<dshader_t>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -537,11 +532,9 @@ pub fn CMod_LoadShaders(
             com_error(errorParm_t::ERR_DROP, "Map with no shaders".into());
         }
         cmap.shaders = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            ((1 + count) * core::mem::size_of::<CCMShader>()) as c_int, ha_pref::h_high
+            view,
+            ((1 + count) * core::mem::size_of::<CCMShader>()) as c_int,
+            ha_pref::h_high,
         ) as *mut CCMShader;
         cmap.numShaders = count as c_int;
 
@@ -563,16 +556,9 @@ pub fn CMod_LoadShaders(
 /// Raven `CMod_LoadSubmodels`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:109-166`
-pub fn CMod_LoadSubmodels(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadSubmodels(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
-        let mut r#in = cm.cmod_base.offset((*l).fileofs as isize) as *mut dmodel_t;
+        let mut r#in = view.cm.cmod_base.offset((*l).fileofs as isize) as *mut dmodel_t;
         if (*l).filelen as usize % core::mem::size_of::<dmodel_t>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -585,11 +571,9 @@ pub fn CMod_LoadSubmodels(
             com_error(errorParm_t::ERR_DROP, "Map with no models".into());
         }
         cmap.cmodels = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            (count * core::mem::size_of::<cmodel_s>()) as c_int, ha_pref::h_high
+            view,
+            (count * core::mem::size_of::<cmodel_s>()) as c_int,
+            ha_pref::h_high,
         ) as *mut cmodel_s;
         cmap.numSubModels = count as c_int;
 
@@ -610,7 +594,7 @@ pub fn CMod_LoadSubmodels(
             // Are they getting leaf data elsewhere? (the reason this needs to
             // be done is in sub bsp instances the first brush model isn't
             // necessary a world model and might be real architecture)
-            if i == 0 && core::ptr::eq(cmap as *const clipMap_t, &cm.cmg as *const clipMap_t) {
+            if i == 0 && core::ptr::eq(cmap as *const clipMap_t, &view.cm.cmg as *const clipMap_t) {
                 (*out).firstNode = 0;
                 r#in = r#in.offset(1);
                 continue; // world model doesn't need other info
@@ -621,11 +605,9 @@ pub fn CMod_LoadSubmodels(
 
             (*out).leaf.numLeafBrushes = (*r#in).numBrushes;
             let indexes = Hunk_Alloc(
-                common,
-                cm,
-                rm,
-                host,
-                ((*out).leaf.numLeafBrushes as usize * 4) as c_int, ha_pref::h_high
+                view,
+                ((*out).leaf.numLeafBrushes as usize * 4) as c_int,
+                ha_pref::h_high,
             ) as *mut c_int;
             (*out).leaf.firstLeafBrush = (indexes.offset_from(cmap.leafbrushes)) as c_int;
             for j in 0..(*out).leaf.numLeafBrushes {
@@ -634,11 +616,9 @@ pub fn CMod_LoadSubmodels(
 
             (*out).leaf.numLeafSurfaces = (*r#in).numSurfaces;
             let indexes = Hunk_Alloc(
-                common,
-                cm,
-                rm,
-                host,
-                ((*out).leaf.numLeafSurfaces as usize * 4) as c_int, ha_pref::h_high
+                view,
+                ((*out).leaf.numLeafSurfaces as usize * 4) as c_int,
+                ha_pref::h_high,
             ) as *mut c_int;
             (*out).leaf.firstLeafSurface = (indexes.offset_from(cmap.leafsurfaces)) as c_int;
             for j in 0..(*out).leaf.numLeafSurfaces {
@@ -653,16 +633,9 @@ pub fn CMod_LoadSubmodels(
 /// Raven `CMod_LoadNodes`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:175-203`
-pub fn CMod_LoadNodes(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadNodes(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
-        let mut r#in = cm.cmod_base.offset((*l).fileofs as isize) as *mut dnode_t;
+        let mut r#in = view.cm.cmod_base.offset((*l).fileofs as isize) as *mut dnode_t;
         if (*l).filelen as usize % core::mem::size_of::<dnode_t>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -675,11 +648,9 @@ pub fn CMod_LoadNodes(
             com_error(errorParm_t::ERR_DROP, "Map has no nodes".into());
         }
         cmap.nodes = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            (count * core::mem::size_of::<cNode_t>()) as c_int, ha_pref::h_high
+            view,
+            (count * core::mem::size_of::<cNode_t>()) as c_int,
+            ha_pref::h_high,
         ) as *mut cNode_t;
         cmap.numNodes = count as c_int;
 
@@ -699,16 +670,9 @@ pub fn CMod_LoadNodes(
 /// Raven `CMod_LoadBrushes`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:229-262`
-pub fn CMod_LoadBrushes(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadBrushes(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
-        let mut r#in = cm.cmod_base.offset((*l).fileofs as isize) as *mut dbrush_t;
+        let mut r#in = view.cm.cmod_base.offset((*l).fileofs as isize) as *mut dbrush_t;
         if (*l).filelen as usize % core::mem::size_of::<dbrush_t>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -718,11 +682,9 @@ pub fn CMod_LoadBrushes(
         let count = (*l).filelen as usize / core::mem::size_of::<dbrush_t>();
 
         cmap.brushes = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            ((BOX_BRUSHES + count) * core::mem::size_of::<cbrush_t>()) as c_int, ha_pref::h_high
+            view,
+            ((BOX_BRUSHES + count) * core::mem::size_of::<cbrush_t>()) as c_int,
+            ha_pref::h_high,
         ) as *mut cbrush_t;
         cmap.numBrushes = count as c_int;
 
@@ -755,16 +717,9 @@ pub fn CMod_LoadBrushes(
 /// Raven `CMod_LoadLeafs`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:269-305`
-pub fn CMod_LoadLeafs(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadLeafs(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
-        let mut r#in = cm.cmod_base.offset((*l).fileofs as isize) as *mut dleaf_t;
+        let mut r#in = view.cm.cmod_base.offset((*l).fileofs as isize) as *mut dleaf_t;
         if (*l).filelen as usize % core::mem::size_of::<dleaf_t>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -778,11 +733,9 @@ pub fn CMod_LoadLeafs(
         }
 
         cmap.leafs = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            ((BOX_LEAFS + count) * core::mem::size_of::<cLeaf_t>()) as c_int, ha_pref::h_high
+            view,
+            ((BOX_LEAFS + count) * core::mem::size_of::<cLeaf_t>()) as c_int,
+            ha_pref::h_high,
         ) as *mut cLeaf_t;
         cmap.numLeafs = count as c_int;
 
@@ -807,18 +760,15 @@ pub fn CMod_LoadLeafs(
         }
 
         cmap.areas = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            (cmap.numAreas as usize * core::mem::size_of::<cArea_t>()) as c_int, ha_pref::h_high
+            view,
+            (cmap.numAreas as usize * core::mem::size_of::<cArea_t>()) as c_int,
+            ha_pref::h_high,
         ) as *mut cArea_t;
         cmap.areaPortals = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            (cmap.numAreas as usize * cmap.numAreas as usize * core::mem::size_of::<c_int>()) as c_int, ha_pref::h_high
+            view,
+            (cmap.numAreas as usize * cmap.numAreas as usize * core::mem::size_of::<c_int>())
+                as c_int,
+            ha_pref::h_high,
         ) as *mut c_int;
     }
 }
@@ -826,16 +776,9 @@ pub fn CMod_LoadLeafs(
 /// Raven `CMod_LoadPlanes`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:312-346`
-pub fn CMod_LoadPlanes(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadPlanes(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
-        let mut r#in = cm.cmod_base.offset((*l).fileofs as isize) as *mut dplane_t;
+        let mut r#in = view.cm.cmod_base.offset((*l).fileofs as isize) as *mut dplane_t;
         if (*l).filelen as usize % core::mem::size_of::<dplane_t>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -848,11 +791,9 @@ pub fn CMod_LoadPlanes(
             com_error(errorParm_t::ERR_DROP, "Map with no planes".into());
         }
         cmap.planes = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            ((BOX_PLANES + count) * core::mem::size_of::<cplane_t>()) as c_int, ha_pref::h_high
+            view,
+            ((BOX_PLANES + count) * core::mem::size_of::<cplane_t>()) as c_int,
+            ha_pref::h_high,
         ) as *mut cplane_t;
         cmap.numPlanes = count as c_int;
 
@@ -879,16 +820,9 @@ pub fn CMod_LoadPlanes(
 /// Raven `CMod_LoadLeafBrushes`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:353-373`
-pub fn CMod_LoadLeafBrushes(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadLeafBrushes(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
-        let mut r#in = cm.cmod_base.offset((*l).fileofs as isize) as *mut c_int;
+        let mut r#in = view.cm.cmod_base.offset((*l).fileofs as isize) as *mut c_int;
         if (*l).filelen as usize % core::mem::size_of::<c_int>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -898,11 +832,9 @@ pub fn CMod_LoadLeafBrushes(
         let count = (*l).filelen as usize / core::mem::size_of::<c_int>();
 
         cmap.leafbrushes = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            ((count + BOX_BRUSHES) * core::mem::size_of::<c_int>()) as c_int, ha_pref::h_high
+            view,
+            ((count + BOX_BRUSHES) * core::mem::size_of::<c_int>()) as c_int,
+            ha_pref::h_high,
         ) as *mut c_int;
         cmap.numLeafBrushes = count as c_int;
 
@@ -918,16 +850,9 @@ pub fn CMod_LoadLeafBrushes(
 /// Raven `CMod_LoadLeafSurfaces`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:380-400`
-pub fn CMod_LoadLeafSurfaces(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadLeafSurfaces(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
-        let mut r#in = cm.cmod_base.offset((*l).fileofs as isize) as *mut c_int;
+        let mut r#in = view.cm.cmod_base.offset((*l).fileofs as isize) as *mut c_int;
         if (*l).filelen as usize % core::mem::size_of::<c_int>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -937,11 +862,9 @@ pub fn CMod_LoadLeafSurfaces(
         let count = (*l).filelen as usize / core::mem::size_of::<c_int>();
 
         cmap.leafsurfaces = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            (count * core::mem::size_of::<c_int>()) as c_int, ha_pref::h_high
+            view,
+            (count * core::mem::size_of::<c_int>()) as c_int,
+            ha_pref::h_high,
         ) as *mut c_int;
         cmap.numLeafSurfaces = count as c_int;
 
@@ -957,16 +880,9 @@ pub fn CMod_LoadLeafSurfaces(
 /// Raven `CMod_LoadBrushSides`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:407-434`
-pub fn CMod_LoadBrushSides(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadBrushSides(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
-        let mut r#in = cm.cmod_base.offset((*l).fileofs as isize) as *mut dbrushside_t;
+        let mut r#in = view.cm.cmod_base.offset((*l).fileofs as isize) as *mut dbrushside_t;
         if (*l).filelen as usize % core::mem::size_of::<dbrushside_t>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -976,11 +892,9 @@ pub fn CMod_LoadBrushSides(
         let count = (*l).filelen as usize / core::mem::size_of::<dbrushside_t>();
 
         cmap.brushsides = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            ((BOX_SIDES + count) * core::mem::size_of::<cbrushside_t>()) as c_int, ha_pref::h_high
+            view,
+            ((BOX_SIDES + count) * core::mem::size_of::<cbrushside_t>()) as c_int,
+            ha_pref::h_high,
         ) as *mut cbrushside_t;
         cmap.numBrushSides = count as c_int;
 
@@ -1005,21 +919,14 @@ pub fn CMod_LoadBrushSides(
 /// Raven `CMod_LoadEntityString`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:442-446`
-pub fn CMod_LoadEntityString(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadEntityString(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
         cmap.entityString =
-            Hunk_Alloc(common, cm, rm, host, ((*l).filelen as usize) as c_int, ha_pref::h_high) as *mut c_char;
+            Hunk_Alloc(view, ((*l).filelen as usize) as c_int, ha_pref::h_high) as *mut c_char;
         cmap.numEntityChars = (*l).filelen;
         Com_Memcpy(
             cmap.entityString as *mut (),
-            cm.cmod_base.offset((*l).fileofs as isize) as *const (),
+            view.cm.cmod_base.offset((*l).fileofs as isize) as *const (),
             (*l).filelen as usize,
         );
     }
@@ -1028,27 +935,20 @@ pub fn CMod_LoadEntityString(
 /// Raven `CMod_LoadVisibility`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:454-472`
-pub fn CMod_LoadVisibility(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    l: *mut lump_t,
-    cmap: &mut clipMap_t,
-) {
+pub fn CMod_LoadVisibility(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut clipMap_t) {
     unsafe {
         let len = (*l).filelen;
         if len == 0 {
             cmap.clusterBytes = (cmap.numClusters + 31) & !31;
             cmap.visibility =
-                Hunk_Alloc(common, cm, rm, host, (cmap.clusterBytes as usize) as c_int, ha_pref::h_high) as *mut u8;
+                Hunk_Alloc(view, (cmap.clusterBytes as usize) as c_int, ha_pref::h_high) as *mut u8;
             Com_Memset(cmap.visibility as *mut (), 255, cmap.clusterBytes as usize);
             return;
         }
-        let buf = cm.cmod_base.offset((*l).fileofs as isize);
+        let buf = view.cm.cmod_base.offset((*l).fileofs as isize);
 
         cmap.vised = mp_qshared::shared::qtrue;
-        cmap.visibility = Hunk_Alloc(common, cm, rm, host, (len as usize) as c_int, ha_pref::h_high) as *mut u8;
+        cmap.visibility = Hunk_Alloc(view, (len as usize) as c_int, ha_pref::h_high) as *mut u8;
         cmap.numClusters = i32::from_le(*(buf as *const c_int));
         cmap.clusterBytes = i32::from_le(*(buf.offset(4) as *const c_int));
         Com_Memcpy(
@@ -1134,10 +1034,7 @@ pub fn CM_ModelContents(cm: &mut CollisionWorld, model: clipHandle_t, subBSPInde
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:483-536`
 pub fn CMod_LoadPatches(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     surfs: *mut lump_t,
     verts: *mut lump_t,
     cmap: &mut clipMap_t,
@@ -1145,7 +1042,7 @@ pub fn CMod_LoadPatches(
     unsafe {
         let mut points: [vec3_t; MAX_PATCH_VERTS] = [[0.0; 3]; MAX_PATCH_VERTS];
 
-        let mut r#in = cm.cmod_base.offset((*surfs).fileofs as isize) as *mut dsurface_t;
+        let mut r#in = view.cm.cmod_base.offset((*surfs).fileofs as isize) as *mut dsurface_t;
         if (*surfs).filelen as usize % core::mem::size_of::<dsurface_t>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -1155,14 +1052,12 @@ pub fn CMod_LoadPatches(
         let count = (*surfs).filelen as usize / core::mem::size_of::<dsurface_t>();
         cmap.numSurfaces = count as c_int;
         cmap.surfaces = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            (cmap.numSurfaces as usize * core::mem::size_of::<*mut cPatch_t>()) as c_int, ha_pref::h_high
+            view,
+            (cmap.numSurfaces as usize * core::mem::size_of::<*mut cPatch_t>()) as c_int,
+            ha_pref::h_high,
         ) as *mut *mut cPatch_t;
 
-        let dv = cm.cmod_base.offset((*verts).fileofs as isize) as *mut drawVert_t;
+        let dv = view.cm.cmod_base.offset((*verts).fileofs as isize) as *mut drawVert_t;
         if (*verts).filelen as usize % core::mem::size_of::<drawVert_t>() != 0 {
             com_error(
                 errorParm_t::ERR_DROP,
@@ -1179,11 +1074,9 @@ pub fn CMod_LoadPatches(
             // FIXME: check for non-colliding patches
 
             let patch = Hunk_Alloc(
-                common,
-                cm,
-                rm,
-                host,
-                (core::mem::size_of::<cPatch_t>()) as c_int, ha_pref::h_high
+                view,
+                (core::mem::size_of::<cPatch_t>()) as c_int,
+                ha_pref::h_high,
             ) as *mut cPatch_t;
             *cmap.surfaces.add(i) = patch;
 
@@ -1208,8 +1101,7 @@ pub fn CMod_LoadPatches(
             (*patch).surfaceFlags = (*cmap.shaders.offset(shaderNum as isize)).surfaceFlags;
 
             // create the internal facet structure
-            (*patch).pc =
-                CM_GeneratePatchCollide(common, cm, rm, host, width, height, points.as_mut_ptr());
+            (*patch).pc = CM_GeneratePatchCollide(view, width, height, points.as_mut_ptr());
         }
     }
 }
@@ -1219,11 +1111,7 @@ pub fn CMod_LoadPatches(
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:605-770`
 // rwwRMG - function needs heavy modification
 pub fn CM_LoadMap_Actual(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     name: *const c_char,
     clientload: qboolean,
     checksum: *mut c_int,
@@ -1234,29 +1122,20 @@ pub fn CM_LoadMap_Actual(
             com_error(errorParm_t::ERR_DROP, "CM_LoadMap: NULL name".into());
         }
 
-        cm.cm_noAreas = Cvar_Get(
-            common,
-            cm,
-            rm,
-            host,
+        view.cm.cm_noAreas = Cvar_Get(
+            view,
             c"cm_noAreas".as_ptr(),
             c"0".as_ptr(),
             mp_qshared::shared::cvar::CVAR_CHEAT,
         );
-        cm.cm_noCurves = Cvar_Get(
-            common,
-            cm,
-            rm,
-            host,
+        view.cm.cm_noCurves = Cvar_Get(
+            view,
             c"cm_noCurves".as_ptr(),
             c"0".as_ptr(),
             mp_qshared::shared::cvar::CVAR_CHEAT,
         );
-        cm.cm_playerCurveClip = Cvar_Get(
-            common,
-            cm,
-            rm,
-            host,
+        view.cm.cm_playerCurveClip = Cvar_Get(
+            view,
             c"cm_playerCurveClip".as_ptr(),
             c"1".as_ptr(),
             mp_qshared::shared::cvar::CVAR_ARCHIVE | mp_qshared::shared::cvar::CVAR_CHEAT,
@@ -1264,7 +1143,7 @@ pub fn CM_LoadMap_Actual(
 
         let name_cstr = std::ffi::CStr::from_ptr(name);
         Com_DPrintf(
-            common,
+            view.common,
             &format!(
                 "CM_LoadMap( {}, {} )\n",
                 name_cstr.to_string_lossy(),
@@ -1274,16 +1153,16 @@ pub fn CM_LoadMap_Actual(
 
         let cmap_name = std::ffi::CStr::from_ptr(cmap.name.as_ptr());
         if cmap_name == name_cstr && clientload != 0 {
-            *checksum = cm.last_checksum as c_int;
+            *checksum = view.cm.last_checksum as c_int;
             return;
         }
 
         let orig_name = name_cstr.to_owned();
 
-        if core::ptr::eq(cmap as *const clipMap_t, &cm.cmg as *const clipMap_t) {
+        if core::ptr::eq(cmap as *const clipMap_t, &view.cm.cmg as *const clipMap_t) {
             // free old stuff
-            CM_ClearMap(cm, rmg);
-            CM_ClearLevelPatches(cm);
+            CM_ClearMap(view.cm, &mut view.rmg);
+            CM_ClearLevelPatches(view.cm);
         }
 
         // free old stuff
@@ -1298,11 +1177,9 @@ pub fn CM_LoadMap_Actual(
             cmap.numClusters = 1;
             cmap.numAreas = 1;
             cmap.cmodels = Hunk_Alloc(
-                common,
-                cm,
-                rm,
-                host,
-                (core::mem::size_of::<cmodel_s>()) as c_int, ha_pref::h_high
+                view,
+                (core::mem::size_of::<cmodel_s>()) as c_int,
+                ha_pref::h_high,
             ) as *mut cmodel_s;
             *checksum = 0;
             return;
@@ -1314,32 +1191,21 @@ pub fn CM_LoadMap_Actual(
         let mut buf: *mut c_int = core::ptr::null_mut();
         let new_buff: *mut ();
         let mut h: fileHandle_t = 0;
-        let bsp_len = FS_FOpenFileRead(
-            common,
-            cm,
-            rm,
-            host,
-            name,
-            &mut h,
-            mp_qshared::shared::qfalse,
-        );
+        let bsp_len = FS_FOpenFileRead(view, name, &mut h, mp_qshared::shared::qfalse);
         if h != 0 {
             new_buff = Z_Malloc(
-                common,
-                cm,
-                rm,
-                host,
+                view,
                 bsp_len,
                 memtag_t::TAG_BSP_DISKIMAGE,
                 mp_qshared::shared::qfalse,
                 0,
             );
-            FS_Read(common, new_buff, bsp_len, h);
-            FS_FCloseFile(common, h);
+            FS_Read(view.common, new_buff, bsp_len, h);
+            FS_FCloseFile(view.common, h);
 
             buf = new_buff as *mut c_int;
-            if core::ptr::eq(cmap as *const clipMap_t, &cm.cmg as *const clipMap_t) {
-                cm.gpvCachedMapDiskImage = new_buff;
+            if core::ptr::eq(cmap as *const clipMap_t, &view.cm.cmg as *const clipMap_t) {
+                view.cm.gpvCachedMapDiskImage = new_buff;
             }
         }
 
@@ -1350,9 +1216,10 @@ pub fn CM_LoadMap_Actual(
             );
         }
 
-        cm.last_checksum =
-            i32::from_le(Com_BlockChecksum(common, buf as *const (), bsp_len) as i32) as c_uint;
-        *checksum = cm.last_checksum as c_int;
+        view.cm.last_checksum =
+            i32::from_le(Com_BlockChecksum(view.common, buf as *const (), bsp_len) as i32)
+                as c_uint;
+        *checksum = view.cm.last_checksum as c_int;
 
         let mut header: dheader_t = core::ptr::read(buf as *const dheader_t);
         {
@@ -1365,9 +1232,9 @@ pub fn CM_LoadMap_Actual(
 
         if header.version != BSP_VERSION {
             unsafe {
-                Z_Free(common, cm.gpvCachedMapDiskImage);
+                Z_Free(view.common, view.cm.gpvCachedMapDiskImage);
             }
-            cm.gpvCachedMapDiskImage = core::ptr::null_mut();
+            view.cm.gpvCachedMapDiskImage = core::ptr::null_mut();
 
             com_error(
                 errorParm_t::ERR_DROP,
@@ -1380,65 +1247,34 @@ pub fn CM_LoadMap_Actual(
             );
         }
 
-        cm.cmod_base = buf as *mut u8;
+        view.cm.cmod_base = buf as *mut u8;
 
         // load into heap
-        CMod_LoadShaders(common, cm, rm, host, &mut header.lumps[LUMP_SHADERS], cmap);
-        CMod_LoadLeafs(common, cm, rm, host, &mut header.lumps[LUMP_LEAFS], cmap);
-        CMod_LoadLeafBrushes(
-            common,
-            cm,
-            rm,
-            host,
-            &mut header.lumps[LUMP_LEAFBRUSHES],
-            cmap,
-        );
-        CMod_LoadLeafSurfaces(
-            common,
-            cm,
-            rm,
-            host,
-            &mut header.lumps[LUMP_LEAFSURFACES],
-            cmap,
-        );
-        CMod_LoadPlanes(common, cm, rm, host, &mut header.lumps[LUMP_PLANES], cmap);
-        CMod_LoadBrushSides(
-            common,
-            cm,
-            rm,
-            host,
-            &mut header.lumps[LUMP_BRUSHSIDES],
-            cmap,
-        );
-        CMod_LoadBrushes(common, cm, rm, host, &mut header.lumps[LUMP_BRUSHES], cmap);
-        CMod_LoadSubmodels(common, cm, rm, host, &mut header.lumps[LUMP_MODELS], cmap);
-        CMod_LoadNodes(common, cm, rm, host, &mut header.lumps[LUMP_NODES], cmap);
-        CMod_LoadEntityString(common, cm, rm, host, &mut header.lumps[LUMP_ENTITIES], cmap);
-        CMod_LoadVisibility(
-            common,
-            cm,
-            rm,
-            host,
-            &mut header.lumps[LUMP_VISIBILITY],
-            cmap,
-        );
+        CMod_LoadShaders(view, &mut header.lumps[LUMP_SHADERS], cmap);
+        CMod_LoadLeafs(view, &mut header.lumps[LUMP_LEAFS], cmap);
+        CMod_LoadLeafBrushes(view, &mut header.lumps[LUMP_LEAFBRUSHES], cmap);
+        CMod_LoadLeafSurfaces(view, &mut header.lumps[LUMP_LEAFSURFACES], cmap);
+        CMod_LoadPlanes(view, &mut header.lumps[LUMP_PLANES], cmap);
+        CMod_LoadBrushSides(view, &mut header.lumps[LUMP_BRUSHSIDES], cmap);
+        CMod_LoadBrushes(view, &mut header.lumps[LUMP_BRUSHES], cmap);
+        CMod_LoadSubmodels(view, &mut header.lumps[LUMP_MODELS], cmap);
+        CMod_LoadNodes(view, &mut header.lumps[LUMP_NODES], cmap);
+        CMod_LoadEntityString(view, &mut header.lumps[LUMP_ENTITIES], cmap);
+        CMod_LoadVisibility(view, &mut header.lumps[LUMP_VISIBILITY], cmap);
         CMod_LoadPatches(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             &mut header.lumps[LUMP_SURFACES],
             &mut header.lumps[LUMP_DRAWVERTS],
             cmap,
         );
 
-        cm.TotalSubModels += cmap.numSubModels;
+        view.cm.TotalSubModels += cmap.numSubModels;
 
-        if core::ptr::eq(cmap as *const clipMap_t, &cm.cmg as *const clipMap_t) {
+        if core::ptr::eq(cmap as *const clipMap_t, &view.cm.cmg as *const clipMap_t) {
             // Load in the shader text - return instantly if already loaded
-            CM_LoadShaderText(common, cm, rm, rmg, host, mp_qshared::shared::qfalse);
-            CM_InitBoxHull(cm);
-            CM_SetupShaderProperties(common, cm, rmg, host);
+            CM_LoadShaderText(view, mp_qshared::shared::qfalse);
+            CM_InitBoxHull(view.cm);
+            CM_SetupShaderProperties(view);
         }
 
         //
@@ -1447,11 +1283,11 @@ pub fn CM_LoadMap_Actual(
         // (but not if this gets ported to a big-endian machine, because some
         // of the map data will have been Little-Long'd, but some hasn't).
         //
-        if Sys_LowPhysicalMemory() != 0 || (*common.com_dedicated).integer != 0 {
+        if Sys_LowPhysicalMemory() != 0 || (*view.common.com_dedicated).integer != 0 {
             unsafe {
-                Z_Free(common, cm.gpvCachedMapDiskImage);
+                Z_Free(view.common, view.cm.gpvCachedMapDiskImage);
             }
-            cm.gpvCachedMapDiskImage = core::ptr::null_mut();
+            view.cm.gpvCachedMapDiskImage = core::ptr::null_mut();
         } else {
             // ... do nothing, and let the renderer free it after it's finished
             // playing with it...
@@ -1474,79 +1310,51 @@ pub fn CM_LoadMap_Actual(
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:775-782`
 pub fn CM_LoadMap(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     name: *const c_char,
     clientload: qboolean,
     checksum: *mut c_int,
 ) {
-    cm.gbUsingCachedMapDataRightNow = mp_qshared::shared::qtrue; // !!!!!!!!!!!!!!!!!!
+    view.cm.gbUsingCachedMapDataRightNow = mp_qshared::shared::qtrue; // !!!!!!!!!!!!!!!!!!
 
-    let cmg_ptr = &mut cm.cmg as *mut clipMap_t;
+    let cmg_ptr = &mut view.cm.cmg as *mut clipMap_t;
     unsafe {
-        CM_LoadMap_Actual(
-            common,
-            cm,
-            rm,
-            rmg,
-            host,
-            name,
-            clientload,
-            checksum,
-            &mut *cmg_ptr,
-        );
+        CM_LoadMap_Actual(view, name, clientload, checksum, &mut *cmg_ptr);
     }
 
-    cm.gbUsingCachedMapDataRightNow = mp_qshared::shared::qfalse; // !!!!!!!!!!!!!!!!!!
+    view.cm.gbUsingCachedMapDataRightNow = mp_qshared::shared::qfalse; // !!!!!!!!!!!!!!!!!!
 }
 
 /// Raven `CM_LoadSubBSP`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:1083-1108`
 pub fn CM_LoadSubBSP(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     name: *const c_char,
     clientload: qboolean,
 ) -> c_int {
     unsafe {
-        let mut count = cm.cmg.numSubModels;
-        for i in 0..cm.NumSubBSP {
-            let sub_name = cm.SubBSP[i as usize].name.as_ptr();
+        let mut count = view.cm.cmg.numSubModels;
+        for i in 0..view.cm.NumSubBSP {
+            let sub_name = view.cm.SubBSP[i as usize].name.as_ptr();
             if libc::strcasecmp(name, sub_name) == 0 {
                 return count;
             }
-            count += cm.SubBSP[i as usize].numSubModels;
+            count += view.cm.SubBSP[i as usize].numSubModels;
         }
 
-        if cm.NumSubBSP == MAX_SUB_BSP {
+        if view.cm.NumSubBSP == MAX_SUB_BSP {
             com_error(
                 errorParm_t::ERR_DROP,
                 "CM_LoadSubBSP: too many unique sub BSPs".into(),
             );
         }
 
-        let idx = cm.NumSubBSP;
-        let sub_ptr = &mut cm.SubBSP[idx as usize] as *mut clipMap_t;
+        let idx = view.cm.NumSubBSP;
+        let sub_ptr = &mut view.cm.SubBSP[idx as usize] as *mut clipMap_t;
         let mut dummy_checksum: c_int = 0;
-        CM_LoadMap_Actual(
-            common,
-            cm,
-            rm,
-            rmg,
-            host,
-            name,
-            clientload,
-            &mut dummy_checksum,
-            &mut *sub_ptr,
-        );
-        cm.NumSubBSP += 1;
+        CM_LoadMap_Actual(view, name, clientload, &mut dummy_checksum, &mut *sub_ptr);
+        view.cm.NumSubBSP += 1;
 
         count
     }

@@ -365,7 +365,11 @@ unsafe fn vert_bone_weight(
 /// # Safety
 /// `vert` a valid `mdxmVertex_t`, `bone_refs` the surface's bone-reference
 /// array, and `cache` the surface's model's live bone cache.
-unsafe fn transform_vertex(cache: &mut CBoneCache, vert: *const u8, bone_refs: *const u8) -> [f32; 3] {
+unsafe fn transform_vertex(
+    cache: &mut CBoneCache,
+    vert: *const u8,
+    bone_refs: *const u8,
+) -> [f32; 3] {
     // VectorClear( pTri[j] );
     let mut p = [0.0f32; 3];
     let vert_coords = unsafe {
@@ -471,7 +475,8 @@ fn g2_process_surface_bolt2(
             let vert1 = vert_base.add(index1 as usize * MDXM_VERTEX_SIZE);
             let vert2 = vert_base.add(index2 as usize * MDXM_VERTEX_SIZE);
 
-            let bone_refs = original_surf.add(read_i32(original_surf, SURF_OFS_BONE_REFERENCES) as usize);
+            let bone_refs =
+                original_surf.add(read_i32(original_surf, SURF_OFS_BONE_REFERENCES) as usize);
 
             // now go and transform just the points we need from the surface
             // that was hit originally.
@@ -1317,7 +1322,15 @@ mod tests {
             position: IDENTITY_MATRIX,
         }];
         assert_eq!(
-            resolve_bolt_matrix_low(&mut bone_caches, &mut host, Some(id), &[], &bltlist, 0, scale),
+            resolve_bolt_matrix_low(
+                &mut bone_caches,
+                &mut host,
+                Some(id),
+                &[],
+                &bltlist,
+                0,
+                scale
+            ),
             IDENTITY_MATRIX
         );
     }

@@ -7,15 +7,13 @@
 
 use core::ffi::{c_char, c_int};
 
-use mp_engine_qcommon::collision_world::CollisionWorld;
-use mp_engine_qcommon::cm_load::RenderModels;
 use mp_engine_qcommon::common::common::com_printf;
 use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common_fns::Com_Milliseconds;
 use mp_engine_qcommon::cvar_fns::Cvar_Set;
 use mp_engine_qcommon::net_chan::{NET_OutOfBandPrint, NET_StringToAdr};
 use mp_engine_qcommon::qcommon::net_limits::MAX_RELIABLE_COMMANDS;
-use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::netsrc_t::netsrc_t;
 use mp_qshared::shared::swap::BigShort;
@@ -23,7 +21,9 @@ use mp_qshared::shared::{qboolean, qfalse, qtrue, MAX_STRING_CHARS};
 
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
-use crate::server_host::{HEARTBEAT_GAME, HEARTBEAT_MSEC, MAX_MASTER_SERVERS, NEW_RESOLVE_DURATION};
+use crate::server_host::{
+    HEARTBEAT_GAME, HEARTBEAT_MSEC, MAX_MASTER_SERVERS, NEW_RESOLVE_DURATION,
+};
 use crate::Server;
 use mp_engine_qcommon::qcommon::protocol::PORT_MASTER;
 use mp_qshared::shared::q_string::{Q_strncmp, Q_strncpyz};
@@ -108,7 +108,6 @@ pub fn SV_ReplacePendingServerCommands(client: *mut client_t, cmd: *const c_char
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:116-141`
 pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut client_t, cmd: &str) {
-
     unsafe {
         // this is very ugly but it's also a waste to for instance send multiple
         // config string updates for the same config string index in one snapshot
@@ -127,7 +126,8 @@ pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut cl
             com_printf(common, "===== pending server commands =====\n");
             let mut i = (*client).reliableAcknowledge + 1;
             while i <= (*client).reliableSequence {
-                let slot = &(*client).reliableCommands[(i & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize];
+                let slot = &(*client).reliableCommands
+                    [(i & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize];
                 com_printf(
                     common,
                     &format!(
@@ -166,7 +166,6 @@ pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut cl
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:153-180`
 pub fn SV_SendServerCommand(common: &mut Common, sv: &mut Server, cl: *mut client_t, fmt: &str) {
-
     if !cl.is_null() {
         SV_AddServerCommand(common, sv, cl, fmt);
         return;
@@ -250,15 +249,9 @@ pub fn SV_MasterNeedsResolving(sv: &mut Server, server: c_int, time: c_int) -> b
 /// to let it know we are alive, and log information.
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:222-280`
-pub fn SV_MasterHeartbeat(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    sv: &mut Server,
-) {
+pub fn SV_MasterHeartbeat(view: &mut EngineHostView, sv: &mut Server) {
     // "dedicated 1" is for lan play, "dedicated 2" is for inet public play
-    if common.com_dedicated.is_null() || unsafe { (*common.com_dedicated).integer } != 2 {
+    if view.common.com_dedicated.is_null() || unsafe { (*view.common.com_dedicated).integer } != 2 {
         return; // only dedicated servers send heartbeats
     }
 
@@ -271,11 +264,11 @@ pub fn SV_MasterHeartbeat(
     // we need to use this instead of svs.time since svs.time resets over map
     // changes (or rather every time the game restarts), and we don't really need
     // to resolve every map change
-    let time = Com_Milliseconds(common, cm, rm, host);
+    let time = Com_Milliseconds(view);
 
     // send to group masters
     for i in 0..MAX_MASTER_SERVERS {
-        let master = common.sv_master[i];
+        let master = view.common.sv_master[i];
         if unsafe { *(*master).string } == 0 {
             continue;
         }
@@ -291,23 +284,22 @@ pub fn SV_MasterHeartbeat(
 
             sv.master_heartbeat[i] = time;
 
-            com_printf(common, &format!("Resolving {}\n", unsafe {
-                core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
-            }));
+            com_printf(
+                view.common,
+                &format!("Resolving {}\n", unsafe {
+                    core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
+                }),
+            );
             if NET_StringToAdr(unsafe { (*master).string }, &mut sv.master_adr[i]) == qfalse {
                 // if the address failed to resolve, clear it
                 // so we don't take repeated dns hits
-                com_printf(common, &format!("Couldn't resolve address: {}\n", unsafe {
-                    core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
-                }));
-                Cvar_Set(
-                    common,
-                    cm,
-                    rm,
-                    host,
-                    unsafe { (*master).name },
-                    c"".as_ptr(),
+                com_printf(
+                    view.common,
+                    &format!("Couldn't resolve address: {}\n", unsafe {
+                        core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
+                    }),
                 );
+                Cvar_Set(view, unsafe { (*master).name }, c"".as_ptr());
                 unsafe {
                     (*master).modified = qfalse;
                 }
@@ -319,24 +311,30 @@ pub fn SV_MasterHeartbeat(
                 sv.master_adr[i].port = BigShort(PORT_MASTER as c_short) as u16;
             }
             let adr = sv.master_adr[i];
-            com_printf(common, &format!(
-                "{} resolved to {}.{}.{}.{}:{}\n",
-                unsafe { core::ffi::CStr::from_ptr((*master).string).to_string_lossy() },
-                adr.ip[0],
-                adr.ip[1],
-                adr.ip[2],
-                adr.ip[3],
-                BigShort(adr.port as c_short),
-            ));
+            com_printf(
+                view.common,
+                &format!(
+                    "{} resolved to {}.{}.{}.{}:{}\n",
+                    unsafe { core::ffi::CStr::from_ptr((*master).string).to_string_lossy() },
+                    adr.ip[0],
+                    adr.ip[1],
+                    adr.ip[2],
+                    adr.ip[3],
+                    BigShort(adr.port as c_short),
+                ),
+            );
         }
 
-        com_printf(common, &format!("Sending heartbeat to {}\n", unsafe {
-            core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
-        }));
+        com_printf(
+            view.common,
+            &format!("Sending heartbeat to {}\n", unsafe {
+                core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
+            }),
+        );
         // this command should be changed if the server info / status format
         // ever incompatably changes
         NET_OutOfBandPrint(
-            common,
+            view.common,
             netsrc_t::NS_SERVER,
             sv.master_adr[i],
             format!("heartbeat {}\n", HEARTBEAT_GAME),
@@ -348,20 +346,14 @@ pub fn SV_MasterHeartbeat(
 /// down.
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:288-299`
-pub fn SV_MasterShutdown(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    sv: &mut Server,
-) {
+pub fn SV_MasterShutdown(view: &mut EngineHostView, sv: &mut Server) {
     // send a hearbeat right now
     sv.svs.nextHeartbeatTime = -9999;
-    SV_MasterHeartbeat(common, cm, rm, host, sv);
+    SV_MasterHeartbeat(view, sv);
 
     // send it again to minimize chance of drops
     sv.svs.nextHeartbeatTime = -9999;
-    SV_MasterHeartbeat(common, cm, rm, host, sv);
+    SV_MasterHeartbeat(view, sv);
 
     // when the master tries to poll the server, it won't respond, so
     // it will be removed from the list

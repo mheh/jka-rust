@@ -17,7 +17,7 @@ use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
 use native_types::{qfalse, qtrue, MAX_QPATH};
 
-use crate::collision_world::CollisionWorld;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
 use crate::qcommon::vm_interpret_t::vmInterpret_t;
 use crate::qfiles::vm_header_t::vmHeader_t;
@@ -26,16 +26,13 @@ use crate::vm::vm_s::vm_t;
 use crate::vm::vm_symbol_s::vmSymbol_t;
 use crate::vm::vmptr_t::vmptr_t;
 
-#[allow(dead_code)]
-use crate::cm_load::RenderModels;
-
 use crate::cmd::Cmd_AddCommand;
-use crate::z_memman_pc::Hunk_Alloc;
 use crate::cvar_fns::Cvar_VariableValue;
+use crate::sys_engine::Sys_LoadDll;
+use crate::z_memman_pc::Hunk_Alloc;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::shared::q_string::{COM_Parse, COM_StripExtension};
 use mp_qshared::shared::swap::LittleLong;
-use crate::sys_engine::Sys_LoadDll;
 use native_platform::Sys_UnloadDll;
 
 /// `VM_VM2C`.
@@ -365,32 +362,16 @@ pub fn VM_Clear(common: &mut Common) {
 /// `VM_Shifted_Alloc`.
 ///
 /// Source: `oracle/codemp/qcommon/vm.cpp:679-717`
-pub fn VM_Shifted_Alloc(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    ptr: *mut *mut (),
-    size: c_int,
-) {
+pub fn VM_Shifted_Alloc(view: &mut EngineHostView, ptr: *mut *mut (), size: c_int) {
     unsafe {
-        if common.currentVM.is_null() {
+        if view.common.currentVM.is_null() {
             debug_assert!(false);
             *ptr = core::ptr::null_mut();
             return;
         }
 
         // first allocate our desired memory, up front
-        let mem = Z_Malloc(
-            common,
-            cm,
-            rm,
-            host,
-            size + 1,
-            memtag_t::TAG_VM_ALLOCATED,
-            qfalse,
-            0,
-        );
+        let mem = Z_Malloc(view, size + 1, memtag_t::TAG_VM_ALLOCATED, qfalse, 0);
 
         if mem.is_null() {
             debug_assert!(false);
@@ -404,7 +385,7 @@ pub fn VM_Shifted_Alloc(
         // memory address relative to the VM. When the VM modifies it it
         // should be modifying the same chunk of memory we have allocated in
         // the engine.
-        *ptr = (mem as isize - (*common.currentVM).dataBase as isize) as *mut ();
+        *ptr = (mem as isize - (*view.common.currentVM).dataBase as isize) as *mut ();
     }
 }
 
@@ -435,28 +416,20 @@ pub fn VM_Shifted_Free(common: &mut Common, ptr: *mut *mut ()) {
 /// `VM_VmProfile_f`.
 ///
 /// Source: `oracle/codemp/qcommon/vm.cpp:854-893`
-pub fn VM_VmProfile_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn VM_VmProfile_f(view: &mut EngineHostView) {
     unsafe {
-        if common.lastVM.is_null() {
+        if view.common.lastVM.is_null() {
             return;
         }
 
-        let vm = common.lastVM;
+        let vm = view.common.lastVM;
 
         if (*vm).numSymbols == 0 {
             return;
         }
 
         let sorted = Z_Malloc(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             ((*vm).numSymbols as usize * core::mem::size_of::<*mut vmSymbol_t>()) as c_int,
             memtag_t::TAG_VM,
             qtrue,
@@ -484,13 +457,13 @@ pub fn VM_VmProfile_f(
             let sym = *sorted.offset(i);
             let perc = (100.0 * (*sym).profileCount as f32 / total as f32) as c_int;
             let name = std::ffi::CStr::from_ptr((*sym).symName.as_ptr()).to_string_lossy();
-            host.print(&format!("{perc:2}% {:9} {name}\n", (*sym).profileCount));
+            view.print(&format!("{perc:2}% {:9} {name}\n", (*sym).profileCount));
             (*sym).profileCount = 0;
         }
 
-        host.print(&format!("    {total:9.0} total\n"));
+        view.print(&format!("    {total:9.0} total\n"));
 
-        Z_Free(common, sorted as *mut ());
+        Z_Free(view.common, sorted as *mut ());
     }
 }
 
@@ -539,26 +512,21 @@ pub fn VM_VmInfo_f(common: &mut Common) {
 /// `VM_Init`.
 ///
 /// Source: `oracle/codemp/qcommon/vm.cpp:50-61`
-pub fn VM_Init(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn VM_Init(view: &mut EngineHostView) {
     // default to DLLs now instead. Our VMs are getting too HUGE.
-    host.cvar_register(
+    view.cvar_register(
         "vm_cgame",
         "0",
         (mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE)
             as c_int,
     );
-    host.cvar_register(
+    view.cvar_register(
         "vm_game",
         "0",
         (mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE)
             as c_int,
     );
-    host.cvar_register(
+    view.cvar_register(
         "vm_ui",
         "0",
         (mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE)
@@ -568,23 +536,17 @@ pub fn VM_Init(
     // so if pure we can force the same method (be it vm or dll) -rww
 
     Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"vmprofile".as_ptr(),
-        Some(|common, cm, _sv, rm, _rmg, _g2, host| VM_VmProfile_f(common, cm, rm, host)),
+        Some(|view| VM_VmProfile_f(view)),
     );
     Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"vminfo".as_ptr(),
-        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| VM_VmInfo_f(common)),
+        Some(|view| VM_VmInfo_f(view.common)),
     );
 
-    common.vmTable = unsafe { core::mem::zeroed() };
+    view.common.vmTable = unsafe { core::mem::zeroed() };
 }
 
 /// `VM_Alloc`.
@@ -592,14 +554,8 @@ pub fn VM_Init(
 /// Raven: the `Z_Malloc` alternative is commented out — `Hunk_Alloc` is the
 /// live path.
 /// Source: `oracle/codemp/qcommon/vm.cpp:227-231`
-pub fn VM_Alloc(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    size: c_int,
-) -> *mut () {
-    Hunk_Alloc(common, cm, rm, host, size, ha_pref::h_high)
+pub fn VM_Alloc(view: &mut EngineHostView, size: c_int) -> *mut () {
+    Hunk_Alloc(view, size, ha_pref::h_high)
 }
 
 /// `VM_LoadSymbols`.
@@ -607,15 +563,9 @@ pub fn VM_Alloc(
 /// Raven: `CRAZY_SYMBOL_MAP` is never defined in this build; the
 /// `g_symbolMap` write-through cache is intentionally unreachable here.
 /// Source: `oracle/codemp/qcommon/vm.cpp:238-323`
-pub fn VM_LoadSymbols(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    vm: *mut vm_t,
-) {
+pub fn VM_LoadSymbols(view: &mut EngineHostView, vm: *mut vm_t) {
     // don't load symbols if not developer
-    if host.cvar_integer("developer") == 0 {
+    if view.cvar_integer("developer") == 0 {
         return;
     }
 
@@ -628,10 +578,10 @@ pub fn VM_LoadSymbols(
 
         let symbols = format!("vm/{}.map", String::from_utf8_lossy(&name[..n]));
 
-        let mapfile = match host.fs_read_file(&symbols) {
+        let mapfile = match view.fs_read_file(&symbols) {
             Some(bytes) => bytes,
             None => {
-                host.print(&format!("Couldn't load symbol file: {symbols}\n"));
+                view.print(&format!("Couldn't load symbol file: {symbols}\n"));
                 return;
             }
         };
@@ -663,7 +613,7 @@ pub fn VM_LoadSymbols(
             let (token, rest) = COM_Parse(cursor);
             cursor = rest;
             if token.is_empty() {
-                host.print("WARNING: incomplete line at end of file\n");
+                view.print("WARNING: incomplete line at end of file\n");
                 break;
             }
             let token_c = std::ffi::CString::new(token).unwrap();
@@ -672,18 +622,13 @@ pub fn VM_LoadSymbols(
             let (token, rest) = COM_Parse(cursor);
             cursor = rest;
             if token.is_empty() {
-                host.print("WARNING: incomplete line at end of file\n");
+                view.print("WARNING: incomplete line at end of file\n");
                 break;
             }
             let chars = token.len();
 
-            let sym = VM_Alloc(
-                common,
-                cm,
-                rm,
-                host,
-                (core::mem::size_of::<vmSymbol_t>() + chars) as c_int,
-            ) as *mut vmSymbol_t;
+            let sym = VM_Alloc(view, (core::mem::size_of::<vmSymbol_t>() + chars) as c_int)
+                as *mut vmSymbol_t;
             *prev = sym;
             prev = &mut (*sym).next;
             (*sym).next = core::ptr::null_mut();
@@ -705,7 +650,7 @@ pub fn VM_LoadSymbols(
         }
 
         (*vm).numSymbols = count;
-        host.print(&format!("{count} symbols parsed from {symbols}\n"));
+        view.print(&format!("{count} symbols parsed from {symbols}\n"));
     }
 }
 
@@ -716,10 +661,7 @@ pub fn VM_LoadSymbols(
 /// matching `vm_t::systemCall`'s already-landed shape.
 /// Source: `oracle/codemp/qcommon/vm.cpp:471-597`
 pub fn VM_Create(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     module: *const c_char,
     systemCalls: Option<extern "C" fn(*mut c_int) -> c_int>,
     mut interpret: vmInterpret_t,
@@ -727,31 +669,32 @@ pub fn VM_Create(
     unsafe {
         let module_str = std::ffi::CStr::from_ptr(module).to_string_lossy();
         if module.is_null() || module_str.is_empty() || systemCalls.is_none() {
-            host.error(errorParm_t::ERR_FATAL, "VM_Create: bad parms");
+            view.error(errorParm_t::ERR_FATAL, "VM_Create: bad parms");
         }
 
         // see if we already have the VM
         for i in 0..MAX_VM {
-            let name = std::ffi::CStr::from_ptr(common.vmTable[i].name.as_ptr()).to_string_lossy();
+            let name =
+                std::ffi::CStr::from_ptr(view.common.vmTable[i].name.as_ptr()).to_string_lossy();
             if name.eq_ignore_ascii_case(&module_str) {
-                return &mut common.vmTable[i] as *mut vm_t;
+                return &mut view.common.vmTable[i] as *mut vm_t;
             }
         }
 
         // find a free vm
         let mut i = 0;
         while i < MAX_VM {
-            if common.vmTable[i].name[0] == 0 {
+            if view.common.vmTable[i].name[0] == 0 {
                 break;
             }
             i += 1;
         }
 
         if i == MAX_VM {
-            host.error(errorParm_t::ERR_FATAL, "VM_Create: no free vm_t");
+            view.error(errorParm_t::ERR_FATAL, "VM_Create: no free vm_t");
         }
 
-        let vm = &mut common.vmTable[i] as *mut vm_t;
+        let vm = &mut view.common.vmTable[i] as *mut vm_t;
 
         let name_bytes = module_str.as_bytes();
         let n = name_bytes.len().min((*vm).name.len() - 1);
@@ -763,7 +706,7 @@ pub fn VM_Create(
 
         // never allow dll loading with a demo
         if interpret == vmInterpret_t::VMI_NATIVE {
-            if Cvar_VariableValue(common, cm, rm, host, c"fs_restrict".as_ptr()) != 0.0 {
+            if Cvar_VariableValue(view, c"fs_restrict".as_ptr()) != 0.0 {
                 interpret = vmInterpret_t::VMI_COMPILED;
             }
         }
@@ -771,12 +714,12 @@ pub fn VM_Create(
         if interpret == vmInterpret_t::VMI_NATIVE {
             // try to load as a system dll
             let vm_name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
-            host.print(&format!("Loading dll file {vm_name}.\n"));
+            view.print(&format!("Loading dll file {vm_name}.\n"));
             // SEAM-D11: `game_syscall_trampoline` is the C-variadic entry that
             // unpacks the va_list and dispatches to the armed engine slot; the
             // Rust `VM_DllSyscall` is reached through slot arming, not directly.
             (*vm).dllHandle = Sys_LoadDll(
-                common,
+                view.common,
                 module,
                 &mut (*vm).entryPoint,
                 Some(crate::vm::trampoline::game_syscall_trampoline),
@@ -785,20 +728,20 @@ pub fn VM_Create(
                 return vm;
             }
 
-            host.print("Failed to load dll, looking for qvm.\n");
+            view.print("Failed to load dll, looking for qvm.\n");
             interpret = vmInterpret_t::VMI_COMPILED;
         }
 
         // load the image
         let vm_name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
         let filename = format!("vm/{vm_name}.qvm");
-        host.print(&format!("Loading vm file {filename}.\n"));
-        let file_bytes = host.fs_read_file(&filename);
+        view.print(&format!("Loading vm file {filename}.\n"));
+        let file_bytes = view.fs_read_file(&filename);
         let header = match file_bytes.as_ref() {
             Some(bytes) if !bytes.is_empty() => bytes.as_ptr() as *mut vmHeader_t,
             _ => {
-                host.print("Failed.\n");
-                VM_Free(common, vm);
+                view.print("Failed.\n");
+                VM_Free(view.common, vm);
                 return core::ptr::null_mut();
             }
         };
@@ -821,8 +764,8 @@ pub fn VM_Create(
             || (*header).litLength < 0
             || (*header).codeLength <= 0
         {
-            VM_Free(common, vm);
-            host.error(
+            VM_Free(view.common, vm);
+            view.error(
                 errorParm_t::ERR_FATAL,
                 &format!("{filename} has bad header"),
             );
@@ -838,7 +781,7 @@ pub fn VM_Create(
         dataLength = 1 << j;
 
         // allocate zero filled space for initialized and uninitialized data
-        (*vm).dataBase = VM_Alloc(common, cm, rm, host, dataLength) as *mut u8;
+        (*vm).dataBase = VM_Alloc(view, dataLength) as *mut u8;
         (*vm).dataMask = dataLength - 1;
 
         // copy the intialized data
@@ -859,22 +802,21 @@ pub fn VM_Create(
         // allocate space for the jump targets, which will be filled in by
         // the compile/prep functions
         (*vm).instructionPointersLength = (*header).instructionCount * 4;
-        (*vm).instructionPointers =
-            VM_Alloc(common, cm, rm, host, (*vm).instructionPointersLength) as *mut c_int;
+        (*vm).instructionPointers = VM_Alloc(view, (*vm).instructionPointersLength) as *mut c_int;
 
         // copy or compile the instructions
         (*vm).codeLength = (*header).codeLength;
 
         if interpret as c_int >= vmInterpret_t::VMI_COMPILED as c_int {
             (*vm).compiled = qtrue;
-            crate::vm_x86::VM_Compile(common, cm, rm, host, vm, header);
+            crate::vm_x86::VM_Compile(view, vm, header);
         } else {
             (*vm).compiled = qfalse;
-            crate::vm_interpreted::VM_PrepareInterpreter(common, cm, rm, host, vm, header);
+            crate::vm_interpreted::VM_PrepareInterpreter(view, vm, header);
         }
 
         // load the map file
-        VM_LoadSymbols(common, cm, rm, host, vm);
+        VM_LoadSymbols(view, vm);
 
         // the stack is implicitly at the end of the image
         (*vm).programStack = (*vm).dataMask + 1;
@@ -943,13 +885,7 @@ pub fn VM_Call(common: &mut Common, vm: *mut vm_t, callnum: c_int, args: &[c_int
 /// `VM_Restart`.
 ///
 /// Source: `oracle/codemp/qcommon/vm.cpp:391-458`
-pub fn VM_Restart(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    vm: *mut vm_t,
-) -> *mut vm_t {
+pub fn VM_Restart(view: &mut EngineHostView, vm: *mut vm_t) -> *mut vm_t {
     unsafe {
         // DLL's can't be restarted in place
         if !(*vm).dllHandle.is_null() {
@@ -958,30 +894,22 @@ pub fn VM_Restart(
                 .to_string_lossy()
                 .into_owned();
 
-            VM_Free(common, vm);
+            VM_Free(view.common, vm);
 
             let name_c = std::ffi::CString::new(name).unwrap();
-            return VM_Create(
-                common,
-                cm,
-                rm,
-                host,
-                name_c.as_ptr(),
-                systemCall,
-                vmInterpret_t::VMI_NATIVE,
-            );
+            return VM_Create(view, name_c.as_ptr(), systemCall, vmInterpret_t::VMI_NATIVE);
         }
 
         // load the image
-        host.print("VM_Restart()\n");
+        view.print("VM_Restart()\n");
         let vm_name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
         let filename = format!("vm/{vm_name}.qvm");
-        host.print(&format!("Loading vm file {filename}.\n"));
-        let file_bytes = host.fs_read_file(&filename);
+        view.print(&format!("Loading vm file {filename}.\n"));
+        let file_bytes = view.fs_read_file(&filename);
         let header = match &file_bytes {
             Some(bytes) if !bytes.is_empty() => bytes.as_ptr() as *mut vmHeader_t,
             _ => {
-                host.error(errorParm_t::ERR_DROP, "VM_Restart failed.\n");
+                view.error(errorParm_t::ERR_DROP, "VM_Restart failed.\n");
             }
         };
 
@@ -998,8 +926,8 @@ pub fn VM_Restart(
             || (*header).litLength < 0
             || (*header).codeLength <= 0
         {
-            VM_Free(common, vm);
-            host.error(
+            VM_Free(view.common, vm);
+            view.error(
                 errorParm_t::ERR_FATAL,
                 &format!("{filename} has bad header"),
             );

@@ -395,8 +395,7 @@ pub fn EA_Setup(bot: &mut BotLib) -> c_int {
     // initialize the bot inputs
     bot.botinputs = GetClearedHunkMemory(
         bot,
-        (bot.botlibglobals.maxclients as usize * core::mem::size_of::<bot_input_t>())
-            as c_ulong,
+        (bot.botlibglobals.maxclients as usize * core::mem::size_of::<bot_input_t>()) as c_ulong,
     ) as *mut bot_input_t;
     BLERR_NOERROR
 }

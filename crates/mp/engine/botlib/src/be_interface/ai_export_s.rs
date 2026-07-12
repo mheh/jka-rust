@@ -29,9 +29,8 @@ pub struct ai_export_s {
     pub BotLoadCharacter: Option<fn(bot: &mut BotLib, charfile: *mut c_char, skill: f32) -> c_int>,
     pub BotFreeCharacter: Option<fn(bot: &mut BotLib, handle: c_int)>,
     pub Characteristic_Float: Option<fn(bot: &mut BotLib, character: c_int, index: c_int) -> f32>,
-    pub Characteristic_BFloat: Option<
-        fn(bot: &mut BotLib, character: c_int, index: c_int, min: f32, max: f32) -> f32,
-    >,
+    pub Characteristic_BFloat:
+        Option<fn(bot: &mut BotLib, character: c_int, index: c_int, min: f32, max: f32) -> f32>,
     pub Characteristic_Integer:
         Option<fn(bot: &mut BotLib, character: c_int, index: c_int) -> c_int>,
     pub Characteristic_BInteger: Option<
@@ -67,7 +66,8 @@ pub struct ai_export_s {
             var7: *mut c_char,
         ),
     >,
-    pub BotNumInitialChats: Option<fn(bot: &mut BotLib, chatstate: c_int, r#type: *mut c_char) -> c_int>,
+    pub BotNumInitialChats:
+        Option<fn(bot: &mut BotLib, chatstate: c_int, r#type: *mut c_char) -> c_int>,
     pub BotReplyChat: Option<
         fn(
             common: &mut Common,
@@ -87,13 +87,19 @@ pub struct ai_export_s {
         ) -> c_int,
     >,
     pub BotChatLength: Option<fn(bot: &mut BotLib, chatstate: c_int) -> c_int>,
-    pub BotEnterChat: Option<fn(bot: &mut BotLib, chatstate: c_int, clientto: c_int, sendto: c_int)>,
+    pub BotEnterChat:
+        Option<fn(bot: &mut BotLib, chatstate: c_int, clientto: c_int, sendto: c_int)>,
     pub BotGetChatMessage:
         Option<fn(bot: &mut BotLib, chatstate: c_int, buf: *mut c_char, size: c_int)>,
     pub StringContains:
         Option<fn(str1: *mut c_char, str2: *mut c_char, casesensitive: c_int) -> c_int>,
     pub BotFindMatch: Option<
-        fn(bot: &mut BotLib, str: *mut c_char, r#match: *mut bot_match_t, context: c_ulong) -> c_int,
+        fn(
+            bot: &mut BotLib,
+            str: *mut c_char,
+            r#match: *mut bot_match_t,
+            context: c_ulong,
+        ) -> c_int,
     >,
     pub BotMatchVariable: Option<
         fn(
@@ -116,7 +122,8 @@ pub struct ai_export_s {
         ) -> c_int,
     >,
     pub BotSetChatGender: Option<fn(bot: &mut BotLib, chatstate: c_int, gender: c_int)>,
-    pub BotSetChatName: Option<fn(bot: &mut BotLib, chatstate: c_int, name: *mut c_char, client: c_int)>,
+    pub BotSetChatName:
+        Option<fn(bot: &mut BotLib, chatstate: c_int, name: *mut c_char, client: c_int)>,
     //-----------------------------------
     // be_ai_goal.h
     //-----------------------------------
@@ -129,7 +136,8 @@ pub struct ai_export_s {
     pub BotDumpAvoidGoals: Option<fn(bot: &mut BotLib, goalstate: c_int)>,
     pub BotDumpGoalStack: Option<fn(bot: &mut BotLib, goalstate: c_int)>,
     pub BotGoalName: Option<fn(bot: &mut BotLib, number: c_int, name: *mut c_char, size: c_int)>,
-    pub BotGetTopGoal: Option<fn(bot: &mut BotLib, goalstate: c_int, goal: *mut bot_goal_t) -> c_int>,
+    pub BotGetTopGoal:
+        Option<fn(bot: &mut BotLib, goalstate: c_int, goal: *mut bot_goal_t) -> c_int>,
     pub BotGetSecondGoal:
         Option<fn(bot: &mut BotLib, goalstate: c_int, goal: *mut bot_goal_t) -> c_int>,
     pub BotChooseLTGItem: Option<
@@ -154,7 +162,8 @@ pub struct ai_export_s {
             maxtime: f32,
         ) -> c_int,
     >,
-    pub BotTouchingGoal: Option<fn(bot: &mut BotLib, origin: vec3_t, goal: *mut bot_goal_t) -> c_int>,
+    pub BotTouchingGoal:
+        Option<fn(bot: &mut BotLib, origin: vec3_t, goal: *mut bot_goal_t) -> c_int>,
     pub BotItemGoalInVisButNotVisible: Option<
         fn(
             bot: &mut BotLib,
@@ -167,7 +176,8 @@ pub struct ai_export_s {
     pub BotGetLevelItemGoal: Option<
         fn(bot: &mut BotLib, index: c_int, classname: *mut c_char, goal: *mut bot_goal_t) -> c_int,
     >,
-    pub BotGetNextCampSpotGoal: Option<fn(bot: &mut BotLib, num: c_int, goal: *mut bot_goal_t) -> c_int>,
+    pub BotGetNextCampSpotGoal:
+        Option<fn(bot: &mut BotLib, num: c_int, goal: *mut bot_goal_t) -> c_int>,
     pub BotGetMapLocationGoal:
         Option<fn(bot: &mut BotLib, name: *mut c_char, goal: *mut bot_goal_t) -> c_int>,
     pub BotAvoidGoalTime: Option<fn(bot: &mut BotLib, goalstate: c_int, number: c_int) -> f32>,
@@ -175,11 +185,13 @@ pub struct ai_export_s {
         Option<fn(bot: &mut BotLib, goalstate: c_int, number: c_int, avoidtime: f32)>,
     pub BotInitLevelItems: Option<fn(bot: &mut BotLib)>,
     pub BotUpdateEntityItems: Option<fn(bot: &mut BotLib)>,
-    pub BotLoadItemWeights: Option<fn(bot: &mut BotLib, goalstate: c_int, filename: *mut c_char) -> c_int>,
+    pub BotLoadItemWeights:
+        Option<fn(bot: &mut BotLib, goalstate: c_int, filename: *mut c_char) -> c_int>,
     pub BotFreeItemWeights: Option<fn(bot: &mut BotLib, goalstate: c_int)>,
     pub BotInterbreedGoalFuzzyLogic:
         Option<fn(bot: &mut BotLib, parent1: c_int, parent2: c_int, child: c_int)>,
-    pub BotSaveGoalFuzzyLogic: Option<fn(bot: &mut BotLib, goalstate: c_int, filename: *mut c_char)>,
+    pub BotSaveGoalFuzzyLogic:
+        Option<fn(bot: &mut BotLib, goalstate: c_int, filename: *mut c_char)>,
     pub BotMutateGoalFuzzyLogic:
         Option<fn(common: &mut Common, bot: &mut BotLib, goalstate: c_int, range: f32)>,
     pub BotAllocGoalState: Option<fn(bot: &mut BotLib, client: c_int) -> c_int>,
@@ -203,7 +215,8 @@ pub struct ai_export_s {
     >,
     pub BotResetAvoidReach: Option<fn(bot: &mut BotLib, movestate: c_int)>,
     pub BotResetLastAvoidReach: Option<fn(bot: &mut BotLib, movestate: c_int)>,
-    pub BotReachabilityArea: Option<fn(bot: &mut BotLib, origin: vec3_t, testground: c_int) -> c_int>,
+    pub BotReachabilityArea:
+        Option<fn(bot: &mut BotLib, origin: vec3_t, testground: c_int) -> c_int>,
     pub BotMovementViewTarget: Option<
         fn(
             bot: &mut BotLib,
@@ -226,10 +239,10 @@ pub struct ai_export_s {
     >,
     pub BotAllocMoveState: Option<fn(bot: &mut BotLib) -> c_int>,
     pub BotFreeMoveState: Option<fn(bot: &mut BotLib, handle: c_int)>,
-    pub BotInitMoveState: Option<fn(bot: &mut BotLib, handle: c_int, initmove: *mut bot_initmove_t)>,
-    pub BotAddAvoidSpot: Option<
-        fn(bot: &mut BotLib, movestate: c_int, origin: vec3_t, radius: f32, r#type: c_int),
-    >,
+    pub BotInitMoveState:
+        Option<fn(bot: &mut BotLib, handle: c_int, initmove: *mut bot_initmove_t)>,
+    pub BotAddAvoidSpot:
+        Option<fn(bot: &mut BotLib, movestate: c_int, origin: vec3_t, radius: f32, r#type: c_int)>,
     //-----------------------------------
     // be_ai_weap.h
     //-----------------------------------

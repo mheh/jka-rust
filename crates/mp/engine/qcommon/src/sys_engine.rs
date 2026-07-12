@@ -15,17 +15,15 @@
 
 use core::ffi::{c_char, c_int, c_long, c_void};
 
-use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::qfalse;
 use native_types::fileHandle_t;
 
-use crate::cm_load::RenderModels;
-use crate::collision_world::CollisionWorld;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::{com_error, com_printf, Common, MASK_QUED_EVENTS, MAX_QUED_EVENTS};
-use crate::cvar_fns::Cvar_VariableString;
+use crate::cvar_fns::{Cvar_Set, Cvar_VariableString};
 use crate::files_common::{FS_BuildOSPath4, FS_Read};
 use crate::files_pc::FS_Seek;
 use crate::msg::MSG_Init;
@@ -51,7 +49,11 @@ fn dlerror_string() -> String {
     if err.is_null() {
         String::new()
     } else {
-        unsafe { core::ffi::CStr::from_ptr(err).to_string_lossy().into_owned() }
+        unsafe {
+            core::ffi::CStr::from_ptr(err)
+                .to_string_lossy()
+                .into_owned()
+        }
     }
 }
 
@@ -77,7 +79,9 @@ pub unsafe fn Sys_LoadDll(
     // branch (`%si386.so`) — the only unix arch the oracle defines and the name
     // CI ships (`jampgamei386.so`).
     // Source: `oracle/codemp/unix/unix_main.c:342-356`
-    let name_str = core::ffi::CStr::from_ptr(name).to_string_lossy().into_owned();
+    let name_str = core::ffi::CStr::from_ptr(name)
+        .to_string_lossy()
+        .into_owned();
     let fname = std::ffi::CString::new(format!("{name_str}i386.so")).unwrap_or_default();
 
     // bk001129 - was RTLD_LAZY: `#define Q_RTLD RTLD_NOW`.
@@ -89,7 +93,9 @@ pub unsafe fn Sys_LoadDll(
 
     let mut path = FS_BuildOSPath4(common, basepath, gamedir, fname.as_ptr());
     // bk001206 - verbose
-    let path_str = core::ffi::CStr::from_ptr(path).to_string_lossy().into_owned();
+    let path_str = core::ffi::CStr::from_ptr(path)
+        .to_string_lossy()
+        .into_owned();
     com_printf(common, &format!("Sys_LoadDll({path_str})... \n"));
 
     // bk001129 - from cvs1.17 (mkv), was fname not fn
@@ -105,7 +111,9 @@ pub unsafe fn Sys_LoadDll(
 
             path = FS_BuildOSPath4(common, cdpath, gamedir, fname.as_ptr());
             lib_handle = libc::dlopen(path, q_rtld);
-            let path2 = core::ffi::CStr::from_ptr(path).to_string_lossy().into_owned();
+            let path2 = core::ffi::CStr::from_ptr(path)
+                .to_string_lossy()
+                .into_owned();
             if lib_handle.is_null() {
                 // bk001206 - report any problem
                 com_printf(
@@ -189,16 +197,8 @@ pub fn Sys_StreamedRead(
 ///
 /// Raven's `int offset` param is widened to `c_long` to match the `FS_Seek` seam
 /// (the caller already holds a `c_long` offset).
-pub fn Sys_StreamSeek(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    f: fileHandle_t,
-    offset: c_long,
-    origin: c_int,
-) {
-    FS_Seek(common, cm, rm, host, f, offset, origin);
+pub fn Sys_StreamSeek(view: &mut EngineHostView, f: fileHandle_t, offset: c_long, origin: c_int) {
+    FS_Seek(view, f, offset, origin);
 }
 
 /// Raven `Sys_QueEvent` (unix) — push one event onto the 256-entry
@@ -257,40 +257,44 @@ pub unsafe fn Sys_QueEvent(
 /// the headless module host, so they queue nothing and are elided.
 ///
 /// Source: `oracle/codemp/unix/unix_main.c:995-1051`
-pub fn Sys_GetEvent(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) -> sysEvent_t {
+pub fn Sys_GetEvent(view: &mut EngineHostView) -> sysEvent_t {
     // return if we have data
-    if common.sys_events.head > common.sys_events.tail {
-        common.sys_events.tail += 1;
-        return common.sys_events.que[((common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
+    if view.common.sys_events.head > view.common.sys_events.tail {
+        view.common.sys_events.tail += 1;
+        return view.common.sys_events.que
+            [((view.common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
     }
 
     // check for console commands
     if let Some(s) = native_platform::net::sys_console_input() {
         let bytes = s.as_bytes();
         let len = bytes.len() as c_int + 1;
-        let b = Z_Malloc(common, cm, rm, host, len, memtag_t::TAG_EVENT, qfalse, 4) as *mut u8;
+        let b = Z_Malloc(view, len, memtag_t::TAG_EVENT, qfalse, 4) as *mut u8;
         // strcpy( b, s ): copy the line and NUL-terminate.
         unsafe {
             core::ptr::copy_nonoverlapping(bytes.as_ptr(), b, bytes.len());
             *b.add(bytes.len()) = 0;
-            Sys_QueEvent(common, 0, sysEventType_t::SE_CONSOLE, 0, 0, len, b as *mut c_void);
+            Sys_QueEvent(
+                view.common,
+                0,
+                sysEventType_t::SE_CONSOLE,
+                0,
+                0,
+                len,
+                b as *mut c_void,
+            );
         }
     }
 
     // check for network packets
     let mut netmsg: msg_t = unsafe { core::mem::zeroed() };
-    let pkt = common.sys_packetReceived.as_mut_ptr();
-    MSG_Init(common, cm, rm, host, &mut netmsg, pkt, MAX_MSGLEN as c_int);
+    let pkt = view.common.sys_packetReceived.as_mut_ptr();
+    MSG_Init(view, &mut netmsg, pkt, MAX_MSGLEN as c_int);
     let mut adr: netadr_t = unsafe { core::mem::zeroed() };
-    if Sys_GetPacket(common, &mut adr, &mut netmsg) {
+    if Sys_GetPacket(view.common, &mut adr, &mut netmsg) {
         // copy out to a seperate buffer for qeueing
         let len = core::mem::size_of::<netadr_t>() as c_int + netmsg.cursize;
-        let buf = Z_Malloc(common, cm, rm, host, len, memtag_t::TAG_EVENT, qfalse, 4) as *mut netadr_t;
+        let buf = Z_Malloc(view, len, memtag_t::TAG_EVENT, qfalse, 4) as *mut netadr_t;
         unsafe {
             *buf = adr;
             core::ptr::copy_nonoverlapping(
@@ -298,18 +302,53 @@ pub fn Sys_GetEvent(
                 buf.add(1) as *mut u8,
                 netmsg.cursize as usize,
             );
-            Sys_QueEvent(common, 0, sysEventType_t::SE_PACKET, 0, 0, len, buf as *mut c_void);
+            Sys_QueEvent(
+                view.common,
+                0,
+                sysEventType_t::SE_PACKET,
+                0,
+                0,
+                len,
+                buf as *mut c_void,
+            );
         }
     }
 
     // return if we have data
-    if common.sys_events.head > common.sys_events.tail {
-        common.sys_events.tail += 1;
-        return common.sys_events.que[((common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
+    if view.common.sys_events.head > view.common.sys_events.tail {
+        view.common.sys_events.tail += 1;
+        return view.common.sys_events.que
+            [((view.common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
     }
 
     // create an empty event to return
     let mut ev: sysEvent_t = unsafe { core::mem::zeroed() };
-    ev.evTime = sys_milliseconds(common);
+    ev.evTime = sys_milliseconds(view.common);
     ev
+}
+
+/// Raven's unix `arch` cvar value (`Sys_Init`'s `#if` chain): only the linux
+/// i386 build has a specific string; every other target this port builds for
+/// falls to Raven's own `#else` arms (`"linux unknown"` / `"unknown"`).
+///
+/// Source: `oracle/codemp/unix/unix_main.c:164-200`
+#[cfg(all(target_os = "linux", target_arch = "x86"))]
+const SYS_ARCH: &str = "linux i386";
+#[cfg(all(target_os = "linux", not(target_arch = "x86")))]
+const SYS_ARCH: &str = "linux unknown";
+#[cfg(not(target_os = "linux"))]
+const SYS_ARCH: &str = "unknown";
+
+/// Raven unix `Sys_Init` — the `arch`/`username` cvar writes. The input-layer
+/// tail is client-shell slice work:
+//TODO: Port Sys_In_Restart_f + IN_Init (client-shell slice)
+// Source: oracle/codemp/unix/unix_main.c:162,204
+///
+/// Source: `oracle/codemp/unix/unix_main.c:160-206`
+pub fn Sys_Init(view: &mut EngineHostView) {
+    let arch = std::ffi::CString::new(SYS_ARCH).unwrap();
+    Cvar_Set(view, c"arch".as_ptr(), arch.as_ptr());
+    let username = std::ffi::CString::new(native_platform::sys_main::Sys_GetCurrentUser())
+        .unwrap_or_else(|_| std::ffi::CString::new("player").unwrap());
+    Cvar_Set(view, c"username".as_ptr(), username.as_ptr());
 }

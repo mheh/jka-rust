@@ -4,26 +4,17 @@
 
 use std::os::raw::{c_char, c_int};
 
-use mp_host_interface::EngineHost;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::ha_pref;
 
-use crate::collision_world::CollisionWorld;
 use crate::common::com_error;
 use crate::common::com_printf;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
 use crate::qfiles::vm_header_t::vmHeader_t;
 use crate::vm::opcode_t::opcode_t;
 use crate::vm::vm_s::vm_t;
 use crate::vm_fns::VM_ValueToSymbol;
-
-// PORT-NOTE(rm-types): `RenderModels` is the state-receiver type pinned by
-// the engine-fork-discovery preamble's receiver order (rmg-terrain.md /
-// tr-model.md own its real shape); not importable here yet. Referenced by
-// its exact resolved-signature name per the no-stub rule (z_memman_pc.rs
-// precedent); reported as a missing symbol for the finisher.
-#[allow(dead_code)]
-use crate::cm_load::RenderModels;
 
 // Real in-crate callee imported (sweep: extern forward-declares eliminated).
 use crate::z_memman_pc::Hunk_Alloc;
@@ -83,17 +74,9 @@ pub fn VM_StackTrace(
 /// Raven `VM_PrepareInterpreter`.
 ///
 /// Source: `oracle/codemp/qcommon/vm_interpreted.cpp:139-266`
-pub fn VM_PrepareInterpreter(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    vm: *mut vm_t,
-    header: *mut vmHeader_t,
-) {
+pub fn VM_PrepareInterpreter(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeader_t) {
     unsafe {
-        (*vm).codeBase =
-            Hunk_Alloc(common, cm, rm, host, (*vm).codeLength * 4, ha_pref::h_high).cast::<u8>();
+        (*vm).codeBase = Hunk_Alloc(view, (*vm).codeLength * 4, ha_pref::h_high).cast::<u8>();
         // memcpy( vm->codeBase, (byte *)header + header->codeOffset, vm->codeLength ); (Raven: commented out)
 
         // we don't need to translate the instructions, but we still need

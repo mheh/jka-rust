@@ -58,7 +58,11 @@ unsafe fn c_strlen(p: *const c_char) -> usize {
 /// `Com_StringContains`.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:551-578`
-fn Com_StringContains(mut str1: *mut c_char, str2: *mut c_char, casesensitive: c_int) -> *mut c_char {
+fn Com_StringContains(
+    mut str1: *mut c_char,
+    str2: *mut c_char,
+    casesensitive: c_int,
+) -> *mut c_char {
     unsafe {
         let len1 = c_strlen(str1);
         let len2 = c_strlen(str2);
@@ -185,7 +189,8 @@ fn Com_FilterPath(filter: *mut c_char, name: *mut c_char, casesensitive: c_int) 
     unsafe {
         let mut i = 0usize;
         while i < MAX_QPATH - 1 && *filter.add(i) != 0 {
-            new_filter[i] = if *filter.add(i) == b'\\' as c_char || *filter.add(i) == b':' as c_char {
+            new_filter[i] = if *filter.add(i) == b'\\' as c_char || *filter.add(i) == b':' as c_char
+            {
                 b'/' as c_char
             } else {
                 *filter.add(i)
@@ -204,7 +209,11 @@ fn Com_FilterPath(filter: *mut c_char, name: *mut c_char, casesensitive: c_int) 
         }
         new_name[i] = 0;
     }
-    Com_Filter(new_filter.as_mut_ptr(), new_name.as_mut_ptr(), casesensitive)
+    Com_Filter(
+        new_filter.as_mut_ptr(),
+        new_name.as_mut_ptr(),
+        casesensitive,
+    )
 }
 
 // ===========================================================================

@@ -797,9 +797,8 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
             return core::ptr::null_mut();
         }
         //
-        config =
-            GetClearedMemory(bot, core::mem::size_of::<weightconfig_t>() as u64)
-                as *mut weightconfig_t;
+        config = GetClearedMemory(bot, core::mem::size_of::<weightconfig_t>() as u64)
+            as *mut weightconfig_t;
         (*config).numweights = 0;
         Q_strncpyz(
             (*config).filename.as_mut_ptr(),

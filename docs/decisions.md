@@ -328,3 +328,38 @@ state live in `qcommon`'s `sys_engine` module; and the net/event receivers are
 Rationale: the platform layer is the one place a faithful transcription buys nothing
 (the oracle is unix-specific); native Rust is cleaner and cross-platform, while
 engine-reaching wrappers stay in qcommon so no platform global is introduced.
+
+## DEC-23 — The host seam is `EngineHostView`: one borrowed world bundle, not receiver lists beside a dyn host (2026-07-11)
+
+The engine island's live `EngineHost` is `EngineHostView<'a>` in
+`mp_engine_qcommon` (`common/engine_host_view.rs`): `{ &mut Common, &mut
+CollisionWorld }` plus the six opaque slots (`sv`/`cl`/`bot`/`rm`/`rmg`/`g2`),
+implementing the trait by routing back through the view-migrated functions
+(`self` recursion) and, for `Server`/`RenderModels`-touching methods, through
+accessor fields on `Common.hooks` installed at boot by
+`mp_engine_server::hook_install` / `mp_renderer::hook_install`. Every
+host-consuming C-track function takes `view: &mut EngineHostView` as its single
+world parameter; `EngineHooks` fields and `CmdFunction` carry the view
+(amending, not reverting, the 2026-07-12 receiver-order and hook-table
+rulings). §F code keeps its generic `&mut impl EngineHost` signatures and now
+receives the live view where only `MockHost` could stand before. Amends
+engine-fork-discovery ruling 43 (crate home moved `mp_engine_core` →
+`mp_engine_qcommon`; slots instead of plain `&mut` fields); the ruling-43
+split constructor is `mp_engine_core::engine_host_view(&mut Engine)`.
+
+Rejected: a raw-pointer `LiveHost` over `Engine` (user, 2026-07-11) — a host
+method mutating `Common` through a raw pointer while a caller frame holds
+`&mut Common` violates the `noalias` contract on `&mut` parameters; real
+miscompile risk, not theoretical.
+
+Slot-cast discipline is PER-SLOT: a cast copies the raw pointer out
+(`slot.as_raw()`), so the view stays usable while the cast borrow lives; sound
+iff nothing called meanwhile casts the SAME slot again (casts of different
+slots may nest). Hook-target functions get exactly the hook field's signature;
+callers already holding the real receiver use the `_body` variant so no second
+cast of the same slot is created (`SV_ShutdownGameProgs` pattern). The
+one-state-in-Common exception (`Common.stringed`) uses documented
+take/put-back at its `SE_*` wrappers.
+
+Plan + worker spec: `docs/plans/2026-07-11-host-seam-restructure.md`,
+`docs/plans/2026-07-11-host-seam-worker-spec.md`.

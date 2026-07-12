@@ -231,4 +231,3 @@ pub fn LibVarValue(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) 
     let v = LibVar(bot, var_name, value);
     unsafe { (*v).value }
 }
-

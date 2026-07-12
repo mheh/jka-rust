@@ -49,3 +49,33 @@ pub fn Sys_BeginStreamedFile(_f: fileHandle_t, _readAhead: c_int) {}
 ///
 /// Source: `oracle/codemp/unix/unix_main.c:755-756`
 pub fn Sys_EndStreamedFile(_f: fileHandle_t) {}
+
+/// Raven unix `Sys_Quit`'s process tail: restore blocking stdin
+/// (`fcntl(0, F_SETFL, … & ~FNDELAY)`) and `Sys_Exit` — the NDEBUG `_exit`
+/// branch, Raven's regular behavior. The `CL_Shutdown()` head stays with the
+/// caller (a hook the platform tier cannot reach).
+///
+/// Source: `oracle/codemp/unix/unix_main.c:140-158`
+pub fn Sys_Exit_restore_stdin(ex: c_int) -> ! {
+    unsafe {
+        let fl = libc::fcntl(0, libc::F_GETFL, 0);
+        libc::fcntl(0, libc::F_SETFL, fl & !libc::O_NDELAY);
+        libc::_exit(ex);
+    }
+}
+
+/// Raven unix `Sys_GetCurrentUser` — `getpwuid(getuid())->pw_name`, or
+/// `"player"` when there is no passwd entry.
+///
+/// Source: `oracle/codemp/unix/unix_shared.cpp:342-350`
+pub fn Sys_GetCurrentUser() -> String {
+    unsafe {
+        let p = libc::getpwuid(libc::getuid());
+        if p.is_null() {
+            return "player".to_string();
+        }
+        core::ffi::CStr::from_ptr((*p).pw_name)
+            .to_string_lossy()
+            .into_owned()
+    }
+}

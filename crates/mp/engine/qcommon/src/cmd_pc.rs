@@ -6,18 +6,15 @@
 
 use core::ffi::{c_char, c_int, CStr};
 
-use mp_host_interface::engine_host::EngineHost;
-
 use crate::cmd::cmd_function_t::{cmd_function_t, CmdFunction};
-use crate::collision_world::CollisionWorld;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
 use crate::common_fns::Com_Filter;
-use crate::z_memman_pc::{CopyString, Ghoul2System, S_Malloc, Z_Free};
+use crate::z_memman_pc::{CopyString, S_Malloc, Z_Free};
 
 // `Server` is a type-erased receiver slot: the real type lives in
 // mp_engine_server, which depends on this crate (importing it would cycle).
 // Re-exported at this historical home; defined once in `common::opaque_slots`.
-pub(crate) use crate::cm_load::{RenderModels, RmManager};
 pub use crate::common::opaque_slots::Server;
 
 use crate::common::com_printf;
@@ -28,22 +25,22 @@ use mp_qshared::shared::q_string::Q_stricmp;
 ///
 /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:18-39`
 pub fn Cmd_AddCommand(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     cmd_name: *const c_char,
     function: Option<CmdFunction>,
 ) {
     unsafe {
         // fail if the command already exists
-        let mut cmd: *mut cmd_function_t = common.cmd_functions;
+        let mut cmd: *mut cmd_function_t = view.common.cmd_functions;
         while !cmd.is_null() {
             if libc::strcmp(cmd_name, (*cmd).name) == 0 {
                 // allow completion-only commands to be silently doubled
                 if function.is_some() {
                     let name = CStr::from_ptr(cmd_name).to_string_lossy();
-                    com_printf(common, &format!("Cmd_AddCommand: {name} already defined\n"));
+                    com_printf(
+                        view.common,
+                        &format!("Cmd_AddCommand: {name} already defined\n"),
+                    );
                 }
                 return;
             }
@@ -51,17 +48,12 @@ pub fn Cmd_AddCommand(
         }
 
         // use a small malloc to avoid zone fragmentation
-        let cmd = S_Malloc(
-            common,
-            cm,
-            rm,
-            host,
-            core::mem::size_of::<cmd_function_t>() as c_int,
-        ) as *mut cmd_function_t;
-        (*cmd).name = CopyString(common, cm, rm, host, cmd_name);
+        let cmd =
+            S_Malloc(view, core::mem::size_of::<cmd_function_t>() as c_int) as *mut cmd_function_t;
+        (*cmd).name = CopyString(view, cmd_name);
         (*cmd).function = function;
-        (*cmd).next = common.cmd_functions;
-        common.cmd_functions = cmd;
+        (*cmd).next = view.common.cmd_functions;
+        view.common.cmd_functions = cmd;
     }
 }
 
@@ -149,19 +141,10 @@ pub fn Cmd_List_f(common: &mut Common) {
 /// `Cmd_ExecuteString`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:91-145`
-pub fn Cmd_ExecuteString(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    g2: &mut Ghoul2System,
-    host: &mut dyn EngineHost,
-    text: *const c_char,
-) {
+pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
     // execute the command line
-    crate::cmd_common::Cmd_TokenizeString(common, text);
-    if crate::cmd_common::Cmd_Argc(common) == 0 {
+    crate::cmd_common::Cmd_TokenizeString(view.common, text);
+    if crate::cmd_common::Cmd_Argc(view.common) == 0 {
         return; // no tokens
     }
 
@@ -170,19 +153,19 @@ pub fn Cmd_ExecuteString(
     // `prev`/`cmd` double-pointer walk is transcribed with raw pointers to
     // match Raven's link-rearrangement exactly.
     unsafe {
-        let mut prev: *mut *mut cmd_function_t = &mut common.cmd_functions as *mut _;
+        let mut prev: *mut *mut cmd_function_t = &mut view.common.cmd_functions as *mut _;
         while !(*prev).is_null() {
             let cmd = *prev;
-            if Q_stricmp(crate::cmd_common::Cmd_Argv(common, 0), (*cmd).name) == 0 {
+            if Q_stricmp(crate::cmd_common::Cmd_Argv(view.common, 0), (*cmd).name) == 0 {
                 // rearrange the links so that the command will be
                 // near the head of the list next time it is used
                 *prev = (*cmd).next;
-                (*cmd).next = common.cmd_functions;
-                common.cmd_functions = cmd;
+                (*cmd).next = view.common.cmd_functions;
+                view.common.cmd_functions = cmd;
 
                 // perform the action
                 if let Some(function) = (*cmd).function {
-                    function(common, cm, sv, rm, rmg, g2, host);
+                    function(view);
                 } else {
                     // let the cgame or game handle it
                     break;
@@ -194,7 +177,7 @@ pub fn Cmd_ExecuteString(
     }
 
     // check cvars
-    if Cvar_Command(common, cm, rm, host) != 0 {
+    if Cvar_Command(view) != 0 {
         return;
     }
 
@@ -202,28 +185,37 @@ pub fn Cmd_ExecuteString(
     // PORT-NOTE(com_cl_running/com_sv_running): `Common`'s `cvar_t*` handle
     // fields aren't landed yet (the cvar sub-struct TODO in `common/common.rs`);
     // referenced verbatim as missing symbols.
-    let cl_game_command = common.hooks.CL_GameCommand.expect("CL_GameCommand hook");
-    if !common.com_cl_running.is_null()
-        && unsafe { (*common.com_cl_running).integer != 0 && cl_game_command() != 0 }
+    let cl_game_command = view
+        .common
+        .hooks
+        .CL_GameCommand
+        .expect("CL_GameCommand hook");
+    if !view.common.com_cl_running.is_null()
+        && unsafe { (*view.common.com_cl_running).integer != 0 && cl_game_command(view) != 0 }
     {
         return;
     }
 
     // check server game commands
-    let sv_game_command = common
+    let sv_game_command = view
+        .common
         .hooks
         .SV_GameCommand
         .expect("SV_GameCommand hook — installed by mp_engine_server at boot");
-    if !common.com_sv_running.is_null()
-        && unsafe { (*common.com_sv_running).integer != 0 && sv_game_command(common, sv) != 0 }
+    if !view.common.com_sv_running.is_null()
+        && unsafe { (*view.common.com_sv_running).integer != 0 && sv_game_command(view) != 0 }
     {
         return;
     }
 
     // check ui commands
-    let ui_game_command = common.hooks.UI_GameCommand.expect("UI_GameCommand hook");
-    if !common.com_cl_running.is_null()
-        && unsafe { (*common.com_cl_running).integer != 0 && ui_game_command() != 0 }
+    let ui_game_command = view
+        .common
+        .hooks
+        .UI_GameCommand
+        .expect("UI_GameCommand hook");
+    if !view.common.com_cl_running.is_null()
+        && unsafe { (*view.common.com_cl_running).integer != 0 && ui_game_command(view) != 0 }
     {
         return;
     }
@@ -231,8 +223,10 @@ pub fn Cmd_ExecuteString(
     // send it as a server command if we are connected
     // this will usually result in a chat message
     //CL_ForwardCommandToServer ( text );
-    (common
+    let cl_forward = view
+        .common
         .hooks
         .CL_ForwardCommandToServer
-        .expect("CL_ForwardCommandToServer hook"))(text);
+        .expect("CL_ForwardCommandToServer hook");
+    cl_forward(view, text);
 }
