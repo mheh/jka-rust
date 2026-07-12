@@ -20,12 +20,20 @@ pub struct bot_consolemessage_t {
 /// Raven `bot_consolemessage_s` tag alias (`bot_consolemessage_t`'s C struct tag).
 pub type bot_consolemessage_s = bot_consolemessage_t;
 
-const _: () = assert!(core::mem::size_of::<bot_consolemessage_t>() == 288);
 const _: () = assert!(core::mem::offset_of!(bot_consolemessage_t, handle) == 0);
 const _: () = assert!(core::mem::offset_of!(bot_consolemessage_t, time) == 4);
 const _: () = assert!(core::mem::offset_of!(bot_consolemessage_t, r#type) == 8);
 const _: () = assert!(core::mem::offset_of!(bot_consolemessage_t, message) == 12);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(bot_consolemessage_t, prev) == 272);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(bot_consolemessage_t, next) == 280);
+const _: () = {
+    assert!(core::mem::size_of::<bot_consolemessage_t>() == 288);
+    assert!(core::mem::offset_of!(bot_consolemessage_t, prev) == 272);
+    assert!(core::mem::offset_of!(bot_consolemessage_t, next) == 280);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bot_consolemessage_t>() == 276);
+    assert!(core::mem::offset_of!(bot_consolemessage_t, prev) == 268);
+    assert!(core::mem::offset_of!(bot_consolemessage_t, next) == 272);
+};

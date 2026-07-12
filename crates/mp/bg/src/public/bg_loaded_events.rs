@@ -27,8 +27,18 @@ pub struct bgLoadedEvents_t {
     pub eventsParsed: qboolean,
 }
 
-const _: () = assert!(core::mem::size_of::<bgLoadedEvents_t>() == 19272);
 const _: () = assert!(core::mem::offset_of!(bgLoadedEvents_t, filename) == 0);
 const _: () = assert!(core::mem::offset_of!(bgLoadedEvents_t, torsoAnimEvents) == 64);
-const _: () = assert!(core::mem::offset_of!(bgLoadedEvents_t, legsAnimEvents) == 9664);
-const _: () = assert!(core::mem::offset_of!(bgLoadedEvents_t, eventsParsed) == 19264);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<bgLoadedEvents_t>() == 19272);
+    assert!(core::mem::offset_of!(bgLoadedEvents_t, legsAnimEvents) == 9664);
+    assert!(core::mem::offset_of!(bgLoadedEvents_t, eventsParsed) == 19264);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<bgLoadedEvents_t>() == 14468);
+    assert!(core::mem::offset_of!(bgLoadedEvents_t, legsAnimEvents) == 7264);
+    assert!(core::mem::offset_of!(bgLoadedEvents_t, eventsParsed) == 14464);
+};

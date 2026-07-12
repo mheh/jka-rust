@@ -10,17 +10,18 @@ name: Build modules
 # load a renamed module). Profile/arch live in the zip name, never in the
 # module filename:
 #
-#   Windows 32-bit  x86      jampgamex86.dll      (allowed failure, see below)
+#   Windows 32-bit  x86      jampgamex86.dll
 #   Windows 64-bit  x86_64   jampgamex86_64.dll
-#   Linux   32-bit  i386     jampgamei386.so      (allowed failure, see below)
+#   Linux   32-bit  i386     jampgamei386.so
 #   Linux   64-bit  x86_64   jampgamex86_64.so
 #
-# 32-bit lanes are `continue-on-error`: the workspace's layout static-asserts
-# are computed for LP64, and on ILP32 they fail by design (~52 errors in
-# mp_qshared alone — pointer-bearing structs shrink). They flip to enforced
-# once the ILP32 assert pass lands. Debug builds are a real link gate — the
-# cdylib's release link catches undefined symbols a local debug `cargo build`
-# tolerates on Linux/macOS.
+# All lanes are enforced: the ILP32 assert pass (2026-07-13) gave every
+# pointer-width-dependent layout assert in jampgame's crate tree a
+# cfg(target_pointer_width = "32") twin whose values are clang i386 ground
+# truth (i386-pc-windows-msvc and i386-pc-linux-gnu agree) — the retail
+# modules are 32-bit, so these are the shipping-ABI numbers. Debug builds are
+# a real link gate — the cdylib's release link catches undefined symbols a
+# local debug `cargo build` tolerates on Linux/macOS.
 #
 # Zip names are STABLE (no version segment) so the rolling `latest` release
 # keeps stable download URLs; the built commit is recorded in the release body.
@@ -88,7 +89,7 @@ jobs:
             cargo_artifact: jampgame.dll
             arch: x86
             platform: windows
-            allow_failure: true # ILP32 layout-assert pass not done yet
+            allow_failure: false
           - module: jampgamex86_64.dll
             runner: windows-latest
             triple: x86_64-pc-windows-msvc
@@ -102,7 +103,7 @@ jobs:
             cargo_artifact: libjampgame.so
             arch: i386
             platform: linux
-            allow_failure: true # ILP32 layout-assert pass not done yet
+            allow_failure: false
           - module: jampgamex86_64.so
             runner: ubuntu-latest
             triple: x86_64-unknown-linux-gnu

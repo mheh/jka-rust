@@ -18,13 +18,26 @@ pub struct navInfo_t {
     pub flags: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<navInfo_t>() == 88);
 const _: () = assert!(core::mem::offset_of!(navInfo_t, blocker) == 0);
-const _: () = assert!(core::mem::offset_of!(navInfo_t, direction) == 8);
-const _: () = assert!(core::mem::offset_of!(navInfo_t, pathDirection) == 20);
-const _: () = assert!(core::mem::offset_of!(navInfo_t, distance) == 32);
-const _: () = assert!(core::mem::offset_of!(navInfo_t, trace) == 36);
-const _: () = assert!(core::mem::offset_of!(navInfo_t, flags) == 84);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<navInfo_t>() == 88);
+    assert!(core::mem::offset_of!(navInfo_t, direction) == 8);
+    assert!(core::mem::offset_of!(navInfo_t, pathDirection) == 20);
+    assert!(core::mem::offset_of!(navInfo_t, distance) == 32);
+    assert!(core::mem::offset_of!(navInfo_t, trace) == 36);
+    assert!(core::mem::offset_of!(navInfo_t, flags) == 84);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<navInfo_t>() == 84);
+    assert!(core::mem::offset_of!(navInfo_t, direction) == 4);
+    assert!(core::mem::offset_of!(navInfo_t, pathDirection) == 16);
+    assert!(core::mem::offset_of!(navInfo_t, distance) == 28);
+    assert!(core::mem::offset_of!(navInfo_t, trace) == 32);
+    assert!(core::mem::offset_of!(navInfo_t, flags) == 80);
+};
 
 // `navInfo_t.flags` bits.
 // Source: `oracle/codemp/game/b_local.h:302-306`

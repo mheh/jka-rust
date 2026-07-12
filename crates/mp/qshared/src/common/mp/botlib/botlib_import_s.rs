@@ -94,26 +94,56 @@ pub struct botlib_import_t {
 
 pub type botlib_import_s = botlib_import_t;
 
-const _: () = assert!(core::mem::size_of::<botlib_import_t>() == 176);
 const _: () = assert!(core::mem::offset_of!(botlib_import_t, Print) == 0);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, Trace) == 8);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, EntityTrace) == 16);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, PointContents) == 24);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, inPVS) == 32);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, BSPEntityData) == 40);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, BSPModelMinsMaxsOrigin) == 48);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, BotClientCommand) == 56);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, GetMemory) == 64);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, FreeMemory) == 72);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, AvailableMemory) == 80);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, HunkAlloc) == 88);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, FS_FOpenFile) == 96);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, FS_Read) == 104);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, FS_Write) == 112);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, FS_FCloseFile) == 120);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, FS_Seek) == 128);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, DebugLineCreate) == 136);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, DebugLineDelete) == 144);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, DebugLineShow) == 152);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, DebugPolygonCreate) == 160);
-const _: () = assert!(core::mem::offset_of!(botlib_import_t, DebugPolygonDelete) == 168);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<botlib_import_t>() == 176);
+    assert!(core::mem::offset_of!(botlib_import_t, Trace) == 8);
+    assert!(core::mem::offset_of!(botlib_import_t, EntityTrace) == 16);
+    assert!(core::mem::offset_of!(botlib_import_t, PointContents) == 24);
+    assert!(core::mem::offset_of!(botlib_import_t, inPVS) == 32);
+    assert!(core::mem::offset_of!(botlib_import_t, BSPEntityData) == 40);
+    assert!(core::mem::offset_of!(botlib_import_t, BSPModelMinsMaxsOrigin) == 48);
+    assert!(core::mem::offset_of!(botlib_import_t, BotClientCommand) == 56);
+    assert!(core::mem::offset_of!(botlib_import_t, GetMemory) == 64);
+    assert!(core::mem::offset_of!(botlib_import_t, FreeMemory) == 72);
+    assert!(core::mem::offset_of!(botlib_import_t, AvailableMemory) == 80);
+    assert!(core::mem::offset_of!(botlib_import_t, HunkAlloc) == 88);
+    assert!(core::mem::offset_of!(botlib_import_t, FS_FOpenFile) == 96);
+    assert!(core::mem::offset_of!(botlib_import_t, FS_Read) == 104);
+    assert!(core::mem::offset_of!(botlib_import_t, FS_Write) == 112);
+    assert!(core::mem::offset_of!(botlib_import_t, FS_FCloseFile) == 120);
+    assert!(core::mem::offset_of!(botlib_import_t, FS_Seek) == 128);
+    assert!(core::mem::offset_of!(botlib_import_t, DebugLineCreate) == 136);
+    assert!(core::mem::offset_of!(botlib_import_t, DebugLineDelete) == 144);
+    assert!(core::mem::offset_of!(botlib_import_t, DebugLineShow) == 152);
+    assert!(core::mem::offset_of!(botlib_import_t, DebugPolygonCreate) == 160);
+    assert!(core::mem::offset_of!(botlib_import_t, DebugPolygonDelete) == 168);
+};
+// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree) — the retail
+// 32-bit module ABI.
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<botlib_import_t>() == 88);
+    assert!(core::mem::offset_of!(botlib_import_t, Trace) == 4);
+    assert!(core::mem::offset_of!(botlib_import_t, EntityTrace) == 8);
+    assert!(core::mem::offset_of!(botlib_import_t, PointContents) == 12);
+    assert!(core::mem::offset_of!(botlib_import_t, inPVS) == 16);
+    assert!(core::mem::offset_of!(botlib_import_t, BSPEntityData) == 20);
+    assert!(core::mem::offset_of!(botlib_import_t, BSPModelMinsMaxsOrigin) == 24);
+    assert!(core::mem::offset_of!(botlib_import_t, BotClientCommand) == 28);
+    assert!(core::mem::offset_of!(botlib_import_t, GetMemory) == 32);
+    assert!(core::mem::offset_of!(botlib_import_t, FreeMemory) == 36);
+    assert!(core::mem::offset_of!(botlib_import_t, AvailableMemory) == 40);
+    assert!(core::mem::offset_of!(botlib_import_t, HunkAlloc) == 44);
+    assert!(core::mem::offset_of!(botlib_import_t, FS_FOpenFile) == 48);
+    assert!(core::mem::offset_of!(botlib_import_t, FS_Read) == 52);
+    assert!(core::mem::offset_of!(botlib_import_t, FS_Write) == 56);
+    assert!(core::mem::offset_of!(botlib_import_t, FS_FCloseFile) == 60);
+    assert!(core::mem::offset_of!(botlib_import_t, FS_Seek) == 64);
+    assert!(core::mem::offset_of!(botlib_import_t, DebugLineCreate) == 68);
+    assert!(core::mem::offset_of!(botlib_import_t, DebugLineDelete) == 72);
+    assert!(core::mem::offset_of!(botlib_import_t, DebugLineShow) == 76);
+    assert!(core::mem::offset_of!(botlib_import_t, DebugPolygonCreate) == 80);
+    assert!(core::mem::offset_of!(botlib_import_t, DebugPolygonDelete) == 84);
+};
