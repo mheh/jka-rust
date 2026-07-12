@@ -690,12 +690,27 @@ pub fn com_printf(common: &mut Common, msg: &str) {
                 let mut aclock: libc::time_t = 0;
                 libc::time(&mut aclock);
                 let newtime = libc::localtime(&aclock);
+                // asctime(newtime), formatted from tm fields (libc's linux
+                // bindings omit asctime; same "Www Mmm dd hh:mm:ss yyyy\n" text).
                 let asc = if newtime.is_null() {
                     String::new()
                 } else {
-                    core::ffi::CStr::from_ptr(libc::asctime(newtime))
-                        .to_string_lossy()
-                        .into_owned()
+                    const WDAY: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                    const MON: [&str; 12] = [
+                        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct",
+                        "Nov", "Dec",
+                    ];
+                    let tm = &*newtime;
+                    format!(
+                        "{} {} {:2} {:02}:{:02}:{:02} {}\n",
+                        WDAY[tm.tm_wday.rem_euclid(7) as usize],
+                        MON[tm.tm_mon.rem_euclid(12) as usize],
+                        tm.tm_mday,
+                        tm.tm_hour,
+                        tm.tm_min,
+                        tm.tm_sec,
+                        1900 + tm.tm_year
+                    )
                 };
 
                 let lf = FS_FOpenFileWrite(common, c"qconsole.log".as_ptr());
