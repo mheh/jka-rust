@@ -130,7 +130,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::DownedSaberThink => DownedSaberThink(ctx, self_),
         EntThink::EWebThink => EWebThink(ctx, self_),
         EntThink::FinishSpawningItem => FinishSpawningItem(ctx, self_),
-        EntThink::G_ExplodeMissile => G_ExplodeMissile(ctx, self_),
+        EntThink::G_ExplodeMissile => G_ExplodeMissile(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::G_FreeEntity => G_FreeEntity(ctx, self_),
         EntThink::G_PortalifyEntities => G_PortalifyEntities(ctx, self_),
         EntThink::G_RunObject => G_RunObject(ctx, ctx.entity_id_of(self_).unwrap()),
@@ -159,7 +159,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::Think_SetupTrainTargets => Think_SetupTrainTargets(ctx, self_),
         EntThink::Think_SpawnNewDoorTrigger => Think_SpawnNewDoorTrigger(ctx, self_),
         EntThink::Think_Strike => Think_Strike(ctx, self_),
-        EntThink::Think_Target_Delay => Think_Target_Delay(ctx, self_),
+        EntThink::Think_Target_Delay => Think_Target_Delay(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::TrapThink => TrapThink(ctx, self_),
         EntThink::Use_BinaryMover_Go => Use_BinaryMover_Go(ctx, self_),
         EntThink::WP_VehWeapSetSolidToOwner => WP_VehWeapSetSolidToOwner(ctx, self_),
@@ -190,12 +190,14 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::rocketThink => rocketThink(ctx, self_),
         EntThink::saberBackToOwner => saberBackToOwner(ctx, self_),
         EntThink::saberFirstThrown => saberFirstThrown(ctx, self_),
-        EntThink::scriptrunner_run => scriptrunner_run(ctx, self_),
+        EntThink::scriptrunner_run => scriptrunner_run(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::sentryExpire => sentryExpire(ctx, self_),
         EntThink::shipboundary_think => shipboundary_think(ctx, self_),
-        EntThink::target_laser_start => target_laser_start(ctx, self_),
-        EntThink::target_laser_think => target_laser_think(ctx, self_),
-        EntThink::target_location_linkup => target_location_linkup(ctx, self_),
+        EntThink::target_laser_start => target_laser_start(ctx, ctx.entity_id_of(self_).unwrap()),
+        EntThink::target_laser_think => target_laser_think(ctx, ctx.entity_id_of(self_).unwrap()),
+        EntThink::target_location_linkup => {
+            target_location_linkup(ctx, ctx.entity_id_of(self_).unwrap())
+        }
         EntThink::thermalDetonatorExplode => thermalDetonatorExplode(ctx, self_),
         EntThink::thermalThinkStandard => thermalThinkStandard(ctx, self_),
         EntThink::trigger_always_think => trigger_always_think(ctx, self_),
@@ -297,17 +299,45 @@ pub fn dispatch_use(
         EntUse::Use_Multi => Use_Multi(ctx, self_, other, activator),
         EntUse::Use_Shooter => Use_Shooter(ctx, self_, other, activator),
         EntUse::Use_Strike => Use_Strike(ctx, self_, other, activator),
-        EntUse::Use_Target_Delay => Use_Target_Delay(ctx, self_, other, activator),
+        EntUse::Use_Target_Delay => Use_Target_Delay(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::Use_Target_Escapetrig => Use_Target_Escapetrig(ctx, self_, other, activator),
-        EntUse::Use_Target_Give => Use_Target_Give(ctx, self_, other, activator),
-        EntUse::Use_Target_Print => Use_Target_Print(ctx, self_, other, activator),
-        EntUse::Use_Target_Score => Use_Target_Score(ctx, self_, other, activator),
+        EntUse::Use_Target_Give => Use_Target_Give(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::Use_Target_Print => Use_Target_Print(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::Use_Target_Score => Use_Target_Score(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::Use_Target_Screenshake => Use_Target_Screenshake(ctx, self_, other, activator),
-        EntUse::Use_Target_Speaker => Use_Target_Speaker(ctx, self_, other, activator),
+        EntUse::Use_Target_Speaker => Use_Target_Speaker(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::Use_target_push => Use_target_push(ctx, self_, other, activator),
-        EntUse::Use_target_remove_powerups => {
-            Use_target_remove_powerups(ctx, self_, other, activator)
-        }
+        EntUse::Use_target_remove_powerups => Use_target_remove_powerups(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::ammo_generic_power_converter_use => {
             ammo_generic_power_converter_use(ctx, self_, other, activator)
         }
@@ -332,17 +362,72 @@ pub fn dispatch_use(
         }
         EntUse::siegeEndUse => siegeEndUse(ctx, self_, other, activator),
         EntUse::siegeTriggerUse => siegeTriggerUse(ctx, self_, other, activator),
-        EntUse::target_activate_use => target_activate_use(ctx, self_, other, activator),
-        EntUse::target_counter_use => target_counter_use(ctx, self_, other, activator),
-        EntUse::target_deactivate_use => target_deactivate_use(ctx, self_, other, activator),
-        EntUse::target_kill_use => target_kill_use(ctx, self_, other, activator),
-        EntUse::target_laser_use => target_laser_use(ctx, self_, other, activator),
-        EntUse::target_level_change_use => target_level_change_use(ctx, self_, other, activator),
-        EntUse::target_play_music_use => target_play_music_use(ctx, self_, other, activator),
-        EntUse::target_random_use => target_random_use(ctx, self_, other, activator),
-        EntUse::target_relay_use => target_relay_use(ctx, self_, other, activator),
-        EntUse::target_scriptrunner_use => target_scriptrunner_use(ctx, self_, other, activator),
-        EntUse::target_teleporter_use => target_teleporter_use(ctx, self_, other, activator),
+        EntUse::target_activate_use => target_activate_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::target_counter_use => target_counter_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::target_deactivate_use => target_deactivate_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::target_kill_use => target_kill_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::target_laser_use => target_laser_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::target_level_change_use => target_level_change_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::target_play_music_use => target_play_music_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::target_random_use => target_random_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::target_relay_use => target_relay_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::target_scriptrunner_use => target_scriptrunner_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::target_teleporter_use => target_teleporter_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::turretG2_base_use => turretG2_base_use(self_, other, activator),
         EntUse::turret_base_use => turret_base_use(self_, other, activator),
         EntUse::use_wall => use_wall(ctx, self_, other, activator),
@@ -1067,26 +1152,40 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         EntSpawn::trigger_shipboundary => SP_trigger_shipboundary(ctx, ent),
         EntSpawn::trigger_hyperspace => SP_trigger_hyperspace(ctx, ent),
         EntSpawn::trigger_asteroid_field => SP_trigger_asteroid_field(ctx, ent),
-        EntSpawn::target_give => SP_target_give(ent),
-        EntSpawn::target_remove_powerups => SP_target_remove_powerups(ent),
-        EntSpawn::target_delay => SP_target_delay(ctx, ent),
-        EntSpawn::target_speaker => SP_target_speaker(ctx, ent),
-        EntSpawn::target_print => SP_target_print(ent),
-        EntSpawn::target_laser => SP_target_laser(ctx, ent),
-        EntSpawn::target_score => SP_target_score(ent),
-        EntSpawn::target_teleporter => SP_target_teleporter(ctx, ent),
-        EntSpawn::target_relay => SP_target_relay(ent),
-        EntSpawn::target_kill => SP_target_kill(ent),
-        EntSpawn::target_position => SP_target_position(ent),
-        EntSpawn::target_location => SP_target_location(ctx, ent),
-        EntSpawn::target_counter => SP_target_counter(ent),
-        EntSpawn::target_random => SP_target_random(ent),
-        EntSpawn::target_scriptrunner => SP_target_scriptrunner(ctx, ent),
+        EntSpawn::target_give => SP_target_give(ctx.entity_mut(ctx.entity_id_of(ent).unwrap())),
+        EntSpawn::target_remove_powerups => {
+            SP_target_remove_powerups(ctx.entity_mut(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::target_delay => SP_target_delay(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::target_speaker => SP_target_speaker(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::target_print => SP_target_print(ctx.entity_mut(ctx.entity_id_of(ent).unwrap())),
+        EntSpawn::target_laser => SP_target_laser(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::target_score => SP_target_score(ctx.entity_mut(ctx.entity_id_of(ent).unwrap())),
+        EntSpawn::target_teleporter => SP_target_teleporter(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::target_relay => SP_target_relay(ctx.entity_mut(ctx.entity_id_of(ent).unwrap())),
+        EntSpawn::target_kill => SP_target_kill(ctx.entity_mut(ctx.entity_id_of(ent).unwrap())),
+        EntSpawn::target_position => {
+            SP_target_position(ctx.entity_mut(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::target_location => SP_target_location(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::target_counter => {
+            SP_target_counter(ctx.entity_mut(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::target_random => SP_target_random(ctx.entity_mut(ctx.entity_id_of(ent).unwrap())),
+        EntSpawn::target_scriptrunner => {
+            SP_target_scriptrunner(ctx, ctx.entity_id_of(ent).unwrap())
+        }
         EntSpawn::target_interest => SP_target_interest(ctx, ent),
-        EntSpawn::target_activate => SP_target_activate(ent),
-        EntSpawn::target_deactivate => SP_target_deactivate(ent),
-        EntSpawn::target_level_change => SP_target_level_change(ctx, ent),
-        EntSpawn::target_play_music => SP_target_play_music(ctx, ent),
+        EntSpawn::target_activate => {
+            SP_target_activate(ctx.entity_mut(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::target_deactivate => {
+            SP_target_deactivate(ctx.entity_mut(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::target_level_change => {
+            SP_target_level_change(ctx, ctx.entity_id_of(ent).unwrap())
+        }
+        EntSpawn::target_play_music => SP_target_play_music(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::target_push => SP_target_push(ctx, ent),
         EntSpawn::light => SP_light(ctx, ent),
         EntSpawn::path_corner => SP_path_corner(ctx, ent),

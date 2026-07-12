@@ -239,7 +239,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
             muzzle_dir,
             BOWCASTER_VELOCITY as f32,
             10000,
-            npc,
+            ctx.entity_id_of(npc).unwrap(),
             qfalse,
         );
 
@@ -316,8 +316,15 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
             muzzle_dir,
         );
 
-        let missile =
-            crate::g_missile::CreateMissile(ctx, muzzle1, muzzle_dir, 1600.0, 10000, npc, qfalse);
+        let missile = crate::g_missile::CreateMissile(
+            ctx,
+            muzzle1,
+            muzzle_dir,
+            1600.0,
+            10000,
+            ctx.entity_id_of(npc).unwrap(),
+            qfalse,
+        );
 
         crate::g_utils::G_Sound(
             ctx,
@@ -767,8 +774,15 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
             crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
         );
 
-        let missile =
-            crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc, qfalse);
+        let missile = crate::g_missile::CreateMissile(
+            ctx,
+            muzzle1,
+            forward,
+            1600.0,
+            10000,
+            ctx.entity_id_of(npc).unwrap(),
+            qfalse,
+        );
 
         if !missile.is_null() {
             (*missile).classname = c"bryar_proj".as_ptr().cast_mut();
@@ -932,7 +946,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
             forward,
             BOWCASTER_VELOCITY as f32,
             10000,
-            npc,
+            ctx.entity_id_of(npc).unwrap(),
             qfalse,
         );
 

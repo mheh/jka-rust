@@ -268,7 +268,7 @@ pub fn WP_FireBryarPistol(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qb
             (*ctx.world).globals.forward,
             BRYAR_PISTOL_VEL as f32,
             10000,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             altFire,
         );
 
@@ -332,8 +332,15 @@ pub fn WP_FireTurretMissile(
     ignore: *mut gentity_t,
 ) {
     unsafe {
-        let missile =
-            crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+        let missile = crate::g_missile::CreateMissile(
+            ctx,
+            start,
+            dir,
+            velocity as f32,
+            10000,
+            ctx.entity_id_of(ent).unwrap(),
+            altFire,
+        );
 
         (*missile).classname = c"generic_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_TURRET;
@@ -369,8 +376,15 @@ pub fn WP_FireGenericBlasterMissile(
     r#mod: c_int,
 ) {
     unsafe {
-        let missile =
-            crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+        let missile = crate::g_missile::CreateMissile(
+            ctx,
+            start,
+            dir,
+            velocity as f32,
+            10000,
+            ctx.entity_id_of(ent).unwrap(),
+            altFire,
+        );
 
         (*missile).classname = c"generic_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_BRYAR_PISTOL;
@@ -404,8 +418,15 @@ pub fn WP_FireBlasterMissile(
             damage = 10;
         }
 
-        let missile =
-            crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+        let missile = crate::g_missile::CreateMissile(
+            ctx,
+            start,
+            dir,
+            velocity as f32,
+            10000,
+            ctx.entity_id_of(ent).unwrap(),
+            altFire,
+        );
 
         (*missile).classname = c"blaster_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_BLASTER;
@@ -432,8 +453,15 @@ pub fn WP_FireTurboLaserMissile(
     unsafe {
         // FIXME (Raven): velocity/damage/splash externalized off the shooter ent.
         let velocity: c_int = (*ent).mass as c_int;
-        let missile =
-            crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, qfalse);
+        let missile = crate::g_missile::CreateMissile(
+            ctx,
+            start,
+            dir,
+            velocity as f32,
+            10000,
+            ctx.entity_id_of(ent).unwrap(),
+            qfalse,
+        );
 
         // use a custom shot effect / custom impact effect
         (*missile).s.otherEntityNum2 = (*ent).genericValue14;
@@ -477,8 +505,15 @@ pub fn WP_FireEmplacedMissile(
         let velocity: c_int = BLASTER_VELOCITY;
         let damage: c_int = BLASTER_DAMAGE;
 
-        let missile =
-            crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+        let missile = crate::g_missile::CreateMissile(
+            ctx,
+            start,
+            dir,
+            velocity as f32,
+            10000,
+            ctx.entity_id_of(ent).unwrap(),
+            altFire,
+        );
 
         (*missile).classname = c"emplaced_gun_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_TURRET; //WP_EMPLACED_GUN;
@@ -1109,7 +1144,7 @@ pub fn WP_BowcasterAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ctx.world).globals.forward,
             BOWCASTER_VELOCITY as f32,
             10000,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             qfalse,
         );
 
@@ -1197,7 +1232,7 @@ pub fn WP_BowcasterMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 dir,
                 vel,
                 10000,
-                ent,
+                ctx.entity_id_of(ent).unwrap(),
                 qtrue,
             );
 
@@ -1249,7 +1284,7 @@ pub fn WP_RepeaterMainFire(ctx: GameContext<'_>, ent: *mut gentity_t, dir: vec3_
             dir,
             REPEATER_VELOCITY as f32,
             10000,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             qfalse,
         );
 
@@ -1280,7 +1315,7 @@ pub fn WP_RepeaterAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ctx.world).globals.forward,
             REPEATER_ALT_VELOCITY as f32,
             10000,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             qtrue,
         );
 
@@ -1354,7 +1389,7 @@ pub fn WP_DEMP2_MainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ctx.world).globals.forward,
             DEMP2_VELOCITY as f32,
             10000,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             qfalse,
         );
 
@@ -1701,7 +1736,7 @@ pub fn WP_FlechetteMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 fwd,
                 FLECHETTE_VEL as f32,
                 10000,
-                ent,
+                ctx.entity_id_of(ent).unwrap(),
                 qfalse,
             );
 
@@ -1875,8 +1910,15 @@ pub fn WP_CreateFlechetteBouncyThing(
     unsafe {
         let vel = 700.0 + (*ctx.world).bg_state.rng.random() * 700.0;
         let life = 1500.0 + (*ctx.world).bg_state.rng.random() * 2000.0;
-        let missile =
-            crate::g_missile::CreateMissile(ctx, start, fwd, vel, life as c_int, self_, qtrue);
+        let missile = crate::g_missile::CreateMissile(
+            ctx,
+            start,
+            fwd,
+            vel,
+            life as c_int,
+            ctx.entity_id_of(self_).unwrap(),
+            qtrue,
+        );
 
         (*missile).think = Some(EntThink::WP_flechette_alt_blow).into();
 
@@ -2131,7 +2173,7 @@ pub fn RocketDie(
         (*self_).die = FnId::NONE;
         (*self_).r.contents = 0;
 
-        crate::g_missile::G_ExplodeMissile(ctx, self_);
+        crate::g_missile::G_ExplodeMissile(ctx, ctx.entity_id_of(self_).unwrap());
 
         (*self_).think = Some(EntThink::G_FreeEntity).into();
         (*self_).nextthink = (*ctx.world).level.time;
@@ -2159,7 +2201,7 @@ pub fn WP_FireRocket(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolea
             (*ctx.world).globals.forward,
             vel,
             10000,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             altFire,
         );
 
@@ -3873,7 +3915,7 @@ pub fn WP_FireConcussion(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ctx.world).globals.forward,
             vel,
             10000,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             qfalse,
         );
 
@@ -4294,7 +4336,7 @@ pub fn WP_TouchVehMissile(
         if !other.is_null() {
             myTrace.entityNum = (*other).s.number as i16;
         }
-        crate::g_missile::G_MissileImpact(ctx, ent, &mut myTrace);
+        crate::g_missile::G_MissileImpact(ctx, ctx.entity_id_of(ent).unwrap(), &mut myTrace);
     }
 }
 
@@ -4421,7 +4463,7 @@ pub fn WP_FireVehicleWeapon(
                 dir,
                 (*vehWeapon).fSpeed,
                 10000,
-                ent,
+                ctx.entity_id_of(ent).unwrap(),
                 qfalse,
             );
 

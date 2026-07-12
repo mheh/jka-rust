@@ -2191,7 +2191,15 @@ pub fn EWebFire(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_
         let bPoint = [p[0] - 16.0 * d[0], p[1] - 16.0 * d[1], p[2] - 16.0 * d[2]];
 
         // create the missile
-        let missile = CreateMissile(ctx, bPoint, d, 1200.0, 10000, owner, qfalse);
+        let missile = CreateMissile(
+            ctx,
+            bPoint,
+            d,
+            1200.0,
+            10000,
+            ctx.entity_id_of(owner).unwrap(),
+            qfalse,
+        );
 
         (*missile).classname = c"generic_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_TURRET as c_int;

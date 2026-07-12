@@ -456,8 +456,15 @@ pub fn Seeker_Fire(ctx: GameContext<'_>) {
             muzzle[i] = (*NPC).r.currentOrigin[i] + 15.0f32 * dir[i];
         }
 
-        let missile =
-            crate::g_missile::CreateMissile(ctx, muzzle, dir, 1000.0f32, 10000, NPC, qfalse);
+        let missile = crate::g_missile::CreateMissile(
+            ctx,
+            muzzle,
+            dir,
+            1000.0f32,
+            10000,
+            ctx.entity_id_of(NPC).unwrap(),
+            qfalse,
+        );
 
         crate::g_utils::G_PlayEffectID(
             crate::g_utils::G_EffectIndex(c"blaster/muzzle_flash".as_ptr()),

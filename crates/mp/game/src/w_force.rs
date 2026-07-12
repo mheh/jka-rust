@@ -3972,7 +3972,12 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                     if pull != 0 {
                         //deflect rather than reflect?
                     } else {
-                        G_ReflectMissile(ctx, self_, push_list[x], forward);
+                        G_ReflectMissile(
+                            ctx,
+                            ctx.entity_id_of(self_).unwrap(),
+                            ctx.entity_id_of(push_list[x]).unwrap(),
+                            forward,
+                        );
                     }
                 } else if cstr_to_str((*push_list[x]).classname).eq_ignore_ascii_case("func_static")
                 {

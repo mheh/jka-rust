@@ -347,7 +347,7 @@ pub fn Remote_Fire(ctx: GameContext<'_>) {
         forward,
         1000.0,
         10000,
-        npc,
+        ctx.entity_id_of(npc).unwrap(),
         qfalse,
     );
 
