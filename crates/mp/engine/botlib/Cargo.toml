@@ -6,6 +6,10 @@ edition = "2021"
 [lib]
 name = "mp_engine_botlib"
 
+[features]
+# Raven's BSPC (BSP-to-AAS compiler) tool build gate; never enabled in this port.
+bspc = []
+
 [dependencies]
 mp_qshared = { path = "../../qshared" }
 mp_bg = { path = "../../bg" }

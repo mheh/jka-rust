@@ -442,7 +442,7 @@ pub fn SkipWhitespace(data: *const c_char, hasNewLines: *mut qboolean) -> *const
 /// Source: `oracle/codemp/game/q_shared.c:421-526`
 pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *mut c_char {
     unsafe {
-        let mut c: c_int = 0;
+        let mut c: c_int;
         let mut len: c_int;
         let mut hasNewLines = qfalse;
         let mut data = *data_p;

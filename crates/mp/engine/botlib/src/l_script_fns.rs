@@ -28,7 +28,7 @@ use core::ffi::{c_char, c_int, c_long, c_ulong, c_void};
 use libc::sprintf;
 
 use crate::l_script::consts::{
-    MAX_TOKEN, P_RSHIFT_ASSIGN, SCFL_NOERRORS, SCFL_NOSTRINGESCAPECHARS, SCFL_NOSTRINGWHITESPACES,
+    MAX_TOKEN, SCFL_NOERRORS, SCFL_NOSTRINGESCAPECHARS, SCFL_NOSTRINGWHITESPACES,
     SCFL_NOWARNINGS, SCFL_PRIMITIVE, TT_BINARY, TT_DECIMAL, TT_FLOAT, TT_HEX, TT_INTEGER,
     TT_LITERAL, TT_LONG, TT_NAME, TT_NUMBER, TT_OCTAL, TT_PUNCTUATION, TT_STRING, TT_UNSIGNED,
 };
@@ -37,7 +37,7 @@ use crate::l_script::script_s::script_t;
 use crate::l_script::token_s::token_t;
 use crate::BotLib;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_WARNING};
-use mp_qshared::shared::{fileHandle_t, qfalse, qtrue, FS_READ, MAX_QPATH};
+use mp_qshared::shared::{fileHandle_t, FS_READ, MAX_QPATH};
 
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory, GetMemory};
 use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
@@ -126,18 +126,14 @@ pub fn ScriptWarning(bot: &mut BotLib, script: *mut script_t, text: *const c_cha
 macro_rules! script_error {
     ($bot:expr, $script:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
         let mut __se_text = [0 as c_char; 1024];
-        unsafe {
-            sprintf(__se_text.as_mut_ptr(), $fmt $(, $arg)*);
-        }
+        sprintf(__se_text.as_mut_ptr(), $fmt $(, $arg)*);
         ScriptError($bot, $script, __se_text.as_ptr())
     }};
 }
 macro_rules! script_warning {
     ($bot:expr, $script:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
         let mut __sw_text = [0 as c_char; 1024];
-        unsafe {
-            sprintf(__sw_text.as_mut_ptr(), $fmt $(, $arg)*);
-        }
+        sprintf(__sw_text.as_mut_ptr(), $fmt $(, $arg)*);
         ScriptWarning($bot, $script, __sw_text.as_ptr())
     }};
 }
@@ -501,7 +497,7 @@ pub fn PS_ReadEscapeCharacter(bot: &mut BotLib, script: *mut script_t, ch: *mut 
     unsafe {
         // step over the leading '\\'
         (*script).script_p = (*script).script_p.offset(1);
-        let mut c: c_int;
+        let c: c_int;
         // determine the escape character
         match *(*script).script_p as u8 as char {
             '\\' => c = b'\\' as c_int,
@@ -865,9 +861,7 @@ pub fn ScriptSkipTo(script: *mut script_t, value: *mut c_char) -> c_int {
 /// `PS_ReadPunctuation`'s note); the punctuationtable free arm is dropped
 /// per §C10.
 pub fn FreeScript(bot: &mut BotLib, script: *mut script_t) {
-    unsafe {
-        FreeMemory(bot, script as *mut ());
-    }
+    FreeMemory(bot, script as *mut ());
 }
 
 /// Raven `SetScriptPunctuations` — install a script's punctuation set
@@ -1388,17 +1382,17 @@ pub fn PS_ExpectTokenType(
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:990-1001`
 pub fn PS_ExpectAnyToken(bot: &mut BotLib, script: *mut script_t, token: *mut token_t) -> c_int {
-    unsafe {
-        if PS_ReadToken(bot, script, token) == 0 {
+    if PS_ReadToken(bot, script, token) == 0 {
+        unsafe {
             script_error!(
                 bot,
                 script,
                 c"couldn't read expected token".as_ptr() as *mut c_char,
-            );
-            0
-        } else {
-            1
-        }
+            )
+        };
+        0
+    } else {
+        1
     }
 }
 

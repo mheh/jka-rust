@@ -59,7 +59,6 @@ use crate::be_aas_bsp::be_aas_bsp_consts::MAX_EPAIRKEY;
 use crate::be_aas_bspq3::be_aas_bspq3_cpp_consts::MAX_BSPENTITIES;
 use crate::be_aas_def::bsp_link_s::bsp_link_t;
 use crate::l_script::consts::{SCFL_NOSTRINGESCAPECHARS, SCFL_NOSTRINGWHITESPACES, TT_STRING};
-use crate::l_script::script_s::script_t;
 use crate::l_script::token_s::token_t;
 use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
 
@@ -413,22 +412,20 @@ pub fn AAS_IntForBSPEpairKey(
 ///
 /// Source: `oracle/codemp/botlib/be_aas_bspq3.cpp:443-453`
 pub fn AAS_DumpBSPData(bot: &mut BotLib) {
-    unsafe {
-        AAS_FreeBSPEntities(bot);
+    AAS_FreeBSPEntities(bot);
 
-        if !bot.bspworld.dentdata.is_null() {
-            FreeMemory(bot, bot.bspworld.dentdata as *mut ());
-        }
-        bot.bspworld.dentdata = core::ptr::null_mut();
-        bot.bspworld.entdatasize = 0;
-        //
-        bot.bspworld.loaded = qfalse;
-        Com_Memset(
-            &mut bot.bspworld as *mut _ as *mut (),
-            0,
-            core::mem::size_of_val(&bot.bspworld),
-        );
+    if !bot.bspworld.dentdata.is_null() {
+        FreeMemory(bot, bot.bspworld.dentdata as *mut ());
     }
+    bot.bspworld.dentdata = core::ptr::null_mut();
+    bot.bspworld.entdatasize = 0;
+    //
+    bot.bspworld.loaded = qfalse;
+    Com_Memset(
+        &mut bot.bspworld as *mut _ as *mut (),
+        0,
+        core::mem::size_of_val(&bot.bspworld),
+    );
 }
 
 /// Raven `AAS_ParseBSPEntities`.

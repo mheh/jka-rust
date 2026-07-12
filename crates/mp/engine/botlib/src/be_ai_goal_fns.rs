@@ -20,7 +20,6 @@ use mp_qshared::common::mp::botlib::botlib_error::{
     BLERR_CANNOTLOADITEMCONFIG, BLERR_CANNOTLOADITEMWEIGHTS, BLERR_NOERROR,
 };
 use mp_qshared::common::mp::botlib::botlib_misc::BOTFILESBASEFOLDER;
-use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL, PRT_MESSAGE, PRT_WARNING};
 use mp_qshared::common::mp::qcommon::bot_goal::{bot_goal_t, GFL_DROPPED, GFL_ITEM, GFL_ROAM};
 use mp_qshared::shared::limits::MAX_CLIENTS;
@@ -42,8 +41,6 @@ use crate::be_ai_goal::itemconfig_s::itemconfig_t;
 use crate::be_ai_goal::iteminfo_s::iteminfo_t;
 use crate::be_ai_goal::levelitem_s::levelitem_t;
 use crate::be_ai_weight::weightconfig_s::weightconfig_t;
-use crate::l_libvar::libvar_s::libvar_t;
-use crate::l_precomp::source_s::source_t;
 use crate::l_script::consts::TT_STRING;
 use crate::l_script::token_s::token_t;
 use crate::l_struct::structdef_s::structdef_t;
@@ -570,8 +567,8 @@ pub fn BotGetSecondGoal(bot: &mut BotLib, goalstate: c_int, goal: *mut bot_goal_
 ///
 /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:1592-1614`
 pub fn BotTouchingGoal(bot: &mut BotLib, origin: vec3_t, goal: *mut bot_goal_t) -> c_int {
-    let mut boxmins: vec3_t = [0.0; 3];
-    let mut boxmaxs: vec3_t = [0.0; 3];
+    let boxmins: vec3_t = [0.0; 3];
+    let boxmaxs: vec3_t = [0.0; 3];
     let safety_maxs: vec3_t = [0.0, 0.0, 0.0]; //{4, 4, 10};
     let safety_mins: vec3_t = [0.0, 0.0, 0.0]; //{-4, -4, 0};
 
@@ -1072,7 +1069,6 @@ pub fn BotUpdateEntityItems(bot: &mut BotLib) {
                                     //remove this level item
                                     RemoveLevelItemFromList(bot, li);
                                     FreeLevelItem(bot, li);
-                                    li = core::ptr::null_mut();
                                 } else {
                                     if entinfo.origin[0] != (*li).origin[0]
                                         || entinfo.origin[1] != (*li).origin[1]
@@ -1223,9 +1219,7 @@ pub fn BotFreeGoalState(bot: &mut BotLib, handle: c_int) {
         return;
     }
     BotFreeItemWeights(bot, handle);
-    unsafe {
-        FreeMemory(bot, bot.botgoalstates[handle as usize] as *mut ());
-    }
+    FreeMemory(bot, bot.botgoalstates[handle as usize] as *mut ());
     bot.botgoalstates[handle as usize] = core::ptr::null_mut();
 }
 
@@ -1233,25 +1227,23 @@ pub fn BotFreeGoalState(bot: &mut BotLib, handle: c_int) {
 ///
 /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:1784-1805`
 pub fn BotShutdownGoalAI(bot: &mut BotLib) {
-    unsafe {
-        if !bot.itemconfig.is_null() {
-            FreeMemory(bot, bot.itemconfig as *mut ());
-        }
-        bot.itemconfig = core::ptr::null_mut();
-        if !bot.levelitemheap.is_null() {
-            FreeMemory(bot, bot.levelitemheap as *mut ());
-        }
-        bot.levelitemheap = core::ptr::null_mut();
-        bot.freelevelitems = core::ptr::null_mut();
-        bot.levelitems = core::ptr::null_mut();
-        bot.numlevelitems = 0;
+    if !bot.itemconfig.is_null() {
+        FreeMemory(bot, bot.itemconfig as *mut ());
+    }
+    bot.itemconfig = core::ptr::null_mut();
+    if !bot.levelitemheap.is_null() {
+        FreeMemory(bot, bot.levelitemheap as *mut ());
+    }
+    bot.levelitemheap = core::ptr::null_mut();
+    bot.freelevelitems = core::ptr::null_mut();
+    bot.levelitems = core::ptr::null_mut();
+    bot.numlevelitems = 0;
 
-        BotFreeInfoEntities(bot);
+    BotFreeInfoEntities(bot);
 
-        for i in 1..=MAX_CLIENTS as c_int {
-            if !bot.botgoalstates[i as usize].is_null() {
-                BotFreeGoalState(bot, i);
-            }
+    for i in 1..=MAX_CLIENTS as c_int {
+        if !bot.botgoalstates[i as usize].is_null() {
+            BotFreeGoalState(bot, i);
         }
     }
 }
@@ -1340,7 +1332,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                     continue;
                 }
                 //get the origin of the item
-                let mut origin: vec3_t = [0.0; 3];
+                let origin: vec3_t = [0.0; 3];
                 if AAS_VectorForBSPEpairKey(
                     bot,
                     ent,

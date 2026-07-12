@@ -15,7 +15,7 @@ use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
-use native_types::{qboolean, qfalse, qtrue, MAX_QPATH};
+use native_types::{qfalse, qtrue, MAX_QPATH};
 
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
@@ -567,24 +567,22 @@ pub fn VM_Init(
     // client wants to know if the server is using vm's for certain modules,
     // so if pure we can force the same method (be it vm or dll) -rww
 
-    unsafe {
-        Cmd_AddCommand(
-            common,
-            cm,
-            rm,
-            host,
-            c"vmprofile".as_ptr(),
-            Some(|common, cm, _sv, rm, _rmg, _g2, host| VM_VmProfile_f(common, cm, rm, host)),
-        );
-        Cmd_AddCommand(
-            common,
-            cm,
-            rm,
-            host,
-            c"vminfo".as_ptr(),
-            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| VM_VmInfo_f(common)),
-        );
-    }
+    Cmd_AddCommand(
+        common,
+        cm,
+        rm,
+        host,
+        c"vmprofile".as_ptr(),
+        Some(|common, cm, _sv, rm, _rmg, _g2, host| VM_VmProfile_f(common, cm, rm, host)),
+    );
+    Cmd_AddCommand(
+        common,
+        cm,
+        rm,
+        host,
+        c"vminfo".as_ptr(),
+        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| VM_VmInfo_f(common)),
+    );
 
     common.vmTable = unsafe { core::mem::zeroed() };
 }
@@ -601,7 +599,7 @@ pub fn VM_Alloc(
     host: &mut dyn EngineHost,
     size: c_int,
 ) -> *mut () {
-    unsafe { Hunk_Alloc(common, cm, rm, host, size, ha_pref::h_high) }
+    Hunk_Alloc(common, cm, rm, host, size, ha_pref::h_high)
 }
 
 /// `VM_LoadSymbols`.

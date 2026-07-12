@@ -19,7 +19,7 @@
 
 use core::ffi::{c_char, c_int, c_long, c_ulong};
 
-use libc::{abs, free, sprintf, strcat, strcmp, strcpy, strlen, strncat, strncpy, time};
+use libc::{abs, sprintf, strcat, strcmp, strcpy, strlen, strncat, strncpy, time};
 
 /// `ctime(&t)` in asctime layout ("Www Mmm dd hh:mm:ss yyyy\n", 26 bytes incl.
 /// NUL) from `localtime` fields — libc's linux bindings omit `ctime`, and the
@@ -145,23 +145,18 @@ pub fn SourceWarning(bot: &mut BotLib, source: *mut source_t, text: *const c_cha
 macro_rules! source_error {
     ($bot:expr, $source:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
         let mut __se_text = [0 as ::core::ffi::c_char; 1024];
-        unsafe {
-            ::libc::sprintf(__se_text.as_mut_ptr(), $fmt $(, $arg)*);
-        }
+        ::libc::sprintf(__se_text.as_mut_ptr(), $fmt $(, $arg)*);
         $crate::l_precomp_fns::SourceError($bot, $source, __se_text.as_ptr())
     }};
 }
 macro_rules! source_warning {
     ($bot:expr, $source:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
         let mut __sw_text = [0 as ::core::ffi::c_char; 1024];
-        unsafe {
-            ::libc::sprintf(__sw_text.as_mut_ptr(), $fmt $(, $arg)*);
-        }
+        ::libc::sprintf(__sw_text.as_mut_ptr(), $fmt $(, $arg)*);
         $crate::l_precomp_fns::SourceWarning($bot, $source, __sw_text.as_ptr())
     }};
 }
 pub(crate) use source_error;
-pub(crate) use source_warning;
 
 /// Raven `PC_InitTokenHeap` — the static token heap is entirely commented out in
 /// Raven; the body is a no-op.
@@ -245,10 +240,8 @@ pub fn PC_PushScript(bot: &mut BotLib, source: *mut source_t, script: *mut scrip
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:279-286`
 pub fn PC_FreeToken(bot: &mut BotLib, token: *mut token_t) {
-    unsafe {
-        FreeMemory(bot, token as *mut _);
-        bot.numtokens -= 1;
-    }
+    FreeMemory(bot, token as *mut _);
+    bot.numtokens -= 1;
 }
 
 /// Raven `PC_CopyToken` — allocate a duplicate of a token, aborting on OOM.
@@ -546,8 +539,8 @@ pub fn PC_ExpandBuiltinDefine(
 ) -> c_int {
     unsafe {
         let token: *mut token_t = PC_CopyToken(bot, deftoken);
-        let mut t: c_ulong; // time_t t; (LCC warning workaround)
-        let mut curtime: *const c_char;
+        let t: c_ulong; // time_t t; (LCC warning workaround)
+        let curtime: *const c_char;
         match (*define).builtin {
             BUILTIN_LINE => {
                 sprintf(
@@ -2081,39 +2074,35 @@ pub fn PC_Directive_ifndef(bot: &mut BotLib, source: *mut source_t) -> c_int {
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:1610-1627`
 pub fn PC_Directive_else(bot: &mut BotLib, source: *mut source_t) -> c_int {
-    unsafe {
-        let mut r#type: c_int = 0;
-        let mut skip: c_int = 0;
+    let mut r#type: c_int = 0;
+    let mut skip: c_int = 0;
 
-        PC_PopIndent(bot, source, &mut r#type, &mut skip);
-        if r#type == 0 {
-            source_error!(bot, source, c"misplaced #else".as_ptr() as *mut c_char);
-            return qfalse;
-        }
-        if r#type == INDENT_ELSE {
-            source_error!(bot, source, c"#else after #else".as_ptr() as *mut c_char);
-            return qfalse;
-        }
-        PC_PushIndent(bot, source, INDENT_ELSE, (skip == 0) as c_int);
-        qtrue
+    PC_PopIndent(bot, source, &mut r#type, &mut skip);
+    if r#type == 0 {
+        unsafe { source_error!(bot, source, c"misplaced #else".as_ptr() as *mut c_char) };
+        return qfalse;
     }
+    if r#type == INDENT_ELSE {
+        unsafe { source_error!(bot, source, c"#else after #else".as_ptr() as *mut c_char) };
+        return qfalse;
+    }
+    PC_PushIndent(bot, source, INDENT_ELSE, (skip == 0) as c_int);
+    qtrue
 }
 
 /// Raven `PC_Directive_endif` — handle `#endif`.
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:1634-1645`
 pub fn PC_Directive_endif(bot: &mut BotLib, source: *mut source_t) -> c_int {
-    unsafe {
-        let mut r#type: c_int = 0;
-        let mut skip: c_int = 0;
+    let mut r#type: c_int = 0;
+    let mut skip: c_int = 0;
 
-        PC_PopIndent(bot, source, &mut r#type, &mut skip);
-        if r#type == 0 {
-            source_error!(bot, source, c"misplaced #endif".as_ptr() as *mut c_char);
-            return qfalse;
-        }
-        qtrue
+    PC_PopIndent(bot, source, &mut r#type, &mut skip);
+    if r#type == 0 {
+        unsafe { source_error!(bot, source, c"misplaced #endif".as_ptr() as *mut c_char) };
+        return qfalse;
     }
+    qtrue
 }
 
 /// Raven `PC_ExpandDefine` — expand a macro invocation into a token list.
@@ -2319,11 +2308,13 @@ pub fn PC_ExpandDefineIntoSource(
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2429-2433`
 pub fn PC_Directive_line(bot: &mut BotLib, source: *mut source_t) -> c_int {
-    source_error!(
-        bot,
-        source,
-        c"#line directive not supported".as_ptr() as *mut c_char
-    );
+    unsafe {
+        source_error!(
+            bot,
+            source,
+            c"#line directive not supported".as_ptr() as *mut c_char
+        )
+    };
     qfalse
 }
 
@@ -3041,40 +3032,36 @@ pub fn PC_ReadToken(bot: &mut BotLib, source: *mut source_t, token: *mut token_t
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2391-2406`
 pub fn PC_Directive_elif(bot: &mut BotLib, source: *mut source_t) -> c_int {
-    unsafe {
-        let mut value: c_long = 0;
-        let mut r#type: c_int = 0;
-        let mut skip: c_int = 0;
+    let mut value: c_long = 0;
+    let mut r#type: c_int = 0;
+    let mut skip: c_int = 0;
 
-        PC_PopIndent(bot, source, &mut r#type, &mut skip);
-        if r#type == 0 || r#type == INDENT_ELSE {
-            source_error!(bot, source, c"misplaced #elif".as_ptr() as *mut c_char);
-            return qfalse;
-        }
-        if PC_Evaluate(bot, source, &mut value, core::ptr::null_mut(), qtrue) == 0 {
-            return qfalse;
-        }
-        skip = (value == 0) as c_int;
-        PC_PushIndent(bot, source, INDENT_ELIF, skip);
-        qtrue
+    PC_PopIndent(bot, source, &mut r#type, &mut skip);
+    if r#type == 0 || r#type == INDENT_ELSE {
+        unsafe { source_error!(bot, source, c"misplaced #elif".as_ptr() as *mut c_char) };
+        return qfalse;
     }
+    if PC_Evaluate(bot, source, &mut value, core::ptr::null_mut(), qtrue) == 0 {
+        return qfalse;
+    }
+    skip = (value == 0) as c_int;
+    PC_PushIndent(bot, source, INDENT_ELIF, skip);
+    qtrue
 }
 
 /// Raven `PC_Directive_if` — handle `#if`.
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2413-2422`
 pub fn PC_Directive_if(bot: &mut BotLib, source: *mut source_t) -> c_int {
-    unsafe {
-        let mut value: c_long = 0;
-        let skip: c_int;
+    let mut value: c_long = 0;
+    let skip: c_int;
 
-        if PC_Evaluate(bot, source, &mut value, core::ptr::null_mut(), qtrue) == 0 {
-            return qfalse;
-        }
-        skip = (value == 0) as c_int;
-        PC_PushIndent(bot, source, INDENT_IF, skip);
-        qtrue
+    if PC_Evaluate(bot, source, &mut value, core::ptr::null_mut(), qtrue) == 0 {
+        return qfalse;
     }
+    skip = (value == 0) as c_int;
+    PC_PushIndent(bot, source, INDENT_IF, skip);
+    qtrue
 }
 
 /// Raven `PC_ExpectTokenString` — read the next token and require it to equal
@@ -3212,17 +3199,17 @@ pub fn PC_ExpectTokenType(
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2920-2931`
 pub fn PC_ExpectAnyToken(bot: &mut BotLib, source: *mut source_t, token: *mut token_t) -> c_int {
-    unsafe {
-        if PC_ReadToken(bot, source, token) == 0 {
+    if PC_ReadToken(bot, source, token) == 0 {
+        unsafe {
             source_error!(
                 bot,
                 source,
                 c"couldn't read expected token".as_ptr() as *mut c_char
-            );
-            qfalse
-        } else {
-            qtrue
-        }
+            )
+        };
+        qfalse
+    } else {
+        qtrue
     }
 }
 
@@ -3428,18 +3415,16 @@ pub fn LoadSourceMemory(
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:3214-3224`
 pub fn PC_FreeSourceHandle(bot: &mut BotLib, handle: c_int) -> c_int {
-    unsafe {
-        if handle < 1 || handle >= MAX_SOURCEFILES as c_int {
-            return qfalse;
-        }
-        if bot.sourceFiles[handle as usize].is_null() {
-            return qfalse;
-        }
-
-        FreeSource(bot, bot.sourceFiles[handle as usize]);
-        bot.sourceFiles[handle as usize] = core::ptr::null_mut();
-        qtrue
+    if handle < 1 || handle >= MAX_SOURCEFILES as c_int {
+        return qfalse;
     }
+    if bot.sourceFiles[handle as usize].is_null() {
+        return qfalse;
+    }
+
+    FreeSource(bot, bot.sourceFiles[handle as usize]);
+    bot.sourceFiles[handle as usize] = core::ptr::null_mut();
+    qtrue
 }
 
 /// Raven `PC_LoadSourceHandle` — load a source file and store it in the handle
@@ -3447,25 +3432,23 @@ pub fn PC_FreeSourceHandle(bot: &mut BotLib, handle: c_int) -> c_int {
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:3189-3207`
 pub fn PC_LoadSourceHandle(bot: &mut BotLib, filename: *const c_char) -> c_int {
-    unsafe {
-        let mut i: c_int = 1;
-        while i < MAX_SOURCEFILES as c_int {
-            if bot.sourceFiles[i as usize].is_null() {
-                break;
-            }
-            i += 1;
+    let mut i: c_int = 1;
+    while i < MAX_SOURCEFILES as c_int {
+        if bot.sourceFiles[i as usize].is_null() {
+            break;
         }
-        if i >= MAX_SOURCEFILES as c_int {
-            return 0;
-        }
-        PS_SetBaseFolder(bot, c"".as_ptr() as *mut c_char);
-        let source: *mut source_t = LoadSourceFile(bot, filename);
-        if source.is_null() {
-            return 0;
-        }
-        bot.sourceFiles[i as usize] = source;
-        i
+        i += 1;
     }
+    if i >= MAX_SOURCEFILES as c_int {
+        return 0;
+    }
+    PS_SetBaseFolder(bot, c"".as_ptr() as *mut c_char);
+    let source: *mut source_t = LoadSourceFile(bot, filename);
+    if source.is_null() {
+        return 0;
+    }
+    bot.sourceFiles[i as usize] = source;
+    i
 }
 
 /// Raven `PC_SetBaseFolder` — forward to the script tokenizer's base folder.

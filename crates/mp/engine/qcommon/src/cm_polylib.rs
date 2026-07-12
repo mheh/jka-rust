@@ -21,7 +21,7 @@
 //! no-stub rule (common_fns.rs/vm_x86.rs precedent); reported as missing
 //! symbols for the finisher to replace with the real imports once they land.
 
-use core::ffi::{c_char, c_int};
+use core::ffi::c_int;
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::q_math::{
@@ -159,7 +159,7 @@ pub fn WindingBounds(w: *mut winding_t, mut mins: vec3_t, mut maxs: vec3_t) {
 ///
 /// PORT-NOTE(signature-shape): `center` is a BY-VALUE `vec3_t` out-param per
 /// the same shape mismatch as `WindingPlane`; flagged for the finisher.
-pub fn WindingCenter(common: &mut Common, w: *mut winding_t, mut center: vec3_t) {
+pub fn WindingCenter(_common: &mut Common, w: *mut winding_t, mut center: vec3_t) {
     VectorCopy(vec3_origin, &mut center);
     unsafe {
         for i in 0..(*w).numpoints {
@@ -333,7 +333,7 @@ pub fn CheckWinding(w: *mut winding_t) {
             );
         }
 
-        let mut facenormal: vec3_t = [0.0; 3];
+        let facenormal: vec3_t = [0.0; 3];
         let mut facedist: vec_t = 0.0;
         WindingPlane(w, facenormal, &mut facedist);
 

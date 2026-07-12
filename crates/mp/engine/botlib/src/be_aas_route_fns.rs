@@ -14,7 +14,6 @@ use mp_qshared::common::mp::botlib::aas_predictroute_s::aas_predictroute_s;
 use mp_qshared::common::mp::botlib::aas_route_stop_event::{
     RSE_ENTERAREA, RSE_ENTERCONTENTS, RSE_NONE, RSE_NOROUTE, RSE_USETRAVELTYPE,
 };
-use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL, PRT_MESSAGE, PRT_WARNING};
 use mp_qshared::common::mp::botlib::travel_flags::{
     TFL_AIR, TFL_BARRIERJUMP, TFL_BFGJUMP, TFL_BRIDGE, TFL_CROUCH, TFL_DEFAULT, TFL_DONOTENTER,
@@ -23,7 +22,7 @@ use mp_qshared::common::mp::botlib::travel_flags::{
     TFL_STRAFEJUMP, TFL_SWIM, TFL_TELEPORT, TFL_WALK, TFL_WALKOFFLEDGE, TFL_WATER, TFL_WATERJUMP,
 };
 use mp_qshared::shared::file_mode::{FS_READ, FS_WRITE};
-use mp_qshared::shared::{fileHandle_t, qboolean, qfalse, qtrue, vec3_t, MAX_QPATH};
+use mp_qshared::shared::{fileHandle_t, qfalse, qtrue, vec3_t};
 
 use crate::aasfile::aas_area_s::aas_area_t;
 use crate::aasfile::aas_areasettings_s::aas_areasettings_t;
@@ -217,14 +216,14 @@ pub fn AAS_GetAreaContentsTravelFlags(bot: &mut BotLib, areanum: c_int) -> c_int
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:365-368`
 pub fn AAS_AreaContentsTravelFlags_inline(bot: &mut BotLib, areanum: c_int) -> c_int {
-    unsafe { (*bot.aasworld.areacontentstravelflags.add(areanum as usize)) }
+    unsafe { *bot.aasworld.areacontentstravelflags.add(areanum as usize) }
 }
 
 /// Raven `AAS_AreaContentsTravelFlags`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:375-378`
 pub fn AAS_AreaContentsTravelFlags(bot: &mut BotLib, areanum: c_int) -> c_int {
-    unsafe { (*bot.aasworld.areacontentstravelflags.add(areanum as usize)) }
+    unsafe { *bot.aasworld.areacontentstravelflags.add(areanum as usize) }
 }
 
 /// Raven `AAS_PortalMaxTravelTime`.
@@ -233,30 +232,28 @@ pub fn AAS_AreaContentsTravelFlags(bot: &mut BotLib, areanum: c_int) -> c_int {
 pub fn AAS_PortalMaxTravelTime(bot: &mut BotLib, portalnum: c_int) -> c_int {
     unsafe {
         let portal: *const aas_portal_t = bot.aasworld.portals.add(portalnum as usize);
-        unsafe {
-            let revreach: *const aas_reversedreachability_t = bot
-                .aasworld
-                .reversedreachability
-                .add((*portal).areanum as usize);
-            let settings: *const aas_areasettings_t =
-                bot.aasworld.areasettings.add((*portal).areanum as usize);
-            let mut maxt: c_int = 0;
-            for _l in 0..(*settings).numreachableareas {
-                let mut n = 0usize;
-                let mut revlink = (*revreach).first;
-                while !revlink.is_null() {
-                    let t = (*(*(*bot.aasworld.areatraveltimes.add((*portal).areanum as usize))
-                        .add(_l as usize))
-                    .add(n)) as c_int;
-                    if t > maxt {
-                        maxt = t;
-                    }
-                    revlink = (*revlink).next;
-                    n += 1;
+        let revreach: *const aas_reversedreachability_t = bot
+            .aasworld
+            .reversedreachability
+            .add((*portal).areanum as usize);
+        let settings: *const aas_areasettings_t =
+            bot.aasworld.areasettings.add((*portal).areanum as usize);
+        let mut maxt: c_int = 0;
+        for _l in 0..(*settings).numreachableareas {
+            let mut n = 0usize;
+            let mut revlink = (*revreach).first;
+            while !revlink.is_null() {
+                let t = (*(*(*bot.aasworld.areatraveltimes.add((*portal).areanum as usize))
+                    .add(_l as usize))
+                .add(n)) as c_int;
+                if t > maxt {
+                    maxt = t;
                 }
+                revlink = (*revlink).next;
+                n += 1;
             }
-            maxt
         }
+        maxt
     }
 }
 
@@ -347,141 +344,139 @@ pub fn AAS_ReadCache(bot: &mut BotLib, fp: fileHandle_t) -> *mut aas_routingcach
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:1271-1375`
 pub fn AAS_UpdateAreaRoutingCache(bot: &mut BotLib, areacache: *mut aas_routingcache_t) {
     unsafe {
-        unsafe {
-            // §19: `startareatraveltimes` is a local array Raven reads via the
-            // `curupdate->areatraveltimes` pointer before any of it is written by
-            // this function; zero-init to match the `Com_Memset` immediately below.
-            let mut startareatraveltimes: [u16; 128] = [0; 128];
+        // §19: `startareatraveltimes` is a local array Raven reads via the
+        // `curupdate->areatraveltimes` pointer before any of it is written by
+        // this function; zero-init to match the `Com_Memset` immediately below.
+        let mut startareatraveltimes: [u16; 128] = [0; 128];
 
-            let numreachabilityareas =
-                (*bot.aasworld.clusters.add((*areacache).cluster as usize)).numreachabilityareas;
-            bot.aasworld.frameroutingupdates += 1;
+        let numreachabilityareas =
+            (*bot.aasworld.clusters.add((*areacache).cluster as usize)).numreachabilityareas;
+        bot.aasworld.frameroutingupdates += 1;
 
-            let badtravelflags = !(*areacache).travelflags;
+        let badtravelflags = !(*areacache).travelflags;
 
-            let mut clusterareanum =
-                AAS_ClusterAreaNum(bot, (*areacache).cluster, (*areacache).areanum);
-            if clusterareanum >= numreachabilityareas {
-                return;
+        let mut clusterareanum =
+            AAS_ClusterAreaNum(bot, (*areacache).cluster, (*areacache).areanum);
+        if clusterareanum >= numreachabilityareas {
+            return;
+        }
+
+        let curupdate: *mut aas_routingupdate_t =
+            bot.aasworld.areaupdate.add(clusterareanum as usize);
+        (*curupdate).areanum = (*areacache).areanum;
+        (*curupdate).areatraveltimes = startareatraveltimes.as_mut_ptr();
+        (*curupdate).tmptraveltime = (*areacache).starttraveltime as u16;
+
+        *(*areacache)
+            .traveltimes
+            .as_mut_ptr()
+            .add(clusterareanum as usize) = (*areacache).starttraveltime as u16;
+
+        (*curupdate).next = std::ptr::null_mut();
+        (*curupdate).prev = std::ptr::null_mut();
+        let mut updateliststart = curupdate;
+        let mut updatelistend = curupdate;
+
+        while !updateliststart.is_null() {
+            let curupdate = updateliststart;
+
+            if !(*curupdate).next.is_null() {
+                (*(*curupdate).next).prev = std::ptr::null_mut();
+            } else {
+                updatelistend = std::ptr::null_mut();
             }
+            updateliststart = (*curupdate).next;
 
-            let curupdate: *mut aas_routingupdate_t =
-                bot.aasworld.areaupdate.add(clusterareanum as usize);
-            (*curupdate).areanum = (*areacache).areanum;
-            (*curupdate).areatraveltimes = startareatraveltimes.as_mut_ptr();
-            (*curupdate).tmptraveltime = (*areacache).starttraveltime as u16;
+            (*curupdate).inlist = qfalse;
 
-            *(*areacache)
-                .traveltimes
-                .as_mut_ptr()
-                .add(clusterareanum as usize) = (*areacache).starttraveltime as u16;
+            let revreach: *const aas_reversedreachability_t = bot
+                .aasworld
+                .reversedreachability
+                .add((*curupdate).areanum as usize);
+            let mut i = 0usize;
+            let mut revlink = (*revreach).first;
+            while !revlink.is_null() {
+                let linknum = (*revlink).linknum;
+                let reach: *const aas_reachability_t =
+                    bot.aasworld.reachability.add(linknum as usize);
 
-            (*curupdate).next = std::ptr::null_mut();
-            (*curupdate).prev = std::ptr::null_mut();
-            let mut updateliststart = curupdate;
-            let mut updatelistend = curupdate;
-
-            while !updateliststart.is_null() {
-                let curupdate = updateliststart;
-
-                if !(*curupdate).next.is_null() {
-                    (*(*curupdate).next).prev = std::ptr::null_mut();
-                } else {
-                    updatelistend = std::ptr::null_mut();
-                }
-                updateliststart = (*curupdate).next;
-
-                (*curupdate).inlist = qfalse;
-
-                let revreach: *const aas_reversedreachability_t = bot
-                    .aasworld
-                    .reversedreachability
-                    .add((*curupdate).areanum as usize);
-                let mut i = 0usize;
-                let mut revlink = (*revreach).first;
-                while !revlink.is_null() {
-                    let linknum = (*revlink).linknum;
-                    let reach: *const aas_reachability_t =
-                        bot.aasworld.reachability.add(linknum as usize);
-
-                    if AAS_TravelFlagForType_inline(bot, (*reach).traveltype) & badtravelflags != 0
-                    {
-                        revlink = (*revlink).next;
-                        i += 1;
-                        continue;
-                    }
-                    if (*bot.aasworld.areasettings.add((*reach).areanum as usize)).areaflags
-                        & AREA_DISABLED
-                        != 0
-                    {
-                        revlink = (*revlink).next;
-                        i += 1;
-                        continue;
-                    }
-                    if AAS_AreaContentsTravelFlags_inline(bot, (*reach).areanum) & badtravelflags
-                        != 0
-                    {
-                        revlink = (*revlink).next;
-                        i += 1;
-                        continue;
-                    }
-                    let nextareanum = (*revlink).areanum;
-                    let cluster = (*bot.aasworld.areasettings.add(nextareanum as usize)).cluster;
-                    if cluster > 0 && cluster != (*areacache).cluster {
-                        revlink = (*revlink).next;
-                        i += 1;
-                        continue;
-                    }
-                    clusterareanum = AAS_ClusterAreaNum(bot, (*areacache).cluster, nextareanum);
-                    if clusterareanum >= numreachabilityareas {
-                        revlink = (*revlink).next;
-                        i += 1;
-                        continue;
-                    }
-
-                    let t = (*curupdate).tmptraveltime
-                        + *(*curupdate).areatraveltimes.add(i)
-                        + (*reach).traveltime;
-
-                    let existing = *(*areacache)
-                        .traveltimes
-                        .as_ptr()
-                        .add(clusterareanum as usize);
-                    if existing == 0 || existing > t {
-                        *(*areacache)
-                            .traveltimes
-                            .as_mut_ptr()
-                            .add(clusterareanum as usize) = t;
-                        *(*areacache).reachabilities.add(clusterareanum as usize) = (linknum
-                            - (*bot.aasworld.areasettings.add(nextareanum as usize))
-                                .firstreachablearea)
-                            as u8;
-                        let nextupdate: *mut aas_routingupdate_t =
-                            bot.aasworld.areaupdate.add(clusterareanum as usize);
-                        (*nextupdate).areanum = nextareanum;
-                        (*nextupdate).tmptraveltime = t;
-                        (*nextupdate).areatraveltimes =
-                            *(*bot.aasworld.areatraveltimes.add(nextareanum as usize)).add(
-                                (linknum
-                                    - (*bot.aasworld.areasettings.add(nextareanum as usize))
-                                        .firstreachablearea)
-                                    as usize,
-                            );
-                        if (*nextupdate).inlist == qfalse {
-                            (*nextupdate).next = std::ptr::null_mut();
-                            (*nextupdate).prev = updatelistend;
-                            if !updatelistend.is_null() {
-                                (*updatelistend).next = nextupdate;
-                            } else {
-                                updateliststart = nextupdate;
-                            }
-                            updatelistend = nextupdate;
-                            (*nextupdate).inlist = qtrue;
-                        }
-                    }
+                if AAS_TravelFlagForType_inline(bot, (*reach).traveltype) & badtravelflags != 0
+                {
                     revlink = (*revlink).next;
                     i += 1;
+                    continue;
                 }
+                if (*bot.aasworld.areasettings.add((*reach).areanum as usize)).areaflags
+                    & AREA_DISABLED
+                    != 0
+                {
+                    revlink = (*revlink).next;
+                    i += 1;
+                    continue;
+                }
+                if AAS_AreaContentsTravelFlags_inline(bot, (*reach).areanum) & badtravelflags
+                    != 0
+                {
+                    revlink = (*revlink).next;
+                    i += 1;
+                    continue;
+                }
+                let nextareanum = (*revlink).areanum;
+                let cluster = (*bot.aasworld.areasettings.add(nextareanum as usize)).cluster;
+                if cluster > 0 && cluster != (*areacache).cluster {
+                    revlink = (*revlink).next;
+                    i += 1;
+                    continue;
+                }
+                clusterareanum = AAS_ClusterAreaNum(bot, (*areacache).cluster, nextareanum);
+                if clusterareanum >= numreachabilityareas {
+                    revlink = (*revlink).next;
+                    i += 1;
+                    continue;
+                }
+
+                let t = (*curupdate).tmptraveltime
+                    + *(*curupdate).areatraveltimes.add(i)
+                    + (*reach).traveltime;
+
+                let existing = *(*areacache)
+                    .traveltimes
+                    .as_ptr()
+                    .add(clusterareanum as usize);
+                if existing == 0 || existing > t {
+                    *(*areacache)
+                        .traveltimes
+                        .as_mut_ptr()
+                        .add(clusterareanum as usize) = t;
+                    *(*areacache).reachabilities.add(clusterareanum as usize) = (linknum
+                        - (*bot.aasworld.areasettings.add(nextareanum as usize))
+                            .firstreachablearea)
+                        as u8;
+                    let nextupdate: *mut aas_routingupdate_t =
+                        bot.aasworld.areaupdate.add(clusterareanum as usize);
+                    (*nextupdate).areanum = nextareanum;
+                    (*nextupdate).tmptraveltime = t;
+                    (*nextupdate).areatraveltimes =
+                        *(*bot.aasworld.areatraveltimes.add(nextareanum as usize)).add(
+                            (linknum
+                                - (*bot.aasworld.areasettings.add(nextareanum as usize))
+                                    .firstreachablearea)
+                                as usize,
+                        );
+                    if (*nextupdate).inlist == qfalse {
+                        (*nextupdate).next = std::ptr::null_mut();
+                        (*nextupdate).prev = updatelistend;
+                        if !updatelistend.is_null() {
+                            (*updatelistend).next = nextupdate;
+                        } else {
+                            updateliststart = nextupdate;
+                        }
+                        updatelistend = nextupdate;
+                        (*nextupdate).inlist = qtrue;
+                    }
+                }
+                revlink = (*revlink).next;
+                i += 1;
             }
         }
     }
@@ -492,17 +487,15 @@ pub fn AAS_UpdateAreaRoutingCache(bot: &mut BotLib, areacache: *mut aas_routingc
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:1902-1915`
 pub fn AAS_ReachabilityFromNum(bot: &mut BotLib, num: c_int, reach: *mut aas_reachability_s) {
     unsafe {
-        unsafe {
-            if bot.aasworld.initialized == qfalse {
-                std::ptr::write_bytes(reach, 0, 1);
-                return;
-            }
-            if num < 0 || num >= bot.aasworld.reachabilitysize {
-                std::ptr::write_bytes(reach, 0, 1);
-                return;
-            }
-            *reach = (*bot.aasworld.reachability.add(num as usize));
+        if bot.aasworld.initialized == qfalse {
+            std::ptr::write_bytes(reach, 0, 1);
+            return;
         }
+        if num < 0 || num >= bot.aasworld.reachabilitysize {
+            std::ptr::write_bytes(reach, 0, 1);
+            return;
+        }
+        *reach = *bot.aasworld.reachability.add(num as usize);
     }
 }
 
@@ -515,27 +508,23 @@ pub fn AAS_NextAreaReachability(bot: &mut BotLib, areanum: c_int, reachnum: c_in
             return 0;
         }
         if areanum <= 0 || areanum >= bot.aasworld.numareas {
-            unsafe {
-                bot.botimport.Print.unwrap()(
-                    PRT_ERROR,
-                    c"AAS_NextAreaReachability: areanum %d out of range\n".as_ptr() as *mut c_char,
-                    areanum,
-                );
-            }
+            bot.botimport.Print.unwrap()(
+                PRT_ERROR,
+                c"AAS_NextAreaReachability: areanum %d out of range\n".as_ptr() as *mut c_char,
+                areanum,
+            );
             return 0;
         }
-        let settings = (*bot.aasworld.areasettings.add(areanum as usize));
+        let settings = *bot.aasworld.areasettings.add(areanum as usize);
         if reachnum == 0 {
             return settings.firstreachablearea;
         }
         if reachnum < settings.firstreachablearea {
-            unsafe {
-                bot.botimport.Print.unwrap()(
-                    PRT_FATAL,
-                    c"AAS_NextAreaReachability: reachnum < settings->firstreachableara".as_ptr()
-                        as *mut c_char,
-                );
-            }
+            bot.botimport.Print.unwrap()(
+                PRT_FATAL,
+                c"AAS_NextAreaReachability: reachnum < settings->firstreachableara".as_ptr()
+                    as *mut c_char,
+            );
             return 0;
         }
         let reachnum = reachnum + 1;
@@ -600,22 +589,20 @@ pub fn AAS_AreaVisible(_srcarea: c_int, _destarea: c_int) -> c_int {
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:231-249`
 pub fn AAS_RemoveRoutingCacheInCluster(bot: &mut BotLib, clusternum: c_int) {
     unsafe {
-        unsafe {
-            if bot.aasworld.clusterareacache.is_null() {
-                return;
+        if bot.aasworld.clusterareacache.is_null() {
+            return;
+        }
+        let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(clusternum as usize);
+        for i in 0..(*cluster).numareas {
+            let mut cache =
+                *(*bot.aasworld.clusterareacache.add(clusternum as usize)).add(i as usize);
+            while !cache.is_null() {
+                let nextcache = (*cache).next;
+                AAS_FreeRoutingCache(bot, cache);
+                cache = nextcache;
             }
-            let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(clusternum as usize);
-            for i in 0..(*cluster).numareas {
-                let mut cache =
-                    *(*bot.aasworld.clusterareacache.add(clusternum as usize)).add(i as usize);
-                while !cache.is_null() {
-                    let nextcache = (*cache).next;
-                    AAS_FreeRoutingCache(bot, cache);
-                    cache = nextcache;
-                }
-                *(*bot.aasworld.clusterareacache.add(clusternum as usize)).add(i as usize) =
-                    std::ptr::null_mut();
-            }
+            *(*bot.aasworld.clusterareacache.add(clusternum as usize)).add(i as usize) =
+                std::ptr::null_mut();
         }
     }
 }
@@ -645,60 +632,58 @@ pub fn AAS_InitAreaContentsTravelFlags(bot: &mut BotLib) {
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:402-450`
 pub fn AAS_CreateReversedReachability(bot: &mut BotLib) {
     unsafe {
-        unsafe {
-            if !bot.aasworld.reversedreachability.is_null() {
-                crate::l_memory_fns::FreeMemory(bot, bot.aasworld.reversedreachability as *mut ());
+        if !bot.aasworld.reversedreachability.is_null() {
+            crate::l_memory_fns::FreeMemory(bot, bot.aasworld.reversedreachability as *mut ());
+        }
+        let total = bot.aasworld.numareas as usize
+            * std::mem::size_of::<aas_reversedreachability_t>()
+            + bot.aasworld.reachabilitysize as usize
+                * std::mem::size_of::<aas_reversedlink_t>();
+        let mut ptr = crate::l_memory_fns::GetClearedMemory(bot, total as c_ulong) as *mut u8;
+
+        bot.aasworld.reversedreachability = ptr as *mut aas_reversedreachability_t;
+        ptr = ptr.add(
+            bot.aasworld.numareas as usize * std::mem::size_of::<aas_reversedreachability_t>(),
+        );
+
+        for i in 1..bot.aasworld.numareas {
+            let settings: *const aas_areasettings_t = bot.aasworld.areasettings.add(i as usize);
+            if (*settings).numreachableareas >= 128 {
+                bot.botimport.Print.unwrap()(
+                    PRT_WARNING,
+                    c"area %d has more than 128 reachabilities\n".as_ptr() as *mut c_char,
+                    i,
+                );
             }
-            let total = bot.aasworld.numareas as usize
-                * std::mem::size_of::<aas_reversedreachability_t>()
-                + bot.aasworld.reachabilitysize as usize
-                    * std::mem::size_of::<aas_reversedlink_t>();
-            let mut ptr = crate::l_memory_fns::GetClearedMemory(bot, total as c_ulong) as *mut u8;
+            let mut n = 0;
+            while n < (*settings).numreachableareas && n < 128 {
+                let reach: *const aas_reachability_t = bot
+                    .aasworld
+                    .reachability
+                    .add(((*settings).firstreachablearea + n) as usize);
 
-            bot.aasworld.reversedreachability = ptr as *mut aas_reversedreachability_t;
-            ptr = ptr.add(
-                bot.aasworld.numareas as usize * std::mem::size_of::<aas_reversedreachability_t>(),
-            );
+                let revlink = ptr as *mut aas_reversedlink_t;
+                ptr = ptr.add(std::mem::size_of::<aas_reversedlink_t>());
 
-            for i in 1..bot.aasworld.numareas {
-                let settings: *const aas_areasettings_t = bot.aasworld.areasettings.add(i as usize);
-                if (*settings).numreachableareas >= 128 {
-                    bot.botimport.Print.unwrap()(
-                        PRT_WARNING,
-                        c"area %d has more than 128 reachabilities\n".as_ptr() as *mut c_char,
-                        i,
-                    );
-                }
-                let mut n = 0;
-                while n < (*settings).numreachableareas && n < 128 {
-                    let reach: *const aas_reachability_t = bot
-                        .aasworld
-                        .reachability
-                        .add(((*settings).firstreachablearea + n) as usize);
+                (*revlink).areanum = i;
+                (*revlink).linknum = (*settings).firstreachablearea + n;
+                (*revlink).next = (*bot
+                    .aasworld
+                    .reversedreachability
+                    .add((*reach).areanum as usize))
+                .first;
+                (*bot
+                    .aasworld
+                    .reversedreachability
+                    .add((*reach).areanum as usize))
+                .first = revlink;
+                (*bot
+                    .aasworld
+                    .reversedreachability
+                    .add((*reach).areanum as usize))
+                .numlinks += 1;
 
-                    let revlink = ptr as *mut aas_reversedlink_t;
-                    ptr = ptr.add(std::mem::size_of::<aas_reversedlink_t>());
-
-                    (*revlink).areanum = i;
-                    (*revlink).linknum = (*settings).firstreachablearea + n;
-                    (*revlink).next = (*bot
-                        .aasworld
-                        .reversedreachability
-                        .add((*reach).areanum as usize))
-                    .first;
-                    (*bot
-                        .aasworld
-                        .reversedreachability
-                        .add((*reach).areanum as usize))
-                    .first = revlink;
-                    (*bot
-                        .aasworld
-                        .reversedreachability
-                        .add((*reach).areanum as usize))
-                    .numlinks += 1;
-
-                    n += 1;
-                }
+                n += 1;
             }
         }
     }
@@ -709,53 +694,51 @@ pub fn AAS_CreateReversedReachability(bot: &mut BotLib) {
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:483-542`
 pub fn AAS_CalculateAreaTravelTimes(bot: &mut BotLib) {
     unsafe {
-        unsafe {
-            if !bot.aasworld.areatraveltimes.is_null() {
-                crate::l_memory_fns::FreeMemory(bot, bot.aasworld.areatraveltimes as *mut ());
-            }
-            let mut size = bot.aasworld.numareas as usize * std::mem::size_of::<*mut *mut u16>();
-            for i in 0..bot.aasworld.numareas {
-                let revreach: *const aas_reversedreachability_t =
-                    bot.aasworld.reversedreachability.add(i as usize);
-                let settings: *const aas_areasettings_t = bot.aasworld.areasettings.add(i as usize);
-                size += (*settings).numreachableareas as usize * std::mem::size_of::<*mut u16>();
-                size += (*settings).numreachableareas as usize
-                    * (*revreach).numlinks as usize
-                    * std::mem::size_of::<u16>();
-            }
-            let mut ptr = crate::l_memory_fns::GetClearedMemory(bot, size as c_ulong) as *mut u8;
-            bot.aasworld.areatraveltimes = ptr as *mut *mut *mut u16;
-            ptr = ptr.add(bot.aasworld.numareas as usize * std::mem::size_of::<*mut *mut u16>());
+        if !bot.aasworld.areatraveltimes.is_null() {
+            crate::l_memory_fns::FreeMemory(bot, bot.aasworld.areatraveltimes as *mut ());
+        }
+        let mut size = bot.aasworld.numareas as usize * std::mem::size_of::<*mut *mut u16>();
+        for i in 0..bot.aasworld.numareas {
+            let revreach: *const aas_reversedreachability_t =
+                bot.aasworld.reversedreachability.add(i as usize);
+            let settings: *const aas_areasettings_t = bot.aasworld.areasettings.add(i as usize);
+            size += (*settings).numreachableareas as usize * std::mem::size_of::<*mut u16>();
+            size += (*settings).numreachableareas as usize
+                * (*revreach).numlinks as usize
+                * std::mem::size_of::<u16>();
+        }
+        let mut ptr = crate::l_memory_fns::GetClearedMemory(bot, size as c_ulong) as *mut u8;
+        bot.aasworld.areatraveltimes = ptr as *mut *mut *mut u16;
+        ptr = ptr.add(bot.aasworld.numareas as usize * std::mem::size_of::<*mut *mut u16>());
 
-            for i in 0..bot.aasworld.numareas {
-                let revreach: *const aas_reversedreachability_t =
-                    bot.aasworld.reversedreachability.add(i as usize);
-                let settings: *const aas_areasettings_t = bot.aasworld.areasettings.add(i as usize);
+        for i in 0..bot.aasworld.numareas {
+            let revreach: *const aas_reversedreachability_t =
+                bot.aasworld.reversedreachability.add(i as usize);
+            let settings: *const aas_areasettings_t = bot.aasworld.areasettings.add(i as usize);
 
-                *bot.aasworld.areatraveltimes.add(i as usize) = ptr as *mut *mut u16;
-                ptr = ptr
-                    .add((*settings).numreachableareas as usize * std::mem::size_of::<*mut u16>());
+            *bot.aasworld.areatraveltimes.add(i as usize) = ptr as *mut *mut u16;
+            ptr = ptr
+                .add((*settings).numreachableareas as usize * std::mem::size_of::<*mut u16>());
 
-                for l in 0..(*settings).numreachableareas {
-                    *(*bot.aasworld.areatraveltimes.add(i as usize)).add(l as usize) =
-                        ptr as *mut u16;
-                    ptr = ptr.add((*revreach).numlinks as usize * std::mem::size_of::<u16>());
+            for l in 0..(*settings).numreachableareas {
+                *(*bot.aasworld.areatraveltimes.add(i as usize)).add(l as usize) =
+                    ptr as *mut u16;
+                ptr = ptr.add((*revreach).numlinks as usize * std::mem::size_of::<u16>());
 
-                    let reach: *const aas_reachability_t = bot
-                        .aasworld
-                        .reachability
-                        .add(((*settings).firstreachablearea + l) as usize);
+                let reach: *const aas_reachability_t = bot
+                    .aasworld
+                    .reachability
+                    .add(((*settings).firstreachablearea + l) as usize);
 
-                    let mut n = 0usize;
-                    let mut revlink = (*revreach).first;
-                    while !revlink.is_null() {
-                        let end = (*bot.aasworld.reachability.add((*revlink).linknum as usize)).end;
-                        let tt = AAS_AreaTravelTime(bot, i, end, (*reach).start);
-                        *(*(*bot.aasworld.areatraveltimes.add(i as usize)).add(l as usize))
-                            .add(n) = tt;
-                        revlink = (*revlink).next;
-                        n += 1;
-                    }
+                let mut n = 0usize;
+                let mut revlink = (*revreach).first;
+                while !revlink.is_null() {
+                    let end = (*bot.aasworld.reachability.add((*revlink).linknum as usize)).end;
+                    let tt = AAS_AreaTravelTime(bot, i, end, (*reach).start);
+                    *(*(*bot.aasworld.areatraveltimes.add(i as usize)).add(l as usize))
+                        .add(n) = tt;
+                    revlink = (*revlink).next;
+                    n += 1;
                 }
             }
         }
@@ -787,45 +770,43 @@ pub fn AAS_InitPortalMaxTravelTimes(bot: &mut BotLib) {
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:678-710`
 pub fn AAS_FreeOldestCache(bot: &mut BotLib) -> c_int {
     unsafe {
-        unsafe {
-            let mut cache = bot.aasworld.oldestcache;
-            while !cache.is_null() {
-                if (*cache).r#type == CACHETYPE_AREA
-                    && (*bot.aasworld.areasettings.add((*cache).areanum as usize)).cluster < 0
-                {
-                    cache = (*cache).time_next;
-                    continue;
-                }
-                break;
+        let mut cache = bot.aasworld.oldestcache;
+        while !cache.is_null() {
+            if (*cache).r#type == CACHETYPE_AREA
+                && (*bot.aasworld.areasettings.add((*cache).areanum as usize)).cluster < 0
+            {
+                cache = (*cache).time_next;
+                continue;
             }
-            if !cache.is_null() {
-                if (*cache).r#type == CACHETYPE_AREA {
-                    let clusterareanum =
-                        AAS_ClusterAreaNum(bot, (*cache).cluster, (*cache).areanum);
-                    if !(*cache).prev.is_null() {
-                        (*(*cache).prev).next = (*cache).next;
-                    } else {
-                        *(*bot.aasworld.clusterareacache.add((*cache).cluster as usize))
-                            .add(clusterareanum as usize) = (*cache).next;
-                    }
-                    if !(*cache).next.is_null() {
-                        (*(*cache).next).prev = (*cache).prev;
-                    }
+            break;
+        }
+        if !cache.is_null() {
+            if (*cache).r#type == CACHETYPE_AREA {
+                let clusterareanum =
+                    AAS_ClusterAreaNum(bot, (*cache).cluster, (*cache).areanum);
+                if !(*cache).prev.is_null() {
+                    (*(*cache).prev).next = (*cache).next;
                 } else {
-                    if !(*cache).prev.is_null() {
-                        (*(*cache).prev).next = (*cache).next;
-                    } else {
-                        *bot.aasworld.portalcache.add((*cache).areanum as usize) = (*cache).next;
-                    }
-                    if !(*cache).next.is_null() {
-                        (*(*cache).next).prev = (*cache).prev;
-                    }
+                    *(*bot.aasworld.clusterareacache.add((*cache).cluster as usize))
+                        .add(clusterareanum as usize) = (*cache).next;
                 }
-                AAS_FreeRoutingCache(bot, cache);
-                qtrue
+                if !(*cache).next.is_null() {
+                    (*(*cache).next).prev = (*cache).prev;
+                }
             } else {
-                qfalse
+                if !(*cache).prev.is_null() {
+                    (*(*cache).prev).next = (*cache).next;
+                } else {
+                    *bot.aasworld.portalcache.add((*cache).areanum as usize) = (*cache).next;
+                }
+                if !(*cache).next.is_null() {
+                    (*(*cache).next).prev = (*cache).prev;
+                }
             }
+            AAS_FreeRoutingCache(bot, cache);
+            qtrue
+        } else {
+            qfalse
         }
     }
 }
@@ -856,27 +837,25 @@ pub fn AAS_AllocRoutingCache(bot: &mut BotLib, numtraveltimes: c_int) -> *mut aa
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:741-766`
 pub fn AAS_FreeAllClusterAreaCache(bot: &mut BotLib) {
     unsafe {
-        unsafe {
-            if bot.aasworld.clusterareacache.is_null() {
-                return;
-            }
-            for i in 0..bot.aasworld.numclusters {
-                let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(i as usize);
-                for j in 0..(*cluster).numareas {
-                    let mut cache =
-                        *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize);
-                    while !cache.is_null() {
-                        let nextcache = (*cache).next;
-                        AAS_FreeRoutingCache(bot, cache);
-                        cache = nextcache;
-                    }
-                    *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize) =
-                        std::ptr::null_mut();
-                }
-            }
-            crate::l_memory_fns::FreeMemory(bot, bot.aasworld.clusterareacache as *mut ());
-            bot.aasworld.clusterareacache = std::ptr::null_mut();
+        if bot.aasworld.clusterareacache.is_null() {
+            return;
         }
+        for i in 0..bot.aasworld.numclusters {
+            let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(i as usize);
+            for j in 0..(*cluster).numareas {
+                let mut cache =
+                    *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize);
+                while !cache.is_null() {
+                    let nextcache = (*cache).next;
+                    AAS_FreeRoutingCache(bot, cache);
+                    cache = nextcache;
+                }
+                *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize) =
+                    std::ptr::null_mut();
+            }
+        }
+        crate::l_memory_fns::FreeMemory(bot, bot.aasworld.clusterareacache as *mut ());
+        bot.aasworld.clusterareacache = std::ptr::null_mut();
     }
 }
 
@@ -890,27 +869,25 @@ pub fn AAS_InitClusterAreaCache(bot: &mut BotLib) {
         for i in 0..bot.aasworld.numclusters {
             size += (*bot.aasworld.clusters.add(i as usize)).numareas;
         }
-        unsafe {
-            let mut ptr = crate::l_memory_fns::GetClearedMemory(
-                bot,
-                (bot.aasworld.numclusters
-                    * std::mem::size_of::<*mut *mut aas_routingcache_t>() as c_int
-                    + size * std::mem::size_of::<*mut aas_routingcache_t>() as c_int)
-                    as c_ulong,
-            ) as *mut u8;
-            bot.aasworld.clusterareacache = ptr as *mut *mut *mut aas_routingcache_t;
+        let mut ptr = crate::l_memory_fns::GetClearedMemory(
+            bot,
+            (bot.aasworld.numclusters
+                * std::mem::size_of::<*mut *mut aas_routingcache_t>() as c_int
+                + size * std::mem::size_of::<*mut aas_routingcache_t>() as c_int)
+                as c_ulong,
+        ) as *mut u8;
+        bot.aasworld.clusterareacache = ptr as *mut *mut *mut aas_routingcache_t;
+        ptr = ptr.add(
+            bot.aasworld.numclusters as usize
+                * std::mem::size_of::<*mut *mut aas_routingcache_t>(),
+        );
+        for i in 0..bot.aasworld.numclusters {
+            *bot.aasworld.clusterareacache.add(i as usize) =
+                ptr as *mut *mut aas_routingcache_t;
             ptr = ptr.add(
-                bot.aasworld.numclusters as usize
-                    * std::mem::size_of::<*mut *mut aas_routingcache_t>(),
+                (*bot.aasworld.clusters.add(i as usize)).numareas as usize
+                    * std::mem::size_of::<*mut aas_routingcache_t>(),
             );
-            for i in 0..bot.aasworld.numclusters {
-                *bot.aasworld.clusterareacache.add(i as usize) =
-                    ptr as *mut *mut aas_routingcache_t;
-                ptr = ptr.add(
-                    (*bot.aasworld.clusters.add(i as usize)).numareas as usize
-                        * std::mem::size_of::<*mut aas_routingcache_t>(),
-                );
-            }
         }
     }
 }
@@ -986,67 +963,81 @@ pub fn AAS_InitRoutingUpdate(bot: &mut BotLib) {
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:917-1007`
 pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
     unsafe {
-        unsafe {
-            let mut numportalcache = 0;
-            for i in 0..bot.aasworld.numareas {
-                let mut cache = *bot.aasworld.portalcache.add(i as usize);
+        let mut numportalcache = 0;
+        for i in 0..bot.aasworld.numareas {
+            let mut cache = *bot.aasworld.portalcache.add(i as usize);
+            while !cache.is_null() {
+                numportalcache += 1;
+                cache = (*cache).next;
+            }
+        }
+        let mut numareacache = 0;
+        for i in 0..bot.aasworld.numclusters {
+            let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(i as usize);
+            for j in 0..(*cluster).numareas {
+                let mut cache =
+                    *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize);
                 while !cache.is_null() {
-                    numportalcache += 1;
+                    numareacache += 1;
                     cache = (*cache).next;
                 }
             }
-            let mut numareacache = 0;
-            for i in 0..bot.aasworld.numclusters {
-                let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(i as usize);
-                for j in 0..(*cluster).numareas {
-                    let mut cache =
-                        *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize);
-                    while !cache.is_null() {
-                        numareacache += 1;
-                        cache = (*cache).next;
-                    }
-                }
+        }
+
+        let mapname_str =
+            core::ffi::CStr::from_ptr(bot.aasworld.mapname.as_ptr()).to_string_lossy();
+        let filename = format!("maps/{}.rcd", mapname_str);
+        let c_filename = std::ffi::CString::new(filename.clone()).unwrap_or_default();
+        let mut fp: fileHandle_t = 0;
+        (bot.botimport.FS_FOpenFile.unwrap())(c_filename.as_ptr(), &mut fp, FS_WRITE);
+        if fp == 0 {
+            let msg = std::ffi::CString::new(format!("Unable to open file: {}\n", filename))
+                .unwrap_or_default();
+            crate::be_aas_main::AAS_Error(bot, msg.as_ptr() as *mut core::ffi::c_char);
+            return;
+        }
+
+        let mut routecacheheader = crate::be_aas_route::routecacheheader_t::default();
+        routecacheheader.ident = crate::be_aas_route::RCID;
+        routecacheheader.version = crate::be_aas_route::RCVERSION;
+        routecacheheader.numareas = bot.aasworld.numareas;
+        routecacheheader.numclusters = bot.aasworld.numclusters;
+        routecacheheader.areacrc = crate::l_crc_fns::CRC_ProcessString(
+            bot,
+            bot.aasworld.areas as *mut core::ffi::c_uchar,
+            std::mem::size_of::<aas_area_t>() as c_int * bot.aasworld.numareas,
+        ) as c_int;
+        routecacheheader.clustercrc = crate::l_crc_fns::CRC_ProcessString(
+            bot,
+            bot.aasworld.clusters as *mut core::ffi::c_uchar,
+            std::mem::size_of::<aas_cluster_t>() as c_int * bot.aasworld.numclusters,
+        ) as c_int;
+        routecacheheader.numportalcache = numportalcache;
+        routecacheheader.numareacache = numareacache;
+        (bot.botimport.FS_Write.unwrap())(
+            &routecacheheader as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<crate::be_aas_route::routecacheheader_t>() as c_int,
+            fp,
+        );
+
+        let mut totalsize = 0;
+        for i in 0..bot.aasworld.numareas {
+            let mut cache = *bot.aasworld.portalcache.add(i as usize);
+            while !cache.is_null() {
+                (bot.botimport.FS_Write.unwrap())(
+                    cache as *const std::ffi::c_void,
+                    (*cache).size,
+                    fp,
+                );
+                totalsize += (*cache).size;
+                cache = (*cache).next;
             }
-
-            let mapname_str =
-                core::ffi::CStr::from_ptr(bot.aasworld.mapname.as_ptr()).to_string_lossy();
-            let filename = format!("maps/{}.rcd", mapname_str);
-            let c_filename = std::ffi::CString::new(filename.clone()).unwrap_or_default();
-            let mut fp: fileHandle_t = 0;
-            (bot.botimport.FS_FOpenFile.unwrap())(c_filename.as_ptr(), &mut fp, FS_WRITE);
-            if fp == 0 {
-                let msg = std::ffi::CString::new(format!("Unable to open file: {}\n", filename))
-                    .unwrap_or_default();
-                crate::be_aas_main::AAS_Error(bot, msg.as_ptr() as *mut core::ffi::c_char);
-                return;
-            }
-
-            let mut routecacheheader = crate::be_aas_route::routecacheheader_t::default();
-            routecacheheader.ident = crate::be_aas_route::RCID;
-            routecacheheader.version = crate::be_aas_route::RCVERSION;
-            routecacheheader.numareas = bot.aasworld.numareas;
-            routecacheheader.numclusters = bot.aasworld.numclusters;
-            routecacheheader.areacrc = crate::l_crc_fns::CRC_ProcessString(
-                bot,
-                bot.aasworld.areas as *mut core::ffi::c_uchar,
-                std::mem::size_of::<aas_area_t>() as c_int * bot.aasworld.numareas,
-            ) as c_int;
-            routecacheheader.clustercrc = crate::l_crc_fns::CRC_ProcessString(
-                bot,
-                bot.aasworld.clusters as *mut core::ffi::c_uchar,
-                std::mem::size_of::<aas_cluster_t>() as c_int * bot.aasworld.numclusters,
-            ) as c_int;
-            routecacheheader.numportalcache = numportalcache;
-            routecacheheader.numareacache = numareacache;
-            (bot.botimport.FS_Write.unwrap())(
-                &routecacheheader as *const _ as *const std::ffi::c_void,
-                std::mem::size_of::<crate::be_aas_route::routecacheheader_t>() as c_int,
-                fp,
-            );
-
-            let mut totalsize = 0;
-            for i in 0..bot.aasworld.numareas {
-                let mut cache = *bot.aasworld.portalcache.add(i as usize);
+        }
+        for i in 0..bot.aasworld.numclusters {
+            let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(i as usize);
+            for j in 0..(*cluster).numareas {
+                let mut cache =
+                    *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize);
                 while !cache.is_null() {
                     (bot.botimport.FS_Write.unwrap())(
                         cache as *const std::ffi::c_void,
@@ -1057,34 +1048,18 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
                     cache = (*cache).next;
                 }
             }
-            for i in 0..bot.aasworld.numclusters {
-                let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(i as usize);
-                for j in 0..(*cluster).numareas {
-                    let mut cache =
-                        *(*bot.aasworld.clusterareacache.add(i as usize)).add(j as usize);
-                    while !cache.is_null() {
-                        (bot.botimport.FS_Write.unwrap())(
-                            cache as *const std::ffi::c_void,
-                            (*cache).size,
-                            fp,
-                        );
-                        totalsize += (*cache).size;
-                        cache = (*cache).next;
-                    }
-                }
-            }
-            // NOTE: the visarea write pass is commented out in the oracle
-            // (be_aas_route.cpp:988-1002); not transcribed.
-            (bot.botimport.FS_FCloseFile.unwrap())(fp);
-            let msg = std::ffi::CString::new(format!("\nroute cache written to {}\n", filename))
-                .unwrap_or_default();
-            bot.botimport.Print.unwrap()(PRT_MESSAGE, msg.as_ptr() as *mut c_char);
-            bot.botimport.Print.unwrap()(
-                PRT_MESSAGE,
-                c"written %d bytes of routing cache\n".as_ptr() as *mut c_char,
-                totalsize,
-            );
         }
+        // NOTE: the visarea write pass is commented out in the oracle
+        // (be_aas_route.cpp:988-1002); not transcribed.
+        (bot.botimport.FS_FCloseFile.unwrap())(fp);
+        let msg = std::ffi::CString::new(format!("\nroute cache written to {}\n", filename))
+            .unwrap_or_default();
+        bot.botimport.Print.unwrap()(PRT_MESSAGE, msg.as_ptr() as *mut c_char);
+        bot.botimport.Print.unwrap()(
+            PRT_MESSAGE,
+            c"written %d bytes of routing cache\n".as_ptr() as *mut c_char,
+            totalsize,
+        );
     }
 }
 
@@ -1214,7 +1189,7 @@ pub fn AAS_InitReachabilityAreas(bot: &mut BotLib) {
 
         let mut numreachareas = 0;
         for i in 0..bot.aasworld.reachabilitysize {
-            let reach = (*bot.aasworld.reachability.add(i as usize));
+            let reach = *bot.aasworld.reachability.add(i as usize);
             let mut numareas = 0;
             match reach.traveltype & TRAVELTYPE_MASK {
                 t if t == TRAVEL_BARRIERJUMP || t == TRAVEL_WATERJUMP => {
@@ -1264,15 +1239,13 @@ pub fn AAS_InitReachabilityAreas(bot: &mut BotLib) {
                     || t == TRAVEL_TELEPORT => {}
                 _ => {}
             }
-            unsafe {
-                (*bot.aasworld.reachabilityareas.add(i as usize)).firstarea = numreachareas;
-                (*bot.aasworld.reachabilityareas.add(i as usize)).numareas = numareas;
-                for j in 0..numareas {
-                    *bot.aasworld
-                        .reachabilityareaindex
-                        .add(numreachareas as usize) = areas[j as usize];
-                    numreachareas += 1;
-                }
+            (*bot.aasworld.reachabilityareas.add(i as usize)).firstarea = numreachareas;
+            (*bot.aasworld.reachabilityareas.add(i as usize)).numareas = numareas;
+            for j in 0..numareas {
+                *bot.aasworld
+                    .reachabilityareaindex
+                    .add(numreachareas as usize) = areas[j as usize];
+                numreachareas += 1;
             }
         }
     }
@@ -1293,156 +1266,154 @@ pub fn AAS_NearestHideArea(
     travelflags: c_int,
 ) -> c_int {
     unsafe {
-        unsafe {
-            // Function-scope static `hidetraveltimes` (fork-3 rule): genuine
-            // cross-frame state → a field on the owning host struct.
-            if bot.hidetraveltimes.is_null() {
-                bot.hidetraveltimes = crate::l_memory_fns::GetClearedMemory(
-                    bot,
-                    (bot.aasworld.numareas * std::mem::size_of::<u16>() as c_int) as c_ulong,
-                ) as *mut u16;
-            } else {
-                std::ptr::write_bytes(bot.hidetraveltimes, 0, bot.aasworld.numareas as usize);
-            }
-            let mut besttraveltime: u16 = 0;
-            let mut bestarea: c_int = 0;
-            let start_visible = qtrue;
-
-            let badtravelflags = !travelflags;
-
-            let curupdate: *mut aas_routingupdate_t = bot.aasworld.areaupdate.add(areanum as usize);
-            (*curupdate).areanum = areanum;
-            (*curupdate).start = origin;
-            (*curupdate).areatraveltimes =
-                *(*bot.aasworld.areatraveltimes.add(areanum as usize)).add(0);
-            (*curupdate).tmptraveltime = 0;
-
-            (*curupdate).next = std::ptr::null_mut();
-            (*curupdate).prev = std::ptr::null_mut();
-            let mut updateliststart = curupdate;
-            let mut updatelistend = curupdate;
-
-            while !updateliststart.is_null() {
-                let curupdate = updateliststart;
-
-                if !(*curupdate).next.is_null() {
-                    (*(*curupdate).next).prev = std::ptr::null_mut();
-                } else {
-                    updatelistend = std::ptr::null_mut();
-                }
-                updateliststart = (*curupdate).next;
-
-                (*curupdate).inlist = qfalse;
-
-                let numreach = (*bot.aasworld.areasettings.add((*curupdate).areanum as usize))
-                    .numreachableareas;
-                let firstreach = (*bot.aasworld.areasettings.add((*curupdate).areanum as usize))
-                    .firstreachablearea;
-
-                for i in 0..numreach {
-                    let reach: *const aas_reachability_t =
-                        bot.aasworld.reachability.add((firstreach + i) as usize);
-
-                    if AAS_TravelFlagForType_inline(bot, (*reach).traveltype) & badtravelflags != 0
-                    {
-                        continue;
-                    }
-                    if AAS_AreaContentsTravelFlags_inline(bot, (*reach).areanum) & badtravelflags
-                        != 0
-                    {
-                        continue;
-                    }
-                    let nextareanum = (*reach).areanum;
-                    if nextareanum == enemyareanum {
-                        continue;
-                    }
-                    let mut t = (*curupdate).tmptraveltime
-                        + AAS_AreaTravelTime(
-                            bot,
-                            (*curupdate).areanum,
-                            (*curupdate).start,
-                            (*reach).start,
-                        );
-
-                    // PORT-NOTE(vProj): see `DistancePointToLine` above — the resolved
-                    // signature cannot write back through this call.
-                    let p: vec3_t = [0.0, 0.0, 0.0];
-                    crate::be_aas_main::AAS_ProjectPointOntoVector(
-                        enemyorigin,
-                        (*curupdate).start,
-                        (*reach).end,
-                        p,
-                    );
-                    let mut j = 0;
-                    while j < 3 {
-                        if (p[j] > (*curupdate).start[j] && p[j] > (*reach).end[j])
-                            || (p[j] < (*curupdate).start[j] && p[j] < (*reach).end[j])
-                        {
-                            break;
-                        }
-                        j += 1;
-                    }
-                    let v2 = if j < 3 {
-                        [
-                            enemyorigin[0] - (*reach).end[0],
-                            enemyorigin[1] - (*reach).end[1],
-                            enemyorigin[2] - (*reach).end[2],
-                        ]
-                    } else {
-                        [
-                            enemyorigin[0] - p[0],
-                            enemyorigin[1] - p[1],
-                            enemyorigin[2] - p[2],
-                        ]
-                    };
-                    let dist2 = (v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]).sqrt();
-                    if dist2 < 40.0 {
-                        continue;
-                    }
-                    let v1 = [
-                        enemyorigin[0] - (*curupdate).start[0],
-                        enemyorigin[1] - (*curupdate).start[1],
-                        enemyorigin[2] - (*curupdate).start[2],
-                    ];
-                    let dist1 = (v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]).sqrt();
-
-                    if dist2 < dist1 {
-                        t += ((dist1 - dist2) * 10.0) as u16;
-                    }
-                    if start_visible == qfalse && AAS_AreaVisible(enemyareanum, nextareanum) != 0 {
-                        continue;
-                    }
-                    if besttraveltime != 0 && t >= besttraveltime {
-                        continue;
-                    }
-                    let existing = *bot.hidetraveltimes.add(nextareanum as usize);
-                    if existing == 0 || existing > t {
-                        if AAS_AreaVisible(enemyareanum, nextareanum) == 0 {
-                            besttraveltime = t;
-                            bestarea = nextareanum;
-                        }
-                        *bot.hidetraveltimes.add(nextareanum as usize) = t;
-                        let nextupdate: *mut aas_routingupdate_t =
-                            bot.aasworld.areaupdate.add(nextareanum as usize);
-                        (*nextupdate).areanum = nextareanum;
-                        (*nextupdate).tmptraveltime = t;
-                        (*nextupdate).start = (*reach).end;
-                        if (*nextupdate).inlist == qfalse {
-                            (*nextupdate).next = std::ptr::null_mut();
-                            (*nextupdate).prev = updatelistend;
-                            if !updatelistend.is_null() {
-                                (*updatelistend).next = nextupdate;
-                            } else {
-                                updateliststart = nextupdate;
-                            }
-                            updatelistend = nextupdate;
-                            (*nextupdate).inlist = qtrue;
-                        }
-                    }
-                }
-            }
-            bestarea
+        // Function-scope static `hidetraveltimes` (fork-3 rule): genuine
+        // cross-frame state → a field on the owning host struct.
+        if bot.hidetraveltimes.is_null() {
+            bot.hidetraveltimes = crate::l_memory_fns::GetClearedMemory(
+                bot,
+                (bot.aasworld.numareas * std::mem::size_of::<u16>() as c_int) as c_ulong,
+            ) as *mut u16;
+        } else {
+            std::ptr::write_bytes(bot.hidetraveltimes, 0, bot.aasworld.numareas as usize);
         }
+        let mut besttraveltime: u16 = 0;
+        let mut bestarea: c_int = 0;
+        let start_visible = qtrue;
+
+        let badtravelflags = !travelflags;
+
+        let curupdate: *mut aas_routingupdate_t = bot.aasworld.areaupdate.add(areanum as usize);
+        (*curupdate).areanum = areanum;
+        (*curupdate).start = origin;
+        (*curupdate).areatraveltimes =
+            *(*bot.aasworld.areatraveltimes.add(areanum as usize)).add(0);
+        (*curupdate).tmptraveltime = 0;
+
+        (*curupdate).next = std::ptr::null_mut();
+        (*curupdate).prev = std::ptr::null_mut();
+        let mut updateliststart = curupdate;
+        let mut updatelistend = curupdate;
+
+        while !updateliststart.is_null() {
+            let curupdate = updateliststart;
+
+            if !(*curupdate).next.is_null() {
+                (*(*curupdate).next).prev = std::ptr::null_mut();
+            } else {
+                updatelistend = std::ptr::null_mut();
+            }
+            updateliststart = (*curupdate).next;
+
+            (*curupdate).inlist = qfalse;
+
+            let numreach = (*bot.aasworld.areasettings.add((*curupdate).areanum as usize))
+                .numreachableareas;
+            let firstreach = (*bot.aasworld.areasettings.add((*curupdate).areanum as usize))
+                .firstreachablearea;
+
+            for i in 0..numreach {
+                let reach: *const aas_reachability_t =
+                    bot.aasworld.reachability.add((firstreach + i) as usize);
+
+                if AAS_TravelFlagForType_inline(bot, (*reach).traveltype) & badtravelflags != 0
+                {
+                    continue;
+                }
+                if AAS_AreaContentsTravelFlags_inline(bot, (*reach).areanum) & badtravelflags
+                    != 0
+                {
+                    continue;
+                }
+                let nextareanum = (*reach).areanum;
+                if nextareanum == enemyareanum {
+                    continue;
+                }
+                let mut t = (*curupdate).tmptraveltime
+                    + AAS_AreaTravelTime(
+                        bot,
+                        (*curupdate).areanum,
+                        (*curupdate).start,
+                        (*reach).start,
+                    );
+
+                // PORT-NOTE(vProj): see `DistancePointToLine` above — the resolved
+                // signature cannot write back through this call.
+                let p: vec3_t = [0.0, 0.0, 0.0];
+                crate::be_aas_main::AAS_ProjectPointOntoVector(
+                    enemyorigin,
+                    (*curupdate).start,
+                    (*reach).end,
+                    p,
+                );
+                let mut j = 0;
+                while j < 3 {
+                    if (p[j] > (*curupdate).start[j] && p[j] > (*reach).end[j])
+                        || (p[j] < (*curupdate).start[j] && p[j] < (*reach).end[j])
+                    {
+                        break;
+                    }
+                    j += 1;
+                }
+                let v2 = if j < 3 {
+                    [
+                        enemyorigin[0] - (*reach).end[0],
+                        enemyorigin[1] - (*reach).end[1],
+                        enemyorigin[2] - (*reach).end[2],
+                    ]
+                } else {
+                    [
+                        enemyorigin[0] - p[0],
+                        enemyorigin[1] - p[1],
+                        enemyorigin[2] - p[2],
+                    ]
+                };
+                let dist2 = (v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]).sqrt();
+                if dist2 < 40.0 {
+                    continue;
+                }
+                let v1 = [
+                    enemyorigin[0] - (*curupdate).start[0],
+                    enemyorigin[1] - (*curupdate).start[1],
+                    enemyorigin[2] - (*curupdate).start[2],
+                ];
+                let dist1 = (v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]).sqrt();
+
+                if dist2 < dist1 {
+                    t += ((dist1 - dist2) * 10.0) as u16;
+                }
+                if start_visible == qfalse && AAS_AreaVisible(enemyareanum, nextareanum) != 0 {
+                    continue;
+                }
+                if besttraveltime != 0 && t >= besttraveltime {
+                    continue;
+                }
+                let existing = *bot.hidetraveltimes.add(nextareanum as usize);
+                if existing == 0 || existing > t {
+                    if AAS_AreaVisible(enemyareanum, nextareanum) == 0 {
+                        besttraveltime = t;
+                        bestarea = nextareanum;
+                    }
+                    *bot.hidetraveltimes.add(nextareanum as usize) = t;
+                    let nextupdate: *mut aas_routingupdate_t =
+                        bot.aasworld.areaupdate.add(nextareanum as usize);
+                    (*nextupdate).areanum = nextareanum;
+                    (*nextupdate).tmptraveltime = t;
+                    (*nextupdate).start = (*reach).end;
+                    if (*nextupdate).inlist == qfalse {
+                        (*nextupdate).next = std::ptr::null_mut();
+                        (*nextupdate).prev = updatelistend;
+                        if !updatelistend.is_null() {
+                            (*updatelistend).next = nextupdate;
+                        } else {
+                            updateliststart = nextupdate;
+                        }
+                        updatelistend = nextupdate;
+                        (*nextupdate).inlist = qtrue;
+                    }
+                }
+            }
+        }
+        bestarea
     }
 }
 
@@ -1462,16 +1433,14 @@ pub fn AAS_RemoveRoutingCacheUsingArea(bot: &mut BotLib, areanum: c_int) {
             AAS_RemoveRoutingCacheInCluster(bot, front);
             AAS_RemoveRoutingCacheInCluster(bot, back);
         }
-        unsafe {
-            for i in 0..bot.aasworld.numareas {
-                let mut cache = *bot.aasworld.portalcache.add(i as usize);
-                while !cache.is_null() {
-                    let nextcache = (*cache).next;
-                    AAS_FreeRoutingCache(bot, cache);
-                    cache = nextcache;
-                }
-                *bot.aasworld.portalcache.add(i as usize) = std::ptr::null_mut();
+        for i in 0..bot.aasworld.numareas {
+            let mut cache = *bot.aasworld.portalcache.add(i as usize);
+            while !cache.is_null() {
+                let nextcache = (*cache).next;
+                AAS_FreeRoutingCache(bot, cache);
+                cache = nextcache;
             }
+            *bot.aasworld.portalcache.add(i as usize) = std::ptr::null_mut();
         }
     }
 }
@@ -1527,43 +1496,41 @@ pub fn AAS_GetAreaRoutingCache(
     travelflags: c_int,
 ) -> *mut aas_routingcache_t {
     unsafe {
-        unsafe {
-            let clusterareanum = AAS_ClusterAreaNum(bot, clusternum, areanum);
-            let clustercache = *(*bot.aasworld.clusterareacache.add(clusternum as usize))
-                .add(clusterareanum as usize);
-            let mut cache = clustercache;
-            while !cache.is_null() {
-                if (*cache).travelflags == travelflags {
-                    break;
-                }
-                cache = (*cache).next;
+        let clusterareanum = AAS_ClusterAreaNum(bot, clusternum, areanum);
+        let clustercache = *(*bot.aasworld.clusterareacache.add(clusternum as usize))
+            .add(clusterareanum as usize);
+        let mut cache = clustercache;
+        while !cache.is_null() {
+            if (*cache).travelflags == travelflags {
+                break;
             }
-            if cache.is_null() {
-                cache = AAS_AllocRoutingCache(
-                    bot,
-                    (*bot.aasworld.clusters.add(clusternum as usize)).numreachabilityareas,
-                );
-                (*cache).cluster = clusternum;
-                (*cache).areanum = areanum;
-                (*cache).origin = (*bot.aasworld.areas.add(areanum as usize)).center;
-                (*cache).starttraveltime = 1.0;
-                (*cache).travelflags = travelflags;
-                (*cache).prev = std::ptr::null_mut();
-                (*cache).next = clustercache;
-                if !clustercache.is_null() {
-                    (*clustercache).prev = cache;
-                }
-                *(*bot.aasworld.clusterareacache.add(clusternum as usize))
-                    .add(clusterareanum as usize) = cache;
-                AAS_UpdateAreaRoutingCache(bot, cache);
-            } else {
-                AAS_UnlinkCache(bot, cache);
-            }
-            (*cache).time = AAS_RoutingTime(bot);
-            (*cache).r#type = CACHETYPE_AREA;
-            AAS_LinkCache(bot, cache);
-            cache
+            cache = (*cache).next;
         }
+        if cache.is_null() {
+            cache = AAS_AllocRoutingCache(
+                bot,
+                (*bot.aasworld.clusters.add(clusternum as usize)).numreachabilityareas,
+            );
+            (*cache).cluster = clusternum;
+            (*cache).areanum = areanum;
+            (*cache).origin = (*bot.aasworld.areas.add(areanum as usize)).center;
+            (*cache).starttraveltime = 1.0;
+            (*cache).travelflags = travelflags;
+            (*cache).prev = std::ptr::null_mut();
+            (*cache).next = clustercache;
+            if !clustercache.is_null() {
+                (*clustercache).prev = cache;
+            }
+            *(*bot.aasworld.clusterareacache.add(clusternum as usize))
+                .add(clusterareanum as usize) = cache;
+            AAS_UpdateAreaRoutingCache(bot, cache);
+        } else {
+            AAS_UnlinkCache(bot, cache);
+        }
+        (*cache).time = AAS_RoutingTime(bot);
+        (*cache).r#type = CACHETYPE_AREA;
+        AAS_LinkCache(bot, cache);
+        cache
     }
 }
 
@@ -1575,13 +1542,11 @@ pub fn AAS_EnableRoutingArea(bot: &mut BotLib, areanum: c_int, enable: c_int) ->
     unsafe {
         if areanum <= 0 || areanum >= bot.aasworld.numareas {
             if bot.bot_developer != 0 {
-                unsafe {
-                    bot.botimport.Print.unwrap()(
-                        PRT_ERROR,
-                        c"AAS_EnableRoutingArea: areanum %d out of range\n".as_ptr() as *mut c_char,
-                        areanum,
-                    );
-                }
+                bot.botimport.Print.unwrap()(
+                    PRT_ERROR,
+                    c"AAS_EnableRoutingArea: areanum %d out of range\n".as_ptr() as *mut c_char,
+                    areanum,
+                );
             }
             return 0;
         }
@@ -1631,99 +1596,97 @@ pub fn AAS_InitRouting(bot: &mut BotLib) {
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:1428-1519`
 pub fn AAS_UpdatePortalRoutingCache(bot: &mut BotLib, portalcache: *mut aas_routingcache_t) {
     unsafe {
-        unsafe {
-            let curupdate: *mut aas_routingupdate_t = bot
-                .aasworld
-                .portalupdate
-                .add(bot.aasworld.numportals as usize);
-            (*curupdate).cluster = (*portalcache).cluster;
-            (*curupdate).areanum = (*portalcache).areanum;
-            (*curupdate).tmptraveltime = (*portalcache).starttraveltime as u16;
+        let curupdate: *mut aas_routingupdate_t = bot
+            .aasworld
+            .portalupdate
+            .add(bot.aasworld.numportals as usize);
+        (*curupdate).cluster = (*portalcache).cluster;
+        (*curupdate).areanum = (*portalcache).areanum;
+        (*curupdate).tmptraveltime = (*portalcache).starttraveltime as u16;
 
-            let clusternum = (*bot
-                .aasworld
-                .areasettings
-                .add((*portalcache).areanum as usize))
-            .cluster;
-            if clusternum < 0 {
-                *(*portalcache)
-                    .traveltimes
-                    .as_mut_ptr()
-                    .add((-clusternum) as usize) = (*portalcache).starttraveltime as u16;
+        let clusternum = (*bot
+            .aasworld
+            .areasettings
+            .add((*portalcache).areanum as usize))
+        .cluster;
+        if clusternum < 0 {
+            *(*portalcache)
+                .traveltimes
+                .as_mut_ptr()
+                .add((-clusternum) as usize) = (*portalcache).starttraveltime as u16;
+        }
+
+        (*curupdate).next = std::ptr::null_mut();
+        (*curupdate).prev = std::ptr::null_mut();
+        let mut updateliststart = curupdate;
+        let mut updatelistend = curupdate;
+
+        while !updateliststart.is_null() {
+            let curupdate = updateliststart;
+            if !(*curupdate).next.is_null() {
+                (*(*curupdate).next).prev = std::ptr::null_mut();
+            } else {
+                updatelistend = std::ptr::null_mut();
             }
+            updateliststart = (*curupdate).next;
+            (*curupdate).inlist = qfalse;
 
-            (*curupdate).next = std::ptr::null_mut();
-            (*curupdate).prev = std::ptr::null_mut();
-            let mut updateliststart = curupdate;
-            let mut updatelistend = curupdate;
+            let cluster: *const aas_cluster_t =
+                bot.aasworld.clusters.add((*curupdate).cluster as usize);
 
-            while !updateliststart.is_null() {
-                let curupdate = updateliststart;
-                if !(*curupdate).next.is_null() {
-                    (*(*curupdate).next).prev = std::ptr::null_mut();
-                } else {
-                    updatelistend = std::ptr::null_mut();
+            let cache = AAS_GetAreaRoutingCache(
+                bot,
+                (*curupdate).cluster,
+                (*curupdate).areanum,
+                (*portalcache).travelflags,
+            );
+
+            for i in 0..(*cluster).numportals {
+                let portalnum = *bot
+                    .aasworld
+                    .portalindex
+                    .add(((*cluster).firstportal + i) as usize);
+                let portal: *const aas_portal_t = bot.aasworld.portals.add(portalnum as usize);
+                if (*portal).areanum == (*curupdate).areanum {
+                    continue;
                 }
-                updateliststart = (*curupdate).next;
-                (*curupdate).inlist = qfalse;
+                let clusterareanum =
+                    AAS_ClusterAreaNum(bot, (*curupdate).cluster, (*portal).areanum);
+                if clusterareanum >= (*cluster).numreachabilityareas {
+                    continue;
+                }
+                let t0 = *(*cache).traveltimes.as_ptr().add(clusterareanum as usize);
+                if t0 == 0 {
+                    continue;
+                }
+                let t = t0 + (*curupdate).tmptraveltime;
 
-                let cluster: *const aas_cluster_t =
-                    bot.aasworld.clusters.add((*curupdate).cluster as usize);
-
-                let cache = AAS_GetAreaRoutingCache(
-                    bot,
-                    (*curupdate).cluster,
-                    (*curupdate).areanum,
-                    (*portalcache).travelflags,
-                );
-
-                for i in 0..(*cluster).numportals {
-                    let portalnum = (*bot
-                        .aasworld
-                        .portalindex
-                        .add(((*cluster).firstportal + i) as usize));
-                    let portal: *const aas_portal_t = bot.aasworld.portals.add(portalnum as usize);
-                    if (*portal).areanum == (*curupdate).areanum {
-                        continue;
+                let existing = *(*portalcache).traveltimes.as_ptr().add(portalnum as usize);
+                if existing == 0 || existing > t {
+                    *(*portalcache)
+                        .traveltimes
+                        .as_mut_ptr()
+                        .add(portalnum as usize) = t;
+                    let nextupdate: *mut aas_routingupdate_t =
+                        bot.aasworld.portalupdate.add(portalnum as usize);
+                    if (*portal).frontcluster == (*curupdate).cluster {
+                        (*nextupdate).cluster = (*portal).backcluster;
+                    } else {
+                        (*nextupdate).cluster = (*portal).frontcluster;
                     }
-                    let clusterareanum =
-                        AAS_ClusterAreaNum(bot, (*curupdate).cluster, (*portal).areanum);
-                    if clusterareanum >= (*cluster).numreachabilityareas {
-                        continue;
-                    }
-                    let t0 = *(*cache).traveltimes.as_ptr().add(clusterareanum as usize);
-                    if t0 == 0 {
-                        continue;
-                    }
-                    let t = t0 + (*curupdate).tmptraveltime;
-
-                    let existing = *(*portalcache).traveltimes.as_ptr().add(portalnum as usize);
-                    if existing == 0 || existing > t {
-                        *(*portalcache)
-                            .traveltimes
-                            .as_mut_ptr()
-                            .add(portalnum as usize) = t;
-                        let nextupdate: *mut aas_routingupdate_t =
-                            bot.aasworld.portalupdate.add(portalnum as usize);
-                        if (*portal).frontcluster == (*curupdate).cluster {
-                            (*nextupdate).cluster = (*portal).backcluster;
+                    (*nextupdate).areanum = (*portal).areanum;
+                    (*nextupdate).tmptraveltime =
+                        t + *bot.aasworld.portalmaxtraveltimes.add(portalnum as usize) as u16;
+                    if (*nextupdate).inlist == qfalse {
+                        (*nextupdate).next = std::ptr::null_mut();
+                        (*nextupdate).prev = updatelistend;
+                        if !updatelistend.is_null() {
+                            (*updatelistend).next = nextupdate;
                         } else {
-                            (*nextupdate).cluster = (*portal).frontcluster;
+                            updateliststart = nextupdate;
                         }
-                        (*nextupdate).areanum = (*portal).areanum;
-                        (*nextupdate).tmptraveltime =
-                            t + *bot.aasworld.portalmaxtraveltimes.add(portalnum as usize) as u16;
-                        if (*nextupdate).inlist == qfalse {
-                            (*nextupdate).next = std::ptr::null_mut();
-                            (*nextupdate).prev = updatelistend;
-                            if !updatelistend.is_null() {
-                                (*updatelistend).next = nextupdate;
-                            } else {
-                                updateliststart = nextupdate;
-                            }
-                            updatelistend = nextupdate;
-                            (*nextupdate).inlist = qtrue;
-                        }
+                        updatelistend = nextupdate;
+                        (*nextupdate).inlist = qtrue;
                     }
                 }
             }
@@ -1742,36 +1705,34 @@ pub fn AAS_GetPortalRoutingCache(
     travelflags: c_int,
 ) -> *mut aas_routingcache_t {
     unsafe {
-        unsafe {
-            let mut cache = *bot.aasworld.portalcache.add(areanum as usize);
-            while !cache.is_null() {
-                if (*cache).travelflags == travelflags {
-                    break;
-                }
-                cache = (*cache).next;
+        let mut cache = *bot.aasworld.portalcache.add(areanum as usize);
+        while !cache.is_null() {
+            if (*cache).travelflags == travelflags {
+                break;
             }
-            if cache.is_null() {
-                cache = AAS_AllocRoutingCache(bot, bot.aasworld.numportals);
-                (*cache).cluster = clusternum;
-                (*cache).areanum = areanum;
-                (*cache).origin = (*bot.aasworld.areas.add(areanum as usize)).center;
-                (*cache).starttraveltime = 1.0;
-                (*cache).travelflags = travelflags;
-                (*cache).prev = std::ptr::null_mut();
-                (*cache).next = *bot.aasworld.portalcache.add(areanum as usize);
-                if !(*bot.aasworld.portalcache.add(areanum as usize)).is_null() {
-                    (*(*bot.aasworld.portalcache.add(areanum as usize))).prev = cache;
-                }
-                *bot.aasworld.portalcache.add(areanum as usize) = cache;
-                AAS_UpdatePortalRoutingCache(bot, cache);
-            } else {
-                AAS_UnlinkCache(bot, cache);
-            }
-            (*cache).time = AAS_RoutingTime(bot);
-            (*cache).r#type = CACHETYPE_PORTAL;
-            AAS_LinkCache(bot, cache);
-            cache
+            cache = (*cache).next;
         }
+        if cache.is_null() {
+            cache = AAS_AllocRoutingCache(bot, bot.aasworld.numportals);
+            (*cache).cluster = clusternum;
+            (*cache).areanum = areanum;
+            (*cache).origin = (*bot.aasworld.areas.add(areanum as usize)).center;
+            (*cache).starttraveltime = 1.0;
+            (*cache).travelflags = travelflags;
+            (*cache).prev = std::ptr::null_mut();
+            (*cache).next = *bot.aasworld.portalcache.add(areanum as usize);
+            if !(*bot.aasworld.portalcache.add(areanum as usize)).is_null() {
+                (*(*bot.aasworld.portalcache.add(areanum as usize))).prev = cache;
+            }
+            *bot.aasworld.portalcache.add(areanum as usize) = cache;
+            AAS_UpdatePortalRoutingCache(bot, cache);
+        } else {
+            AAS_UnlinkCache(bot, cache);
+        }
+        (*cache).time = AAS_RoutingTime(bot);
+        (*cache).r#type = CACHETYPE_PORTAL;
+        AAS_LinkCache(bot, cache);
+        cache
     }
 }
 
@@ -1789,161 +1750,159 @@ pub fn AAS_AreaRouteToGoalArea(
     reachnum: *mut c_int,
 ) -> c_int {
     unsafe {
-        unsafe {
-            if bot.aasworld.initialized == qfalse {
-                return qfalse;
+        if bot.aasworld.initialized == qfalse {
+            return qfalse;
+        }
+        if areanum == goalareanum {
+            *traveltime = 1;
+            *reachnum = 0;
+            return qtrue;
+        }
+        if areanum <= 0 || areanum >= bot.aasworld.numareas {
+            if bot.bot_developer != 0 {
+                bot.botimport.Print.unwrap()(
+                    PRT_ERROR,
+                    c"AAS_AreaTravelTimeToGoalArea: areanum %d out of range\n".as_ptr()
+                        as *mut c_char,
+                    areanum,
+                );
             }
-            if areanum == goalareanum {
-                *traveltime = 1;
-                *reachnum = 0;
+            return qfalse;
+        }
+        if goalareanum <= 0 || goalareanum >= bot.aasworld.numareas {
+            if bot.bot_developer != 0 {
+                bot.botimport.Print.unwrap()(
+                    PRT_ERROR,
+                    c"AAS_AreaTravelTimeToGoalArea: goalareanum %d out of range\n".as_ptr()
+                        as *mut c_char,
+                    goalareanum,
+                );
+            }
+            return qfalse;
+        }
+        while crate::l_memory_fns::AvailableMemory(bot) < 1 * 1024 * 1024 {
+            if AAS_FreeOldestCache(bot) == 0 {
+                break;
+            }
+        }
+        if crate::be_aas_reach_fns::AAS_AreaDoNotEnter(bot, areanum) != 0
+            || crate::be_aas_reach_fns::AAS_AreaDoNotEnter(bot, goalareanum) != 0
+        {
+            travelflags |= TFL_DONOTENTER;
+        }
+
+        let mut clusternum = (*bot.aasworld.areasettings.add(areanum as usize)).cluster;
+        let mut goalclusternum = (*bot.aasworld.areasettings.add(goalareanum as usize)).cluster;
+        if clusternum < 0 && goalclusternum > 0 {
+            let portal: *const aas_portal_t = bot.aasworld.portals.add((-clusternum) as usize);
+            if (*portal).frontcluster == goalclusternum
+                || (*portal).backcluster == goalclusternum
+            {
+                clusternum = goalclusternum;
+            }
+        } else if clusternum > 0 && goalclusternum < 0 {
+            let portal: *const aas_portal_t =
+                bot.aasworld.portals.add((-goalclusternum) as usize);
+            if (*portal).frontcluster == clusternum || (*portal).backcluster == clusternum {
+                goalclusternum = clusternum;
+            }
+        }
+        if clusternum > 0 && goalclusternum > 0 && clusternum == goalclusternum {
+            let areacache = AAS_GetAreaRoutingCache(bot, clusternum, goalareanum, travelflags);
+            let clusterareanum = AAS_ClusterAreaNum(bot, clusternum, areanum);
+            let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(clusternum as usize);
+            if clusterareanum >= (*cluster).numreachabilityareas {
+                return 0;
+            }
+            let tt = *(*areacache)
+                .traveltimes
+                .as_ptr()
+                .add(clusterareanum as usize);
+            if tt != 0 {
+                *reachnum = (*bot.aasworld.areasettings.add(areanum as usize))
+                    .firstreachablearea
+                    + *(*areacache).reachabilities.add(clusterareanum as usize) as c_int;
+                if origin.is_null() {
+                    *traveltime = tt as c_int;
+                    return qtrue;
+                }
+                let reach = &*bot.aasworld.reachability.add(*reachnum as usize);
+                *traveltime = tt as c_int
+                    + AAS_AreaTravelTime(bot, areanum, *origin, reach.start) as c_int;
                 return qtrue;
             }
-            if areanum <= 0 || areanum >= bot.aasworld.numareas {
-                if bot.bot_developer != 0 {
-                    bot.botimport.Print.unwrap()(
-                        PRT_ERROR,
-                        c"AAS_AreaTravelTimeToGoalArea: areanum %d out of range\n".as_ptr()
-                            as *mut c_char,
-                        areanum,
-                    );
-                }
-                return qfalse;
-            }
-            if goalareanum <= 0 || goalareanum >= bot.aasworld.numareas {
-                if bot.bot_developer != 0 {
-                    bot.botimport.Print.unwrap()(
-                        PRT_ERROR,
-                        c"AAS_AreaTravelTimeToGoalArea: goalareanum %d out of range\n".as_ptr()
-                            as *mut c_char,
-                        goalareanum,
-                    );
-                }
-                return qfalse;
-            }
-            while crate::l_memory_fns::AvailableMemory(bot) < 1 * 1024 * 1024 {
-                if AAS_FreeOldestCache(bot) == 0 {
-                    break;
-                }
-            }
-            if crate::be_aas_reach_fns::AAS_AreaDoNotEnter(bot, areanum) != 0
-                || crate::be_aas_reach_fns::AAS_AreaDoNotEnter(bot, goalareanum) != 0
-            {
-                travelflags |= TFL_DONOTENTER;
-            }
+        }
 
-            let mut clusternum = (*bot.aasworld.areasettings.add(areanum as usize)).cluster;
-            let mut goalclusternum = (*bot.aasworld.areasettings.add(goalareanum as usize)).cluster;
-            if clusternum < 0 && goalclusternum > 0 {
-                let portal: *const aas_portal_t = bot.aasworld.portals.add((-clusternum) as usize);
-                if (*portal).frontcluster == goalclusternum
-                    || (*portal).backcluster == goalclusternum
-                {
-                    clusternum = goalclusternum;
-                }
-            } else if clusternum > 0 && goalclusternum < 0 {
-                let portal: *const aas_portal_t =
-                    bot.aasworld.portals.add((-goalclusternum) as usize);
-                if (*portal).frontcluster == clusternum || (*portal).backcluster == clusternum {
-                    goalclusternum = clusternum;
-                }
+        clusternum = (*bot.aasworld.areasettings.add(areanum as usize)).cluster;
+        goalclusternum = (*bot.aasworld.areasettings.add(goalareanum as usize)).cluster;
+        if goalclusternum < 0 {
+            let portal: *const aas_portal_t =
+                bot.aasworld.portals.add((-goalclusternum) as usize);
+            goalclusternum = (*portal).frontcluster;
+        }
+        let portalcache =
+            AAS_GetPortalRoutingCache(bot, goalclusternum, goalareanum, travelflags);
+        if clusternum < 0 {
+            *traveltime = *(*portalcache)
+                .traveltimes
+                .as_ptr()
+                .add((-clusternum) as usize) as c_int;
+            *reachnum = (*bot.aasworld.areasettings.add(areanum as usize)).firstreachablearea
+                + *(*portalcache).reachabilities.add((-clusternum) as usize) as c_int;
+            return qtrue;
+        }
+
+        let mut besttime: u16 = 0;
+        let mut bestreachnum: c_int = -1;
+        let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(clusternum as usize);
+        for i in 0..(*cluster).numportals {
+            let portalnum = *bot
+                .aasworld
+                .portalindex
+                .add(((*cluster).firstportal + i) as usize);
+            if *(*portalcache).traveltimes.as_ptr().add(portalnum as usize) == 0 {
+                continue;
             }
-            if clusternum > 0 && goalclusternum > 0 && clusternum == goalclusternum {
-                let areacache = AAS_GetAreaRoutingCache(bot, clusternum, goalareanum, travelflags);
-                let clusterareanum = AAS_ClusterAreaNum(bot, clusternum, areanum);
-                let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(clusternum as usize);
-                if clusterareanum >= (*cluster).numreachabilityareas {
-                    return 0;
-                }
-                let tt = *(*areacache)
+            let portal: *const aas_portal_t = bot.aasworld.portals.add(portalnum as usize);
+            let areacache =
+                AAS_GetAreaRoutingCache(bot, clusternum, (*portal).areanum, travelflags);
+            let clusterareanum = AAS_ClusterAreaNum(bot, clusternum, areanum);
+            if clusterareanum >= (*cluster).numreachabilityareas {
+                continue;
+            }
+            if *(*areacache)
+                .traveltimes
+                .as_ptr()
+                .add(clusterareanum as usize)
+                == 0
+            {
+                continue;
+            }
+            let mut t = *(*portalcache).traveltimes.as_ptr().add(portalnum as usize)
+                + *(*areacache)
                     .traveltimes
                     .as_ptr()
                     .add(clusterareanum as usize);
-                if tt != 0 {
-                    *reachnum = (*bot.aasworld.areasettings.add(areanum as usize))
-                        .firstreachablearea
-                        + *(*areacache).reachabilities.add(clusterareanum as usize) as c_int;
-                    if origin.is_null() {
-                        *traveltime = tt as c_int;
-                        return qtrue;
-                    }
-                    let reach = &*bot.aasworld.reachability.add(*reachnum as usize);
-                    *traveltime = tt as c_int
-                        + AAS_AreaTravelTime(bot, areanum, *origin, reach.start) as c_int;
-                    return qtrue;
-                }
-            }
+            t += *bot.aasworld.portalmaxtraveltimes.add(portalnum as usize) as u16;
 
-            clusternum = (*bot.aasworld.areasettings.add(areanum as usize)).cluster;
-            goalclusternum = (*bot.aasworld.areasettings.add(goalareanum as usize)).cluster;
-            if goalclusternum < 0 {
-                let portal: *const aas_portal_t =
-                    bot.aasworld.portals.add((-goalclusternum) as usize);
-                goalclusternum = (*portal).frontcluster;
+            if !origin.is_null() {
+                *reachnum = (*bot.aasworld.areasettings.add(areanum as usize))
+                    .firstreachablearea
+                    + *(*areacache).reachabilities.add(clusterareanum as usize) as c_int;
+                let reach = &*bot.aasworld.reachability.add(*reachnum as usize);
+                t += AAS_AreaTravelTime(bot, areanum, *origin, reach.start);
             }
-            let portalcache =
-                AAS_GetPortalRoutingCache(bot, goalclusternum, goalareanum, travelflags);
-            if clusternum < 0 {
-                *traveltime = *(*portalcache)
-                    .traveltimes
-                    .as_ptr()
-                    .add((-clusternum) as usize) as c_int;
-                *reachnum = (*bot.aasworld.areasettings.add(areanum as usize)).firstreachablearea
-                    + *(*portalcache).reachabilities.add((-clusternum) as usize) as c_int;
-                return qtrue;
+            if besttime == 0 || t < besttime {
+                bestreachnum = *reachnum;
+                besttime = t;
             }
-
-            let mut besttime: u16 = 0;
-            let mut bestreachnum: c_int = -1;
-            let cluster: *const aas_cluster_t = bot.aasworld.clusters.add(clusternum as usize);
-            for i in 0..(*cluster).numportals {
-                let portalnum = (*bot
-                    .aasworld
-                    .portalindex
-                    .add(((*cluster).firstportal + i) as usize));
-                if *(*portalcache).traveltimes.as_ptr().add(portalnum as usize) == 0 {
-                    continue;
-                }
-                let portal: *const aas_portal_t = bot.aasworld.portals.add(portalnum as usize);
-                let areacache =
-                    AAS_GetAreaRoutingCache(bot, clusternum, (*portal).areanum, travelflags);
-                let clusterareanum = AAS_ClusterAreaNum(bot, clusternum, areanum);
-                if clusterareanum >= (*cluster).numreachabilityareas {
-                    continue;
-                }
-                if *(*areacache)
-                    .traveltimes
-                    .as_ptr()
-                    .add(clusterareanum as usize)
-                    == 0
-                {
-                    continue;
-                }
-                let mut t = *(*portalcache).traveltimes.as_ptr().add(portalnum as usize)
-                    + *(*areacache)
-                        .traveltimes
-                        .as_ptr()
-                        .add(clusterareanum as usize);
-                t += *bot.aasworld.portalmaxtraveltimes.add(portalnum as usize) as u16;
-
-                if !origin.is_null() {
-                    *reachnum = (*bot.aasworld.areasettings.add(areanum as usize))
-                        .firstreachablearea
-                        + *(*areacache).reachabilities.add(clusterareanum as usize) as c_int;
-                    let reach = &*bot.aasworld.reachability.add(*reachnum as usize);
-                    t += AAS_AreaTravelTime(bot, areanum, *origin, reach.start);
-                }
-                if besttime == 0 || t < besttime {
-                    bestreachnum = *reachnum;
-                    besttime = t;
-                }
-            }
-            if bestreachnum < 0 {
-                return qfalse;
-            }
-            *reachnum = bestreachnum;
-            *traveltime = besttime as c_int;
-            qtrue
         }
+        if bestreachnum < 0 {
+            return qfalse;
+        }
+        *reachnum = bestreachnum;
+        *traveltime = besttime as c_int;
+        qtrue
     }
 }
 
@@ -2008,12 +1967,10 @@ pub fn AAS_AreaReachabilityToGoalArea(
 pub fn AAS_CreateAllRoutingCache(bot: &mut BotLib) {
     unsafe {
         bot.aasworld.initialized = qtrue;
-        unsafe {
-            bot.botimport.Print.unwrap()(
-                PRT_MESSAGE,
-                c"AAS_CreateAllRoutingCache\n".as_ptr() as *mut c_char,
-            );
-        }
+        bot.botimport.Print.unwrap()(
+            PRT_MESSAGE,
+            c"AAS_CreateAllRoutingCache\n".as_ptr() as *mut c_char,
+        );
         for i in 1..bot.aasworld.numareas {
             if crate::be_aas_reach_fns::AAS_AreaReachability(bot, i) == 0 {
                 continue;
@@ -2057,115 +2014,113 @@ pub fn AAS_PredictRoute(
     stopareanum: c_int,
 ) -> c_int {
     unsafe {
-        unsafe {
-            (*route).stopevent = RSE_NONE;
-            (*route).endarea = goalareanum;
-            (*route).endcontents = 0;
-            (*route).endtravelflags = 0;
-            (*route).endpos = origin;
-            (*route).time = 0;
+        (*route).stopevent = RSE_NONE;
+        (*route).endarea = goalareanum;
+        (*route).endcontents = 0;
+        (*route).endtravelflags = 0;
+        (*route).endpos = origin;
+        (*route).time = 0;
 
-            let mut curareanum = areanum;
-            let mut curorigin = origin;
+        let mut curareanum = areanum;
+        let mut curorigin = origin;
 
-            let mut i = 0;
-            while curareanum != goalareanum
-                && (maxareas == 0 || i < maxareas)
-                && i < bot.aasworld.numareas
-            {
-                let reachnum = AAS_AreaReachabilityToGoalArea(
-                    bot,
-                    curareanum,
-                    curorigin,
-                    goalareanum,
-                    travelflags,
-                );
-                if reachnum == 0 {
-                    (*route).stopevent = RSE_NOROUTE;
-                    return qfalse;
-                }
-                let reach = (*bot.aasworld.reachability.add(reachnum as usize));
-
-                if stopevent & RSE_USETRAVELTYPE != 0 {
-                    if AAS_TravelFlagForType_inline(bot, reach.traveltype) & stoptfl != 0 {
-                        (*route).stopevent = RSE_USETRAVELTYPE;
-                        (*route).endarea = curareanum;
-                        (*route).endcontents =
-                            (*bot.aasworld.areasettings.add(curareanum as usize)).contents;
-                        (*route).endtravelflags =
-                            AAS_TravelFlagForType_inline(bot, reach.traveltype);
-                        (*route).endpos = reach.start;
-                        return qtrue;
-                    }
-                    if AAS_AreaContentsTravelFlags_inline(bot, reach.areanum) & stoptfl != 0 {
-                        (*route).stopevent = RSE_USETRAVELTYPE;
-                        (*route).endarea = reach.areanum;
-                        (*route).endcontents =
-                            (*bot.aasworld.areasettings.add(reach.areanum as usize)).contents;
-                        (*route).endtravelflags =
-                            AAS_AreaContentsTravelFlags_inline(bot, reach.areanum);
-                        (*route).endpos = reach.end;
-                        (*route).time +=
-                            AAS_AreaTravelTime(bot, areanum, origin, reach.start) as c_int;
-                        (*route).time += reach.traveltime as c_int;
-                        return qtrue;
-                    }
-                }
-                let reachareas = (*bot.aasworld.reachabilityareas.add(reachnum as usize));
-                for j in 0..(reachareas.numareas + 1) {
-                    let testareanum = if j >= reachareas.numareas {
-                        reach.areanum
-                    } else {
-                        *bot.aasworld
-                            .reachabilityareaindex
-                            .add((reachareas.firstarea + j) as usize)
-                    };
-                    if stopevent & RSE_ENTERCONTENTS != 0
-                        && (*bot.aasworld.areasettings.add(testareanum as usize)).contents
-                            & stopcontents
-                            != 0
-                    {
-                        (*route).stopevent = RSE_ENTERCONTENTS;
-                        (*route).endarea = testareanum;
-                        (*route).endcontents =
-                            (*bot.aasworld.areasettings.add(testareanum as usize)).contents;
-                        (*route).endpos = reach.end;
-                        (*route).time +=
-                            AAS_AreaTravelTime(bot, areanum, origin, reach.start) as c_int;
-                        (*route).time += reach.traveltime as c_int;
-                        return qtrue;
-                    }
-                    if stopevent & RSE_ENTERAREA != 0 && testareanum == stopareanum {
-                        (*route).stopevent = RSE_ENTERAREA;
-                        (*route).endarea = testareanum;
-                        (*route).endcontents =
-                            (*bot.aasworld.areasettings.add(testareanum as usize)).contents;
-                        (*route).endpos = reach.start;
-                        return qtrue;
-                    }
-                }
-
-                (*route).time += AAS_AreaTravelTime(bot, areanum, origin, reach.start) as c_int;
-                (*route).time += reach.traveltime as c_int;
-                (*route).endarea = reach.areanum;
-                (*route).endcontents =
-                    (*bot.aasworld.areasettings.add(reach.areanum as usize)).contents;
-                (*route).endtravelflags = AAS_TravelFlagForType_inline(bot, reach.traveltype);
-                (*route).endpos = reach.end;
-
-                curareanum = reach.areanum;
-                curorigin = reach.end;
-
-                if maxtime != 0 && (*route).time > maxtime {
-                    break;
-                }
-                i += 1;
-            }
-            if curareanum != goalareanum {
+        let mut i = 0;
+        while curareanum != goalareanum
+            && (maxareas == 0 || i < maxareas)
+            && i < bot.aasworld.numareas
+        {
+            let reachnum = AAS_AreaReachabilityToGoalArea(
+                bot,
+                curareanum,
+                curorigin,
+                goalareanum,
+                travelflags,
+            );
+            if reachnum == 0 {
+                (*route).stopevent = RSE_NOROUTE;
                 return qfalse;
             }
-            qtrue
+            let reach = *bot.aasworld.reachability.add(reachnum as usize);
+
+            if stopevent & RSE_USETRAVELTYPE != 0 {
+                if AAS_TravelFlagForType_inline(bot, reach.traveltype) & stoptfl != 0 {
+                    (*route).stopevent = RSE_USETRAVELTYPE;
+                    (*route).endarea = curareanum;
+                    (*route).endcontents =
+                        (*bot.aasworld.areasettings.add(curareanum as usize)).contents;
+                    (*route).endtravelflags =
+                        AAS_TravelFlagForType_inline(bot, reach.traveltype);
+                    (*route).endpos = reach.start;
+                    return qtrue;
+                }
+                if AAS_AreaContentsTravelFlags_inline(bot, reach.areanum) & stoptfl != 0 {
+                    (*route).stopevent = RSE_USETRAVELTYPE;
+                    (*route).endarea = reach.areanum;
+                    (*route).endcontents =
+                        (*bot.aasworld.areasettings.add(reach.areanum as usize)).contents;
+                    (*route).endtravelflags =
+                        AAS_AreaContentsTravelFlags_inline(bot, reach.areanum);
+                    (*route).endpos = reach.end;
+                    (*route).time +=
+                        AAS_AreaTravelTime(bot, areanum, origin, reach.start) as c_int;
+                    (*route).time += reach.traveltime as c_int;
+                    return qtrue;
+                }
+            }
+            let reachareas = *bot.aasworld.reachabilityareas.add(reachnum as usize);
+            for j in 0..(reachareas.numareas + 1) {
+                let testareanum = if j >= reachareas.numareas {
+                    reach.areanum
+                } else {
+                    *bot.aasworld
+                        .reachabilityareaindex
+                        .add((reachareas.firstarea + j) as usize)
+                };
+                if stopevent & RSE_ENTERCONTENTS != 0
+                    && (*bot.aasworld.areasettings.add(testareanum as usize)).contents
+                        & stopcontents
+                        != 0
+                {
+                    (*route).stopevent = RSE_ENTERCONTENTS;
+                    (*route).endarea = testareanum;
+                    (*route).endcontents =
+                        (*bot.aasworld.areasettings.add(testareanum as usize)).contents;
+                    (*route).endpos = reach.end;
+                    (*route).time +=
+                        AAS_AreaTravelTime(bot, areanum, origin, reach.start) as c_int;
+                    (*route).time += reach.traveltime as c_int;
+                    return qtrue;
+                }
+                if stopevent & RSE_ENTERAREA != 0 && testareanum == stopareanum {
+                    (*route).stopevent = RSE_ENTERAREA;
+                    (*route).endarea = testareanum;
+                    (*route).endcontents =
+                        (*bot.aasworld.areasettings.add(testareanum as usize)).contents;
+                    (*route).endpos = reach.start;
+                    return qtrue;
+                }
+            }
+
+            (*route).time += AAS_AreaTravelTime(bot, areanum, origin, reach.start) as c_int;
+            (*route).time += reach.traveltime as c_int;
+            (*route).endarea = reach.areanum;
+            (*route).endcontents =
+                (*bot.aasworld.areasettings.add(reach.areanum as usize)).contents;
+            (*route).endtravelflags = AAS_TravelFlagForType_inline(bot, reach.traveltype);
+            (*route).endpos = reach.end;
+
+            curareanum = reach.areanum;
+            curorigin = reach.end;
+
+            if maxtime != 0 && (*route).time > maxtime {
+                break;
+            }
+            i += 1;
         }
+        if curareanum != goalareanum {
+            return qfalse;
+        }
+        qtrue
     }
 }
 
@@ -2182,73 +2137,71 @@ pub fn AAS_RandomGoalArea(
     goalorigin: *mut vec3_t,
 ) -> c_int {
     unsafe {
-        unsafe {
-            if crate::be_aas_reach_fns::AAS_AreaReachability(bot, areanum) == 0 {
-                return qfalse;
+        if crate::be_aas_reach_fns::AAS_AreaReachability(bot, areanum) == 0 {
+            return qfalse;
+        }
+        // `random()` (libc, [0,1) via ruling 21's rand family): the engine LCG
+        // on `common`.
+        // PORT-NOTE(qrand-field): the `QRand` field name on `Common` is
+        // pinned when the type lands (ruling 21); `common.qrand` stands in.
+        let mut n = (bot.aasworld.numareas as f32 * common.qrand.flrand(0.0, 1.0)) as c_int;
+        for _ in 0..bot.aasworld.numareas {
+            if n <= 0 {
+                n = 1;
             }
-            // `random()` (libc, [0,1) via ruling 21's rand family): the engine LCG
-            // on `common`.
-            // PORT-NOTE(qrand-field): the `QRand` field name on `Common` is
-            // pinned when the type lands (ruling 21); `common.qrand` stands in.
-            let mut n = (bot.aasworld.numareas as f32 * common.qrand.flrand(0.0, 1.0)) as c_int;
-            for _ in 0..bot.aasworld.numareas {
-                if n <= 0 {
-                    n = 1;
-                }
-                if n >= bot.aasworld.numareas {
-                    n = 1;
-                }
-                if crate::be_aas_reach_fns::AAS_AreaReachability(bot, n) != 0 {
-                    let t = AAS_AreaTravelTimeToGoalArea(
+            if n >= bot.aasworld.numareas {
+                n = 1;
+            }
+            if crate::be_aas_reach_fns::AAS_AreaReachability(bot, n) != 0 {
+                let t = AAS_AreaTravelTimeToGoalArea(
+                    bot,
+                    areanum,
+                    (*bot.aasworld.areas.add(areanum as usize)).center,
+                    n,
+                    travelflags,
+                );
+                if t > 0 {
+                    if crate::be_aas_reach_fns::AAS_AreaSwim(bot, n) != 0 {
+                        *goalareanum = n;
+                        *goalorigin = (*bot.aasworld.areas.add(n as usize)).center;
+                        return qtrue;
+                    }
+                    let start = (*bot.aasworld.areas.add(n as usize)).center;
+                    if crate::be_aas_sample_fns::AAS_PointAreaNum(bot, start) == 0 {
+                        let msg = std::ffi::CString::new(format!(
+                            "area {} center {} {} {} in solid?",
+                            n, start[0], start[1], start[2]
+                        ))
+                        .unwrap_or_default();
+                        crate::l_log_fns::Log_Write(
+                            bot,
+                            msg.as_ptr() as *mut std::os::raw::c_char,
+                        );
+                    }
+                    let mut end = start;
+                    end[2] -= 300.0;
+                    let trace = crate::be_aas_sample_fns::AAS_TraceClientBBox(
                         bot,
-                        areanum,
-                        (*bot.aasworld.areas.add(areanum as usize)).center,
-                        n,
-                        travelflags,
+                        start,
+                        end,
+                        PRESENCE_CROUCH,
+                        -1,
                     );
-                    if t > 0 {
-                        if crate::be_aas_reach_fns::AAS_AreaSwim(bot, n) != 0 {
+                    if trace.startsolid == qfalse
+                        && trace.fraction < 1.0
+                        && crate::be_aas_sample_fns::AAS_PointAreaNum(bot, trace.endpos) == n
+                    {
+                        if crate::be_aas_reach_fns::AAS_AreaGroundFaceArea(bot, n) > 300.0 {
                             *goalareanum = n;
-                            *goalorigin = (*bot.aasworld.areas.add(n as usize)).center;
+                            *goalorigin = trace.endpos;
                             return qtrue;
                         }
-                        let mut start = (*bot.aasworld.areas.add(n as usize)).center;
-                        if crate::be_aas_sample_fns::AAS_PointAreaNum(bot, start) == 0 {
-                            let msg = std::ffi::CString::new(format!(
-                                "area {} center {} {} {} in solid?",
-                                n, start[0], start[1], start[2]
-                            ))
-                            .unwrap_or_default();
-                            crate::l_log_fns::Log_Write(
-                                bot,
-                                msg.as_ptr() as *mut std::os::raw::c_char,
-                            );
-                        }
-                        let mut end = start;
-                        end[2] -= 300.0;
-                        let trace = crate::be_aas_sample_fns::AAS_TraceClientBBox(
-                            bot,
-                            start,
-                            end,
-                            PRESENCE_CROUCH,
-                            -1,
-                        );
-                        if trace.startsolid == qfalse
-                            && trace.fraction < 1.0
-                            && crate::be_aas_sample_fns::AAS_PointAreaNum(bot, trace.endpos) == n
-                        {
-                            if crate::be_aas_reach_fns::AAS_AreaGroundFaceArea(bot, n) > 300.0 {
-                                *goalareanum = n;
-                                *goalorigin = trace.endpos;
-                                return qtrue;
-                            }
-                        }
-                        let _ = start;
                     }
+                    let _ = start;
                 }
-                n += 1;
             }
-            qfalse
+            n += 1;
         }
+        qfalse
     }
 }

@@ -19,11 +19,10 @@
 //! by the renderer-model wave (tr-model.md); `RmManager` threads as the
 //! opaque-slot re-export, cast back at the server boundary.
 
-use core::ffi::{c_char, c_int, c_uint, c_void};
+use core::ffi::{c_char, c_int, c_uint};
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::collision::cplane_t;
-use mp_qshared::shared::cvar::cvar_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::limits::MAX_SUB_BSP;
 use mp_qshared::shared::{qboolean, vec3_t, MAX_QPATH};
@@ -316,8 +315,8 @@ pub fn CM_FindSubBSP(cm: &mut CollisionWorld, modelIndex: c_int) -> c_int {
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:1132-1136`
 pub fn CM_GetWorldBounds(cm: &mut CollisionWorld, mins: vec3_t, maxs: vec3_t) {
-    let mut mins = mins;
-    let mut maxs = maxs;
+    let mins;
+    let maxs;
     unsafe {
         mins = (*cm.cmg.cmodels.offset(0)).mins;
         maxs = (*cm.cmg.cmodels.offset(0)).maxs;
@@ -1313,7 +1312,7 @@ pub fn CM_LoadMap_Actual(
         // load the file
         //
         let mut buf: *mut c_int = core::ptr::null_mut();
-        let mut new_buff: *mut () = core::ptr::null_mut();
+        let new_buff: *mut ();
         let mut h: fileHandle_t = 0;
         let bsp_len = FS_FOpenFileRead(
             common,
@@ -1341,7 +1340,6 @@ pub fn CM_LoadMap_Actual(
             buf = new_buff as *mut c_int;
             if core::ptr::eq(cmap as *const clipMap_t, &cm.cmg as *const clipMap_t) {
                 cm.gpvCachedMapDiskImage = new_buff;
-                new_buff = core::ptr::null_mut();
             }
         }
 

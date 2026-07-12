@@ -32,7 +32,6 @@ use mp_qshared::common::mp::botlib::aas_stop_event::{
     SE_TOUCHCLUSTERPORTAL, SE_TOUCHJUMPPAD, SE_TOUCHTELEPORTER,
 };
 use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
-use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
 use mp_qshared::common::mp::botlib::line_color::{LINECOLOR_BLUE, LINECOLOR_RED};
 use mp_qshared::common::mp::botlib::print_type::PRT_MESSAGE;
 use mp_qshared::shared::q_math::{

@@ -497,8 +497,8 @@ pub fn ReadStructure(
                 );
                 return qfalse;
             }
-            if unsafe { (*fd).r#type } & FT_ARRAY != 0 {
-                num = unsafe { (*fd).maxarray };
+            if (*fd).r#type & FT_ARRAY != 0 {
+                num = (*fd).maxarray;
                 if crate::l_precomp_fns::PC_ExpectTokenString(
                     bot,
                     source,
@@ -510,13 +510,13 @@ pub fn ReadStructure(
             } else {
                 num = 1;
             }
-            p = (structure as *mut u8).offset(unsafe { (*fd).offset } as isize);
+            p = (structure as *mut u8).offset((*fd).offset as isize);
             while {
                 let cur = num;
                 num -= 1;
                 cur > 0
             } {
-                if unsafe { (*fd).r#type } & FT_ARRAY != 0
+                if (*fd).r#type & FT_ARRAY != 0
                     && crate::l_precomp_fns::PC_CheckTokenString(
                         bot,
                         source,
@@ -525,7 +525,7 @@ pub fn ReadStructure(
                 {
                     break;
                 }
-                match unsafe { (*fd).r#type } & FT_TYPE {
+                match (*fd).r#type & FT_TYPE {
                     x if x == FT_CHAR => {
                         if ReadChar(bot, source, fd, p as *mut ()) == 0 {
                             return qfalse;
@@ -551,7 +551,7 @@ pub fn ReadStructure(
                         p = p.add(crate::be_ai_goal::iteminfo_s::MAX_STRINGFIELD);
                     }
                     x if x == FT_STRUCT => {
-                        if unsafe { (*fd).substruct }.is_null() {
+                        if (*fd).substruct.is_null() {
                             crate::l_precomp_fns::SourceError(
                                 bot,
                                 source,
@@ -560,12 +560,12 @@ pub fn ReadStructure(
                             return qfalse;
                         }
                         // Raven ignores this recursive call's return value.
-                        ReadStructure(bot, source, unsafe { (*fd).substruct }, p as *mut c_char);
-                        p = p.add(unsafe { (*(*fd).substruct).size } as usize);
+                        ReadStructure(bot, source, (*fd).substruct, p as *mut c_char);
+                        p = p.add((*(*fd).substruct).size as usize);
                     }
                     _ => {}
                 }
-                if unsafe { (*fd).r#type } & FT_ARRAY != 0 {
+                if (*fd).r#type & FT_ARRAY != 0 {
                     if crate::l_precomp_fns::PC_ExpectAnyToken(bot, source, &mut token) == 0 {
                         return qfalse;
                     }

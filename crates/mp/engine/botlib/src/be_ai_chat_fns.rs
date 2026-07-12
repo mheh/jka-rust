@@ -520,7 +520,7 @@ pub fn BotNumConsoleMessages(bot: &mut BotLib, chatstate: c_int) -> c_int {
 pub fn UnifyWhiteSpaces(string: *mut c_char) {
     unsafe {
         let mut ptr = string;
-        let mut oldptr = string;
+        let mut oldptr;
         while *ptr != 0 {
             oldptr = ptr;
             while *ptr != 0 && IsWhiteSpace(*ptr) != 0 {
@@ -1447,7 +1447,7 @@ pub fn BotEnterChat(bot: &mut BotLib, chatstate: c_int, clientto: c_int, sendto:
 pub fn BotAllocChatState(bot: &mut BotLib) -> c_int {
     for i in 1..=MAX_CLIENTS {
         if bot.botchatstates[i].is_null() {
-            bot.botchatstates[i] = unsafe {
+            bot.botchatstates[i] = {
                 GetClearedMemory(bot, (core::mem::size_of::<bot_chatstate_t>()) as u64)
                     as *mut bot_chatstate_t
             };
@@ -1471,7 +1471,7 @@ pub fn BotFreeChatState(bot: &mut BotLib, handle: c_int) {
         unsafe { crate::be_interface::botimport_print(bot, PRT_FATAL, "invalid chat state\n") };
         return;
     }
-    if unsafe { LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) } != 0.0 {
+    if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) != 0.0 {
         BotFreeChatFile(bot, handle);
     }
     let mut m = bot_consolemessage_t {
@@ -1487,7 +1487,7 @@ pub fn BotFreeChatState(bot: &mut BotLib, handle: c_int) {
         BotRemoveConsoleMessage(bot, handle, h);
         h = BotNextConsoleMessage(bot, handle, &mut m);
     }
-    unsafe { FreeMemory(bot, bot.botchatstates[handle as usize] as *mut ()) };
+    FreeMemory(bot, bot.botchatstates[handle as usize] as *mut ());
     bot.botchatstates[handle as usize] = core::ptr::null_mut();
 }
 
@@ -1691,26 +1691,20 @@ pub fn BotShutdownChatAI(bot: &mut BotLib) {
             }
         }
     }
-    unsafe {
-        if !bot.consolemessageheap.is_null() {
-            FreeMemory(bot, bot.consolemessageheap as *mut ());
-        }
+    if !bot.consolemessageheap.is_null() {
+        FreeMemory(bot, bot.consolemessageheap as *mut ());
     }
     bot.consolemessageheap = core::ptr::null_mut();
     if !bot.matchtemplates.is_null() {
         BotFreeMatchTemplates(bot, bot.matchtemplates);
     }
     bot.matchtemplates = core::ptr::null_mut();
-    unsafe {
-        if !bot.randomstrings.is_null() {
-            FreeMemory(bot, bot.randomstrings as *mut ());
-        }
+    if !bot.randomstrings.is_null() {
+        FreeMemory(bot, bot.randomstrings as *mut ());
     }
     bot.randomstrings = core::ptr::null_mut();
-    unsafe {
-        if !bot.synonyms.is_null() {
-            FreeMemory(bot, bot.synonyms as *mut ());
-        }
+    if !bot.synonyms.is_null() {
+        FreeMemory(bot, bot.synonyms as *mut ());
     }
     bot.synonyms = core::ptr::null_mut();
     if !bot.replychats.is_null() {
@@ -2866,18 +2860,16 @@ pub fn BotLoadChatFile(
 ///
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:2934-2961`
 pub fn BotSetupChatAI(common: &mut Common, bot: &mut BotLib) -> c_int {
-    unsafe {
-        let file = LibVarString(bot, c"synfile".as_ptr() as *mut c_char, c"syn.c".as_ptr() as *mut c_char);
-        bot.synonyms = BotLoadSynonyms(bot, file);
-        let file = LibVarString(bot, c"rndfile".as_ptr() as *mut c_char, c"rnd.c".as_ptr() as *mut c_char);
-        bot.randomstrings = BotLoadRandomStrings(bot, file);
-        let file = LibVarString(bot, c"matchfile".as_ptr() as *mut c_char, c"match.c".as_ptr() as *mut c_char);
-        bot.matchtemplates = BotLoadMatchTemplates(bot, file);
-        if LibVarValue(bot, c"nochat".as_ptr() as *mut c_char, c"0".as_ptr() as *mut c_char) == 0.0 {
-            let file = LibVarString(bot, c"rchatfile".as_ptr() as *mut c_char, c"rchat.c".as_ptr() as *mut c_char);
-            bot.replychats = BotLoadReplyChat(common, bot, file);
-        }
-        InitConsoleMessageHeap(bot);
+    let file = LibVarString(bot, c"synfile".as_ptr() as *mut c_char, c"syn.c".as_ptr() as *mut c_char);
+    bot.synonyms = BotLoadSynonyms(bot, file);
+    let file = LibVarString(bot, c"rndfile".as_ptr() as *mut c_char, c"rnd.c".as_ptr() as *mut c_char);
+    bot.randomstrings = BotLoadRandomStrings(bot, file);
+    let file = LibVarString(bot, c"matchfile".as_ptr() as *mut c_char, c"match.c".as_ptr() as *mut c_char);
+    bot.matchtemplates = BotLoadMatchTemplates(bot, file);
+    if LibVarValue(bot, c"nochat".as_ptr() as *mut c_char, c"0".as_ptr() as *mut c_char) == 0.0 {
+        let file = LibVarString(bot, c"rchatfile".as_ptr() as *mut c_char, c"rchat.c".as_ptr() as *mut c_char);
+        bot.replychats = BotLoadReplyChat(common, bot, file);
     }
+    InitConsoleMessageHeap(bot);
     BLERR_NOERROR
 }

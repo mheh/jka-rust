@@ -62,7 +62,6 @@ use crate::aasfile::travel_type::{
     TRAVELTYPE_MASK, TRAVEL_BARRIERJUMP, TRAVEL_BFGJUMP, TRAVEL_CROUCH, TRAVEL_ELEVATOR,
     TRAVEL_FUNCBOB, TRAVEL_GRAPPLEHOOK, TRAVEL_INVALID, TRAVEL_JUMP, TRAVEL_JUMPPAD, TRAVEL_LADDER,
     TRAVEL_ROCKETJUMP, TRAVEL_SWIM, TRAVEL_TELEPORT, TRAVEL_WALK, TRAVEL_WALKOFFLEDGE,
-    TRAVEL_WATERJUMP,
 };
 use crate::be_aas_debug::be_aas_debug_cpp_consts::{MAX_DEBUGLINES, MAX_DEBUGPOLYGONS};
 use crate::be_aas_sample_fns::{AAS_AreaCluster, AAS_PointAreaNum};
@@ -679,7 +678,7 @@ pub fn AAS_FloodAreas_r(bot: &mut BotLib, areanum: c_int, cluster: c_int, done: 
         for i in 0..(*area).numfaces {
             let facenum = (*bot.aasworld.faceindex.add(((*area).firstface + i) as usize)).abs();
             let face: *mut aas_face_t = bot.aasworld.faces.add(facenum as usize);
-            let mut nextareanum = if (*face).frontarea == areanum {
+            let nextareanum = if (*face).frontarea == areanum {
                 (*face).backarea
             } else {
                 (*face).frontarea
@@ -741,15 +740,13 @@ pub fn AAS_FloodAreas_r(bot: &mut BotLib, areanum: c_int, cluster: c_int, done: 
 ///
 /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:752-760`
 pub fn AAS_FloodAreas(bot: &mut BotLib, origin: vec3_t) {
-    unsafe {
-        let done = GetClearedMemory(
-            bot,
-            bot.aasworld.numareas as u64 * core::mem::size_of::<c_int>() as u64,
-        ) as *mut c_int;
-        let areanum = AAS_PointAreaNum(bot, origin);
-        let cluster = AAS_AreaCluster(bot, areanum);
-        AAS_FloodAreas_r(bot, areanum, cluster, done);
-    }
+    let done = GetClearedMemory(
+        bot,
+        bot.aasworld.numareas as u64 * core::mem::size_of::<c_int>() as u64,
+    ) as *mut c_int;
+    let areanum = AAS_PointAreaNum(bot, origin);
+    let cluster = AAS_AreaCluster(bot, areanum);
+    AAS_FloodAreas_r(bot, areanum, cluster, done);
 }
 
 /// Raven `AAS_ShowReachability`.
@@ -863,7 +860,7 @@ pub fn AAS_ShowReachability(common: &mut Common, bot: &mut BotLib, reach: *mut a
                 qtrue as c_int,
             );
         } else if traveltype == TRAVEL_JUMPPAD {
-            let mut cmdmove: vec3_t = [0.0, 0.0, 0.0];
+            let cmdmove: vec3_t = [0.0, 0.0, 0.0];
             //
             let mut dir: vec3_t = [
                 (*reach).end[0] - (*reach).start[0],

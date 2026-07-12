@@ -543,7 +543,6 @@ pub fn Z_MorphMallocTag(common: &mut Common, pvAddress: *mut (), eDesiredTag: me
                 errorParm_t::ERR_FATAL,
                 "Z_MorphMallocTag(): Not a valid zone header!".to_string(),
             );
-            return; // won't get here
         }
 
         // DEC existing tag stats...
@@ -582,7 +581,6 @@ pub fn Z_Size(pvAddress: *mut ()) -> c_int {
                 errorParm_t::ERR_FATAL,
                 "Z_Size(): Not a valid zone header!".to_string(),
             );
-            return 0; // won't get here
         }
 
         (*pMemory).iSize
@@ -595,22 +593,18 @@ pub fn Z_Size(pvAddress: *mut ()) -> c_int {
 pub fn Com_ShutdownZoneMemory(common: &mut Common) {
     //	Com_Printf("Shutting down zone memory .....\n");
 
-    unsafe {
-        Cmd_RemoveCommand(common, c"zone_stats".as_ptr());
-        Cmd_RemoveCommand(common, c"zone_details".as_ptr());
-    }
+    Cmd_RemoveCommand(common, c"zone_stats".as_ptr());
+    Cmd_RemoveCommand(common, c"zone_details".as_ptr());
 
     if common.TheZone.Stats.iCount != 0 {
         // §E0382: `common` moves into the call as the first arg, so the
         // fields it needs must be read into locals before the call.
         let count = common.TheZone.Stats.iCount;
         let current = common.TheZone.Stats.iCurrent;
-        unsafe {
-            Com_Printf(
-                common,
-                &format!("Automatically freeing {count} blocks making up {current} bytes\n"),
-            );
-        }
+        Com_Printf(
+            common,
+            &format!("Automatically freeing {count} blocks making up {current} bytes\n"),
+        );
         Z_TagFree(common, memtag_t::TAG_ALL);
 
         assert!(common.TheZone.Stats.iCount == 0);
@@ -637,29 +631,25 @@ pub fn Com_InitZoneMemory(
     //#ifdef _DEBUG
     //	com_validateZone = Cvar_Get("com_validateZone", "1", 0);
     //#else
-    unsafe {
-        common.com_validateZone = Cvar_Get(common, cm, rm, host, c"com_validateZone".as_ptr(), c"0".as_ptr(), 0);
-    }
+    common.com_validateZone = Cvar_Get(common, cm, rm, host, c"com_validateZone".as_ptr(), c"0".as_ptr(), 0);
     //#endif
 
-    unsafe {
-        Cmd_AddCommand(
-            common,
-            cm,
-            rm,
-            host,
-            c"zone_stats".as_ptr(),
-            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Z_Stats_f(common)),
-        );
-        Cmd_AddCommand(
-            common,
-            cm,
-            rm,
-            host,
-            c"zone_details".as_ptr(),
-            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Z_Details_f(common)),
-        );
-    }
+    Cmd_AddCommand(
+        common,
+        cm,
+        rm,
+        host,
+        c"zone_stats".as_ptr(),
+        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Z_Stats_f(common)),
+    );
+    Cmd_AddCommand(
+        common,
+        cm,
+        rm,
+        host,
+        c"zone_details".as_ptr(),
+        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Z_Details_f(common)),
+    );
 
     // #ifdef _DEBUG: zone_memrecovertest is a debug-only command; this is a
     // release build, so the block is dropped per its own guard.
@@ -799,9 +789,7 @@ pub fn Com_TouchMemory(common: &mut Common) {
     let mut sum: i32;
 
     //	start = Sys_Milliseconds();
-    unsafe {
-        Z_Validate(common);
-    }
+    Z_Validate(common);
 
     sum = 0;
 
@@ -840,7 +828,7 @@ pub fn Hunk_Alloc(
     // §E0382: `common` moves into the call as the first arg, so its
     // `hunk_tag` field must be read into a local before the call, not inline.
     let hunk_tag = common.hunk_tag;
-    unsafe { Z_Malloc(common, cm, rm, host, size, hunk_tag, native_types::qtrue, 4) }
+    Z_Malloc(common, cm, rm, host, size, hunk_tag, native_types::qtrue, 4)
 }
 
 /// Raven `Hunk_AllocateTempMemory`.
@@ -854,27 +842,23 @@ pub fn Hunk_AllocateTempMemory(
     size: c_int,
 ) -> *mut () {
     // don't bother clearing, because we are going to load a file over it
-    unsafe {
-        Z_Malloc(
-            common,
-            cm,
-            rm,
-            host,
-            size,
-            memtag_t::TAG_TEMP_HUNKALLOC,
-            native_types::qfalse,
-            4,
-        )
-    }
+    Z_Malloc(
+        common,
+        cm,
+        rm,
+        host,
+        size,
+        memtag_t::TAG_TEMP_HUNKALLOC,
+        native_types::qfalse,
+        4,
+    )
 }
 
 /// Raven `Hunk_FreeTempMemory`.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:815-818`
 pub fn Hunk_FreeTempMemory(common: &mut Common, buf: *mut ()) {
-    unsafe {
-        Z_Free(common, buf);
-    }
+    Z_Free(common, buf);
 }
 
 /// Raven `Hunk_Clear`.

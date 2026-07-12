@@ -465,8 +465,8 @@ pub fn Com_Quit_f(
             .expect("SV_Shutdown hook — installed by mp_engine_server at boot");
         sv_shutdown(common, cm, sv, rm, rmg, host, "Server quit\n");
         (common.hooks.CL_Shutdown.expect("CL_Shutdown hook"))();
-        unsafe { Com_Shutdown(common, cm, rmg) };
-        unsafe { FS_Shutdown(common, qtrue) };
+        Com_Shutdown(common, cm, rmg);
+        FS_Shutdown(common, qtrue);
     }
     host.sys_quit();
 }
@@ -490,9 +490,9 @@ pub fn Com_StartupVariable(
         let s = crate::cmd_common::Cmd_Argv(common, 1);
         if r#match.is_null() || q_strcmp(s, r#match as *mut c_char) == 0 {
             let arg2 = crate::cmd_common::Cmd_Argv(common, 2);
-            unsafe { Cvar_Set(common, cm, rm, host, s, arg2) };
+            Cvar_Set(common, cm, rm, host, s, arg2);
             let cv: *mut cvar_t =
-                unsafe { Cvar_Get(common, cm, rm, host, s, c"".as_ptr() as *mut c_char, 0) };
+                Cvar_Get(common, cm, rm, host, s, c"".as_ptr() as *mut c_char, 0);
             unsafe {
                 (*cv).flags |= mp_qshared::shared::cvar::CVAR_USER_CREATED;
             }
@@ -586,7 +586,7 @@ pub fn Com_GetEvent(
         return common.com_pushedEvents
             [((common.com_pushedEventsTail - 1) & (MAX_PUSHED_EVENTS as i32 - 1)) as usize];
     }
-    unsafe { Com_GetRealEvent(common, cm, rm, host) }
+    Com_GetRealEvent(common, cm, rm, host)
 }
 
 /// Raven `Com_GetRealEvent` — either read the next event from the system or
@@ -617,18 +617,16 @@ pub fn Com_GetRealEvent(
             );
         }
         if ev.evPtrLength != 0 {
-            ev.evPtr = unsafe {
-                Z_Malloc(
-                    common,
-                    cm,
-                    rm,
-                    host,
-                    ev.evPtrLength,
-                    memtag_t::TAG_EVENT,
-                    qtrue,
-                    4,
-                )
-            } as *mut c_void;
+            ev.evPtr = Z_Malloc(
+                common,
+                cm,
+                rm,
+                host,
+                ev.evPtrLength,
+                memtag_t::TAG_EVENT,
+                qtrue,
+                4,
+            ) as *mut c_void;
             let r = FS_Read(common, ev.evPtr as *mut (), ev.evPtrLength, common.com_journalFile);
             if r != ev.evPtrLength {
                 crate::common::com_error(
@@ -684,7 +682,7 @@ pub fn Com_PushEvent(common: &mut Common, event: *mut sysEvent_t) {
         }
 
         if !common.com_pushedEvents[ev_idx].evPtr.is_null() {
-            unsafe { Z_Free(common, common.com_pushedEvents[ev_idx].evPtr as *mut ()) };
+            Z_Free(common, common.com_pushedEvents[ev_idx].evPtr as *mut ());
         }
         common.com_pushedEventsTail += 1;
     } else {
@@ -709,7 +707,7 @@ pub fn Com_Milliseconds(
 
     // get events and push them until we get a null event with the current time
     loop {
-        ev = unsafe { Com_GetRealEvent(common, cm, rm, host) };
+        ev = Com_GetRealEvent(common, cm, rm, host);
         if !matches!(ev.evType, sysEventType_t::SE_NONE) {
             Com_PushEvent(common, &mut ev);
         }
@@ -729,13 +727,13 @@ pub fn Com_Shutdown(common: &mut Common, cm: &mut CollisionWorld, rmg: &mut RmMa
     CM_ClearMap(cm, rmg);
 
     if common.logfile != 0 {
-        unsafe { FS_FCloseFile(common, common.logfile) };
+        FS_FCloseFile(common, common.logfile);
         common.logfile = 0;
         unsafe { (*common.com_logfile).integer = 0 }; // don't open up the log file again!!
     }
 
     if common.com_journalFile != 0 {
-        unsafe { FS_FCloseFile(common, common.com_journalFile) };
+        FS_FCloseFile(common, common.com_journalFile);
         common.com_journalFile = 0;
     }
 
@@ -771,10 +769,10 @@ pub fn Com_Freeze_f(
         .parse()
         .unwrap_or(0.0);
 
-    let start = unsafe { Com_Milliseconds(common, cm, rm, host) };
+    let start = Com_Milliseconds(common, cm, rm, host);
 
     loop {
-        let now = unsafe { Com_Milliseconds(common, cm, rm, host) };
+        let now = Com_Milliseconds(common, cm, rm, host);
         if (now - start) as f32 * 0.001 > s {
             break;
         }
@@ -844,17 +842,15 @@ pub fn Com_InitJournaling(
     host: &mut dyn EngineHost,
 ) {
     Com_StartupVariable(common, cm, rm, host, c"journal".as_ptr());
-    common.com_journal = unsafe {
-        Cvar_Get(
-            common,
-            cm,
-            rm,
-            host,
-            c"journal".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_INIT,
-        )
-    };
+    common.com_journal = Cvar_Get(
+        common,
+        cm,
+        rm,
+        host,
+        c"journal".as_ptr() as *mut c_char,
+        c"0".as_ptr() as *mut c_char,
+        mp_qshared::shared::cvar::CVAR_INIT,
+    );
     unsafe {
         if (*common.com_journal).integer == 0 {
             return;
@@ -894,7 +890,7 @@ pub fn Com_InitJournaling(
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1446-1461`
 pub fn Com_WriteConfigToFile(common: &mut Common, filename: *const c_char) {
-    let f = unsafe { FS_FOpenFileWrite(common, filename) };
+    let f = FS_FOpenFileWrite(common, filename);
     if f == 0 {
         crate::common::com_printf(
             common,
@@ -909,8 +905,8 @@ pub fn Com_WriteConfigToFile(common: &mut Common, filename: *const c_char) {
         "// generated by Star Wars Jedi Academy MP, do not modify\n",
     );
     (common.hooks.Key_WriteBindings.expect("Key_WriteBindings hook"))(f);
-    unsafe { Cvar_WriteVariables(common, f) };
-    unsafe { FS_FCloseFile(common, f) };
+    Cvar_WriteVariables(common, f);
+    FS_FCloseFile(common, f);
 }
 
 /// `Com_WriteConfiguration`.
@@ -1016,17 +1012,15 @@ pub fn Com_EventLoop(
 ) -> c_int {
     let mut buf_data = [0u8; MAX_MSGLEN];
     let mut buf: msg_t = unsafe { core::mem::zeroed() };
-    unsafe {
-        MSG_Init(
-            common,
-            cm,
-            rm,
-            host,
-            &mut buf,
-            buf_data.as_mut_ptr(),
-            MAX_MSGLEN as c_int,
-        )
-    };
+    MSG_Init(
+        common,
+        cm,
+        rm,
+        host,
+        &mut buf,
+        buf_data.as_mut_ptr(),
+        MAX_MSGLEN as c_int,
+    );
 
     loop {
         let ev = Com_GetEvent(common, cm, rm, host);
@@ -1156,17 +1150,14 @@ pub fn Com_EventLoop(
                     }
                 }
             }
-            _ => {
-                crate::common::com_error(
-                    errorParm_t::ERR_FATAL,
-                    format!("Com_EventLoop: bad event type {}", ev.evType as i32),
-                );
-            }
+            // Raven's `default:` (`Com_Error(ERR_FATAL, "bad event type %i")`) guards
+            // against a corrupted/out-of-range int; `sysEventType_t` is a proper Rust
+            // enum, so every value is already one of the arms above — unreachable.
         }
 
         // free any block data
         if !ev.evPtr.is_null() {
-            unsafe { Z_Free(common, ev.evPtr as *mut ()) };
+            Z_Free(common, ev.evPtr as *mut ());
         }
     }
 }
@@ -1378,13 +1369,13 @@ pub fn Com_ParseTextFile(
     }
 
     let mut buf = vec![0u8; (length + 1) as usize];
-    unsafe { FS_Read(common, buf.as_mut_ptr() as *mut (), length, f) };
+    FS_Read(common, buf.as_mut_ptr() as *mut (), length, f);
     buf[length as usize] = 0;
 
     let text = String::from_utf8_lossy(&buf[..length as usize]).into_owned();
     let _ = parser.parse(&text, cleanFirst);
 
-    unsafe { FS_FCloseFile(common, f) };
+    FS_FCloseFile(common, f);
 
     true
 }
@@ -1415,8 +1406,8 @@ pub fn Com_ParseTextFile2(
     }
 
     let mut buf = vec![0u8; (length + 1) as usize];
-    unsafe { FS_Read(common, buf.as_mut_ptr() as *mut (), length, f) };
-    unsafe { FS_FCloseFile(common, f) };
+    FS_Read(common, buf.as_mut_ptr() as *mut (), length, f);
+    FS_FCloseFile(common, f);
     buf[length as usize] = 0;
 
     let text = String::from_utf8_lossy(&buf[..length as usize]).into_owned();
@@ -1458,7 +1449,7 @@ pub fn Com_Init(
         // bk001129 - do this before anything else decides to push events
         Com_InitPushEvent(common);
 
-        unsafe { Cvar_Init(common, cm, rm, host) };
+        Cvar_Init(common, cm, rm, host);
 
         // prepare enough of the subsystems to handle
         // cvar and command buffer management
@@ -1507,17 +1498,15 @@ pub fn Com_Init(
         Com_StartupVariable(common, cm, rm, host, core::ptr::null());
 
         // get dedicated here for proper hunk megs initialization
-        common.com_dedicated = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"dedicated".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_LATCH,
-            )
-        };
+        common.com_dedicated = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"dedicated".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_LATCH,
+        );
         // allocate the stack based hunk allocator
         crate::z_memman_pc::Com_InitHunkMemory(common, sv, rm, g2, host);
 
@@ -1528,452 +1517,374 @@ pub fn Com_Init(
         //
         // init commands and vars
         //
-        common.com_maxfps = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_maxfps".as_ptr() as *mut c_char,
-                c"85".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ARCHIVE,
-            )
-        };
-        common.com_blood = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_blood".as_ptr() as *mut c_char,
-                c"1".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ARCHIVE,
-            )
-        };
+        common.com_maxfps = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_maxfps".as_ptr() as *mut c_char,
+            c"85".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ARCHIVE,
+        );
+        common.com_blood = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_blood".as_ptr() as *mut c_char,
+            c"1".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ARCHIVE,
+        );
 
-        common.com_developer = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"developer".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_TEMP,
-            )
-        };
-        common.com_vmdebug = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"vmdebug".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_TEMP,
-            )
-        };
-        common.com_logfile = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"logfile".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_TEMP,
-            )
-        };
+        common.com_developer = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"developer".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_TEMP,
+        );
+        common.com_vmdebug = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"vmdebug".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_TEMP,
+        );
+        common.com_logfile = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"logfile".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_TEMP,
+        );
 
-        common.com_timescale = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"timescale".as_ptr() as *mut c_char,
-                c"1".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_CHEAT | mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-            )
-        };
-        common.com_fixedtime = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"fixedtime".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_CHEAT,
-            )
-        };
-        common.com_showtrace = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_showtrace".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_CHEAT,
-            )
-        };
+        common.com_timescale = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"timescale".as_ptr() as *mut c_char,
+            c"1".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_CHEAT | mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
+        );
+        common.com_fixedtime = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"fixedtime".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_CHEAT,
+        );
+        common.com_showtrace = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_showtrace".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_CHEAT,
+        );
 
-        common.com_terrainPhysics = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_terrainPhysics".as_ptr() as *mut c_char,
-                c"1".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_CHEAT,
-            )
-        };
+        common.com_terrainPhysics = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_terrainPhysics".as_ptr() as *mut c_char,
+            c"1".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_CHEAT,
+        );
 
-        common.com_dropsim = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_dropsim".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_CHEAT,
-            )
-        };
-        common.com_viewlog = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"viewlog".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_CHEAT,
-            )
-        };
-        common.com_speeds = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_speeds".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                0,
-            )
-        };
-        common.com_timedemo = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"timedemo".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                0,
-            )
-        };
-        common.com_cameraMode = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_cameraMode".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_CHEAT,
-            )
-        };
+        common.com_dropsim = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_dropsim".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_CHEAT,
+        );
+        common.com_viewlog = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"viewlog".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_CHEAT,
+        );
+        common.com_speeds = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_speeds".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            0,
+        );
+        common.com_timedemo = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"timedemo".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            0,
+        );
+        common.com_cameraMode = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_cameraMode".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_CHEAT,
+        );
 
-        common.com_optvehtrace = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_optvehtrace".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                0,
-            )
-        };
+        common.com_optvehtrace = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_optvehtrace".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            0,
+        );
 
-        common.cl_paused = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"cl_paused".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ROM,
-            )
-        };
-        common.sv_paused = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"sv_paused".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ROM,
-            )
-        };
-        common.com_sv_running = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"sv_running".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ROM,
-            )
-        };
-        common.com_cl_running = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"cl_running".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ROM,
-            )
-        };
-        common.com_buildScript = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_buildScript".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                0,
-            )
-        };
+        common.cl_paused = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"cl_paused".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ROM,
+        );
+        common.sv_paused = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"sv_paused".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ROM,
+        );
+        common.com_sv_running = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"sv_running".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ROM,
+        );
+        common.com_cl_running = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"cl_running".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ROM,
+        );
+        common.com_buildScript = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_buildScript".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            0,
+        );
 
         // G2_PERFORMANCE_ANALYSIS gated in retail (unresolved const,
         // escalated) — com_G2Report registers unconditionally here since the
         // engine ships that build config.
-        common.com_G2Report = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_G2Report".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                0,
-            )
-        };
+        common.com_G2Report = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_G2Report".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            0,
+        );
 
-        common.com_RMG = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                0,
-            )
-        };
+        common.com_RMG = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            0,
+        );
 
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_seed".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                0,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_time".as_ptr() as *mut c_char,
-                c"day".as_ptr() as *mut c_char,
-                0,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_soundset".as_ptr() as *mut c_char,
-                c"".as_ptr() as *mut c_char,
-                0,
-            )
-        };
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_seed".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            0,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_time".as_ptr() as *mut c_char,
+            c"day".as_ptr() as *mut c_char,
+            0,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_soundset".as_ptr() as *mut c_char,
+            c"".as_ptr() as *mut c_char,
+            0,
+        );
 
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_textseed".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_map".as_ptr() as *mut c_char,
-                c"small".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ARCHIVE | mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_timefile".as_ptr() as *mut c_char,
-                c"day".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ARCHIVE,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_terrain".as_ptr() as *mut c_char,
-                c"grassyhills".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ARCHIVE,
-            )
-        };
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_textseed".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_map".as_ptr() as *mut c_char,
+            c"small".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ARCHIVE | mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_timefile".as_ptr() as *mut c_char,
+            c"day".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ARCHIVE,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_terrain".as_ptr() as *mut c_char,
+            c"grassyhills".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ARCHIVE,
+        );
 
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_sky".as_ptr() as *mut c_char,
-                c"".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_fog".as_ptr() as *mut c_char,
-                c"".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_weather".as_ptr() as *mut c_char,
-                c"".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_SYSTEMINFO
-                    | mp_qshared::shared::cvar::CVAR_SERVERINFO
-                    | mp_qshared::shared::cvar::CVAR_CHEAT,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_instances".as_ptr() as *mut c_char,
-                c"colombia".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_miscents".as_ptr() as *mut c_char,
-                c"deciduous".as_ptr() as *mut c_char,
-                0,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_music".as_ptr() as *mut c_char,
-                c"music/dm_kam1".as_ptr() as *mut c_char,
-                0,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_mission".as_ptr() as *mut c_char,
-                c"ctf".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_course".as_ptr() as *mut c_char,
-                c"standard".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-            )
-        };
-        unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"RMG_distancecull".as_ptr() as *mut c_char,
-                c"5000".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_CHEAT,
-            )
-        };
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_sky".as_ptr() as *mut c_char,
+            c"".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_fog".as_ptr() as *mut c_char,
+            c"".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_weather".as_ptr() as *mut c_char,
+            c"".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_SYSTEMINFO
+                | mp_qshared::shared::cvar::CVAR_SERVERINFO
+                | mp_qshared::shared::cvar::CVAR_CHEAT,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_instances".as_ptr() as *mut c_char,
+            c"colombia".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_miscents".as_ptr() as *mut c_char,
+            c"deciduous".as_ptr() as *mut c_char,
+            0,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_music".as_ptr() as *mut c_char,
+            c"music/dm_kam1".as_ptr() as *mut c_char,
+            0,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_mission".as_ptr() as *mut c_char,
+            c"ctf".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_course".as_ptr() as *mut c_char,
+            c"standard".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
+        );
+        Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"RMG_distancecull".as_ptr() as *mut c_char,
+            c"5000".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_CHEAT,
+        );
 
-        common.com_introPlayed = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"com_introplayed".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ARCHIVE,
-            )
-        };
+        common.com_introPlayed = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"com_introplayed".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ARCHIVE,
+        );
 
         unsafe {
             if (*common.com_dedicated).integer != 0 && (*common.com_viewlog).integer == 0 {
@@ -2018,36 +1929,30 @@ pub fn Com_Init(
         // dispatch site (`Cmd_ExecuteString`) threads it in the pinned
         // common/cm/sv/rm/rmg/host order, so the registered handler reaches it as
         // the slot's fifth receiver.
-        unsafe {
-            Cmd_AddCommand(
-                common,
-                cm,
-                rm,
-                host,
-                c"quit".as_ptr(),
-                Some(|common, cm, sv, rm, rmg, _g2, host| Com_Quit_f(common, cm, sv, rm, rmg, host)),
-            )
-        };
-        unsafe {
-            Cmd_AddCommand(
-                common,
-                cm,
-                rm,
-                host,
-                c"changeVectors".as_ptr(),
-                Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| crate::msg::MSG_ReportChangeVectors_f(common)),
-            )
-        };
-        unsafe {
-            Cmd_AddCommand(
-                common,
-                cm,
-                rm,
-                host,
-                c"writeconfig".as_ptr(),
-                Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Com_WriteConfig_f(common)),
-            )
-        };
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            c"quit".as_ptr(),
+            Some(|common, cm, sv, rm, rmg, _g2, host| Com_Quit_f(common, cm, sv, rm, rmg, host)),
+        );
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            c"changeVectors".as_ptr(),
+            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| crate::msg::MSG_ReportChangeVectors_f(common)),
+        );
+        Cmd_AddCommand(
+            common,
+            cm,
+            rm,
+            host,
+            c"writeconfig".as_ptr(),
+            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Com_WriteConfig_f(common)),
+        );
 
         let s = format!(
             "{} {} {}",
@@ -2055,22 +1960,20 @@ pub fn Com_Init(
             mp_qshared::shared::CPUSTRING,
             option_env!("BUILD_DATE").unwrap_or("unknown"),
         );
-        common.com_version = unsafe {
-            Cvar_Get(
-                common,
-                cm,
-                rm,
-                host,
-                c"version".as_ptr() as *mut c_char,
-                s.as_ptr() as *mut c_char,
-                mp_qshared::shared::cvar::CVAR_ROM | mp_qshared::shared::cvar::CVAR_SERVERINFO,
-            )
-        };
+        common.com_version = Cvar_Get(
+            common,
+            cm,
+            rm,
+            host,
+            c"version".as_ptr() as *mut c_char,
+            s.as_ptr() as *mut c_char,
+            mp_qshared::shared::cvar::CVAR_ROM | mp_qshared::shared::cvar::CVAR_SERVERINFO,
+        );
 
-        unsafe { SE_Init(common, host) };
+        SE_Init(common, host);
 
         host.sys_init();
-        let netchan_port = (unsafe { Com_Milliseconds(common, cm, rm, host) } & 0xffff) as c_int;
+        let netchan_port = (Com_Milliseconds(common, cm, rm, host) & 0xffff) as c_int;
         crate::net_chan::Netchan_Init(common, cm, rm, host, netchan_port);
         crate::vm_fns::VM_Init(common, cm, rm, host);
         let sv_init = common
@@ -2091,7 +1994,7 @@ pub fn Com_Init(
         // set com_frameTime so that if a map is started on the
         // command line it will still be able to count on com_frameTime
         // being random enough for a serverid
-        common.com_frameTime = unsafe { Com_Milliseconds(common, cm, rm, host) };
+        common.com_frameTime = Com_Milliseconds(common, cm, rm, host);
 
         // add + commands from command line
         unsafe {
@@ -2107,30 +2010,26 @@ pub fn Com_Init(
         }
 
         // start in full screen ui mode
-        unsafe {
-            Cvar_Set(
-                common,
-                cm,
-                rm,
-                host,
-                c"r_uiFullScreen".as_ptr() as *mut c_char,
-                c"1".as_ptr() as *mut c_char,
-            )
-        };
+        Cvar_Set(
+            common,
+            cm,
+            rm,
+            host,
+            c"r_uiFullScreen".as_ptr() as *mut c_char,
+            c"1".as_ptr() as *mut c_char,
+        );
 
         (common.hooks.CL_StartHunkUsers.expect("CL_StartHunkUsers hook"))();
 
         // make sure single player is off by default
-        unsafe {
-            Cvar_Set(
-                common,
-                cm,
-                rm,
-                host,
-                c"ui_singlePlayerActive".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-            )
-        };
+        Cvar_Set(
+            common,
+            cm,
+            rm,
+            host,
+            c"ui_singlePlayerActive".as_ptr() as *mut c_char,
+            c"0".as_ptr() as *mut c_char,
+        );
 
         common.com_fullyInitialized = true;
         crate::common::com_printf(common, "--- Common Initialization Complete ---\n");

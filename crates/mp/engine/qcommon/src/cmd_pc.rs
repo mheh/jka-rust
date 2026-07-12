@@ -143,9 +143,7 @@ pub fn Cmd_List_f(common: &mut Common) {
             cmd = (*cmd).next;
         }
     }
-    unsafe {
-        com_printf(common, &format!("{} commands\n", i));
-    }
+    com_printf(common, &format!("{} commands\n", i));
 }
 
 /// `Cmd_ExecuteString`.
@@ -196,7 +194,7 @@ pub fn Cmd_ExecuteString(
     }
 
     // check cvars
-    if unsafe { Cvar_Command(common, cm, rm, host) } != 0 {
+    if Cvar_Command(common, cm, rm, host) != 0 {
         return;
     }
 

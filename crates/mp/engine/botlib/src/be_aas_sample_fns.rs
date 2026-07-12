@@ -14,7 +14,7 @@ use core::ffi::{c_char, c_int};
 
 use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
-use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL, PRT_MESSAGE};
+use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL};
 use mp_qshared::common::mp::qcommon::aas_areainfo::aas_areainfo_t;
 use mp_qshared::shared::surface_flags::{CONTENTS_PLAYERCLIP, CONTENTS_SOLID};
 use mp_qshared::shared::vec3_t;
@@ -83,8 +83,8 @@ struct aas_linkstack_t {
 pub fn AAS_PresenceTypeBoundingBox(
     bot: &mut BotLib,
     presencetype: c_int,
-    mins: vec3_t,
-    maxs: vec3_t,
+    _mins: vec3_t,
+    _maxs: vec3_t,
 ) {
     //bounding box size for each presence type
     let boxmins: [vec3_t; 3] = [
@@ -108,10 +108,8 @@ pub fn AAS_PresenceTypeBoundingBox(
         }
         index = 2;
     }
-    let mut mins = mins;
-    let mut maxs = maxs;
-    mins = boxmins[index];
-    maxs = boxmaxs[index];
+    let mins = boxmins[index];
+    let maxs = boxmaxs[index];
     let _ = (mins, maxs);
 }
 
@@ -265,9 +263,7 @@ pub fn AAS_BoxOriginDistanceFromPlane(
     }
     //
     let mut v2 = normal;
-    unsafe {
-        VectorInverse(&mut v2);
-    }
+    VectorInverse(&mut v2);
     DotProduct(v1, v2)
 }
 
@@ -531,13 +527,13 @@ pub fn AAS_PointInsideFace(
 /// Raven `AAS_FacePlane`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_sample.cpp:1035-1042`
-pub fn AAS_FacePlane(bot: &mut BotLib, facenum: c_int, mut normal: vec3_t, dist: *mut f32) {
+pub fn AAS_FacePlane(bot: &mut BotLib, facenum: c_int, _normal: vec3_t, dist: *mut f32) {
     unsafe {
         let plane: *mut aas_plane_t = bot
             .aasworld
             .planes
             .add((*bot.aasworld.faces.add(facenum as usize)).planenum as usize);
-        normal = (*plane).normal;
+        let normal = (*plane).normal;
         *dist = (*plane).dist;
         let _ = normal;
     }
@@ -617,25 +613,21 @@ pub fn AAS_PlaneFromNum(bot: &mut BotLib, planenum: c_int) -> *mut aas_plane_t {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_sample.cpp:117-122`
 pub fn AAS_FreeAASLinkHeap(bot: &mut BotLib) {
-    unsafe {
-        if !bot.aasworld.linkheap.is_null() {
-            FreeMemory(bot, bot.aasworld.linkheap as *mut ());
-        }
-        bot.aasworld.linkheap = core::ptr::null_mut();
-        bot.aasworld.linkheapsize = 0;
+    if !bot.aasworld.linkheap.is_null() {
+        FreeMemory(bot, bot.aasworld.linkheap as *mut ());
     }
+    bot.aasworld.linkheap = core::ptr::null_mut();
+    bot.aasworld.linkheapsize = 0;
 }
 
 /// Raven `AAS_FreeAASLinkedEntities`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_sample.cpp:184-188`
 pub fn AAS_FreeAASLinkedEntities(bot: &mut BotLib) {
-    unsafe {
-        if !bot.aasworld.arealinkedentities.is_null() {
-            FreeMemory(bot, bot.aasworld.arealinkedentities as *mut ());
-        }
-        bot.aasworld.arealinkedentities = core::ptr::null_mut();
+    if !bot.aasworld.arealinkedentities.is_null() {
+        FreeMemory(bot, bot.aasworld.arealinkedentities as *mut ());
     }
+    bot.aasworld.arealinkedentities = core::ptr::null_mut();
 }
 
 /// Raven `AAS_PointPresenceType`.
@@ -877,18 +869,16 @@ pub fn AAS_AASLinkEntity(
 ///
 /// Source: `oracle/codemp/botlib/be_aas_sample.cpp:171-177`
 pub fn AAS_InitAASLinkedEntities(bot: &mut BotLib) {
-    unsafe {
-        if bot.aasworld.loaded == 0 {
-            return;
-        }
-        if !bot.aasworld.arealinkedentities.is_null() {
-            FreeMemory(bot, bot.aasworld.arealinkedentities as *mut ());
-        }
-        bot.aasworld.arealinkedentities = GetClearedHunkMemory(
-            bot,
-            (bot.aasworld.numareas as usize * core::mem::size_of::<*mut aas_link_t>()) as u64,
-        ) as *mut *mut aas_link_t;
+    if bot.aasworld.loaded == 0 {
+        return;
     }
+    if !bot.aasworld.arealinkedentities.is_null() {
+        FreeMemory(bot, bot.aasworld.arealinkedentities as *mut ());
+    }
+    bot.aasworld.arealinkedentities = GetClearedHunkMemory(
+        bot,
+        (bot.aasworld.numareas as usize * core::mem::size_of::<*mut aas_link_t>()) as u64,
+    ) as *mut *mut aas_link_t;
 }
 
 /// Raven `AAS_PointReachabilityAreaIndex`.
@@ -937,8 +927,8 @@ pub fn AAS_AreaEntityCollision(
     trace: *mut aas_trace_t,
 ) -> qboolean {
     unsafe {
-        let mut boxmins: vec3_t = [0.0; 3];
-        let mut boxmaxs: vec3_t = [0.0; 3];
+        let boxmins: vec3_t = [0.0; 3];
+        let boxmaxs: vec3_t = [0.0; 3];
         AAS_PresenceTypeBoundingBox(bot, presencetype, boxmins, boxmaxs);
 
         let mut bsptrace = core::mem::zeroed::<bsp_trace_t>();
@@ -991,8 +981,8 @@ pub fn AAS_LinkEntityClientBBox(
     entnum: c_int,
     presencetype: c_int,
 ) -> *mut aas_link_t {
-    let mut mins: vec3_t = [0.0; 3];
-    let mut maxs: vec3_t = [0.0; 3];
+    let mins: vec3_t = [0.0; 3];
+    let maxs: vec3_t = [0.0; 3];
 
     AAS_PresenceTypeBoundingBox(bot, presencetype, mins, maxs);
     let newabsmins: vec3_t = [

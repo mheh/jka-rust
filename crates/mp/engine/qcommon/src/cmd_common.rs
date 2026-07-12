@@ -244,18 +244,14 @@ pub fn Cmd_Wait_f(common: &mut Common) {
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:324-326`
 pub fn Cmd_ArgvBuffer(common: &mut Common, arg: c_int, buffer: *mut c_char, bufferLength: c_int) {
-    unsafe {
-        Q_strncpyz(buffer, Cmd_Argv(common, arg), bufferLength);
-    }
+    Q_strncpyz(buffer, Cmd_Argv(common, arg), bufferLength);
 }
 
 /// `Cmd_ArgsBuffer`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:383-385`
 pub fn Cmd_ArgsBuffer(common: &mut Common, buffer: *mut c_char, bufferLength: c_int) {
-    unsafe {
-        Q_strncpyz(buffer, Cmd_Args(common), bufferLength);
-    }
+    Q_strncpyz(buffer, Cmd_Args(common), bufferLength);
 }
 
 /// `Cbuf_AddText`.
@@ -320,9 +316,7 @@ pub fn Cmd_Echo_f(common: &mut Common) {
             com_printf(common, &msg);
         }
     }
-    unsafe {
-        com_printf(common, "\n");
-    }
+    com_printf(common, "\n");
 }
 
 /// `Cmd_Exec_f`.
@@ -338,51 +332,39 @@ pub fn Cmd_Exec_f(
         [0; native_types::MAX_QPATH as usize];
 
     if Cmd_Argc(common) != 2 {
-        unsafe {
-            com_printf(common, "exec <filename> : execute a script file\n");
-        }
+        com_printf(common, "exec <filename> : execute a script file\n");
         return;
     }
 
-    unsafe {
-        Q_strncpyz(
-            filename.as_mut_ptr(),
-            Cmd_Argv(common, 1),
-            core::mem::size_of_val(&filename) as c_int,
-        );
-        COM_DefaultExtension(
-            filename.as_mut_ptr(),
-            core::mem::size_of_val(&filename) as c_int,
-            b".cfg\0".as_ptr() as *const c_char,
-        );
-    }
+    Q_strncpyz(
+        filename.as_mut_ptr(),
+        Cmd_Argv(common, 1),
+        core::mem::size_of_val(&filename) as c_int,
+    );
+    COM_DefaultExtension(
+        filename.as_mut_ptr(),
+        core::mem::size_of_val(&filename) as c_int,
+        b".cfg\0".as_ptr() as *const c_char,
+    );
 
     let mut f: *mut c_char = core::ptr::null_mut();
-    let _len = unsafe {
-        FS_ReadFile(
-            common,
-            cm,
-            rm,
-            host,
-            filename.as_ptr(),
-            &mut f as *mut _ as *mut *mut (),
-        )
-    };
+    let _len = FS_ReadFile(
+        common,
+        cm,
+        rm,
+        host,
+        filename.as_ptr(),
+        &mut f as *mut _ as *mut *mut (),
+    );
     if f.is_null() {
-        unsafe {
-            com_printf(common, "couldn't exec %s\n");
-        }
+        com_printf(common, "couldn't exec %s\n");
         return;
     }
-    unsafe {
-        com_printf(common, "execing %s\n");
-    }
+    com_printf(common, "execing %s\n");
 
     Cbuf_InsertText(common, f as *const c_char);
 
-    unsafe {
-        FS_FreeFile(common, f as *mut ());
-    }
+    FS_FreeFile(common, f as *mut ());
 }
 
 /// `Cmd_Vstr_f`.
@@ -390,9 +372,7 @@ pub fn Cmd_Exec_f(
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:251-261`
 pub fn Cmd_Vstr_f(common: &mut Common) {
     if Cmd_Argc(common) != 2 {
-        unsafe {
-            com_printf(common, "vstr <variablename> : execute a variable command\n");
-        }
+        com_printf(common, "vstr <variablename> : execute a variable command\n");
         return;
     }
 
@@ -486,48 +466,46 @@ pub fn Cmd_Init(
     rm: &mut RenderModels,
     host: &mut dyn EngineHost,
 ) {
-    unsafe {
-        Cmd_AddCommand(
-            common,
-            cm,
-            rm,
-            host,
-            b"cmdlist\0".as_ptr() as *const c_char,
-            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_List_f(common)),
-        );
-        Cmd_AddCommand(
-            common,
-            cm,
-            rm,
-            host,
-            b"exec\0".as_ptr() as *const c_char,
-            Some(|common, cm, _sv, rm, _rmg, _g2, host| Cmd_Exec_f(common, cm, rm, host)),
-        );
-        Cmd_AddCommand(
-            common,
-            cm,
-            rm,
-            host,
-            b"vstr\0".as_ptr() as *const c_char,
-            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Vstr_f(common)),
-        );
-        Cmd_AddCommand(
-            common,
-            cm,
-            rm,
-            host,
-            b"echo\0".as_ptr() as *const c_char,
-            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Echo_f(common)),
-        );
-        Cmd_AddCommand(
-            common,
-            cm,
-            rm,
-            host,
-            b"wait\0".as_ptr() as *const c_char,
-            Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Wait_f(common)),
-        );
-    }
+    Cmd_AddCommand(
+        common,
+        cm,
+        rm,
+        host,
+        b"cmdlist\0".as_ptr() as *const c_char,
+        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_List_f(common)),
+    );
+    Cmd_AddCommand(
+        common,
+        cm,
+        rm,
+        host,
+        b"exec\0".as_ptr() as *const c_char,
+        Some(|common, cm, _sv, rm, _rmg, _g2, host| Cmd_Exec_f(common, cm, rm, host)),
+    );
+    Cmd_AddCommand(
+        common,
+        cm,
+        rm,
+        host,
+        b"vstr\0".as_ptr() as *const c_char,
+        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Vstr_f(common)),
+    );
+    Cmd_AddCommand(
+        common,
+        cm,
+        rm,
+        host,
+        b"echo\0".as_ptr() as *const c_char,
+        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Echo_f(common)),
+    );
+    Cmd_AddCommand(
+        common,
+        cm,
+        rm,
+        host,
+        b"wait\0".as_ptr() as *const c_char,
+        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cmd_Wait_f(common)),
+    );
 }
 
 /// `Cbuf_ExecuteText`.
@@ -558,7 +536,7 @@ pub fn Cbuf_ExecuteText(
         x if x == cbufExec_t::EXEC_APPEND as c_int => {
             Cbuf_AddText(common, text);
         }
-        _ => unsafe {
+        _ => {
             com_error(errorParm_t::ERR_FATAL, "Cbuf_ExecuteText: bad exec_when".to_string());
         },
     }

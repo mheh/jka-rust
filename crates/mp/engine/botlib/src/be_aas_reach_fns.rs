@@ -61,13 +61,12 @@ use mp_qshared::common::mp::botlib::aas_stop_event::{
 };
 use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
-use mp_qshared::common::mp::botlib::line_color::LINECOLOR_RED;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE, PRT_WARNING};
 use mp_qshared::shared::q_math::{
     AngleVectors, CrossProduct, VectorInverse, VectorLength, VectorNormalize,
 };
 use mp_qshared::shared::surface_flags::{
-    CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER, MASK_WATER, SURF_SKY,
+    CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER, SURF_SKY,
 };
 use mp_qshared::shared::{vec3_t, vec_t};
 
@@ -354,7 +353,7 @@ pub fn VectorMiddle(v1: vec3_t, v2: vec3_t, mut middle: vec3_t) {
 /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:128-161`
 pub fn AAS_AreaVolume(bot: &mut BotLib, areanum: c_int) -> f32 {
     unsafe {
-        let mut edgenum: c_int;
+        let edgenum: c_int;
         let mut facenum: c_int;
         let mut side: c_int;
         let mut plane: *mut aas_plane_t;
@@ -883,7 +882,7 @@ pub fn AAS_Reachability_Swim(bot: &mut BotLib, area1num: c_int, area2num: c_int)
                 .abs();
                 //
                 if face1num == face2num {
-                    let mut start: vec3_t = [0.0; 3];
+                    let start: vec3_t = [0.0; 3];
                     AAS_FaceCenter(bot, face1num, start);
                     //
                     if AAS_PointContents(bot, start)
@@ -1151,9 +1150,9 @@ pub fn AAS_FindFaceReachabilities(
         let mut hordist: f32;
         let mut dist: f32;
         let mut beststart: vec3_t = [0.0; 3];
-        let mut beststart2: vec3_t = [0.0; 3];
+        let beststart2: vec3_t = [0.0; 3];
         let mut bestend: vec3_t = [0.0; 3];
-        let mut bestend2: vec3_t = [0.0; 3];
+        let bestend2: vec3_t = [0.0; 3];
         let mut tmp: vec3_t;
         let mut hordir: vec3_t;
         let mut testpoint: vec3_t;
@@ -1388,12 +1387,12 @@ pub fn AAS_GetJumpPadInfo(
     mut velocity: vec3_t,
 ) -> c_int {
     unsafe {
-        let mut modelnum: c_int;
+        let modelnum: c_int;
         let mut speed: f32 = 0.0;
         let mut origin: vec3_t = [0.0; 3];
-        let mut angles: vec3_t;
+        let angles: vec3_t;
         let mut teststart: vec3_t;
-        let mut ent2origin: vec3_t = [0.0; 3];
+        let ent2origin: vec3_t = [0.0; 3];
         let trace: aas_trace_t;
         let mut model: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
         let mut target: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
@@ -1620,7 +1619,7 @@ pub fn AAS_SetWeaponJumpAreaFlags(bot: &mut BotLib) {
     unsafe {
         let mins: vec3_t = [-15.0, -15.0, -15.0];
         let maxs: vec3_t = [15.0, 15.0, 15.0];
-        let mut origin: vec3_t = [0.0; 3];
+        let origin: vec3_t = [0.0; 3];
         let mut areanum: c_int;
         let mut spawnflags: c_int;
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
@@ -2645,11 +2644,11 @@ pub fn AAS_Reachability_Ladder(bot: &mut BotLib, area1num: c_int, mut area2num: 
                     //
                     if (*face2).faceflags & FACE_LADDER != 0 {
                         plane2 = bot.aasworld.planes.add((*face2).planenum as usize);
-                        if (((((*plane2).normal[0] * up[0]
+                        if ((((*plane2).normal[0] * up[0]
                             + (*plane2).normal[1] * up[1]
                             + (*plane2).normal[2] * up[2]) as c_int)
                             .abs() as f32)
-                            < 0.1)
+                            < 0.1
                         {
                             break;
                         }
@@ -2728,7 +2727,7 @@ pub fn AAS_Reachability_Elevator(bot: &mut BotLib) {
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
         let mut mins: vec3_t = [0.0; 3];
         let mut maxs: vec3_t = [0.0; 3];
-        let mut origin: vec3_t = [0.0; 3];
+        let origin: vec3_t = [0.0; 3];
         let angles: vec3_t = [0.0, 0.0, 0.0];
         let mut pos1: vec3_t;
         let mut pos2: vec3_t;
@@ -3389,7 +3388,7 @@ pub fn AAS_Reachability_Grapple(bot: &mut BotLib, area1num: c_int, area2num: c_i
         let mut bsptrace: bsp_trace_t;
         let mut trace: aas_trace_t;
         let mut areastart: vec3_t = [0.0; 3];
-        let mut facecenter: vec3_t = [0.0; 3];
+        let facecenter: vec3_t = [0.0; 3];
         let mut start: vec3_t;
         let mut end: vec3_t;
         let mut dir: vec3_t;
@@ -3896,32 +3895,30 @@ pub fn AAS_Reachability_WalkOffLedge(bot: &mut BotLib, areanum: c_int) {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:4494-4525`
 pub fn AAS_InitReachability(bot: &mut BotLib) {
-    unsafe {
-        if bot.aasworld.loaded == 0 {
+    if bot.aasworld.loaded == 0 {
+        return;
+    }
+
+    if bot.aasworld.reachabilitysize != 0 {
+        if (LibVarGetValue(bot, c"forcereachability".as_ptr() as *mut c_char) as c_int) == 0 {
+            bot.aasworld.numreachabilityareas = bot.aasworld.numareas + 2;
             return;
         }
-
-        if bot.aasworld.reachabilitysize != 0 {
-            if (LibVarGetValue(bot, c"forcereachability".as_ptr() as *mut c_char) as c_int) == 0 {
-                bot.aasworld.numreachabilityareas = bot.aasworld.numareas + 2;
-                return;
-            }
-        }
-        bot.calcgrapplereach =
-            LibVarGetValue(bot, c"grapplereach".as_ptr() as *mut c_char) as c_int;
-        bot.aasworld.savefile = qtrue;
-        //start with area 1 because area zero is a dummy
-        bot.aasworld.numreachabilityareas = 1;
-        //setup the heap with reachability links
-        AAS_SetupReachabilityHeap(bot);
-        //allocate area reachability link array
-        bot.areareachability = GetClearedMemory(
-            bot,
-            bot.aasworld.numareas as u64 * core::mem::size_of::<*mut aas_lreachability_t>() as u64,
-        ) as *mut *mut aas_lreachability_t;
-        //
-        AAS_SetWeaponJumpAreaFlags(bot);
     }
+    bot.calcgrapplereach =
+        LibVarGetValue(bot, c"grapplereach".as_ptr() as *mut c_char) as c_int;
+    bot.aasworld.savefile = qtrue;
+    //start with area 1 because area zero is a dummy
+    bot.aasworld.numreachabilityareas = 1;
+    //setup the heap with reachability links
+    AAS_SetupReachabilityHeap(bot);
+    //allocate area reachability link array
+    bot.areareachability = GetClearedMemory(
+        bot,
+        bot.aasworld.numareas as u64 * core::mem::size_of::<*mut aas_lreachability_t>() as u64,
+    ) as *mut *mut aas_lreachability_t;
+    //
+    AAS_SetWeaponJumpAreaFlags(bot);
 }
 
 /// Raven `AAS_BestReachableFromJumpPadArea`.
@@ -3938,11 +3935,11 @@ pub fn AAS_BestReachableFromJumpPadArea(
         let bot_visualizejumppads: c_int;
         let mut volume: f32;
         let mut bestareavolume: f32;
-        let mut areastart: vec3_t = [0.0; 3];
+        let areastart: vec3_t = [0.0; 3];
         let mut cmdmove: vec3_t;
-        let mut absmins: vec3_t = [0.0; 3];
-        let mut absmaxs: vec3_t = [0.0; 3];
-        let mut velocity: vec3_t = [0.0; 3];
+        let absmins: vec3_t = [0.0; 3];
+        let absmaxs: vec3_t = [0.0; 3];
+        let velocity: vec3_t = [0.0; 3];
         let mut r#move: aas_clientmove_t = core::mem::zeroed();
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
 
@@ -4067,13 +4064,13 @@ pub fn AAS_Reachability_Jump(bot: &mut BotLib, area1num: c_int, area2num: c_int)
         let phys_jumpvel: f32;
         let maxjumpdistance: f32;
         let maxjumpheight: f32;
-        let mut height: f32;
+        let height: f32;
         let mut bestdist: f32;
         let mut speed: f32 = 0.0;
         let mut beststart: vec3_t = [0.0; 3];
-        let mut beststart2: vec3_t = [0.0; 3];
+        let beststart2: vec3_t = [0.0; 3];
         let mut bestend: vec3_t = [0.0; 3];
-        let mut bestend2: vec3_t = [0.0; 3];
+        let bestend2: vec3_t = [0.0; 3];
         let mut teststart: vec3_t;
         let mut testend: vec3_t = [0.0; 3];
         let mut dir: vec3_t;
@@ -4470,7 +4467,7 @@ pub fn AAS_Reachability_Teleport(bot: &mut BotLib) {
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
         let mut model: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
         let mut angle: f32 = 0.0;
-        let mut origin: vec3_t = [0.0; 3];
+        let origin: vec3_t = [0.0; 3];
         let mut destorigin: vec3_t = [0.0; 3];
         let mut mins: vec3_t = [0.0; 3];
         let mut maxs: vec3_t = [0.0; 3];
@@ -4811,8 +4808,8 @@ pub fn AAS_Reachability_WeaponJump(bot: &mut BotLib, area1num: c_int, area2num: 
         let mut zvel: f32;
         let mut hordist: f32;
         let mut areastart: vec3_t = [0.0; 3];
-        let mut facecenter: vec3_t = [0.0; 3];
-        let mut start: vec3_t;
+        let facecenter: vec3_t = [0.0; 3];
+        let start: vec3_t;
         let mut end: vec3_t;
         let mut dir: vec3_t;
         let mut cmdmove: vec3_t;
@@ -4981,12 +4978,12 @@ pub fn AAS_Reachability_JumpPad(bot: &mut BotLib) {
         let mut speed: f32 = 0.0;
         let mut zvel: f32;
         let mut hordist: f32;
-        let mut facecenter: vec3_t = [0.0; 3];
+        let facecenter: vec3_t = [0.0; 3];
         let mut dir: vec3_t;
         let mut cmdmove: vec3_t;
         let mut velocity: vec3_t = [0.0; 3];
-        let mut absmins: vec3_t = [0.0; 3];
-        let mut absmaxs: vec3_t = [0.0; 3];
+        let absmins: vec3_t = [0.0; 3];
+        let absmaxs: vec3_t = [0.0; 3];
         let mut areastart: vec3_t = [0.0; 3];
         let mut r#move: aas_clientmove_t = core::mem::zeroed();
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];

@@ -31,8 +31,8 @@ use mp_qshared::shared::{
 use mp_qshared::shared::q_math::{
     _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorCopy as VectorCopy,
     _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
-    AngleVectors, Square, VectorAdvance, VectorClear, VectorInverse, VectorLength,
-    VectorLengthSquared, VectorNormalize, VectorSet,
+    AngleVectors, Square, VectorAdvance, VectorClear, VectorInverse, VectorLengthSquared,
+    VectorNormalize, VectorSet,
 };
 
 use crate::cm::c_leaf_t::cLeaf_t;
@@ -41,7 +41,6 @@ use crate::cm::c_patch_t::cPatch_t;
 use crate::cm::cbrush_s::cbrush_t;
 use crate::cm::cbrushside_s::cbrushside_t;
 use crate::cm::clip_map_t::clipMap_t;
-use crate::cm::cm_landscape_consts::TERRAIN_STEP_MAGIC;
 use crate::cm::cm_local_consts::{BOX_MODEL_HANDLE, CAPSULE_MODEL_HANDLE, SURFACE_CLIP_EPSILON};
 use crate::cm::cm_trace_consts::{MAX_POSITION_LEAFS, RADIUS_EPSILON};
 use crate::cm::cmodel_s::cmodel_t;
@@ -49,7 +48,7 @@ use crate::cm::leaf_list_s::leafList_t;
 use crate::cm::sphere_t::sphere_t;
 use crate::cm::trace_work_s::{traceWork_s, traceWork_t};
 use crate::cm_load::{
-    CCMLandScape, CM_ClipHandleToModel, CM_ModelBounds, CM_TempBoxModel, RenderModels, RmManager,
+    CM_ClipHandleToModel, CM_ModelBounds, CM_TempBoxModel, RenderModels, RmManager,
 };
 use crate::cm_patch_fns::{CM_PositionTestInPatchCollide, CM_TraceThroughPatchCollide};
 use crate::cm_test::{CM_BoxLeafnums_r, CM_StoreLeafs};
@@ -85,6 +84,7 @@ pub fn RotatePoint(mut point: vec3_t, matrix: *mut vec3_t) {
         point[1] = DotProduct(*matrix.add(1), tvec);
         point[2] = DotProduct(*matrix.add(2), tvec);
     }
+    let _ = point;
 }
 
 /// Raven `TransposeMatrix` — transpose a 3x3 matrix.
@@ -348,7 +348,7 @@ pub fn CM_CullBox(frustum: *const cplane_t, transformed: *const vec3_t) -> bool 
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:95-113`
 pub fn CM_DistanceFromLineSquared(p: vec3_t, lp1: vec3_t, lp2: vec3_t, dir: vec3_t) -> f32 {
-    let mut proj: vec3_t = [0.0; 3];
+    let proj: vec3_t = [0.0; 3];
     let mut t: vec3_t = [0.0; 3];
 
     CM_ProjectPointOntoVector(p, lp1, dir, proj);
@@ -702,8 +702,8 @@ pub fn CM_TraceThroughVerticalCylinder(
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:703-798`
 pub fn CM_TraceThroughTerrain(
     cm: &mut CollisionWorld,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    _rmg: &mut RmManager,
+    _host: &mut dyn EngineHost,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
     brush: *mut cbrush_t,
@@ -741,10 +741,7 @@ pub fn CM_TraceThroughTerrain(
         VectorSubtract(tEnd, tBegin, &mut tDistance);
 
         // Calculate number of iterations to process
-        let mut count = (VectorLength(tDistance)
-            / (cm.terrain_patch_scalar_size() * TERRAIN_STEP_MAGIC))
-            .ceil() as i32;
-        count = 1;
+        let count = 1;
         let fraction = trace.fraction;
         VectorScale(tDistance, 1.0 / count as f32, &mut tStep);
 
@@ -960,8 +957,8 @@ pub fn CM_TestCapsuleInCapsule(
     model: clipHandle_t,
 ) {
     unsafe {
-        let mut mins: vec3_t = [0.0; 3];
-        let mut maxs: vec3_t = [0.0; 3];
+        let mins: vec3_t = [0.0; 3];
+        let maxs: vec3_t = [0.0; 3];
         let mut top: vec3_t = [0.0; 3];
         let mut bottom: vec3_t = [0.0; 3];
         let mut p1: vec3_t = [0.0; 3];
@@ -1049,8 +1046,8 @@ pub fn CM_TestBoundingBoxInCapsule(
     model: clipHandle_t,
 ) {
     unsafe {
-        let mut mins: vec3_t = [0.0; 3];
-        let mut maxs: vec3_t = [0.0; 3];
+        let mins: vec3_t = [0.0; 3];
+        let maxs: vec3_t = [0.0; 3];
         let mut offset: vec3_t = [0.0; 3];
         let mut size: vec3pair_t = [[0.0; 3]; 2];
 
@@ -1130,8 +1127,8 @@ pub fn CM_TraceCapsuleThroughCapsule(
     model: clipHandle_t,
 ) {
     unsafe {
-        let mut mins: vec3_t = [0.0; 3];
-        let mut maxs: vec3_t = [0.0; 3];
+        let mins: vec3_t = [0.0; 3];
+        let maxs: vec3_t = [0.0; 3];
         let mut top: vec3_t = [0.0; 3];
         let mut bottom: vec3_t = [0.0; 3];
         let mut starttop: vec3_t = [0.0; 3];
@@ -1378,8 +1375,8 @@ pub fn CM_TraceBoundingBoxThroughCapsule(
     model: clipHandle_t,
 ) {
     unsafe {
-        let mut mins: vec3_t = [0.0; 3];
-        let mut maxs: vec3_t = [0.0; 3];
+        let mins: vec3_t = [0.0; 3];
+        let maxs: vec3_t = [0.0; 3];
         let mut offset: vec3_t = [0.0; 3];
         let mut size: vec3pair_t = [[0.0; 3]; 2];
 

@@ -26,7 +26,6 @@ use crate::qcommon::netchan_t::netchan_t;
 use crate::qcommon::protocol::PORT_SERVER;
 
 use mp_host_interface::engine_host::EngineHost;
-use mp_qshared::shared::cvar::cvar_t;
 
 // `RenderModels` here is a local placeholder: `mp_renderer` depends on this crate, so importing the real type would cycle (matches cm_load.rs's precedent).
 #[allow(dead_code)]
@@ -58,49 +57,47 @@ pub fn NET_AdrToString(common: &mut Common, a: netadr_t) -> *const c_char {
     let s_ptr = common.net_adr_to_string_buf.as_mut_ptr() as *mut c_char;
     let size = common.net_adr_to_string_buf.len() as c_int;
 
-    unsafe {
-        match a.r#type {
-            netadrtype_t::NA_LOOPBACK => {
-                Com_sprintf(s_ptr, size, "loopback");
-            }
-            netadrtype_t::NA_BOT => {
-                Com_sprintf(s_ptr, size, "bot");
-            }
-            netadrtype_t::NA_IP => {
-                // BigShort(a.port): host is little-endian (matches the referee
-                // platform), so BigShort is a byte-swap; %i vararg promotion
-                // sign-extends the `short` return, reproduced via the i16 hop.
-                let port = (a.port.swap_bytes() as i16) as i32;
-                Com_sprintf(
-                    s_ptr,
-                    size,
-                    &format!("{}.{}.{}.{}:{}", a.ip[0], a.ip[1], a.ip[2], a.ip[3], port),
-                );
-            }
-            netadrtype_t::NA_BAD => {
-                Com_sprintf(s_ptr, size, "BAD");
-            }
-            _ => {
-                let port = (a.port.swap_bytes() as i16) as i32;
-                Com_sprintf(
-                    s_ptr,
-                    size,
-                    &format!(
-                        "{:02x}{:02x}{:02x}{:02x}.{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}:{}",
-                        a.ipx[0],
-                        a.ipx[1],
-                        a.ipx[2],
-                        a.ipx[3],
-                        a.ipx[4],
-                        a.ipx[5],
-                        a.ipx[6],
-                        a.ipx[7],
-                        a.ipx[8],
-                        a.ipx[9],
-                        port
-                    ),
-                );
-            }
+    match a.r#type {
+        netadrtype_t::NA_LOOPBACK => {
+            Com_sprintf(s_ptr, size, "loopback");
+        }
+        netadrtype_t::NA_BOT => {
+            Com_sprintf(s_ptr, size, "bot");
+        }
+        netadrtype_t::NA_IP => {
+            // BigShort(a.port): host is little-endian (matches the referee
+            // platform), so BigShort is a byte-swap; %i vararg promotion
+            // sign-extends the `short` return, reproduced via the i16 hop.
+            let port = (a.port.swap_bytes() as i16) as i32;
+            Com_sprintf(
+                s_ptr,
+                size,
+                &format!("{}.{}.{}.{}:{}", a.ip[0], a.ip[1], a.ip[2], a.ip[3], port),
+            );
+        }
+        netadrtype_t::NA_BAD => {
+            Com_sprintf(s_ptr, size, "BAD");
+        }
+        _ => {
+            let port = (a.port.swap_bytes() as i16) as i32;
+            Com_sprintf(
+                s_ptr,
+                size,
+                &format!(
+                    "{:02x}{:02x}{:02x}{:02x}.{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}:{}",
+                    a.ipx[0],
+                    a.ipx[1],
+                    a.ipx[2],
+                    a.ipx[3],
+                    a.ipx[4],
+                    a.ipx[5],
+                    a.ipx[6],
+                    a.ipx[7],
+                    a.ipx[8],
+                    a.ipx[9],
+                    port
+                ),
+            );
         }
     }
 
@@ -179,19 +176,17 @@ pub fn NET_SendLoopPacket(
     to: netadr_t,
 ) {
     let _ = to;
-    unsafe {
-        let loop_ = &mut common.loopbacks[(sock as usize) ^ 1];
+    let loop_ = &mut common.loopbacks[(sock as usize) ^ 1];
 
-        let i = (loop_.send & (MAX_LOOPBACK - 1)) as usize;
-        loop_.send += 1;
+    let i = (loop_.send & (MAX_LOOPBACK - 1)) as usize;
+    loop_.send += 1;
 
-        crate::common_fns::Com_Memcpy(
-            loop_.msgs[i].data.as_mut_ptr() as *mut (),
-            data,
-            length as usize,
-        );
-        loop_.msgs[i].datalen = length;
-    }
+    crate::common_fns::Com_Memcpy(
+        loop_.msgs[i].data.as_mut_ptr() as *mut (),
+        data,
+        length as usize,
+    );
+    loop_.msgs[i].datalen = length;
 }
 
 /// Raven `NET_SendPacket`.

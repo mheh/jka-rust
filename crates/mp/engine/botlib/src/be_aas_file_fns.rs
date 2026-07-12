@@ -234,83 +234,81 @@ pub fn AAS_WriteAASLump(
 ///
 /// Source: `oracle/codemp/botlib/be_aas_file.cpp:166-215`
 pub fn AAS_DumpAASData(bot: &mut BotLib) {
-    unsafe {
-        bot.aasworld.numbboxes = 0;
-        if !bot.aasworld.bboxes.is_null() {
-            FreeMemory(bot, bot.aasworld.bboxes as *mut ());
-        }
-        bot.aasworld.bboxes = core::ptr::null_mut();
-        bot.aasworld.numvertexes = 0;
-        if !bot.aasworld.vertexes.is_null() {
-            FreeMemory(bot, bot.aasworld.vertexes as *mut ());
-        }
-        bot.aasworld.vertexes = core::ptr::null_mut();
-        bot.aasworld.numplanes = 0;
-        if !bot.aasworld.planes.is_null() {
-            FreeMemory(bot, bot.aasworld.planes as *mut ());
-        }
-        bot.aasworld.planes = core::ptr::null_mut();
-        bot.aasworld.numedges = 0;
-        if !bot.aasworld.edges.is_null() {
-            FreeMemory(bot, bot.aasworld.edges as *mut ());
-        }
-        bot.aasworld.edges = core::ptr::null_mut();
-        bot.aasworld.edgeindexsize = 0;
-        if !bot.aasworld.edgeindex.is_null() {
-            FreeMemory(bot, bot.aasworld.edgeindex as *mut ());
-        }
-        bot.aasworld.edgeindex = core::ptr::null_mut();
-        bot.aasworld.numfaces = 0;
-        if !bot.aasworld.faces.is_null() {
-            FreeMemory(bot, bot.aasworld.faces as *mut ());
-        }
-        bot.aasworld.faces = core::ptr::null_mut();
-        bot.aasworld.faceindexsize = 0;
-        if !bot.aasworld.faceindex.is_null() {
-            FreeMemory(bot, bot.aasworld.faceindex as *mut ());
-        }
-        bot.aasworld.faceindex = core::ptr::null_mut();
-        bot.aasworld.numareas = 0;
-        if !bot.aasworld.areas.is_null() {
-            FreeMemory(bot, bot.aasworld.areas as *mut ());
-        }
-        bot.aasworld.areas = core::ptr::null_mut();
-        bot.aasworld.numareasettings = 0;
-        if !bot.aasworld.areasettings.is_null() {
-            FreeMemory(bot, bot.aasworld.areasettings as *mut ());
-        }
-        bot.aasworld.areasettings = core::ptr::null_mut();
-        bot.aasworld.reachabilitysize = 0;
-        if !bot.aasworld.reachability.is_null() {
-            FreeMemory(bot, bot.aasworld.reachability as *mut ());
-        }
-        bot.aasworld.reachability = core::ptr::null_mut();
-        bot.aasworld.numnodes = 0;
-        if !bot.aasworld.nodes.is_null() {
-            FreeMemory(bot, bot.aasworld.nodes as *mut ());
-        }
-        bot.aasworld.nodes = core::ptr::null_mut();
-        bot.aasworld.numportals = 0;
-        if !bot.aasworld.portals.is_null() {
-            FreeMemory(bot, bot.aasworld.portals as *mut ());
-        }
-        bot.aasworld.portals = core::ptr::null_mut();
-        bot.aasworld.numportals = 0;
-        if !bot.aasworld.portalindex.is_null() {
-            FreeMemory(bot, bot.aasworld.portalindex as *mut ());
-        }
-        bot.aasworld.portalindex = core::ptr::null_mut();
-        bot.aasworld.portalindexsize = 0;
-        if !bot.aasworld.clusters.is_null() {
-            FreeMemory(bot, bot.aasworld.clusters as *mut ());
-        }
-        bot.aasworld.clusters = core::ptr::null_mut();
-        bot.aasworld.numclusters = 0;
-        //
-        bot.aasworld.loaded = qfalse;
-        bot.aasworld.initialized = qfalse;
-        bot.aasworld.savefile = qfalse;
+    bot.aasworld.numbboxes = 0;
+    if !bot.aasworld.bboxes.is_null() {
+        FreeMemory(bot, bot.aasworld.bboxes as *mut ());
     }
+    bot.aasworld.bboxes = core::ptr::null_mut();
+    bot.aasworld.numvertexes = 0;
+    if !bot.aasworld.vertexes.is_null() {
+        FreeMemory(bot, bot.aasworld.vertexes as *mut ());
+    }
+    bot.aasworld.vertexes = core::ptr::null_mut();
+    bot.aasworld.numplanes = 0;
+    if !bot.aasworld.planes.is_null() {
+        FreeMemory(bot, bot.aasworld.planes as *mut ());
+    }
+    bot.aasworld.planes = core::ptr::null_mut();
+    bot.aasworld.numedges = 0;
+    if !bot.aasworld.edges.is_null() {
+        FreeMemory(bot, bot.aasworld.edges as *mut ());
+    }
+    bot.aasworld.edges = core::ptr::null_mut();
+    bot.aasworld.edgeindexsize = 0;
+    if !bot.aasworld.edgeindex.is_null() {
+        FreeMemory(bot, bot.aasworld.edgeindex as *mut ());
+    }
+    bot.aasworld.edgeindex = core::ptr::null_mut();
+    bot.aasworld.numfaces = 0;
+    if !bot.aasworld.faces.is_null() {
+        FreeMemory(bot, bot.aasworld.faces as *mut ());
+    }
+    bot.aasworld.faces = core::ptr::null_mut();
+    bot.aasworld.faceindexsize = 0;
+    if !bot.aasworld.faceindex.is_null() {
+        FreeMemory(bot, bot.aasworld.faceindex as *mut ());
+    }
+    bot.aasworld.faceindex = core::ptr::null_mut();
+    bot.aasworld.numareas = 0;
+    if !bot.aasworld.areas.is_null() {
+        FreeMemory(bot, bot.aasworld.areas as *mut ());
+    }
+    bot.aasworld.areas = core::ptr::null_mut();
+    bot.aasworld.numareasettings = 0;
+    if !bot.aasworld.areasettings.is_null() {
+        FreeMemory(bot, bot.aasworld.areasettings as *mut ());
+    }
+    bot.aasworld.areasettings = core::ptr::null_mut();
+    bot.aasworld.reachabilitysize = 0;
+    if !bot.aasworld.reachability.is_null() {
+        FreeMemory(bot, bot.aasworld.reachability as *mut ());
+    }
+    bot.aasworld.reachability = core::ptr::null_mut();
+    bot.aasworld.numnodes = 0;
+    if !bot.aasworld.nodes.is_null() {
+        FreeMemory(bot, bot.aasworld.nodes as *mut ());
+    }
+    bot.aasworld.nodes = core::ptr::null_mut();
+    bot.aasworld.numportals = 0;
+    if !bot.aasworld.portals.is_null() {
+        FreeMemory(bot, bot.aasworld.portals as *mut ());
+    }
+    bot.aasworld.portals = core::ptr::null_mut();
+    bot.aasworld.numportals = 0;
+    if !bot.aasworld.portalindex.is_null() {
+        FreeMemory(bot, bot.aasworld.portalindex as *mut ());
+    }
+    bot.aasworld.portalindex = core::ptr::null_mut();
+    bot.aasworld.portalindexsize = 0;
+    if !bot.aasworld.clusters.is_null() {
+        FreeMemory(bot, bot.aasworld.clusters as *mut ());
+    }
+    bot.aasworld.clusters = core::ptr::null_mut();
+    bot.aasworld.numclusters = 0;
+    //
+    bot.aasworld.loaded = qfalse;
+    bot.aasworld.initialized = qfalse;
+    bot.aasworld.savefile = qfalse;
 } //end of the function AAS_DumpAASData
 
 /// Raven `AAS_LoadAASLump` — allocate memory and read a lump of an AAS file.

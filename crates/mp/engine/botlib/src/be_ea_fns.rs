@@ -392,14 +392,12 @@ pub fn EA_ResetInput(bot: &mut BotLib, client: c_int) {
 ///
 /// Source: `oracle/codemp/botlib/be_ea.cpp:502-508`
 pub fn EA_Setup(bot: &mut BotLib) -> c_int {
-    unsafe {
-        // initialize the bot inputs
-        bot.botinputs = GetClearedHunkMemory(
-            bot,
-            (bot.botlibglobals.maxclients as usize * core::mem::size_of::<bot_input_t>())
-                as c_ulong,
-        ) as *mut bot_input_t;
-    }
+    // initialize the bot inputs
+    bot.botinputs = GetClearedHunkMemory(
+        bot,
+        (bot.botlibglobals.maxclients as usize * core::mem::size_of::<bot_input_t>())
+            as c_ulong,
+    ) as *mut bot_input_t;
     BLERR_NOERROR
 }
 
@@ -407,8 +405,6 @@ pub fn EA_Setup(bot: &mut BotLib) -> c_int {
 ///
 /// Source: `oracle/codemp/botlib/be_ea.cpp:515-519`
 pub fn EA_Shutdown(bot: &mut BotLib) {
-    unsafe {
-        FreeMemory(bot, bot.botinputs as *mut ());
-        bot.botinputs = core::ptr::null_mut();
-    }
+    FreeMemory(bot, bot.botinputs as *mut ());
+    bot.botinputs = core::ptr::null_mut();
 }

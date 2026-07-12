@@ -22,7 +22,6 @@ use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::cvar_fns::Cvar_VariableValue;
 use mp_engine_qcommon::qcommon::net_limits::{MAX_DOWNLOAD_BLKSIZE, MAX_DOWNLOAD_WINDOW};
-use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_host_interface::engine_host::EngineHost;
 // PORT-NOTE(engine-host-state, matches sv_game.rs's identical note): `RmManager`
 // and `RenderModels` do not exist anywhere in the tree yet (only enum/type
@@ -36,7 +35,6 @@ use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::netsrc_t::netsrc_t;
-use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
@@ -626,7 +624,7 @@ pub fn SV_AuthorizeIpPacket(
             .into_owned();
     let r = mp_engine_qcommon::cmd_common::Cmd_Argv(common, 3); // reason
 
-    if unsafe {
+    if {
         Q_stricmp(
             s.as_ptr() as *const c_char,
             c"demo".as_ptr() as *const c_char,
@@ -661,7 +659,7 @@ pub fn SV_AuthorizeIpPacket(
         sv.svs.challenges[i] = unsafe { core::mem::zeroed::<challenge_t>() };
         return;
     }
-    if unsafe {
+    if {
         Q_stricmp(
             s.as_ptr() as *const c_char,
             c"accept".as_ptr() as *const c_char,
@@ -676,7 +674,7 @@ pub fn SV_AuthorizeIpPacket(
         );
         return;
     }
-    if unsafe {
+    if {
         Q_stricmp(
             s.as_ptr() as *const c_char,
             c"unknown".as_ptr() as *const c_char,
@@ -926,9 +924,9 @@ pub fn SV_DirectConnect(
             );
         }
 
-        let mut newcl: client_t = core::mem::zeroed();
+        let newcl: client_t = core::mem::zeroed();
         let mut reconnect = false;
-        let mut cl_ptr: *mut client_t;
+        let cl_ptr: *mut client_t;
 
         // if there is already a slot for this ip, reuse it
         {

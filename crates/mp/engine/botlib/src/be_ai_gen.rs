@@ -112,13 +112,11 @@ pub fn GeneticParentsAndChildSelection(
         return 0; // qfalse
     }
 
-    unsafe {
-        mp_engine_qcommon::common_fns::Com_Memcpy(
-            rankings.as_mut_ptr() as *mut (),
-            ranks as *const (),
-            std::mem::size_of::<f32>() * numranks as usize,
-        );
-    }
+    mp_engine_qcommon::common_fns::Com_Memcpy(
+        rankings.as_mut_ptr() as *mut (),
+        ranks as *const (),
+        std::mem::size_of::<f32>() * numranks as usize,
+    );
 
     // select first parent
     unsafe {

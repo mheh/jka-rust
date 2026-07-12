@@ -409,12 +409,10 @@ pub fn Characteristic_String(
 ///
 /// Source: `oracle/codemp/botlib/be_ai_char.cpp:152-156`
 pub fn BotFreeCharacter(bot: &mut BotLib, handle: c_int) {
-    unsafe {
-        if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
-            return;
-        } //end if
-        BotFreeCharacter2(bot, handle);
-    }
+    if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
+        return;
+    } //end if
+    BotFreeCharacter2(bot, handle);
 }
 
 /// Raven `Characteristic_BFloat`.
@@ -493,13 +491,11 @@ pub fn Characteristic_BInteger(
 ///
 /// Source: `oracle/codemp/botlib/be_ai_char.cpp:761-772`
 pub fn BotShutdownCharacters(bot: &mut BotLib) {
-    unsafe {
-        for handle in 1..=MAX_CLIENTS as c_int {
-            if !bot.botcharacters[handle as usize].is_null() {
-                BotFreeCharacter2(bot, handle);
-            } //end if
-        } //end for
-    }
+    for handle in 1..=MAX_CLIENTS as c_int {
+        if !bot.botcharacters[handle as usize].is_null() {
+            BotFreeCharacter2(bot, handle);
+        } //end if
+    } //end for
 }
 
 /// Raven `BotLoadCharacterFromFile`.
@@ -827,27 +823,25 @@ pub fn BotLoadCachedCharacter(
 ///
 /// Source: `oracle/codemp/botlib/be_ai_char.cpp:479-492`
 pub fn BotLoadCharacterSkill(bot: &mut BotLib, charfile: *mut c_char, skill: f32) -> c_int {
-    unsafe {
-        let defaultch = BotLoadCachedCharacter(
+    let defaultch = BotLoadCachedCharacter(
+        bot,
+        DEFAULT_CHARACTER.as_ptr() as *mut c_char,
+        skill,
+        qfalse as c_int,
+    );
+    let reload =
+        LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) as c_int;
+    let ch = BotLoadCachedCharacter(bot, charfile, skill, reload);
+
+    if defaultch != 0 && ch != 0 {
+        BotDefaultCharacteristics(
             bot,
-            DEFAULT_CHARACTER.as_ptr() as *mut c_char,
-            skill,
-            qfalse as c_int,
+            bot.botcharacters[ch as usize],
+            bot.botcharacters[defaultch as usize],
         );
-        let reload =
-            LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) as c_int;
-        let ch = BotLoadCachedCharacter(bot, charfile, skill, reload);
+    } //end if
 
-        if defaultch != 0 && ch != 0 {
-            BotDefaultCharacteristics(
-                bot,
-                bot.botcharacters[ch as usize],
-                bot.botcharacters[defaultch as usize],
-            );
-        } //end if
-
-        ch
-    }
+    ch
 }
 
 /// Raven `BotLoadCharacter`.

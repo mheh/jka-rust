@@ -966,15 +966,13 @@ pub fn SV_SpawnServer(
     );
 
     // save systeminfo and serverinfo strings
-    unsafe {
-        Q_strncpyz(
-            systemInfo.as_mut_ptr(),
-            Cvar_InfoString_Big(common, mp_qshared::shared::cvar::CVAR_SYSTEMINFO),
-            systemInfo.len() as c_int,
-        );
-    }
+    Q_strncpyz(
+        systemInfo.as_mut_ptr(),
+        Cvar_InfoString_Big(common, mp_qshared::shared::cvar::CVAR_SYSTEMINFO),
+        systemInfo.len() as c_int,
+    );
     common.cvar_modifiedFlags &= !mp_qshared::shared::cvar::CVAR_SYSTEMINFO;
-    SV_SetConfigstring(common, cm, sv, rm, host, mp_bg::public::configstring::CS_SYSTEMINFO, unsafe {
+    SV_SetConfigstring(common, cm, sv, rm, host, mp_bg::public::configstring::CS_SYSTEMINFO, {
         systemInfo.as_ptr()
     });
 

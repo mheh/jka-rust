@@ -57,7 +57,6 @@ use mp_qshared::common::mp::botlib::bot_initmove_s::bot_initmove_t;
 use mp_qshared::common::mp::botlib::bot_moveresult_s::bot_moveresult_t;
 use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
 use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
-use mp_qshared::common::mp::botlib::line_color::LINECOLOR_BLUE;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL, PRT_MESSAGE};
 use mp_qshared::common::mp::botlib::travel_flags::{TFL_DONOTENTER, TFL_JUMPPAD};
 use mp_qshared::common::mp::qcommon::bot_goal::bot_goal_t;
@@ -72,7 +71,7 @@ use mp_qshared::shared::surface_flags::{
     CONTENTS_BODY, CONTENTS_LAVA, CONTENTS_PLAYERCLIP, CONTENTS_SLIME, CONTENTS_SOLID,
     CONTENTS_WATER,
 };
-use mp_qshared::shared::{qboolean, qfalse, qtrue, vec2_t, vec3_t};
+use mp_qshared::shared::{qfalse, qtrue, vec2_t, vec3_t};
 
 use crate::be_aas_bspq3_fns::{
     AAS_BSPModelMinsMaxsOrigin, AAS_NextBSPEntity, AAS_PointContents, AAS_Trace,

@@ -127,7 +127,7 @@ pub fn SV_GetPlayerByFedName(
             );
             Q_CleanStr(cleanName.as_mut_ptr());
         }
-        if unsafe { Q_stricmp(cleanName.as_ptr(), name) } == 0 {
+        if Q_stricmp(cleanName.as_ptr(), name) == 0 {
             return cl;
         }
     }
@@ -188,7 +188,7 @@ pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t
             );
             Q_CleanStr(cleanName.as_mut_ptr());
         }
-        if unsafe { Q_stricmp(cleanName.as_ptr(), s) } == 0 {
+        if Q_stricmp(cleanName.as_ptr(), s) == 0 {
             return cl;
         }
     }
@@ -265,7 +265,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
 
     let cl = SV_GetPlayerByFedName(common, sv, name);
     if cl.is_null() {
-        if unsafe { Q_stricmp(name, c"all".as_ptr()) } == 0 {
+        if Q_stricmp(name, c"all".as_ptr()) == 0 {
             let n = sv.svs.clients;
             for i in 0..unsafe { (*common.sv_maxclients).integer } {
                 let cl = unsafe { n.offset(i as isize) };
@@ -285,7 +285,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
             }
-        } else if unsafe { Q_stricmp(name, c"allbots".as_ptr()) } == 0
+        } else if Q_stricmp(name, c"allbots".as_ptr()) == 0
         {
             let n = sv.svs.clients;
             for i in 0..unsafe { (*common.sv_maxclients).integer } {
@@ -353,7 +353,7 @@ pub fn SV_Status_f(common: &mut Common, sv: &mut Server, host: &mut dyn EngineHo
     }
 
     if Cmd_Argc(common) > 1 {
-        if unsafe {
+        if {
             Q_stricmp(
                 c"notrunc".as_ptr(),
                 Cmd_Argv(common, 1),
@@ -509,8 +509,8 @@ pub fn SV_ForceToggle_f(
         host,
         c"g_forcePowerDisable".as_ptr(),
     ) as c_int;
-    let mut targetPower: c_int = 0;
-    let mut powerDisabled = "Enabled";
+    let targetPower: c_int;
+    let mut powerDisabled;
 
     if Cmd_Argc(common) < 2 {
         // no argument supplied, spit out a list of force powers and their numbers
@@ -637,7 +637,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
         return;
     }
 
-    if unsafe {
+    if {
         Q_stricmp(
             Cmd_Argv(common, 1),
             c"Padawan".as_ptr(),
@@ -650,7 +650,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
 
     let cl = SV_GetPlayerByName(common, sv);
     if cl.is_null() {
-        if unsafe {
+        if {
             Q_stricmp(
                 Cmd_Argv(common, 1),
                 c"all".as_ptr(),
@@ -676,7 +676,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
             }
-        } else if unsafe {
+        } else if {
             Q_stricmp(
                 Cmd_Argv(common, 1),
                 c"allbots".as_ptr(),
@@ -900,7 +900,7 @@ pub fn SV_Map_f(
         .to_string_lossy()
         .into_owned();
     let (cheat, killBots);
-    if unsafe {
+    if {
         Q_stricmpn(
             format!("{}\0", cmd).as_ptr() as *const c_char,
             c"sp".as_ptr(),
@@ -938,14 +938,14 @@ pub fn SV_Map_f(
         killBots = qtrue;
     } else {
         let cmd_c = format!("{}\0", cmd);
-        if unsafe {
+        if {
             Q_stricmpn(
                 cmd_c.as_ptr() as *const c_char,
                 c"devmap".as_ptr(),
                 6,
             )
         } == 0
-            || unsafe {
+            || {
                 Q_stricmp(
                     cmd_c.as_ptr() as *const c_char,
                     c"spdevmap".as_ptr(),
@@ -966,9 +966,7 @@ pub fn SV_Map_f(
     // save the map name here cause on a map restart we reload the jampconfig.cfg
     // and thus nuke the arguments of the map command
     let mut mapname = [0 as c_char; MAX_QPATH as usize];
-    unsafe {
-        Q_strncpyz(mapname.as_mut_ptr(), map, mapname.len() as c_int);
-    }
+    Q_strncpyz(mapname.as_mut_ptr(), map, mapname.len() as c_int);
 
     let mut eForceReload = ForceReload_e::eForceReload_NOTHING;
 
@@ -977,7 +975,7 @@ pub fn SV_Map_f(
     // }
     // else
     let cmd_c = format!("{}\0", cmd);
-    if unsafe {
+    if {
         Q_stricmp(
             cmd_c.as_ptr() as *const c_char,
             c"devmapmdl".as_ptr(),
@@ -985,7 +983,7 @@ pub fn SV_Map_f(
     } == 0
     {
         eForceReload = ForceReload_e::eForceReload_MODELS;
-    } else if unsafe {
+    } else if {
         Q_stricmp(
             cmd_c.as_ptr() as *const c_char,
             c"devmapall".as_ptr(),
@@ -1085,13 +1083,11 @@ pub fn SV_MapRestart_f(
     if unsafe { (*common.sv_maxclients).modified != 0 || (*common.sv_gametype).modified != 0 } {
         // restart the map the slow way
         let mut mapname = [0 as c_char; MAX_QPATH as usize];
-        unsafe {
-            Q_strncpyz(
-                mapname.as_mut_ptr(),
-                Cvar_VariableString(common, c"mapname".as_ptr()),
-                mapname.len() as c_int,
-            );
-        }
+        Q_strncpyz(
+            mapname.as_mut_ptr(),
+            Cvar_VariableString(common, c"mapname".as_ptr()),
+            mapname.len() as c_int,
+        );
 
         com_printf(common, "variable change -- restarting.\n");
 
@@ -1228,7 +1224,7 @@ fn add(
 pub fn SV_AddOperatorCommands(
     common: &mut Common,
     cm: &mut CollisionWorld,
-    sv: &mut Server,
+    _sv: &mut Server,
     rm: &mut RenderModels,
     host: &mut dyn EngineHost,
 ) {

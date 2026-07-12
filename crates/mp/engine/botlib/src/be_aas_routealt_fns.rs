@@ -233,24 +233,22 @@ pub fn AAS_InitAlternativeRouting(bot: &mut BotLib) {
     if !ENABLE_ALTROUTING {
         return;
     }
-    unsafe {
-        if !bot.midrangeareas.is_null() {
-            FreeMemory(bot, bot.midrangeareas as *mut ());
-        }
-        bot.midrangeareas = GetMemory(
-            bot,
-            (bot.aasworld.numareas
-                * core::mem::size_of::<crate::be_aas_routealt::midrangearea_t>() as c_int)
-                as u64,
-        ) as *mut crate::be_aas_routealt::midrangearea_t;
-        if !bot.clusterareas.is_null() {
-            FreeMemory(bot, bot.clusterareas as *mut ());
-        }
-        bot.clusterareas = GetMemory(
-            bot,
-            (bot.aasworld.numareas * core::mem::size_of::<c_int>() as c_int) as u64,
-        ) as *mut c_int;
+    if !bot.midrangeareas.is_null() {
+        FreeMemory(bot, bot.midrangeareas as *mut ());
     }
+    bot.midrangeareas = GetMemory(
+        bot,
+        (bot.aasworld.numareas
+            * core::mem::size_of::<crate::be_aas_routealt::midrangearea_t>() as c_int)
+            as u64,
+    ) as *mut crate::be_aas_routealt::midrangearea_t;
+    if !bot.clusterareas.is_null() {
+        FreeMemory(bot, bot.clusterareas as *mut ());
+    }
+    bot.clusterareas = GetMemory(
+        bot,
+        (bot.aasworld.numareas * core::mem::size_of::<c_int>() as c_int) as u64,
+    ) as *mut c_int;
 }
 
 /// Raven `AAS_ShutdownAlternativeRouting`.
@@ -260,15 +258,13 @@ pub fn AAS_ShutdownAlternativeRouting(bot: &mut BotLib) {
     if !ENABLE_ALTROUTING {
         return;
     }
-    unsafe {
-        if !bot.midrangeareas.is_null() {
-            FreeMemory(bot, bot.midrangeareas as *mut ());
-        }
-        bot.midrangeareas = core::ptr::null_mut();
-        if !bot.clusterareas.is_null() {
-            FreeMemory(bot, bot.clusterareas as *mut ());
-        }
-        bot.clusterareas = core::ptr::null_mut();
-        bot.numclusterareas = 0;
+    if !bot.midrangeareas.is_null() {
+        FreeMemory(bot, bot.midrangeareas as *mut ());
     }
+    bot.midrangeareas = core::ptr::null_mut();
+    if !bot.clusterareas.is_null() {
+        FreeMemory(bot, bot.clusterareas as *mut ());
+    }
+    bot.clusterareas = core::ptr::null_mut();
+    bot.numclusterareas = 0;
 }

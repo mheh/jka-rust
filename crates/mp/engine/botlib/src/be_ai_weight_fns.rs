@@ -454,12 +454,10 @@ pub fn FuzzyWeightUndecided(
 ///
 /// Source: `oracle/codemp/botlib/be_ai_weight.cpp:125-129`
 pub fn FreeWeightConfig(bot: &mut BotLib, config: *mut weightconfig_t) {
-    unsafe {
-        if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
-            return;
-        }
-        FreeWeightConfig2(bot, config);
+    if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
+        return;
     }
+    FreeWeightConfig2(bot, config);
 }
 
 /// Raven `BotShutdownWeights` — free every cached weight config file.
@@ -732,7 +730,6 @@ pub fn ReadFuzzySeperators_r(bot: &mut BotLib, source: *mut source_t) -> *mut fu
             } else {
                 firstfs = fs;
             }
-            lastfs = fs;
         }
         //
         firstfs
@@ -755,7 +752,7 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
         let mut token: token_t = core::mem::zeroed();
         let source: *mut source_t;
         let mut fs: *mut fuzzyseperator_t;
-        let mut config: *mut weightconfig_t = core::ptr::null_mut();
+        let mut config: *mut weightconfig_t;
 
         if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
             avail = -1;

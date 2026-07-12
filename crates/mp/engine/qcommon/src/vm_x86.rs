@@ -12,7 +12,6 @@ use core::ffi::{c_char, c_int};
 use std::ffi::CStr;
 
 use mp_host_interface::engine_host::EngineHost;
-use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::ha_pref;
 use native_types::{byte, qboolean, qfalse, qtrue};
@@ -27,14 +26,12 @@ use crate::vm::vm_s::vm_t;
 
 // PORT-NOTE(rm-types): `RenderModels`/`RmManager` are state-receiver types
 // pinned by the engine-fork-discovery preamble's receiver order
-// (rmg-terrain.md/tr-model.md own their real shape); neither has landed in
-// this crate yet. Referenced by their exact resolved-signature names per the
-// no-stub rule (common_fns.rs precedent); reported as missing symbols for the
-// finisher to replace with the real imports once they land.
+// (rmg-terrain.md/tr-model.md own their real shape). qcommon names them via the
+// type-erased opaque slots re-exported from `cm_load`; it only threads them
+// (never dereferences), so a null-backed slot satisfies the callee signatures.
 #[allow(dead_code)]
 use crate::cm_load::RenderModels;
-#[allow(dead_code)]
-struct RmManager;
+use crate::cm_load::RmManager;
 
 // Real in-crate callee imported (sweep: extern forward-declares eliminated).
 use crate::z_memman_pc::Hunk_Alloc;
@@ -177,11 +174,11 @@ pub fn Emit4(common: &mut Common, v: c_int) {
 ///
 /// Source: `oracle/codemp/qcommon/vm_x86.cpp:240-254`
 pub fn Hex(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    _common: &mut Common,
+    _cm: &mut CollisionWorld,
+    _rm: &mut RenderModels,
+    _rmg: &mut RmManager,
+    _host: &mut dyn EngineHost,
     c: c_int,
 ) -> c_int {
     if c >= b'a' as c_int && c <= b'f' as c_int {
@@ -417,7 +414,7 @@ pub fn VM_Compile(
     // receiver of `VM_Compile` per the packet's printed signature; a local
     // placeholder default is threaded through to satisfy those callees until
     // the real `RmManager` state lands (missing-symbol reported).
-    let mut rmg = RmManager;
+    let mut rmg = RmManager::from_raw(core::ptr::null_mut());
     let mut opt: qboolean;
 
     unsafe {

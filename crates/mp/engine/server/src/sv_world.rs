@@ -487,20 +487,18 @@ pub fn SV_AreaEntities(
 ///
 /// Source: `oracle/codemp/server/sv_world.cpp:131-142`
 pub fn SV_ClearWorld(cm: &mut CollisionWorld, sv: &mut Server) {
-    unsafe {
-        let size = core::mem::size_of_val(&sv.world_sectors.sv_worldSectors);
-        mp_engine_qcommon::common_fns::Com_Memset(
-            sv.world_sectors.sv_worldSectors.as_mut_ptr() as *mut (),
-            0,
-            size,
-        );
-    }
+    let size = core::mem::size_of_val(&sv.world_sectors.sv_worldSectors);
+    mp_engine_qcommon::common_fns::Com_Memset(
+        sv.world_sectors.sv_worldSectors.as_mut_ptr() as *mut (),
+        0,
+        size,
+    );
     sv.world_sectors.sv_numworldSectors = 0;
 
     // get world map bounds
     let h = mp_engine_qcommon::cm_load::CM_InlineModel(cm, 0);
-    let mut mins: vec3_t = [0.0; 3];
-    let mut maxs: vec3_t = [0.0; 3];
+    let mins: vec3_t = [0.0; 3];
+    let maxs: vec3_t = [0.0; 3];
     // CM_ModelBounds now takes mins/maxs by value (shape-mismatch out-param
     // documented at its definition, cm_load.rs); reconciled call, no write-back.
     mp_engine_qcommon::cm_load::CM_ModelBounds(cm, h, mins, maxs);

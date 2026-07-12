@@ -26,8 +26,6 @@ use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use crate::files::files_consts::BASEGAME;
 use crate::cm_load::RenderModels;
-// Source: `mp_engine_client::client::client_connection_t::MAX_OSPATH` (value 1024)
-const MAX_OSPATH: usize = 1024;
 
 // Sweep: extern forward-declares eliminated. Real in-crate callees imported
 // (`com_error`, `com_printf`, `Com_StartupVariable`); q_shared helpers
@@ -385,8 +383,7 @@ pub fn FS_HandleForFile(common: &mut Common) -> fileHandle_t {
             return i;
         }
     }
-    com_error(errorParm_t::ERR_DROP, "FS_HandleForFile: none free".to_string());
-    0
+    com_error(errorParm_t::ERR_DROP, "FS_HandleForFile: none free".to_string())
 }
 
 /// Raven `FS_FileForHandle`.
@@ -2146,7 +2143,6 @@ pub fn FS_Restart(
                 Cvar_Set(common, cm, rm, host, c"fs_restrict".as_ptr(), c"0".as_ptr());
                 FS_Restart(common, cm, rm, host, checksumFeed);
                 com_error(errorParm_t::ERR_DROP, "Invalid game folder\n".to_string());
-                return;
             }
             com_error(errorParm_t::ERR_FATAL, "Couldn't load mpdefault.cfg".to_string());
         }

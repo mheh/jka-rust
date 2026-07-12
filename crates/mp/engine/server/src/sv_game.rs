@@ -381,9 +381,7 @@ pub fn SV_GetServerinfo(common: &mut Common, buffer: *mut c_char, bufferSize: c_
         );
     }
     let info = Cvar_InfoString(common, mp_qshared::shared::cvar::CVAR_SERVERINFO);
-    unsafe {
-        Q_strncpyz(buffer, info as *const c_char, bufferSize);
-    }
+    Q_strncpyz(buffer, info as *const c_char, bufferSize);
 }
 
 /// Raven `SV_GetUsercmd`.
@@ -422,7 +420,7 @@ pub fn SV_InitGameVM(
         &[sv.svs.time, ms, restart as c_int],
     );
 
-    let max_clients = (unsafe { (*common.sv_maxclients).integer });
+    let max_clients = unsafe { (*common.sv_maxclients).integer };
     for i in 0..max_clients {
         unsafe {
             (*sv.svs.clients.offset(i as isize)).gentity = core::ptr::null_mut();
@@ -566,8 +564,8 @@ pub fn SV_SetBrushModel(
         }
 
         let name_str = core::ffi::CStr::from_ptr(name).to_string_lossy();
-        let mut mins = [0.0f32; 3];
-        let mut maxs = [0.0f32; 3];
+        let mins = [0.0f32; 3];
+        let maxs = [0.0f32; 3];
 
         if *name == b'*' as c_char {
             (*ent).s.modelindex = atoi(name.offset(1));
@@ -768,7 +766,6 @@ pub fn SV_GameSystemCalls(
                 .to_string_lossy()
                 .into_owned();
             mp_engine_qcommon::common::com_error(errorParm_t::ERR_DROP, s);
-            return 0;
         } else if trap == G::G_MILLISECONDS as c_int {
             return mp_engine_qcommon::timing::sys_milliseconds(common);
         } else if trap == G::G_PRECISIONTIMER_START as c_int {

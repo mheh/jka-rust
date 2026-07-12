@@ -8,7 +8,7 @@ use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void};
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fs_origin::fsOrigin_t;
-use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_STRING_TOKENS};
+use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 use mp_qshared::shared::qboolean;
 use mp_qshared::shared::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
 use native_types::fileHandle_t;
@@ -16,11 +16,11 @@ use native_types::fileHandle_t;
 use crate::collision_world::CollisionWorld;
 use crate::common::Common;
 use crate::files::file_in_pack_s::fileInPack_t;
-use crate::files::files_consts::{BASEGAME, MAX_SEARCH_PATHS, MAX_ZPATH};
+use crate::files::files_consts::{BASEGAME, MAX_SEARCH_PATHS};
 use crate::files::pack_t::pack_t;
 use crate::files::searchpath_s::searchpath_t;
 use crate::qcommon::filesystem_limits::{
-    FS_CGAME_REF, FS_GENERAL_REF, FS_QAGAME_REF, FS_UI_REF, MAX_FILE_HANDLES, NUM_ID_PAKS,
+    FS_CGAME_REF, FS_GENERAL_REF, FS_QAGAME_REF, FS_UI_REF, NUM_ID_PAKS,
 };
 use crate::cm_load::RenderModels;
 
@@ -548,7 +548,7 @@ pub fn FS_idPak(pak: *mut c_char, base: *mut c_char) -> qboolean {
     while i < NUM_ID_PAKS {
         let candidate = format!("{}/assets{}", base_str, i);
         let candidate_c = std::ffi::CString::new(candidate).unwrap();
-        if unsafe { crate::files_common::FS_FilenameCompare(pak, candidate_c.as_ptr()) } == 0 {
+        if crate::files_common::FS_FilenameCompare(pak, candidate_c.as_ptr()) == 0 {
             break;
         }
         i += 1;
@@ -725,7 +725,7 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
         let len = libc::strlen(ospath);
         *ospath.add(len - 1) = 0;
 
-        let f = unsafe { FS_HandleForFile(common) };
+        let f = FS_HandleForFile(common);
         common.fsh[f as usize].zipFile = mp_qshared::shared::qfalse;
 
         if (*common.fs_debug).integer != 0 {
@@ -864,16 +864,14 @@ pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileH
         );
     }
 
-    let f = unsafe { FS_HandleForFile(common) };
+    let f = FS_HandleForFile(common);
     common.fsh[f as usize].zipFile = mp_qshared::shared::qfalse;
 
-    unsafe {
-        copy_cname(
-            common.fsh[f as usize].name.as_mut_ptr(),
-            filename,
-            common.fsh[f as usize].name.len(),
-        );
-    }
+    copy_cname(
+        common.fsh[f as usize].name.as_mut_ptr(),
+        filename,
+        common.fsh[f as usize].name.len(),
+    );
 
     // don't let sound stutter
     null::S_ClearSoundBuffer();
@@ -927,7 +925,7 @@ pub fn FS_Read2(common: &mut Common, buffer: *mut (), len: c_int, f: fileHandle_
         common.fsh[f as usize].streamed = mp_qshared::shared::qtrue;
         r
     } else {
-        unsafe { FS_Read(common, buffer, len, f) }
+        FS_Read(common, buffer, len, f)
     }
 }
 
@@ -952,7 +950,6 @@ pub fn FS_Seek(
             errorParm_t::ERR_FATAL,
             "Filesystem call made without initialization\n".to_string(),
         );
-        return -1;
     }
 
     if common.fsh[f as usize].streamed != mp_qshared::shared::qfalse {
@@ -982,27 +979,23 @@ pub fn FS_Seek(
             unsafe {
                 unzOpenCurrentFile(common.fsh[f as usize].handleFiles.file.z);
             }
-            unsafe { FS_Read(common, foo.as_mut_ptr() as *mut (), offset as c_int, f) }
+            FS_Read(common, foo.as_mut_ptr() as *mut (), offset as c_int, f)
         } else {
             crate::common::com_error(
                 errorParm_t::ERR_FATAL,
                 "ZIP FILE FSEEK NOT YET IMPLEMENTED\n".to_string(),
-            );
-            -1
+            )
         }
     } else {
-        let file = unsafe { FS_FileForHandle(common, f) };
+        let file = FS_FileForHandle(common, f);
         let _origin = match origin {
             x if x == fsOrigin_t::FS_SEEK_CUR as c_int => libc::SEEK_CUR,
             x if x == fsOrigin_t::FS_SEEK_END as c_int => libc::SEEK_END,
             x if x == fsOrigin_t::FS_SEEK_SET as c_int => libc::SEEK_SET,
-            _ => {
-                crate::common::com_error(
-                    errorParm_t::ERR_FATAL,
-                    "Bad origin in FS_Seek\n".to_string(),
-                );
-                libc::SEEK_CUR
-            }
+            _ => crate::common::com_error(
+                errorParm_t::ERR_FATAL,
+                "Bad origin in FS_Seek\n".to_string(),
+            ),
         };
 
         unsafe { libc::fseek(file, offset as libc::c_long, _origin) }
@@ -1237,7 +1230,7 @@ pub fn FS_PureServerSetReferencedPaks(
 
     for i in 0..c as usize {
         if !common.fs_serverReferencedPakNames[i].is_null() {
-            unsafe { Z_Free(common, common.fs_serverReferencedPakNames[i] as *mut ()) };
+            Z_Free(common, common.fs_serverReferencedPakNames[i] as *mut ());
         }
         common.fs_serverReferencedPakNames[i] = core::ptr::null_mut();
     }
@@ -1259,7 +1252,7 @@ pub fn FS_PureServerSetReferencedPaks(
         for i in 0..d as usize {
             let arg = crate::cmd_common::Cmd_Argv(common, i as c_int);
             common.fs_serverReferencedPakNames[i] =
-                unsafe { CopyString(common, cm, rm, host, arg) };
+                CopyString(common, cm, rm, host, arg);
         }
     }
 }
@@ -1461,7 +1454,7 @@ pub fn FS_FOpenFileByMode(
 
     let r;
     match mode {
-        m if m == FS_READ => unsafe {
+        m if m == FS_READ => {
             r = FS_FOpenFileRead(common, cm, rm, host, qpath, f, mp_qshared::shared::qtrue);
         },
         m if m == FS_WRITE => unsafe {

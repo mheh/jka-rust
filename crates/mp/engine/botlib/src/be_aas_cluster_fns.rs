@@ -309,28 +309,26 @@ pub fn AAS_CreatePortals(bot: &mut BotLib) {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_cluster.cpp:706-719`
 pub fn AAS_ConnectedAreas(bot: &mut BotLib, areanums: *mut c_int, numareas: c_int) -> qboolean {
-    unsafe {
-        let mut connectedareas = [0 as c_int; MAX_PORTALAREAS as usize];
+    let mut connectedareas = [0 as c_int; MAX_PORTALAREAS as usize];
 
-        Com_Memset(
-            connectedareas.as_mut_ptr() as *mut (),
-            0,
-            core::mem::size_of_val(&connectedareas),
-        );
-        if numareas < 1 {
+    Com_Memset(
+        connectedareas.as_mut_ptr() as *mut (),
+        0,
+        core::mem::size_of_val(&connectedareas),
+    );
+    if numareas < 1 {
+        return qfalse;
+    }
+    if numareas == 1 {
+        return qtrue;
+    }
+    AAS_ConnectedAreas_r(bot, areanums, numareas, connectedareas.as_mut_ptr(), 0);
+    for i in 0..numareas {
+        if connectedareas[i as usize] == 0 {
             return qfalse;
         }
-        if numareas == 1 {
-            return qtrue;
-        }
-        AAS_ConnectedAreas_r(bot, areanums, numareas, connectedareas.as_mut_ptr(), 0);
-        for i in 0..numareas {
-            if connectedareas[i as usize] == 0 {
-                return qfalse;
-            }
-        } //end for
-        qtrue
-    }
+    } //end for
+    qtrue
 }
 
 /// Raven `AAS_GetAdjacentAreasWithLessPresenceTypes_r` — recursively collects

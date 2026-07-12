@@ -204,7 +204,7 @@ fn CM_TransposeGrid(grid: &mut cGrid_t) {
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:269-289`
 fn CM_SetGridWrapWidth(grid: &mut cGrid_t) {
     let mut i = 0;
-    let mut j = 0;
+    let mut j;
     while i < grid.height {
         j = 0;
         while j < 3 {

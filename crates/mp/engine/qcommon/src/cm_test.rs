@@ -27,9 +27,8 @@ use crate::cm::clip_map_t::clipMap_t;
 use crate::cm::cm_local_consts::BOX_MODEL_HANDLE;
 use crate::cm::cmodel_s::cmodel_t;
 use crate::cm::leaf_list_s::leafList_t;
-use crate::cm_load::{CCMLandScape, CM_ClipHandleToModel};
+use crate::cm_load::CM_ClipHandleToModel;
 use crate::collision_world::CollisionWorld;
-use crate::common::Common;
 use crate::common_fns::Com_Memset;
 use mp_qshared::shared::q_math::{_DotProduct, _VectorCopy, _VectorSubtract};
 
@@ -429,7 +428,7 @@ pub fn CM_TransformedPointContents(
     angles: vec3_t,
 ) -> c_int {
     let mut p_l: vec3_t = [0.0; 3];
-    let mut temp: vec3_t;
+    let temp: vec3_t;
 
     // subtract origin offset
     _VectorSubtract(p, origin, &mut p_l);
@@ -441,9 +440,7 @@ pub fn CM_TransformedPointContents(
         let mut forward: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
         let mut up: vec3_t = [0.0; 3];
-        unsafe {
-            AngleVectors(angles, Some(&mut forward), Some(&mut right), Some(&mut up));
-        }
+        AngleVectors(angles, Some(&mut forward), Some(&mut right), Some(&mut up));
 
         temp = p_l;
         p_l[0] = _DotProduct(temp, forward);

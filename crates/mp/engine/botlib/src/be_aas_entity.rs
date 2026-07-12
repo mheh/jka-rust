@@ -31,8 +31,6 @@ use mp_qshared::shared::vec3_t;
 use mp_bg::public::entity_type::entityType_t;
 
 use crate::aasfile::presence_type::PRESENCE_NORMAL;
-use crate::be_aas_def::aas_entity_s::aas_entity_t;
-use crate::be_aas_def::aas_link_s::aas_link_t;
 use crate::be_aas_def::bsp_entdata_s::bsp_entdata_t;
 use crate::BotLib;
 

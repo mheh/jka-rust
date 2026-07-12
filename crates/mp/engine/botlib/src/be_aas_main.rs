@@ -29,7 +29,6 @@ use mp_bg::public::configstring::CS_MODELS;
 use mp_qshared::shared::limits::MAX_MODELS;
 
 use crate::be_aas_def::be_aas_def_consts::MAX_PATH;
-use crate::l_libvar::libvar_s::libvar_t;
 use crate::BotLib;
 
 use crate::be_aas_bspq3_fns::{AAS_DumpBSPData, AAS_LoadBSPFile};
@@ -400,36 +399,34 @@ pub fn AAS_LoadFiles(bot: &mut BotLib, mapname: *const c_char) -> c_int {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:324-358`
 pub fn AAS_LoadMap(bot: &mut BotLib, mapname: *const c_char) -> c_int {
-    unsafe {
-        // if no mapname is provided then the string indexes are updated
-        if mapname.is_null() {
-            return 0;
-        }
-        //
-        bot.aasworld.initialized = mp_qshared::shared::qfalse as c_int;
-        // NOTE: free the routing caches before loading a new map because
-        // to free the caches the old number of areas, number of clusters
-        // and number of areas in a clusters must be available
-        AAS_FreeRoutingCaches(bot);
-        // load the map
-        let errnum = AAS_LoadFiles(bot, mapname);
-        if errnum != BLERR_NOERROR {
-            bot.aasworld.loaded = mp_qshared::shared::qfalse as c_int;
-            return errnum;
-        }
-        //
-        AAS_InitSettings(bot);
-        // initialize the AAS link heap for the new map
-        AAS_InitAASLinkHeap(bot);
-        // initialize the AAS linked entities for the new map
-        AAS_InitAASLinkedEntities(bot);
-        // initialize reachability for the new map
-        AAS_InitReachability(bot);
-        // initialize the alternative routing
-        AAS_InitAlternativeRouting(bot);
-        // everything went ok
-        0
+    // if no mapname is provided then the string indexes are updated
+    if mapname.is_null() {
+        return 0;
     }
+    //
+    bot.aasworld.initialized = mp_qshared::shared::qfalse as c_int;
+    // NOTE: free the routing caches before loading a new map because
+    // to free the caches the old number of areas, number of clusters
+    // and number of areas in a clusters must be available
+    AAS_FreeRoutingCaches(bot);
+    // load the map
+    let errnum = AAS_LoadFiles(bot, mapname);
+    if errnum != BLERR_NOERROR {
+        bot.aasworld.loaded = mp_qshared::shared::qfalse as c_int;
+        return errnum;
+    }
+    //
+    AAS_InitSettings(bot);
+    // initialize the AAS link heap for the new map
+    AAS_InitAASLinkHeap(bot);
+    // initialize the AAS linked entities for the new map
+    AAS_InitAASLinkedEntities(bot);
+    // initialize reachability for the new map
+    AAS_InitReachability(bot);
+    // initialize the alternative routing
+    AAS_InitAlternativeRouting(bot);
+    // everything went ok
+    0
 }
 
 /// Raven `AAS_ProjectPointOntoVector`.
@@ -442,16 +439,14 @@ pub fn AAS_LoadMap(bot: &mut BotLib, mapname: *const c_char) -> c_int {
 /// not propagate to the caller — see shape_mismatches; Raven's C array decay
 /// makes `vProj` a true out-param, which this signature cannot express.
 pub fn AAS_ProjectPointOntoVector(point: vec3_t, vStart: vec3_t, vEnd: vec3_t, mut vProj: vec3_t) {
-    unsafe {
-        let mut pVec = [0.0f32; 3];
-        let mut vec = [0.0f32; 3];
+    let mut pVec = [0.0f32; 3];
+    let mut vec = [0.0f32; 3];
 
-        VectorSubtract(point, vStart, &mut pVec);
-        VectorSubtract(vEnd, vStart, &mut vec);
-        mp_game::q_math::VectorNormalize(&mut vec);
-        // project onto the directional vector for this segment
-        VectorMA(vStart, DotProduct(pVec, vec), vec, &mut vProj);
-    }
+    VectorSubtract(point, vStart, &mut pVec);
+    VectorSubtract(vEnd, vStart, &mut vec);
+    mp_game::q_math::VectorNormalize(&mut vec);
+    // project onto the directional vector for this segment
+    VectorMA(vStart, DotProduct(pVec, vec), vec, &mut vProj);
 }
 
 // PORT-NOTE(macros): Raven's vector `#define`s (`VectorSubtract`, `VectorMA`,
@@ -479,74 +474,70 @@ fn VectorMA(a: vec3_t, scale: f32, b: vec3_t, out: &mut vec3_t) {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:366-382`
 pub fn AAS_Setup(bot: &mut BotLib) -> c_int {
-    unsafe {
-        bot.aasworld.maxclients = LibVarValue(
-            bot,
-            c"maxclients".as_ptr() as *mut c_char,
-            c"128".as_ptr() as *mut c_char,
-        ) as c_int;
-        bot.aasworld.maxentities = LibVarValue(
-            bot,
-            c"maxentities".as_ptr() as *mut c_char,
-            c"1024".as_ptr() as *mut c_char,
-        ) as c_int;
-        // as soon as it's set to 1 the routing cache will be saved
-        bot.saveroutingcache = LibVar(
-            bot,
-            c"saveroutingcache".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-        );
-        // allocate memory for the entities
-        if !bot.aasworld.entities.is_null() {
-            FreeMemory(bot, bot.aasworld.entities as *mut ());
-        }
-        bot.aasworld.entities = GetClearedHunkMemory(
-            bot,
-            (bot.aasworld.maxentities as usize
-                * core::mem::size_of::<crate::be_aas_def::aas_entity_s::aas_entity_t>())
-                as core::ffi::c_ulong,
-        ) as *mut crate::be_aas_def::aas_entity_s::aas_entity_t;
-        // invalidate all the entities
-        AAS_InvalidateEntities(bot);
-        // force some recalculations
-        // LibVarSet("forceclustering", "1");			//force clustering calculation
-        // LibVarSet("forcereachability", "1");		//force reachability calculation
-        bot.aasworld.numframes = 0;
-        BLERR_NOERROR
+    bot.aasworld.maxclients = LibVarValue(
+        bot,
+        c"maxclients".as_ptr() as *mut c_char,
+        c"128".as_ptr() as *mut c_char,
+    ) as c_int;
+    bot.aasworld.maxentities = LibVarValue(
+        bot,
+        c"maxentities".as_ptr() as *mut c_char,
+        c"1024".as_ptr() as *mut c_char,
+    ) as c_int;
+    // as soon as it's set to 1 the routing cache will be saved
+    bot.saveroutingcache = LibVar(
+        bot,
+        c"saveroutingcache".as_ptr() as *mut c_char,
+        c"0".as_ptr() as *mut c_char,
+    );
+    // allocate memory for the entities
+    if !bot.aasworld.entities.is_null() {
+        FreeMemory(bot, bot.aasworld.entities as *mut ());
     }
+    bot.aasworld.entities = GetClearedHunkMemory(
+        bot,
+        (bot.aasworld.maxentities as usize
+            * core::mem::size_of::<crate::be_aas_def::aas_entity_s::aas_entity_t>())
+            as core::ffi::c_ulong,
+    ) as *mut crate::be_aas_def::aas_entity_s::aas_entity_t;
+    // invalidate all the entities
+    AAS_InvalidateEntities(bot);
+    // force some recalculations
+    // LibVarSet("forceclustering", "1");			//force clustering calculation
+    // LibVarSet("forcereachability", "1");		//force reachability calculation
+    bot.aasworld.numframes = 0;
+    BLERR_NOERROR
 }
 
 /// Raven `AAS_Shutdown`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:389-412`
 pub fn AAS_Shutdown(bot: &mut BotLib) {
-    unsafe {
-        AAS_ShutdownAlternativeRouting(bot);
-        //
-        AAS_DumpBSPData(bot);
-        // free routing caches
-        AAS_FreeRoutingCaches(bot);
-        // free aas link heap
-        AAS_FreeAASLinkHeap(bot);
-        // free aas linked entities
-        AAS_FreeAASLinkedEntities(bot);
-        // free the aas data
-        AAS_DumpAASData(bot);
-        // free the entities
-        if !bot.aasworld.entities.is_null() {
-            FreeMemory(bot, bot.aasworld.entities as *mut ());
-        }
-        // clear the aasworld structure
-        Com_Memset(
-            &mut bot.aasworld as *mut _ as *mut (),
-            0,
-            core::mem::size_of::<crate::be_aas_def::aas_s::aas_t>(),
-        );
-        // aas has not been initialized
-        bot.aasworld.initialized = mp_qshared::shared::qfalse as c_int;
-        // NOTE: as soon as a new .bsp file is loaded the .bsp file memory is
-        // freed an reallocated, so there's no need to free that memory here
-        // print shutdown
-        // botimport.Print(PRT_MESSAGE, "AAS shutdown.\n");
+    AAS_ShutdownAlternativeRouting(bot);
+    //
+    AAS_DumpBSPData(bot);
+    // free routing caches
+    AAS_FreeRoutingCaches(bot);
+    // free aas link heap
+    AAS_FreeAASLinkHeap(bot);
+    // free aas linked entities
+    AAS_FreeAASLinkedEntities(bot);
+    // free the aas data
+    AAS_DumpAASData(bot);
+    // free the entities
+    if !bot.aasworld.entities.is_null() {
+        FreeMemory(bot, bot.aasworld.entities as *mut ());
     }
+    // clear the aasworld structure
+    Com_Memset(
+        &mut bot.aasworld as *mut _ as *mut (),
+        0,
+        core::mem::size_of::<crate::be_aas_def::aas_s::aas_t>(),
+    );
+    // aas has not been initialized
+    bot.aasworld.initialized = mp_qshared::shared::qfalse as c_int;
+    // NOTE: as soon as a new .bsp file is loaded the .bsp file memory is
+    // freed an reallocated, so there's no need to free that memory here
+    // print shutdown
+    // botimport.Print(PRT_MESSAGE, "AAS shutdown.\n");
 }
