@@ -402,25 +402,6 @@ pub struct Common {
     /// Source: `oracle/codemp/qcommon/cvar.cpp:855`
     pub cvar_info_string_big: [c_char; BIG_INFO_STRING],
 
-    // ---- collision (`cm_load.cpp`) trace counters ----
-    /// Raven `c_pointcontents` / `c_traces` / `c_brush_traces` / `c_patch_traces`.
-    ///
-    /// Source: `oracle/codemp/qcommon/cm_load.cpp:38-39`
-    pub c_pointcontents: c_int,
-    pub c_traces: c_int,
-    pub c_brush_traces: c_int,
-    pub c_patch_traces: c_int,
-
-    // ---- winding (`cm_polylib.cpp`) debug counters ----
-    /// Raven `c_active_windings` / `c_peak_windings` / `c_winding_allocs` /
-    /// `c_winding_points` — file-static winding accounting.
-    ///
-    /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:12-15`
-    pub c_active_windings: c_int,
-    pub c_peak_windings: c_int,
-    pub c_winding_allocs: c_int,
-    pub c_winding_points: c_int,
-
     // ---- filesystem (`files_common.cpp` / `files_pc.cpp`) ----
     /// Raven `fs_searchpaths` / `fsh[MAX_FILE_HANDLES]`.
     ///
@@ -506,13 +487,12 @@ pub struct Common {
     pub hunk_tag: memtag_t,
 
     // ---- VM core (`vm.cpp`) ----
-    /// Raven `currentVM` / `lastVM` / `gvm` (game VM) VM pointers and the
-    /// `vmTable[MAX_VM]` array + `vm_debugLevel`.
+    /// Raven `currentVM` / `lastVM` VM pointers and the `vmTable[MAX_VM]`
+    /// array + `vm_debugLevel`.
     ///
-    /// Source: `oracle/codemp/qcommon/vm.cpp:24-29`, `oracle/codemp/server/server.h:234`
+    /// Source: `oracle/codemp/qcommon/vm.cpp:24-29`
     pub currentVM: *mut vm_t,
     pub lastVM: *mut vm_t,
-    pub gvm: *mut vm_t,
     pub vmTable: [vm_t; MAX_VM],
     pub vm_debugLevel: c_int,
     /// Raven `VM_ValueToSymbol`'s `static char text[MAX_TOKEN_CHARS]` and

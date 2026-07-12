@@ -33,17 +33,19 @@ use crate::z_memman_pc::{Z_Free, Z_Malloc};
 /// Raven: save the stack to allow recursive VM entry.
 /// Source: `oracle/codemp/qcommon/vm_x86.cpp:159-165`
 pub extern "C" fn callAsmCall(common: &mut Common) {
-    // PORT-NOTE(vm-x86-statics): `currentVM`/`callOpStack`/`callProgramStack`/
+    // PORT-NOTE(vm-x86-statics): `callOpStack`/`callProgramStack`/
     // `callSyscallNum` are vm_x86.cpp file-scope globals/statics (ruling 3,
     // genuine cross-frame state) with no home field on `Common` yet; referenced
     // by their obvious snake_case names and reported as missing symbols.
+    // DoSyscall dereferences the real `currentVM` global (`common.currentVM`);
+    // `savedVM` (`common.current_vm`) is only the save/restore guard.
     unsafe {
-        (*common.current_vm).programStack = common.call_program_stack - 4;
-        let data_base = (*common.current_vm).dataBase;
+        (*common.currentVM).programStack = common.call_program_stack - 4;
+        let data_base = (*common.currentVM).dataBase;
         *(data_base.offset((common.call_program_stack + 4) as isize) as *mut c_int) =
             common.call_syscall_num;
         //VM_LogSyscalls(  (int *)((byte *)currentVM->dataBase + programStack + 4) );
-        let sys_call = (*common.current_vm).systemCall.unwrap();
+        let sys_call = (*common.currentVM).systemCall.unwrap();
         *(common.call_op_stack.offset(1)) =
             sys_call(data_base.offset((common.call_program_stack + 4) as isize) as *mut c_int);
     }

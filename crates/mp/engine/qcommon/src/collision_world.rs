@@ -104,10 +104,14 @@ pub struct CollisionWorld {
     pub NumSubBSP: c_int,
     pub TotalSubModels: c_int,
 
-    /// Raven `int c_pointcontents` — trace optimize counter.
+    /// Raven `c_pointcontents` / `c_traces` / `c_brush_traces` /
+    /// `c_patch_traces` — trace optimize/statistics counters.
     ///
-    /// Source: `oracle/codemp/qcommon/cm_local.h:221`
+    /// Source: `oracle/codemp/qcommon/cm_local.h:220-221`
     pub c_pointcontents: c_int,
+    pub c_traces: c_int,
+    pub c_brush_traces: c_int,
+    pub c_patch_traces: c_int,
 
     /// Raven `cm_polylib.cpp` winding debug counters reached through the
     /// clipmap receiver (`c_removed` free-side, `c_active_windings`).
@@ -115,6 +119,9 @@ pub struct CollisionWorld {
     /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:12-15`
     pub c_removed: c_int,
     pub c_active_windings: c_int,
+    pub c_peak_windings: c_int,
+    pub c_winding_allocs: c_int,
+    pub c_winding_points: c_int,
 
     /// Raven `int c_totalPatchBlocks` — running total of grid blocks across every
     /// generated patch collide (a load-time statistic accumulated by
@@ -157,12 +164,6 @@ pub struct CollisionWorld {
     pub cm_noAreas: *mut cvar_t,
     pub cm_noCurves: *mut cvar_t,
     pub cm_playerCurveClip: *mut cvar_t,
-
-    /// Raven `cvar_t *com_terrainPhysics` — gates terrain-brush trace
-    /// handling (`CM_TraceThroughTerrain`); named `cm_terrainPhysics` at the
-    /// `CollisionWorld` call sites (`cm_trace.rs`) rather than the Raven
-    /// global's own `com_` prefix.
-    ///
 
     /// Raven `void *gpvCachedMapDiskImage` / `char gsCachedMapDiskImage[MAX_QPATH]`
     /// / `qboolean gbUsingCachedMapDataRightNow` — the cached-map-diskimage

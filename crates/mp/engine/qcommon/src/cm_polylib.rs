@@ -272,15 +272,11 @@ pub(crate) unsafe fn winding_p(w: *mut winding_t, i: usize) -> *mut vec3_t {
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:30-45`
 pub fn AllocWinding(view: &mut EngineHostView, points: c_int) -> *mut winding_t {
-    // PORT-NOTE(missing-field): `c_active_windings`/`c_peak_windings`/
-    // `c_winding_allocs`/`c_winding_points` (`cm_polylib.cpp:12-15`) have no
-    // home fields yet; referenced as `common.c_active_windings` etc. per the
-    // owning-file convention, reported as missing symbols.
-    view.common.c_winding_allocs += 1;
-    view.common.c_winding_points += points;
-    view.common.c_active_windings += 1;
-    if view.common.c_active_windings > view.common.c_peak_windings {
-        view.common.c_peak_windings = view.common.c_active_windings;
+    view.cm.c_winding_allocs += 1;
+    view.cm.c_winding_points += points;
+    view.cm.c_active_windings += 1;
+    if view.cm.c_active_windings > view.cm.c_peak_windings {
+        view.cm.c_peak_windings = view.cm.c_active_windings;
     }
 
     let s = core::mem::size_of::<vec_t>() as c_int * 3 * points

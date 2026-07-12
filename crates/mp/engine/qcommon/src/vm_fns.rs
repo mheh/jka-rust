@@ -232,18 +232,18 @@ pub fn VM_ArgPtrWord(common: &Common, value: isize) -> *mut () {
 ///
 /// Raven: `gvm` — "always using the game vm here."
 /// Source: `oracle/codemp/qcommon/vm.cpp:657-677`
-pub fn BotVMShift(common: &mut Common, ptr: c_int) -> *mut () {
+pub fn BotVMShift(gvm: *mut vm_t, ptr: c_int) -> *mut () {
     if ptr == 0 {
         return core::ptr::null_mut();
     }
-    if common.gvm.is_null() {
+    if gvm.is_null() {
         return core::ptr::null_mut();
     }
     unsafe {
-        if !(*common.gvm).entryPoint.is_none() {
-            ((*common.gvm).dataBase as isize + ptr as isize) as *mut ()
+        if !(*gvm).entryPoint.is_none() {
+            ((*gvm).dataBase as isize + ptr as isize) as *mut ()
         } else {
-            ((*common.gvm).dataBase as isize + (ptr & (*common.gvm).dataMask) as isize) as *mut ()
+            ((*gvm).dataBase as isize + (ptr & (*gvm).dataMask) as isize) as *mut ()
         }
     }
 }

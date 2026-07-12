@@ -3588,7 +3588,6 @@ pub fn SV_GameSystemCalls(
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
             let sv = &mut *(view.sv.as_raw() as *mut Server);
             SV_BotWaypointReception(
-                view.common,
                 sv,
                 *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut *mut wpobject_t,

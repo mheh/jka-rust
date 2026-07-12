@@ -1088,7 +1088,7 @@ pub fn CM_TraceThroughPatch(
     patch: *mut cPatch_t,
 ) {
     unsafe {
-        view.common.c_patch_traces += 1;
+        view.cm.c_patch_traces += 1;
 
         let oldFrac = trace.fraction;
 
@@ -1575,7 +1575,7 @@ pub fn CM_Trace(
 
         (*local).checkcount += 1; // for multi-check avoidance
 
-        view.common.c_traces += 1; // for statistics, may be zeroed
+        view.cm.c_traces += 1; // for statistics, may be zeroed
 
         // fill in a default trace
         Com_Memset(

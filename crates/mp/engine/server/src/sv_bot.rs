@@ -361,18 +361,13 @@ pub fn SV_OrgVisibleBox(
 /// truncation Raven relies on).
 ///
 /// Source: `oracle/codemp/server/sv_bot.cpp:63-75`
-pub fn SV_BotWaypointReception(
-    common: &mut Common,
-    sv: &mut Server,
-    wpnum: c_int,
-    wps: *mut *mut wpobject_t,
-) {
+pub fn SV_BotWaypointReception(sv: &mut Server, wpnum: c_int, wps: *mut *mut wpobject_t) {
     sv.bot.gWPNum = wpnum;
 
     let mut i: c_int = 0;
     while i < sv.bot.gWPNum {
         let wp = unsafe { *wps.offset(i as isize) };
-        sv.bot.gWPArray[i as usize] = BotVMShift(common, wp as usize as c_int) as *mut wpobject_t;
+        sv.bot.gWPArray[i as usize] = BotVMShift(sv.gvm, wp as usize as c_int) as *mut wpobject_t;
         i += 1;
     }
 }

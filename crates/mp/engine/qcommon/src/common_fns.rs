@@ -1398,16 +1398,16 @@ pub fn Com_Frame(view: &mut EngineHostView) {
                     view.common,
                     &format!(
                         "{:4} traces  ({}b {}p) {:4} points\n",
-                        view.common.c_traces,
-                        view.common.c_brush_traces,
-                        view.common.c_patch_traces,
-                        view.common.c_pointcontents
+                        view.cm.c_traces,
+                        view.cm.c_brush_traces,
+                        view.cm.c_patch_traces,
+                        view.cm.c_pointcontents
                     ),
                 );
-                view.common.c_traces = 0;
-                view.common.c_brush_traces = 0;
-                view.common.c_patch_traces = 0;
-                view.common.c_pointcontents = 0;
+                view.cm.c_traces = 0;
+                view.cm.c_brush_traces = 0;
+                view.cm.c_patch_traces = 0;
+                view.cm.c_pointcontents = 0;
             }
         }
 
