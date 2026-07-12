@@ -4,8 +4,9 @@
 //! `oracle/codemp/Splines/q_shared.h` (a standalone vendored copy of this
 //! header for the Splines math library); nothing in `crates/` references
 //! `Splines/`, so it is dead/unreferenced and the real, compiled definitions
-//! below cite the actual `game/q_shared.h` instead. This project only
-//! targets Linux, so only that branch of each OS-conditional chain applies.
+//! below cite the actual `game/q_shared.h` instead. This project's dev/CI
+//! lanes span both Linux and macOS, so both OS branches of the
+//! OS-conditional chains apply.
 //!
 //! Source: `oracle/codemp/game/q_shared.h:118-330`
 
@@ -15,11 +16,20 @@
 /// chain), falls through to `"linux-other"` — so the two lanes this
 /// project's CI builds (`i686`/`x86_64-unknown-linux-gnu`) take different
 /// literal values, matching what compiling this exact source would do.
+/// Raven's `MACOS_X` branch special-cases `__ppc__`/`__i386__`; any other
+/// arch (including `arm64`, uncovered by that era's chain) falls through to
+/// `"MacOSX-other"`.
 ///
-/// Source: `oracle/codemp/game/q_shared.h:270-277`
-#[cfg(target_arch = "x86")]
+/// Source: `oracle/codemp/game/q_shared.h:192-198,270-277`
+#[cfg(all(target_os = "linux", target_arch = "x86"))]
 pub const CPUSTRING: &str = "linux-i386";
-#[cfg(not(target_arch = "x86"))]
+#[cfg(all(target_os = "linux", not(target_arch = "x86")))]
+pub const CPUSTRING: &str = "linux-other";
+#[cfg(target_os = "macos")]
+pub const CPUSTRING: &str = "MacOSX-other";
+// Unported-platform fallback: no non-Linux/macOS host is targeted by this
+// project's dev/CI lanes, so this default keeps the const total.
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 pub const CPUSTRING: &str = "linux-other";
 
 /// Raven `PATH_SEP` — filesystem path separator. `'/'` on every non-Windows,
@@ -44,10 +54,10 @@ pub const QDECL: () = ();
 /// Source: `oracle/codemp/game/q_shared.h:268` (`__linux__` branch)
 pub const MAC_STATIC: () = ();
 
-/// Raven `Q3_VERSION` — build-banner version string, `"(internal)JAmp: v" +
-/// VERSION_STRING_DOTTED` (neither `_DEBUG` nor `FINAL_BUILD` defined for
-/// this build config).
+/// Raven `Q3_VERSION` — build-banner version string, `"JAmp: v" +
+/// VERSION_STRING_DOTTED` (`FINAL_BUILD` branch: retail binaries define
+/// `FINAL_BUILD`, not `_DEBUG`).
 ///
-/// Source: `oracle/codemp/qcommon/game_version.h:11`,
+/// Source: `oracle/codemp/qcommon/game_version.h:9`,
 /// `oracle/codemp/win32/AutoVersion.h:10`
-pub const Q3_VERSION: &str = "(internal)JAmp: v1.0.1.0";
+pub const Q3_VERSION: &str = "JAmp: v1.0.1.0";

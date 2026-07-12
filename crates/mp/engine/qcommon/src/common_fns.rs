@@ -16,7 +16,7 @@ use mp_qshared::common::mp::qcommon::qtime::qtime_t;
 use mp_qshared::shared::cvar::cvar_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
-use mp_qshared::shared::{qboolean, qfalse, qtrue, FS_READ, MAX_QPATH};
+use mp_qshared::shared::{qboolean, qfalse, qtrue, CPUSTRING, FS_READ, MAX_QPATH, Q3_VERSION};
 
 use crate::collision_world::CollisionWorld;
 use crate::common::com_printf;
@@ -1522,8 +1522,8 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         view.common,
         &format!(
             "{} {} {}\n",
-            mp_qshared::shared::Q3_VERSION,
-            mp_qshared::shared::CPUSTRING,
+            Q3_VERSION,
+            CPUSTRING,
             option_env!("BUILD_DATE").unwrap_or("unknown"),
         ),
     );
@@ -1894,8 +1894,8 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
 
         let s = format!(
             "{} {} {}",
-            mp_qshared::shared::Q3_VERSION,
-            mp_qshared::shared::CPUSTRING,
+            Q3_VERSION,
+            CPUSTRING,
             option_env!("BUILD_DATE").unwrap_or("unknown"),
         );
         view.common.com_version = Cvar_Get(

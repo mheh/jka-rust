@@ -107,10 +107,16 @@ pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
 
         G_Printf(ctx, c"------- Game Initialization -------\n".as_ptr());
         G_Printf(ctx, c"gamename: basejka\n".as_ptr());
-        // Raven's `__DATE__` (compile-time C macro) has no faithful Rust
-        // reproduction; left empty (matches the oracle Rust port's own
-        // `gamedate` handling, `oracle/src/codemp/game/g_main.rs:4245`).
-        G_Printf(ctx, c"gamedate: \n".as_ptr());
+        // Raven's `__DATE__` (compile-time C macro): `build.rs` emits it as
+        // the `BUILD_DATE` env var (`__DATE__` format, computed at build time).
+        G_Printf(
+            ctx,
+            cstr(&format!(
+                "gamedate: {}\n",
+                option_env!("BUILD_DATE").unwrap_or("")
+            ))
+            .as_ptr(),
+        );
 
         // Raven `srand( randomSeed )` — resolves to `bg_lib.c`'s own
         // `srand`/`rand` pair (not the platform libc), which seed the

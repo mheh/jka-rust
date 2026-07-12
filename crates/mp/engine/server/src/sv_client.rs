@@ -16,7 +16,7 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, CStr};
 
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
@@ -260,8 +260,8 @@ pub fn SV_ClientEnterWorld(
         mp_engine_qcommon::common::common::com_printf(
             common,
             &format!(
-                "Going from CS_PRIMED to CS_ACTIVE for {:?}\n",
-                (*client).name
+                "Going from CS_PRIMED to CS_ACTIVE for {}\n",
+                CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
             ),
         );
         (*client).state = clientState_t::CS_ACTIVE;
@@ -301,9 +301,9 @@ pub fn SV_StopDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
             mp_engine_qcommon::common::common::com_printf(
                 common,
                 &format!(
-                    "clientDownload: {} : file \"{:?}\" aborted\n",
+                    "clientDownload: {} : file \"{}\" aborted\n",
                     client_num,
-                    (*cl).downloadName
+                    CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
                 ),
             );
         }
@@ -338,9 +338,9 @@ pub fn SV_NextDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
                 mp_engine_qcommon::common::common::com_printf(
                     common,
                     &format!(
-                        "clientDownload: {} : file \"{:?}\" completed\n",
+                        "clientDownload: {} : file \"{}\" completed\n",
                         client_num,
-                        (*cl).downloadName
+                        CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
                     ),
                 );
                 crate::SV_CloseDownload(common, cl);
@@ -1066,8 +1066,8 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
         mp_engine_qcommon::common::common::com_printf(
             view.common,
             &format!(
-                "Going from CS_FREE to CS_CONNECTED for {:?}\n",
-                (*cl_ptr).name
+                "Going from CS_FREE to CS_CONNECTED for {}\n",
+                CStr::from_ptr((*cl_ptr).name.as_ptr()).to_string_lossy()
             ),
         );
 
@@ -1120,8 +1120,8 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
             mp_engine_qcommon::common::common::com_printf(
                 view.common,
                 &format!(
-                    "[ISM]SV_SendClientGameState() [2] for {:?}, writing out old fragments\n",
-                    (*client).name
+                    "[ISM]SV_SendClientGameState() [2] for {}, writing out old fragments\n",
+                    CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
                 ),
             );
             mp_engine_qcommon::net_chan::Netchan_TransmitNextFragment(view, &mut (*client).netchan);
@@ -1129,13 +1129,16 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
 
         mp_engine_qcommon::common::common::com_printf(
             view.common,
-            &format!("SV_SendClientGameState() for {:?}\n", (*client).name),
+            &format!(
+                "SV_SendClientGameState() for {}\n",
+                CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
+            ),
         );
         mp_engine_qcommon::common::common::com_printf(
             view.common,
             &format!(
-                "Going from CS_CONNECTED to CS_PRIMED for {:?}\n",
-                (*client).name
+                "Going from CS_CONNECTED to CS_PRIMED for {}\n",
+                CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
             ),
         );
         (*client).state = clientState_t::CS_PRIMED;
@@ -1493,7 +1496,10 @@ pub fn SV_DoneDownload_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut cl
     unsafe {
         mp_engine_qcommon::common::common::com_printf(
             view.common,
-            &format!("clientDownload: {:?} Done\n", (*cl).name),
+            &format!(
+                "clientDownload: {} Done\n",
+                CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy()
+            ),
         );
     }
     // resend the game state to update any clients that entered during the download
@@ -1522,10 +1528,10 @@ pub fn SV_ClientCommand(
         mp_engine_qcommon::common::common::com_printf(
             view.common,
             &format!(
-                "clientCommand: {:?} : {} : {:?}\n",
-                (*cl).name,
+                "clientCommand: {} : {} : {}\n",
+                CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy(),
                 seq,
-                core::ffi::CStr::from_ptr(s)
+                CStr::from_ptr(s).to_string_lossy()
             ),
         );
 
@@ -1534,8 +1540,8 @@ pub fn SV_ClientCommand(
             mp_engine_qcommon::common::common::com_printf(
                 view.common,
                 &format!(
-                    "Client {:?} lost {} clientCommands\n",
-                    (*cl).name,
+                    "Client {} lost {} clientCommands\n",
+                    CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy(),
                     seq - (*cl).lastClientCommand + 1
                 ),
             );
@@ -1564,7 +1570,10 @@ pub fn SV_ClientCommand(
             client_ok = qfalse;
             mp_engine_qcommon::common::common::com_printf(
                 view.common,
-                &format!("client text ignored for {:?}\n", (*cl).name),
+                &format!(
+                    "client text ignored for {}\n",
+                    CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy()
+                ),
             );
         }
 
@@ -1750,7 +1759,10 @@ pub fn SV_ExecuteClientMessage(
             if (*cl).messageAcknowledge > (*cl).gamestateMessageNum {
                 mp_engine_qcommon::common::common::com_printf(
                     view.common,
-                    &format!("{:?} : dropped gamestate, resending\n", (*cl).name),
+                    &format!(
+                        "{} : dropped gamestate, resending\n",
+                        CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy()
+                    ),
                 );
                 SV_SendClientGameState(view, sv, cl);
             }

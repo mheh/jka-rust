@@ -414,11 +414,15 @@ pub const GAME_CVAR_TABLE: [CvarTableEntry; 140] = [
         track_change: false,
         team_shader: false,
     },
-    // C compile-date macro — Land phase decides the dual
+    // Raven's `__DATE__` compile-date macro: `build.rs` emits it as the
+    // `BUILD_DATE` env var (`__DATE__` format, computed at build time).
     CvarTableEntry {
         field: None,
         name: "gamedate",
-        default: "__DATE__",
+        default: match option_env!("BUILD_DATE") {
+            Some(d) => d,
+            None => "__DATE__",
+        },
         flags: "CVAR_ROM",
         track_change: false,
         team_shader: false,
