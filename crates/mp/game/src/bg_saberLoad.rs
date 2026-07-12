@@ -1,5 +1,5 @@
 // PORT-COMPLETE: bg_saberLoad.c 31/7 (pass-3 zero-park fill)
-//! Port of `oracle/oracle/codemp/game/bg_saberLoad.c`.
+//! Port of `oracle/codemp/game/bg_saberLoad.c`.
 //!
 //! This crate is `mp/game` (jampgame == Raven's `QAGAME`); the file's
 //! `#elif defined CGAME` branches are dead code here and are dropped per
@@ -21,14 +21,13 @@ use mp_qshared::common::mp::qcommon::saber::saber_colors::{
 };
 use mp_qshared::common::mp::qcommon::saber::saber_type::saberType_t;
 use mp_qshared::common::mp::qcommon::saber::saber_type::saberType_t::*;
-use mp_qshared::shared::{QFALSE, QTRUE};
 // `SaberMoveTable`/`SaberTable` id spellings (LS_*/SABER_*) + the force-power
 // name table shared with `bg_saga`.
 use crate::bg_saga::FPTable;
 use mp_bg::public::saber_move_name::*;
 
 /// Raven `SaberTable` — saber-type name/id lookup table.
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:46-61`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:46-61`
 pub static SaberTable: [stringID_table_t; 13] = [
     stringID_table_t {
         name: c"SABER_NONE".as_ptr() as *mut c_char,
@@ -85,7 +84,7 @@ pub static SaberTable: [stringID_table_t; 13] = [
 ];
 
 /// Raven `SaberMoveTable` — saber-move name/id lookup table.
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:63-127`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:63-127`
 pub static SaberMoveTable: [stringID_table_t; 60] = [
     stringID_table_t {
         name: c"LS_NONE".as_ptr() as *mut c_char,
@@ -389,7 +388,7 @@ pub fn saber_snd_tape_drain() -> Vec<String> {
 ///
 /// Raven: builds under both `QAGAME` and `CGAME`; only the `QAGAME` branch
 /// (`G_SoundIndex`) is live in this crate (jampgame).
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:32-39`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:32-39`
 pub fn BG_SoundIndex(sound: *mut c_char) -> c_int {
     SABER_SND_TAPE.with(|t| {
         if let Some(v) = t.borrow_mut().as_mut() {
@@ -406,30 +405,30 @@ pub fn BG_SoundIndex(sound: *mut c_char) -> c_int {
 /// Raven `BG_ParseLiteral`.
 ///
 /// Raven: "Also used in npc code".
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:129-147`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:129-147`
 pub fn BG_ParseLiteral(data: *mut *const c_char, string: *const c_char) -> qboolean {
     unsafe {
-        let token = crate::q_shared::COM_ParseExt(data, QTRUE);
+        let token = crate::q_shared::COM_ParseExt(data, qtrue);
         if *token == 0 {
             let msg = std::ffi::CString::new("unexpected EOF\n").unwrap();
             crate::g_main::Com_Printf(msg.as_ptr());
-            return QTRUE;
+            return qtrue;
         }
 
         if crate::q_shared::Q_stricmp(token as *const c_char, string) != 0 {
             let s = std::ffi::CStr::from_ptr(string).to_string_lossy();
             let msg = std::ffi::CString::new(format!("required string '{}' missing\n", s)).unwrap();
             crate::g_main::Com_Printf(msg.as_ptr());
-            return QTRUE;
+            return qtrue;
         }
 
-        QFALSE
+        qfalse
     }
 }
 
 /// Raven `TranslateSaberColor`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:149-180`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:149-180`
 pub fn TranslateSaberColor(name: *const c_char, bg: &mut BgState) -> saber_colors_t {
     unsafe {
         if qstricmp_eq(name, c"red") {
@@ -459,7 +458,7 @@ pub fn TranslateSaberColor(name: *const c_char, bg: &mut BgState) -> saber_color
 
 /// Raven `TranslateSaberStyle`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:182-213`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:182-213`
 pub fn TranslateSaberStyle(name: *const c_char) -> saber_styles_t {
     unsafe {
         if qstricmp_eq(name, c"fast") {
@@ -489,40 +488,40 @@ pub fn TranslateSaberStyle(name: *const c_char) -> saber_styles_t {
 
 /// Raven `WP_SaberBladeUseSecondBladeStyle`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:215-228`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:215-228`
 pub fn WP_SaberBladeUseSecondBladeStyle(saber: *mut saberInfo_t, bladeNum: c_int) -> qboolean {
     if !saber.is_null() {
         let saber = unsafe { &*saber };
         if saber.bladeStyle2Start > 0 && bladeNum >= saber.bladeStyle2Start {
-            return QTRUE;
+            return qtrue;
         }
     }
-    QFALSE
+    qfalse
 }
 
 /// Raven `WP_SaberBladeDoTransitionDamage`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:230-243`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:230-243`
 pub fn WP_SaberBladeDoTransitionDamage(saber: *mut saberInfo_t, bladeNum: c_int) -> qboolean {
     unsafe {
-        if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == QFALSE
+        if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == qfalse
             && ((*saber).saberFlags2 & SFL2_TRANSITION_DAMAGE) != 0
         {
             // use first blade style for this blade
-            return QTRUE;
-        } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) != QFALSE
+            return qtrue;
+        } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) != qfalse
             && ((*saber).saberFlags2 & SFL2_TRANSITION_DAMAGE2) != 0
         {
             // use second blade style for this blade
-            return QTRUE;
+            return qtrue;
         }
-        QFALSE
+        qfalse
     }
 }
 
 /// Raven `WP_UseFirstValidSaberStyle`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:245-351`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:245-351`
 pub fn WP_UseFirstValidSaberStyle(
     saber1: *mut saberInfo_t,
     saber2: *mut saberInfo_t,
@@ -530,10 +529,10 @@ pub fn WP_UseFirstValidSaberStyle(
     saberAnimLevel: *mut c_int,
 ) -> qboolean {
     unsafe {
-        let mut styleInvalid = QFALSE;
+        let mut styleInvalid = qfalse;
         let saber1Active: qboolean;
         let saber2Active: qboolean;
-        let mut dualSabers = QFALSE;
+        let mut dualSabers = qfalse;
         let mut validStyles: c_int = 0;
 
         let s1 = if saber1.is_null() {
@@ -549,32 +548,32 @@ pub fn WP_UseFirstValidSaberStyle(
 
         if let Some(sb2) = s2 {
             if sb2.model[0] != 0 {
-                dualSabers = QTRUE;
+                dualSabers = qtrue;
             }
         }
 
-        if dualSabers != QFALSE {
+        if dualSabers != qfalse {
             // dual
             if saberHolstered > 1 {
-                saber1Active = QFALSE;
-                saber2Active = QFALSE;
+                saber1Active = qfalse;
+                saber2Active = qfalse;
             } else if saberHolstered > 0 {
-                saber1Active = QTRUE;
-                saber2Active = QFALSE;
+                saber1Active = qtrue;
+                saber2Active = qfalse;
             } else {
-                saber1Active = QTRUE;
-                saber2Active = QTRUE;
+                saber1Active = qtrue;
+                saber2Active = qtrue;
             }
         } else {
-            saber2Active = QFALSE;
+            saber2Active = qfalse;
             if s1.is_none() || s1.unwrap().model[0] == 0 {
-                saber1Active = QFALSE;
+                saber1Active = qfalse;
             } else if s1.unwrap().numBlades > 1 {
                 // staff
-                saber1Active = if saberHolstered > 1 { QFALSE } else { QTRUE };
+                saber1Active = if saberHolstered > 1 { qfalse } else { qtrue };
             } else {
                 // single
-                saber1Active = if saberHolstered != 0 { QFALSE } else { QTRUE };
+                saber1Active = if saberHolstered != 0 { qfalse } else { qtrue };
             }
         }
 
@@ -585,7 +584,7 @@ pub fn WP_UseFirstValidSaberStyle(
             styleNum += 1;
         }
 
-        if saber1Active != QFALSE
+        if saber1Active != qfalse
             && s1.is_some()
             && s1.unwrap().model[0] != 0
             && s1.unwrap().stylesForbidden != 0
@@ -593,41 +592,41 @@ pub fn WP_UseFirstValidSaberStyle(
             let sf = s1.unwrap().stylesForbidden;
             if (sf & (1 << *saberAnimLevel)) != 0 {
                 // not a valid style for first saber!
-                styleInvalid = QTRUE;
+                styleInvalid = qtrue;
                 validStyles &= !sf;
             }
         }
-        if dualSabers != QFALSE {
+        if dualSabers != qfalse {
             // check second saber, too
-            if saber2Active != QFALSE && s2.unwrap().stylesForbidden != 0 {
+            if saber2Active != qfalse && s2.unwrap().stylesForbidden != 0 {
                 let sf2 = s2.unwrap().stylesForbidden;
                 if (sf2 & (1 << *saberAnimLevel)) != 0 {
                     // not a valid style for second saber!
-                    styleInvalid = QTRUE;
+                    styleInvalid = qtrue;
                     // only the ones both sabers allow is valid
                     validStyles &= !sf2;
                 }
             }
         }
-        if styleInvalid != QFALSE && validStyles != 0 {
+        if styleInvalid != qfalse && validStyles != 0 {
             // using an invalid style and have at least one valid style to
             // use, so switch to it
             let mut styleNum = saber_styles_t::SS_FAST as c_int;
             while styleNum < saber_styles_t::SS_NUM_SABER_STYLES as c_int {
                 if (validStyles & (1 << styleNum)) != 0 {
                     *saberAnimLevel = styleNum;
-                    return QTRUE;
+                    return qtrue;
                 }
                 styleNum += 1;
             }
         }
-        QFALSE
+        qfalse
     }
 }
 
 /// Raven `WP_SaberStyleValidForSaber`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:353-464`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:353-464`
 pub fn WP_SaberStyleValidForSaber(
     saber1: *mut saberInfo_t,
     saber2: *mut saberInfo_t,
@@ -637,7 +636,7 @@ pub fn WP_SaberStyleValidForSaber(
     unsafe {
         let saber1Active: qboolean;
         let saber2Active: qboolean;
-        let mut dualSabers = QFALSE;
+        let mut dualSabers = qfalse;
 
         let s1 = if saber1.is_null() {
             None
@@ -652,47 +651,47 @@ pub fn WP_SaberStyleValidForSaber(
 
         if let Some(sb2) = s2 {
             if sb2.model[0] != 0 {
-                dualSabers = QTRUE;
+                dualSabers = qtrue;
             }
         }
 
-        if dualSabers != QFALSE {
+        if dualSabers != qfalse {
             // dual
             if saberHolstered > 1 {
-                saber1Active = QFALSE;
-                saber2Active = QFALSE;
+                saber1Active = qfalse;
+                saber2Active = qfalse;
             } else if saberHolstered > 0 {
-                saber1Active = QTRUE;
-                saber2Active = QFALSE;
+                saber1Active = qtrue;
+                saber2Active = qfalse;
             } else {
-                saber1Active = QTRUE;
-                saber2Active = QTRUE;
+                saber1Active = qtrue;
+                saber2Active = qtrue;
             }
         } else {
-            saber2Active = QFALSE;
+            saber2Active = qfalse;
             if s1.is_none() || s1.unwrap().model[0] == 0 {
-                saber1Active = QFALSE;
+                saber1Active = qfalse;
             } else if s1.unwrap().numBlades > 1 {
                 // staff
-                saber1Active = if saberHolstered > 1 { QFALSE } else { QTRUE };
+                saber1Active = if saberHolstered > 1 { qfalse } else { qtrue };
             } else {
                 // single
-                saber1Active = if saberHolstered != 0 { QFALSE } else { QTRUE };
+                saber1Active = if saberHolstered != 0 { qfalse } else { qtrue };
             }
         }
 
-        if saber1Active != QFALSE
+        if saber1Active != qfalse
             && s1.is_some()
             && s1.unwrap().model[0] != 0
             && s1.unwrap().stylesForbidden != 0
         {
             if (s1.unwrap().stylesForbidden & (1 << saberAnimLevel)) != 0 {
                 // not a valid style for first saber!
-                return QFALSE;
+                return qfalse;
             }
         }
-        if dualSabers != QFALSE
-            && saber2Active != QFALSE
+        if dualSabers != qfalse
+            && saber2Active != qfalse
             && s2.is_some()
             && s2.unwrap().model[0] != 0
         {
@@ -701,7 +700,7 @@ pub fn WP_SaberStyleValidForSaber(
                 // check second saber, too
                 if (sb2.stylesForbidden & (1 << saberAnimLevel)) != 0 {
                     // not a valid style for second saber!
-                    return QFALSE;
+                    return qfalse;
                 }
             }
             // now: if using dual sabers, only dual and tavion (if given
@@ -710,10 +709,10 @@ pub fn WP_SaberStyleValidForSaber(
                 // dual is okay
                 if saberAnimLevel != saber_styles_t::SS_TAVION as c_int {
                     // tavion might be okay, all others are not
-                    return QFALSE;
+                    return qfalse;
                 } else {
                     // see if "tavion" style is okay
-                    let first_gave_it = saber1Active != QFALSE
+                    let first_gave_it = saber1Active != qfalse
                         && s1.is_some()
                         && s1.unwrap().model[0] != 0
                         && (s1.unwrap().stylesLearned
@@ -728,12 +727,12 @@ pub fn WP_SaberStyleValidForSaber(
                     } else {
                         // tavion style is not allowed because neither of the
                         // sabers we're using gave it to us
-                        return QFALSE;
+                        return qfalse;
                     }
                 }
             }
         }
-        QTRUE
+        qtrue
     }
 }
 
@@ -742,7 +741,7 @@ pub fn WP_SaberStyleValidForSaber(
 // referenced by name per zero-park policy, reported as missing symbols.
 /// Raven `WP_SaberCanTurnOffSomeBlades`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:466-486`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:466-486`
 pub fn WP_SaberCanTurnOffSomeBlades(saber: *mut saberInfo_t) -> qboolean {
     unsafe {
         if (*saber).bladeStyle2Start > 0 && (*saber).numBlades > (*saber).bladeStyle2Start {
@@ -750,20 +749,20 @@ pub fn WP_SaberCanTurnOffSomeBlades(saber: *mut saberInfo_t) -> qboolean {
                 && ((*saber).saberFlags2 & SFL2_NO_MANUAL_DEACTIVATE2) != 0
             {
                 // all blades are always on
-                return QFALSE;
+                return qfalse;
             }
         } else if ((*saber).saberFlags2 & SFL2_NO_MANUAL_DEACTIVATE) != 0 {
             // all blades are always on
-            return QFALSE;
+            return qfalse;
         }
         // you can turn some off
-        QTRUE
+        qtrue
     }
 }
 
 /// Raven `WP_SaberSetDefaults`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:488-613`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:488-613`
 pub fn WP_SaberSetDefaults(saber: *mut saberInfo_t) {
     unsafe {
         let s = &mut *saber;
@@ -899,7 +898,7 @@ const DEFAULT_SABER: &std::ffi::CStr = c"Kyle";
 
 /// Raven `WP_SaberParseParms`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:617-2572`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:617-2572`
 // PORT-NOTE(missing-symbols): `SFL_*`/`SFL2_*` bitflag consts beyond
 // `SFL_TWO_HANDED` and the `SaberTable`/`SaberMoveTable`/`FPTable`/
 // `animTable` lookup statics are not yet ported; referenced by name per
@@ -914,12 +913,12 @@ pub fn WP_SaberParseParms(
 ) -> qboolean {
     unsafe {
         let mut useSaber: [c_char; 1024] = [0; 1024];
-        let mut triedDefault = QFALSE;
+        let mut triedDefault = qfalse;
         let mut saberMove: c_int = LS_INVALID;
         let mut anim: c_int = -1;
 
         if saber.is_null() {
-            return QFALSE;
+            return qfalse;
         }
 
         // Set defaults so that, if it fails, there's at least something there
@@ -927,7 +926,7 @@ pub fn WP_SaberParseParms(
 
         if SaberName.is_null() || *SaberName == 0 {
             c_strcpy(useSaber.as_mut_ptr(), DEFAULT_SABER.as_ptr());
-            triedDefault = QTRUE;
+            triedDefault = qtrue;
         } else {
             c_strcpy(useSaber.as_mut_ptr(), SaberName);
         }
@@ -945,16 +944,16 @@ pub fn WP_SaberParseParms(
             if p.is_null() {
                 break;
             }
-            let token = crate::q_shared::COM_ParseExt(&mut p, QTRUE);
+            let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
             if *token == 0 {
-                if triedDefault == QFALSE {
+                if triedDefault == qfalse {
                     // fall back to default and restart, should always be there
                     p = bg.SaberParms.as_ptr() as *const c_char;
                     crate::q_shared::COM_BeginParseSession(c"saberinfo".as_ptr());
                     c_strcpy(useSaber.as_mut_ptr(), DEFAULT_SABER.as_ptr());
-                    triedDefault = QTRUE;
+                    triedDefault = qtrue;
                 } else {
-                    return QFALSE;
+                    return qfalse;
                 }
             }
 
@@ -966,26 +965,26 @@ pub fn WP_SaberParseParms(
         }
         if p.is_null() {
             // even the default saber isn't found?
-            return QFALSE;
+            return qfalse;
         }
 
         // got the name we're using for sure
         c_strcpy((*saber).name.as_mut_ptr(), useSaber.as_ptr());
 
-        if BG_ParseLiteral(&mut p, c"{".as_ptr()) != QFALSE {
-            return QFALSE;
+        if BG_ParseLiteral(&mut p, c"{".as_ptr()) != qfalse {
+            return qfalse;
         }
 
         // parse the saber info block
         loop {
-            let token = crate::q_shared::COM_ParseExt(&mut p, QTRUE);
+            let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
             if *token == 0 {
                 let s = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
                     cstr_to_str(useSaber.as_ptr())
                 );
                 crate::g_main::Com_Printf(cstr(&s).as_ptr());
-                return QFALSE;
+                return qfalse;
             }
 
             let tok = token as *const c_char;
@@ -997,7 +996,7 @@ pub fn WP_SaberParseParms(
             macro_rules! parse_string_field {
                 () => {{
                     let mut value: *const c_char = std::ptr::null();
-                    if crate::q_shared::COM_ParseString(&mut p, &mut value) != QFALSE {
+                    if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
                         continue;
                     }
                     value
@@ -1005,7 +1004,7 @@ pub fn WP_SaberParseParms(
             }
             macro_rules! parse_int_field {
                 ($n:expr) => {{
-                    if crate::q_shared::COM_ParseInt(&mut p, &mut $n) != QFALSE {
+                    if crate::q_shared::COM_ParseInt(&mut p, &mut $n) != qfalse {
                         crate::q_shared::SkipRestOfLine(&mut p);
                         continue;
                     }
@@ -1013,7 +1012,7 @@ pub fn WP_SaberParseParms(
             }
             macro_rules! parse_float_field {
                 ($f:expr) => {{
-                    if crate::q_shared::COM_ParseFloat(&mut p, &mut $f) != QFALSE {
+                    if crate::q_shared::COM_ParseFloat(&mut p, &mut $f) != qfalse {
                         crate::q_shared::SkipRestOfLine(&mut p);
                         continue;
                     }
@@ -1827,7 +1826,7 @@ pub fn WP_SaberParseParms(
             // `trap_R_RegisterShader` call is CGAME-only dead code here (§20).
             if qstricmp_eq(tok, c"g2MarksShader") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut p, &mut value) != QFALSE {
+                if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
                     crate::q_shared::SkipRestOfLine(&mut p);
                     continue;
                 }
@@ -1836,7 +1835,7 @@ pub fn WP_SaberParseParms(
             }
             if qstricmp_eq(tok, c"g2WeaponMarkShader") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut p, &mut value) != QFALSE {
+                if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
                     crate::q_shared::SkipRestOfLine(&mut p);
                     continue;
                 }
@@ -2018,7 +2017,7 @@ pub fn WP_SaberParseParms(
             }
             if qstricmp_eq(tok, c"g2MarksShader2") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut p, &mut value) != QFALSE {
+                if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
                     crate::q_shared::SkipRestOfLine(&mut p);
                     continue;
                 }
@@ -2027,7 +2026,7 @@ pub fn WP_SaberParseParms(
             }
             if qstricmp_eq(tok, c"g2WeaponMarkShader2") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut p, &mut value) != QFALSE {
+                if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
                     crate::q_shared::SkipRestOfLine(&mut p);
                     continue;
                 }
@@ -2191,13 +2190,13 @@ pub fn WP_SaberParseParms(
 
         // FIXME: precache the saberModel(s)?
 
-        QTRUE
+        qtrue
     }
 }
 
 /// Raven `WP_SaberParseParm`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2574-2645`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2574-2645`
 // SHAPE-MISMATCH: this fn gained `bg: &mut BgState` (rulings 12/15) but its
 // existing caller `WP_SaberValidForPlayerInMP` (out of this packet's scope,
 // already ported above) still calls it with the old 3-arg shape — reported
@@ -2210,7 +2209,7 @@ pub fn WP_SaberParseParm(
 ) -> qboolean {
     unsafe {
         if saberName.is_null() || *saberName == 0 {
-            return QFALSE;
+            return qfalse;
         }
 
         if bg.SaberParms.is_empty() {
@@ -2224,11 +2223,11 @@ pub fn WP_SaberParseParm(
         // look for the right saber
         loop {
             if p.is_null() {
-                return QFALSE;
+                return qfalse;
             }
-            let token = crate::q_shared::COM_ParseExt(&mut p, QTRUE);
+            let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
             if *token == 0 {
-                return QFALSE;
+                return qfalse;
             }
 
             if crate::q_shared::Q_stricmp(token as *const c_char, saberName) == 0 {
@@ -2238,23 +2237,23 @@ pub fn WP_SaberParseParm(
             crate::q_shared::SkipBracedSection(&mut p);
         }
         if p.is_null() {
-            return QFALSE;
+            return qfalse;
         }
 
-        if BG_ParseLiteral(&mut p, c"{".as_ptr()) != QFALSE {
-            return QFALSE;
+        if BG_ParseLiteral(&mut p, c"{".as_ptr()) != qfalse {
+            return qfalse;
         }
 
         // parse the saber info block
         loop {
-            let token = crate::q_shared::COM_ParseExt(&mut p, QTRUE);
+            let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
             if *token == 0 {
                 let s = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
                     cstr_to_str(saberName)
                 );
                 crate::g_main::Com_Printf(cstr(&s).as_ptr());
-                return QFALSE;
+                return qfalse;
             }
 
             if qstricmp_eq(token as *const c_char, c"}") {
@@ -2263,46 +2262,46 @@ pub fn WP_SaberParseParm(
 
             if crate::q_shared::Q_stricmp(token as *const c_char, parmname) == 0 {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut p, &mut value) != QFALSE {
+                if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
                     continue;
                 }
                 c_strcpy(saberData, value);
-                return QTRUE;
+                return qtrue;
             }
 
             crate::q_shared::SkipRestOfLine(&mut p);
         }
 
-        QFALSE
+        qfalse
     }
 }
 
 /// Raven `WP_SaberValidForPlayerInMP`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2647-2662`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2647-2662`
 pub fn WP_SaberValidForPlayerInMP(saberName: *const c_char, bg: &mut BgState) -> qboolean {
     unsafe {
         let mut allowed: [c_char; 8] = [0; 8];
-        if WP_SaberParseParm(saberName, c"notInMP".as_ptr(), allowed.as_mut_ptr(), bg) == QFALSE {
+        if WP_SaberParseParm(saberName, c"notInMP".as_ptr(), allowed.as_mut_ptr(), bg) == qfalse {
             // not defined, default is yes
-            return QTRUE;
+            return qtrue;
         }
         if allowed[0] == 0 {
             // not defined, default is yes
-            return QTRUE;
+            return qtrue;
         }
         // return value
         if atoi(allowed.as_ptr()) == 0 {
-            QTRUE
+            qtrue
         } else {
-            QFALSE
+            qfalse
         }
     }
 }
 
 /// Raven `WP_RemoveSaber`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2664-2688`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2664-2688`
 pub fn WP_RemoveSaber(sabers: *mut saberInfo_t, saberNum: c_int) {
     if sabers.is_null() {
         return;
@@ -2322,7 +2321,7 @@ pub fn WP_RemoveSaber(sabers: *mut saberInfo_t, saberNum: c_int) {
 
 /// Raven `WP_SetSaber`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2690-2725`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2690-2725`
 pub fn WP_SetSaber(
     entNum: c_int,
     sabers: *mut saberInfo_t,
@@ -2343,7 +2342,7 @@ pub fn WP_SetSaber(
             return;
         }
 
-        if entNum < MAX_CLIENTS_I32 && WP_SaberValidForPlayerInMP(saberName, bg) == QFALSE {
+        if entNum < MAX_CLIENTS_I32 && WP_SaberValidForPlayerInMP(saberName, bg) == qfalse {
             WP_SaberParseParms(
                 c"Kyle".as_ptr(),
                 sabers.offset(saberNum as isize),
@@ -2369,7 +2368,7 @@ pub fn WP_SetSaber(
 
 /// Raven `WP_SaberSetColor`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2727-2734`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2727-2734`
 // PORT-NOTE(rng-cascade): gained `bg: &mut BgState` so its `TranslateSaberColor`
 // call reaches the shared `Rng` (the `"random"` color branch). This fn has no
 // callers in-tree, so no call site propagates the added param.
@@ -2392,7 +2391,7 @@ pub fn WP_SaberSetColor(
 
 /// Raven `WP_SaberLoadParms`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2738-2790`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2738-2790`
 // PORT-NOTE(vec-as-fixed-buffer): Raven's `SaberParms`/`bgSaberParseTBuffer`
 // are fixed `char[MAX_SABER_DATA_SIZE]` statics; `BgState` owns them as
 // growable `Vec<u8>`. Pre-sized here to `MAX_SABER_DATA_SIZE`
@@ -2493,10 +2492,10 @@ pub fn WP_SaberLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
 /// Raven `BG_BLADE_ActivateTrail`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2803-2807`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2803-2807`
 pub fn BG_BLADE_ActivateTrail(blade: *mut bladeInfo_t, duration: f32) {
     unsafe {
-        (*blade).trail.inAction = QTRUE;
+        (*blade).trail.inAction = qtrue;
         // Raven's `saberTrail_t::duration` is `int`; the float `duration`
         // parameter truncates on assignment, matching C's implicit
         // narrowing conversion.
@@ -2506,32 +2505,32 @@ pub fn BG_BLADE_ActivateTrail(blade: *mut bladeInfo_t, duration: f32) {
 
 /// Raven `BG_BLADE_DeactivateTrail`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2809-2813`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2809-2813`
 pub fn BG_BLADE_DeactivateTrail(blade: *mut bladeInfo_t, duration: f32) {
     unsafe {
-        (*blade).trail.inAction = QFALSE;
+        (*blade).trail.inAction = qfalse;
         (*blade).trail.duration = duration as c_int;
     }
 }
 
 /// Raven `BG_SI_Activate`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2815-2823`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2815-2823`
 pub fn BG_SI_Activate(saber: *mut saberInfo_t) {
     unsafe {
         for i in 0..(*saber).numBlades {
-            (*saber).blade[i as usize].active = QTRUE;
+            (*saber).blade[i as usize].active = qtrue;
         }
     }
 }
 
 /// Raven `BG_SI_Deactivate`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2825-2833`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2825-2833`
 pub fn BG_SI_Deactivate(saber: *mut saberInfo_t) {
     unsafe {
         for i in 0..(*saber).numBlades {
-            (*saber).blade[i as usize].active = QFALSE;
+            (*saber).blade[i as usize].active = qfalse;
         }
     }
 }
@@ -2540,7 +2539,7 @@ pub fn BG_SI_Deactivate(saber: *mut saberInfo_t) {
 ///
 /// Raven: Activate a specific Blade of this Saber.
 /// Created: 10/03/02 by Aurelio Reis, Modified: 10/03/02 by Aurelio Reis.
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2840-2847`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2840-2847`
 pub fn BG_SI_BladeActivate(saber: *mut saberInfo_t, iBlade: c_int, bActive: qboolean) {
     unsafe {
         // Validate blade ID/Index.
@@ -2553,21 +2552,21 @@ pub fn BG_SI_BladeActivate(saber: *mut saberInfo_t, iBlade: c_int, bActive: qboo
 
 /// Raven `BG_SI_Active`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2849-2861`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2849-2861`
 pub fn BG_SI_Active(saber: *mut saberInfo_t) -> qboolean {
     unsafe {
         for i in 0..(*saber).numBlades {
-            if (*saber).blade[i as usize].active != QFALSE {
-                return QTRUE;
+            if (*saber).blade[i as usize].active != qfalse {
+                return qtrue;
             }
         }
     }
-    QFALSE
+    qfalse
 }
 
 /// Raven `BG_SI_SetLength`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2863-2871`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2863-2871`
 pub fn BG_SI_SetLength(saber: *mut saberInfo_t, length: f32) {
     unsafe {
         for i in 0..(*saber).numBlades {
@@ -2579,7 +2578,7 @@ pub fn BG_SI_SetLength(saber: *mut saberInfo_t, length: f32) {
 /// Raven `BG_SI_SetDesiredLength`.
 ///
 /// Raven: "not in sp, added it for my own convenience".
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2874-2887`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2874-2887`
 pub fn BG_SI_SetDesiredLength(saber: *mut saberInfo_t, len: f32, bladeNum: c_int) {
     unsafe {
         let mut startBlade = 0;
@@ -2599,7 +2598,7 @@ pub fn BG_SI_SetDesiredLength(saber: *mut saberInfo_t, len: f32, bladeNum: c_int
 /// Raven `BG_SI_SetLengthGradual`.
 ///
 /// Raven: "also not in sp, added it for my own convenience".
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2890-2957`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2890-2957`
 pub fn BG_SI_SetLengthGradual(saber: *mut saberInfo_t, time: c_int) {
     unsafe {
         for i in 0..(*saber).numBlades {
@@ -2658,7 +2657,7 @@ pub fn BG_SI_SetLengthGradual(saber: *mut saberInfo_t, time: c_int) {
 /// Raven `BG_SI_Length`.
 ///
 /// Raven: return largest length.
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2959-2972`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2959-2972`
 pub fn BG_SI_Length(saber: *mut saberInfo_t) -> f32 {
     unsafe {
         // Raven's `len1` is `int`; the float blade length truncates on
@@ -2676,7 +2675,7 @@ pub fn BG_SI_Length(saber: *mut saberInfo_t) -> f32 {
 
 /// Raven `BG_SI_LengthMax`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2974-2987`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2974-2987`
 pub fn BG_SI_LengthMax(saber: *mut saberInfo_t) -> f32 {
     unsafe {
         let mut len1: c_int = 0;
@@ -2692,7 +2691,7 @@ pub fn BG_SI_LengthMax(saber: *mut saberInfo_t) -> f32 {
 
 /// Raven `BG_SI_ActivateTrail`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2989-2998`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:2989-2998`
 pub fn BG_SI_ActivateTrail(saber: *mut saberInfo_t, duration: f32) {
     unsafe {
         for i in 0..(*saber).numBlades {
@@ -2706,7 +2705,7 @@ pub fn BG_SI_ActivateTrail(saber: *mut saberInfo_t, duration: f32) {
 
 /// Raven `BG_SI_DeactivateTrail`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:3000-3009`
+/// Source: `oracle/codemp/game/bg_saberLoad.c:3000-3009`
 pub fn BG_SI_DeactivateTrail(saber: *mut saberInfo_t, duration: f32) {
     unsafe {
         for i in 0..(*saber).numBlades {

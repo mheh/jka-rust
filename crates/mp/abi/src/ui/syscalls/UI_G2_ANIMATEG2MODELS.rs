@@ -44,7 +44,7 @@ impl UiG2Animateg2ModelsArgs {
 ///
 /// Raven: rww - RAGDOLL_END
 /// Raven: additional ragdoll options -rww
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:545`
+/// Source: `oracle/codemp/ui/ui_public.h:545`
 pub struct UiG2Animateg2Models;
 
 impl OutboundSysCall for UiG2Animateg2Models {

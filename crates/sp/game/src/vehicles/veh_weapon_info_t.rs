@@ -9,57 +9,57 @@ use sp_qshared::shared::qboolean;
 /// struct (including all elements of arrays) must be reflected by
 /// NUM_VWEAP_PARMS!!! *** IMPORTANT!!! *** vWeapFields table correponds to
 /// this structure!
-/// Type definition source: `oracle/oracle/code/game/G_Vehicles.h:33-62`
+/// Type definition source: `oracle/code/game/G_Vehicles.h:33-62`
 #[repr(C)]
 pub struct vehWeaponInfo_t {
-	pub name: *mut c_char,
-	/// traceline or entity?
-	pub bIsProjectile: qboolean,
-	/// if a projectile, drops
-	pub bHasGravity: qboolean,
-	/// disables ship shields and sends them out of control
-	pub bIonWeapon: qboolean,
-	/// lightsabers can deflect this projectile
-	pub bSaberBlockable: qboolean,
-	/// index of Muzzle Effect
-	pub iMuzzleFX: i32,
-	/// handle to the model used by this projectile
-	pub iModel: i32,
-	/// index of Shot Effect
-	pub iShotFX: i32,
-	/// index of Impact Effect
-	pub iImpactFX: i32,
-	/// index of shader to use for G2 marks made on other models when hit by this projectile
-	pub iG2MarkShaderHandle: i32,
-	/// size (diameter) of the ghoul2 mark
-	pub fG2MarkSize: f32,
-	/// index of loopSound
-	pub iLoopSound: i32,
-	/// speed of projectile/range of traceline
-	pub fSpeed: f32,
-	/// 0.0 = not homing, 0.5 = half vel to targ, half cur vel, 1.0 = all vel to targ
-	pub fHoming: f32,
-	pub fHomingFOV: f32,
-	/// 0 = no lock time needed, else # of ms needed to lock on
-	pub iLockOnTime: i32,
-	/// damage done when traceline or projectile directly hits target
-	pub iDamage: i32,
-	/// damage done to ents in splashRadius of end of traceline or projectile origin on impact
-	pub iSplashDamage: i32,
-	/// radius that ent must be in to take splashDamage (linear fall-off)
-	pub fSplashRadius: f32,
-	/// how much "ammo" each shot takes
-	pub iAmmoPerShot: i32,
-	/// if non-zero, projectile can be shot, takes this much damage before being destroyed
-	pub iHealth: i32,
-	/// width of traceline or bounding box of projecile (non-rotating!)
-	pub fWidth: f32,
-	/// height of traceline or bounding box of projecile (non-rotating!)
-	pub fHeight: f32,
-	/// removes itself after this amount of time
-	pub iLifeTime: i32,
-	/// when iLifeTime is up, explodes rather than simply removing itself
-	pub bExplodeOnExpire: qboolean,
+    pub name: *mut c_char,
+    /// traceline or entity?
+    pub bIsProjectile: qboolean,
+    /// if a projectile, drops
+    pub bHasGravity: qboolean,
+    /// disables ship shields and sends them out of control
+    pub bIonWeapon: qboolean,
+    /// lightsabers can deflect this projectile
+    pub bSaberBlockable: qboolean,
+    /// index of Muzzle Effect
+    pub iMuzzleFX: i32,
+    /// handle to the model used by this projectile
+    pub iModel: i32,
+    /// index of Shot Effect
+    pub iShotFX: i32,
+    /// index of Impact Effect
+    pub iImpactFX: i32,
+    /// index of shader to use for G2 marks made on other models when hit by this projectile
+    pub iG2MarkShaderHandle: i32,
+    /// size (diameter) of the ghoul2 mark
+    pub fG2MarkSize: f32,
+    /// index of loopSound
+    pub iLoopSound: i32,
+    /// speed of projectile/range of traceline
+    pub fSpeed: f32,
+    /// 0.0 = not homing, 0.5 = half vel to targ, half cur vel, 1.0 = all vel to targ
+    pub fHoming: f32,
+    pub fHomingFOV: f32,
+    /// 0 = no lock time needed, else # of ms needed to lock on
+    pub iLockOnTime: i32,
+    /// damage done when traceline or projectile directly hits target
+    pub iDamage: i32,
+    /// damage done to ents in splashRadius of end of traceline or projectile origin on impact
+    pub iSplashDamage: i32,
+    /// radius that ent must be in to take splashDamage (linear fall-off)
+    pub fSplashRadius: f32,
+    /// how much "ammo" each shot takes
+    pub iAmmoPerShot: i32,
+    /// if non-zero, projectile can be shot, takes this much damage before being destroyed
+    pub iHealth: i32,
+    /// width of traceline or bounding box of projecile (non-rotating!)
+    pub fWidth: f32,
+    /// height of traceline or bounding box of projecile (non-rotating!)
+    pub fHeight: f32,
+    /// removes itself after this amount of time
+    pub iLifeTime: i32,
+    /// when iLifeTime is up, explodes rather than simply removing itself
+    pub bExplodeOnExpire: qboolean,
 }
 
 #[cfg(target_pointer_width = "64")]

@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_ARGS, buffer, bufferLength );`
 /// Raven transport: `Cmd_ArgsBuffer( (char *) VMA(1), args[2] );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:78-80`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:459-461`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:78-80`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:459-461`
 #[derive(Debug)]
 pub struct CgArgsArgs {
     buffer: *mut c_char,
@@ -31,10 +31,10 @@ impl CgArgsArgs {
 
 /// `CG_ARGS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:69`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:78-80`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:459-461`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:459-461`
+/// Enum value source: `oracle/code/cgame/cg_public.h:69`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:78-80`
+/// Output source: `oracle/code/client/cl_cgame.cpp:459-461`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:459-461`
 pub struct CgArgs;
 
 impl OutboundSysCall for CgArgs {

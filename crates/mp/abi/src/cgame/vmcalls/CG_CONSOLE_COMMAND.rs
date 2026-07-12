@@ -10,10 +10,10 @@ use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, Vm
 /// Raven: main game system.
 /// Raven: use Cmd_Argc() / Cmd_Argv() to read the command, return qfalse if the
 /// Raven: command is not known to the game
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:366-371`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:199-200`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:199-200`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_cgame.cpp:1815-1820`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:366-371`
+/// Args source: `oracle/codemp/cgame/cg_main.c:199-200`
+/// Output source: `oracle/codemp/cgame/cg_main.c:199-200`
+/// Transport/call-site source: `oracle/codemp/client/cl_cgame.cpp:1815-1820`
 pub struct CgConsoleCommand;
 
 impl InboundVmCall for CgConsoleCommand {

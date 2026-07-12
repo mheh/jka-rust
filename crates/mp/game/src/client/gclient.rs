@@ -1,6 +1,6 @@
 //! MP `gclient_s` / `gclient_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/g_local.h:536-748`
+//! Type definition source: `oracle/codemp/game/g_local.h:536-748`
 
 #![allow(non_camel_case_types)]
 
@@ -21,7 +21,7 @@ use super::render_info::renderInfo_t;
 ///
 /// `ps` MUST be first (the server expects it); the rest is private to game.
 /// Pointer-bearing => arch-dependent; asserts pin the host-64-bit layout.
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:536-748`
+/// Type definition source: `oracle/codemp/game/g_local.h:536-748`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct gclient_s {
@@ -228,7 +228,7 @@ pub struct gclient_s {
 
 /// Raven `gclient_t` — `typedef struct gclient_s gclient_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:17`
+/// Type definition source: `oracle/codemp/game/g_local.h:17`
 pub type gclient_t = gclient_s;
 
 #[cfg(target_pointer_width = "64")]
@@ -252,5 +252,5 @@ const _: () = assert!(core::mem::offset_of!(gclient_t, saber) == 1992);
 // The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
 // all-zero bytes are a valid gclient_t — the same property the layout asserts above
 // pin and Raven's memset/static zero-init relies on.
-// Source: oracle/oracle/codemp/game/g_local.h (all-zero-valid #[repr(C)]; Raven memsets g_clients, g_main.c:983)
+// Source: oracle/codemp/game/g_local.h (all-zero-valid #[repr(C)]; Raven memsets g_clients, g_main.c:983)
 unsafe impl native_platform::ZeroValid for gclient_t {}

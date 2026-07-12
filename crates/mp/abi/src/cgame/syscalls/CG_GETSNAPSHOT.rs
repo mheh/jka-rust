@@ -11,8 +11,8 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `qboolean trap_GetSnapshot(int snapshotNumber, snapshot_t *snapshot)`.
 /// Raven transport: `return CL_GetSnapshot(args[1], (snapshot_t *)VMA(2));`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:473-474`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:963-964`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:473-474`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:963-964`
 #[derive(Debug)]
 pub struct CgGetsnapshotArgs {
     /// Snapshot sequence number, read by Raven as `args[1]`.
@@ -48,10 +48,10 @@ impl CgGetsnapshotArgs {
 /// Raven wrapper: `return syscall(CG_GETSNAPSHOT, snapshotNumber, snapshot);`
 /// Raven transport: `return CL_GetSnapshot(args[1], (snapshot_t *)VMA(2));`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:182`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:473-474`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:473-474`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:963-964`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:182`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:473-474`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:473-474`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:963-964`
 pub struct CgGetsnapshot;
 
 impl OutboundSysCall for CgGetsnapshot {

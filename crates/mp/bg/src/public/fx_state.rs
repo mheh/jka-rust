@@ -2,7 +2,7 @@
 //!
 //! Plain `#define`s (not an enum), so §C8 makes them `const`s directly.
 //!
-//! Source: `oracle/oracle/codemp/game/bg_public.h:1177-1185`
+//! Source: `oracle/codemp/game/bg_public.h:1177-1185`
 
 use core::ffi::c_int;
 

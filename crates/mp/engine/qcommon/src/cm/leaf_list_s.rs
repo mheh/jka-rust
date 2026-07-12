@@ -4,9 +4,11 @@ use core::ffi::c_int;
 
 use mp_qshared::shared::{qboolean, vec3_t};
 
+use crate::collision_world::CollisionWorld;
+
 /// Raven `leafList_s` — accumulator used while walking the BSP tree collecting leafs.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_local.h:266-274`
+/// Type definition source: `oracle/codemp/qcommon/cm_local.h:266-274`
 #[repr(C)]
 pub struct leafList_s {
     pub count: c_int,
@@ -16,7 +18,11 @@ pub struct leafList_s {
     pub bounds: [vec3_t; 2],
     /// for overflows where each leaf can't be stored individually
     pub lastLeaf: c_int,
-    pub storeLeafs: Option<unsafe extern "C" fn(ll: *mut leafList_s, nodenum: c_int)>,
+    // leafList_t is engine-INTERNAL (never crosses the module ABI), so the store
+    // callback is retyped to a receiver-carrying Rust fn ptr: `CM_StoreLeafs`/
+    // `CM_StoreBrushes` thread `&mut CollisionWorld` (they read `cm.cmg`) per
+    // ruling 2 state threading. Same size/align as the C fn ptr; offset asserts hold.
+    pub storeLeafs: Option<fn(&mut CollisionWorld, *mut leafList_s, c_int)>,
 }
 
 pub type leafList_t = leafList_s;

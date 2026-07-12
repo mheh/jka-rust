@@ -1,7 +1,7 @@
 //! Shared Raven collision types from `q_shared.h`.
 //!
-//! Source: `oracle/oracle/code/game/q_shared.h:1355-1363`
-//! Source: `oracle/oracle/codemp/game/q_shared.h:1858-1866`
+//! Source: `oracle/code/game/q_shared.h:1355-1363`
+//! Source: `oracle/codemp/game/q_shared.h:1858-1866`
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -24,8 +24,8 @@ pub struct cplane_t {
 
 /// Ghoul2 model collision hit record.
 ///
-/// MP type definition source: `oracle/oracle/codemp/game/q_shared.h:1871-1884`
-/// SP equivalent source: `oracle/oracle/code/game/ghoul2_shared.h:461-486`
+/// MP type definition source: `oracle/codemp/game/q_shared.h:1871-1884`
+/// SP equivalent source: `oracle/code/game/ghoul2_shared.h:461-486`
 ///
 /// Raven uses this layout for records describing Ghoul2 model parts hit by a
 /// trace. Mode-specific modules may expose Raven's local naming and

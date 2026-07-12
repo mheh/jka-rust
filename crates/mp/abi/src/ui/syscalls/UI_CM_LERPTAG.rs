@@ -8,10 +8,10 @@ use abi_transport::pass_float;
 
 /// Arguments for `UI_CM_LERPTAG`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:206-207`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:948`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:996-998`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:996-998`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:206-207`
+/// Args source: `oracle/codemp/ui/ui_local.h:948`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:996-998`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:996-998`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UiCmLerptagArgs {
     tag: *mut core::ffi::c_void,
@@ -44,10 +44,10 @@ impl UiCmLerptagArgs {
 
 /// `UI_CM_LERPTAG` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:48`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:206-207`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:996-998`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:996-998`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:48`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:206-207`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:996-998`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:996-998`
 pub struct UiCmLerptag;
 
 impl OutboundSysCall for UiCmLerptag {

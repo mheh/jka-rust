@@ -29,7 +29,7 @@ impl GG2HaveweghoulmodelsArgs {
 
 /// `G_G2_HAVEWEGHOULMODELS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:509`
+/// Source: `oracle/codemp/game/g_public.h:509`
 pub struct GG2Haveweghoulmodels;
 
 impl OutboundSysCall for GG2Haveweghoulmodels {

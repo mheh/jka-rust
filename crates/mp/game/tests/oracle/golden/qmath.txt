@@ -1,0 +1,4645 @@
+== rng ==
+seed 89abcdef
+fl 4f7ffe7e
+fl 4e111e5e
+fl 5308d538
+qf 52ab692a
+ir -65524
+ir -49833
+ir -64102
+qi -4427
+fl 4ee0c520
+fl 4f8d4fd8
+fl 51883d6b
+qf 5343aae3
+ir 4352
+ir -12801
+ir 4606
+qi 26491
+fl 4f386ef9
+fl 4eea1122
+fl 5271182c
+qf 5428f58d
+ir -2850
+ir 41756
+ir -27603
+qi -27431
+fl 4f3f0c79
+fl 4f7b8563
+fl 52813dbd
+qf 535fb433
+ir -34647
+ir 13712
+ir -5813
+qi 42132
+fl 4ebb472b
+fl 4e5cc250
+fl 53470f00
+qf 541f57f3
+ir 42638
+ir -7282
+ir -54821
+qi -26174
+fl 4f125d6a
+fl 4f2c76c5
+fl 53380c22
+qf 54281860
+ir 1408
+ir -21264
+ir -676
+qi 57870
+fl 4efde2c4
+fl 4fc7b5ba
+fl 51b3e474
+qf 528bbb92
+ir -50747
+ir -6853
+ir -64503
+qi -36111
+fl 4f2c67b0
+fl 4f96a2fe
+fl 52c83191
+qf 52b0b11e
+ir 37861
+ir -59720
+ir -4915
+qi 28408
+fl 4daa87a2
+fl 4e6c2e30
+fl 52cb7b86
+qf 543cb0e2
+ir 48599
+ir -22758
+ir 19875
+qi -44286
+fl 4ef357a0
+fl 4fa571bf
+fl 52cd9880
+qf 53bec0ab
+ir -38702
+ir 43924
+ir -17161
+qi -21631
+fl 4f2705d6
+fl 4e468358
+fl 5281cc6a
+qf 53cefaaa
+ir -24416
+ir 49003
+ir -34088
+qi -44618
+fl 4f4c7389
+fl 4fe6002d
+fl 532f3a0a
+qf 5473e351
+ir 15336
+ir -25258
+ir -53005
+qi 12534
+fl 4f4bfff1
+fl 4f5387a6
+fl 5248e742
+qf 5463793d
+ir 49982
+ir 45377
+ir 61618
+qi 37865
+fl 4f048c98
+fl 4f93d4e5
+fl 52c9f07f
+qf 5327d3cb
+ir -58521
+ir 54591
+ir -24828
+qi 63943
+fl 4f3943b4
+fl 4febf556
+fl 52a54a43
+qf 540d727d
+ir 16830
+ir 61893
+ir -37489
+qi 29595
+fl 4e6d5202
+fl 4f037e2e
+fl 524bdb83
+qf 533a2e9f
+ir 31750
+ir -47496
+ir 55656
+qi 35202
+fl 4eb6e5d7
+fl 4ed7c8d0
+fl 527a002d
+qf 5376cf2a
+ir -32854
+ir 46632
+ir 59270
+qi -22549
+fl 4ec2b7f9
+fl 4f011ba5
+fl 5297ff1d
+qf 52a5c101
+ir -47433
+ir -29247
+ir -117
+qi -60202
+fl 4f4e6d81
+fl 4eb67973
+fl 52f708d7
+qf 53faf407
+ir 35714
+ir 58191
+ir 54695
+qi -37610
+fl 4d64df10
+fl 4f38095f
+fl 52305507
+qf 543212c4
+ir 13911
+ir -10408
+ir -45924
+qi 43409
+fl 4def7528
+fl 4ff8d7de
+fl 507797a8
+qf 542bc087
+ir -38117
+ir -18384
+ir -59093
+qi 44156
+fl 4d13af68
+fl 4f629cea
+fl 5330dbf6
+qf 54587a6a
+ir 22334
+ir 17418
+ir 14472
+qi -43359
+fl 4f250811
+fl 4f51bb89
+fl 53440884
+qf 53a98830
+ir 25319
+ir -62495
+ir 64378
+qi -56166
+fl 4e6bbf56
+fl 4f849ec0
+fl 532bc125
+qf 53e128d9
+ir 64188
+ir -47484
+ir -32677
+qi -44011
+fl 4f0c6a63
+fl 4fc5d193
+fl 51563c74
+qf 5464287e
+ir 51752
+ir -51106
+ir -2529
+qi 37136
+fl 4f41928d
+fl 4f1fe7a8
+fl 5279bd95
+qf 54245ee3
+ir -3966
+ir 45516
+ir 60161
+qi -54500
+fl 4e8b0d8a
+fl 4f14a520
+fl 5315c7dc
+qf 52b7de6a
+ir 32260
+ir 2820
+ir 14748
+qi -11621
+fl 4e419af3
+fl 4feefa19
+fl 5338c95d
+qf 54243cac
+ir -43035
+ir -36358
+ir 57197
+qi -8700
+fl 4f66c360
+fl 4f235531
+fl 51e23e8c
+qf 518966a4
+ir 34183
+ir 21434
+ir -55262
+qi 5915
+fl 4de27c5f
+fl 4f5fe5d7
+fl 5342daaf
+qf 542f97c7
+ir 56089
+ir -55269
+ir 8483
+qi -61381
+fl 4ede729f
+fl 4fd94c31
+fl 5252d2c8
+qf 542a081d
+ir -1906
+ir -5163
+ir 14642
+qi 398
+fl 4f616a67
+fl 4fd330c0
+fl 53108060
+qf 546ef1b1
+ir 42574
+ir 8782
+ir 18473
+qi -53680
+fl 4f2ac00b
+fl 4e91e810
+fl 50b4ee18
+qf 53580651
+ir 48016
+ir -45650
+ir 64280
+qi 53777
+fl 4f03f329
+fl 4f863ac7
+fl 52973b67
+qf 52662882
+ir 60589
+ir -38638
+ir -13992
+qi -27150
+fl 4e159e2d
+fl 4fb2d810
+fl 52bf55d8
+qf 54191d49
+ir 8799
+ir -59928
+ir -55469
+qi -29211
+fl 4f228792
+fl 4fd0fa91
+fl 5320265e
+qf 54418736
+ir -45749
+ir -9525
+ir 42003
+qi 48623
+fl 4f4bef92
+fl 4ff45f21
+fl 531f1f14
+qf 536cb2a3
+ir 3008
+ir -63633
+ir -290
+qi 10086
+fl 4f15d517
+fl 4e73b291
+fl 50d768ec
+qf 534c709a
+ir -5637
+ir 36469
+ir -62876
+qi 24117
+fl 4f7147dd
+fl 4fdab371
+fl 52aa7dbd
+qf 539e3c84
+ir -30728
+ir -38103
+ir 25435
+qi 42517
+fl 4cb82e6c
+fl 4fab8adc
+fl 52b5583b
+qf 538ecb80
+ir 33289
+ir -2413
+ir -26505
+qi -26669
+fl 4f6bb238
+fl 4ef4ddcb
+fl 528de7b7
+qf 54574937
+ir 39996
+ir 58457
+ir -40411
+qi 20110
+fl 4ec4670b
+fl 4e46c2f6
+fl 526a1538
+qf 54737982
+ir 25310
+ir 32077
+ir 61567
+qi -58120
+fl 4f4abca1
+fl 4f9e5c31
+fl 5225cfb8
+qf 537640ef
+ir -51961
+ir 4796
+ir -55736
+qi 51858
+fl 4f41c75d
+fl 4fc5a57f
+fl 51d43f39
+qf 543ce277
+ir 32911
+ir 37572
+ir 53247
+qi -42766
+fl 4e77dbff
+fl 4fe1a8c9
+fl 52d94fad
+qf 540e8383
+ir -9894
+ir -25773
+ir 34385
+qi -44802
+fl 4f1eed8b
+fl 4fdbdc6d
+fl 52487d6f
+qf 53a2c330
+ir -30642
+ir -39276
+ir 62318
+qi 38959
+fl 4db82939
+fl 4f8ebad8
+fl 52c357bb
+qf 542ce51d
+ir -53016
+ir 28900
+ir -23788
+qi -12848
+fl 4f383b0f
+fl 4fb575f1
+fl 5087fee6
+qf 541e16eb
+ir 16072
+ir 50583
+ir 23887
+qi -53186
+fl 4ea8f62e
+fl 4ffa19f5
+fl 5327ff25
+qf 53aad259
+ir -4320
+ir -35535
+ir 19529
+qi 2600
+fl 4f6f0480
+fl 4fe5a6a4
+fl 52c4609c
+qf 538d346a
+ir 64614
+ir -11058
+ir -10851
+qi -22578
+fl 4f49cebb
+fl 4fbd2089
+fl 50b937fd
+qf 541ca3ed
+ir -51925
+ir 52192
+ir -57328
+qi 54339
+fl 4ea78878
+fl 4fd7f2cb
+fl 52886fab
+qf 5447da83
+ir -26241
+ir -23930
+ir 46755
+qi 57005
+fl 4f37979b
+fl 4fee7495
+fl 5336a5ed
+qf 53c07330
+ir -823
+ir 30743
+ir 39515
+qi -55423
+fl 4f1640c8
+fl 4fc8ed87
+fl 527e94e2
+qf 54306a37
+ir -25496
+ir -14673
+ir -41927
+qi 13769
+fl 4ee4a475
+fl 4ec24d22
+fl 52a05acd
+qf 5473f8f1
+ir 40472
+ir -57905
+ir -30405
+qi -43936
+fl 4f3bedaf
+fl 4ffbd84d
+fl 52a26fe2
+qf 52c48f22
+ir 64366
+ir 35688
+ir 51809
+qi -18639
+fl 4b6a209f
+fl 4f8fca72
+fl 52a7a1f9
+qf 546af7c8
+ir 586
+ir 65497
+ir 39696
+qi 10365
+fl 4e8b2cfb
+fl 4fa197e4
+fl 51ce905d
+qf 541686d6
+ir 17599
+ir -43330
+ir -40885
+qi 15892
+fl 4f5b6ab9
+fl 4ff0a31d
+fl 5329d634
+qf 53aaf324
+ir 38196
+ir 37781
+ir 64415
+qi 5785
+fl 4f4208ac
+fl 4dc8453d
+fl 534510ed
+qf 540adb24
+ir -33227
+ir -45413
+ir 44218
+qi -24896
+fl 4dcb248d
+fl 4e79c814
+fl 53215d03
+qf 537f0c1b
+ir -30762
+ir -48288
+ir 13576
+qi 24209
+fl 4e089a6e
+fl 4fad797c
+fl 5309a65d
+qf 539227fe
+ir -28921
+ir -36876
+ir 47313
+qi 52899
+fl 4f62d1ab
+fl 4db4288b
+fl 51e53199
+qf 54036ace
+ir -35391
+ir 14519
+ir -13912
+qi 13667
+fl 4f6f92f4
+fl 4e29f278
+fl 523697e6
+qf 542caff7
+ir 34154
+ir 37406
+ir -41408
+qi 3149
+fl 4e93219e
+fl 4d74afd8
+fl 528e348e
+qf 53e33cac
+ir -157
+ir 18184
+ir -50219
+qi -4817
+fl 4f3df904
+fl 4ff5d8de
+fl 52822d5c
+qf 51c64acb
+ir -30194
+ir -61599
+ir 32215
+qi -63637
+fl 4e91da55
+fl 4fa35cd9
+fl 526da17a
+qf 52b4d9f0
+ir 27461
+ir -44992
+ir -34685
+qi 7474
+fl 4f43dbf7
+fl 4d36b593
+fl 522a4e8f
+qf 545669bc
+ir -11372
+ir -62535
+ir 11136
+qi -63285
+fl 4f7814a7
+fl 4f882c0d
+fl 524c72c2
+qf 536ac426
+ir -8151
+ir 48133
+ir 55761
+qi 51660
+fl 4edd97f8
+fl 4fd6a905
+fl 52b08938
+qf 53fd0fb9
+ir 27608
+ir -27956
+ir 9365
+qi -58786
+fl 4eefb96e
+fl 4f3c49ac
+fl 52179bcb
+qf 543ce47a
+ir 18961
+ir -9562
+ir -51599
+qi 35963
+fl 4f73e5b8
+fl 4f21827c
+fl 51b493f1
+qf 543e25a1
+ir -59083
+ir 1562
+ir 9633
+qi 12080
+fl 4e7f0a48
+fl 4fa55c8a
+fl 5254487a
+qf 5338b5b5
+ir -33746
+ir 19651
+ir -19715
+qi -17443
+fl 4e892b2c
+fl 4fb0a128
+fl 52256967
+qf 53a2c585
+ir -49756
+ir 37973
+ir 62595
+qi -46223
+fl 4f1db114
+fl 4f5aac83
+fl 529e1170
+qf 540fa9e9
+ir 41405
+ir -14171
+ir 18984
+qi -27728
+fl 4ec97bb5
+fl 4fceaa18
+fl 50f3e066
+qf 52eacd73
+ir -565
+ir -19716
+ir 13303
+qi -21393
+fl 4f73c3c4
+fl 4f5f3eda
+fl 527b2b76
+qf 54796cf1
+ir 36802
+ir -10677
+ir -48936
+qi -41772
+fl 4f569383
+fl 4ece750f
+fl 534077d6
+qf 53c11102
+ir -32273
+ir -11495
+ir -43654
+qi 61592
+fl 4f72fbaa
+fl 4ffce4b7
+fl 533b961e
+qf 54202db1
+ir 2484
+ir -42199
+ir 64295
+qi -27321
+fl 4f1dcb5b
+fl 4ef2319b
+fl 531dda1c
+qf 545bfe02
+ir -23853
+ir -13755
+ir 16033
+qi -49284
+fl 4e56a008
+fl 4d2ba750
+fl 529a944d
+qf 546d73af
+ir -29942
+ir -61790
+ir 59195
+qi -59353
+fl 4e4c1750
+fl 4f5de3c0
+fl 52e4f3ed
+qf 5355d693
+ir 54394
+ir -22320
+ir 30406
+qi -36408
+fl 4f2421f4
+fl 4ff2d264
+fl 5227c46e
+qf 53eeadfb
+ir 42932
+ir -53206
+ir 29460
+qi 17842
+fl 4f15cd7a
+fl 4f053185
+fl 516ffa58
+qf 53f8fff9
+ir 41170
+ir 63018
+ir -3549
+qi -50869
+fl 4edccf9b
+fl 4fafc31e
+fl 51bef468
+qf 5439efcc
+ir -27267
+ir 6187
+ir -48592
+qi 11080
+fl 4ee5e255
+fl 4ed6762f
+fl 532bce4a
+qf 53c78ae9
+ir -31669
+ir 35957
+ir 53064
+qi -46861
+fl 4f112182
+fl 4fb82911
+fl 533db4a1
+qf 539d0e4f
+ir -4015
+ir 31889
+ir 6167
+qi -21657
+fl 4c2213d1
+fl 4e5a03aa
+fl 520ce9a0
+qf 53cb8f6c
+ir 32338
+ir -29614
+ir -25601
+qi -33584
+fl 4e914aab
+fl 4e09f888
+fl 5315ec3e
+qf 532badf3
+ir 19310
+ir -32243
+ir 11470
+qi 42413
+fl 4f4884d2
+fl 4f490528
+fl 523fbe45
+qf 53d955c4
+ir -55371
+ir 8673
+ir -2422
+qi -65010
+fl 4f74b101
+fl 4ea9403d
+fl 533dda9f
+qf 52daf009
+ir 41341
+ir -3306
+ir 57389
+qi -57640
+fl 4f385b8a
+fl 4fc5973f
+fl 52f00d9b
+qf 5373a9dd
+ir -24339
+ir 5108
+ir -24497
+qi 32510
+fl 4e5ee2e4
+fl 4f950e22
+fl 52a079ed
+qf 51d96815
+ir 13710
+ir -51825
+ir 276
+qi 26824
+fl 4ea80294
+fl 4ee44dc2
+fl 53229188
+qf 5453d6e0
+ir 10839
+ir 22132
+ir 22237
+qi 15118
+fl 4b6ad4d1
+fl 4fdc3977
+fl 51858b09
+qf 53ed9fcd
+ir -2297
+ir -10197
+ir -57973
+qi 19067
+fl 4e30ff8d
+fl 4e6ba88a
+fl 533ebfd8
+qf 536ade1a
+ir 47179
+ir 6397
+ir -63393
+qi 18123
+fl 4e115054
+fl 4e9ddd3d
+fl 51fe9c6f
+qf 5395a824
+ir 64111
+ir 53375
+ir 37056
+qi 10255
+fl 4f203bb9
+fl 4e9c71b9
+fl 5299d8a8
+qf 5442da9b
+ir -43740
+ir -62799
+ir -51090
+qi 41957
+fl 4f1cedb8
+fl 4f6e4287
+fl 523a4d15
+qf 540eb2ba
+ir -59099
+ir -15662
+ir -48143
+qi 10946
+fl 4f4fe7b8
+fl 4f084484
+fl 5165b992
+qf 54441f11
+ir 41770
+ir -13262
+ir -21944
+qi -37590
+seed 00000000
+fl 3a180000
+fl 437b3c4c
+fl 4fa0e0c3
+qf 546645d2
+ir 2701
+ir -52100
+ir -5651
+qi 48910
+fl 4f4d7842
+fl 4f1b18e6
+fl 531484a9
+qf 5307b83b
+ir -60117
+ir 1905
+ir -1543
+qi -24808
+fl 4f2350a1
+fl 4f4889b5
+fl 530771bf
+qf 53644b3f
+ir 61213
+ir -28231
+ir -5324
+qi -3431
+fl 4ecaaa39
+fl 4fc14cbc
+fl 527dcc9a
+qf 53d12f92
+ir -39911
+ir -61615
+ir 9011
+qi -48857
+fl 4f394274
+fl 4fd7212d
+fl 5322cc54
+qf 5418612c
+ir -700
+ir 39745
+ir -30516
+qi 16817
+fl 4f30c3bc
+fl 4e7ab218
+fl 528491e5
+qf 534dff89
+ir -32586
+ir 46421
+ir -12075
+qi 31939
+fl 4d3e5c6f
+fl 4ee808e7
+fl 52eba13a
+qf 5416998a
+ir 56967
+ir -32486
+ir -38069
+qi -26944
+fl 4ee15056
+fl 4fdabbf4
+fl 523111e0
+qf 5264345d
+ir 40931
+ir 11137
+ir -20264
+qi -48601
+fl 4d711bd3
+fl 4fc0912f
+fl 532ae12d
+qf 5387a402
+ir 35104
+ir -47430
+ir -13837
+qi 55758
+fl 4dfda913
+fl 4e9475bb
+fl 5307e22c
+qf 5325308f
+ir 3126
+ir 63011
+ir -22026
+qi -23766
+fl 4eb76500
+fl 4fd68277
+fl 52d67f88
+qf 53f43b21
+ir -39516
+ir 30307
+ir -40455
+qi 47236
+fl 4e0db991
+fl 4e28d6fe
+fl 52cd869a
+qf 54745725
+ir 51748
+ir 59407
+ir -65465
+qi -25788
+fl 4f5e7cc0
+fl 4fc62433
+fl 5332dacf
+qf 533d2c72
+ir 59438
+ir 17780
+ir -54598
+qi 28202
+fl 4e054888
+fl 4fd33cd5
+fl 5210523a
+qf 5384ec8c
+ir 11445
+ir 5717
+ir -23722
+qi 55183
+fl 4f397e83
+fl 4ff777d4
+fl 52a7392f
+qf 5469e545
+ir 46871
+ir 50887
+ir -4115
+qi 35752
+fl 4e21d212
+fl 4d645687
+fl 52456469
+qf 541ccaf3
+ir -19272
+ir -32644
+ir 28331
+qi 32451
+fl 4e9f7f02
+fl 4f62e852
+fl 4fc8c80c
+qf 53fea322
+ir -1746
+ir 2065
+ir 15046
+qi -16505
+fl 4e88756a
+fl 4feaa3c0
+fl 53462116
+qf 5334215d
+ir -60282
+ir -38326
+ir -39483
+qi 63800
+fl 4f142d80
+fl 4fd9ee65
+fl 533d636f
+qf 5466d120
+ir -6784
+ir 14148
+ir 13064
+qi -25104
+fl 4ebb2a0c
+fl 4f8f77d0
+fl 52ead080
+qf 53b481d4
+ir -19894
+ir 41987
+ir 13451
+qi -18202
+fl 4e8ad6fd
+fl 4ee26798
+fl 53367116
+qf 5404e75f
+ir -53598
+ir -54028
+ir 24851
+qi -38741
+fl 4ea2342a
+fl 4ee7d8c3
+fl 5265039d
+qf 54789700
+ir -32046
+ir 15926
+ir 32049
+qi -65177
+fl 4c312594
+fl 4ff28fcf
+fl 531b5889
+qf 53115170
+ir 25480
+ir -1847
+ir -34338
+qi 55072
+fl 4dadb82b
+fl 4f590478
+fl 50a54184
+qf 52a13a92
+ir -26905
+ir -39417
+ir 48269
+qi -20493
+fl 4f5f7de5
+fl 4f81e0a8
+fl 51c9bdd3
+qf 540d67d9
+ir -8223
+ir -45848
+ir 40431
+qi 56920
+fl 4f7d4b30
+fl 4f8f56b2
+fl 52ae380f
+qf 544bf670
+ir -51921
+ir -39163
+ir -12827
+qi -64670
+fl 4d50cec1
+fl 4dbd3adf
+fl 51cad818
+qf 5240077a
+ir 26107
+ir -6809
+ir 46139
+qi 30972
+fl 4f4277e4
+fl 4eee278b
+fl 52ea2d33
+qf 528eb503
+ir 55956
+ir 3963
+ir 22322
+qi 25645
+fl 4e1948a6
+fl 4fdca876
+fl 52d9494d
+qf 53705d17
+ir -975
+ir 18633
+ir 51714
+qi -37036
+fl 4f012f19
+fl 4f14bc3b
+fl 52bdd9fe
+qf 54392ace
+ir 64308
+ir 62539
+ir 42701
+qi -54164
+fl 4eb3c3d1
+fl 4facf110
+fl 52173f9c
+qf 53d496c6
+ir -55332
+ir -33164
+ir 41121
+qi -57527
+fl 4e1878b2
+fl 4e39d866
+fl 52e0a1fe
+qf 54512500
+ir 56797
+ir 20811
+ir 52126
+qi 28632
+fl 4f6b9f81
+fl 4e775ebd
+fl 5321ebb9
+qf 543f8397
+ir -57387
+ir 38962
+ir -11699
+qi -48030
+fl 4f17f405
+fl 4e382f28
+fl 5343d4b8
+qf 544cab38
+ir 27658
+ir 33577
+ir -3915
+qi 50122
+fl 4d2798bf
+fl 4fcda58d
+fl 522c9490
+qf 522746ac
+ir 4212
+ir -54345
+ir -51505
+qi 49098
+fl 4e02d0f6
+fl 4edbde50
+fl 532ae443
+qf 5335d29f
+ir 20591
+ir -43061
+ir -47783
+qi 1849
+fl 4f09efbd
+fl 4f103ae5
+fl 527d606e
+qf 53bb616c
+ir -62685
+ir -59099
+ir -36565
+qi 24647
+fl 4f30cb39
+fl 4f938956
+fl 5316b420
+qf 54263add
+ir 15877
+ir 45628
+ir -1394
+qi -54594
+fl 4ee86adb
+fl 4e61340f
+fl 52a7fcef
+qf 524e8936
+ir -17556
+ir 15255
+ir 53054
+qi -21950
+fl 4f3d692b
+fl 4ee6655f
+fl 51877c76
+qf 53bc1d7e
+ir -18008
+ir 16153
+ir -57587
+qi -1902
+fl 4eca7c0c
+fl 4f36a3fa
+fl 5306187b
+qf 51c4e7aa
+ir 31642
+ir 57524
+ir -7084
+qi -24635
+fl 4f7bcc89
+fl 4ffc8259
+fl 530eb304
+qf 53fc1087
+ir 16436
+ir 13953
+ir -40273
+qi 56461
+fl 4f74cad3
+fl 4f77a1c4
+fl 5308b036
+qf 53c48737
+ir -7459
+ir 9277
+ir -30808
+qi -30601
+fl 4eaf2cd7
+fl 4ebe29a9
+fl 52b66401
+qf 5465a924
+ir 9006
+ir -38770
+ir 2637
+qi 44073
+fl 4f69abf6
+fl 4fd3eb12
+fl 52070768
+qf 53d8b251
+ir -39180
+ir -29525
+ir 8161
+qi -18014
+fl 4efe0b9a
+fl 4f678c6b
+fl 53376d86
+qf 542e6f3e
+ir -2571
+ir -61113
+ir -25322
+qi 28284
+fl 4e8da0e7
+fl 4fe46c2a
+fl 52db7bd1
+qf 545f0747
+ir -54427
+ir -31292
+ir -39804
+qi 24108
+fl 4f0108bc
+fl 4c2bbfb1
+fl 530fb8af
+qf 538283b2
+ir 58750
+ir -52955
+ir 5204
+qi -56256
+fl 4e7dee6e
+fl 4fe93761
+fl 51bd3fca
+qf 54196c49
+ir -26568
+ir 38462
+ir 65101
+qi 16032
+fl 4f0274da
+fl 4dfc6c38
+fl 533493ba
+qf 533e9aae
+ir 54413
+ir 26384
+ir -26964
+qi -28722
+fl 4f07004e
+fl 4f5629db
+fl 51892586
+qf 53eabe3f
+ir -11716
+ir -37536
+ir -20595
+qi -30426
+fl 4f456ace
+fl 4f724228
+fl 52f1866f
+qf 54460771
+ir -27002
+ir 35045
+ir 1992
+qi -739
+fl 4cb79a07
+fl 4f86bcbb
+fl 5314bc35
+qf 539cae07
+ir 44755
+ir 9644
+ir -4749
+qi 39301
+fl 4ec7d4fe
+fl 4f9a7cac
+fl 52813196
+qf 544ecf7f
+ir -56649
+ir -34943
+ir 62852
+qi 2503
+fl 4f04bc30
+fl 4fff2381
+fl 533f4b6a
+qf 5420c36a
+ir 15687
+ir -42616
+ir 4932
+qi 49447
+fl 4ef1e068
+fl 4ffe8fd7
+fl 53144557
+qf 53e5a47f
+ir -58826
+ir -5300
+ir 43900
+qi 27907
+fl 4dfae3f7
+fl 4fb0207a
+fl 534635e3
+qf 52f2c1d6
+ir 32680
+ir -6417
+ir -26474
+qi -61676
+fl 4e8c29ff
+fl 4fc01f1a
+fl 527b8495
+qf 52fa3956
+ir 31292
+ir 13900
+ir 30241
+qi 49067
+fl 4c28d3cb
+fl 4f0d468c
+fl 529108f5
+qf 53da14c0
+ir 27949
+ir 32547
+ir -3218
+qi -59403
+fl 4ee53e10
+fl 4ffe30c9
+fl 52877c08
+qf 5417be9d
+ir 54547
+ir -51016
+ir -41423
+qi -48073
+fl 4f788440
+fl 4ff8e2cb
+fl 530bd918
+qf 53f05f9c
+ir 55333
+ir 24421
+ir -61601
+qi -16879
+fl 4d818484
+fl 4f4e5ad9
+fl 51cd88bb
+qf 5455cbee
+ir 60291
+ir 1302
+ir -6732
+qi 44734
+fl 4e591e36
+fl 4d65e16d
+fl 52da3e92
+qf 54537370
+ir -44695
+ir 53168
+ir 33432
+qi -1710
+fl 4f64d6de
+fl 4ffe5da2
+fl 531e6e72
+qf 5469c506
+ir -65330
+ir 61649
+ir 36698
+qi -4869
+fl 4f2478df
+fl 4fc9614f
+fl 52a4858e
+qf 53e4334e
+ir -23719
+ir -48009
+ir -5661
+qi -24767
+fl 4f561c55
+fl 4d11ece0
+fl 5243bd7a
+qf 5426ee21
+ir -15573
+ir -61852
+ir 14689
+qi -4539
+fl 4e01436b
+fl 4fa94713
+fl 51c0ca2c
+qf 5341d2c5
+ir 65120
+ir 16492
+ir 5276
+qi 11012
+fl 4ef1e6df
+fl 4f8d15eb
+fl 53374d86
+qf 5468b970
+ir -56620
+ir -45579
+ir 38108
+qi -37995
+fl 4f4e6636
+fl 4f37ab3d
+fl 52d0666f
+qf 545169b7
+ir 28932
+ir -44219
+ir -5730
+qi -31386
+fl 4c3497e8
+fl 4ff7d05c
+fl 52d14223
+qf 515d7fdb
+ir 61847
+ir 49541
+ir 17023
+qi 44931
+fl 4e813a6e
+fl 4fa57530
+fl 5317908a
+qf 54748f2c
+ir 50549
+ir 53893
+ir -53731
+qi 52430
+fl 4eca5317
+fl 4f76daaf
+fl 52f8cc24
+qf 542fe791
+ir -23320
+ir -15971
+ir -41519
+qi -41401
+fl 4f31c6f8
+fl 4fad4424
+fl 52c6c37e
+qf 5130f62a
+ir 24239
+ir 10576
+ir 38780
+qi -58042
+fl 4f01812e
+fl 4f2973b0
+fl 5334d65f
+qf 543bd205
+ir 5256
+ir -4228
+ir 32732
+qi 15803
+fl 4f342bd6
+fl 4dbd383e
+fl 52ec57d8
+qf 5382564c
+ir 12058
+ir -9157
+ir -12016
+qi 22644
+fl 4ecbf98c
+fl 4f08e7c5
+fl 52fd40e4
+qf 54548e75
+ir -28754
+ir -44594
+ir -32182
+qi 64855
+fl 4e255b4f
+fl 4df8fdb5
+fl 52efed73
+qf 51a8df85
+ir -40260
+ir 40485
+ir -41255
+qi -4701
+fl 4f23c52c
+fl 4ff8d245
+fl 53149192
+qf 52aa7334
+ir 8882
+ir -63256
+ir 35836
+qi -461
+fl 4f74e1e7
+fl 4fd7ca55
+fl 5226fa37
+qf 5329e8cf
+ir -10519
+ir -60655
+ir -31178
+qi -24133
+fl 4eadd8d5
+fl 4d5783b4
+fl 523d2776
+qf 5449ca1f
+ir -39095
+ir 22398
+ir -53231
+qi 6920
+fl 4ebb7aeb
+fl 4f9b2763
+fl 53215aa4
+qf 53ab3f26
+ir -1664
+ir 7685
+ir 42369
+qi 22339
+fl 4f25c0b7
+fl 4f49081d
+fl 51603d24
+qf 545cc2ba
+ir 47432
+ir 64751
+ir 43103
+qi 28718
+fl 4e75ddd6
+fl 4f46330f
+fl 5225fb49
+qf 54409917
+ir -54861
+ir -10511
+ir 41895
+qi 54885
+fl 4f18362d
+fl 4e839115
+fl 513fdebe
+qf 52b83496
+ir 10729
+ir 7679
+ir -35734
+qi 9118
+fl 4f3760f2
+fl 4f5fffef
+fl 52e736d7
+qf 52ee8d13
+ir 13392
+ir -31344
+ir 24755
+qi 38121
+fl 4ee6223a
+fl 4f88f1c3
+fl 53344d16
+qf 54648f4e
+ir 2970
+ir -50902
+ir -6720
+qi 11505
+fl 4f7e1af5
+fl 4dc8230c
+fl 4f9d56e0
+qf 53a95073
+ir 1432
+ir -49574
+ir -44981
+qi 32312
+fl 4f01cd1c
+fl 4f158d1c
+fl 52d3d199
+qf 5464e40b
+ir -36770
+ir 58218
+ir 25302
+qi -58018
+fl 4ee21c15
+fl 4f86d2c0
+fl 53023abe
+qf 5475a769
+ir -54630
+ir -401
+ir 42788
+qi -17574
+fl 4f31df22
+fl 4f94bbb0
+fl 5206fac0
+qf 534cc13f
+ir 29858
+ir -46451
+ir -38570
+qi 59326
+fl 4f5899e5
+fl 4d7498b7
+fl 53470548
+qf 511378b6
+ir -50151
+ir -40053
+ir 50276
+qi 31479
+fl 4f55e359
+fl 4fee3531
+fl 5336aa94
+qf 545280a7
+ir -20303
+ir 47624
+ir 39127
+qi 43146
+fl 4f0364d7
+fl 4fc4d101
+fl 522f29d1
+qf 5220e0bb
+ir -13065
+ir 23806
+ir 49152
+qi 47448
+fl 4ddc4c27
+fl 4fc33b79
+fl 533971fb
+qf 53e4b278
+ir 43675
+ir 40785
+ir -45286
+qi 28123
+fl 4e8a3a40
+fl 4f19d0d3
+fl 515ebe07
+qf 544711d2
+ir 63019
+ir 29351
+ir -47351
+qi -63386
+fl 4eef4a13
+fl 4f8b66b4
+fl 5317761c
+qf 53fcd0cb
+ir -23884
+ir -13635
+ir 40620
+qi 65384
+fl 4f1b3851
+fl 4e2a1d24
+fl 53014df5
+qf 536d18b2
+ir 6718
+ir -33036
+ir -53523
+qi -43095
+fl 4f4ca805
+fl 4f15f469
+fl 521f5a3c
+qf 53bcef5b
+ir -27501
+ir 59871
+ir -22265
+qi -22902
+fl 4e958e79
+fl 4fc17fd7
+fl 522947b2
+qf 5324f9b9
+ir -1458
+ir -1818
+ir -38737
+qi -17335
+fl 4f1d030d
+fl 4e73b776
+fl 50cafd05
+qf 5450f8b0
+ir -14696
+ir 30832
+ir 42267
+qi -2501
+seed 00000001
+fl 3a200000
+fl 43884822
+fl 4fae7b2e
+qf 542089a1
+ir 62187
+ir 34272
+ir 45291
+qi -50857
+fl 4f1b2166
+fl 4f00ff3a
+fl 5344c86c
+qf 53f94640
+ir -51819
+ir -55336
+ir -44311
+qi -16139
+fl 4f353f20
+fl 4d46e19c
+fl 530c2499
+qf 529d9811
+ir -59285
+ir 57214
+ir 57191
+qi -32692
+fl 4f20ca5e
+fl 4ff855f8
+fl 53263eaf
+qf 544ac851
+ir -28570
+ir 33897
+ir -32807
+qi 10863
+fl 4f7b9028
+fl 4fcea4d0
+fl 531de0b3
+qf 53db5a52
+ir 25290
+ir -42233
+ir 58428
+qi -44205
+fl 4f097f96
+fl 4d9f76b9
+fl 532d0160
+qf 5479f4ab
+ir 26150
+ir 15030
+ir -6314
+qi 20239
+fl 4a9724b2
+fl 4fc907b3
+fl 531e5224
+qf 541632b0
+ir 22864
+ir -22925
+ir 11459
+qi 55581
+fl 4c19ee6d
+fl 4fb3328a
+fl 533cd604
+qf 54462dbe
+ir -38157
+ir 20189
+ir -41986
+qi -31847
+fl 4e45fee9
+fl 4f881f11
+fl 532a1878
+qf 53a950b3
+ir 33438
+ir -60470
+ir -16860
+qi 61054
+fl 4edacfed
+fl 4ee11b3f
+fl 52e9332a
+qf 53fb33a2
+ir -7439
+ir 707
+ir -12751
+qi 50926
+fl 4f240a87
+fl 4f68eb1b
+fl 52d0286e
+qf 537d9894
+ir -11565
+ir -245
+ir 48604
+qi -29080
+fl 4e890390
+fl 4cc6970b
+fl 51121b91
+qf 54085496
+ir 41544
+ir -18674
+ir 2932
+qi 10769
+fl 4f7f0e69
+fl 4e15cf5e
+fl 53398d8e
+qf 5432fbb4
+ir 38369
+ir -46485
+ir -63678
+qi 14829
+fl 4d4a7a68
+fl 4f2b5aa4
+fl 53478b15
+qf 538f488f
+ir -62903
+ir -29980
+ir -28321
+qi 14372
+fl 4d36da65
+fl 4ff0e93c
+fl 5327b32a
+qf 543bf1fc
+ir -34814
+ir -60953
+ir 27410
+qi 24640
+fl 4e8a9a77
+fl 4f4b81e8
+fl 53383888
+qf 53835b25
+ir 58811
+ir -33907
+ir 12550
+qi -41365
+fl 4f47ce2d
+fl 4ff507bf
+fl 52aa0c5d
+qf 53b711c3
+ir 52831
+ir 63274
+ir -35326
+qi -14669
+fl 4e5e5beb
+fl 4f4795be
+fl 5283bdbc
+qf 54482db8
+ir -31153
+ir -64288
+ir -32787
+qi -43961
+fl 4f700f7f
+fl 4fc9efe0
+fl 53439e75
+qf 5195da49
+ir -15918
+ir -22843
+ir 56139
+qi 61625
+fl 4e50f118
+fl 4edefbfc
+fl 515b4aa1
+qf 5140a268
+ir -64193
+ir -31864
+ir 21369
+qi 33595
+fl 4eac26c2
+fl 4f0db236
+fl 51f3e4c9
+qf 543e9b38
+ir -33315
+ir 30651
+ir 57421
+qi -30748
+fl 4e8bdcec
+fl 4fe6fd1c
+fl 532bded2
+qf 53f40e29
+ir -63215
+ir -9705
+ir 50161
+qi -37142
+fl 4e9a82d0
+fl 4fb0a2b6
+fl 5263f965
+qf 5448b277
+ir -64064
+ir -47512
+ir 26141
+qi 50151
+fl 4e4d99b6
+fl 4fe3c11a
+fl 533a1776
+qf 5312c927
+ir 62087
+ir -58886
+ir -35853
+qi 7446
+fl 4f56448e
+fl 4f39513d
+fl 52e13aa0
+qf 54505311
+ir 53690
+ir -5197
+ir -37328
+qi -11627
+fl 4ee83332
+fl 4eef5d1c
+fl 527bda90
+qf 54729a66
+ir -11598
+ir -52944
+ir -59013
+qi -33374
+fl 4e8252ba
+fl 4f1fe5ac
+fl 51707fb2
+qf 53a70f66
+ir -10635
+ir -3691
+ir -51465
+qi 16351
+fl 4d10675f
+fl 4ffe085d
+fl 5285a507
+qf 5360b248
+ir -62417
+ir -8734
+ir -31385
+qi 53903
+fl 4f353a70
+fl 4fb6ea38
+fl 5312018e
+qf 5476011c
+ir 6291
+ir 26110
+ir 19849
+qi 24024
+fl 4f140809
+fl 4f7f6615
+fl 5211fd4b
+qf 540833f0
+ir -65138
+ir -38709
+ir -22915
+qi -59390
+fl 4f0bc047
+fl 4f0acf23
+fl 529fcbe7
+qf 539daa38
+ir -37268
+ir 60669
+ir -52915
+qi -21324
+fl 4dfd76fb
+fl 4fb25b24
+fl 52d9ddb5
+qf 53cdbc6a
+ir -19748
+ir -6287
+ir 17661
+qi 27707
+fl 4f4120af
+fl 4f71d885
+fl 51bea7a3
+qf 541df573
+ir -28183
+ir 29519
+ir 26284
+qi -48444
+fl 4ec77b08
+fl 4fb798dd
+fl 5116aa84
+qf 53cadbf0
+ir -21412
+ir -63689
+ir -35920
+qi -34914
+fl 4c30511a
+fl 4e58ef95
+fl 52c002b5
+qf 5460c9e5
+ir -56171
+ir -56782
+ir -59968
+qi 13434
+fl 4f03157b
+fl 4f9cc49f
+fl 52461290
+qf 541a63fb
+ir 10336
+ir -24003
+ir 62335
+qi 54444
+fl 4e0e1f28
+fl 4d2720cb
+fl 52003dd6
+qf 542e7c84
+ir -14396
+ir 30101
+ir -28143
+qi -918
+fl 4f5b2136
+fl 4fe2fe5f
+fl 508fc8cb
+qf 52a2081a
+ir -14766
+ir -24802
+ir 1673
+qi 30730
+fl 4dc6d2e1
+fl 4fca17df
+fl 52eae2a5
+qf 5391fc39
+ir -5384
+ir -27239
+ir -38838
+qi 58182
+fl 4db4b4a1
+fl 4f6f8332
+fl 53226ff5
+qf 53fd828f
+ir -18209
+ir -9100
+ir -36926
+qi -59272
+fl 4e0a62e8
+fl 4f2f4e37
+fl 5308e67f
+qf 53947531
+ir -36265
+ir -43929
+ir 52990
+qi 26592
+fl 4f61ccd7
+fl 4f143269
+fl 52b10f90
+qf 538a81aa
+ir -12980
+ir -54980
+ir 39958
+qi -26918
+fl 4efb5e5a
+fl 4f962958
+fl 524d4454
+qf 53682917
+ir 55131
+ir 29019
+ir -26777
+qi -22742
+fl 4f71d02d
+fl 4ffcb90d
+fl 528bd24d
+qf 5207e2fe
+ir 11764
+ir 35595
+ir -52723
+qi 26163
+fl 4d69ac9e
+fl 4f1f0e58
+fl 52c324d1
+qf 538f9a4a
+ir 58785
+ir 638
+ir -1234
+qi -15304
+fl 4de6e13a
+fl 4f99c4e7
+fl 5222b5d8
+qf 5423d50a
+ir 16876
+ir 21264
+ir 34035
+qi 62371
+fl 4f637e0f
+fl 4fff125f
+fl 5347b684
+qf 544ef0c4
+ir -18972
+ir -55975
+ir -7108
+qi 20540
+fl 4f1ef5d2
+fl 4fe5def2
+fl 5291c28b
+qf 5397edd6
+ir 35794
+ir 49909
+ir 43143
+qi -61841
+fl 4eb07844
+fl 4f2d3b2c
+fl 52effe5f
+qf 53c51f0f
+ir 2329
+ir 22558
+ir -29825
+qi -19831
+fl 4f63fd39
+fl 4f027486
+fl 52c5722c
+qf 5198532b
+ir -5695
+ir 17035
+ir -56788
+qi 20472
+fl 4df3c14d
+fl 4dc93f5d
+fl 50dfa90e
+qf 52c45009
+ir 42430
+ir 7197
+ir 35783
+qi -28528
+fl 4f65bd84
+fl 4ecb7f27
+fl 5228f497
+qf 53a19aa4
+ir -59284
+ir 26449
+ir -35681
+qi -31806
+fl 4f034d8a
+fl 4fabd671
+fl 525de5dc
+qf 53912ef0
+ir -9912
+ir -15727
+ir 50584
+qi -51740
+fl 4f6c4215
+fl 4d816baa
+fl 51cfa2be
+qf 5471220a
+ir -9367
+ir 20166
+ir 814
+qi 3950
+fl 4dc8e7f8
+fl 4f4b1d93
+fl 51a0a41e
+qf 5247acf8
+ir -16450
+ir 33992
+ir 45318
+qi -968
+fl 4f5d0632
+fl 4fa3f374
+fl 51a21c48
+qf 5414536a
+ir -21353
+ir 3228
+ir 2423
+qi -42305
+fl 4f00e1dd
+fl 4e1713ac
+fl 52778b85
+qf 539ce79a
+ir 29558
+ir 18578
+ir 64149
+qi -19617
+fl 4f567434
+fl 4ff57247
+fl 5273a18b
+qf 5381c974
+ir 21687
+ir 11698
+ir -23382
+qi 14232
+fl 4f0029ee
+fl 4f58f3e7
+fl 53437708
+qf 53634b82
+ir -14588
+ir 45581
+ir -30690
+qi -63158
+fl 4e32612f
+fl 4fd135bf
+fl 515ccf2f
+qf 5401ec93
+ir -45269
+ir -28440
+ir -54452
+qi 18938
+fl 4f7301b8
+fl 4fc42b3e
+fl 533772b9
+qf 53d7dd98
+ir 43847
+ir 25539
+ir 17075
+qi -3571
+fl 4f0dea46
+fl 4f46048f
+fl 5264302b
+qf 52151fa0
+ir -42282
+ir -59703
+ir -44924
+qi -36854
+fl 4f0fee26
+fl 4d380c4b
+fl 5215c0d1
+qf 53ce8fae
+ir 58276
+ir -29157
+ir 17036
+qi 4058
+fl 4f37a0ea
+fl 4f2cc67e
+fl 518fed04
+qf 537b25a6
+ir 6701
+ir -5883
+ir -12317
+qi -54776
+fl 4f7363d8
+fl 4ecb35d2
+fl 528903e6
+qf 54160bb5
+ir 10852
+ir 12061
+ir 14837
+qi -58622
+fl 4e8841b3
+fl 4f730fd8
+fl 52b24c59
+qf 53aed6af
+ir 9323
+ir 23234
+ir 40635
+qi 600
+fl 4da09ca9
+fl 4fb6d361
+fl 51e24afd
+qf 540117de
+ir 26434
+ir -23664
+ir -50106
+qi -46598
+fl 4eaf9016
+fl 4ef5636f
+fl 52b71858
+qf 544f08ec
+ir 27118
+ir 41660
+ir -8207
+qi 62844
+fl 4e376aba
+fl 4f988756
+fl 52056e3a
+qf 5453adbf
+ir -58854
+ir 27235
+ir -49709
+qi -18093
+fl 4f54964d
+fl 4f2c1126
+fl 5345e3bb
+qf 542fede2
+ir 19901
+ir -4030
+ir -59563
+qi 55830
+fl 4ee45a85
+fl 4f6e0181
+fl 513f5ecd
+qf 5426f52c
+ir 39872
+ir 15216
+ir 59886
+qi 54208
+fl 4f600261
+fl 4e8fd2a8
+fl 52dfa2c3
+qf 53ce5fed
+ir 22066
+ir -25604
+ir 22915
+qi -14102
+fl 4eeccf5c
+fl 4ec7287c
+fl 52bb08ac
+qf 53473499
+ir 22276
+ir -11629
+ir 44002
+qi 47635
+fl 4ef7553c
+fl 4fb98eb2
+fl 5323dafa
+qf 5462acc2
+ir -10539
+ir -35441
+ir 30020
+qi 34009
+fl 4efd3750
+fl 4fd55b21
+fl 51966fd8
+qf 531bc9e3
+ir -25638
+ir -61422
+ir -63498
+qi -21697
+fl 4e9afe71
+fl 4f8c3681
+fl 528c2f88
+qf 545e0ea3
+ir 30035
+ir -37107
+ir -44177
+qi -7449
+fl 4ef44990
+fl 4fae5cd5
+fl 51b33816
+qf 50eacc17
+ir -53590
+ir -45222
+ir 41339
+qi 27734
+fl 4d28387a
+fl 4f4ee37d
+fl 523bbdcd
+qf 545b47ea
+ir 60327
+ir 10049
+ir 2647
+qi 12852
+fl 4f62977a
+fl 4c216f0a
+fl 528bc37c
+qf 5289f5fb
+ir 13773
+ir -60140
+ir 35533
+qi 45195
+fl 4f5c52f6
+fl 4f2f7da5
+fl 51c6da78
+qf 5381234a
+ir 59748
+ir -60477
+ir 25013
+qi 41989
+fl 4f4174a0
+fl 4f953ef2
+fl 5320cbcb
+qf 537afe51
+ir -22743
+ir -35452
+ir -17301
+qi -32463
+fl 4e04d5e0
+fl 4ee18e43
+fl 52c18840
+qf 51f906d5
+ir 30255
+ir 19442
+ir -15331
+qi 46012
+fl 4bb9b1df
+fl 4fcd5e19
+fl 532f6981
+qf 53bb2a9e
+ir -10244
+ir 54348
+ir 53254
+qi -23111
+fl 4f24bea4
+fl 4fa20a3f
+fl 52e1c7df
+qf 522a4262
+ir -18601
+ir -51794
+ir -9488
+qi -28966
+fl 4f7129f6
+fl 4ed2e5be
+fl 533cfc5e
+qf 52cd6812
+ir 20689
+ir -8593
+ir -41830
+qi 2998
+fl 4eef63b8
+fl 4f5583a1
+fl 5306a356
+qf 53d8e1b0
+ir 31388
+ir 38134
+ir -44586
+qi -33532
+fl 4f126540
+fl 4fef0e66
+fl 522b416c
+qf 54209d8f
+ir 34707
+ir 57276
+ir 36998
+qi 11996
+fl 4eea6a2e
+fl 4fff0875
+fl 52fabe7f
+qf 53805a88
+ir -38882
+ir -16561
+ir -33091
+qi -47110
+fl 4d796c6a
+fl 4ec732db
+fl 533aef4b
+qf 539a8f4d
+ir 41426
+ir 54396
+ir 59058
+qi 33019
+fl 4f5d3b3d
+fl 4fdae9dc
+fl 51d7ef73
+qf 52d8e216
+ir -49809
+ir -3066
+ir -5289
+qi -23648
+fl 4f0b673f
+fl 4f86b29b
+fl 5307d191
+qf 543a0c75
+ir -7894
+ir 55426
+ir -60501
+qi 53768
+fl 4f4c7e28
+fl 4f95ecc5
+fl 52b0b003
+qf 54115ab4
+ir 62419
+ir 6725
+ir 64804
+qi 38391
+fl 4f09b39a
+fl 4fe469ed
+fl 52393f84
+qf 545bd6ad
+ir 56278
+ir -11133
+ir 34766
+qi 47124
+fl 4eaabf6d
+fl 4f908db6
+fl 5175d3e6
+qf 5435c18a
+ir 13218
+ir 26103
+ir -50954
+qi 57124
+fl 4f010181
+fl 4f4e867d
+fl 529a3562
+qf 5410300d
+ir 9065
+ir -30006
+ir 9077
+qi -2223
+fl 4e1a6219
+fl 4fa25701
+fl 52308fa5
+qf 5471d0a2
+ir -2344
+ir 42118
+ir 57092
+qi -40601
+fl 4f4bcf8e
+fl 4f504c44
+fl 5276c633
+qf 52e7b794
+ir 31662
+ir -39871
+ir -1501
+qi 59923
+fl 4f18ba40
+fl 4f6090d8
+fl 5215752b
+qf 53b28ad0
+ir -17206
+ir -52631
+ir -9098
+qi 35108
+fl 4e8c1961
+fl 4f9e1817
+fl 5322de6c
+qf 536e9053
+ir 17328
+ir 40643
+ir -48714
+qi 59596
+fl 4e78ea59
+fl 4f983317
+fl 5149a2ac
+qf 533bf570
+ir 12544
+ir -9590
+ir 20350
+qi -19235
+seed deadbeef
+fl 4f7fff93
+fl 4f9ca94e
+fl 512e0dd9
+qf 540fb960
+ir -24540
+ir -1288
+ir 18032
+qi -23194
+fl 4efb3318
+fl 4ff4408b
+fl 5336be00
+qf 51d96c2b
+ir 50087
+ir 28121
+ir 2160
+qi 54670
+fl 4f70df94
+fl 4f18a5f1
+fl 513f31c0
+qf 5460b677
+ir -21536
+ir -33440
+ir -33449
+qi 1727
+fl 4e357138
+fl 4fe68874
+fl 5335863b
+qf 5451d646
+ir -32546
+ir 63029
+ir 35771
+qi 36864
+fl 4dc2af60
+fl 4f1bbdb9
+fl 532d5d4b
+qf 534614cd
+ir -61200
+ir 63651
+ir -18987
+qi -23130
+fl 4ead218e
+fl 4fc5f584
+fl 52b07368
+qf 546438cc
+ir -34852
+ir 51039
+ir -556
+qi 61084
+fl 4f42a19f
+fl 4f82723e
+fl 52d80426
+qf 542ca8c3
+ir 29080
+ir -35519
+ir 42112
+qi -24166
+fl 4eaf2eb9
+fl 4f080e72
+fl 531e1bf6
+qf 53151fae
+ir 62935
+ir -19125
+ir 49242
+qi -54673
+fl 4e8d53ba
+fl 4fe1b4e7
+fl 51c057f5
+qf 54015326
+ir 23647
+ir 25988
+ir 43876
+qi 22330
+fl 4e5d01ed
+fl 4fecd87f
+fl 52304bce
+qf 52978f6e
+ir -903
+ir 19069
+ir -20945
+qi 3498
+fl 4f3804dc
+fl 4fb67778
+fl 4fb50f65
+qf 5420614b
+ir 64622
+ir -10600
+ir 7925
+qi 34882
+fl 4f21f1b0
+fl 4f375729
+fl 52413265
+qf 5394ccc7
+ir -10128
+ir 50522
+ir 25534
+qi 7065
+fl 4db4f7d9
+fl 4fe86291
+fl 5202f3a7
+qf 5435f89a
+ir -62772
+ir -14244
+ir 59115
+qi 33684
+fl 4edfa58f
+fl 4cee6d2e
+fl 52a0e0d1
+qf 527a2f90
+ir 12765
+ir -32587
+ir -59995
+qi -18260
+fl 4f2d12f3
+fl 4fdba0b8
+fl 5258948a
+qf 54366c48
+ir -60793
+ir 34016
+ir 61436
+qi -45780
+fl 4e54e13a
+fl 4f0094f0
+fl 52ae76d6
+qf 51841a72
+ir -5960
+ir -49019
+ir 35527
+qi -44432
+fl 4efb2212
+fl 4ea03401
+fl 53454fc6
+qf 5380bda7
+ir 39365
+ir -61284
+ir 9089
+qi -14807
+fl 4e035809
+fl 4f7a2e41
+fl 5135c43c
+qf 53bbe06e
+ir 36619
+ir -58408
+ir -61763
+qi -30826
+fl 4ee020ef
+fl 4f6bb1b3
+fl 531915af
+qf 54130460
+ir -48710
+ir 3158
+ir 55796
+qi -11062
+fl 4f6ba917
+fl 4f579c8a
+fl 52857a26
+qf 5417b893
+ir -11483
+ir 64754
+ir -36435
+qi -45078
+fl 4f5f7394
+fl 4fd1d388
+fl 52830b71
+qf 532d9418
+ir 28555
+ir 41411
+ir -672
+qi -29587
+fl 4f50ff62
+fl 4f892c96
+fl 5346c139
+qf 5405b988
+ir 43946
+ir 61606
+ir -38268
+qi 9308
+fl 4f1a445b
+fl 4f570c5f
+fl 533c5ce4
+qf 53f3d537
+ir 36884
+ir 21460
+ir 20649
+qi 21905
+fl 4ebb0b94
+fl 4fcf8fab
+fl 5312f607
+qf 54587609
+ir 38804
+ir 48612
+ir 61590
+qi 9978
+fl 4f62bc64
+fl 4f8f2f71
+fl 52465891
+qf 543fcc40
+ir -30565
+ir -13376
+ir 37056
+qi 5588
+fl 4eadbb1e
+fl 4f822810
+fl 526fbae3
+qf 54298d5b
+ir -15345
+ir 32369
+ir 24992
+qi 19186
+fl 4f64e876
+fl 4f62a407
+fl 52c6e252
+qf 53dae52d
+ir 26210
+ir -1095
+ir 25779
+qi 22517
+fl 4f7ddd46
+fl 4f9f0006
+fl 522c788e
+qf 5440d6b5
+ir -38321
+ir 12771
+ir -30417
+qi 31891
+fl 4f6ce531
+fl 4fad01d0
+fl 5332b592
+qf 54012289
+ir 57135
+ir 12376
+ir 20909
+qi -35885
+fl 4ee0af48
+fl 4fe2ecb4
+fl 52843583
+qf 52fc1849
+ir 14140
+ir -31809
+ir -8597
+qi -14004
+fl 4f566f90
+fl 4fcd636c
+fl 5252bb01
+qf 544f8187
+ir -19283
+ir 59844
+ir -55347
+qi -18837
+fl 4f68076c
+fl 4f852faf
+fl 51fba6b8
+qf 53c67b30
+ir -61679
+ir 15835
+ir 36167
+qi 34731
+fl 4e3944a8
+fl 4f81ea00
+fl 53000392
+qf 536d1479
+ir -29501
+ir 38274
+ir -25369
+qi 35292
+fl 4f77151d
+fl 4dd0f188
+fl 51e60dd0
+qf 54126747
+ir 65252
+ir -57367
+ir -57327
+qi 32606
+fl 4f418d82
+fl 4fd7c800
+fl 52ef89e6
+qf 54720150
+ir 20676
+ir 33278
+ir -62930
+qi -25243
+fl 4f239036
+fl 4d3f5924
+fl 53345b3f
+qf 52c80ea0
+ir -20982
+ir 5437
+ir -8597
+qi -61131
+fl 4ea34593
+fl 4fa5bf30
+fl 52a0ecf7
+qf 53e1e870
+ir -23145
+ir -23347
+ir 33207
+qi 3428
+fl 4eac565e
+fl 4cbd4d60
+fl 53112eaf
+qf 540c178d
+ir 8563
+ir 451
+ir -51547
+qi -41187
+fl 4e995bbe
+fl 4fe604e5
+fl 52643359
+qf 53b69668
+ir -28997
+ir 3223
+ir -20248
+qi -29864
+fl 4f698e76
+fl 4f77ce0e
+fl 5347739f
+qf 535f2735
+ir 8930
+ir -24794
+ir -14724
+qi 29733
+fl 4e3f39d6
+fl 4fa84787
+fl 52f30ddd
+qf 5459154b
+ir 52791
+ir -59454
+ir -47927
+qi -31264
+fl 4f3aac12
+fl 4fbb449d
+fl 532de05b
+qf 5211c15a
+ir -57840
+ir 9016
+ir 55358
+qi -37765
+fl 4dae2d42
+fl 4ee02ab4
+fl 52260211
+qf 54565072
+ir -60556
+ir -14136
+ir 50491
+qi 20665
+fl 4eb74587
+fl 4f67f9d3
+fl 52df1f29
+qf 53b8e714
+ir -14915
+ir -22405
+ir -38578
+qi -25234
+fl 4eaeecd5
+fl 4fad876a
+fl 520a1bd5
+qf 53a3462a
+ir -29956
+ir -11963
+ir 7180
+qi 19650
+fl 4edbe969
+fl 4fd30963
+fl 520ba573
+qf 54230277
+ir 21151
+ir 37360
+ir 3858
+qi 48493
+fl 4f03ac93
+fl 4d20d33e
+fl 52c7674d
+qf 53b792a6
+ir 57633
+ir -54089
+ir -49929
+qi -61446
+fl 4e086c66
+fl 4e4937b5
+fl 533d206a
+qf 543e5da4
+ir -20927
+ir 25357
+ir 20286
+qi -62458
+fl 4f435c78
+fl 4fae4351
+fl 531dbab8
+qf 542aed85
+ir 18831
+ir -39946
+ir 41860
+qi 36224
+fl 4f5dd55b
+fl 4e910102
+fl 529fa804
+qf 539d5ac2
+ir 23494
+ir -15121
+ir 16523
+qi -34328
+fl 4ee6d4b1
+fl 4feecbaf
+fl 528fb086
+qf 540f75eb
+ir -25147
+ir 53848
+ir -25650
+qi 15761
+fl 4f0bf79b
+fl 4ff0e16a
+fl 526b1bb0
+qf 537eda4d
+ir 28823
+ir 45501
+ir -30517
+qi -12064
+fl 4f48f607
+fl 4e1c75ef
+fl 53367298
+qf 544fadb6
+ir -56207
+ir -31340
+ir -29910
+qi 17804
+fl 4d3f1b26
+fl 4e9ab9d1
+fl 5247f015
+qf 5419c080
+ir 28405
+ir 65340
+ir -62106
+qi 56286
+fl 4e34924f
+fl 4feace23
+fl 52a70942
+qf 54427e24
+ir 5052
+ir 37199
+ir -21067
+qi 40944
+fl 4d86683f
+fl 4f3689bc
+fl 53248a31
+qf 53931525
+ir -43916
+ir 49565
+ir 60214
+qi 36592
+fl 4dab7765
+fl 4ffc82c4
+fl 516909d2
+qf 53c12a35
+ir -40838
+ir -4255
+ir 64963
+qi 17500
+fl 4ee5e98e
+fl 4c18ea1b
+fl 530dbaa9
+qf 53c50440
+ir 44643
+ir -49284
+ir 35533
+qi 12100
+fl 4f6999ac
+fl 4e3f5d36
+fl 525664e8
+qf 5466414e
+ir 60480
+ir 17873
+ir 14903
+qi 20365
+fl 4ef382c5
+fl 4e45b372
+fl 52b84d3b
+qf 53c535ee
+ir 1558
+ir 28689
+ir 58903
+qi 31530
+fl 4ef94f1c
+fl 4fb576af
+fl 52b41a31
+qf 54146114
+ir -23453
+ir -54400
+ir 16570
+qi -54430
+fl 4f657570
+fl 4fd1f39e
+fl 51a95c81
+qf 53e3fcff
+ir -35048
+ir 15513
+ir -43925
+qi -11761
+fl 4e39552f
+fl 4b760b05
+fl 53134f89
+qf 50b3e2e2
+ir -23578
+ir -15223
+ir -53034
+qi -18726
+fl 4ef83e76
+fl 4f87c7d4
+fl 5341d0a7
+qf 542e9c32
+ir -16052
+ir -528
+ir -36361
+qi 23682
+fl 4ed5f597
+fl 4fc05540
+fl 51e1c327
+qf 54081efd
+ir -5564
+ir 53082
+ir -62213
+qi 28180
+fl 4eff4f48
+fl 4ff42881
+fl 52a17570
+qf 5428eb7a
+ir 43246
+ir -4254
+ir 63375
+qi 13361
+fl 4ec815cf
+fl 4f60bb43
+fl 52b24959
+qf 529e5fbc
+ir -18133
+ir 31608
+ir 52833
+qi 37453
+fl 4f353c2b
+fl 4f3c23ef
+fl 52e56144
+qf 54344a53
+ir 63101
+ir -28758
+ir 38892
+qi -29716
+fl 4f77d83f
+fl 4f0bd208
+fl 51c50ce6
+qf 52b17836
+ir 11035
+ir -23809
+ir -57137
+qi -44572
+fl 4ef46e74
+fl 4fea4859
+fl 52d02bf6
+qf 541ebd71
+ir -5995
+ir -54994
+ir -51394
+qi 55200
+fl 4e8f859b
+fl 4f1e1a8a
+fl 52a1f968
+qf 53f1a49c
+ir -60175
+ir -49196
+ir 15182
+qi 61529
+fl 4f3caf03
+fl 4f1e2904
+fl 511470e2
+qf 5413d64b
+ir 27045
+ir -1433
+ir -60877
+qi 62556
+fl 4f647f40
+fl 4fe03a44
+fl 5300b439
+qf 541db6c7
+ir 50257
+ir 13704
+ir 35506
+qi -4536
+fl 4f01e89b
+fl 4e1f418f
+fl 50b0cf43
+qf 53d7223a
+ir 56216
+ir -18561
+ir 43346
+qi -44978
+fl 4e53190e
+fl 4fd5e0cf
+fl 52fd0b03
+qf 536c290f
+ir 44294
+ir 51441
+ir 8981
+qi 12657
+fl 4f671219
+fl 4f48c9bf
+fl 523f4af2
+qf 546680c1
+ir 52063
+ir -41432
+ir -31288
+qi 4806
+fl 4e7d9cf6
+fl 4f4cb218
+fl 52ee90dd
+qf 53fb2def
+ir -26820
+ir 24185
+ir -53971
+qi 11443
+fl 4e336f73
+fl 4f6d41e0
+fl 52088166
+qf 53d6006c
+ir 24162
+ir 38048
+ir -54128
+qi 17457
+fl 4f427735
+fl 4cc08e25
+fl 522e288e
+qf 534dd4f4
+ir 24746
+ir -42979
+ir -15222
+qi 2059
+fl 4eb19ca5
+fl 4fbab741
+fl 5246f0d6
+qf 545dc9ba
+ir -13340
+ir 3308
+ir 54530
+qi -2530
+fl 4f7221db
+fl 4fba2dd0
+fl 52a9187f
+qf 542d9a34
+ir 58018
+ir 11299
+ir -1099
+qi 51352
+fl 4e6e3b33
+fl 4fa1ad43
+fl 5336a12b
+qf 53fb531e
+ir -19393
+ir 42314
+ir 47047
+qi 27451
+fl 4f4e7fec
+fl 4f23a0e6
+fl 53179189
+qf 53124948
+ir -61684
+ir 3460
+ir 64311
+qi -34662
+fl 4e36ad3f
+fl 4fe78c13
+fl 530ef3c4
+qf 5319bb83
+ir -22508
+ir 16081
+ir 2861
+qi 16216
+fl 4e330d96
+fl 4f912b22
+fl 51f6a85c
+qf 53e8ea70
+ir 54850
+ir 48903
+ir 28799
+qi 20333
+fl 4f08fa64
+fl 4e214a42
+fl 52e67ee4
+qf 5429279d
+ir 45409
+ir 33609
+ir -65050
+qi -28830
+fl 4f490751
+fl 4f89a79e
+fl 5318cd77
+qf 543150b4
+ir -6184
+ir 27155
+ir -15947
+qi -9839
+fl 4f3f214b
+fl 4f7718e1
+fl 520c6625
+qf 51612de3
+ir 12408
+ir -60619
+ir 24866
+qi 8552
+fl 4ede3c13
+fl 4fc8fb0a
+fl 52b02739
+qf 542d537b
+ir 57425
+ir -28106
+ir 47968
+qi 8357
+fl 4f62682e
+fl 4f8e1e69
+fl 530017a1
+qf 52b31809
+ir -8472
+ir -10987
+ir 33559
+qi -29543
+fl 4f75d646
+fl 4fdc4a1a
+fl 52a0113b
+qf 53513360
+ir -2638
+ir 32345
+ir -21241
+qi -11418
+fl 4ef15242
+fl 4fe5e00d
+fl 534230fe
+qf 53c092f5
+ir 19012
+ir -41257
+ir -9501
+qi -40638
+fl 4f5d5c60
+fl 4e0c1376
+fl 5313ce86
+qf 544a0d8d
+ir -19195
+ir 45236
+ir -54879
+qi -37452
+fl 4ee9b829
+fl 4f298be1
+fl 52a099e8
+qf 5456a11a
+ir -26402
+ir 45694
+ir -45350
+qi -44845
+fl 4ea53502
+fl 4f9564ed
+fl 5325ecb9
+qf 5350fc12
+ir 58047
+ir 18024
+ir -7947
+qi 24716
+fl 4e3a1c23
+fl 4f5a0e2d
+fl 532d8b3f
+qf 538fc5f7
+ir 59998
+ir 50941
+ir 65075
+qi -43558
+fl 4f1ac7c5
+fl 4f8dd51f
+fl 527ac2ef
+qf 543fc92a
+ir -61421
+ir 22491
+ir -47396
+qi 14861
+fl 4d997913
+fl 4fb2acdd
+fl 52a6bd1f
+qf 5422611e
+ir -55739
+ir -27064
+ir 18206
+qi -9210
+fl 4f6fb378
+fl 4f09d413
+fl 52bb4736
+qf 54634482
+ir -2264
+ir 45754
+ir -668
+qi -12937
+fl 4f10cc77
+fl 4c80a4d7
+fl 529afb31
+qf 54770b44
+ir 35422
+ir -22125
+ir 8756
+qi -6107
+== qrand ==
+qr 852656806
+qr -438629137
+qr 1023442532
+qr 1580485141
+qr 1639408594
+qr -205612757
+qr 1989334640
+qr 1055483825
+qr -1562573378
+qr -1442431193
+qr -1218671300
+qr 361047309
+qr 596464746
+qr -102761757
+qr 1929146056
+qr 1418518057
+qr -1170277418
+qr 1393526879
+qr -709097708
+qr -1157517563
+qr -2059311102
+qr 1873437595
+qr 1981522464
+qr -1652788319
+qr -500644626
+qr -241973097
+qr -1122087956
+qr 1191823357
+qr 704249498
+qr 1303950163
+qrn 3f02a600
+qrn 3d4ef000
+qrn 3efcc800
+qrn 3e942a00
+qrn 3ec7a400
+qrn 3f192b00
+qrn 3f567000
+qrn 3ecf6200
+qrn 3cb7c000
+qrn 3e7c9c00
+qrn 3f0d3c00
+qrn 3e143400
+qrn 3ea8d400
+qrn 3f7ae300
+qrn 3edd9000
+qrn 3f5e2900
+qrn 3f7bd600
+qrn 3f085f00
+qrn 3ce28000
+qrn 3f2f0500
+qrn 3ed00400
+qrn 3ec73600
+qrn 3f222000
+qrn 3ee74200
+qrn 3f44ee00
+qrn 3f489700
+qrn 3e97d800
+qrn 3f47fd00
+qrn 3f7e9a00
+qrn 3f335300
+qcr 3ca98000
+qcr bf662200
+qcr bc4e0000
+qcr bed7ac00
+qcr be617000
+qcr 3e495800
+qcr 3f2ce000
+qcr be427800
+qcr bf748400
+qcr bf01b200
+qcr 3dd3c000
+qcr bf35e600
+qcr beae5800
+qcr 3f75c600
+qcr be09c000
+qcr 3f3c5200
+qcr 3f77ac00
+qcr 3d85f000
+qcr bf71d800
+qcr 3ebc1400
+qcr be3ff000
+qcr be632800
+qcr 3e888000
+qcr bdc5f000
+qcr 3f09dc00
+qcr 3f112e00
+qcr bed05000
+qcr 3f0ffa00
+qcr 3f7d3400
+qcr 3ecd4c00
+qr -69068
+qr -475490395
+qr 1968820258
+qr 1486841147
+qr 1963134784
+qr -361138623
+qr 1686503182
+qr 1280242743
+qr 299326220
+qr -1809873763
+qr -1147786566
+qr 36022515
+qr 1253024152
+qr 1534140089
+qr 383647526
+qr -1797243025
+qr -633704732
+qr 659579029
+qr -254154670
+qr -677563477
+== scalars ==
+cc -128 cs -300 log2 8
+cc -128 cs -128 log2 7
+cc -1 cs -1 log2 0
+cc 0 cs 0 log2 0
+cc 1 cs 1 log2 0
+cc 127 cs 127 log2 6
+cc 127 cs 128 log2 7
+cc 127 cs 200 log2 7
+cc -128 cs -32768 log2 15
+cc -128 cs -32768 log2 15
+cc 127 cs 32767 log2 14
+cc 127 cs 32767 log2 15
+cc 127 cs 32767 log2 16
+cc -128 cs -32768 log2 16
+cc 1 cs 1 log2 0
+cc 2 cs 2 log2 1
+cc 3 cs 3 log2 1
+cc 127 cs 255 log2 7
+cc 127 cs 256 log2 8
+cc 127 cs 1023 log2 9
+cc 127 cs 1024 log2 10
+cc 127 cs 32767 log2 30
+rsqrt 3f7f910f fabs 3f800000
+rsqrt 3f105f7d fabs 40490fdb
+rsqrt 5f898367 fabs 00000001
+rsqrt 9f898367 fabs 00000000
+rsqrt 1f7f9110 fabs 7f7fffff
+rsqrt 404a1017 fabs 3dcccccd
+rsqrt 3f34f95e fabs 40000000
+rsqrt 3dcc7b79 fabs 42c80000
+rsqrt 5eff910f fabs 00800000
+rsqrt 3fb4f95e fabs 3f000000
+powf 3fc00000
+powf 40100000
+powf 40a20000
+powf 41cd0800
+powf 442435d0
+powf 48d2a9fc
+b2d 0 bf06964f 00000000 3f59c444
+b2d 17 bf167914 3ed9c433 3f302d49
+b2d 34 be86965f 3f737868 3e265bea
+b2d 51 3f74969a 3e9729f6 00000000
+b2d 68 3f4f1bbd be9e377a bf000000
+b2d 85 3e9729f6 00000000 bf74969a
+b2d 102 3f167914 bed9c433 bf302d49
+b2d 119 bf06964f bf59c444 00000000
+b2d 136 3e1729f6 bf3770ef 3f2e8512
+b2d 153 bf2e8512 3e1729f6 bf3770ef
+b2d -1 00000000 00000000 00000000
+b2d 500 00000000 00000000 00000000
+cb3 00ff3f7f cb4 7fff3f7f
+ncol 3f800000 3f000000 3e800000 3f800000
+cb3 00000000 cb4 7f000000
+ncol 00000000 00000000 00000000 00000000
+cb3 00ffffff cb4 7fffffff
+ncol 3f800000 3f800000 3f800000 3f800000
+cb3 00f29933 cb4 7ff29933
+ncol 3f733333 3e579436 3f21af29 3f800000
+== n2ll ==
+n2ll 3f00
+n2ll 3f3f
+n2ll 0000
+n2ll 8000
+n2ll 291f
+n2ll 3f5f
+== planes ==
+plane 0 ty 0 sb 0 side 1
+plane 0 ty 1 sb 0 side 1
+plane 0 ty 2 sb 0 side 1
+plane 0 ty 3 sb 0 side 1
+plane 1 ty 0 sb 0 side 2
+plane 1 ty 1 sb 0 side 1
+plane 1 ty 2 sb 0 side 2
+plane 1 ty 3 sb 0 side 2
+plane 2 ty 0 sb 0 side 1
+plane 2 ty 1 sb 0 side 1
+plane 2 ty 2 sb 0 side 1
+plane 2 ty 3 sb 0 side 1
+plane 3 ty 0 sb 0 side 2
+plane 3 ty 1 sb 0 side 1
+plane 3 ty 2 sb 0 side 1
+plane 3 ty 3 sb 0 side 1
+plane 4 ty 0 sb 1 side 1
+plane 4 ty 1 sb 1 side 1
+plane 4 ty 2 sb 1 side 1
+plane 4 ty 3 sb 1 side 1
+plane 5 ty 0 sb 2 side 1
+plane 5 ty 1 sb 2 side 1
+plane 5 ty 2 sb 2 side 3
+plane 5 ty 3 sb 2 side 3
+plane 6 ty 0 sb 4 side 1
+plane 6 ty 1 sb 4 side 1
+plane 6 ty 2 sb 4 side 1
+plane 6 ty 3 sb 4 side 0
+plane 7 ty 0 sb 0 side 3
+plane 7 ty 1 sb 0 side 3
+plane 7 ty 2 sb 0 side 2
+plane 7 ty 3 sb 0 side 3
+plane 8 ty 0 sb 7 side 1
+plane 8 ty 1 sb 7 side 1
+plane 8 ty 2 sb 7 side 1
+plane 8 ty 3 sb 7 side 2
+plane 9 ty 0 sb 0 side 2
+plane 9 ty 1 sb 0 side 3
+plane 9 ty 2 sb 0 side 1
+plane 9 ty 3 sb 0 side 1
+plane 10 ty 0 sb 0 side 2
+plane 10 ty 1 sb 0 side 1
+plane 10 ty 2 sb 0 side 2
+plane 10 ty 3 sb 0 side 3
+plane 11 ty 0 sb 5 side 1
+plane 11 ty 1 sb 5 side 1
+plane 11 ty 2 sb 5 side 1
+plane 11 ty 3 sb 5 side 1
+plane 12 ty 0 sb 0 side 1
+plane 12 ty 1 sb 0 side 1
+plane 12 ty 2 sb 0 side 1
+plane 12 ty 3 sb 0 side 1
+plane 13 ty 0 sb 0 side 1
+plane 13 ty 1 sb 0 side 1
+plane 13 ty 2 sb 0 side 1
+plane 13 ty 3 sb 0 side 1
+plane 14 ty 0 sb 0 side 1
+plane 14 ty 1 sb 0 side 1
+plane 14 ty 2 sb 0 side 1
+plane 14 ty 3 sb 0 side 1
+plane 15 ty 0 sb 0 side 1
+plane 15 ty 1 sb 0 side 2
+plane 15 ty 2 sb 0 side 3
+plane 15 ty 3 sb 0 side 1
+plane 16 ty 0 sb 0 side 2
+plane 16 ty 1 sb 0 side 3
+plane 16 ty 2 sb 0 side 1
+plane 16 ty 3 sb 0 side 2
+plane 17 ty 0 sb 0 side 3
+plane 17 ty 1 sb 0 side 1
+plane 17 ty 2 sb 0 side 3
+plane 17 ty 3 sb 0 side 3
+plane 18 ty 0 sb 5 side 1
+plane 18 ty 1 sb 5 side 3
+plane 18 ty 2 sb 5 side 1
+plane 18 ty 3 sb 5 side 2
+plane 19 ty 0 sb 2 side 2
+plane 19 ty 1 sb 2 side 2
+plane 19 ty 2 sb 2 side 2
+plane 19 ty 3 sb 2 side 1
+plane 20 ty 0 sb 2 side 3
+plane 20 ty 1 sb 2 side 2
+plane 20 ty 2 sb 2 side 2
+plane 20 ty 3 sb 2 side 1
+plane 21 ty 0 sb 2 side 1
+plane 21 ty 1 sb 2 side 2
+plane 21 ty 2 sb 2 side 2
+plane 21 ty 3 sb 2 side 1
+plane 22 ty 0 sb 2 side 2
+plane 22 ty 1 sb 2 side 2
+plane 22 ty 2 sb 2 side 2
+plane 22 ty 3 sb 2 side 2
+plane 23 ty 0 sb 2 side 1
+plane 23 ty 1 sb 2 side 1
+plane 23 ty 2 sb 2 side 1
+plane 23 ty 3 sb 2 side 1
+plane 24 ty 0 sb 0 side 1
+plane 24 ty 1 sb 0 side 2
+plane 24 ty 2 sb 0 side 1
+plane 24 ty 3 sb 0 side 0
+plane 25 ty 0 sb 2 side 2
+plane 25 ty 1 sb 2 side 2
+plane 25 ty 2 sb 2 side 2
+plane 25 ty 3 sb 2 side 2
+plane 26 ty 0 sb 0 side 1
+plane 26 ty 1 sb 0 side 1
+plane 26 ty 2 sb 0 side 1
+plane 26 ty 3 sb 0 side 1
+plane 27 ty 0 sb 0 side 1
+plane 27 ty 1 sb 0 side 2
+plane 27 ty 2 sb 0 side 1
+plane 27 ty 3 sb 0 side 2
+plane 28 ty 0 sb 2 side 2
+plane 28 ty 1 sb 2 side 2
+plane 28 ty 2 sb 2 side 2
+plane 28 ty 3 sb 2 side 2
+plane 29 ty 0 sb 5 side 1
+plane 29 ty 1 sb 5 side 1
+plane 29 ty 2 sb 5 side 1
+plane 29 ty 3 sb 5 side 1
+== vecmath ==
+i 0
+av 3f800000 00000000 80000000 00000000 bf800000 80000000 00000000 00000000 3f800000
+va c3870000 00000000 00000000
+vn 00000000 00000000 00000000 00000000
+vn2 00000000 00000000 00000000 00000000
+vl 00000000 vls 00000000
+dist 3f800000 dsq 3f800000
+dh 3f800000 dhs 3f800000
+vcmp 0 1
+cross 00000000 00000000 00000000
+dot 00000000 _dot 00000000
+dpn 00000000
+vinv 80000000 80000000 80000000
+vma 40200000 00000000 00000000
+vadd 3f800000 00000000 00000000
+vsub bf800000 00000000 00000000
+vscale 00000000 00000000 00000000
+v4s 00000000 00000000 00000000 40000000
+proj 00000000 00000000 00000000
+mnv 00000000 80000000 00000000 80000000 00000000 00000000
+perp SKIP
+rot SKIP
+pfp 1 00000000 00000000 bf800000 00000000
+angsub 00000000
+angssub bf800000 00000000 00000000
+lerp 00000000
+an360 00000000 an180 00000000 amod 00000000 adel 00000000
+rfb 3f800000
+d2b 0
+gclose 0 00000000 00000000 00000000
+gdist 3f800000
+a2a 3f800000 00000000 80000000 00000000 3f800000 00000000 00000000 00000000 3f800000
+vrot 3f800000 00000000 00000000
+acopy 00000000 3f800000 00000000
+rad 00000000 3f800000 00000000
+aclear 3f800000 3f800000 3f800000
+mm 00000000 00000000 00000000
+bounds 00000000 00000000 00000000 3f800000 00000000 00000000
+i 1
+av 3f7ff605 00000000 bc8ef859 00000000 bf800000 80000000 3c8ef859 00000000 3f7ff605
+va 80000000 00000000 00000000
+vn 3f800000 3f800000 00000000 00000000
+vn2 3f800000 3f800000 00000000 00000000
+vl 3f800000 vls 3f800000
+dist 3fb504f3 dsq 40000000
+dh 3fb504f3 dhs 40000000
+vcmp 0 1
+cross 00000000 00000000 3f800000
+dot 00000000 _dot 00000000
+dpn 00000000
+vinv bf800000 80000000 80000000
+vma 3f800000 40200000 00000000
+vadd 3f800000 3f800000 00000000
+vsub 3f800000 bf800000 00000000
+vscale 3fc00000 00000000 00000000
+v4s 40000000 00000000 00000000 00000000
+proj 3f800000 00000000 00000000
+mnv 00000000 bf800000 00000000 80000000 00000000 3f800000
+perp 00000000 3f800000 00000000
+rot 00000000 3f7ff605 3c8ef859
+pfp 1 bf13cd3a bf13cd3a bf13cd3a bf13cd3a
+angsub 3f800000
+angssub 3f800000 bf800000 00000000
+lerp 3f800000
+an360 3f7ff000 an180 3f7ff000 amod 3f7ff000 adel 3f7ff000
+rfb 3fb504f3
+d2b 52
+gclose 1 3f3504f2 3e95f61c 00000000
+gdist 3fa13017
+a2a 3f7ff605 00000000 bc8ef859 00000000 3f800000 00000000 3c8ef859 00000000 3f7ff605
+vrot 00000000 3f800000 00000000
+acopy 00000000 3f800000 00000000
+rad 00000000 3f800000 00000000
+aclear 3f800000 3f800000 3f800000
+mm 00000000 00000000 3f800000
+bounds 00000000 00000000 00000000 3f800000 3f800000 00000000
+i 2
+av 3f7ff605 3c8ef859 80000000 3c8ef859 bf7ff605 80000000 00000000 00000000 3f800000
+va 80000000 42b40000 00000000
+vn 3f800000 00000000 3f800000 00000000
+vn2 3f800000 00000000 3f800000 00000000
+vl 3f800000 vls 3f800000
+dist 3fb504f3 dsq 40000000
+dh 3f800000 dhs 3f800000
+vcmp 0 1
+cross 3f800000 00000000 00000000
+dot 00000000 _dot 00000000
+dpn 00000000
+vinv 80000000 bf800000 80000000
+vma 00000000 3f800000 40200000
+vadd 00000000 3f800000 3f800000
+vsub 00000000 3f800000 bf800000
+vscale 00000000 3fc00000 00000000
+v4s 00000000 40000000 00000000 00000000
+proj 00000000 3f800000 00000000
+mnv 00000000 80000000 3f800000 bf800000 00000000 00000000
+perp 3f800000 00000000 00000000
+rot 00000000 00000000 3f800000
+pfp 1 bf13cd3a 3f13cd3a 3f13cd3a 3f13cd3a
+angsub bf800000
+angssub 00000000 3f800000 bf800000
+lerp 00000000
+an360 00000000 an180 00000000 amod 00000000 adel bf7ff000
+rfb 3fb504f3
+d2b 32
+gclose 1 00000000 3f3504f2 3e95f61c
+gdist 3fa13017
+a2a 3f7ff605 3c8ef859 80000000 bc8ef859 3f7ff605 00000000 00000000 00000000 3f800000
+vrot 00000000 00000000 3f800000
+acopy bc8ef859 3f7ff605 00000000
+rad 399fb0e7 bc8ef2c6 3f7ff605
+aclear 3f800000 3f800000 3f800000
+mm 00000000 3f800000 00000000
+bounds 00000000 00000000 00000000 00000000 3f800000 3f800000
+i 3
+av 3f800000 00000000 80000000 00000000 bf7ff605 bc8ef859 00000000 bc8ef859 3f7ff605
+va c2b40000 00000000 00000000
+vn 3f800000 00000000 00000000 3f800000
+vn2 3f800000 00000000 00000000 3f800000
+vl 3f800000 vls 3f800000
+dist 3fb504f3 dsq 40000000
+dh 3f800000 dhs 3f800000
+vcmp 0 1
+cross 00000000 bf800000 00000000
+dot 00000000 _dot 00000000
+dpn 00000000
+vinv 80000000 80000000 bf800000
+vma c0200000 00000000 3f800000
+vadd bf800000 00000000 3f800000
+vsub 3f800000 00000000 3f800000
+vscale 00000000 00000000 3fc00000
+v4s 00000000 00000000 40000000 c0000000
+proj 00000000 00000000 3f800000
+mnv 3f800000 80000000 00000000 80000000 bf800000 00000000
+perp 3f800000 00000000 00000000
+rot bf800000 00000000 00000000
+pfp 1 3f13cd3a 3f13cd3a bf13cd3a bf13cd3a
+angsub 00000000
+angssub 3f800000 00000000 3f800000
+lerp 00000000
+an360 00000000 an180 00000000 amod 00000000 adel 00000000
+rfb 3fb504f3
+d2b 5
+gclose 1 be95f61c 00000000 3f3504f2
+gdist 3fa13017
+a2a 3f800000 00000000 80000000 00000000 3f7ff605 3c8ef859 00000000 bc8ef859 3f7ff605
+vrot bf800000 00000000 00000000
+acopy 00000000 3f7ff605 3c8ef859
+rad 00000000 3f800000 00000000
+aclear 3f800000 3f800000 3f800000
+mm bf800000 00000000 00000000
+bounds bf800000 00000000 00000000 00000000 00000000 3f800000
+i 4
+av 3f7ff605 00000000 3c8ef859 00000000 bf800000 80000000 bc8ef859 80000000 3f7ff605
+va 80000000 43340000 00000000
+vn 3f800000 bf800000 00000000 00000000
+vn2 3f800000 bf800000 00000000 00000000
+vl 3f800000 vls 3f800000
+dist 3fb504f3 dsq 40000000
+dh 3fb504f3 dhs 40000000
+vcmp 0 1
+cross 00000000 00000000 3f800000
+dot 00000000 _dot 00000000
+dpn 00000000
+vinv 3f800000 80000000 80000000
+vma bf800000 c0200000 00000000
+vadd bf800000 bf800000 00000000
+vsub bf800000 3f800000 00000000
+vscale bfc00000 00000000 00000000
+v4s c0000000 00000000 00000000 00000000
+proj bf800000 00000000 00000000
+mnv 00000000 3f800000 00000000 00000000 80000000 3f800000
+perp 00000000 3f800000 00000000
+rot 00000000 bf7ff605 bc8ef859
+pfp 1 bf13cd3a bf13cd3a bf13cd3a 3f13cd3a
+angsub bf800000
+angssub bf800000 3f800000 00000000
+lerp bf800000
+an360 43b38008 an180 bf7ff000 amod 43b38008 adel bf7ff000
+rfb 3fb504f3
+d2b 143
+gclose 1 bf3504f2 be95f61c 00000000
+gdist 3fa13017
+a2a 3f7ff605 00000000 3c8ef859 00000000 3f800000 00000000 bc8ef859 80000000 3f7ff605
+vrot 00000000 bf800000 00000000
+acopy 00000000 3f800000 00000000
+rad 00000000 3f800000 00000000
+aclear 3f800000 3f800000 3f800000
+mm 00000000 00000000 3f800000
+bounds bf800000 bf800000 00000000 00000000 00000000 00000000
+i 5
+av 3f7ff605 bc8ef859 80000000 bc8ef859 bf7ff605 80000000 00000000 80000000 3f800000
+va 80000000 43870000 00000000
+vn 3f800000 00000000 bf800000 00000000
+vn2 3f800000 00000000 bf800000 00000000
+vl 3f800000 vls 3f800000
+dist 3fb504f3 dsq 40000000
+dh 3f800000 dhs 3f800000
+vcmp 0 1
+cross 3f800000 00000000 00000000
+dot 00000000 _dot 00000000
+dpn 00000000
+vinv 80000000 3f800000 80000000
+vma 00000000 bf800000 c0200000
+vadd 00000000 bf800000 bf800000
+vsub 00000000 bf800000 3f800000
+vscale 00000000 bfc00000 00000000
+v4s 00000000 c0000000 00000000 00000000
+proj 00000000 bf800000 00000000
+mnv 00000000 00000000 bf800000 bf800000 80000000 80000000
+perp 3f800000 00000000 00000000
+rot 00000000 00000000 bf800000
+pfp 1 bf678f8b 3e9a5fb2 3e9a5fb2 be9a5fb2
+angsub 3f800000
+angssub 00000000 bf800000 3f800000
+lerp 00000000
+an360 00000000 an180 00000000 amod 00000000 adel 3f7ff000
+rfb 3fb504f3
+d2b 104
+gclose 1 00000000 bf423dfb be770814
+gdist 4017e8d6
+a2a 3f7ff605 bc8ef859 80000000 3c8ef859 3f7ff605 00000000 00000000 80000000 3f800000
+vrot 00000000 00000000 bf800000
+acopy 3c8ef859 3f7ff605 00000000
+rad 399fb0e7 3c8ef2c6 3f7ff605
+aclear 3f800000 3f800000 3f800000
+mm 00000000 3f800000 00000000
+bounds 00000000 bf800000 bf800000 00000000 00000000 00000000
+i 6
+av 3f800000 00000000 80000000 00000000 bf7ff605 3c8ef859 00000000 3c8ef859 3f7ff605
+va c3870000 00000000 00000000
+vn 3f800000 00000000 00000000 bf800000
+vn2 3f800000 00000000 00000000 bf800000
+vl 3f800000 vls 3f800000
+dist 401cc471 dsq 40c00000
+dh 3fb504f3 dhs 40000000
+vcmp 0 1
+cross 3f800000 bf800000 00000000
+dot bf800000 _dot bf800000
+dpn bf13cd3a
+vinv 80000000 80000000 3f800000
+vma 40200000 40200000 3fc00000
+vadd 3f800000 3f800000 00000000
+vsub bf800000 bf800000 c0000000
+vscale 00000000 00000000 bfc00000
+v4s 00000000 00000000 c0000000 40000000
+proj 3de38e3a 3de38e3a bf638e39
+mnv bf800000 00000000 00000000 80000000 bf800000 80000000
+perp 3f800000 00000000 00000000
+rot 3f800000 3f800000 3f800000
+pfp 1 bf3504f3 3f3504f3 00000000 00000000
+angsub 00000000
+angssub bf800000 bf800000 c0000000
+lerp 00000000
+an360 00000000 an180 00000000 amod 00000000 adel 00000000
+rfb 3fddb3d7
+d2b 84
+gclose 0 00000000 00000000 bf800000
+gdist 3fb504f3
+a2a 3f800000 00000000 80000000 00000000 3f7ff605 bc8ef859 00000000 3c8ef859 3f7ff605
+vrot 3f800000 3f7b7e42 3f8236e4
+acopy 00000000 3f7ff605 bc8ef859
+rad 00000000 3f800000 00000000
+aclear 3f800000 3f800000 3f800000
+mm bf800000 00000000 3f800000
+bounds 00000000 00000000 bf800000 3f800000 3f800000 3f800000
+i 7
+av 3f7fec0a 3c8ef2c6 bc8ef859 3c8c741b bf7fec63 bc8ef2c6 3c916bf7 bc8c741b 3f7fec0a
+va c20d0ebc 42340000 00000000
+vn 3fddb3d7 3f13cd3a 3f13cd3a 3f13cd3a
+vn2 3fddb3d7 3f13cd3a 3f13cd3a 3f13cd3a
+vl 3fddb3d7 vls 40400000
+dist 405db3d7 dsq 41400000
+dh 403504f3 dhs 41000000
+vcmp 0 1
+cross 00000000 00000000 00000000
+dot c0400000 _dot c0400000
+dpn bf7fffff
+vinv bf800000 bf800000 bf800000
+vma bfc00000 bfc00000 bfc00000
+vadd 00000000 00000000 00000000
+vsub 40000000 40000000 40000000
+vscale 3fc00000 3fc00000 3fc00000
+v4s 40000000 40000000 40000000 c0000000
+proj 3f2aaaaa 3f2aaaaa 3f2aaaaa
+mnv 00000000 bf800000 00000000 bf800000 00000000 3f800000
+perp 3f7c1765 bdfc1767 bdfc1767
+rot c06e89d2 c03b18b8 c03944d2
+pfp 1 bf48d2ab 3f169e00 3e48d2ab b2800000
+angsub 00000000
+angssub 40000000 40000000 40000000
+lerp 3f800000
+an360 3f7ff000 an180 3f7ff000 amod 3f7ff000 adel 00000000
+rfb 3fddb3d7
+d2b 50
+gclose 0 3f800000 3f800000 3f800000
+gdist 406f7751
+a2a 3f7fec0a 3c8ef2c6 bc8ef859 bc8c741b 3f7fec63 3c8ef2c6 3c916bf7 bc8c741b 3f7fec0a
+vrot bf7febdd bf80002c bf8009e4
+acopy bc8c741b 3f7fec63 3c8ef2c6
+rad bc8c68c2 3f7fec0c 3c917171
+aclear 3f800000 3f800000 3f800000
+mm 40400000 c0800000 bf800000
+bounds bf800000 bf800000 bf800000 3f800000 3f800000 3f800000
+i 8
+av 3f7fec0a bc8ef2c6 3c8ef859 bc917171 bf7febb1 3c8ef2c6 bc8c6e6f 3c917171 3f7fec0a
+va c3a25e28 43610000 00000000
+vn 3fddb3d7 bf13cd3a bf13cd3a bf13cd3a
+vn2 3fddb3d7 bf13cd3a bf13cd3a bf13cd3a
+vl 3fddb3d7 vls 40400000
+dist 40cf623a dsq 42280000
+dh 40cce665 dhs 42240000
+vcmp 0 1
+cross 40800000 c0400000 bf800000
+dot c0e00000 _dot c0e00000
+dpn bf4eec1e
+vinv 3f800000 3f800000 3f800000
+vma 40d00000 41100000 bf800000
+vadd 40000000 40400000 bf800000
+vsub c0800000 c0a00000 bf800000
+vscale bfc00000 bfc00000 bfc00000
+v4s c0000000 c0000000 c0000000 40c00000
+proj bf7765fe bf7487fd bf800000
+mnv 00000000 3f800000 00000000 bf800000 00000000 3f800000
+perp 3f7c1765 bdfc1767 bdfc1767
+rot 41159040 413a9981 3fe01374
+pfp 1 bf44cde3 3f2212f7 bdb93a3f 3e6788d0
+angsub 00000000
+angssub c0800000 c0a00000 bf800000
+lerp bf800000
+an360 43b38008 an180 bf7ff000 amod 43b38008 adel 00000000
+rfb 40a32b2b
+d2b 160
+gclose 1 3f84920c 3fc5b68e befb6df4
+gdist 4061553c
+a2a 3f7fec0a bc8ef2c6 3c8ef859 3c917171 3f7febb1 bc8ef2c6 bc8c6e6f 3c917171 3f7fec0a
+vrot 403b7972 4081aa2d 3ca07a78
+acopy 3c917171 3f7febb1 bc8ef2c6
+rad 3c91667b 3f7fec0c bc8c741c
+aclear 3f800000 3f800000 3f800000
+mm c0400000 41a00000 41000000
+bounds bf800000 bf800000 bf800000 40400000 40800000 00000000
+i 9
+av 3f7f06c3 3d8eaa5c bd565e3b 3d8edc7b bf7f605c 80000000 3d55d88d 3b6f41c9 3f7fa62f
+va 80000000 4254853a 00000000
+vn 40a00000 3f19999a 3f4ccccd 00000000
+vn2 40a00000 3f19999a 3f4ccccd 00000000
+vl 40a00000 vls 41c80000
+dist 4083f07b dsq 41880000
+dh 403504f3 dhs 41000000
+vcmp 0 1
+cross 41400000 c1100000 40000000
+dot 41300000 _dot 41300000
+dpn 3f168583
+vinv c0400000 c0800000 80000000
+vma 40b00000 41100000 40f00000
+vadd 40800000 40c00000 40400000
+vsub 40000000 40000000 c0400000
+vscale 40900000 40c00000 00000000
+v4s 40c00000 41000000 00000000 40000000
+proj 403c687d 4078d0fb be2c687f
+mnv 3f1f89c0 3f476c30 3d8dcfc7 be8dcfc7 3e54b7aa 3e1f89c0
+perp 00000000 00000000 3f800000
+rot 41cd1caa 42461540 40466f95
+pfp 1 be740d5c 3f5fb6e9 3ed8ef6e 4031f468
+angsub bf800000
+angssub 40000000 40000000 c0400000
+lerp 40400000
+an360 403ff400 an180 403ff400 amod 403ff400 adel bf7ff000
+rfb 40ba9728
+d2b 44
+gclose 0 40400000 40800000 00000000
+gdist 411460be
+a2a 3f7f06c3 3d8eaa5c bd565e3b bd8edc7b 3f7f605c 00000000 3d55d88d 3b6f41c9 3f7fa62f
+vrot 3f7a7faf 3ff67294 40438ba6
+acopy bd8edc7b 3f7f605c 00000000
+rad 3d694187 bd870dff 3f7f06c2
+aclear 3f800000 3f800000 3f800000
+mm 00000000 41c00000 424c0000
+bounds 3f800000 40000000 00000000 40400000 40800000 40400000
+i 10
+av 3f7fce1b 3d0eed33 bc8ef859 3d0b0373 bf7f8068 bd5655e0 3c9da65e bd53bf02 3f7f9c38
+va c25533fe 427dbd63 00000000
+vn 406f7751 3e88d677 3f08d677 3f4d41b2
+vn2 406f7751 3e88d677 3f08d677 3f4d41b2
+vl 406f7751 vls 41600000
+dist 412b94b5 dsq 42e60000
+dh 40ba9728 dhs 42080000
+vcmp 0 1
+cross c1d80000 c0c00000 41500000
+dot c1400000 _dot c1400000
+dpn bebb211b
+vinv bf800000 c0000000 c0400000
+vma c1100000 41680000 c1400000
+vadd c0400000 40e00000 c0400000
+vsub 40a00000 c0400000 41100000
+vscale 3fc00000 40400000 40900000
+v4s 40000000 40800000 40c00000 c1000000
+proj 3f7ded6f 4000a5cd 403f390a
+mnv be26f0c4 bf1c81b8 bf463de9 be9212ac be9212ac 3e9212ac
+perp 3f7ff4ce bc280328 bc7c04bd
+rot c18371a3 426684c4 c2b4a483
+pfp 1 bf5f8954 3bdb410e 3ef98409 3f1a29be
+angsub bf800000
+angssub 40a00000 c0400000 41100000
+lerp 40800000
+an360 3f7ff000 an180 3f7ff000 amod 3f7ff000 adel bf7ff000
+rfb 410c6641
+d2b 10
+gclose 0 c0800000 40a00000 c0c00000
+gdist 42aa9c55
+a2a 3f7fce1b 3d0eed33 bc8ef859 bd0b0373 3f7f8068 3d5655e0 3c9da65e bd53bf02 3f7f9c38
+vrot c06defef 4099fc56 c0ca713a
+acopy bd0b0373 3f7f8068 3d5655e0
+rad 3c98c608 bd0c5e35 3f7fce1c
+aclear 3f800000 3f800000 3f800000
+mm c1200000 43d10000 c4070000
+bounds c0800000 40000000 c0c00000 3f800000 40a00000 40400000
+i 11
+av 3f7e6796 3db20f66 3d8edc7b 3da2a412 bf7dca9f 3dd58d86 bda03220 3dc8e071 3f7dfa39
+va c39e6e48 4300a8e9 00000000
+vn 410c6641 bee9642a 3f11de9a bf2f0b20
+vn2 410c6641 bee9642a 3f11de9a bf2f0b20
+vl 410c6641 vls 429a0000
+dist 42aa9c55 dsq 45e36800
+dh 42aa3029 dhs 45e24800
+vcmp 0 1
+cross 44070000 00000000 c3b40000
+dot 43e10000 _dot 43e10000
+dpn 3f11de9a
+vinv 40800000 c0a00000 40c00000
+vma c0800000 43660000 c0c00000
+vadd c0800000 42be0000 c0c00000
+vsub c0800000 c2aa0000 c0c00000
+vscale c0c00000 40f00000 c1100000
+v4s c1000000 41200000 c1400000 00000000
+proj c0800000 409ffaf1 c0c00000
+mnv 3ed2982c bf0afe08 3f3b6dd5 bece61f0 beebdda0 bdebdd80
+perp 3f7fff15 3b5daa17 bb84ffa7
+rot c4e5aee8 45abdc44 41033a9c
+pfp 1 3f550140 00000000 bf0e00d6 34800000
+angsub c1100000
+angssub c0800000 c2aa0000 c0c00000
+lerp c2680000
+an360 43b20020 an180 c07ff000 amod 43b20020 adel c10ff700
+rfb 42b493ad
+d2b 158
+gclose 0 00000000 42b40000 00000000
+gdist 42b40000
+a2a 3f7e6796 3db20f66 3d8edc7b bda2a412 3f7dca9f bdd58d86 bda03220 3dc8e071 3f7dfa39
+vrot 40fa65a7 42b27278 410d3dcf
+acopy bda2a412 3f7dca9f bdd58d86
+rad bd7c7030 bdbe3834 3f7e6797
+aclear 3f800000 3f800000 3f800000
+mm c1a00000 467d2000 00000000
+bounds c0800000 40a00000 c0c00000 00000000 42b40000 00000000
+i 12
+av b33bbd2e 3f800000 80000000 3f800000 333bbd2e 80000000 00000000 00000000 3f800000
+va 80000000 42b40000 00000000
+vn 42b40000 00000000 3f800000 00000000
+vn2 42b40000 00000000 3f800000 00000000
+vl 42b40000 vls 45fd2000
+dist 42b40000 dsq 45fd2000
+dh 42b40000 dhs 45fd2000
+vcmp 0 1
+cross 00000000 00000000 00000000
+dot 467d2000 _dot 467d2000
+dpn 3f800000
+vinv 80000000 c2b40000 80000000
+vma 00000000 44070000 00000000
+vadd 00000000 43870000 00000000
+vsub 00000000 c2b40000 00000000
+vscale 00000000 43070000 00000000
+v4s 00000000 43340000 00000000 00000000
+proj 00000000 42b3fe94 00000000
+mnv 00000000 80000000 3f800000 c2b40000 00000000 00000000
+perp 3f800000 00000000 00000000
+rot 00000000 49b1fa80 00000000
+pfp 0 00000000 00000000 00000000 00000000
+angsub c2b40000
+angssub 00000000 c2b40000 00000000
+lerp 00000000
+an360 00000000 an180 00000000 amod 00000000 adel c2b40000
+rfb 43340000
+d2b 32
+gclose 0 00000000 43340000 00000000
+gdist 42b40000
+a2a b33bbd2e 3f800000 80000000 bf800000 b33bbd2e 00000000 00000000 00000000 3f800000
+vrot 43340000 b7040104 00000000
+acopy bf800000 b33bbd2e 00000000
+rad 3f800000 333bbd2e b33bbd2e
+aclear 3f800000 3f800000 3f800000
+mm 00000000 473dd800 00000000
+bounds 00000000 42b40000 00000000 00000000 43340000 00000000
+i 13
+av bf800000 b3bbbd2e 80000000 b3bbbd2e 3f800000 80000000 80000000 00000000 3f800000
+va 80000000 42b40000 00000000
+vn 43340000 00000000 3f800000 00000000
+vn2 43340000 00000000 3f800000 00000000
+vl 43340000 vls 46fd2000
+dist 42b40000 dsq 45fd2000
+dh 42b40000 dhs 45fd2000
+vcmp 0 1
+cross 00000000 00000000 00000000
+dot 473dd800 _dot 473dd800
+dpn 3f800000
+vinv 80000000 c3340000 80000000
+vma 00000000 4455c000 00000000
+vadd 00000000 43e10000 00000000
+vsub 00000000 c2b40000 00000000
+vscale 00000000 43870000 00000000
+v4s 00000000 43b40000 00000000 00000000
+proj 00000000 4333ff5e 00000000
+mnv 00000000 80000000 3f800000 c3340000 00000000 00000000
+perp 3f800000 00000000 00000000
+rot 00000000 4b057be0 00000000
+pfp 1 bf3504f4 00000000 3f3504f4 00000000
+angsub c3340000
+angssub 00000000 c2b40000 00000000
+lerp 00000000
+an360 00000000 an180 00000000 amod 00000000 adel 43340000
+rfb 43870000
+d2b 32
+gclose 0 00000000 43340000 00000000
+gdist 43153f85
+a2a bf800000 b3bbbd2e 80000000 33bbbd2e bf800000 00000000 80000000 00000000 3f800000
+vrot b7c60187 c3870000 00000000
+acopy 33bbbd2e bf800000 00000000
+rad 2809aded b3bbbd2e bf800000
+aclear 3f800000 3f800000 3f800000
+mm 00000000 463dd800 44fd2000
+bounds 00000000 43340000 00000000 00000000 43870000 00000000
+i 14
+av 324cde2e bf800000 80000000 bf800000 b24cde2e 80000000 00000000 80000000 3f800000
+va 80000000 42b40000 00000000
+vn 43870000 00000000 3f800000 00000000
+vn2 43870000 00000000 3f800000 00000000
+vl 43870000 vls 478e6200
+dist 4369d3ad dsq 47559300
+dh 436574b4 dhs 474daa00
+vcmp 0 1
+cross 463dd800 00000000 c63dd800
+dot 463dd800 _dot 463dd800
+dpn 3f13cd3b
+vinv 80000000 c3870000 80000000
+vma 42e10000 43bf4000 42e10000
+vadd 42340000 439d8000 42340000
+vsub c2340000 43610000 c2340000
+vscale 00000000 43ca8000 00000000
+v4s 00000000 44070000 00000000 42b40000
+proj bc72b9d6 4386fe1b bc72b9d6
+mnv 00000000 80000000 3f800000 c3870000 00000000 00000000
+perp 3f800000 00000000 00000000
+rot 42340000 4a4839d0 4a4839d0
+pfp 1 bf4d41b3 be88d678 bf08d678 c2905233
+angsub 42b40000
+angssub c2340000 c3070000 c2340000
+lerp 00000000
+an360 00000000 an180 00000000 amod 00000000 adel 42b40000
+rfb 438ab306
+d2b 32
+gclose 0 42340000 42340000 42340000
+gdist 429be273
+a2a 324cde2e bf800000 80000000 3f800000 324cde2e 00000000 00000000 80000000 3f800000
+vrot c2340000 42340000 42340000
+acopy 3f800000 324cde2e 00000000
+rad 3f800000 324cde2e 324cde2e
+aclear 3f800000 3f800000 3f800000
+mm 00000000 465d7c00 00000000
+bounds 00000000 42340000 00000000 42340000 43870000 42340000
+i 15
+av 3effffff 3effffff bf3504f3 3e15f61a bf5a8278 beffffff 3f5a8278 be15f61a 3effffff
+va c20d0ebc 42340000 00000000
+vn 429be273 3f13cd3b 3f13cd3b 3f13cd3b
+vn2 429be273 3f13cd3b 3f13cd3b 3f13cd3b
+vl 429be273 vls 45bdd800
+dist 429be273 dsq 45bdd800
+dh 427e8ef6 dhs 457d2000
+vcmp 0 1
+cross 00000000 457d2000 c57d2000
+dot 457d2000 _dot 457d2000
+dpn 3f13cd3b
+vinv c2340000 c2340000 c2340000
+vma 43870000 42340000 42340000
+vadd 43070000 42340000 42340000
+vsub c2340000 42340000 42340000
+vscale 42870000 42870000 42870000
+v4s 42b40000 42b40000 42b40000 43340000
+proj 4233fa50 42340000 42340000
+mnv bf13c0c3 bf13e623 bf13c0c3 bcd23c00 00000000 3cd23c00
+perp 3f800000 b866271c b866271c
+rot 48320a69 4834c67c 482f2e84
+pfp 1 3f3504f4 00000000 3f3504f4 427e8ef7
+angsub 00000000
+angssub c2340000 42340000 42340000
+lerp 42340000
+an360 42340000 an180 42340000 amod 42340000 adel 00000000
+rfb 42dc743e
+d2b 45
+gclose 0 42340000 42340000 42340000
+gdist 429be273
+a2a 3effffff 3effffff bf3504f3 be15f61a 3f5a8278 3effffff 3f5a8278 be15f61a 3effffff
+vrot 4233ffff c152e215 4299a3bc
+acopy be15f61a 3f5a8278 3effffff
+rad 3f1cc470 bf480eb6 bdf4e2bc
+aclear 3f800000 3f800000 3f800000
+mm 45bdd800 00000000 45fd2000
+bounds 42340000 00000000 00000000 42b40000 42340000 42340000
+i 16
+av b33bbd2e 80000000 bf800000 00000000 bf800000 00000000 3f800000 00000000 b33bbd2e
+va 80000000 00000000 00000000
+vn 42b40000 3f800000 00000000 00000000
+vn2 42b40000 3f800000 00000000 00000000
+vl 42b40000 vls 45fd2000
+dist 42fe8ef6 dsq 467d2000
+dh 42b40000 dhs 45fd2000
+vcmp 0 1
+cross 00000000 c5fd2000 00000000
+dot 00000000 _dot 00000000
+dpn 00000000
+vinv c2b40000 80000000 80000000
+vma 42b40000 00000000 43610000
+vadd 42b40000 00000000 42b40000
+vsub 42b40000 00000000 c2b40000
+vscale 43070000 00000000 00000000
+v4s 43340000 00000000 00000000 00000000
+proj 42b40000 00000000 00000000
+mnv 00000000 bf800000 00000000 80000000 00000000 42b40000
+perp 00000000 3f800000 00000000
+rot 00000000 c5fd2000 bd028581
+pfp 1 3eb2416a 3f5ed1c4 3eb2416a 41faabfd
+angsub 42b40000
+angssub 42b40000 00000000 c2b40000
+lerp 42b40000
+an360 42b40000 an180 42b40000 amod 42b40000 adel 42b40000
+rfb 42fe8ef6
+d2b 52
+gclose 0 42b40000 00000000 00000000
+gdist 43b98a2d
+a2a b33bbd2e 80000000 bf800000 00000000 3f800000 00000000 3f800000 00000000 b33bbd2e
+vrot c2b40000 00000000 b6840104
+acopy 00000000 3f800000 00000000
+rad 00000000 3f800000 00000000
+aclear 3f800000 3f800000 3f800000
+mm c5fd2000 00000000 47ae0600
+bounds 00000000 00000000 00000000 42b40000 00000000 42b40000
+i 17
+av 3f800000 00000000 80000000 80000000 333bbd2e bf800000 00000000 bf800000 b33bbd2e
+va c2b40000 00000000 00000000
+vn 42b40000 00000000 00000000 3f800000
+vn2 42b40000 00000000 00000000 3f800000
+vl 42b40000 vls 45fd2000
+dist 43ce3746 dsq 48261d00
+dh 43493f02 dhs 471e3400
+vcmp 0 1
+cross c67d2000 c5fd2000 00000000
+dot c6bdd800 _dot c6bdd800
+dpn bf4d41b2
+vinv 80000000 80000000 c2b40000
+vma c3610000 43e10000 c4124000
+vadd c2b40000 43340000 c3340000
+vsub 42b40000 c3340000 43b40000
+vscale 00000000 00000000 43070000
+v4s 00000000 00000000 43340000 c3340000
+proj b932544a 39b2544a 42b3ffbd
+mnv 3f800000 80000000 00000000 80000000 c2b40000 00000000
+perp 3f800000 00000000 00000000
+rot c2b40000 49b1fa80 ca057be0
+pfp 1 3e484fc3 3f655581 3ecc4b88 420fa51c
+angsub 00000000
+angssub 42b40000 c3340000 00000000
+lerp 00000000
+an360 00000000 an180 00000000 amod 00000000 adel 00000000
+rfb 43a85fe5
+d2b 5
+gclose 0 00000000 00000000 42b40000
+gdist 444a4729
+a2a 3f800000 00000000 80000000 00000000 b33bbd2e 3f800000 00000000 bf800000 b33bbd2e
+vrot c2b40000 c3870000 c333ffff
+acopy 00000000 b33bbd2e 3f800000
+rad 00000000 3f800000 00000000
+aclear 3f800000 3f800000 3f800000
+mm c5fd2000 c79dda00 491e1d80
+bounds c2b40000 00000000 c3870000 00000000 43340000 42b40000
+i 18
+av 333bbd2e 2789aded 3f800000 bf800000 b3a22168 333bbd2e b3a22168 3f800000 a6163db0
+va c3995980 42e9214e 00000000
+vn 43a85fe5 be88d677 3f08d677 bf4d41b2
+vn2 43a85fe5 be88d677 3f08d677 bf4d41b2
+vl 43a85fe5 vls 47dd7c00
+dist 4497ab40 dsq 49b3b6f0
+dh 442f60e7 dhs 48f04b40
+vcmp 0 1
+cross 46ff3c00 c6fb0400 c6fc6c00
+dot c88e4040 _dot c88e4040
+dpn bf7b6304
+vinv 42b40000 c3340000 43870000
+vma 4449e000 c4336000 44bf4000
+vadd 43868000 c3330000 43e10000
+vsub c3e08000 4406c000 c4778000
+vscale c3070000 43870000 c3ca8000
+v4s c3340000 43b40000 c4070000 44338000
+proj c2b3ffe9 4333fff5 c386fff5
+mnv be88e3bf 3f08d8ef bf4d3dd6 bcaa4000 bd05c800 bc735000
+perp 3f800000 35a9152a b5fd9fc0
+rot 4bc7ca8b cc47abb2 4c962751
+pfp 1 bf152afb 3f12b3ca 3f13862f 00000000
+angsub 42b40000
+angssub c2b20000 43330000 42b40000
+lerp 46bd2400
+an360 43870000 an180 c2b40000 amod 43870000 adel 42b40000
+rfb 445c4009
+d2b 78
+gclose 1 423a4ae0 41806940 41f90a80
+gdist 424d77da
+a2a 333bbd2e 2789aded 3f800000 3f800000 33a22168 b33bbd2e b3a22168 3f800000 a6163db0
+vrot 44340000 43b37ffe c3b38001
+acopy 3f800000 33a22168 b33bbd2e
+rad 33bbbd2e bf800000 00000000
+aclear 3f800000 3f800000 3f800000
+mm c7deb700 45f6d800 c67d2000
+bounds c2b40000 c3b38000 c3870000 43b38000 43340000 44340000
+i 19
+av 3f7fec0a 3c8ef333 3c8ef8c6 3c8ef8c9 bf7ff605 b4bbb5dc bc8ef330 b99fe0c8 3f7ff605
+va c25b3e2a 439d8000 00000000
+vn 445c4009 3ed0a2b0 bed0a2b0 3f513777
+vn2 445c4009 3ed0a2b0 bed0a2b0 3f513777
+vl 445c4009 vls 493d7e20
+dist 4453126c dsq 492e0760
+dh 43f3453b dhs 48672c80
+vcmp 0 1
+cross 4562e000 c55f2000 c5606000
+dot 46fce400 _dot 46fce400
+dpn 3f7b6305
+vinv c3b38000 43b38000 c4340000
+vma 43c00000 c3cc8000 4446c000
+vadd 43b88000 c3bd8000 443b8000
+vsub 43ae8000 c3a98000 442c8000
+vscale 4406a000 c406a000 44870000
+v4s 44338000 c4338000 44b40000 41a00000
+proj 43b36adc c3b355b9 4433e04a
+mnv bed0a1ed 3ed0a258 bf5137be bb600000 bbbb0000 ba960000
+perp 3f800000 3465b657 b4e65a25
+rot 4b3151a9 cb593231 4ba7df53
+pfp 1 bf10fcbe 3f16e407 3f1377b2 be2e4000
+angsub c0000000
+angssub c1300000 41a80000 c1f00000
+lerp c87b5e40
+an360 43b37f54 an180 bf80ac00 amod 43b37f54 adel c0005200
+rfb 445c4009
+d2b 135
+gclose 0 41200000 c1a00000 41f00000
+gdist 4211cc64
+a2a 3f7fec0a 3c8ef333 3c8ef8c6 bc8ef8c9 3f7ff605 34bbb5dc bc8ef330 b99fe0c8 3f7ff605
+vrot 4122be9a c1a15f2c 41ee9dc3
+acopy bc8ef8c9 3f7ff605 34bbb5dc
+rad bc9166e6 3f7fec06 3c8c7484
+aclear 3f800000 3f800000 3f800000
+mm c7ed4ec0 c62b4000 43acc000
+bounds 41200000 c3b38000 41f00000 43b38000 c1a00000 44340000
+i 20
+av 3f6ce819 beac7434 be31d0d4 bec16d2c bf48baea befc1c5c bcf34428 bf0572a5 3f5a5597
+va c25533fe 43944854 00000000
+vn 4215aa92 3e88d677 bf08d677 3f4d41b3
+vn2 4215aa92 3e88d677 bf08d677 3f4d41b3
+vl 4215aa92 vls 44af0000
+dist 4211cc64 dsq 44a6125a
+dh 41ad8731 dhs 43eb4000
+vcmp 0 1
+cross 3f5b9cf0 40fdb9cf 40a00000
+dot 4210da52 _dot 4210da52
+dpn 3f77c445
+vinv c1200000 41a00000 c1f00000
+vma 41340000 c1aa0000 41fe2463
+vadd 41280000 c1a40000 41f5a828
+vsub 41180000 c19c0000 41ea57d8
+vscale 41700000 c1f00000 42340000
+v4s 41a00000 c2200000 42700000 3f800000
+proj c101b4a4 bff25ae0 408c96b4
+mnv 3e8d095f bf099d07 3f4c0619 be3fb3c0 be969f30 be08edc0
+perp 3f800000 38d6018b b9208129
+rot 43b562fa c43ac07b 4485e77b
+pfp 1 3f77251c 3e1a5938 be59dbd6 3e838880
+angsub 41f00000
+angssub 41180000 c19c0000 41ea57d8
+lerp c45e8000
+an360 411ff600 an180 411ff600 amod 411ff600 adel 41effc40
+rfb 4215aa92
+d2b 135
+gclose 0 41200000 c1a00000 41f00000
+gdist 44427a8f
+a2a 3f6ce819 beac7434 be31d0d4 3ec16d2c 3f48baea 3efc1c5c bcf34428 bf0572a5 3f5a5597
+vrot 3f022214 3e148134 3f594eff
+acopy 3ec16d2c 3f48baea 3efc1c5c
+rad 3e8a6675 3e87faa9 3f6ce815
+aclear 3f800000 3f800000 3f800000
+mm 448331ec 43be0e93 45449c3a
+bounds 3f000000 c1a00000 3f3504f4 41200000 bf000000 41f00000
+i 21
+av 3f7ffb02 bc0ef859 bc0ef9be bc10baa4 bf7ff873 bc4a300e 3c0d31db bc4b6f70 3f7ff883
+va c2340001 439d8000 00000000
+vn 3f800000 3f000000 bf000000 3f3504f4
+vn2 3f800000 3f000000 bf000000 3f3504f4
+vl 3f800000 vls 3f800000
+dist 444782a4 dsq 491b7c5e
+dh 4447829f dhs 491b7c56
+vcmp 0 1
+cross 440b7a94 42ae9798 c3a66396
+dot 43e41e0b _dot 43e41e0b
+dpn 3f123fb3
+vinv bf000000 3f000000 bf3504f4
+vma 439a91ec c4f6a0f6 3f35a8cb
+vadd 42f7e979 c44560c5 3f35467d
+vsub c2f5e979 444520c5 3f34c36b
+vscale 3f400000 bf400000 3f87c3b7
+v4s 3f800000 bf800000 3fb504f4 4376e979
+proj 3efffffb beffffe2 3f3504f4
+mnv 3f19e812 bec64bf8 bf32efd4 bf1f93b0 bf464bf9 bddb0858
+perp 3f5db3d7 3e93cd3a bed105ec
+rot 43005423 c4450ea7 c03900fb
+pfp 1 bf59e6ca be0860f7 3f01f897 33000000
+angsub 3f800000
+angssub c2f5e979 42890628 3f34c36b
+lerp be5413d0
+an360 3efff000 an180 3efff000 amod 3efff000 adel 3f7ff000
+rfb 4447a733
+d2b 139
+gclose 0 3f000000 bf000000 3f3504f4
+gdist 3f800000
+a2a 3f7ffb02 bc0ef859 bc0ef9be 3c10baa4 3f7ff873 3c4a300e 3c0d31db bc4b6f70 3f7ff883
+vrot 430254e8 c444f528 412dca28
+acopy 3c10baa4 3f7ff873 3c4a300e
+rad 3c0db624 3f7ffb05 bc1037c0
+aclear 3f800000 3f800000 3f800000
+mm 42ae17da c7be4022 0000c4d6
+bounds 3f000000 c44540c5 3a83126f 42f6e979 bf000000 3f3504f4
+i 22
+av be4a32a9 3f03c4c2 bf55954e bf6f0467 beb76086 37216de8 3e98fd9c bf476a30 bf0d21c3
+va b896755e 438b724b 00000000
+vn 4447a72e 3e1e4c5d bf7cec31 35a81050
+vn2 4447a72e 3e1e4c5d bf7cec31 35a81050
+vl 4447a72e vls 491bb556
+dist 4447a72e dsq 491bb556
+dh 4447a72e dhs 491bb556
+vcmp 0 1
+cross 81d6c9bf 80866e0c 01b52e3c
+dot 01f86578 _dot 01f86578
+dpn 00000000
+vinv c2f6e979 444540c5 ba83126f
+vma 42f6e979 c44540c5 3a83126f
+vadd 42f6e979 c44540c5 3a83126f
+vsub 42f6e979 c44540c5 3a83126f
+vscale 43392f1b c493f094 3ac49ba6
+v4s 4376e979 c4c540c5 3b03126f 00022d84
+proj SKIP
+mnv be1e4c6d 3f7cec30 b73f2cce bc031df7 baa42048 39480000
+perp aaaadbf5 2c087ef7 3f800000
+rot 85bcc309 86cb76c4 01974250
+pfp 0 00000000 00000000 00000000 00000000
+angsub c3278830
+angssub 42f6e979 c28a0628 3a83126f
+lerp 42f5ce9c
+an360 42f6e820 an180 42f6e820 amod 42f6e820 adel c3278938
+rfb 4447a72e
+d2b 104
+gclose 0 000116c2 800116c2 000116c2
+gdist 1ea3964e
+a2a be4a32a9 3f03c4c2 bf55954e 3f6f0467 3eb76086 b7216de8 3e98fd9c bf476a30 bf0d21c3
+vrot 8001af19 0000a06c 000092c2
+acopy 3f6f0467 3eb76086 b7216de8
+rad 3eb3c5fc 3f54ecb6 3edc2d4c
+aclear 3f800000 3f800000 3f800000
+mm c7be4022 81d6c9d1 19416d9a
+bounds 000116c2 c44540c5 000116c2 42f6e979 800116c2 3a83126f
+i 23
+av 3f800000 800004de 800004de 800004de bf800000 800004de 000004de 800004de 3f800000
+va c2b40000 439d8000 00000000
+vn 00000000 000116c2 800116c2 000116c2
+vn2 00000000 00000000 00000000 00000000
+vl 00000000 vls 00000000
+dist 1ea3964e dsq 00034446
+dh 1e85917e dhs 00022d84
+vcmp 0 1
+cross 80000000 00000000 00000000
+dot 00000000 _dot 00000000
+dpn 00000000
+vinv 800116c2 000116c2 800116c2
+vma 1eec1e4a 1eec1e4a 1eec1e4a
+vadd 1e3ce508 1e3ce508 1e3ce508
+vsub 9e3ce508 9e3ce508 9e3ce508
+vscale 0001a223 8001a223 0001a223
+v4s 00022d84 80022d84 00022d84 1ebce508
+proj 7fc00000 7fc00000 7fc00000
+mnv 000116c2 800116c2 800116c2 80000000 80000000 00000000
+perp SKIP
+rot SKIP
+pfp 1 bf3504f3 00000000 3f3504f3 00000000
+angsub 00022d84
+angssub 9e3ce508 9e3ce508 9e3ce508
+lerp 000116c2
+an360 00000000 an180 00000000 amod 00000000 adel 00000000
+rfb 1ea3964e
+d2b 138
+gclose 0 1e3ce508 1e3ce508 1e3ce508
+gdist 5dc04bd8
+a2a 3f800000 800004de 800004de 000004de 3f800000 000004de 000004de 800004de 3f800000
+vrot 1e3ce508 1e3ce508 1e3ce508
+acopy 000004de 3f800000 000004de
+rad 000004de 3f800000 800004de
+aclear 3f800000 3f800000 3f800000
+mm 1af1c8ab bc23d70a 7b4097ce
+bounds 000116c2 800116c2 000116c2 1e3ce508 1e3ce508 1e3ce508
+i 24
+av 3f800000 1b52ff53 9b52ff53 1b52ff53 bf800000 9b52ff53 1b52ff53 9b52ff53 3f800000
+va c20d0ecf 42340000 00000000
+vn 1ea3964e 3f13cd54 3f13cd54 3f13cd54
+vn2 1ea3964e 3f13cd54 3f13cd54 3f13cd54
+vl 1ea3964e vls 00034446
+dist 5dc04bd8 dsq 7c1071da
+dh 5d9d025e dhs 7bc097ce
+vcmp 0 1
+cross 3ca3d70a 00000000 bca3d70a
+dot 3c23d70a _dot 3c23d70a
+dpn 3eaaaac9
+vinv 9e3ce508 9e3ce508 9e3ce508
+vma 5e0ac723 de0ac723 5e0ac723
+vadd 5d5e0b6b dd5e0b6b 5d5e0b6b
+vsub dd5e0b6b 5d5e0b6b dd5e0b6b
+vscale 1e8dabc6 1e8dabc6 1e8dabc6
+v4s 1ebce508 1ebce508 1ebce508 5dde0b6b
+proj 1e3ce508 1e3ce508 1e3ce508
+mnv 3f13cd54 bf13cd54 3f13cd54 9e5a1e0a 00000000 1e5a1e0a
+perp 7fc00000 7fc00000 7fc00000
+rot 7fc00000 7fc00000 7fc00000
+pfp 1 bf3504f3 00000000 3f3504f3 00000000
+angsub 00000000
+angssub c2200000 42200000 c2200000
+lerp 1e3ce508
+an360 00000000 an180 00000000 amod 00000000 adel 00000000
+rfb 5dc04bd8
+d2b 45
+gclose 0 1e3ce508 1e3ce508 1e3ce508
+gdist 1ea3964e
+a2a 3f800000 1b52ff53 9b52ff53 9b52ff53 3f800000 1b52ff53 1b52ff53 9b52ff53 3f800000
+vrot 5d5e0b6b dd5e0b6b 5d5e0b6b
+acopy 9b52ff53 3f800000 1b52ff53
+rad 9b52ff53 3f800000 1b52ff53
+aclear 3f800000 3f800000 3f800000
+mm 3c23d70a fb4097ce 00000000
+bounds 1e3ce508 dd5e0b6b 1e3ce508 5d5e0b6b 1e3ce508 5d5e0b6b
+i 25
+av 3f739801 3e5be4d1 be616c83 3e862692 bf70dcd7 3e5be4d1 3e24dfdf 3e862693 3f739801
+va c20d0ebc 439d8000 00000000
+vn 5dc04bd8 3f13cd3b bf13cd3b 3f13cd3b
+vn2 5dc04bd8 3f13cd3b bf13cd3b 3f13cd3b
+vl 5dc04bd8 vls 7c1071da
+dist 5dc04bd8 dsq 7c1071da
+dh 5d9d025e dhs 7bc097ce
+vcmp 0 1
+cross 9af1c8ab 9af1c8ab 00000000
+dot 1af1c8ab _dot 1af1c8ab
+dpn 00000000
+vinv dd5e0b6b 5d5e0b6b dd5e0b6b
+vma 5d5e0b6b dd5e0b6b 5d5e0b6b
+vadd 5d5e0b6b dd5e0b6b 5d5e0b6b
+vsub 5d5e0b6b dd5e0b6b 5d5e0b6b
+vscale 5da68890 dda68890 5da68890
+v4s 5dde0b6b ddde0b6b 5dde0b6b 00000000
+proj SKIP
+mnv 7fc00000 7fc00000 7fc00000 7fc00000 7fc00000 7fc00000
+perp 3f800000 02173c94 82173c94
+rot 38d1b6cd b94f2448 3624a11b
+pfp 0 00000000 00000000 00000000 00000000
+angsub 42a00000
+angssub 42200000 c2200000 42200000
+lerp fbc097ce
+an360 43b3ff4c an180 bbb40000 amod 43b3ff4c adel bbb40000
+rfb 5dc04bd8
+d2b 138
+gclose 0 00000000 00000000 000116c2
+gdist 3f800000
+a2a 3f739801 3e5be4d1 be616c83 be862692 3f70dcd7 be5be4d1 3e24dfdf 3e862693 3f739801
+vrot 80003d5e 80003bdc 00010940
+acopy be862692 3f70dcd7 be5be4d1
+rad 3e1e2b59 bf73e4e9 be85fc44
+aclear 3f800000 3f800000 3f800000
+mm fb4097ce 9af1c8ab 5d053a0d
+bounds 00000000 dd5e0b6b 000116c2 5d5e0b6b 00000000 5d5e0b6b
+i 26
+av 3f800000 00000000 80000000 00000000 bf800000 800004de 00000000 800004de 3f800000
+va c2b40000 00000000 00000000
+vn 00000000 00000000 00000000 000116c2
+vn2 00000000 00000000 00000000 00000000
+vl 00000000 vls 00000000
+dist 3f800000 dsq 3f800000
+dh 3f800000 dhs 3f800000
+vcmp 0 1
+cross 8000df02 0000a741 00000000
+dot 00000000 _dot 00000000
+dpn 00000000
+vinv 80000000 80000000 800116c2
+vma 3fc00000 40000000 000116c2
+vadd 3f19999a 3f4ccccd 000116c2
+vsub bf19999a bf4ccccd 000116c2
+vscale 00000000 00000000 0001a223
+v4s 00000000 00000000 00022d84 3f99999a
+proj 00000000 00000000 000116c2
+mnv 000116c2 80000000 00000000 80000000 00000000 00000000
+perp SKIP
+rot SKIP
+pfp 1 bf17632d 3ee314c3 3f2c69d7 0000bbbe
+angsub 00000000
+angssub bf19999a bf4ccccd 000116c2
+lerp 00000000
+an360 00000000 an180 00000000 amod 00000000 adel 00000000
+rfb 3f800000
+d2b 5
+gclose 0 00000000 00000000 000116c2
+gdist 40c732ca
+a2a 3f800000 00000000 80000000 00000000 3f800000 000004de 00000000 800004de 3f800000
+vrot 3f19999a 3f4ccccd 800003e5
+acopy 00000000 3f800000 000004de
+rad 00000000 3f800000 00000000
+aclear 3f800000 3f800000 3f800000
+mm 0000a741 c0147ae1 41a20000
+bounds 00000000 00000000 00000000 3f19999a 3f4ccccd 000116c2
+i 27
+av 3f7ff605 3c64be6b bc2b91d9 3c64c1a1 bf7ff99d 80000000 3c2b8d91 39194faa 3f7ffc68
+va 80000000 42548539 00000000
+vn 3f800000 3f19999a 3f4ccccd 00000000
+vn2 3f800000 3f19999a 3f4ccccd 00000000
+vl 3f800000 vls 3f800000
+dist 40d03efb dsq 42296667
+dh 40966f1e dhs 41b0ccce
+vcmp 0 1
+cross 40666667 c02ccccd c0833334
+dot bfa66666 _dot bfa66666
+dpn be55d961
+vinv bf19999a bf4ccccd 80000000
+vma 40db3333 c0fe6666 41340000
+vadd 40466666 c02ccccd 40900000
+vsub bff33333 4089999a c0900000
+vscale 3f666667 3f99999a 00000000
+v4s 3f99999a 3fcccccd 00000000 40a00000
+proj 3f1a2773 3f4c0637 3b7f530d
+mnv 3ea815dc be7c20c8 3f6973b0 bf3ac2f3 3f0c1237 3ed21b52
+perp 00000000 00000000 3f800000
+rot 402266b5 c061cd08 408e9e42
+pfp 1 bef1b6c5 3f077a86 3f347c5f 3e0f798e
+angsub be4ccccc
+angssub bff33333 4089999a c0900000
+lerp 3f19999a
+an360 3f194800 an180 3f194800 amod 3f194800 adel be4a8000
+rfb 40c732ca
+d2b 44
+gclose 1 3f1e828a 3f41b028 3d3a0f80
+gdist 3f8a37db
+a2a 3f7ff605 3c64be6b bc2b91d9 bc64c1a1 3f7ff99d 00000000 3c2b8d91 39194faa 3f7ffc68
+vrot 4019d519 c062364d 4090d03a
+acopy bc64c1a1 3f7ff99d 00000000
+rad 3c2ebaee bc6256bd 3f7ff605
+aclear 3f800000 3f800000 3f800000
+mm 3ea8f5c3 c0b2cccc 3f110000
+bounds 3f19999a c0600000 00000000 40200000 3f4ccccd 40900000
+i 28
+av 3f7f4781 bd79d11c bd32aa3e bd83a34b bf7eae6b bda08803 3d1e29b7 bda5d243 3f7ef7ca
+va c2392d47 4398c4d3 00000000
+vn 40c732ca 3ecd9fc8 bf0fefd9 3f390fcd
+vn2 40c732ca 3ecd9fc8 bf0fefd9 3f390fcd
+vl 40c732ca vls 421b0000
+dist 40ce31af dsq 42261400
+dh 40919a2a dhs 41a5a000
+vcmp 0 1
+cross beb00000 bf780000 bf100000
+dot bfac0000 _dot bfac0000
+dpn bf40f1d9
+vinv c0200000 40600000 c0900000
+vma 3ff00000 c04c0000 408b0000
+vadd 40100000 c0580000 408e0000
+vsub 40300000 c0680000 40920000
+vscale 40700000 c0a80000 40d80000
+v4s 40a00000 c0e00000 41100000 bf000000
+proj c23db10e 41abb10e c0ff621c
+mnv be6ca116 3eef0b39 bf5a8516 bf62f88c bf8c0bc0 beb7822a
+perp 3f7ffd05 3bbfbcb5 bbf684e9
+rot c067debb 40c6be7f c09bdffd
+pfp 1 3e963335 3f53a53f 3ef5c828 00000000
+angsub 40c00000
+angssub 40300000 c0680000 40920000
+lerp c1c40000
+an360 401ff600 an180 401ff600 amod 401ff600 adel 40bff400
+rfb 40c732ca
+d2b 135
+gclose 1 be0abbea bcd49f70 3e028e0e
+gdist 3e405951
+a2a 3f7f4781 bd79d11c bd32aa3e 3d83a34b 3f7eae6b 3da08803 3d1e29b7 bda5d243 3f7ef7ca
+vrot be8225b1 3dd3bd18 bda7fb64
+acopy 3d83a34b 3f7eae6b 3da08803
+rad 3d4143c2 3d6eb39b 3f7f4785
+aclear 3f800000 3f800000 3f800000
+mm c11e0000 3e400000 00000000
+bounds be800000 c0600000 bd800000 40200000 3e000000 40900000
+i 29
+av 3f7fff38 3b0ef9d5 3b8efa17 3b0eaa4e bf7fffce 3a8ef9da bb8f0df2 3a8dbab3 3f7fff56
+va c3adb2a4 43196f59 00000000
+vn 3e92a476 bf5f7482 3edf7482 be5f7482
+vn2 3e92a476 bf5f7482 3edf7482 be5f7482
+vl 3e92a476 vls 3da80000
+dist 3e92a476 dsq 3da80000
+dh 3e8f1bbd dhs 3da00000
+vcmp 0 1
+cross 00000000 00000000 80000000
+dot 00000000 _dot 00000000
+dpn 00000000
+vinv 3e800000 be000000 3d800000
+vma be800000 3e000000 bd800000
+vadd be800000 3e000000 bd800000
+vsub be800000 3e000000 bd800000
+vscale bec00000 3e400000 bdc00000
+v4s bf000000 3e800000 be000000 00000000
+proj SKIP
+mnv be3fff0a 3f5f1b54 3ee7fed6 bde38d15 bdfffeb7 3e471b73
+perp bf620a8e 3ee20a8e 3e2359a0
+rot 00000000 00000000 00000000
+pfp 1 00000000 bee4f92e bf64f92e 00000000
+angsub bec00000
+angssub be800000 3e000000 bd800000
+lerp be8c0000
+an360 43b3e05c an180 be7d2000 amod 43b3e05c adel bebf4000
+rfb 3e92a476
+d2b 147
+gclose 0 00000000 00000000 00000000
+gdist 3f800000
+a2a 3f7fff38 3b0ef9d5 3b8efa17 bb0eaa4e 3f7fffce ba8ef9da bb8f0df2 3a8dbab3 3f7fff56
+vrot 00000000 00000000 00000000
+acopy bb0eaa4e 3f7fffce ba8ef9da
+rad bb0f991d 3f7fffb0 3b0e5a21
+aclear 3f800000 3f800000 3f800000
+mm be900000 00000000 bd800000
+bounds be800000 00000000 bd800000 00000000 3e000000 00000000
+== end ==

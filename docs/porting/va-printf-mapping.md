@@ -7,7 +7,7 @@ handling. Ruling 18 (`docs/handoffs/jampgame-fork-discovery.md`): va/printf →
 divergence at `g_target.c:800`.
 
 Owning types live in `crates/mp/game/src/q_shared.rs`
-(`Com_sprintf` :907, `va` :922, `Q_strncpyz` :689, `Q_strcat` :837).
+(`Com_sprintf` :1160, `va` :1190, `Q_strncpyz` :912, `Q_strcat` :1071).
 
 ---
 
@@ -96,9 +96,9 @@ through the pointer with the same truncate-at-`size-1` rule.
 
 - `Q_strncpyz(dest, src, destsize)` — size-capped copy, always NUL-terminates.
   Into a fixed field: `write_cstr_field(&mut dest, src)`. Through a raw pointer:
-  call the ported `crate::q_shared::Q_strncpyz(dest, src, destsize)` (:689).
+  call the ported `crate::q_shared::Q_strncpyz(dest, src, destsize)` (:912).
 - `Q_strcat(dest, size, src)` — append, size-capped. Through a raw pointer: call
-  the ported `crate::q_shared::Q_strcat(dest, size, src)` (:837). Into an owned
+  the ported `crate::q_shared::Q_strcat(dest, size, src)` (:1071). Into an owned
   `String`, use `dest.push_str(src)` then re-emit with `write_cstr_field`.
 - Do not replace these with naive `strcpy`/`format!` that drops the size cap —
   the cap is behavior (parity).
@@ -120,7 +120,7 @@ drops before the syscall reads it (dangling). Bind, then pass.
 Raven stores a `va()` rotating-buffer pointer into a **persistent** field:
 
 ```c
-// oracle/oracle/codemp/game/g_target.c:800
+// oracle/codemp/game/g_target.c:800
 self->activator->script_targetname = va( "newICARUSEnt%d", numNewICARUSEnts++ );
 ```
 

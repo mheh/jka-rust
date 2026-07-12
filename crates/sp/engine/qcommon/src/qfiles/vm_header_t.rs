@@ -2,22 +2,22 @@
 
 /// Raven `vmHeader_t` — QVM bytecode file header.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:26-38`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:26-38`
 #[repr(C)]
 pub struct vmHeader_t {
-	pub vmMagic: i32,
+    pub vmMagic: i32,
 
-	pub instructionCount: i32,
+    pub instructionCount: i32,
 
-	pub codeOffset: i32,
-	pub codeLength: i32,
+    pub codeOffset: i32,
+    pub codeLength: i32,
 
-	pub dataOffset: i32,
-	pub dataLength: i32,
-	/// ( dataLength - litLength ) should be byteswapped on load
-	pub litLength: i32,
-	/// zero filled memory appended to datalength
-	pub bssLength: i32,
+    pub dataOffset: i32,
+    pub dataLength: i32,
+    /// ( dataLength - litLength ) should be byteswapped on load
+    pub litLength: i32,
+    /// zero filled memory appended to datalength
+    pub bssLength: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<vmHeader_t>() == 32);

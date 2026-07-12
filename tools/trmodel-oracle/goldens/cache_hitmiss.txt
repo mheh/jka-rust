@@ -1,0 +1,9 @@
+=== first register (disk miss) ===
+handle=1  FS disk reads=2
+cache after first register:
+0/2: "models/test.glm" (360 bytes)1/2: "skeletons/test.gla" (100 bytes)460 bytes total (0.00MB)
+
+=== re-register after HunkClear+ModelInit (cache hit) ===
+handle=1  FS disk reads=0 (0 == served from CachedModels)
+cache after re-register:
+0/2: "models/test.glm" (360 bytes)1/2: "skeletons/test.gla" (100 bytes)460 bytes total (0.00MB)

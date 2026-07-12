@@ -7,12 +7,12 @@ use native_math::vector::vec3_t;
 
 /// Raven `MAX_NEIGHBOR_SIZE`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:994`
+/// Source: `oracle/codemp/game/q_shared.h:994`
 pub const MAX_NEIGHBOR_SIZE: usize = 32;
 
 /// Raven `wpobject_t` (`wpobject_s`) — a bot-navigation waypoint node.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1007-1020`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1007-1020`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct wpobject_t {

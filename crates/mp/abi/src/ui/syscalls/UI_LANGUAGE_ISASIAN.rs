@@ -1,5 +1,7 @@
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use mp_qshared::shared::qboolean;
 
 /// Arguments for `UI_LANGUAGE_ISASIAN`.
@@ -7,9 +9,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( UI_LANGUAGE_ISASIAN );`
 /// Raven transport: `return re.Language_IsAsian();`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:136-138`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:997`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1148-1149`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:136-138`
+/// Args source: `oracle/codemp/ui/ui_local.h:997`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1148-1149`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct UiLanguageIsasianArgs;
 
@@ -21,11 +23,11 @@ impl UiLanguageIsasianArgs {
 
 /// `UI_LANGUAGE_ISASIAN` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:80`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:136-138`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:997`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1148-1149`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1148-1149`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:80`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:136-138`
+/// Output source: `oracle/codemp/ui/ui_local.h:997`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1148-1149`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1148-1149`
 pub struct UiLanguageIsasian;
 
 impl OutboundSysCall for UiLanguageIsasian {

@@ -37,7 +37,7 @@ impl BotlibAiGetWeaponInfoArgs {
 
 /// `BOTLIB_AI_GET_WEAPON_INFO` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:476`
+/// Source: `oracle/codemp/game/g_public.h:476`
 pub struct BotlibAiGetWeaponInfo;
 
 impl OutboundSysCall for BotlibAiGetWeaponInfo {

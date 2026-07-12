@@ -62,7 +62,7 @@ impl BotlibAiChooseNbgItemArgs {
 
 /// `BOTLIB_AI_CHOOSE_NBG_ITEM` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:451`
+/// Source: `oracle/codemp/game/g_public.h:451`
 pub struct BotlibAiChooseNbgItem;
 
 impl OutboundSysCall for BotlibAiChooseNbgItem {

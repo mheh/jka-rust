@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_CVAR_SET, var_name, value );`
 /// Raven transport: `Cvar_Set( (const char *) VMA(1), (const char *) VMA(2) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:66-68`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:451-453`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:66-68`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:451-453`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCvarSetArgs {
     var_name: *const c_char,
@@ -28,10 +28,10 @@ impl CgCvarSetArgs {
 
 /// `CG_CVAR_SET` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:66`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:66-68`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:451-453`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:451-453`
+/// Enum value source: `oracle/code/cgame/cg_public.h:66`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:66-68`
+/// Output source: `oracle/code/client/cl_cgame.cpp:451-453`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:451-453`
 pub struct CgCvarSet;
 
 impl OutboundSysCall for CgCvarSet {

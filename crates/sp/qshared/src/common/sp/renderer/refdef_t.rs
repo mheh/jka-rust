@@ -7,14 +7,14 @@ use native_types::byte;
 
 /// Raven `MAX_MAP_AREA_BYTES` — bit vector of area visibility.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:232`
+/// Source: `oracle/code/game/q_shared.h:232`
 pub const MAX_MAP_AREA_BYTES: usize = 32;
 
 /// Raven `refdef_t` — the scene definition cgame/ui hand to the renderer each frame.
 ///
 /// SP diverges from MP: no `viewangles` field, and the deform-text `text`
 /// array is commented out in the SP oracle.
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:159-176`
+/// Type definition source: `oracle/code/renderer/tr_types.h:159-176`
 #[repr(C)]
 pub struct refdef_t {
     pub x: i32,

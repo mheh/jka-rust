@@ -2,15 +2,15 @@
 
 /// Raven `bsp_link_t` — linked-list node tying a BSP entity into a leaf.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:59-65`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:59-65`
 #[repr(C)]
 pub struct bsp_link_t {
-	pub entnum: i32,
-	pub leafnum: i32,
-	pub next_ent: *mut bsp_link_t,
-	pub prev_ent: *mut bsp_link_t,
-	pub next_leaf: *mut bsp_link_t,
-	pub prev_leaf: *mut bsp_link_t,
+    pub entnum: i32,
+    pub leafnum: i32,
+    pub next_ent: *mut bsp_link_t,
+    pub prev_ent: *mut bsp_link_t,
+    pub next_leaf: *mut bsp_link_t,
+    pub prev_leaf: *mut bsp_link_t,
 }
 
 pub type bsp_link_s = bsp_link_t;

@@ -18,7 +18,7 @@ use crate::vehicles::{turretStats_t, vehWeaponStats_t, vehicleType_t};
 /// Raven: `//*** IMPORTANT!!! *** vehFields table correponds to this
 /// structure!` — see the `vehFields` parsing table this layout must stay in
 /// sync with.
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:131-360`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:131-360`
 #[repr(C)]
 pub struct vehicleInfo_t {
     /// unique name of the vehicle
@@ -272,7 +272,6 @@ pub struct vehicleInfo_t {
     // internal variables, not read in from the .veh file
     /// set internally, not until this vehicle is spawned into the level
     pub modelIndex: c_int,
-
     // The 25 `vehicleInfo_t` function-pointer
     // "virtual" slots (`AnimateVehicle`..`Inhabited`, Raven bg_vehicles.h:291-359)
     // are RETIRED. Raven filled them once at `.veh` load via `G_Set*VehicleFunctions`

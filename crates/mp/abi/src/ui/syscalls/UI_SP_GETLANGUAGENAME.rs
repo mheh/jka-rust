@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_SP_GETLANGUAGENAME, languageIndex, buffer);`
 /// Raven transport: `Q_strncpyz( holdName, languageName,128 ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:443-445`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1213-1219`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:443-445`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1213-1219`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiSpGetlanguagenameArgs {
     language_index: c_int,
@@ -37,10 +37,10 @@ impl UiSpGetlanguagenameArgs {
 
 /// `UI_SP_GETLANGUAGENAME` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:136`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:443-445`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1213-1219`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1213-1219`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:136`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:443-445`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1213-1219`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1213-1219`
 pub struct UiSpGetlanguagename;
 
 impl OutboundSysCall for UiSpGetlanguagename {

@@ -5,8 +5,8 @@
 /// C++-track idiomatic reimplementation: Raven chains `CGPObject` string nodes
 /// through `mList`/`mNext` (with `mInOrderNext` doubling as a tail cache in
 /// `AddValue`); the values are simply an insertion-ordered `Vec<String>` here.
-/// Class definition source: `oracle/oracle/code/game/genericparser2.h:76-97`
-/// Method source: `oracle/oracle/code/game/genericparser2.cpp:276-450`
+/// Class definition source: `oracle/code/game/genericparser2.h:76-97`
+/// Method source: `oracle/code/game/genericparser2.cpp:276-450`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GpValue {
     name: String,

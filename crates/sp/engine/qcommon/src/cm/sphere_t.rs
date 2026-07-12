@@ -4,7 +4,7 @@ use sp_qshared::shared::{qboolean, vec3_t};
 
 /// Raven `sphere_t` — bounding sphere used for capsule/sphere collision.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:228-234`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:228-234`
 #[repr(C)]
 pub struct sphere_t {
     pub use_: qboolean,

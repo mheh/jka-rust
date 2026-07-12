@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_SENDCLIENTCOMMAND, s );`
 /// Raven transport: `CL_AddReliableCommand( (const char *) VMA(1) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:106-108`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:479-481`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:106-108`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:479-481`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSendclientcommandArgs {
     text: *const c_char,
@@ -27,10 +27,10 @@ impl CgSendclientcommandArgs {
 
 /// `CG_SENDCLIENTCOMMAND` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:76`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:106-108`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:479-481`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:479-481`
+/// Enum value source: `oracle/code/cgame/cg_public.h:76`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:106-108`
+/// Output source: `oracle/code/client/cl_cgame.cpp:479-481`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:479-481`
 pub struct CgSendclientcommand;
 
 impl OutboundSysCall for CgSendclientcommand {

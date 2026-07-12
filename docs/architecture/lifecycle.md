@@ -4,8 +4,8 @@ Decision prefix: LIFE     Ledger deps: DEC-01, DEC-02, DEC-04, DEC-07, DEC-08, D
 
 ## Standing context
 
-Links only — never restated here. MP tree = `oracle/oracle/codemp/`, SP tree =
-`oracle/oracle/code/`; file:line short forms below resolve against those roots.
+Links only — never restated here. MP tree = `oracle/codemp/`, SP tree =
+`oracle/code/`; file:line short forms below resolve against those roots.
 
 - `docs/workspace-architecture.md` — crate graph and tiers (`native/*`,
   `abi-transport`, `crates/{mp,sp}/{qshared,engine/*,app}`).
@@ -48,7 +48,7 @@ Links only — never restated here. MP tree = `oracle/oracle/codemp/`, SP tree =
   aggregate `Engine` type — and the per-mode facade crate that defines it,
   `crates/{mp,sp}/engine/core` = `mp_engine_core`/`sp_engine_core`; the former
   STATE-Q1, resolved 2026-07-02).
-- `docs/dossiers/A3-lifecycle.md` — the survey this doc renders.
+- `docs/dossiers/A3-lifecycle.md` — the survey this doc renders (removed 2026-07-08; see git history).
 
 ## Scope & non-goals
 
@@ -65,7 +65,7 @@ signature (LIFE-D4b), and the `SysEventQueue` surface.
 **Non-goals** (each punted to its owning doc):
 
 - **Seam mechanics** — how a trap/`vmMain` crosses, dispatcher routing, transport
-  (`NativeDll|Static|Wasm`) → `docs/architecture/engine-seam.md`.
+  (`NativeDll|Static`) → `docs/architecture/engine-seam.md`.
 - **Module load / restart mechanics** — `SV_InitGameProgs`, DLL/`GetGameAPI`
   loading, `vm_restart`, VM table → `docs/architecture/module-loading.md`.
 - **Subsystem internals** — cvar parse tables, filesystem search paths, sound

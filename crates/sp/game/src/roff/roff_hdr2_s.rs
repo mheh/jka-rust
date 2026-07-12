@@ -9,14 +9,14 @@ use core::ffi::{c_char, c_long};
 /// float because of a limitation of the roff exporter. `mFrameRate` frame
 /// rate the roff should be played at. `mNumNotes` number of notes (null
 /// terminated strings) after the roff data.
-/// Type definition source: `oracle/oracle/code/game/g_roff.h:38-47`
+/// Type definition source: `oracle/code/game/g_roff.h:38-47`
 #[repr(C)]
 pub struct roff_hdr2_t {
-	pub mHeader: [c_char; 4],
-	pub mVersion: c_long,
-	pub mCount: i32,
-	pub mFrameRate: i32,
-	pub mNumNotes: i32,
+    pub mHeader: [c_char; 4],
+    pub mVersion: c_long,
+    pub mCount: i32,
+    pub mFrameRate: i32,
+    pub mNumNotes: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<roff_hdr2_t>() == 32);

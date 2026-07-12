@@ -8,10 +8,10 @@ use abi_transport::generic::InboundVmCall;
 /// Raven signature in this enum block is shifted; actual signature is
 /// `_UI_Refresh( int time )`.
 ///
-/// Source (enum): `oracle/oracle/codemp/ui/ui_public.h:231`
-/// Source (args): `oracle/oracle/codemp/ui/ui_main.c:554`
-/// Source (output): `oracle/oracle/codemp/ui/ui_main.c:601` (return 0)
-/// Source (call site/transport): `oracle/oracle/codemp/client/cl_scrn.cpp:436`
+/// Source (enum): `oracle/codemp/ui/ui_public.h:231`
+/// Source (args): `oracle/codemp/ui/ui_main.c:554`
+/// Source (output): `oracle/codemp/ui/ui_main.c:601` (return 0)
+/// Source (call site/transport): `oracle/codemp/client/cl_scrn.cpp:436`
 pub struct UiRefresh;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

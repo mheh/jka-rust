@@ -44,7 +44,7 @@ impl BotlibLibvarGetArgs {
 
 /// `BOTLIB_LIBVAR_GET` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:345`
+/// Source: `oracle/codemp/game/g_public.h:345`
 pub struct BotlibLibvarGet;
 
 impl OutboundSysCall for BotlibLibvarGet {

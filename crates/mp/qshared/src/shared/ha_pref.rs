@@ -2,7 +2,7 @@
 
 /// Raven `ha_pref` Hunk_Alloc allocation preference.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:504-508`
+/// Type definition source: `oracle/codemp/game/q_shared.h:504-508`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ha_pref {

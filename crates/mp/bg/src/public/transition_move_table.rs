@@ -1,6 +1,6 @@
 //! MP `bg_saber.c` quadrant-to-quadrant transition-move lookup.
 //!
-//! Source: `oracle/oracle/codemp/game/bg_saber.c:324-390`
+//! Source: `oracle/codemp/game/bg_saber.c:324-390`
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
@@ -13,7 +13,7 @@ use super::saber_quadrant::saberQuadrant_t::Q_NUM_QUADS;
 /// pair, the `LS_T1_*` transition move that bridges them (`LS_NONE` where no
 /// transition exists). Row-major, matching the C flat initializer.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:324-390`
+/// Source: `oracle/codemp/game/bg_saber.c:324-390`
 #[rustfmt::skip]
 pub static transitionMove: [[c_int; Q_NUM_QUADS as usize]; Q_NUM_QUADS as usize] = [
     [

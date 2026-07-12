@@ -90,7 +90,7 @@ impl UiG2PlayanimArgs {
 
 /// `UI_G2_PLAYANIM` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:520`
+/// Source: `oracle/codemp/ui/ui_public.h:520`
 pub struct UiG2Playanim;
 
 impl OutboundSysCall for UiG2Playanim {

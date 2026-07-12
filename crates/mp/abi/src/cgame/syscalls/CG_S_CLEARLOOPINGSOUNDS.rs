@@ -1,5 +1,7 @@
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_S_CLEARLOOPINGSOUNDS`.
 ///
@@ -7,9 +9,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven's wrapper sends only the syscall token, and the client switch calls
 /// `S_ClearLoopingSounds()` with no decoded argument words.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:200-201`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2226`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:818-820`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:200-201`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2226`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:818-820`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgSClearloopingsoundsArgs;
 
@@ -24,11 +26,11 @@ impl CgSClearloopingsoundsArgs {
 /// Raven wrapper: `syscall( CG_S_CLEARLOOPINGSOUNDS );`
 /// Raven transport: `S_ClearLoopingSounds(); return 0;`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:99`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:200-201`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:200-201`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:818-820`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:818-820`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:99`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:200-201`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:200-201`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:818-820`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:818-820`
 pub struct CgSClearloopingsounds;
 
 impl OutboundSysCall for CgSClearloopingsounds {

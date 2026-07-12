@@ -31,8 +31,8 @@ pub(crate) struct GpGroupNode {
 /// [`GenericParser2`], with the sorted view computed on demand. This type is a
 /// copyable borrow of one node, so Raven pointer walks like
 /// `group->GetParent()->FindPairValue(...)` translate directly.
-/// Class definition source: `oracle/oracle/codemp/qcommon/GenericParser2.h:93-134`
-/// Method source: `oracle/oracle/codemp/qcommon/GenericParser2.cpp:458-844`
+/// Class definition source: `oracle/codemp/qcommon/GenericParser2.h:93-134`
+/// Method source: `oracle/codemp/qcommon/GenericParser2.cpp:458-844`
 #[derive(Clone, Copy)]
 pub struct GpGroup<'a> {
     pub(crate) doc: &'a GenericParser2,
@@ -87,7 +87,10 @@ impl<'a> GpGroup<'a> {
     /// insertion order.
     pub fn subgroups(&self) -> impl Iterator<Item = GpGroup<'a>> + '_ {
         let doc = self.doc;
-        self.node().subgroups.iter().map(move |&id| GpGroup { doc, id })
+        self.node()
+            .subgroups
+            .iter()
+            .map(move |&id| GpGroup { doc, id })
     }
 
     /// Raven `CGPGroup::GetInOrderSubGroups` + `GetInOrderNext` chain (see
@@ -116,7 +119,8 @@ impl<'a> GpGroup<'a> {
     /// Raven `CGPGroup::FindSubGroup` — first subgroup whose name matches
     /// case-insensitively, in insertion order.
     pub fn find_sub_group(&self, name: &str) -> Option<GpGroup<'a>> {
-        self.subgroups().find(|g| g.name().eq_ignore_ascii_case(name))
+        self.subgroups()
+            .find(|g| g.name().eq_ignore_ascii_case(name))
     }
 
     /// Raven `CGPGroup::FindPair`.

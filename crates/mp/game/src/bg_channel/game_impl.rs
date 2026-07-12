@@ -423,7 +423,7 @@ impl BgTraps for GameBgTraps<'_> {
         // `G_PlayEffectID` (a `GameCallbacks` upcall). There is no
         // `G_FX_PLAY_EFFECT_ID` in the game syscall table, so this method is dead
         // surface on the game side and must never be reached here.
-        // Source: `oracle/oracle/codemp/game/bg_slidemove.c:37-39,116-124`
+        // Source: `oracle/codemp/game/bg_slidemove.c:37-39,116-124`
         unreachable!(
             "trap_FX_PlayEffectID is cgame-only (#ifndef QAGAME); QAGAME uses G_PlayEffectID"
         )
@@ -483,7 +483,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `GameContext`, and delegates to the ported `G_Damage`. `dir`/`point` are
         // bg-visible raw pointers; the ported body takes `dir: Option<&mut vec3_t>`
         // and `point` by value. Every bg caller passes `dir = null` and a non-null
-        // `point`. Source: `oracle/oracle/codemp/game/g_combat.c` (`G_Damage`).
+        // `point`. Source: `oracle/codemp/game/g_combat.c` (`G_Damage`).
         unsafe {
             let ctx = GameContext {
                 world: self.world,
@@ -519,7 +519,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `attacker`. `killerNum` is not a body parameter — `G_DamageFromKiller`
         // initializes `killer = attacker` internally (bg passes it equal to
         // `attackerNum`); `dir` is unused (bg passes null). `point`->`org` by value.
-        // Source: `oracle/oracle/codemp/game/g_combat.c` (`G_DamageFromKiller`).
+        // Source: `oracle/codemp/game/g_combat.c` (`G_DamageFromKiller`).
         let _ = (killerNum, dir);
         unsafe {
             let ctx = GameContext {
@@ -536,7 +536,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn add_event(&mut self, entNum: c_int, event: c_int, eventParm: c_int) {
         // `G_AddEvent` is ctx-free and takes a `gentity_t*`; resolve `entNum`.
-        // Source: `oracle/oracle/codemp/game/g_utils.c` (`G_AddEvent`).
+        // Source: `oracle/codemp/game/g_utils.c` (`G_AddEvent`).
         unsafe {
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
             crate::g_utils::G_AddEvent(ent, event, eventParm);
@@ -551,7 +551,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn alloc(&mut self, size: c_int) -> *mut c_void {
         // `G_Alloc` bumps the game pool via `ctx.world`; rebuild the ctx from the
         // impl's owned `world`/`engine` (STATE-D6 leaf reborrow).
-        // Source: `oracle/oracle/codemp/game/g_mem.c` (`G_Alloc`).
+        // Source: `oracle/codemp/game/g_mem.c` (`G_Alloc`).
         let ctx = GameContext {
             world: self.world,
             engine: self.engine,
@@ -560,7 +560,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn new_string(&mut self, string: *const c_char) -> *mut c_char {
         // `G_NewString` copies into the game pool via `ctx.world`.
-        // Source: `oracle/oracle/codemp/game/g_spawn.c` (`G_NewString`).
+        // Source: `oracle/codemp/game/g_spawn.c` (`G_NewString`).
         let ctx = GameContext {
             world: self.world,
             engine: self.engine,
@@ -570,7 +570,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn play_effect(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) {
         // `G_PlayEffect` is ctx-free and takes `org`/`ang` by value; the spawned
         // temp-entity return is discarded (as at the bg call sites).
-        // Source: `oracle/oracle/codemp/game/g_utils.c` (`G_PlayEffect`).
+        // Source: `oracle/codemp/game/g_utils.c` (`G_PlayEffect`).
         unsafe {
             crate::g_utils::G_PlayEffect(fxID, *org, *ang);
         }
@@ -578,7 +578,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn play_effect_id(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) -> c_int {
         // `G_PlayEffectID` returns the spawned temp-entity; the bg-visible upcall
         // yields its entity number (`ENTITYNUM_NONE` when none was spawned).
-        // Source: `oracle/oracle/codemp/game/g_utils.c` (`G_PlayEffectID`).
+        // Source: `oracle/codemp/game/g_utils.c` (`G_PlayEffectID`).
         unsafe {
             let te = crate::g_utils::G_PlayEffectID(fxID, *org, *ang);
             if te.is_null() {
@@ -602,7 +602,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn cheap_weapon_fire(&mut self, entNum: c_int, weapon: c_int) {
         // Raven `G_CheapWeaponFire(entNum, ev)` takes the entity number directly.
-        // Source: `oracle/oracle/codemp/game/g_active.c` (`G_CheapWeaponFire`).
+        // Source: `oracle/codemp/game/g_active.c` (`G_CheapWeaponFire`).
         let ctx = GameContext {
             world: self.world,
             engine: self.engine,
@@ -611,7 +611,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn client_check_impact_bbrush(&mut self, entNum: c_int, impactNum: c_int) {
         // Raven `Client_CheckImpactBBrush(self, other)`; resolve both nums.
-        // Source: `oracle/oracle/codemp/game/g_active.c` (`Client_CheckImpactBBrush`).
+        // Source: `oracle/codemp/game/g_active.c` (`Client_CheckImpactBBrush`).
         unsafe {
             let ctx = GameContext {
                 world: self.world,
@@ -631,7 +631,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     ) {
         // Resolve `entNum`->vehicle gentity, rebuild `ctx`, and delegate to
         // `G_FlyVehicleSurfaceDestruction` with the bg-supplied impact `trace` and
-        // `force` flag. Source: `oracle/oracle/codemp/game/g_vehicles.c:3190`;
+        // `force` flag. Source: `oracle/codemp/game/g_vehicles.c:3190`;
         // `bg_slidemove.c:472`.
         unsafe {
             let ctx = GameContext {
@@ -683,7 +683,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     ) {
         // Resolves the vehicle + pilot nums against the world arena, rebuilds the
         // module `GameContext`, and delegates to the ported `WP_GetVehicleCamPos`.
-        // Source: `oracle/oracle/codemp/game/g_weapon.c:3961-4020`.
+        // Source: `oracle/codemp/game/g_weapon.c:3961-4020`.
         unsafe {
             let ctx = GameContext {
                 world: self.world,
@@ -696,7 +696,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn can_be_enemy(&mut self, entNum: c_int, otherNum: c_int) -> qboolean {
         // Raven `G_CanBeEnemy(self, enemy)`; resolve both nums.
-        // Source: `oracle/oracle/codemp/game/w_saber.c` (`G_CanBeEnemy`).
+        // Source: `oracle/codemp/game/w_saber.c` (`G_CanBeEnemy`).
         unsafe {
             let ctx = GameContext {
                 world: self.world,
@@ -708,14 +708,14 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn get_time(&self) -> c_int {
-        // Raven `level.time`. Source: `oracle/oracle/codemp/game/g_local.h`.
+        // Raven `level.time`. Source: `oracle/codemp/game/g_local.h`.
         unsafe { (*self.world).level.time }
     }
     fn try_grapple(&mut self, entNum: c_int) -> qboolean {
         // Resolves `entNum` against the world arena, rebuilds the module
         // `GameContext` from the handles this impl holds, and delegates to the
         // ported `TryGrapple` body.
-        // Source: `oracle/oracle/codemp/game/g_cmds.c:3148-3191` (`TryGrapple`).
+        // Source: `oracle/codemp/game/g_cmds.c:3148-3191` (`TryGrapple`).
         unsafe {
             let ctx = GameContext {
                 world: self.world,
@@ -727,7 +727,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: *const c_char) {
         // `Q3_SetParm` takes `entID` as a raw index and resolves it internally.
-        // Source: `oracle/oracle/codemp/game/g_ICARUScb.c` (`Q3_SetParm`).
+        // Source: `oracle/codemp/game/g_ICARUScb.c` (`Q3_SetParm`).
         let ctx = GameContext {
             world: self.world,
             engine: self.engine,
@@ -738,7 +738,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // Resolves `vehEntNum`->`m_pVehicle` and `entNum`->`bgEntity_t` against
         // the world arena, rebuilds the module `GameContext` from the handles this
         // impl holds, and delegates to `crate::veh_dispatch::board` (now that the
-        // dispatch chain threads `ctx`). Source: `oracle/oracle/codemp/game/g_vehicles.c:630`.
+        // dispatch chain threads `ctx`). Source: `oracle/codemp/game/g_vehicles.c:630`.
         unsafe {
             let ctx = GameContext {
                 world: self.world,

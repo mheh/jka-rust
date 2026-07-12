@@ -35,7 +35,7 @@ impl BotlibAiNextConsoleMessageArgs {
 
 /// `BOTLIB_AI_NEXT_CONSOLE_MESSAGE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:425`
+/// Source: `oracle/codemp/game/g_public.h:425`
 pub struct BotlibAiNextConsoleMessage;
 
 impl OutboundSysCall for BotlibAiNextConsoleMessage {

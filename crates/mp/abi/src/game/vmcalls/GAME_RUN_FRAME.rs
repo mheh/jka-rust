@@ -34,7 +34,7 @@ impl GameRunFrameArgs {
 /// `GAME_RUN_FRAME` MP game exports vmMain ABI token.
 ///
 /// Raven: ( int levelTime );
-/// Source: `oracle/oracle/codemp/game/g_public.h:756`
+/// Source: `oracle/codemp/game/g_public.h:756`
 pub struct GameRunFrame;
 
 impl InboundVmCall for GameRunFrame {

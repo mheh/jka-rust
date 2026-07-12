@@ -33,7 +33,7 @@ impl BotlibAiGetTopGoalArgs {
 
 /// `BOTLIB_AI_GET_TOP_GOAL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:448`
+/// Source: `oracle/codemp/game/g_public.h:448`
 pub struct BotlibAiGetTopGoal;
 
 impl OutboundSysCall for BotlibAiGetTopGoal {

@@ -28,7 +28,7 @@ impl BotlibAasEntityInfoArgs {
 
 /// `BOTLIB_AAS_ENTITY_INFO` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:359`
+/// Source: `oracle/codemp/game/g_public.h:359`
 pub struct BotlibAasEntityInfo;
 
 impl OutboundSysCall for BotlibAasEntityInfo {

@@ -163,7 +163,7 @@ def main():
                     o.append(f"// {tag}: {r['path'].name}")
                     o.append(sig + ";")
                 else:
-                    o.append(f"//TODO: Port {name}  // Source: oracle/oracle/codemp/game/ (unresolved)")
+                    o.append(f"//TODO: Port {name}  // Source: oracle/codemp/game/ (unresolved)")
             o.append("```")
             o.append("")
             # ---- state fields

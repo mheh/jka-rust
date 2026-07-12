@@ -11,7 +11,7 @@
 //! (`crates/abi-transport/src/generic/engine.rs`). All ctx-taking game code keeps
 //! using `ctx.engine`; this cell is ONLY for the ctx-less boundary fn-ptrs.
 //!
-//! Source: `oracle/oracle/codemp/game/g_strap.c`
+//! Source: `oracle/codemp/game/g_strap.c`
 #![allow(non_snake_case, unused, clippy::all)]
 
 use std::ffi::{CStr, CString};
@@ -37,14 +37,16 @@ static STRAP_ENGINE: OnceLock<StrapEngine> = OnceLock::new();
 
 /// Arm the seam engine cell. Called exactly once from `g_init_game`
 /// (GAME_INIT) with the entrypoint-owned engine handle.
-/// Source: `oracle/oracle/codemp/game/g_main.c:897` (`G_InitGame`).
+/// Source: `oracle/codemp/game/g_main.c:897` (`G_InitGame`).
 pub fn init_strap_engine(engine: &Engine) {
     let _ = STRAP_ENGINE.set(StrapEngine(engine as *const Engine));
 }
 
 /// Read the seam engine handle; panics loudly (house stub style) if a `strap_*`
-/// wrapper runs before GAME_INIT armed the cell.
-fn strap_engine() -> &'static Engine {
+/// wrapper runs before GAME_INIT armed the cell. Also used by the ctx-less
+/// `G_ModelIndex`/`G_SoundIndex`/`G_EffectIndex` boundary fns (`g_utils.rs`),
+/// which mirror Raven's global-syscall-pointer reach the same way.
+pub(crate) fn strap_engine() -> &'static Engine {
     match STRAP_ENGINE.get() {
         // SAFETY: the pointer was taken from a live `&Engine` at GAME_INIT and the
         // engine outlives the module (mirrors Raven's global syscall pointer).
@@ -56,9 +58,53 @@ fn strap_engine() -> &'static Engine {
     }
 }
 
+/// Seam world handle for the ctx-less boundary fns whose oracle bodies read
+/// the `level`/`g_entities` globals directly (`G_AddEvent`/`G_PlayEffect`/
+/// `G_PlayEffectID`, `g_utils.c`). Mirrors [`StrapEngine`], but unlike the
+/// engine (which outlives the module, so `OnceLock` fits) the shell recreates
+/// the `GameWorld` Box at every GAME_INIT — this cell is RE-ARMED each
+/// GAME_INIT instead of write-once. §D11 seam confinement applies; ctx-taking
+/// game code keeps using `ctx.world`.
+struct StrapWorld(std::cell::UnsafeCell<*mut crate::world::GameWorld>);
+// SAFETY: same soundness argument as `StrapEngine` above — the module runs
+// single-threaded per Raven's contract; the cell is written at GAME_INIT and
+// read single-threaded from the ctx-less boundary fns (§D11 seam confinement).
+unsafe impl Send for StrapWorld {}
+unsafe impl Sync for StrapWorld {}
+
+/// The re-armable seam world cell (see [`StrapWorld`]).
+static STRAP_WORLD: StrapWorld = StrapWorld(std::cell::UnsafeCell::new(core::ptr::null_mut()));
+
+/// Arm (or re-arm) the seam world cell. Called from `g_init_game` (GAME_INIT)
+/// beside [`init_strap_engine`], each time the shell rebuilds the world.
+/// Source: `oracle/codemp/game/g_main.c:897` (`G_InitGame`).
+pub fn init_strap_world(world: *mut crate::world::GameWorld) {
+    // SAFETY: single-threaded GAME_INIT (STATE-D6); no boundary fn can run
+    // concurrently with the arm.
+    unsafe {
+        *STRAP_WORLD.0.get() = world;
+    }
+}
+
+/// Read the seam world handle; panics loudly (house stub style) if a ctx-less
+/// boundary fn runs before GAME_INIT armed the cell. Used by the ctx-less
+/// `G_AddEvent`/`G_PlayEffect`/`G_PlayEffectID` boundary fns (`g_utils.rs`),
+/// which mirror Raven's direct `level`-global reads the same way.
+pub(crate) fn strap_world() -> *mut crate::world::GameWorld {
+    // SAFETY: single-threaded read of the seam cell (see StrapWorld).
+    let w = unsafe { *STRAP_WORLD.0.get() };
+    if w.is_null() {
+        panic!(
+            "ctx-less world boundary fn called before init_strap_world (GAME_INIT) \
+             armed the seam cell"
+        );
+    }
+    w
+}
+
 /// Raven `strap_G2API_GetBoltMatrix`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:6-10`
+/// Source: `oracle/codemp/game/g_strap.c:6-10`
 pub fn strap_G2API_GetBoltMatrix(
     ghoul2: *mut c_void,
     modelIndex: c_int,
@@ -81,7 +127,7 @@ pub fn strap_G2API_GetBoltMatrix(
 
 /// Raven `strap_G2API_GetBoltMatrix_NoReconstruct`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:12-16`
+/// Source: `oracle/codemp/game/g_strap.c:12-16`
 pub fn strap_G2API_GetBoltMatrix_NoReconstruct(
     ghoul2: *mut c_void,
     modelIndex: c_int,
@@ -105,7 +151,7 @@ pub fn strap_G2API_GetBoltMatrix_NoReconstruct(
 
 /// Raven `strap_G2API_GetBoltMatrix_NoRecNoRot`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:18-22`
+/// Source: `oracle/codemp/game/g_strap.c:18-22`
 pub fn strap_G2API_GetBoltMatrix_NoRecNoRot(
     ghoul2: *mut c_void,
     modelIndex: c_int,
@@ -128,7 +174,7 @@ pub fn strap_G2API_GetBoltMatrix_NoRecNoRot(
 
 /// Raven `strap_G2API_SetBoneAngles`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:24-29`
+/// Source: `oracle/codemp/game/g_strap.c:24-29`
 pub fn strap_G2API_SetBoneAngles(
     ghoul2: *mut c_void,
     modelIndex: c_int,
@@ -163,7 +209,7 @@ pub fn strap_G2API_SetBoneAngles(
 
 /// Raven `strap_G2API_SetBoneAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:31-35`
+/// Source: `oracle/codemp/game/g_strap.c:31-35`
 pub fn strap_G2API_SetBoneAnim(
     ghoul2: *mut c_void,
     modelIndex: c_int,
@@ -196,7 +242,7 @@ pub fn strap_G2API_SetBoneAnim(
 
 /// Raven `strap_G2API_GetBoneAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:37-41`
+/// Source: `oracle/codemp/game/g_strap.c:37-41`
 pub fn strap_G2API_GetBoneAnim(
     ghoul2: *mut c_void,
     boneName: *const c_char,
@@ -229,7 +275,7 @@ pub fn strap_G2API_GetBoneAnim(
 
 /// Raven `strap_G2API_SetRagDoll`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:43-46`
+/// Source: `oracle/codemp/game/g_strap.c:43-46`
 pub fn strap_G2API_SetRagDoll(ghoul2: *mut c_void, params: *mut sharedRagDollParams_t) {
     // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_SetRagDoll(
@@ -240,7 +286,7 @@ pub fn strap_G2API_SetRagDoll(ghoul2: *mut c_void, params: *mut sharedRagDollPar
 
 /// Raven `strap_G2API_AnimateG2Models`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:48-51`
+/// Source: `oracle/codemp/game/g_strap.c:48-51`
 pub fn strap_G2API_AnimateG2Models(
     ghoul2: *mut c_void,
     time: c_int,
@@ -257,7 +303,7 @@ pub fn strap_G2API_AnimateG2Models(
 
 /// Raven `strap_G2API_SetBoneIKState`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:53-56`
+/// Source: `oracle/codemp/game/g_strap.c:53-56`
 pub fn strap_G2API_SetBoneIKState(
     ghoul2: *mut c_void,
     time: c_int,
@@ -280,7 +326,7 @@ pub fn strap_G2API_SetBoneIKState(
 
 /// Raven `strap_G2API_IKMove`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:58-61`
+/// Source: `oracle/codemp/game/g_strap.c:58-61`
 pub fn strap_G2API_IKMove(
     ghoul2: *mut c_void,
     time: c_int,
@@ -295,7 +341,7 @@ pub fn strap_G2API_IKMove(
 
 /// Raven `strap_TrueMalloc`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:63-66`
+/// Source: `oracle/codemp/game/g_strap.c:63-66`
 pub fn strap_TrueMalloc(ptr: *mut *mut c_void, size: c_int) {
     // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::TrueMalloc(
@@ -306,7 +352,7 @@ pub fn strap_TrueMalloc(ptr: *mut *mut c_void, size: c_int) {
 
 /// Raven `strap_TrueFree`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_strap.c:68-71`
+/// Source: `oracle/codemp/game/g_strap.c:68-71`
 pub fn strap_TrueFree(ptr: *mut *mut c_void) {
     // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::TrueFree(

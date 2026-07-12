@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_CMD_EXECUTETEXT, exec_when, text );`
 /// Raven transport: `Cbuf_ExecuteText( args[1], (const char *)VMA(2) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:79-80`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:929`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:910-912`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:79-80`
+/// Args source: `oracle/codemp/ui/ui_local.h:929`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:910-912`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCmdExecutetextArgs {
     exec_when: c_int,
@@ -35,11 +35,11 @@ impl UiCmdExecutetextArgs {
 
 /// `UI_CMD_EXECUTETEXT` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:30`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:79-80`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:79-80`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:910-912`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:910-912`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:30`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:79-80`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:79-80`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:910-912`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:910-912`
 pub struct UiCmdExecutetext;
 
 impl OutboundSysCall for UiCmdExecutetext {

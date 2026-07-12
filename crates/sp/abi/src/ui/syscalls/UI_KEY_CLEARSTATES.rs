@@ -1,9 +1,11 @@
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `UI_KEY_CLEARSTATES` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:191`
+/// Source: `oracle/code/ui/ui_public.h:191`
 pub struct UiKeyClearstates;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -20,9 +22,9 @@ impl OutboundSysCall for UiKeyClearstates {
     /// Raven wrapper: `syscall( UI_KEY_CLEARSTATES );`
     /// Raven transport: `Key_ClearStates(); return 0;`
     ///
-    /// Args source: `oracle/oracle/code/ui/ui_syscalls.cpp:128-130`
-    /// Output source: `oracle/oracle/code/ui/ui_syscalls.cpp:128-130`
-    /// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:415-417`
+    /// Args source: `oracle/code/ui/ui_syscalls.cpp:128-130`
+    /// Output source: `oracle/code/ui/ui_syscalls.cpp:128-130`
+    /// Transport/switch source: `oracle/code/client/cl_ui.cpp:415-417`
     type Args = UiKeyClearstatesArgs;
     type Output = ();
 

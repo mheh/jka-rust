@@ -8,13 +8,13 @@ use sp_qshared::shared::fileHandle_t;
 
 /// `UI_FS_WRITE` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:167`
-/// Args source: `oracle/oracle/code/ui/ui_public.h:38`
+/// Enum source: `oracle/code/ui/ui_public.h:167`
+/// Args source: `oracle/code/ui/ui_public.h:38`
 /// Output source:
-/// - `oracle/oracle/code/ui/ui_public.h:38` declares `int` return
-/// - `oracle/oracle/codemp/client/cl_ui.cpp:921-923` returns `0`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:921-923`
-/// TODO: SP `oracle/oracle/code/client/cl_ui.cpp` has no `UI_FS_WRITE` case in this branch.
+/// - `oracle/code/ui/ui_public.h:38` declares `int` return
+/// - `oracle/codemp/client/cl_ui.cpp:921-923` returns `0`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:921-923`
+/// TODO: SP `oracle/code/client/cl_ui.cpp` has no `UI_FS_WRITE` case in this branch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiFsWriteArgs {
     buffer: *const c_void,

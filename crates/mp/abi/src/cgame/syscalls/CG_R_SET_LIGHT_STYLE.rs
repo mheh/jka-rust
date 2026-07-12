@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_R_SET_LIGHT_STYLE`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +28,7 @@ impl CgRSetLightStyleArgs {
 
 /// `CG_R_SET_LIGHT_STYLE` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:169`
+/// Source: `oracle/codemp/cgame/cg_public.h:169`
 pub struct CgRSetLightStyle;
 
 impl OutboundSysCall for CgRSetLightStyle {

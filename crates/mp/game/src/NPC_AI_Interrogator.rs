@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_Interrogator.c 10/10
-//! Faithful port of `oracle/oracle/codemp/game/NPC_AI_Interrogator.c` (jampgame mega-pass).
+//! Faithful port of `oracle/codemp/game/NPC_AI_Interrogator.c` (jampgame mega-pass).
 //!
 //! Interrogator droid NPC AI behavior: idle, patrol, hunt, strafe, melee attack.
 //!
@@ -13,45 +13,45 @@ use crate::prelude::*;
 use crate::trap;
 
 /// Local state enums for Interrogator blade movement.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:8-13`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:8-13`
 const LSTATE_BLADESTOP: c_int = 0;
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:11`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:11`
 pub const LSTATE_BLADEUP: c_int = 1;
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:12`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:12`
 pub const LSTATE_BLADEDOWN: c_int = 2;
 
 /// Velocity decay factor for Interrogator hovering.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:129`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:129`
 const VELOCITY_DECAY: f32 = 0.85;
 
 /// Upward push for Interrogator during strafe.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:130`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:130`
 const HUNTER_UPWARD_PUSH: c_int = 2;
 
 /// Strafe velocity for Interrogator movement.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:231`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:231`
 const HUNTER_STRAFE_VEL: c_int = 32;
 
 /// Distance for Interrogator strafe.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:232`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:232`
 const HUNTER_STRAFE_DIS: c_int = 200;
 
 /// Forward base speed for Interrogator.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:287`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:287`
 const HUNTER_FORWARD_BASE_SPEED: c_int = 10;
 
 /// Forward speed multiplier for Interrogator.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:288`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:288`
 const HUNTER_FORWARD_MULTIPLIER: c_int = 2;
 
 /// Minimum distance for Interrogator melee attack.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:338`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:338`
 const MIN_DISTANCE: c_int = 64;
 
 /// Raven `NPC_Interrogator_Precache`.
 ///
 /// Precache sounds and effects for the Interrogator NPC.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:20-28`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:20-28`
 pub fn NPC_Interrogator_Precache(ctx: GameContext<'_>, self_: *mut gentity_t) {
     G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr() as *const c_char);
     G_SoundIndex(c"sound/chars/mark1/misc/anger.wav".as_ptr() as *const c_char);
@@ -64,7 +64,7 @@ pub fn NPC_Interrogator_Precache(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `Interrogator_die`.
 ///
 /// Death behavior for Interrogator NPC. Sets velocity and clears flying flag.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:34-57`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:34-57`
 pub fn Interrogator_die(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -86,7 +86,7 @@ pub fn Interrogator_die(
                 client.ps.eFlags2 &= !(crate::prelude::EF2_FLYING as c_int);
                 // Raven passes the range reversed — `Q_irand(-10, -20)` — and irand's
                 // arithmetic gives different values for a reversed range; keep it verbatim.
-                // Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:49-50`
+                // Source: `oracle/codemp/game/NPC_AI_Interrogator.c:49-50`
                 client.ps.velocity[0] = (*ctx.world).bg_state.rng.Q_irand(-10, -20) as f32;
                 client.ps.velocity[1] = (*ctx.world).bg_state.rng.Q_irand(-10, -20) as f32;
                 client.ps.velocity[2] = -100.0;
@@ -98,7 +98,7 @@ pub fn Interrogator_die(
 /// Raven `Interrogator_PartsMove`.
 ///
 /// Move the syringe, scalpel, and claw parts of the Interrogator.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:64-127`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:64-127`
 pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -176,7 +176,7 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
 /// Raven `Interrogator_MaintainHeight`.
 ///
 /// Maintain hover height relative to enemy or goal.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:137-229`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:137-229`
 pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -278,7 +278,7 @@ pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
 /// Raven `Interrogator_Strafe`.
 ///
 /// Perform a strafe movement away from the target.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:238-279`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:238-279`
 pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -368,7 +368,7 @@ pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
 /// Raven `Interrogator_Hunt`.
 ///
 /// Hunt the enemy, using strafe and movement.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:290-336`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:290-336`
 pub fn Interrogator_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -409,7 +409,9 @@ pub fn Interrogator_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qbool
             (*npc_info).goalRadius = 12;
 
             // Get our direction from the navigator if we can't see our target
-            if crate::NPC_move::NPC_GetMoveDirection(ctx, forward, &mut distance as *mut f32) == 0 {
+            if crate::NPC_move::NPC_GetMoveDirection(ctx, &mut forward, &mut distance as *mut f32)
+                == 0
+            {
                 return;
             }
         } else {
@@ -438,7 +440,7 @@ pub fn Interrogator_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qbool
 /// Raven `Interrogator_Melee`.
 ///
 /// Perform melee attack if close enough and within height range.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:345-374`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:345-374`
 pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -497,7 +499,7 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
 /// Raven `Interrogator_Attack`.
 ///
 /// Main attack function - handles distance, visibility, and attack selection.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:381-428`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:381-428`
 pub fn Interrogator_Attack(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -512,7 +514,7 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
                 // Raven: `va("sound/chars/probe/misc/talk.wav", Q_irand(1, 3))` — the
                 // format string has no specifier, so the value is discarded, but the
                 // Q_irand still advances the holdrand stream; keep the draw.
-                // Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:395`
+                // Source: `oracle/codemp/game/NPC_AI_Interrogator.c:395`
                 let _ = (*ctx.world).bg_state.rng.Q_irand(1, 3);
                 crate::g_utils::G_SoundOnEnt(
                     ctx,
@@ -584,7 +586,7 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
 /// Raven `Interrogator_Idle`.
 ///
 /// Idle behavior - check for stealth enemies and maintain height.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:435-447`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:435-447`
 pub fn Interrogator_Idle(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -609,7 +611,7 @@ pub fn Interrogator_Idle(ctx: GameContext<'_>) {
 /// Raven `NPC_BSInterrogator_Default`.
 ///
 /// Default behavior state selector - attacks if enemy present, otherwise idles.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:454-467`
+/// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:454-467`
 pub fn NPC_BSInterrogator_Default(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;

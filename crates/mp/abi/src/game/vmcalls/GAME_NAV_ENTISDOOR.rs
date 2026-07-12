@@ -34,7 +34,7 @@ impl GameNavEntIsDoorArgs {
 
 /// `GAME_NAV_ENTISDOOR` MP game exports vmMain ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:793`
+/// Source: `oracle/codemp/game/g_public.h:793`
 pub struct GameNavEntIsDoor;
 
 impl InboundVmCall for GameNavEntIsDoor {

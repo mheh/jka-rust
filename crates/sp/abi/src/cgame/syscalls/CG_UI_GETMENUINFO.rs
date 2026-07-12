@@ -11,9 +11,9 @@ use sp_qshared::shared::qboolean;
 /// Raven wrapper: `cgi_UI_GetMenuInfo(menuFile,x,y,w,h);`
 /// Raven transport: `Menus_FindByName((char *) VMA(1)); if (menu){ *(int *)VMA(2)=...; ...; result=qtrue; } else { result=qfalse; }`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:623-625`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1222`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:895-917`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:623-625`
+/// Args source: `oracle/code/cgame/cg_local.h:1222`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:895-917`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiGetmenuinfoArgs {
     menu_file: *const c_char,
@@ -65,11 +65,11 @@ impl CgUiGetmenuinfoArgs {
 
 /// `CG_UI_GETMENUINFO` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:205`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:623-625`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1222`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:895-917`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:895-917`
+/// Enum value source: `oracle/code/cgame/cg_public.h:205`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:623-625`
+/// Args source: `oracle/code/cgame/cg_local.h:1222`
+/// Output source: `oracle/code/client/cl_cgame.cpp:895-917`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:895-917`
 pub struct CgUiGetmenuinfo;
 
 impl OutboundSysCall for CgUiGetmenuinfo {

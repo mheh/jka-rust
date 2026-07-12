@@ -2,7 +2,7 @@
 
 /// Raven `setModeCommand_t` — render-command to change the video mode.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:2028-2031`
+/// Type definition source: `oracle/code/renderer/tr_local.h:2028-2031`
 #[repr(C)]
 pub struct setModeCommand_t {
     pub commandId: i32,

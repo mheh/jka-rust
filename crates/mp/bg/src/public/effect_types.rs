@@ -1,12 +1,12 @@
 //! MP `bg_public.h` effect type definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:627-649`
+//! Type definition source: `oracle/codemp/game/bg_public.h:627-649`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `effectTypes_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:627-649`
+/// Type definition source: `oracle/codemp/game/bg_public.h:627-649`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum effectTypes_t {

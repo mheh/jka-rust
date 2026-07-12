@@ -2,5 +2,5 @@
 
 /// Raven `TGPGroup` — opaque handle to a generic parser group.
 ///
-/// Type definition source: `oracle/oracle/code/game/genericparser2.h:173-173`
+/// Type definition source: `oracle/code/game/genericparser2.h:173-173`
 pub type TGPGroup = *mut ::core::ffi::c_void;

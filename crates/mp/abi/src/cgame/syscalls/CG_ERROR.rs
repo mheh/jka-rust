@@ -8,8 +8,8 @@ use abi_transport::generic::{
 /// Arguments for the `CG_ERROR` syscall.
 ///
 /// ABI: `void trap_Error(const char *fmt)`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:25`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:691`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:25`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:691`
 #[derive(Debug)]
 pub struct CgErrorArgs {
     /// NUL-terminated message string passed to `Com_Error`.
@@ -33,7 +33,7 @@ impl CgErrorArgs {
 
 /// `CG_ERROR` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:58`
+/// Source: `oracle/codemp/cgame/cg_public.h:58`
 pub struct CgError;
 
 impl OutboundSysCall for CgError {
@@ -51,8 +51,8 @@ impl EncodeSysCall for CgError {
 }
 
 impl DecodeSysCallReturn for CgError {
-    /// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:693`
-    /// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:691`
+    /// Output source: `oracle/codemp/client/cl_cgame.cpp:693`
+    /// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:691`
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

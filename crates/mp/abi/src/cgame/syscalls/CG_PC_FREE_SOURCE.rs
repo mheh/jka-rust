@@ -1,15 +1,17 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_PC_FREE_SOURCE`.
 ///
 /// Raven wrapper: `return syscall( CG_PC_FREE_SOURCE, handle );`
 /// Raven transport: `return botlib_export->PC_FreeSourceHandle( args[1] );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:549-550`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1003-1004`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:549-550`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1003-1004`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgPcFreeSourceArgs {
     handle: c_int,
@@ -23,10 +25,10 @@ impl CgPcFreeSourceArgs {
 
 /// `CG_PC_FREE_SOURCE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:201`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:549-550`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1003-1004`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1003-1004`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:201`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:549-550`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1003-1004`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1003-1004`
 pub struct CgPcFreeSource;
 
 impl OutboundSysCall for CgPcFreeSource {

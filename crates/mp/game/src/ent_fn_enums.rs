@@ -7,7 +7,7 @@
 //! Entity fn-pointer fields are ported as per-field fn-ID
 //! enums; `PartialEq` replaces Raven's fn-address compares; stored as
 //! `Option<EntXxx>` where Raven stored a nullable fn pointer.
-//! Field signatures source: `oracle/oracle/codemp/game/g_local.h:285-291`
+//! Field signatures source: `oracle/codemp/game/g_local.h:285-291`
 //! Targets: fnsweep manifest fn-ptr write census (assignments in game/*.c).
 //! Vehicle-vtable fields are excluded (mp_bg enum dispatch).
 #![allow(non_snake_case, non_camel_case_types, unused)]
@@ -110,7 +110,7 @@ use crate::WalkerNPC::*;
 // `crate::ent_fn_enums::EntXxx` imports keep resolving.
 // Source: `crates/mp/qshared/src/common/mp/ent_fn_ids.rs`
 pub use mp_qshared::common::mp::ent_fn_ids::{
-    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse,
+    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse, FnId,
 };
 
 /// Central `think` dispatch (replaces `ent->think(...)`).
@@ -386,7 +386,7 @@ pub fn dispatch_pain(
         EntPain::TurretPain => TurretPain(ctx, self_, attacker, damage),
         EntPain::emplaced_gun_pain => emplaced_gun_pain(ctx, self_, attacker, damage),
         EntPain::funcBBrushPain => funcBBrushPain(ctx, self_, attacker, damage),
-        EntPain::func_usable_pain => func_usable_pain(self_, attacker, damage),
+        EntPain::func_usable_pain => func_usable_pain(ctx, self_, attacker, damage),
     }
 }
 
@@ -416,7 +416,7 @@ pub fn dispatch_die(
             emplaced_gun_die(ctx, self_, inflictor, attacker, damage, r#mod)
         }
         EntDie::funcBBrushDie => funcBBrushDie(ctx, self_, inflictor, attacker, damage, r#mod),
-        EntDie::func_usable_die => func_usable_die(self_, inflictor, attacker, damage, r#mod),
+        EntDie::func_usable_die => func_usable_die(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::laserTrapDelayedExplode => {
             laserTrapDelayedExplode(ctx, self_, inflictor, attacker, damage, r#mod)
         }
@@ -431,7 +431,7 @@ pub fn dispatch_die(
 // GENERATED addendum (pass-3 prep C1). The spawns[] table dual from
 // oracle g_spawn.c:435-673 (190 entries). classname strcmp
 // becomes an EntSpawn lookup + central match dispatch (EntThink pattern).
-// Source: `oracle/oracle/codemp/game/g_spawn.c:435-673` (G_CallSpawn)
+// Source: `oracle/codemp/game/g_spawn.c:435-673` (G_CallSpawn)
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum EntSpawn {
     /// `SP_info_player_start`
@@ -797,7 +797,7 @@ pub enum EntSpawn {
 /// The `spawns[]` classname->`EntSpawn` table (178 rows, oracle order).
 /// Raven `G_CallSpawn` walks this with a case-sensitive strcmp on
 /// `ent->classname`; `spawn_for_classname` is that lookup.
-/// Source: `oracle/oracle/codemp/game/g_spawn.c:435-673`
+/// Source: `oracle/codemp/game/g_spawn.c:435-673`
 pub static SPAWNS: &[(&str, EntSpawn)] = &[
     ("info_player_start", EntSpawn::info_player_start),
     ("info_player_duel", EntSpawn::info_player_duel),
@@ -1019,7 +1019,7 @@ pub fn spawn_for_classname(classname: &str) -> Option<EntSpawn> {
 /// Central spawn dispatch (replaces the `spawns[].spawn(ent)` call in
 /// `G_CallSpawn`). Faithful raw-pointer `ent` param for staging; the Land
 /// phase re-shapes to `(world, EntityId)`.
-/// Source: `oracle/oracle/codemp/game/g_spawn.c:435-673`
+/// Source: `oracle/codemp/game/g_spawn.c:435-673`
 pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
     match id {
         EntSpawn::info_player_start => SP_info_player_start(ctx, ent),

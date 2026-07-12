@@ -7,7 +7,7 @@
 set -eu
 cd "$(dirname "$0")"
 
-ORACLE=../../oracle/oracle
+ORACLE=../../oracle
 
 rm -rf build
 mkdir -p build/mp/qcommon build/sp/game build/sp/qcommon

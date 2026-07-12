@@ -65,7 +65,7 @@ impl BotlibAiPredictVisiblePositionArgs {
 
 /// `BOTLIB_AI_PREDICT_VISIBLE_POSITION` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:490`
+/// Source: `oracle/codemp/game/g_public.h:490`
 pub struct BotlibAiPredictVisiblePosition;
 
 impl OutboundSysCall for BotlibAiPredictVisiblePosition {

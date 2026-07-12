@@ -37,7 +37,7 @@ impl GameShutdownArgs {
 /// `GAME_SHUTDOWN` MP game exports vmMain ABI token.
 ///
 /// Raven: (void);
-/// Source: `oracle/oracle/codemp/game/g_public.h:740`
+/// Source: `oracle/codemp/game/g_public.h:740`
 pub struct GameShutdown;
 
 impl InboundVmCall for GameShutdown {

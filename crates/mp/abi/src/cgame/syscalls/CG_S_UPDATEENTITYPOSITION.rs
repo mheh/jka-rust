@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_S_UPDATEENTITYPOSITION, entityNum, origin );`
 /// Raven transport: `S_UpdateEntityPosition( args[1], (const float *)VMA(2) );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:208-209`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2229`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:831-833`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:208-209`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2229`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:831-833`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSUpdateentitypositionArgs {
     entity_num: c_int,
@@ -28,10 +28,10 @@ impl CgSUpdateentitypositionArgs {
 
 /// `CG_S_UPDATEENTITYPOSITION` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:101`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:208-209`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:831-833`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:831-833`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:101`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:208-209`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:831-833`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:831-833`
 pub struct CgSUpdateentityposition;
 
 impl OutboundSysCall for CgSUpdateentityposition {

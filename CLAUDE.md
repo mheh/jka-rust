@@ -5,10 +5,11 @@ UI, renderer, engine) as a drop-in replacement, ported from Raven's C/C++ source
 
 ## Oracle
 
-`oracle/oracle/` holds the original Raven source — the differential-testing
-**oracle**, never edited. SP lives under `code/`, MP under `codemp/`. Every port
-is verified against it. `oracle/` (the faithful Rust port) is the parity baseline
-checked via `--features oracle`.
+`oracle/` holds the original Raven source (submodule
+`github.com/mheh/jediacademy`) — the differential-testing **oracle**, never
+edited. SP lives under `code/`, MP under `codemp/`. Every port is verified
+against it. The earlier faithful-Rust-port harness lives externally at
+`github.com/mheh/jedi-academy-rust` (no longer checked out here).
 
 ## Port style — read this before porting anything
 
@@ -34,12 +35,12 @@ rust-analyzer is stale in this workspace — **always confirm compilation with
 - `docs/workspace-architecture.md` — crate graph and dependency tiers
   (native < qshared < bg < game; qshared → abi → game).
 - `docs/decisions.md` — the DEC-xx ledger: user-settled architectural choices
-  (renderer deferral, WASM transport, wire compat, …). Cite, never re-litigate.
+  (renderer deferral, wasm dropped per ruling 35, wire compat, …). Cite, never re-litigate.
 - `docs/doc-standards.md` — template + gates for logic-port design docs
   (`docs/architecture/`, `docs/modules/`, `docs/subsystems/`).
 - `docs/GOAL.md` — project goal (drop-in ABI compatibility checklists).
 - `docs/abi-traps.md` — generated trap_* signature reference.
-- `docs/audits/marker-inventory-2026-07-05.md` — validated open-work inventory
+- `docs/audits/marker-inventory-2026-07-08.md` — validated open-work inventory
   (`TODO: Port` by verdict + PORT-NOTE re-grep); regenerated, never hand-edited.
 - `docs/roadmap-final-stages.md` — ordered post-parity roadmap (referee gates
   everything; then safe-state migration and beyond).
@@ -67,11 +68,21 @@ c_void-family modes). **jampgame transcription and integration are done**:
 `TODO: Port` markers both at zero (2026-07-06). CI builds and publishes
 engine-named modules on master pushes (`.github/workflows/build.yml`, rolling
 `latest` release; 32-bit lanes allowed-failure pending an ILP32 assert pass).
-Remaining on jampgame: per-file oracle review and the referee swap — oracle
-differential tests (single-threaded; the oracle has global state) replace
-clang layout as ground truth — then the safe-state migration. The
-`dangerous_implicit_autorefs` lint is allowed crate-wide in `mp_game`
+The `dangerous_implicit_autorefs` lint is allowed crate-wide in `mp_game`
 (documented in its lib.rs) pending the safe-state migration.
+
+**The MP dedicated-server engine island is closure-complete (workspace green
+2026-07-12).** The `jampDed` link set — `qcommon`, `botlib`, `server`, the seven
+C++ subsystems (ghoul2-server, ICARUS, RMG/terrain, NPC nav, StringEd, ROFF,
+headless renderer model/skin subset), and the native platform layer — is
+transcribed and integrated: `cargo check --workspace` is 0 errors, 343 tests
+pass (incl. §F oracle-parity goldens), and `qcommon`/`botlib`/`server` are closed
+with zero stubs, zero `TODO: Port` markers, and zero extern forward-decl blocks.
+Closure rulings are recorded in `docs/decisions.md` (DEC-13…DEC-22). Remaining:
+boot/lifecycle wiring (hook install + core lifecycle), the referee swap — oracle
+differential tests (single-threaded; the oracle has global state) replace clang
+layout as ground truth — then warning-zero, the safe-state migration, and the
+ILP32 layout-assert pass.
 
 - **MP** (`jamp` engine) ships 3 loadable DLLs: `jampgame`, `cgame`, `ui`.
 - **SP** (`jasp` engine) ships **only** `jagame`; SP cgame/ui are statically

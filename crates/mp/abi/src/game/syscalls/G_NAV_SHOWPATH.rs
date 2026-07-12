@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_SHOWPATH` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -27,7 +29,7 @@ impl GNavShowpathArgs {
 
 /// `G_NAV_SHOWPATH` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:307`
+/// Source: `oracle/codemp/game/g_public.h:307`
 pub struct GNavShowpath;
 
 impl OutboundSysCall for GNavShowpath {

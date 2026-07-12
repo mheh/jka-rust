@@ -11,11 +11,11 @@ use sp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( UI_LAN_MARKSERVERVISIBLE, source, n, visible );`
 /// Raven transport: `LAN_MarkServerVisible( args[1], args[2], (qboolean)args[3] );`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:220`
-/// Args source (SP fallback): `oracle/oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_MARKSERVERVISIBLE`.
-/// Args source (fallback): `oracle/oracle/codemp/ui/ui_local.h:974`
-/// Transport/switch source (fallback): `oracle/oracle/codemp/client/cl_ui.cpp:1099-1101`
-/// Output source fallback: `oracle/oracle/codemp/ui/ui_local.h:974`
+/// Enum source: `oracle/code/ui/ui_public.h:220`
+/// Args source (SP fallback): `oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_MARKSERVERVISIBLE`.
+/// Args source (fallback): `oracle/codemp/ui/ui_local.h:974`
+/// Transport/switch source (fallback): `oracle/codemp/client/cl_ui.cpp:1099-1101`
+/// Output source fallback: `oracle/codemp/ui/ui_local.h:974`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiLanMarkservervisibleArgs {
     source: c_int,
@@ -43,7 +43,7 @@ impl UiLanMarkservervisibleArgs {
 
 /// `UI_LAN_MARKSERVERVISIBLE` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:220`
+/// Source: `oracle/code/ui/ui_public.h:220`
 pub struct UiLanMarkservervisible;
 
 impl OutboundSysCall for UiLanMarkservervisible {

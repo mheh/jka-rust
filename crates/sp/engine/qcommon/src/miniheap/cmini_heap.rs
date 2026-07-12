@@ -7,7 +7,7 @@ use core::ffi::c_char;
 ///
 /// Raven: reset the heap back to the start / initialise the heap / free up
 /// the heap / give me some space from the heap please.
-/// Type definition source: `oracle/oracle/code/qcommon/MiniHeap.h:5-62`
+/// Type definition source: `oracle/code/qcommon/MiniHeap.h:5-62`
 #[repr(C)]
 pub struct CMiniHeap {
     pub mHeap: *mut c_char,

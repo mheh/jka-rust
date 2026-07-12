@@ -6,5 +6,5 @@ use core::ffi::c_int;
 /// only. SP-only: the force-feedback subsystem (`code/ff/`) has no MP
 /// counterpart.
 ///
-/// Type definition source: `oracle/oracle/code/ff/ff_public.h:8`
+/// Type definition source: `oracle/code/ff/ff_public.h:8`
 pub type ffHandle_t = c_int;

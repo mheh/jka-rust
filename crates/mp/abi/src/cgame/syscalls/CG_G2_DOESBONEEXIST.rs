@@ -12,9 +12,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall(CG_G2_DOESBONEEXIST, ghoul2, modelIndex, boneName);`
 /// Raven transport: `return G2API_DoesBoneExist(&g2[args[2]], (const char *)VMA(3));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:971-973`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2562`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1507-1511`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:971-973`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2562`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1507-1511`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2DoesboneexistArgs {
     ghoul2: *mut c_void,
@@ -35,10 +35,10 @@ impl CgG2DoesboneexistArgs {
 /// `CG_G2_DOESBONEEXIST` MP cgame imports syscall ABI token.
 ///
 /// Raven: check if a bone exists on skeleton without actually adding to the bone list -rww
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:289`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:971-973`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1507-1511`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1507-1511`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:289`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:971-973`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1507-1511`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1507-1511`
 pub struct CgG2Doesboneexist;
 
 impl OutboundSysCall for CgG2Doesboneexist {

@@ -5,25 +5,26 @@ use core::ffi::{c_char, c_int};
 use mp_engine_qcommon::cm::cmodel_s::cmodel_s;
 use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
-use mp_qshared::shared::{qboolean, MAX_CONFIGSTRINGS};
+use mp_qshared::shared::limits::MAX_MODELS as MAX_MODELS_I32;
+use mp_qshared::shared::{qboolean, MAX_CONFIGSTRINGS, MAX_GENTITIES};
 
 use super::server_state_t::serverState_t;
 use super::sv_entity_s::svEntity_t;
 
-/// Raven `MAX_MODELS` — models sent over the net as -12 bits.
+/// `usize`-typed dual of the canonical `mp_qshared::shared::limits::MAX_MODELS`
+/// (`c_int`), for array sizing.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2020`
-pub const MAX_MODELS: usize = 512;
+/// Source: `oracle/codemp/game/q_shared.h:2020`
+pub const MAX_MODELS: usize = MAX_MODELS_I32 as usize;
 
-/// Raven `MAX_GENTITIES` — `1 << GENTITYNUM_BITS` (non-`_XBOX`, `GENTITYNUM_BITS` = 10).
-///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1992-1996`
-pub const MAX_GENTITIES: usize = 1024;
+// `MAX_GENTITIES` (`q_shared.h:1992-1996`) imported from its canonical Tier-0
+// home in `mp_qshared::shared` (relocation noted there; this dedupes the copy
+// the mechanical type-port left in `mp_engine_server`).
 
 /// Raven `server_t`.
 ///
 /// Raven: non-`_XBOX` variant (`_XBOX` undefined) is the one this codebase ports.
-/// Type definition source: `oracle/oracle/codemp/qcommon/../server/server.h:53-88`
+/// Type definition source: `oracle/codemp/qcommon/../server/server.h:53-88`
 #[repr(C)]
 pub struct server_t {
     pub state: serverState_t,

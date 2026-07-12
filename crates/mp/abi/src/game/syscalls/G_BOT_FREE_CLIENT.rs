@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_BOT_FREE_CLIENT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -23,7 +25,7 @@ impl GBotFreeClientArgs {
 /// `G_BOT_FREE_CLIENT` MP game imports syscall ABI token.
 ///
 /// Raven: ( int clientNum );
-/// Source: `oracle/oracle/codemp/game/g_public.h:217`
+/// Source: `oracle/codemp/game/g_public.h:217`
 pub struct GBotFreeClient;
 
 impl OutboundSysCall for GBotFreeClient {

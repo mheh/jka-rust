@@ -1,6 +1,8 @@
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AAS_TIME` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,7 +16,7 @@ impl BotlibAasTimeArgs {
 
 /// `BOTLIB_AAS_TIME` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:363`
+/// Source: `oracle/codemp/game/g_public.h:363`
 pub struct BotlibAasTime;
 
 impl OutboundSysCall for BotlibAasTime {

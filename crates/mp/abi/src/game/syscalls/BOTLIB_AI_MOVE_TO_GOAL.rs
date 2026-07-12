@@ -50,7 +50,7 @@ impl BotlibAiMoveToGoalArgs {
 
 /// `BOTLIB_AI_MOVE_TO_GOAL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:465`
+/// Source: `oracle/codemp/game/g_public.h:465`
 pub struct BotlibAiMoveToGoal;
 
 impl OutboundSysCall for BotlibAiMoveToGoal {

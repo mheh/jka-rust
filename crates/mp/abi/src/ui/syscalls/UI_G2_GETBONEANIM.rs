@@ -96,7 +96,7 @@ impl UiG2GetboneanimArgs {
 
 /// `UI_G2_GETBONEANIM` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:521`
+/// Source: `oracle/codemp/ui/ui_public.h:521`
 pub struct UiG2Getboneanim;
 
 impl OutboundSysCall for UiG2Getboneanim {

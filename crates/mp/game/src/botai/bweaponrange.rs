@@ -6,7 +6,7 @@ use core::ffi::c_int;
 /// current weapon.
 ///
 /// Raven: plain `#define`s, not an enum; ported as loose consts.
-/// Source: `oracle/oracle/codemp/game/ai_main.h:46-49`
+/// Source: `oracle/codemp/game/ai_main.h:46-49`
 pub const BWEAPONRANGE_MELEE: c_int = 1;
 pub const BWEAPONRANGE_MID: c_int = 2;
 pub const BWEAPONRANGE_LONG: c_int = 3;

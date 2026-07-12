@@ -16,8 +16,8 @@ Links only — never restated here:
   (`#[repr(C)]` layout parity).
 - `docs/decisions.md` — DEC-01 (renderer port deferred), DEC-03 (audio: faithful
   mixer via cpal, EAX/force-feedback dropped), DEC-04 (per-mode
-  duplication), DEC-05 (module transport `NativeDll | Static | Wasm`, WASM
-  first-class), DEC-07 (SP cgame/ui statically linked via the vmachine shim),
+  duplication), DEC-05 (module transport `NativeDll | Static`), DEC-07 (SP
+  cgame/ui statically linked via the vmachine shim),
   DEC-08 (`Com_Error` = panic + `catch_unwind` at the frame boundary), DEC-09
   (verification layers).
 - `docs/architecture/two-island-model.md` — the STATE-D1 visualization,
@@ -28,7 +28,7 @@ Links only — never restated here:
   names are kept consistent with that doc, and their **concrete shapes are
   defined there, not restated here** (read engine-seam.md for them): `CEngine`
   (engine-seam § `CEngine`, SEAM-D9), `Static` (engine-seam § `Static`),
-  `ModuleTransport` = `enum { NativeDll, Static, Wasm }` (engine-seam
+  `ModuleTransport` = `enum { NativeDll, Static }` (engine-seam
   § Engine-side dispatchers), the `ServerGame` dispatcher arg (engine-seam
   § dispatchers — the reborrowed `Engine.sv` host state), and `SharedGameData`
   (whose *method set* this doc freezes below). The frozen blocks below
@@ -101,7 +101,7 @@ and `com_printf`'s `Common`-owned print state (STATE-D11).
 **Non-goals** (each punted to its owning doc):
 
 - **Seam executor mechanics** — how a trap crosses (`Execute<C>`/`Dispatch<C>`,
-  the syscall/table wires, WASM marshalling) → `docs/architecture/engine-seam.md`.
+  the syscall/table wires) → `docs/architecture/engine-seam.md`.
 - **Per-subsystem internals** — what each owned struct's fields are and what each
   handler *does* (cvar parse tables, filesystem search-path logic, sound mixer,
   collision internals) → `docs/subsystems/*` (pending).
@@ -117,13 +117,13 @@ and `com_printf`'s `Common`-owned print state (STATE-D11).
 
 The full ~60-row census lives in the dossier; § State ownership's master table is
 this doc's rendering of it. This section covers only the *architecture* the table
-rests on. MP tree = `oracle/oracle/codemp/`, SP tree = `oracle/oracle/code/`.
+rests on. MP tree = `oracle/codemp/`, SP tree = `oracle/code/`.
 
 ### Build-canonical file variants
 
 The real PC build links `cmd_common.cpp`+`cmd_pc.cpp`,
 `files_common.cpp`+`files_pc.cpp`, `z_memman_pc.cpp`
-(`oracle/oracle/codemp/unix/makefile:302-307`). `files.cpp`, `cmd_console.cpp`,
+(`oracle/codemp/unix/makefile:302-307`). `files.cpp`, `cmd_console.cpp`,
 `files_console.cpp`, `z_memman_console.cpp` are dead console-platform duplicates
 (same globals under `static` linkage) and are **not** owners of anything in the
 table.
@@ -473,14 +473,14 @@ These four engine subcrates exist in the crate graph (`mp/engine/{botlib,ghoul2,
 
 | Raven global | oracle cite | Rust owner | constructed by | threaded via |
 |---|---|---|---|---|
-| botlib / ghoul2 / icarus / rmg engine-side globals | dossier §1 (not censused; readers only, e.g. `icarus/GameInterface.cpp:129`) | **pending §F subsystem docs** (`docs/subsystems/{botlib,ghoul2,icarus,rmg}.md`); `Engine`-field attachment is STATE-Q2 | their `*_Init` (per §F doc) | n/a here |
+| botlib / ghoul2 / icarus / rmg engine-side globals | dossier §1 (not censused; readers only, e.g. `icarus/GameInterface.cpp:129`) | direct `Engine` fields (`engine.icarus`/`nav`/`g2`/`rmg`/`roff` — STATE-Q2 CLOSED per rulings 12/13/43; internal shapes per the §F docs `docs/subsystems/{icarus,rmg-terrain,ghoul2-server,npcnav,roff}.md`) | their `*_Init` (per §F doc), fields land with each subsystem's waves | `EngineHostView` split-borrow (ruling 43) |
 
 **Module island — MP game (`mp/game::GameWorld`)**
 
 | Raven global | oracle cite | Rust owner | constructed by | threaded via |
 |---|---|---|---|---|
 | `level` (`level_locals_t`) | `g_main.c:9` | `GameWorld.level: mp_game::level::level_locals_t` | `G_InitGame` | `(world, id)` re-borrow |
-| `g_entities[MAX_GENTITIES]` | `g_main.c:27` | `GameWorld.entities: Box<[mp_qshared::common::mp::gentity_t; MAX_GENTITIES]>` (contiguous `#[repr(C)]`, size-asserted 1832B — reuse the existing type, §D12) | `G_InitGame` | `EntityId(u32)` index |
+| `g_entities[MAX_GENTITIES]` | `g_main.c:27` | `GameWorld.g_entities: Box<[mp_qshared::common::mp::gentity_t; MAX_GENTITIES]>` (contiguous `#[repr(C)]`, size-asserted 1832B — reuse the existing type, §D12) | `G_InitGame` | `EntityId(u32)` index |
 | `MAX_GENTITIES` (sizes the array above) | `q_shared.h:1996` | **`mp_qshared`** const per its oracle home + workspace-architecture tier table (Tier 0 qshared) — GameWorld needs it, so it **now also lives in `mp_qshared`**; the existing `mp_engine_server` copy (`crates/mp/engine/server/src/server/server_t.rs:21`) **and its size-asserts stand**. The dedupe (server re-importing the `mp_qshared` const) is a **deferred mechanical sweep** (skeleton finding 5, 2026-07-03), no behavioral change — the value is identical | (compile-time const) | referenced, not threaded |
 | `g_clients[MAX_CLIENTS]` (reached as `level.clients`) | `g_main.c:28` | `GameWorld.clients: Box<[mp_game::client::gclient_t; MAX_CLIENTS]>` (`gclient_t` = `gclient_s`, asserted 7344B; **MP only**) | `G_InitGame` | index |
 | `trap_LocateGameData` registration | `g_main.c:997` | registers `GameWorld` base+stride into the engine's `SharedGameData` (§Seam) | `G_InitGame` | raw seam (§D11) |
@@ -621,7 +621,7 @@ only *which value* `ServerGame` denotes.
 doc's `pub struct Engine` (crate `mp_engine_core`) is the **engine-island
 aggregate** (`common`/`sv`/`cl`/`cm`/`snd`). It is a **different type** from
 engine-seam SEAM-D13's `pub type Engine` (crate `mp_engine_select`), which is the
-**module-side outbound-transport alias** (`CEngine`/`Static`/wasm) that logic
+**module-side outbound-transport alias** (`CEngine`/`Static`) that logic
 crates thread as `&Engine` to *issue* traps. Same bare name, different crates,
 different purpose. Consequently, the `&Engine` a `Dispatch<C>` body needs to issue
 outbound traps mid-dispatch (the former **SEAM-Q12**) is the **module-side
@@ -734,7 +734,7 @@ pub fn com_error(level: ErrorLevel, msg: String) -> !;
 pub struct GameWorld {
     pub level: level_locals_t,                        // mp_game::level::level_locals_t
                                                       //   (game/src/level/level_locals.rs:29)
-    pub entities: Box<[gentity_t; MAX_GENTITIES]>,    // mp_qshared::common::mp::gentity_t
+    pub g_entities: Box<[gentity_t; MAX_GENTITIES]>,  // mp_qshared::common::mp::gentity_t
                                                       //   (qshared/.../gentity.rs:50; size-asserted 1832B :456).
                                                       //   MAX_GENTITIES is referenced from mp_qshared (below).
     pub clients: Box<[gclient_t; MAX_CLIENTS]>,       // mp_game::client::gclient_t (= gclient_s;
@@ -746,9 +746,8 @@ pub struct GameWorld {
 - **Aliasing preserved exactly** (§A1/§A2): entity/client storage is the real
   memory the engine reads through `SharedGameData`; no copy-narrowing. The
   copy-based `CL_GetSnapshot` stays a copy only because the oracle copies there.
-- **`#[repr(C)]` contiguous entity array** (not `Vec<Enum>`): the same byte
-  layout serves both the native pointer-cast reader and the future WASM
-  offset-translation reader (DEC-05.5) — one shape, two `unsafe` readers.
+- **`#[repr(C)]` contiguous entity array** (not `Vec<Enum>`): the byte layout
+  is exactly what the native pointer-cast reader crosses the seam through.
 - **Multi-world constraint** (STATE-D2, user requirement): `GameWorld` is a
   **value type** and the engine holds *a* (registration-keyed) `SharedGameData`,
   not a singleton. Multiple concurrent worlds with cross-world messaging must be
@@ -906,7 +905,7 @@ engine-seam's outbound `ENGINE: OnceLock<CEngine>` (SEAM-D1). Frozen shape:
 ```rust
 // Module cdylib shell crate (crates/jampgame / crates/cgame / crates/ui; SP jagame).
 // Holds the module island's one owned GameWorld — a per-mode logical singleton,
-// exactly Raven's `level` (§B6). Identical shape in NativeDll, Static, and Wasm builds.
+// exactly Raven's `level` (§B6). Identical shape in NativeDll and Static builds.
 // No logic crate names it; MP's shell vmMain reads/writes it (access confined below). SP
 // jagame has no vmMain — ge->Init/ge->Shutdown write/take the cell, each export re-derives
 // its own pointer (STATE-D12); the cell shape and the confined-unsafe rule are identical.
@@ -1130,7 +1129,7 @@ impl<'e> Dispatch<GameRunFrame> for GameContext<'e> {
         // e.g. g_run_frame(unsafe { &mut *self.world }, self.engine, args) at a leaf that
         // holds no borrow across a trap:: re-entry; nested reborrows re-derive from self.world;
         // outbound traps issue as trap::X(self.engine, …).
-        todo!("Port G_RunFrame — oracle/oracle/codemp/game/g_main.c:3582")
+        todo!("Port G_RunFrame — oracle/codemp/game/g_main.c:3582")
     }
 }
 ```
@@ -1204,24 +1203,18 @@ pub trait SharedGameData {
 }
 ```
 
-`SeamPtr` is the transport's raw address word (a host pointer for
-`NativeDll`/`Static`, a linear-memory offset for `Wasm`) — that semantic
-contract is what this doc fixes. As "the transport's" address word its **type is
-defined in `abi-transport`** (the transport crate every `mp/engine/*` crate
-depends on — workspace-architecture § Dependency edges), so this engine-internal
-trait names it unqualified without a new edge. Its *concrete* Rust representation
-(a `usize` alias vs. a newtype, and any WASM `Memory`-handle pairing) is a
+`SeamPtr` is the transport's raw address word (a host pointer for `NativeDll` /
+`Static`) — that semantic contract is what this doc fixes. As "the transport's"
+address word its **type is defined in `abi-transport`** (the transport crate
+every `mp/engine/*` crate depends on — workspace-architecture § Dependency
+edges), so this engine-internal trait names it unqualified without a new edge.
+Its *concrete* Rust representation (a `usize` alias vs. a newtype) is a
 seam-executor mechanic and a non-goal here (§ Non-goals →
 `docs/architecture/engine-seam.md`); the trait above is written against the
-semantic contract only. Two impls, same
-signature, different contract (engine-seam SEAM-D4):
-
-- **`NativeDll` / `Static`**: cache the base pointer + stride once at
-  registration; accessors do raw arithmetic — faithful to `sv.gentities`/
-  `sv.mSharedMemory`, zero cost.
-- **`Wasm`**: store the module `Memory` handle + offset/stride and **re-resolve
-  `(base+offset, len)` per access with bounds checks**, never caching a base
-  pointer, so it survives `memory.grow`.
+semantic contract only. For both `NativeDll` and `Static` the impl is the same
+(engine-seam SEAM-D4): cache the base pointer + stride once at registration;
+accessors do raw arithmetic — faithful to `sv.gentities` / `sv.mSharedMemory`,
+zero cost.
 
 The registration is held in `Server.sv` (per-world value), **keyed** — not a
 process singleton — so the multi-world constraint (STATE-D2) holds structurally.
@@ -1364,8 +1357,8 @@ value type and the engine's server state holds *a* registration-keyed
 structurally retrofittable (no singleton assumptions, no ambient statics);
 single-world remains the built configuration. `clipMap`/`CollisionWorld` and
 `svEntity`/`worldSector` state are likewise instance-shaped values. *Rejected:* a
-`Vec<Enum>` entity store (would fork the native pointer-cast and WASM offset paths
-into two layouts); a process-global `GameWorld` (forecloses multi-world, §B3).
+`Vec<Enum>` entity store (would break the native pointer-cast layout the seam
+crosses through); a process-global `GameWorld` (forecloses multi-world, §B3).
 
 **STATE-D3 — Error recovery ordering.** `com_error(level, msg)` runs oracle's
 per-level recovery **synchronously BEFORE panicking** (mirroring `SV_Shutdown` →
@@ -1824,8 +1817,7 @@ slice-driven.
   Slice 0 by SEAM-D7); it also needs lifecycle.md's `Engine::new`/`com_init`
   command-line-parameter split (§ Seam). MP client then adds `cl: Some(Client)`
   (+ `KeyState`, console) and `snd`; SP adds its `GameWorld` (no `clients`) and the
-  `GetGameAPI` table register (SEAM-D2); the WASM `SharedGameData` re-resolving impl
-  lands after native parity (DEC-05.5). Multi-world retrofit (STATE-D2) is a
+  `GetGameAPI` table register (SEAM-D2). Multi-world retrofit (STATE-D2) is a
   post-parity slice — the value-typed, registration-keyed design makes it
   non-structural.
 
@@ -1865,16 +1857,23 @@ round-7 gate's two Slice-0 stamping blockers are **CLOSED** (user, 2026-07-03, i
 - **Tracked note (finding 15)** (below STATE-Q9) — SP *engine-side* signatures
   (`sv_init_game_progs`, the `ge` handle placement) have no doc home yet.
 
-- **STATE-Q2 — `Engine`-island attachment for the four §F subcrates.**
-  *Owner: the per-subsystem C++-track design docs
-  (`docs/subsystems/{botlib,ghoul2,icarus,rmg}.md`).* botlib, ghoul2, icarus, and
-  rmg have real engine-side Raven globals but were outside the A2 survey (dossier
-  §1 censused only qcommon/server/client/sound/renderer; these appear there as
-  readers, not owners). Their internal ownership is designed in their own §F
-  subsystem docs (porting-rules §F, GP2 precedent), but whether/how their
-  engine-side state becomes fields of `Engine` — especially ghoul2, shared
-  engine↔cgame — is undecided. Placeholdered in the master table; resolve
-  alongside those §F docs.
+- **STATE-Q2 — `Engine`-island attachment for the four §F subcrates —
+  CLOSED 2026-07-09 (engine-fork-discovery rulings 12/13 + 43).** The
+  placement half is ruled: each §F subsystem's engine-side state becomes a
+  **direct `Engine` field** (`engine.icarus`, `engine.nav`, `engine.g2`,
+  `engine.rmg`, `engine.roff` — no `Option`/`Box` wrapping, ruling 12);
+  internal shapes stay owned by their §F docs
+  (`docs/subsystems/{icarus,rmg-terrain,ghoul2-server,npcnav,roff}.md`).
+  The fields land with each subsystem's port waves (the struct types do
+  not exist before their §F work). `Engine` implements `EngineHost` for
+  subsystem calls through the pinned split-borrow view (ruling 43):
+  `pub struct EngineHostView<'a>` in `mp_engine_core`, holding `&mut`
+  borrows of the Common/Server/CollisionWorld/loader fields `EngineHost`
+  needs; `Engine` gains per-subsystem split constructors
+  (`fn nav_call(&mut self) -> (EngineHostView<'_>, &mut Navigator)`
+  pattern) that split-borrow disjoint fields — plain field-level
+  reborrowing, no unsafe. The trait impl lands at wave 20 with the
+  `SV_GameSystemCalls` arms that consume it.
 
 - **STATE-Q7 — Freeze-ordering — CLOSED 2026-07-03 (whole-set freeze, user
   sign-off).** All four architecture docs advanced REVIEWED → FROZEN together,
@@ -1922,7 +1921,7 @@ round-7 gate's two Slice-0 stamping blockers are **CLOSED** (user, 2026-07-03, i
   2026-07-03, citing the settled round-4 decision).** `mp_engine_core::Engine`
   (this doc — the owned engine-island aggregate) and `mp_engine_select::Engine`
   (engine-seam SEAM-D13 — the cfg'd module-side outbound-transport alias
-  `CEngine`/`Static`/wasm) share the bare name in different crates for different
+  `CEngine`/`Static`) share the bare name in different crates for different
   purposes. **Resolution: keep BOTH names, no renames; always crate-qualify.**
   workspace-architecture.md carries the canonical disambiguation block (§ crate tiers,
   2026-07-03); the distinction is also documented inline (§ Engine, and the naming note
@@ -1939,7 +1938,7 @@ round-7 gate's two Slice-0 stamping blockers are **CLOSED** (user, 2026-07-03, i
   `g_shared.h:830`) — the SP mirror of MP's `mp_engine_select::Engine`
   outbound-transport alias (SEAM-D13). But **no SP alias name/crate is derivable
   from settled decisions**: no `sp_engine_select` alias exists yet, and MP's
-  SEAM-D13 alias additionally encodes a `NativeDll`/`Static`/`Wasm` transport
+  SEAM-D13 alias additionally encodes a `NativeDll`/`Static` transport
   selection that SP's static-link/`GetGameAPI` handoff has no analog for — so the
   MP naming does not transpose cleanly. Per the round-4 mandate, this is flagged,
   not invented: the SP slice settles the concrete Rust name/crate when SP mirror

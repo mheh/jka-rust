@@ -1,15 +1,17 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `UI_PC_FREE_SOURCE`.
 ///
 /// Raven wrapper: `syscall( UI_PC_FREE_SOURCE, handle );`
 /// Raven transport: `return botlib_export->PC_FreeSourceHandle( args[1] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:370-371`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1161-1162`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:370-371`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1161-1162`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiPcFreeSourceArgs {
     handle: c_int,
@@ -30,11 +32,11 @@ impl UiPcFreeSourceArgs {
 /// Raven wrapper: `int trap_PC_FreeSource( int handle ) { return syscall( UI_PC_FREE_SOURCE, handle ); }`
 /// Raven transport: `return botlib_export->PC_FreeSourceHandle( args[1] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:86`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:82-90`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:370-371`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1161-1162`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1161-1162`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:86`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:82-90`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:370-371`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1161-1162`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1161-1162`
 pub struct UiPcFreeSource;
 
 impl OutboundSysCall for UiPcFreeSource {

@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `CG_SETUSERCMDVALUE`.
@@ -9,8 +11,8 @@ use abi_transport::pass_float;
 /// Raven wrapper sends `stateValue` plus three `PASSFLOAT` values.
 /// Raven transport: `CL_SetUserCmdValue(args[1], VMF(2), VMF(3), VMF(4));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:475-476`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:770-772`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:475-476`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:770-772`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgSetusercmdvalueArgs {
     state_value: c_int,
@@ -37,10 +39,10 @@ impl CgSetusercmdvalueArgs {
 
 /// `CG_SETUSERCMDVALUE` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:160`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:475-476`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:770-772`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:770-772`
+/// Enum value source: `oracle/code/cgame/cg_public.h:160`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:475-476`
+/// Output source: `oracle/code/client/cl_cgame.cpp:770-772`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:770-772`
 pub struct CgSetusercmdvalue;
 
 impl OutboundSysCall for CgSetusercmdvalue {

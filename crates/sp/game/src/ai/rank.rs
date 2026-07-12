@@ -1,7 +1,7 @@
 //! `rank_t`.
 //!
 //! Raven: "sigh... had to move in here for groupInfo".
-//! Source: `oracle/oracle/code/game/ai.h:31-41`
+//! Source: `oracle/code/game/ai.h:31-41`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum rank_t {

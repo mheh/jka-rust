@@ -7,17 +7,17 @@ use mp_qshared::shared::{qboolean, vec3_t};
 /// Raven `aas_routingupdate_t` — a pending routing-cache update, linked into
 /// the update list while queued.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/be_aas_def.h:150-160`
+/// Type definition source: `oracle/codemp/botlib/be_aas_def.h:150-160`
 #[repr(C)]
 pub struct aas_routingupdate_t {
-	pub cluster: i32,
-	pub areanum: i32,               // area number of the update
-	pub start: vec3_t,               // start point the area was entered
-	pub tmptraveltime: c_ushort,     // temporary travel time
-	pub areatraveltimes: *mut c_ushort, // travel times within the area
-	pub inlist: qboolean,            // true if the update is in the list
-	pub next: *mut aas_routingupdate_t,
-	pub prev: *mut aas_routingupdate_t,
+    pub cluster: i32,
+    pub areanum: i32,                   // area number of the update
+    pub start: vec3_t,                  // start point the area was entered
+    pub tmptraveltime: c_ushort,        // temporary travel time
+    pub areatraveltimes: *mut c_ushort, // travel times within the area
+    pub inlist: qboolean,               // true if the update is in the list
+    pub next: *mut aas_routingupdate_t,
+    pub prev: *mut aas_routingupdate_t,
 }
 
 /// Raven's C tag is `aas_routingupdate_s`; the typedef name

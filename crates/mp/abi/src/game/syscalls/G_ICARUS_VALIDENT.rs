@@ -28,7 +28,7 @@ impl GIcarusValidentArgs {
 
 /// `G_ICARUS_VALIDENT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:256`
+/// Source: `oracle/codemp/game/g_public.h:256`
 pub struct GIcarusValident;
 
 impl OutboundSysCall for GIcarusValident {

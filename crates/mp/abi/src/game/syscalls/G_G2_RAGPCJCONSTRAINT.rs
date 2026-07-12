@@ -53,7 +53,7 @@ impl GG2RagpcjconstraintArgs {
 
 /// `G_G2_RAGPCJCONSTRAINT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:550`
+/// Source: `oracle/codemp/game/g_public.h:550`
 pub struct GG2Ragpcjconstraint;
 
 impl OutboundSysCall for GG2Ragpcjconstraint {

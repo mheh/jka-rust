@@ -17,27 +17,25 @@ use sp_qshared::shared::{
 /// needs from the engine. Unlike MP (which routes UI through a VM syscall table), SP links
 /// its UI code directly into the engine binary, so this is a plain function-pointer struct
 /// rather than a syscall enum.
-/// Type definition source: `oracle/oracle/code/ui/ui_public.h:11-141`
+/// Type definition source: `oracle/code/ui/ui_public.h:11-141`
 #[repr(C)]
 pub struct uiimport_t {
     //============== general Quake services ==================
-
     /// print message on the local console
     //TODO: Port Printf variadic args
-    // Source: oracle/oracle/code/ui/ui_public.h:15
+    // Source: oracle/code/ui/ui_public.h:15
     pub Printf: Option<unsafe extern "C" fn(fmt: *const c_char, ...)>,
 
     /// abort the game
     //TODO: Port Error variadic args
-    // Source: oracle/oracle/code/ui/ui_public.h:18
+    // Source: oracle/code/ui/ui_public.h:18
     pub Error: Option<unsafe extern "C" fn(level: c_int, fmt: *const c_char, ...)>,
 
     // console variable interaction
     pub Cvar_Set: Option<unsafe extern "C" fn(name: *const c_char, value: *const c_char)>,
     pub Cvar_VariableValue: Option<unsafe extern "C" fn(var_name: *const c_char) -> f32>,
-    pub Cvar_VariableStringBuffer: Option<
-        unsafe extern "C" fn(var_name: *const c_char, buffer: *mut c_char, bufsize: c_int),
-    >,
+    pub Cvar_VariableStringBuffer:
+        Option<unsafe extern "C" fn(var_name: *const c_char, buffer: *mut c_char, bufsize: c_int)>,
     pub Cvar_SetValue: Option<unsafe extern "C" fn(var_name: *const c_char, value: f32)>,
     pub Cvar_Reset: Option<unsafe extern "C" fn(name: *const c_char)>,
     pub Cvar_Create: Option<
@@ -54,7 +52,11 @@ pub struct uiimport_t {
 
     // filesystem access
     pub FS_FOpenFile: Option<
-        unsafe extern "C" fn(qpath: *const c_char, file: *mut fileHandle_t, mode: fsMode_t) -> c_int,
+        unsafe extern "C" fn(
+            qpath: *const c_char,
+            file: *mut fileHandle_t,
+            mode: fsMode_t,
+        ) -> c_int,
     >,
     pub FS_Read:
         Option<unsafe extern "C" fn(buffer: *mut c_void, len: c_int, f: fileHandle_t) -> c_int>,
@@ -74,7 +76,6 @@ pub struct uiimport_t {
     pub FS_FreeFile: Option<unsafe extern "C" fn(buf: *mut c_void)>,
 
     // =========== renderer function calls ================
-
     /// returns rgb axis if not found
     pub R_RegisterModel: Option<unsafe extern "C" fn(name: *const c_char) -> qhandle_t>,
     /// returns all white if not found
@@ -125,7 +126,8 @@ pub struct uiimport_t {
         Option<unsafe extern "C" fn(org: *const f32, intensity: f32, r: f32, g: f32, b: f32)>,
     pub R_RenderScene: Option<unsafe extern "C" fn(fd: *const refdef_t)>,
 
-    pub R_ModelBounds: Option<unsafe extern "C" fn(handle: qhandle_t, mins: *mut f32, maxs: *mut f32)>,
+    pub R_ModelBounds:
+        Option<unsafe extern "C" fn(handle: qhandle_t, mins: *mut f32, maxs: *mut f32)>,
 
     /// NULL = 1,1,1,1
     pub R_SetColor: Option<unsafe extern "C" fn(rgba: *const f32)>,
@@ -165,7 +167,6 @@ pub struct uiimport_t {
     // and is omitted here (its offsets are absent from the provided layout too).
 
     //========= model collision ===============
-
     /// R_LerpTag is only valid for md3 models
     pub R_LerpTag: Option<
         unsafe extern "C" fn(
@@ -229,7 +230,8 @@ pub struct uiimport_t {
 
     pub GetClientState: Option<unsafe extern "C" fn() -> connstate_t>,
 
-    pub GetConfigString: Option<unsafe extern "C" fn(index: c_int, buff: *mut c_char, buffsize: c_int)>,
+    pub GetConfigString:
+        Option<unsafe extern "C" fn(index: c_int, buff: *mut c_char, buffsize: c_int)>,
 
     pub Milliseconds: Option<unsafe extern "C" fn() -> c_int>,
     pub Draw_DataPad: Option<unsafe extern "C" fn(HUDType: c_int)>,

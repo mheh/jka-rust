@@ -5,7 +5,7 @@ use crate::blockstream::cblock_stream::CBlockStream;
 /// Raven `bstream_t` — a block-stream node with a link to the previous node.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/code/icarus/sequencer.h:13-17`
+/// Type definition source: `oracle/code/icarus/sequencer.h:13-17`
 #[repr(C)]
 pub struct bstream_t {
     pub stream: *mut CBlockStream,

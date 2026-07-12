@@ -1,6 +1,6 @@
 //! MP `bg_public.h` animation frame range descriptor.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:241-247`
+//! Type definition source: `oracle/codemp/game/bg_public.h:241-247`
 
 #![allow(non_camel_case_types)]
 
@@ -9,7 +9,7 @@ use core::ffi::{c_schar, c_short, c_ushort};
 /// Raven `animation_s` (`animation_t`).
 ///
 /// Raven wraps this in `#pragma pack(push, 1)`; `repr(C, packed)` matches that layout.
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:241-247`
+/// Type definition source: `oracle/codemp/game/bg_public.h:241-247`
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct animation_t {

@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall(CG_G2_RAGFORCESOLVE, ghoul2, force);`
 /// Raven transport: `return G2API_RagForceSolve(*((CGhoul2Info_v *)args[1]), (qboolean)args[2]);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1035-1037`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2579`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1605-1606`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1035-1037`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2579`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1605-1606`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2RagforcesolveArgs {
     ghoul2: *mut c_void,
@@ -29,10 +29,10 @@ impl CgG2RagforcesolveArgs {
 /// `CG_G2_RAGFORCESOLVE` MP cgame imports syscall ABI token.
 ///
 /// Raven: make sure we are actively performing solve/settle routines, if desired
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:312`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1035-1037`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1605-1606`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1605-1606`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:312`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1035-1037`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1605-1606`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1605-1606`
 pub struct CgG2Ragforcesolve;
 
 impl OutboundSysCall for CgG2Ragforcesolve {

@@ -11,8 +11,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_S_UPDATEAMBIENTSET, name, origin );`
 /// Raven transport: `S_UpdateAmbientSet((const char *) VMA(1), (float *) VMA(2));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:197-198`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:562-569`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:197-198`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:562-569`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSUpdateambientsetArgs {
     name: *const c_char,
@@ -38,10 +38,10 @@ impl CgSUpdateambientsetArgs {
 /// Raven switch comment: stops an `ERR_DROP` internally if called illegally from
 /// game side, but can legally arrive during level start before sound has begun.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:162`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:197-198`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:562-569`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:562-569`
+/// Enum value source: `oracle/code/cgame/cg_public.h:162`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:197-198`
+/// Output source: `oracle/code/client/cl_cgame.cpp:562-569`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:562-569`
 pub struct CgSUpdateambientset;
 
 impl OutboundSysCall for CgSUpdateambientset {

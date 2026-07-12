@@ -79,7 +79,7 @@ impl UiG2GetboltNorecArgs {
 
 /// `UI_G2_GETBOLT_NOREC` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:512`
+/// Source: `oracle/codemp/ui/ui_public.h:512`
 pub struct UiG2GetboltNorec;
 
 impl OutboundSysCall for UiG2GetboltNorec {

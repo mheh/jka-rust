@@ -1,6 +1,6 @@
 //! SP `saberInfoRetail_t`.
 //!
-//! Type definition source: `oracle/oracle/code/game/q_shared.h:1947-2062`
+//! Type definition source: `oracle/code/game/q_shared.h:1947-2062`
 
 #![allow(non_camel_case_types)]
 
@@ -20,7 +20,7 @@ use super::saber_type::saberType_t;
 /// Its C++ inline methods (`Activate`, `Deactivate`, `BladeActivate`, `Active`,
 /// `SetLength`, `Length`, `LengthMax`, `ActivateTrail`, `DeactivateTrail`) are
 /// behavior, not layout, and are deferred to the SP savegame system.
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1947-2062`
+/// Type definition source: `oracle/code/game/q_shared.h:1947-2062`
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct saberInfoRetail_t {

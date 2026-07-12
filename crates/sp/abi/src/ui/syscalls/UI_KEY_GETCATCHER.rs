@@ -1,11 +1,13 @@
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use core::ffi::c_int;
 
 /// `UI_KEY_GETCATCHER` SP UI imports syscall ABI token.
 ///
 /// Raven: 40
-/// Source: `oracle/oracle/code/ui/ui_public.h:192`
+/// Source: `oracle/code/ui/ui_public.h:192`
 pub struct UiKeyGetcatcher;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -21,9 +23,9 @@ impl OutboundSysCall for UiKeyGetcatcher {
     type Import = SpUiImport;
     /// Raven's trap forwards only the syscall token.
     ///
-    /// Args source: `oracle/oracle/code/ui/ui_syscalls.cpp:133-137`
-    /// Output source: `oracle/oracle/code/ui/ui_syscalls.cpp:133-137`
-    /// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:449-450`
+    /// Args source: `oracle/code/ui/ui_syscalls.cpp:133-137`
+    /// Output source: `oracle/code/ui/ui_syscalls.cpp:133-137`
+    /// Transport/switch source: `oracle/code/client/cl_ui.cpp:449-450`
     type Args = UiKeyGetcatcherArgs;
     type Output = c_int;
 

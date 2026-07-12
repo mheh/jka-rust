@@ -12,16 +12,19 @@ use super::spatch_info::TPatchInfo;
 
 // Raven's `#if _DEBUG` `mCycleCount` field is not present in a release build; the
 // asserted layout below matches the non-debug shape.
+
+// Raven `#define HEIGHT_RESOLUTION 256`.
+// Source: oracle/codemp/qcommon/cm_landscape.h:13
 const HEIGHT_RESOLUTION: usize = 256;
 
 /// Raven `CTRLandScape` — the renderer-side landscape instance: patch storage,
 /// sort order, terrain shaders, and per-height detail shaders.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_landscape.h:119-186`
+/// Type definition source: `oracle/codemp/renderer/tr_landscape.h:119-186`
 #[repr(C)]
 pub struct CTRLandScape {
     //TODO: Port CCMLandScape
-    // Source: oracle/oracle/codemp/qcommon/cm_landscape.h:135
+    // Source: oracle/codemp/qcommon/cm_landscape.h:135
     pub common: *const c_void,
     /// Local patch info
     pub mTRPatches: *mut CTRPatch,

@@ -6,10 +6,10 @@ use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, Vm
 /// `CG_GET_USEABLE_FORCE` MP cgame exports vmMain ABI token.
 ///
 /// Raven: qboolean CG_NoUseableForce(void)
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:416`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:282-283`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:282-283`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_input.cpp:1298`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:416`
+/// Args source: `oracle/codemp/cgame/cg_main.c:282-283`
+/// Output source: `oracle/codemp/cgame/cg_main.c:282-283`
+/// Transport/call-site source: `oracle/codemp/client/cl_input.cpp:1298`
 pub struct CgGetUseableForce;
 
 impl InboundVmCall for CgGetUseableForce {

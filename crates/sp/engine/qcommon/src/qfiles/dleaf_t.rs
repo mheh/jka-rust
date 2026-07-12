@@ -2,20 +2,20 @@
 
 /// Raven `dleaf_t` — BSP leaf.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:477-489`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:477-489`
 #[repr(C)]
 pub struct dleaf_t {
-	pub cluster: i32, // -1 = opaque cluster (do I still store these?)
-	pub area: i32,
+    pub cluster: i32, // -1 = opaque cluster (do I still store these?)
+    pub area: i32,
 
-	pub mins: [i32; 3], // for frustum culling
-	pub maxs: [i32; 3],
+    pub mins: [i32; 3], // for frustum culling
+    pub maxs: [i32; 3],
 
-	pub firstLeafSurface: i32,
-	pub numLeafSurfaces: i32,
+    pub firstLeafSurface: i32,
+    pub numLeafSurfaces: i32,
 
-	pub firstLeafBrush: i32,
-	pub numLeafBrushes: i32,
+    pub firstLeafBrush: i32,
+    pub numLeafBrushes: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<dleaf_t>() == 48);

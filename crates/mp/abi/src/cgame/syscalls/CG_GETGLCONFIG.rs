@@ -13,9 +13,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_GETGLCONFIG, glconfig );`
 /// Raven transport: `CL_GetGlconfig( (glconfig_t *)VMA(1) ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:461-462`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2313-2316`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:954-956`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:461-462`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2313-2316`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:954-956`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgGetglconfigArgs {
     glconfig: *mut c_void,
@@ -29,10 +29,10 @@ impl CgGetglconfigArgs {
 
 /// `CG_GETGLCONFIG` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:179`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:461-462`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:954-956`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:954-956`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:179`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:461-462`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:954-956`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:954-956`
 pub struct CgGetglconfig;
 
 impl OutboundSysCall for CgGetglconfig {

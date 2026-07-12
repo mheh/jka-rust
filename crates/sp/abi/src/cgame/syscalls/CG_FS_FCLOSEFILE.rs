@@ -1,5 +1,7 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use sp_qshared::shared::fileHandle_t;
 
 /// Arguments for `CG_FS_FCLOSEFILE`.
@@ -7,8 +9,8 @@ use sp_qshared::shared::fileHandle_t;
 /// Raven wrapper: `syscall( CG_FS_FCLOSEFILE, f );`
 /// Raven transport: `FS_FCloseFile( args[1] );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:94-96`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:470-472`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:94-96`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:470-472`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFsFclosefileArgs {
     file: fileHandle_t,
@@ -22,10 +24,10 @@ impl CgFsFclosefileArgs {
 
 /// `CG_FS_FCLOSEFILE` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:73`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:94-96`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:470-472`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:470-472`
+/// Enum value source: `oracle/code/cgame/cg_public.h:73`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:94-96`
+/// Output source: `oracle/code/client/cl_cgame.cpp:470-472`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:470-472`
 pub struct CgFsFclosefile;
 
 impl OutboundSysCall for CgFsFclosefile {

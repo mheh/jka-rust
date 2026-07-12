@@ -10,8 +10,8 @@ use abi_transport::generic::{
 ///
 /// Raven vmMain: `CG_ResizeG2((CGhoul2Info_v *)arg0, arg1);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:119`
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:311`
+/// Args source: `oracle/code/cgame/cg_main.cpp:119`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:311`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgResizeG2Args {
     ghoul2: *mut CGhoul2Info_v,
@@ -35,12 +35,12 @@ impl CgResizeG2Args {
 /// `CG_RESIZE_G2` SP cgame exports vmMain ABI token.
 ///
 /// Raven: `void CG_ResizeG2( CGhoul2Info_v *ghoul2, int newCount );`
-/// Enum value source: `oracle/oracle/code/client/vmachine.h:26`
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:40`, `oracle/oracle/code/cgame/cg_main.cpp:119`
-/// Output source: `oracle/oracle/code/cgame/cg_main.cpp:119`
-/// VM_Main switch source: `oracle/oracle/code/cgame/cg_main.cpp:118-130`
+/// Enum value source: `oracle/code/client/vmachine.h:26`
+/// Args source: `oracle/code/cgame/cg_main.cpp:40`, `oracle/code/cgame/cg_main.cpp:119`
+/// Output source: `oracle/code/cgame/cg_main.cpp:119`
+/// VM_Main switch source: `oracle/code/cgame/cg_main.cpp:118-130`
 /// Raven: `CGhoul2Info_v` is defined in `game/ghoul2_shared.h` as `class CGhoul2Info_v`
-/// at `oracle/oracle/code/game/ghoul2_shared.h:311`.
+/// at `oracle/code/game/ghoul2_shared.h:311`.
 pub struct CgResizeG2;
 
 impl InboundVmCall for CgResizeG2 {

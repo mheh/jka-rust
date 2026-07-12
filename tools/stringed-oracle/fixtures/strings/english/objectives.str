@@ -1,0 +1,15 @@
+VERSION "1"
+CONFIG "cfg"        // absorbed keyword, comment stripped
+FILENOTES "fnotes"
+NOTES "notes"
+REFERENCE MISSION01
+FLAGS FLAG_CAPTION FLAG_TYPEMATIC
+LANG_ENGLISH "Destroy the base."
+REFERENCE MISSION02
+FLAGS FLAG_VOICED
+LANG_ENGLISH "Rescue the // prisoner."   // trailing comment killed
+REFERENCE GREETING
+LANG_ENGLISH "Line one\nLine two"
+REFERENCE HICHAR
+LANG_ENGLISH "A’B “C” D E… F–G—H I?.J	K"
+ENDMARKER

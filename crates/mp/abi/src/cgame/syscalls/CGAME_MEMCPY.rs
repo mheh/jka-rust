@@ -9,9 +9,9 @@ use abi_transport::generic::{
 ///
 /// Raven transport: `Com_Memcpy(VMA(1), VMA(2), args[3])`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_cgame.cpp:653`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:652`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:283`
+/// Args source: `oracle/codemp/client/cl_cgame.cpp:653`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:652`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:283`
 #[derive(Debug)]
 pub struct CgameMemcpyArgs {
     /// Destination buffer read through `VMA(1)`.
@@ -45,10 +45,10 @@ impl CgameMemcpyArgs {
 /// Raven: "DO NOT EVER add a GAME/CGAME/UI generic call without adding a trap
 /// to match"; generic traps are shared and ordered from 100.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:131`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:654`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:652`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:283`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:131`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:654`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:652`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:283`
 pub struct CgameMemcpy;
 
 impl OutboundSysCall for CgameMemcpy {

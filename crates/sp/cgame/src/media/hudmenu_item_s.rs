@@ -7,7 +7,7 @@ use sp_qshared::shared::{qhandle_t, vec4_t};
 
 /// Raven `HUDMenuItem_t` — an on-screen HUD menu item (position, size, color, background).
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_media.h:43-53`
+/// Type definition source: `oracle/code/cgame/cg_media.h:43-53`
 #[repr(C)]
 pub struct HUDMenuItem_t {
     pub menuName: *mut c_char,

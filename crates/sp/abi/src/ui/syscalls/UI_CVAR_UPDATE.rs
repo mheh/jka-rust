@@ -6,10 +6,10 @@ use sp_qshared::shared::vmCvar_t;
 
 /// `UI_CVAR_UPDATE` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:203`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp:387-389`.
-/// Output source: `oracle/oracle/code/client/cl_ui.cpp:387-389`.
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:387-389`.
+/// Enum source: `oracle/code/ui/ui_public.h:203`
+/// Args source: `oracle/code/client/cl_ui.cpp:387-389`.
+/// Output source: `oracle/code/client/cl_ui.cpp:387-389`.
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:387-389`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCvarUpdateArgs {
     cvar: *mut vmCvar_t,

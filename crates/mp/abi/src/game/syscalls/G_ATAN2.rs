@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ATAN2` outbound game-to-engine syscall.
 /// C ABI: float atan2(float y, float x) — TRAP_ATAN2, args at VMF(1)/VMF(2), return FloatAsInt.
@@ -25,7 +27,7 @@ impl GAtan2Args {
 
 /// `G_ATAN2` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:281`
+/// Source: `oracle/codemp/game/g_public.h:281`
 pub struct GAtan2;
 
 impl OutboundSysCall for GAtan2 {
@@ -38,7 +40,10 @@ impl OutboundSysCall for GAtan2 {
 
 impl EncodeSysCall for GAtan2 {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([abi_transport::pass_float(a.y), abi_transport::pass_float(a.x)])
+        SysCallTransport::new([
+            abi_transport::pass_float(a.y),
+            abi_transport::pass_float(a.x),
+        ])
     }
 }
 

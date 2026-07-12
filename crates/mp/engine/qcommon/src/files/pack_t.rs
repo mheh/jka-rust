@@ -6,7 +6,7 @@ use super::unz_file::unzFile;
 
 /// Raven `pack_t` — an open `.pk3` archive tracked by the filesystem.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/files.h:42-56`
+/// Type definition source: `oracle/codemp/qcommon/files.h:42-56`
 #[repr(C)]
 pub struct pack_t {
     /// c:\quake3\base\pak0.pk3

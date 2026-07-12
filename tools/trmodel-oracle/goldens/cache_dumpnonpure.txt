@@ -1,0 +1,6 @@
+=== registered (before DumpNonPure) ===
+0/5: "*default.gla" (294 bytes)1/5: "models/modelb.glm" (360 bytes)2/5: "models/test.glm" (360 bytes)3/5: "skeletons/test.gla" (100 bytes)4/5: "skeletons/test2.gla" (100 bytes)1214 bytes total (0.00MB)
+
+=== after LevelLoadBegin(sv_pure=1) -> DumpNonPure ===
+survivors (pure pak matches + *default.gla, sorted):
+0/3: "*default.gla" (294 bytes)1/3: "models/test.glm" (360 bytes)2/3: "skeletons/test.gla" (100 bytes)754 bytes total (0.00MB)

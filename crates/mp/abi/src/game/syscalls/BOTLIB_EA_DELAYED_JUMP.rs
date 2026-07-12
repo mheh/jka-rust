@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_EA_DELAYED_JUMP` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -22,7 +24,7 @@ impl BotlibEaDelayedJumpArgs {
 
 /// `BOTLIB_EA_DELAYED_JUMP` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:404`
+/// Source: `oracle/codemp/game/g_public.h:404`
 pub struct BotlibEaDelayedJump;
 
 impl OutboundSysCall for BotlibEaDelayedJump {

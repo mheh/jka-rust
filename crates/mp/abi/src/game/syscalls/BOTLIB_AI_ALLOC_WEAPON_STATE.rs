@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_ALLOC_WEAPON_STATE` outbound game-to-engine syscall.
 ///
@@ -19,7 +21,7 @@ impl BotlibAiAllocWeaponStateArgs {
 
 /// `BOTLIB_AI_ALLOC_WEAPON_STATE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:478`
+/// Source: `oracle/codemp/game/g_public.h:478`
 pub struct BotlibAiAllocWeaponState;
 
 impl OutboundSysCall for BotlibAiAllocWeaponState {

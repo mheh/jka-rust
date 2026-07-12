@@ -1,6 +1,6 @@
 //! MP `bg_public.h` player stat index enumeration.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:520-532`
+//! Type definition source: `oracle/codemp/game/bg_public.h:520-532`
 
 #![allow(non_camel_case_types)]
 
@@ -8,7 +8,7 @@
 ///
 /// Raven: Enumeration defining indices into the player statistics array
 /// for health, armor, weapons, and other persistent player state values.
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:520-532`
+/// Type definition source: `oracle/codemp/game/bg_public.h:520-532`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum statIndex_t {

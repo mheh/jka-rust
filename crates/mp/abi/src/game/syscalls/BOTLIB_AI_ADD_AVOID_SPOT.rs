@@ -45,7 +45,7 @@ impl BotlibAiAddAvoidSpotArgs {
 
 /// `BOTLIB_AI_ADD_AVOID_SPOT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:493`
+/// Source: `oracle/codemp/game/g_public.h:493`
 pub struct BotlibAiAddAvoidSpot;
 
 impl OutboundSysCall for BotlibAiAddAvoidSpot {

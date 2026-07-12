@@ -28,7 +28,7 @@ impl GCvarUpdateArgs {
 /// `G_CVAR_UPDATE` MP game imports syscall ABI token.
 ///
 /// Raven: ( vmCvar_t *vmCvar );
-/// Source: `oracle/oracle/codemp/game/g_public.h:122`
+/// Source: `oracle/codemp/game/g_public.h:122`
 pub struct GCvarUpdate;
 
 impl OutboundSysCall for GCvarUpdate {

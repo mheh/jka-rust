@@ -9,7 +9,7 @@ use super::cl_snapshot_t::clSnapshot_t;
 /// Raven `clientActive_t` — the client's active game state (parsed from the
 /// server, plus cgame-communicated values); reset on every level change.
 ///
-/// Type definition source: `oracle/oracle/code/client/client.h:53-110`
+/// Type definition source: `oracle/code/client/client.h:53-110`
 #[repr(C)]
 pub struct clientActive_t {
     pub timeoutcount: i32,

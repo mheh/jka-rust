@@ -3,7 +3,7 @@
 /// Raven `aas_edge_s` — an AAS edge, referencing its two endpoint vertexes.
 ///
 /// Raven: none.
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:165-168`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:165-168`
 #[repr(C)]
 pub struct aas_edge_t {
     /// numbers of the vertexes of this edge

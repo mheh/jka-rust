@@ -40,7 +40,7 @@ impl GMemcpyArgs {
 
 /// `G_MEMCPY` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:277`
+/// Source: `oracle/codemp/game/g_public.h:277`
 pub struct GMemcpy;
 
 impl OutboundSysCall for GMemcpy {

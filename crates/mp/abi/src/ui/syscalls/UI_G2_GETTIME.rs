@@ -1,14 +1,16 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `UI_G2_GETTIME`.
 ///
 /// Raven wrapper: `int trap_G2API_GetTime(void)`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:624-626`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1378-1379`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:624-626`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1378-1379`
 #[derive(Debug, Default)]
 pub struct UiG2GettimeArgs;
 
@@ -20,11 +22,11 @@ impl UiG2GettimeArgs {
 
 /// `UI_G2_GETTIME` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:169`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:169`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:624-626`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1378-1379`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1378-1379`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:169`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:169`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:624-626`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1378-1379`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1378-1379`
 pub struct UiG2Gettime;
 
 impl OutboundSysCall for UiG2Gettime {

@@ -8,3 +8,8 @@ name = "mp_engine_rmg"
 
 [dependencies]
 mp_qshared = { path = "../../qshared" }
+# `RmManager`'s frozen pub API names `CmLandScape`/`CollisionWorld`/`TerrainHandle`
+# (RMG-D4a) — the settled `rmg → qcommon` direction, never the reverse.
+mp_engine_qcommon = { path = "../qcommon" }
+# Every Seam-A/B/C signature threads `&mut impl EngineHost` (RMG-D3, ruling 56c).
+mp_host_interface = { path = "../../host-interface" }

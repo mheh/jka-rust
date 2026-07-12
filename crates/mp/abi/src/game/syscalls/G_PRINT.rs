@@ -41,7 +41,7 @@ impl GPrintArgs {
 /// Raven: ============== general Quake services ==================
 /// Raven: ( const char *string );
 /// Raven: print message on the local console
-/// Source: `oracle/oracle/codemp/game/g_public.h:105`
+/// Source: `oracle/codemp/game/g_public.h:105`
 pub struct GPrint;
 
 impl OutboundSysCall for GPrint {

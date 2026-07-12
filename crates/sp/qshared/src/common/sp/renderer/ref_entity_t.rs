@@ -17,7 +17,7 @@ use super::ref_entity_type_t::refEntityType_t;
 ///
 /// Raven: this doesn't have to be unioned, but it does make for more meaningful variable
 /// names :)
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:135-140`
+/// Type definition source: `oracle/code/renderer/tr_types.h:135-140`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union refEntity_t_uMisc {
@@ -28,7 +28,7 @@ pub union refEntity_t_uMisc {
 
 /// Raven `refEntity_t` — full render entity handed from cgame/ui to the renderer.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:100-153`
+/// Type definition source: `oracle/code/renderer/tr_types.h:100-153`
 #[repr(C)]
 pub struct refEntity_t {
     pub reType: refEntityType_t,

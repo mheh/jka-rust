@@ -1,0 +1,104 @@
+== graph ==
+numNodes 4
+node 0 pos 0.000 0.000 0.000 radius 16 numEdges 2
+  edge 0 -> node 1
+  edge 1 -> node 2
+node 1 pos 100.000 0.000 0.000 radius 24 numEdges 2
+  edge 0 -> node 0
+  edge 1 -> node 3
+node 2 pos 0.000 100.000 0.000 radius 24 numEdges 2
+  edge 0 -> node 0
+  edge 1 -> node 3
+node 3 pos 100.000 100.000 0.000 radius 16 numEdges 2
+  edge 0 -> node 1
+  edge 1 -> node 2
+== rank tables (per node, pop-order; the heap-sift gate) ==
+node 0 ranks[4]: 0 1 2 3
+node 1 ranks[4]: 1 0 3 2
+node 2 ranks[4]: 1 3 0 2
+node 3 ranks[4]: 3 1 2 0
+== ranks (GetPathCost s->e, all pairs) ==
+pathcost 0 0 = 0
+pathcost 0 1 = 100
+pathcost 0 2 = 100
+pathcost 0 3 = 200
+pathcost 1 0 = 100
+pathcost 1 1 = 0
+pathcost 1 2 = 200
+pathcost 1 3 = 100
+pathcost 2 0 = 100
+pathcost 2 1 = 200
+pathcost 2 2 = 0
+pathcost 2 3 = 100
+pathcost 3 0 = 200
+pathcost 3 1 = 100
+pathcost 3 2 = 100
+pathcost 3 3 = 0
+== GetBestNode (s,e,reject=NONE) ==
+bestnode 0 0 = 0
+bestnode 0 1 = 1
+bestnode 0 2 = 2
+bestnode 0 3 = 1
+bestnode 1 0 = 0
+bestnode 1 1 = 1
+bestnode 1 2 = 0
+bestnode 1 3 = 3
+bestnode 2 0 = 0
+bestnode 2 1 = 0
+bestnode 2 2 = 2
+bestnode 2 3 = 3
+bestnode 3 0 = 1
+bestnode 3 1 = 1
+bestnode 3 2 = 2
+bestnode 3 3 = 3
+== GetBestNodeAltRoute (d_altRoutes=0; s,e,reject=NONE) ==
+altroute 0 0 = 0 cost 0
+altroute 0 1 = 1 cost 100
+altroute 0 2 = 2 cost 100
+altroute 0 3 = 1 cost 200
+altroute 1 0 = 0 cost 100
+altroute 1 1 = 1 cost 0
+altroute 1 2 = 0 cost 200
+altroute 1 3 = 3 cost 100
+altroute 2 0 = 0 cost 100
+altroute 2 1 = 0 cost 200
+altroute 2 2 = 2 cost 0
+altroute 2 3 = 3 cost 100
+altroute 3 0 = 1 cost 200
+altroute 3 1 = 1 cost 100
+altroute 3 2 = 2 cost 100
+altroute 3 3 = 3 cost 0
+== Connected / NodesAreNeighbors ==
+conn 0 0 = 1 neigh 0
+conn 0 1 = 1 neigh 1
+conn 0 2 = 1 neigh 1
+conn 0 3 = 1 neigh 0
+conn 1 0 = 1 neigh 1
+conn 1 1 = 1 neigh 0
+conn 1 2 = 1 neigh 0
+conn 1 3 = 1 neigh 1
+conn 2 0 = 1 neigh 1
+conn 2 1 = 1 neigh 0
+conn 2 2 = 1 neigh 0
+conn 2 3 = 1 neigh 1
+conn 3 0 = 1 neigh 0
+conn 3 1 = 1 neigh 1
+conn 3 2 = 1 neigh 1
+conn 3 3 = 1 neigh 0
+== GetProjectedNode (origin = each node pos, from each node) ==
+proj from 0 origin@0 = -1
+proj from 0 origin@1 = 1
+proj from 0 origin@2 = 2
+proj from 0 origin@3 = 1
+proj from 1 origin@0 = 0
+proj from 1 origin@1 = -1
+proj from 1 origin@2 = 0
+proj from 1 origin@3 = 3
+proj from 2 origin@0 = 0
+proj from 2 origin@1 = 0
+proj from 2 origin@2 = -1
+proj from 2 origin@3 = 3
+proj from 3 origin@0 = 1
+proj from 3 origin@1 = 1
+proj from 3 origin@2 = 2
+proj from 3 origin@3 = -1

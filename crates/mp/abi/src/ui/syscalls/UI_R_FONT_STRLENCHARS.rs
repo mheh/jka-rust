@@ -11,9 +11,9 @@ use abi_transport::generic::{
 /// Raven's client switch forwards the text through `VMA(1)` and returns the
 /// string length word.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:121-123`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:121-123`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1138-1139`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:121-123`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:121-123`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1138-1139`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRFontStrlencharsArgs {
     pub text: *const c_char,
@@ -27,7 +27,7 @@ impl UiRFontStrlencharsArgs {
 
 /// `UI_R_FONT_STRLENCHARS` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:77`
+/// Source: `oracle/codemp/ui/ui_public.h:77`
 pub struct UiRFontStrlenchars;
 
 impl OutboundSysCall for UiRFontStrlenchars {

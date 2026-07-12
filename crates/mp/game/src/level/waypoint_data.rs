@@ -1,6 +1,6 @@
 //! MP `waypointData_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/g_local.h:810-818`
+//! Type definition source: `oracle/codemp/game/g_local.h:810-818`
 
 #![allow(non_camel_case_types)]
 
@@ -10,7 +10,7 @@ use mp_qshared::shared::MAX_QPATH;
 
 /// Raven `waypointData_t` — cleared as each map is entered.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:810-818`
+/// Type definition source: `oracle/codemp/game/g_local.h:810-818`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct waypointData_t {
@@ -22,3 +22,7 @@ pub struct waypointData_t {
     pub nodeID: c_int,
 }
 const _: () = assert!(core::mem::size_of::<waypointData_t>() == 324);
+
+// `#[repr(C)]` POD (`c_char`/`c_int` fields only); the all-zero image is a valid
+// inhabitant, so `tempWaypointList` builds heap-first via `zeroed_box`.
+unsafe impl native_platform::ZeroValid for waypointData_t {}

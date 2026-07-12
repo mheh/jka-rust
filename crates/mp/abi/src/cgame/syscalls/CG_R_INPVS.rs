@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven transport passes both points through `VMA(1..2)` and the mutable
 /// visibility mask through `VMA(3)`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:616-617`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2394`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1095-1096`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:616-617`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2394`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1095-1096`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRInpvsArgs {
     p1: *const vec3_t,
@@ -29,10 +29,10 @@ impl CgRInpvsArgs {
 
 /// `CG_R_INPVS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:217`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:616-617`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1095-1096`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1095-1096`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:217`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:616-617`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1095-1096`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1095-1096`
 pub struct CgRInpvs;
 
 impl OutboundSysCall for CgRInpvs {

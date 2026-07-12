@@ -1,0 +1,26 @@
+=== init ===
+numModels=1  models[0].type=MOD_BAD
+
+=== register models/test.glm (recurses skeletons/test.gla) ===
+register returned handle=1, numModels=3
+glm: handle=1 index=1 type=MOD_MDXM dataSize=360 numLods=1 name="models/test.glm"
+     seam: mdxm=SET mdxa=NULL
+  mdxmHeader: ident=0x4d474c32 version=6 numBones=1 numLODs=1 ofsLODs=312 numSurfaces=1 ofsSurfHierarchy=168 ofsEnd=360 animIndex=2 animName="skeletons/test"
+  LOD0 surf0: ident=8 (SF_MDX=8) numVerts=3 numTriangles=1 ofsEnd=40
+gla: handle=2 index=2 type=MOD_MDXA dataSize=100 numLods=1 name="skeletons/test.gla"
+     seam: mdxm=NULL mdxa=SET
+  mdxaHeader: ident=0x41474c32 version=6 numFrames=1 numBones=1 ofsFrames=100 ofsEnd=100 name="skeletons/test"
+
+=== re-register (hash hit -> same handle, no new model) ===
+re-register handle=1 (was 1), numModels=3
+
+=== version reject (badversion.glm) ===
+first register returned=0, numModels=4
+re-register returned=3 (MOD_BAD entry stays hashed under its nonzero index)
+
+=== unknown ident (badident.glm) ===
+first register returned=0, numModels=5
+re-register returned=4
+
+=== R_GetModelByHandle out-of-range -> models[0] (MOD_BAD) ===
+get(0)=MOD_BAD  get(99999)=MOD_BAD  get(-5)=MOD_BAD

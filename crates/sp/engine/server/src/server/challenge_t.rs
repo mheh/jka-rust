@@ -4,7 +4,7 @@ use sp_engine_qcommon::qcommon::netadr_t::netadr_t;
 
 /// Raven `challenge_t` — a pending/verified client connection challenge.
 ///
-/// Type definition source: `oracle/oracle/code/server/server.h:135-139`
+/// Type definition source: `oracle/code/server/server.h:135-139`
 #[repr(C)]
 pub struct challenge_t {
     pub adr: netadr_t,

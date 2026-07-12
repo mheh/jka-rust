@@ -10,12 +10,12 @@ later be driven over identical inputs and byte-diffed. Phase 1 only establishes
 (a) the oracle builds as a working loadable module and (b) our mock-engine harness
 loads and drives it through `dllEntry`/`vmMain` exactly as it drives our port.
 
-The oracle tree (`oracle/oracle/**`) is **never** edited. Everything is compiled
+The oracle tree (`oracle/**`) is **never** edited. Everything is compiled
 from a throwaway copy under `build/src/` (gitignored).
 
 ## What's built
 
-- **`build.sh`** compiles all **89** `oracle/oracle/codemp/game/*.c` translation
+- **`build.sh`** compiles all **89** `oracle/codemp/game/*.c` translation
   units — the complete QAGAME module (`g_*.c`, `bg_*.c`, `ai_*.c`, `NPC_*.c`,
   `w_*.c`, the vehicle NPCs `FighterNPC/SpeederNPC/WalkerNPC/AnimalNPC.c`,
   `q_math.c`, `q_shared.c`, `g_syscalls.c`, `tri_coll_test.c`, …) — and links them

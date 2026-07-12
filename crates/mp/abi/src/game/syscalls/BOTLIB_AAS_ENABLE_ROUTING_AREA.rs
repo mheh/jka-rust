@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AAS_ENABLE_ROUTING_AREA` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -27,7 +29,7 @@ impl BotlibAasEnableRoutingAreaArgs {
 
 /// `BOTLIB_AAS_ENABLE_ROUTING_AREA` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:356`
+/// Source: `oracle/codemp/game/g_public.h:356`
 pub struct BotlibAasEnableRoutingArea;
 
 impl OutboundSysCall for BotlibAasEnableRoutingArea {

@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall( CG_R_FONTSTRLENCHARS, text );`
 /// Raven transport: `return re.Font_StrLenChars((const char *) VMA(1));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:329-330`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:667-668`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:329-330`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:667-668`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRFontstrlencharsArgs {
     text: *const c_char,
@@ -29,10 +29,10 @@ impl CgRFontstrlencharsArgs {
 
 /// `CG_R_FONTSTRLENCHARS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:124`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:329-330`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:667-668`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:667-668`
+/// Enum value source: `oracle/code/cgame/cg_public.h:124`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:329-330`
+/// Output source: `oracle/code/client/cl_cgame.cpp:667-668`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:667-668`
 pub struct CgRFontstrlenchars;
 
 impl OutboundSysCall for CgRFontstrlenchars {

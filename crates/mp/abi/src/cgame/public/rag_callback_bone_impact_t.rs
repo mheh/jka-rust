@@ -2,11 +2,11 @@
 
 /// Raven `ragCallbackBoneImpact_t` — ragdoll bone-impact callback payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:567-571`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:567-571`
 #[repr(C)]
 pub struct ragCallbackBoneImpact_t {
-	pub boneName: [i8; 128], //name of the bone in question
-	pub entNum: i32,         //index of entity who owns the bone in question
+    pub boneName: [i8; 128], //name of the bone in question
+    pub entNum: i32,         //index of entity who owns the bone in question
 }
 
 const _: () = assert!(core::mem::size_of::<ragCallbackBoneImpact_t>() == 132);

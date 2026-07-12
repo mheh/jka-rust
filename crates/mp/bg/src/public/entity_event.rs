@@ -1,18 +1,18 @@
 //! MP `bg_public.h` entity event type definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:745-990`
+//! Type definition source: `oracle/codemp/game/bg_public.h:745-990`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `#define EVENT_VALID_MSEC 300` — events are cleared this many ms
 /// after `eventTime` is set.
-/// Source: `oracle/oracle/codemp/game/bg_public.h:732`
+/// Source: `oracle/codemp/game/bg_public.h:732`
 pub const EVENT_VALID_MSEC: i32 = 300;
 
 /// Raven `entity_event_t`.
 ///
 /// Raven: There is a maximum of 256 events (8 bits transmission, 2 high bits for uniqueness).
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:745-990`
+/// Type definition source: `oracle/codemp/game/bg_public.h:745-990`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum entity_event_t {

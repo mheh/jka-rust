@@ -34,7 +34,7 @@ impl BotlibAiLoadCharacterArgs {
 
 /// `BOTLIB_AI_LOAD_CHARACTER` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:413`
+/// Source: `oracle/codemp/game/g_public.h:413`
 pub struct BotlibAiLoadCharacter;
 
 impl OutboundSysCall for BotlibAiLoadCharacter {

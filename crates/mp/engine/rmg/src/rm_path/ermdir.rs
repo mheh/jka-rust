@@ -3,7 +3,7 @@
 /// Raven `ERMDir` — directions you can proceed from path cells.
 ///
 /// Raven: directions you can proceed from cells.
-/// Type definition source: `oracle/oracle/codemp/RMG/RM_Path.h:24-37`
+/// Type definition source: `oracle/codemp/RMG/RM_Path.h:24-37`
 // Raven's `DIR_FIRST = 0` aliases `DIR_N`; Rust enums forbid duplicate
 // discriminants, so it is a const alias below.
 #[repr(i32)]

@@ -1,14 +1,16 @@
 use super::super::types::clipHandle_t;
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_CM_INLINEMODEL`.
 ///
 /// Raven wrapper: `return syscall( CG_CM_INLINEMODEL, index );`
 /// Raven transport: `return CM_InlineModel( args[1] );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:139-141`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:531-532`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:139-141`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:531-532`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmInlinemodelArgs {
     index: i32,
@@ -22,11 +24,11 @@ impl CgCmInlinemodelArgs {
 
 /// `CG_CM_INLINEMODEL` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:83`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:139-141`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:531-532`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:531-532`
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:188`
+/// Enum value source: `oracle/code/cgame/cg_public.h:83`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:139-141`
+/// Output source: `oracle/code/client/cl_cgame.cpp:531-532`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:531-532`
+/// Type definition source: `oracle/code/game/q_shared.h:188`
 pub struct CgCmInlinemodel;
 
 impl OutboundSysCall for CgCmInlinemodel {

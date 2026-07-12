@@ -23,7 +23,7 @@ impl GIcarusFreeentArgs {
 
 /// `G_ICARUS_FREEENT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:262`
+/// Source: `oracle/codemp/game/g_public.h:262`
 pub struct GIcarusFreeent;
 
 impl OutboundSysCall for GIcarusFreeent {

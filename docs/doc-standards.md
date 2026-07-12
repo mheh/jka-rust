@@ -32,7 +32,7 @@ where it is (or will be) decided.
 
 ## Raven ground truth
 How it actually works in C: init order, data flow, frame role, globals.
-CITE OR OMIT: every behavioral claim carries `oracle/oracle/<path>:<line>`.
+CITE OR OMIT: every behavioral claim carries `oracle/<path>:<line>`.
 No "probably", no "presumably".
 
 ## State ownership

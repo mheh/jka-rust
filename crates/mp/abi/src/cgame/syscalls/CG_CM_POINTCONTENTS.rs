@@ -12,9 +12,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven's wrapper forwards the raw `vec3_t` pointer plus an int-compatible
 /// `clipHandle_t`, and the client switch reads them as `VMA(1)` and `args[2]`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:143-144`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2201`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:789-790`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:143-144`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2201`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:789-790`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmPointcontentsArgs {
     point: *const vec3_t,
@@ -41,13 +41,13 @@ impl CgCmPointcontentsArgs {
 /// Raven transport: `return CM_PointContents((const float *)VMA(1), args[2]);`
 /// Raven collision API: `CM_PointContents` returns an ORed contents mask.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:88`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:143-144`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2201`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:143-144`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:789-790`
-/// Output source: `oracle/oracle/codemp/qcommon/cm_public.h:21`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:789-790`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:88`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:143-144`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2201`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:143-144`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:789-790`
+/// Output source: `oracle/codemp/qcommon/cm_public.h:21`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:789-790`
 pub struct CgCmPointcontents;
 
 impl OutboundSysCall for CgCmPointcontents {

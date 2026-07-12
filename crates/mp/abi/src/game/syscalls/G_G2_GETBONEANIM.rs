@@ -96,7 +96,7 @@ impl GG2GetboneanimArgs {
 
 /// `G_G2_GETBONEANIM` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:521`
+/// Source: `oracle/codemp/game/g_public.h:521`
 pub struct GG2Getboneanim;
 
 impl OutboundSysCall for GG2Getboneanim {

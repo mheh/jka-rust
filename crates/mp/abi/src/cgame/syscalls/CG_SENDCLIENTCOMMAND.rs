@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `void trap_SendClientCommand( const char *s )`.
 /// The MP client switch decodes the command string through `VMA(1)`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:115-116`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:760-762`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:115-116`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:760-762`
 #[derive(Debug)]
 pub struct CgSendclientcommandArgs {
     command: *const c_char,
@@ -37,10 +37,10 @@ impl CgSendclientcommandArgs {
 /// Raven wrapper: `syscall( CG_SENDCLIENTCOMMAND, s );`
 /// Raven transport: `CL_AddReliableCommand( (const char *)VMA(1) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:81`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:115-116`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:762`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:760-762`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:81`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:115-116`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:762`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:760-762`
 pub struct CgSendclientcommand;
 
 impl OutboundSysCall for CgSendclientcommand {

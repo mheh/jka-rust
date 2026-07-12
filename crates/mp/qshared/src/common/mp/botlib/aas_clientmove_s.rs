@@ -6,27 +6,27 @@ use super::aas_trace_s::aas_trace_s;
 
 /// Raven `aas_clientmove_t` — result of client movement prediction.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_aas.h:162-173`
+/// Type definition source: `oracle/codemp/game/be_aas.h:162-173`
 #[repr(C)]
 pub struct aas_clientmove_t {
-	/// position at the end of movement prediction
-	pub endpos: vec3_t,
-	/// area at end of movement prediction
-	pub endarea: i32,
-	/// velocity at the end of movement prediction
-	pub velocity: vec3_t,
-	/// last trace
-	pub trace: aas_trace_s,
-	/// presence type at end of movement prediction
-	pub presencetype: i32,
-	/// event that made the prediction stop
-	pub stopevent: i32,
-	/// contents at the end of movement prediction
-	pub endcontents: i32,
-	/// time predicted ahead
-	pub time: f32,
-	/// number of frames predicted ahead
-	pub frames: i32,
+    /// position at the end of movement prediction
+    pub endpos: vec3_t,
+    /// area at end of movement prediction
+    pub endarea: i32,
+    /// velocity at the end of movement prediction
+    pub velocity: vec3_t,
+    /// last trace
+    pub trace: aas_trace_s,
+    /// presence type at end of movement prediction
+    pub presencetype: i32,
+    /// event that made the prediction stop
+    pub stopevent: i32,
+    /// contents at the end of movement prediction
+    pub endcontents: i32,
+    /// time predicted ahead
+    pub time: f32,
+    /// number of frames predicted ahead
+    pub frames: i32,
 }
 
 pub type aas_clientmove_s = aas_clientmove_t;

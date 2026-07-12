@@ -2,7 +2,7 @@
 
 /// Raven `saberBlockType_t` saber-blocking coverage.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:552-556`
+/// Type definition source: `oracle/codemp/game/q_shared.h:552-556`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum saberBlockType_t {

@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_CHECKEDNODE` outbound game-to-engine syscall.
 ///
@@ -29,7 +31,7 @@ impl GNavCheckednodeArgs {
 
 /// `G_NAV_CHECKEDNODE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:335`
+/// Source: `oracle/codemp/game/g_public.h:335`
 pub struct GNavCheckednode;
 
 impl OutboundSysCall for GNavCheckednode {

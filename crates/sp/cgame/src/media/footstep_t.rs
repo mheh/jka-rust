@@ -2,7 +2,7 @@
 
 /// Raven `footstep_t` — footstep sound type enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_media.h:6-34`
+/// Type definition source: `oracle/code/cgame/cg_media.h:6-34`
 #[repr(i32)]
 pub enum footstep_t {
     FOOTSTEP_STONEWALK,

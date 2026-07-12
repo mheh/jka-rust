@@ -5,7 +5,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `playerEntity_t` — per-player-entity animation/render state.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:168-178`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:168-178`
 #[repr(C)]
 pub struct playerEntity_t {
     pub legs: lerpFrame_t,

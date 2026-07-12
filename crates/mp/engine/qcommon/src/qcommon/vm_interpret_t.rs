@@ -2,7 +2,8 @@
 
 /// Raven `vmInterpret_t` — VM interpretation modes.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qcommon.h:275-279`
+/// Type definition source: `oracle/codemp/qcommon/qcommon.h:275-279`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum vmInterpret_t {
     VMI_NATIVE = 0,

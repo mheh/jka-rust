@@ -6,7 +6,7 @@ use sp_qshared::shared::sfxHandle_t;
 
 /// Raven `characterName_t` — a named sound reference paired with its resolved handle.
 ///
-/// Type definition source: `oracle/oracle/code/game/characters.h:47-52`
+/// Type definition source: `oracle/code/game/characters.h:47-52`
 #[repr(C)]
 pub struct characterName_t {
     pub name: *mut c_char,

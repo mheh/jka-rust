@@ -40,7 +40,7 @@ impl GG2RagpcjgradientspeedArgs {
 
 /// `G_G2_RAGPCJGRADIENTSPEED` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:551`
+/// Source: `oracle/codemp/game/g_public.h:551`
 pub struct GG2Ragpcjgradientspeed;
 
 impl OutboundSysCall for GG2Ragpcjgradientspeed {

@@ -1,5 +1,7 @@
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `UI_COS`.
@@ -7,10 +9,10 @@ use abi_transport::pass_float;
 /// Raven's engine switch reads one float word with `VMF(1)` and returns
 /// `FloatAsInt( cos( VMF(1) ) )`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:660`
-/// Transport source: `oracle/oracle/codemp/ui/ui_syscalls.c:15`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:659`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:286`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:660`
+/// Transport source: `oracle/codemp/ui/ui_syscalls.c:15`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:659`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:286`
 #[derive(Debug)]
 pub struct UiCosArgs {
     value: f32,
@@ -28,10 +30,10 @@ impl UiCosArgs {
 
 /// `UI_COS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:134`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:660`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:659`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:286`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:134`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:660`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:659`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:286`
 pub struct UiCos;
 
 impl OutboundSysCall for UiCos {

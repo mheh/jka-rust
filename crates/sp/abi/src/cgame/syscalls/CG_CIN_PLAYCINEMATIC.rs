@@ -12,9 +12,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall(CG_CIN_PLAYCINEMATIC, arg0, xpos, ypos, width, height, bits, psAudioFile);`
 /// Raven transport: `CIN_PlayCinematic((const char *) VMA(1), args[2], args[3], args[4], args[5], args[6], (const char *) VMA(7));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:519-521`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1198`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:817-819`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:519-521`
+/// Args source: `oracle/code/cgame/cg_local.h:1198`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:817-819`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCinPlaycinematicArgs {
     arg0: *const c_char,
@@ -78,11 +78,11 @@ impl CgCinPlaycinematicArgs {
 
 /// `CG_CIN_PLAYCINEMATIC` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:185`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:519-521`
-/// Output source: `oracle/oracle/code/cgame/cg_syscalls.cpp:519-521`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:817-819`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:817-819`
+/// Enum value source: `oracle/code/cgame/cg_public.h:185`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:519-521`
+/// Output source: `oracle/code/cgame/cg_syscalls.cpp:519-521`
+/// Output source: `oracle/code/client/cl_cgame.cpp:817-819`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:817-819`
 pub struct CgCinPlaycinematic;
 
 impl OutboundSysCall for CgCinPlaycinematic {

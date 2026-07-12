@@ -4,7 +4,7 @@ use sp_qshared::shared::vec3_t;
 
 /// Raven `fogParms_t` — fog color and opaque depth for a fog volume.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:440-443`
+/// Type definition source: `oracle/code/renderer/tr_local.h:440-443`
 #[repr(C)]
 pub struct fogParms_t {
     pub color: vec3_t,

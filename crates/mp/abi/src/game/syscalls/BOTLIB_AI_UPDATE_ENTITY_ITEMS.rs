@@ -1,6 +1,8 @@
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_UPDATE_ENTITY_ITEMS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,7 +16,7 @@ impl BotlibAiUpdateEntityItemsArgs {
 
 /// `BOTLIB_AI_UPDATE_ENTITY_ITEMS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:457`
+/// Source: `oracle/codemp/game/g_public.h:457`
 pub struct BotlibAiUpdateEntityItems;
 
 impl OutboundSysCall for BotlibAiUpdateEntityItems {

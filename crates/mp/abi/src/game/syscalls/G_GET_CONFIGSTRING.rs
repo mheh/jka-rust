@@ -41,7 +41,7 @@ impl GGetConfigstringArgs {
 /// `G_GET_CONFIGSTRING` MP game imports syscall ABI token.
 ///
 /// Raven: ( int num, char *buffer, int bufferSize );
-/// Source: `oracle/oracle/codemp/game/g_public.h:164`
+/// Source: `oracle/codemp/game/g_public.h:164`
 pub struct GGetConfigstring;
 
 impl OutboundSysCall for GGetConfigstring {

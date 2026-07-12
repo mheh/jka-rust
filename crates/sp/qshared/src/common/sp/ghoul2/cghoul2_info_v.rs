@@ -10,7 +10,7 @@ use core::ffi::c_int;
 /// stores the array slot index and defers all access/lifetime behavior to
 /// that array's `Alloc`/`Free`/`Get` methods.
 ///
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:326-452`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:326-452`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CGhoul2Info_v {

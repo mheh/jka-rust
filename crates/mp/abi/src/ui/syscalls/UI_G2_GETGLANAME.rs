@@ -45,7 +45,7 @@ impl UiG2GetglanameArgs {
 
 /// `UI_G2_GETGLANAME` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:522`
+/// Source: `oracle/codemp/ui/ui_public.h:522`
 pub struct UiG2Getglaname;
 
 impl OutboundSysCall for UiG2Getglaname {

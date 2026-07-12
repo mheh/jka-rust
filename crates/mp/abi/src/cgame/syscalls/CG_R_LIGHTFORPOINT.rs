@@ -54,7 +54,7 @@ impl CgRLightforpointArgs {
 
 /// `CG_R_LIGHTFORPOINT` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:155`
+/// Source: `oracle/codemp/cgame/cg_public.h:155`
 pub struct CgRLightforpoint;
 
 impl OutboundSysCall for CgRLightforpoint {

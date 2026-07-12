@@ -11,7 +11,7 @@ use super::sphere_t::sphere_t;
 /// collision model.
 ///
 /// Raven: rwwRMG - modified.
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_local.h:238-264`
+/// Type definition source: `oracle/codemp/qcommon/cm_local.h:238-264`
 #[repr(C)]
 pub struct traceWork_t {
     pub start: vec3_t,

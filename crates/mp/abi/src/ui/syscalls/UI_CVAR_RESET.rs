@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_CVAR_RESET, name );`
 /// Raven transport: `Cvar_Reset( (const char *)VMA(1) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:59-60`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:924`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:891-893`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:59-60`
+/// Args source: `oracle/codemp/ui/ui_local.h:924`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:891-893`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCvarResetArgs {
     name: *const c_char,
@@ -30,10 +30,10 @@ impl UiCvarResetArgs {
 
 /// `UI_CVAR_RESET` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:25`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:59-60`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:891-893`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:891-893`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:25`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:59-60`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:891-893`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:891-893`
 pub struct UiCvarReset;
 
 impl OutboundSysCall for UiCvarReset {

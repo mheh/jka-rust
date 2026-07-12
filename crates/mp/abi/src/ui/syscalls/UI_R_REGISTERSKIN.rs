@@ -25,7 +25,7 @@ impl GRRegisterskinArgs {
 
 /// `UI_R_REGISTERSKIN` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:506`
+/// Source: `oracle/codemp/ui/ui_public.h:506`
 pub struct GRRegisterskin;
 
 impl OutboundSysCall for GRRegisterskin {

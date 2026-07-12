@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 /// Raven `cLeaf_t` — a leaf node's collision-model payload (BSP leaf brush/surface ranges).
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_local.h:34-43`
+/// Type definition source: `oracle/codemp/qcommon/cm_local.h:34-43`
 #[repr(C)]
 pub struct cLeaf_t {
     pub cluster: c_int,

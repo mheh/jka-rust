@@ -1,6 +1,6 @@
 //! MP trace result definition copied from Raven `codemp/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/q_shared.h:1894-1912`
+//! Source: `oracle/codemp/game/q_shared.h:1894-1912`
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]

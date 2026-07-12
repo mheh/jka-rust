@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// `G_FLOOR` outbound game-to-engine syscall.
@@ -22,7 +24,7 @@ impl GFloorArgs {
 
 /// `G_FLOOR` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:286`
+/// Source: `oracle/codemp/game/g_public.h:286`
 pub struct GFloor;
 
 impl OutboundSysCall for GFloor {

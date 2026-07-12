@@ -12,9 +12,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `qboolean trap_G2API_RagEffectorGoal(void *ghoul2, const char *boneName, vec3_t pos)`
 /// Raven transport: `return G2API_RagEffectorGoal(*((CGhoul2Info_v *)args[1]), (const char *)VMA(2), (float *)VMA(3));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1020-1022`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2576`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1599-1600`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1020-1022`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2576`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1599-1600`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2RageffectorgoalArgs {
     ghoul2: *mut c_void,
@@ -36,10 +36,10 @@ impl CgG2RageffectorgoalArgs {
 ///
 /// Raven: additional ragdoll options -rww
 /// Raven: override an effector bone's goal position (world coordinates)
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:309`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1020-1022`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1599-1600`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1599-1600`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:309`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1020-1022`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1599-1600`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1599-1600`
 pub struct CgG2Rageffectorgoal;
 
 impl OutboundSysCall for CgG2Rageffectorgoal {

@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_Mark1.c 1/15
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_Mark1.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Mark1.c`.
 //!
 //! Landed from the `fnskel.py` signature skeleton. One function is
 //! transcribed faithfully from packet + prelude alone; the remaining 15 are
@@ -70,7 +70,7 @@ pub const LSTATE_FIRED4: c_int = 7;
 // signature.
 /// Raven `NPC_Mark1_Precache`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:50-74`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:50-74`
 pub fn NPC_Mark1_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_wakeup".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/shutdown".as_ptr());
@@ -113,7 +113,7 @@ pub fn NPC_Mark1_Precache(ctx: GameContext<'_>) {
 // signature.
 /// Raven `NPC_Mark1_Part_Explode`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:81-102`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:81-102`
 pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: *mut gentity_t, bolt: c_int) {
     if bolt >= 0 {
         unsafe {
@@ -137,11 +137,7 @@ pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: *mut gentity_t, bolt:
             );
 
             BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut org);
-            BG_GiveMeVectorFromMatrix(
-                &boltMatrix,
-                NEGATIVE_Y as c_int,
-                &mut dir,
-            );
+            BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut dir);
 
             crate::g_utils::G_PlayEffectID(
                 crate::g_utils::G_EffectIndex(c"env/med_explode2".as_ptr()),
@@ -162,7 +158,7 @@ pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: *mut gentity_t, bolt:
 // globals; no channel from this context-free faithful signature.
 /// Raven `Mark1_Idle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:109-115`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:109-115`
 pub fn Mark1_Idle(ctx: GameContext<'_>) {
     unsafe {
         crate::NPC_AI_Default::NPC_BSIdle(ctx);
@@ -184,7 +180,7 @@ pub fn Mark1_Idle(ctx: GameContext<'_>) {
 // channel from this context-free faithful signature.
 /// Raven `Mark1Dead_FireRocket`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:123-163`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:123-163`
 pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -222,11 +218,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
         );
 
         BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
-        BG_GiveMeVectorFromMatrix(
-            &boltMatrix,
-            NEGATIVE_Y as c_int,
-            &mut muzzle_dir,
-        );
+        BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut muzzle_dir);
 
         crate::g_utils::G_PlayEffectID(
             crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
@@ -248,7 +240,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
             BOWCASTER_VELOCITY as f32,
             10000,
             npc,
-            QFALSE,
+            qfalse,
         );
 
         if !missile.is_null() {
@@ -279,7 +271,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
 // channel from this context-free faithful signature.
 /// Raven `Mark1Dead_FireBlaster`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:171-202`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:171-202`
 pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -316,11 +308,7 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
         );
 
         BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
-        BG_GiveMeVectorFromMatrix(
-            &boltMatrix,
-            NEGATIVE_Y as c_int,
-            &mut muzzle_dir,
-        );
+        BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut muzzle_dir);
 
         crate::g_utils::G_PlayEffectID(
             crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
@@ -329,7 +317,7 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
         );
 
         let missile =
-            crate::g_missile::CreateMissile(ctx, muzzle1, muzzle_dir, 1600.0, 10000, npc, QFALSE);
+            crate::g_missile::CreateMissile(ctx, muzzle1, muzzle_dir, 1600.0, 10000, npc, qfalse);
 
         crate::g_utils::G_Sound(
             ctx,
@@ -358,7 +346,7 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
 // through it.
 /// Raven `Mark1_die`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:209-243`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:209-243`
 pub fn Mark1_die(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -414,7 +402,7 @@ pub fn Mark1_die(
 // invent a shape the packet doesn't sanction.
 /// Raven `Mark1_dying`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:250-312`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:250-312`
 pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if self_.is_null() {
@@ -493,7 +481,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
 // pointer (needs an EntXxx enum variant).
 /// Raven `NPC_Mark1_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:320-396`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:320-396`
 pub fn NPC_Mark1_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -632,7 +620,7 @@ pub fn NPC_Mark1_Pain(
 // writes `NPCInfo`; no channel from this context-free faithful signature.
 /// Raven `Mark1_Hunt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:404-416`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:404-416`
 pub fn Mark1_Hunt(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -644,12 +632,12 @@ pub fn Mark1_Hunt(ctx: GameContext<'_>) {
             }
         }
 
-        crate::NPC_utils::NPC_FaceEnemy(ctx, QTRUE);
+        crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
 
         if !npc_info.is_null() {
-            (*npc_info).combatMove = QTRUE;
+            (*npc_info).combatMove = qtrue;
         }
-        crate::NPC_move::NPC_MoveToGoal(ctx, QTRUE);
+        crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
     }
 }
 
@@ -660,7 +648,7 @@ pub fn Mark1_Hunt(ctx: GameContext<'_>) {
 // signature.
 /// Raven `Mark1_FireBlaster`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:424-488`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:424-488`
 pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -780,7 +768,7 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
         );
 
         let missile =
-            crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc, QFALSE);
+            crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc, qfalse);
 
         if !missile.is_null() {
             (*missile).classname = c"bryar_proj".as_ptr().cast_mut();
@@ -798,7 +786,7 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
 // globals; no channel from this context-free faithful signature.
 /// Raven `Mark1_BlasterAttack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:495-548`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:495-548`
 pub fn Mark1_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -870,7 +858,7 @@ pub fn Mark1_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
 // cross-frame state); no channel from this context-free faithful signature.
 /// Raven `Mark1_FireRocket`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:555-599`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:555-599`
 pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -945,7 +933,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
             BOWCASTER_VELOCITY as f32,
             10000,
             npc,
-            QFALSE,
+            qfalse,
         );
 
         if !missile.is_null() {
@@ -975,7 +963,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
 // from this context-free faithful signature.
 /// Raven `Mark1_RocketAttack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:606-618`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:606-618`
 pub fn Mark1_RocketAttack(ctx: GameContext<'_>, advance: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1009,7 +997,7 @@ pub fn Mark1_RocketAttack(ctx: GameContext<'_>, advance: qboolean) {
 // from this context-free faithful signature.
 /// Raven `Mark1_AttackDecision`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:625-704`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:625-704`
 pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1033,7 +1021,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
 
         // Enemy is dead or he has no enemy.
         let npc_enemy = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
-        if (*npc_enemy).health < 1 || crate::NPC_utils::NPC_CheckEnemyExt(ctx, QFALSE) == QFALSE {
+        if (*npc_enemy).health < 1 || crate::NPC_utils::NPC_CheckEnemyExt(ctx, qfalse) == qfalse {
             (*npc).enemy = None;
             return;
         }
@@ -1053,13 +1041,13 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
             crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy),
         );
         let advance = if distance > MIN_DISTANCE_SQR {
-            QTRUE
+            qtrue
         } else {
-            QFALSE
+            qfalse
         };
 
         // If we cannot see our target, move to see it
-        if visible == QFALSE || crate::NPC_utils::NPC_FaceEnemy(ctx, QTRUE) == QFALSE {
+        if visible == qfalse || crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue) == qfalse {
             Mark1_Hunt(ctx);
             return;
         }
@@ -1097,7 +1085,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
                 // It should never get here, but just in case
                 (*npc).health = 0;
                 (*((*npc).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] = 0;
-                if let Some(die_fn) = (*npc).die {
+                if let Some(die_fn) = (*npc).die.get() {
                     crate::ent_fn_enums::dispatch_die(ctx, die_fn, npc, npc, npc, 100, MOD_UNKNOWN as c_int);
                 }
                 // C does not return here: it falls through to NPC_FaceEnemy and the
@@ -1106,7 +1094,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
             };
 
         // We can see enemy so shoot him if timers let you.
-        crate::NPC_utils::NPC_FaceEnemy(ctx, QTRUE);
+        crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
 
         if final_distRate == DIST_MELEE {
             Mark1_BlasterAttack(ctx, advance);
@@ -1120,7 +1108,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
 // `ucmd`; no channel from this context-free faithful signature.
 /// Raven `Mark1_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:711-739`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:711-739`
 pub fn Mark1_Patrol(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1135,7 +1123,7 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
                 CHAN_AUTO,
                 crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_wakeup".as_ptr()),
             );
-            crate::NPC_utils::NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+            crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
             return;
         }
 
@@ -1144,8 +1132,8 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
             let goal = crate::NPC_goal::UpdateGoal(ctx);
             if !goal.is_null() {
                 (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
-                crate::NPC_move::NPC_MoveToGoal(ctx, QTRUE);
-                crate::NPC_utils::NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+                crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
+                crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
             }
         }
     }
@@ -1155,7 +1143,7 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
 // writes `NPCInfo`; no channel from this context-free faithful signature.
 /// Raven `NPC_BSMark1_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:747-764`
+/// Source: `oracle/codemp/game/NPC_AI_Mark1.c:747-764`
 pub fn NPC_BSMark1_Default(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;

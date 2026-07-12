@@ -11,9 +11,9 @@ use abi_transport::generic::{
 /// Raven's client switch forwards the writable buffer through `VMA(1)` and
 /// reads the index from `args[2]`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:165-167`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:165-167`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:941-944`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:165-167`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:165-167`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:941-944`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRShadernamefromindexArgs {
     pub name: *mut c_char,
@@ -28,7 +28,7 @@ impl UiRShadernamefromindexArgs {
 
 /// `UI_R_SHADERNAMEFROMINDEX` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:39`
+/// Source: `oracle/codemp/ui/ui_public.h:39`
 pub struct UiRShadernamefromindex;
 
 impl OutboundSysCall for UiRShadernamefromindex {

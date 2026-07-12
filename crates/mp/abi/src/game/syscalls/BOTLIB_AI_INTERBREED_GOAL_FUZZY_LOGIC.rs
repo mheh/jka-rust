@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_INTERBREED_GOAL_FUZZY_LOGIC` outbound game-to-engine syscall.
 ///
@@ -36,7 +38,7 @@ impl BotlibAiInterbreedGoalFuzzyLogicArgs {
 
 /// `BOTLIB_AI_INTERBREED_GOAL_FUZZY_LOGIC` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:483`
+/// Source: `oracle/codemp/game/g_public.h:483`
 pub struct BotlibAiInterbreedGoalFuzzyLogic;
 
 impl OutboundSysCall for BotlibAiInterbreedGoalFuzzyLogic {

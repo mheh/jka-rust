@@ -12,8 +12,8 @@ use mp_qshared::shared::fileHandle_t;
 /// switch decodes `buffer` through `VMA(1)`, reads `len` and `f` from
 /// `args[2]`/`args[3]`, and returns `0` after filling the caller-owned buffer.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:87-88`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:739-741`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:87-88`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:739-741`
 #[derive(Debug)]
 pub struct CgFsReadArgs {
     buffer: *mut u8,
@@ -47,10 +47,10 @@ impl CgFsReadArgs {
 /// `UI_FS_READ` MP cgame imports syscall ABI token.
 ///
 /// Raven: `( void *buffer, int len, fileHandle_t f )`.
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:74`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:87-88`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:741`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:739-741`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:74`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:87-88`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:741`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:739-741`
 pub struct CgFsRead;
 
 impl OutboundSysCall for CgFsRead {

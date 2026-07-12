@@ -6,39 +6,39 @@ use mp_qshared::shared::{qboolean, NUM_FORCE_POWERS};
 
 /// Raven `MAX_SIEGE_CLASSES` — "up to 128 classes".
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saga.h:12`
+/// Source: `oracle/codemp/game/bg_saga.h:12`
 pub const MAX_SIEGE_CLASSES: usize = 128;
 
 /// Raven `siegeClass_t` — a siege gametype player class definition.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_saga.h:54-80`
+/// Type definition source: `oracle/codemp/game/bg_saga.h:54-80`
 #[repr(C)]
 pub struct siegeClass_t {
-	pub name: [c_char; 512],
-	pub forcedModel: [c_char; 256],
-	pub forcedSkin: [c_char; 256],
-	pub saber1: [c_char; 64],
-	pub saber2: [c_char; 64],
-	pub saberStance: i32,
-	pub weapons: i32,
-	pub forcePowerLevels: [i32; NUM_FORCE_POWERS as usize],
-	pub classflags: i32,
-	pub maxhealth: i32,
-	pub starthealth: i32,
-	pub maxarmor: i32,
-	pub startarmor: i32,
-	pub speed: f32,
-	pub hasForcedSaberColor: qboolean,
-	pub forcedSaberColor: i32,
-	pub hasForcedSaber2Color: qboolean,
-	pub forcedSaber2Color: i32,
-	pub invenItems: i32,
-	pub powerups: i32,
-	pub uiPortraitShader: i32,
-	pub uiPortrait: [c_char; 256],
-	pub classShader: i32,
-	// SPC_INFANTRY . ..
-	pub playerClass: i16,
+    pub name: [c_char; 512],
+    pub forcedModel: [c_char; 256],
+    pub forcedSkin: [c_char; 256],
+    pub saber1: [c_char; 64],
+    pub saber2: [c_char; 64],
+    pub saberStance: i32,
+    pub weapons: i32,
+    pub forcePowerLevels: [i32; NUM_FORCE_POWERS as usize],
+    pub classflags: i32,
+    pub maxhealth: i32,
+    pub starthealth: i32,
+    pub maxarmor: i32,
+    pub startarmor: i32,
+    pub speed: f32,
+    pub hasForcedSaberColor: qboolean,
+    pub forcedSaberColor: i32,
+    pub hasForcedSaber2Color: qboolean,
+    pub forcedSaber2Color: i32,
+    pub invenItems: i32,
+    pub powerups: i32,
+    pub uiPortraitShader: i32,
+    pub uiPortrait: [c_char; 256],
+    pub classShader: i32,
+    // SPC_INFANTRY . ..
+    pub playerClass: i16,
 }
 
 const _: () = assert!(core::mem::size_of::<siegeClass_t>() == 1548);

@@ -37,7 +37,7 @@ impl GSendConsoleCommandArgs {
 /// Raven: add commands to the console as if they were typed in
 /// Raven: for map changing, etc
 /// Raven: =========== server specific functionality =============
-/// Source: `oracle/oracle/codemp/game/g_public.h:138`
+/// Source: `oracle/codemp/game/g_public.h:138`
 pub struct GSendConsoleCommand;
 
 impl OutboundSysCall for GSendConsoleCommand {

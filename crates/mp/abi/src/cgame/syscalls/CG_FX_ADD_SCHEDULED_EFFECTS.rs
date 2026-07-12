@@ -1,5 +1,7 @@
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use mp_qshared::shared::qboolean;
 
 /// Arguments for `CG_FX_ADD_SCHEDULED_EFFECTS`.
@@ -7,9 +9,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `syscall( CG_FX_ADD_SCHEDULED_EFFECTS, skyPortal );`
 /// Raven transport: `FX_AddScheduledEffects((qboolean)args[1]); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:659-661`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2405`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1141-1143`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:659-661`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2405`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1141-1143`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxAddScheduledEffectsArgs {
     sky_portal: qboolean,
@@ -23,10 +25,10 @@ impl CgFxAddScheduledEffectsArgs {
 
 /// `CG_FX_ADD_SCHEDULED_EFFECTS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:226`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:659-661`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1141-1143`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1141-1143`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:226`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:659-661`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1141-1143`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1141-1143`
 pub struct CgFxAddScheduledEffects;
 
 impl OutboundSysCall for CgFxAddScheduledEffects {

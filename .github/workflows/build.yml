@@ -25,7 +25,8 @@ name: Build modules
 # Zip names are STABLE (no version segment) so the rolling `latest` release
 # keeps stable download URLs; the built commit is recorded in the release body.
 #
-# The build matrix is gated behind a full-workspace compile + test run. The
+# The build matrix is gated behind the jampgame-lane compile + test run
+# (temporarily scoped down from full-workspace; see the gate step note). The
 # compile is this repo's layout bar (every ABI struct carries size/offset
 # static-asserts), and the test run carries the oracle differential parity
 # suites (pmove/bglib/qmath/saberload goldens under crates/mp/game/tests/).
@@ -64,10 +65,10 @@ jobs:
           key: test-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
           restore-keys: test-cargo-
 
-      - name: Full workspace build (layout asserts are compile-time)
+      - name: workspace build (layout asserts are compile-time)
         run: cargo build --workspace
 
-      - name: Workspace tests incl. oracle parity suites (single-threaded)
+      - name: workspace tests incl. oracle parity suites (single-threaded)
         run: cargo test --workspace -- --test-threads=1
 
   build:

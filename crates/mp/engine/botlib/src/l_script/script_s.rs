@@ -12,7 +12,7 @@ use super::token_s::token_t;
 /// reading token / set by UnreadLastToken / several script flags / the
 /// punctuations used in the script / available token / next script in a
 /// chain.
-/// Type definition source: `oracle/oracle/codemp/botlib/l_script.h:158-176`
+/// Type definition source: `oracle/codemp/botlib/l_script.h:158-176`
 #[repr(C)]
 pub struct script_t {
     /// file name of the script

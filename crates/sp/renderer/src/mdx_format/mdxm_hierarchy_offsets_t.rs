@@ -4,7 +4,7 @@
 ///
 /// Raven: variable sized (mdxmHeader_t->numSurfaces), each offset points to a
 /// mdxmSurfHierarchy_t below.
-/// Type definition source: `oracle/oracle/code/game/../game/../renderer/mdx_format.h:177-180`
+/// Type definition source: `oracle/code/game/../game/../renderer/mdx_format.h:177-180`
 #[repr(C)]
 pub struct mdxmHierarchyOffsets_t {
     pub offsets: [i32; 1],

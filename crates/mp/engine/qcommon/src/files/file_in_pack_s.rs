@@ -3,7 +3,7 @@ use core::ffi::{c_char, c_ulong};
 
 /// Raven `fileInPack_t` — a single hashed file entry inside a loaded pack.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/files.h:36-40`
+/// Type definition source: `oracle/codemp/qcommon/files.h:36-40`
 #[repr(C)]
 pub struct fileInPack_t {
     /// name of the file

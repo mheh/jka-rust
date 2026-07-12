@@ -2,7 +2,7 @@
 
 /// Raven `SAMPLE` — a single mp3 audio sample, as an int or float.
 ///
-/// Type definition source: `oracle/oracle/code/client/../mp3code/small_header.h:11-15`
+/// Type definition source: `oracle/code/client/../mp3code/small_header.h:11-15`
 #[repr(C)]
 pub union SAMPLE {
     pub s: i32,

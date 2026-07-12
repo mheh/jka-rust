@@ -7,7 +7,7 @@ use mp_qshared::shared::qboolean;
 /// Raven `clSnapshot_t` — a locally saved snapshot of the game state at a
 /// serverTime.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/client.h:25-45`
+/// Type definition source: `oracle/codemp/client/client.h:25-45`
 #[repr(C)]
 pub struct clSnapshot_t {
     /// cleared if delta parsing was invalid

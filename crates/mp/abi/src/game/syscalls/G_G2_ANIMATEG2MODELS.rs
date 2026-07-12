@@ -44,7 +44,7 @@ impl GG2Animateg2ModelsArgs {
 ///
 /// Raven: rww - RAGDOLL_END
 /// Raven: additional ragdoll options -rww
-/// Source: `oracle/oracle/codemp/game/g_public.h:545`
+/// Source: `oracle/codemp/game/g_public.h:545`
 pub struct GG2Animateg2Models;
 
 impl OutboundSysCall for GG2Animateg2Models {

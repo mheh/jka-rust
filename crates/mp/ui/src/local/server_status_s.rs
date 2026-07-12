@@ -8,45 +8,45 @@ use super::pinglist_t::pinglist_t;
 
 /// `MAX_PINGREQUESTS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:570`
+/// Source: `oracle/codemp/ui/ui_local.h:570`
 const MAX_PINGREQUESTS: usize = 32;
 
 /// `MAX_DISPLAY_SERVERS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:577`
+/// Source: `oracle/codemp/ui/ui_local.h:577`
 const MAX_DISPLAY_SERVERS: usize = 2048;
 
 /// Raven `serverStatus_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:660-687`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:660-687`
 #[repr(C)]
 pub struct serverStatus_t {
-	pub pingList: [pinglist_t; MAX_PINGREQUESTS],
-	pub numqueriedservers: i32,
-	pub currentping: i32,
-	pub nextpingtime: i32,
-	pub maxservers: i32,
-	pub refreshtime: i32,
-	pub numServers: i32,
-	pub sortKey: i32,
-	pub sortDir: i32,
-	pub lastCount: i32,
-	pub refreshActive: qboolean,
-	pub currentServer: i32,
-	pub displayServers: [i32; MAX_DISPLAY_SERVERS],
-	pub numDisplayServers: i32,
-	pub numPlayersOnServers: i32,
-	pub nextDisplayRefresh: i32,
-	pub nextSortTime: i32,
-	pub currentServerPreview: qhandle_t,
-	pub currentServerCinematic: i32,
-	pub motdLen: i32,
-	pub motdWidth: i32,
-	pub motdPaintX: i32,
-	pub motdPaintX2: i32,
-	pub motdOffset: i32,
-	pub motdTime: i32,
-	pub motd: [c_char; MAX_STRING_CHARS],
+    pub pingList: [pinglist_t; MAX_PINGREQUESTS],
+    pub numqueriedservers: i32,
+    pub currentping: i32,
+    pub nextpingtime: i32,
+    pub maxservers: i32,
+    pub refreshtime: i32,
+    pub numServers: i32,
+    pub sortKey: i32,
+    pub sortDir: i32,
+    pub lastCount: i32,
+    pub refreshActive: qboolean,
+    pub currentServer: i32,
+    pub displayServers: [i32; MAX_DISPLAY_SERVERS],
+    pub numDisplayServers: i32,
+    pub numPlayersOnServers: i32,
+    pub nextDisplayRefresh: i32,
+    pub nextSortTime: i32,
+    pub currentServerPreview: qhandle_t,
+    pub currentServerCinematic: i32,
+    pub motdLen: i32,
+    pub motdWidth: i32,
+    pub motdPaintX: i32,
+    pub motdPaintX2: i32,
+    pub motdOffset: i32,
+    pub motdTime: i32,
+    pub motd: [c_char; MAX_STRING_CHARS],
 }
 
 const _: () = assert!(core::mem::size_of::<serverStatus_t>() == 11484);

@@ -44,7 +44,7 @@ impl GG2GetsurfacerenderstatusArgs {
 
 /// `G_G2_GETSURFACERENDERSTATUS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:537`
+/// Source: `oracle/codemp/game/g_public.h:537`
 pub struct GG2Getsurfacerenderstatus;
 
 impl OutboundSysCall for GG2Getsurfacerenderstatus {

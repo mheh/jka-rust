@@ -1,5 +1,5 @@
 // PORT-COMPLETE: bg_slidemove.c 5/5
-//! Ported `oracle/oracle/codemp/game/bg_slidemove.c` bodies (pass 3).
+//! Ported `oracle/codemp/game/bg_slidemove.c` bodies (pass 3).
 //!
 //! All five functions are built on the pmove working set that `bg_pmove.rs`
 //! threads as `PmoveContext`: `self.pm`/`self.pml`/
@@ -25,28 +25,28 @@ use mp_qshared::shared::trajectory::trType_t;
 // --- file-local `#defines` from `bg_slidemove.c` (porting-rules per-file
 // convention, cf. `bg_pmove.rs`'s `MIN_WALK_NORMAL`/`PMF_STUCK_TO_WALL`). ---
 
-/// `MAX_IMPACT_TURN_ANGLE`. Source: `oracle/oracle/codemp/game/bg_slidemove.c:48`
+/// `MAX_IMPACT_TURN_ANGLE`. Source: `oracle/codemp/game/bg_slidemove.c:48`
 pub const MAX_IMPACT_TURN_ANGLE: f32 = 45.0;
-/// `MAX_CLIP_PLANES`. Source: `oracle/oracle/codemp/game/bg_slidemove.c:633`
+/// `MAX_CLIP_PLANES`. Source: `oracle/codemp/game/bg_slidemove.c:633`
 pub const MAX_CLIP_PLANES: usize = 5;
-/// `MIN_LANDING_SPEED`. Source: `oracle/oracle/codemp/game/bg_vehicles.h:399`
+/// `MIN_LANDING_SPEED`. Source: `oracle/codemp/game/bg_vehicles.h:399`
 pub const MIN_LANDING_SPEED: f32 = 200.0;
-/// `OVERCLIP`. Source: `oracle/oracle/codemp/game/bg_local.h:10`
+/// `OVERCLIP`. Source: `oracle/codemp/game/bg_local.h:10`
 pub const OVERCLIP: f32 = 1.001;
-/// `STEPSIZE`. Source: `oracle/oracle/codemp/game/bg_public.h:22`
+/// `STEPSIZE`. Source: `oracle/codemp/game/bg_public.h:22`
 pub const STEPSIZE: f32 = 18.0;
-/// `MIN_WALK_NORMAL`. Source: `oracle/oracle/codemp/game/bg_local.h:5`
+/// `MIN_WALK_NORMAL`. Source: `oracle/codemp/game/bg_local.h:5`
 const MIN_WALK_NORMAL: f32 = 0.7;
-/// `PMF_STUCK_TO_WALL`. Source: `oracle/oracle/codemp/game/bg_public.h:417`
-const PMF_STUCK_TO_WALL: c_int = 16384;
-/// `SOLID_BMODEL`. Source: `oracle/oracle/codemp/game/q_shared.h:2642`
-pub const SOLID_BMODEL: c_int = 0xffffff;
+// `PMF_STUCK_TO_WALL` local shadow removed in the const sweep — the qshared
+// `pm_flags` canonical (value 16384) reaches this file via `crate::prelude::*`.
+// `SOLID_BMODEL` (`q_shared.h:2642`) canonical in `mp_qshared::shared::surface_flags`,
+// reaches this file via `crate::prelude::*`.
 
 impl PmoveContext<'_> {
     /// Raven `PM_VehicleImpact` — vehicle-vs-world/entity impact damage,
     /// bounce and turn-away reaction (`QAGAME` branch only, see module doc).
     ///
-    /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:49-557`
+    /// Source: `oracle/codemp/game/bg_slidemove.c:49-557`
     pub fn PM_VehicleImpact(&mut self, pEnt: *mut bgEntity_t, trace: *mut trace_t) {
         unsafe {
             let pSelfVeh = ((*pEnt).m_pVehicle as *mut Vehicle_t);
@@ -54,7 +54,7 @@ impl PmoveContext<'_> {
             let ps = (*self.pm).ps;
             let velocity = (*ps).velocity;
             let mut magnitude = VectorLength(velocity) * (*pSelfVehInfo).mass as f32 / 50.0;
-            let mut forceSurfDestruction: qboolean = QFALSE;
+            let mut forceSurfDestruction: qboolean = qfalse;
 
             let hitEnt: *mut bgEntity_t = if !trace.is_null() {
                 self.PM_BGEntForNum((*trace).entityNum as c_int)
@@ -135,7 +135,7 @@ impl PmoveContext<'_> {
                 ) == 0
             {
                 // hit a func_rotating that is supposed to destroy anything it touches!
-                forceSurfDestruction = QTRUE;
+                forceSurfDestruction = qtrue;
             } else if (Q_fabs((*ps).velocity[0]) + Q_fabs((*ps).velocity[1])) < 100.0
                 && (*ps).velocity[2] > -100.0
             {
@@ -158,14 +158,14 @@ impl PmoveContext<'_> {
                     < (*self.pm).cmd.serverTime
                     || forceSurfDestruction != 0
                 {
-                    let mut noDamage: qboolean = QFALSE;
+                    let mut noDamage: qboolean = qfalse;
 
                     if !trace.is_null()
                         && (*pSelfVeh).m_iRemovedSurfaces == 0
                         && forceSurfDestruction == 0
                     {
-                        let mut turnFromImpact: qboolean = QFALSE;
-                        let mut turnHitEnt: qboolean = QFALSE;
+                        let mut turnFromImpact: qboolean = qfalse;
+                        let mut turnHitEnt: qboolean = qfalse;
                         let l0 = (*ps).speed * 0.5;
                         let mut bounceDir: vec3_t = [0.0; 3];
 
@@ -185,7 +185,7 @@ impl PmoveContext<'_> {
                                 return;
                             } else {
                                 if (*pSelfVehInfo).r#type as c_int == VH_FIGHTER as c_int {
-                                    turnFromImpact = QTRUE;
+                                    turnFromImpact = qtrue;
                                 }
                                 bounceDir = (*trace).plane.normal;
                             }
@@ -201,8 +201,8 @@ impl PmoveContext<'_> {
                                     == VH_FIGHTER as c_int
                             {
                                 // two vehicles hit each other, turn away from the impact
-                                turnFromImpact = QTRUE;
-                                turnHitEnt = QTRUE;
+                                turnFromImpact = qtrue;
+                                turnHitEnt = qtrue;
                                 for i in 0..3 {
                                     bounceDir[i] = (*ps).origin[i] - (*hitEnt).r.currentOrigin[i];
                                 }
@@ -451,7 +451,7 @@ impl PmoveContext<'_> {
                         (*pSelfVeh).m_iLastImpactDmg = magnitude as c_int;
                         if (*hitEnt).s.eType == ET_MISSILE as c_int {
                             // FIX: NEVER do or take impact damage from a missile...
-                            noDamage = QTRUE;
+                            noDamage = qtrue;
                             if ((*hitEnt).s.eFlags & EF_JETPACK_ACTIVE) != 0
                                 && (*hitEnt).r.ownerNum < MAX_CLIENTS as c_int
                             {
@@ -588,7 +588,7 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_GroundSlideOkay`.
     ///
-    /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:559-580`
+    /// Source: `oracle/codemp/game/bg_slidemove.c:559-580`
     pub fn PM_GroundSlideOkay(&self, zNormal: f32) -> qboolean {
         unsafe {
             let ps = &*(*self.pm).ps;
@@ -604,26 +604,26 @@ impl PmoveContext<'_> {
                     || legsAnim == BOTH_FORCELONGLEAP_LAND as c_int
                     || BG_InReboundJump(legsAnim) != 0
                 {
-                    return QFALSE;
+                    return qfalse;
                 }
             }
-            QTRUE
+            qtrue
         }
     }
 
     /// Raven `PM_ClientImpact`.
     ///
-    /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:590-623`
+    /// Source: `oracle/codemp/game/bg_slidemove.c:590-623`
     pub fn PM_ClientImpact(&mut self, trace: *mut trace_t) -> qboolean {
         unsafe {
             let otherEntityNum = (*trace).entityNum as c_int;
 
             if self.pm_entSelf.is_null() {
-                return QFALSE;
+                return qfalse;
             }
 
             if otherEntityNum >= ENTITYNUM_WORLD as c_int {
-                return QFALSE;
+                return qfalse;
             }
 
             let ps = &*(*self.pm).ps;
@@ -641,16 +641,16 @@ impl PmoveContext<'_> {
             let traceEnt = self.PM_BGEntForNum(otherEntityNum);
             if traceEnt.is_null() || ((*traceEnt).r.contents & (*self.pm).tracemask) == 0 {
                 // it's dead or not in my way anymore, don't clip against it
-                return QTRUE;
+                return qtrue;
             }
 
-            QFALSE
+            qfalse
         }
     }
 
     /// Raven `PM_SlideMove`.
     ///
-    /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:634-853`
+    /// Source: `oracle/codemp/game/bg_slidemove.c:634-853`
     pub fn PM_SlideMove(&mut self, gravity: qboolean) -> qboolean {
         unsafe {
             let numbumps = 4;
@@ -718,7 +718,7 @@ impl PmoveContext<'_> {
                 if trace.allsolid != 0 {
                     // entity is completely trapped in another solid
                     (*ps).velocity[2] = 0.0; // don't build up falling damage, but allow sideways acceleration
-                    return QTRUE;
+                    return qtrue;
                 }
 
                 if trace.fraction > 0.0 {
@@ -753,7 +753,7 @@ impl PmoveContext<'_> {
                 if numplanes >= MAX_CLIP_PLANES {
                     // this shouldn't really happen
                     (*ps).velocity = [0.0; 3];
-                    return QTRUE;
+                    return qtrue;
                 }
 
                 let mut normal = trace.plane.normal;
@@ -895,7 +895,7 @@ impl PmoveContext<'_> {
                         j += 1;
                     }
                     if triple_stop {
-                        return QTRUE;
+                        return qtrue;
                     }
 
                     // if we have fixed all interactions, try another move
@@ -917,16 +917,16 @@ impl PmoveContext<'_> {
             }
 
             if bumpcount != 0 {
-                QTRUE
+                qtrue
             } else {
-                QFALSE
+                qfalse
             }
         }
     }
 
     /// Raven `PM_StepSlideMove`.
     ///
-    /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:861-1073`
+    /// Source: `oracle/codemp/game/bg_slidemove.c:861-1073`
     pub fn PM_StepSlideMove(&mut self, mut gravity: qboolean) {
         unsafe {
             let ps = (*self.pm).ps;
@@ -934,7 +934,7 @@ impl PmoveContext<'_> {
             let start_v = (*ps).velocity;
 
             if BG_InReboundHold((*ps).legsAnim) != 0 {
-                gravity = QFALSE;
+                gravity = qfalse;
             }
 
             if self.PM_SlideMove(gravity) == 0 {
@@ -981,7 +981,7 @@ impl PmoveContext<'_> {
 
             let mut up = start_o;
 
-            let mut isGiant: qboolean = QFALSE;
+            let mut isGiant: qboolean = qfalse;
             if (*ps).clientNum >= MAX_CLIENTS as c_int {
                 // apply ground friction, even if on ladder
                 // Raven's `&&`-over-`||` precedence leaves the CLASS_VEHICLE clause
@@ -997,11 +997,11 @@ impl PmoveContext<'_> {
                 {
                     // AT-STs can step high
                     up[2] += 66.0;
-                    isGiant = QTRUE;
+                    isGiant = qtrue;
                 } else if !pEnt.is_null() && (*pEnt).s.NPC_class == CLASS_RANCOR as c_int {
                     // also can step up high
                     up[2] += 64.0;
-                    isGiant = QTRUE;
+                    isGiant = qtrue;
                 } else {
                     up[2] += STEPSIZE;
                 }
@@ -1048,7 +1048,7 @@ impl PmoveContext<'_> {
                 (*self.pm).tracemask,
             );
 
-            let mut skipStep: qboolean = QFALSE;
+            let mut skipStep: qboolean = qfalse;
             if (*self.pm).stepSlideFix != 0
                 && (*ps).clientNum < MAX_CLIENTS as c_int
                 && trace.plane.normal[2] < MIN_WALK_NORMAL
@@ -1062,7 +1062,7 @@ impl PmoveContext<'_> {
                 }
                 VectorNormalize(&mut stepVec);
                 if stepVec[2] > (1.0 - MIN_WALK_NORMAL) {
-                    skipStep = QTRUE;
+                    skipStep = qtrue;
                 }
             }
 

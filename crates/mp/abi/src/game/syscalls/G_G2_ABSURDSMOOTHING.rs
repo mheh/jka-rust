@@ -34,7 +34,7 @@ impl GG2AbsurdsmoothingArgs {
 /// `G_G2_ABSURDSMOOTHING` MP game imports syscall ABI token.
 ///
 /// Raven: rww - RAGDOLL_BEGIN
-/// Source: `oracle/oracle/codemp/game/g_public.h:539`
+/// Source: `oracle/codemp/game/g_public.h:539`
 pub struct GG2Absurdsmoothing;
 
 impl OutboundSysCall for GG2Absurdsmoothing {

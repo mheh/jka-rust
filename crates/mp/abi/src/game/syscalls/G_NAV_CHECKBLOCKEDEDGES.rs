@@ -1,6 +1,8 @@
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_CHECKBLOCKEDEDGES` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,7 +16,7 @@ impl GNavCheckblockededgesArgs {
 
 /// `G_NAV_CHECKBLOCKEDEDGES` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:333`
+/// Source: `oracle/codemp/game/g_public.h:333`
 pub struct GNavCheckblockededges;
 
 impl OutboundSysCall for GNavCheckblockededges {

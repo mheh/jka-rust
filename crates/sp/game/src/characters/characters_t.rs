@@ -4,7 +4,7 @@
 ///
 /// Raven: player character selector enum from Voyager's crew; organized by HazTeam Alpha,
 /// HazTeam Beta, Senior Crew, Other Crew, and Generic Crew variants.
-/// Type definition source: `oracle/oracle/code/game/characters.h:1-45`
+/// Type definition source: `oracle/code/game/characters.h:1-45`
 #[repr(i32)]
 pub enum characters_t {
     // HazTeam Alpha

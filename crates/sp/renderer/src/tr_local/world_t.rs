@@ -14,7 +14,7 @@ use super::msurface_s::msurface_t;
 
 /// Raven `world_t` — the loaded BSP world: geometry, planes, fogs, and light grid.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:896-951`
+/// Type definition source: `oracle/code/renderer/tr_local.h:896-951`
 #[repr(C)]
 pub struct world_t {
     pub numShaders: c_int,

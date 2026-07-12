@@ -6,7 +6,7 @@ use mp_qshared::shared::collision::cplane_t;
 
 /// Raven `cNode_t` — a BSP node in the collision model tree.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_local.h:27-30`
+/// Type definition source: `oracle/codemp/qcommon/cm_local.h:27-30`
 #[repr(C)]
 pub struct cNode_t {
     pub plane: *mut cplane_t,

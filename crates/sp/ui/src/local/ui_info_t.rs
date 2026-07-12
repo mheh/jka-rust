@@ -11,17 +11,17 @@ use super::player_species_info_t::playerSpeciesInfo_t;
 
 /// `MAX_MODS`.
 ///
-/// Source: `oracle/oracle/code/ui/ui_local.h:96`
+/// Source: `oracle/code/ui/ui_local.h:96`
 const MAX_MODS: usize = 64;
 
 /// `MAX_PLAYERMODELS`.
 ///
-/// Source: `oracle/oracle/code/ui/ui_local.h:13`
+/// Source: `oracle/code/ui/ui_local.h:13`
 const MAX_PLAYERMODELS: usize = 32;
 
 /// `MAX_DEFERRED_SCRIPT`.
 ///
-/// Source: `oracle/oracle/code/ui/ui_local.h:14`
+/// Source: `oracle/code/ui/ui_local.h:14`
 const MAX_DEFERRED_SCRIPT: usize = 1024;
 
 /// Raven `uiInfo_t` — the SP UI module's top-level runtime state (display
@@ -32,68 +32,68 @@ const MAX_DEFERRED_SCRIPT: usize = 1024;
 /// (no team/gametype/map/server-browser caches) built around the SP-only
 /// Force-power allocation and weapon-selection screens; it lacks all of
 /// MP's multiplayer browser/lobby state.
-/// Type definition source: `oracle/oracle/code/ui/ui_local.h:119-170`
+/// Type definition source: `oracle/code/ui/ui_local.h:119-170`
 #[repr(C)]
 pub struct uiInfo_t {
-	pub uiDC: displayContextDef_t,
+    pub uiDC: displayContextDef_t,
 
-	pub effectsColor: i32,
-	pub currentCrosshair: i32,
+    pub effectsColor: i32,
+    pub currentCrosshair: i32,
 
-	pub modList: [modInfo_t; MAX_MODS],
-	pub modIndex: i32,
-	pub modCount: i32,
+    pub modList: [modInfo_t; MAX_MODS],
+    pub modIndex: i32,
+    pub modCount: i32,
 
-	pub playerSpeciesCount: i32,
-	pub playerSpecies: [playerSpeciesInfo_t; MAX_PLAYERMODELS],
-	pub playerSpeciesIndex: i32,
+    pub playerSpeciesCount: i32,
+    pub playerSpecies: [playerSpeciesInfo_t; MAX_PLAYERMODELS],
+    pub playerSpeciesIndex: i32,
 
-	pub deferredScript: [c_char; MAX_DEFERRED_SCRIPT],
-	pub deferredScriptItem: *mut itemDef_t,
+    pub deferredScript: [c_char; MAX_DEFERRED_SCRIPT],
+    pub deferredScriptItem: *mut itemDef_t,
 
-	pub runScriptItem: *mut itemDef_t,
+    pub runScriptItem: *mut itemDef_t,
 
-	pub inGameLoad: qboolean,
-	// Used by Force Power allocation screen
-	/// Enum of which power had the point allocated
-	pub forcePowerUpdated: i16,
-	// Used by Weapon allocation screen
-	/// 1st weapon chosen
-	pub selectedWeapon1: i16,
-	/// Item name of weapon chosen
-	pub selectedWeapon1ItemName: [c_char; 64],
-	/// Holds index to ammo
-	pub selectedWeapon1AmmoIndex: i32,
-	/// 2nd weapon chosen
-	pub selectedWeapon2: i16,
-	/// Item name of weapon chosen
-	pub selectedWeapon2ItemName: [c_char; 64],
-	/// Holds index to ammo
-	pub selectedWeapon2AmmoIndex: i32,
-	/// throwable weapon chosen
-	pub selectedThrowWeapon: i16,
-	/// Item name of weapon chosen
-	pub selectedThrowWeaponItemName: [c_char; 64],
-	/// Holds index to ammo
-	pub selectedThrowWeaponAmmoIndex: i32,
+    pub inGameLoad: qboolean,
+    // Used by Force Power allocation screen
+    /// Enum of which power had the point allocated
+    pub forcePowerUpdated: i16,
+    // Used by Weapon allocation screen
+    /// 1st weapon chosen
+    pub selectedWeapon1: i16,
+    /// Item name of weapon chosen
+    pub selectedWeapon1ItemName: [c_char; 64],
+    /// Holds index to ammo
+    pub selectedWeapon1AmmoIndex: i32,
+    /// 2nd weapon chosen
+    pub selectedWeapon2: i16,
+    /// Item name of weapon chosen
+    pub selectedWeapon2ItemName: [c_char; 64],
+    /// Holds index to ammo
+    pub selectedWeapon2AmmoIndex: i32,
+    /// throwable weapon chosen
+    pub selectedThrowWeapon: i16,
+    /// Item name of weapon chosen
+    pub selectedThrowWeaponItemName: [c_char; 64],
+    /// Holds index to ammo
+    pub selectedThrowWeaponAmmoIndex: i32,
 
-	pub weapon1ItemButton: *mut itemDef_t,
-	pub litWeapon1Icon: qhandle_t,
-	pub unlitWeapon1Icon: qhandle_t,
-	pub weapon2ItemButton: *mut itemDef_t,
-	pub litWeapon2Icon: qhandle_t,
-	pub unlitWeapon2Icon: qhandle_t,
+    pub weapon1ItemButton: *mut itemDef_t,
+    pub litWeapon1Icon: qhandle_t,
+    pub unlitWeapon1Icon: qhandle_t,
+    pub weapon2ItemButton: *mut itemDef_t,
+    pub litWeapon2Icon: qhandle_t,
+    pub unlitWeapon2Icon: qhandle_t,
 
-	pub weaponThrowButton: *mut itemDef_t,
-	pub litThrowableIcon: qhandle_t,
-	pub unlitThrowableIcon: qhandle_t,
-	pub movesTitleIndex: i16,
-	pub movesBaseAnim: *mut c_char,
-	pub moveAnimTime: i32,
-	pub languageCount: i32,
-	pub languageCountIndex: i32,
+    pub weaponThrowButton: *mut itemDef_t,
+    pub litThrowableIcon: qhandle_t,
+    pub unlitThrowableIcon: qhandle_t,
+    pub movesTitleIndex: i16,
+    pub movesBaseAnim: *mut c_char,
+    pub moveAnimTime: i32,
+    pub languageCount: i32,
+    pub languageCountIndex: i32,
 
-	pub forcePowerLevel: [i32; NUM_FORCE_POWERS as usize],
+    pub forcePowerLevel: [i32; NUM_FORCE_POWERS as usize],
 }
 
 const _: () = assert!(core::mem::size_of::<uiInfo_t>() == 251568);

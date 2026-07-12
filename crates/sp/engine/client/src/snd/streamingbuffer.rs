@@ -5,12 +5,12 @@ use std::os::raw::{c_char, c_uint};
 /// Raven `STREAMINGBUFFER` — OpenAL streaming buffer state.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/code/client/snd_local.h:80-85`
+/// Type definition source: `oracle/code/client/snd_local.h:80-85`
 #[repr(C)]
 pub struct STREAMINGBUFFER {
-	pub BufferID: c_uint,
-	pub Status: c_uint,
-	pub Data: *mut c_char,
+    pub BufferID: c_uint,
+    pub Status: c_uint,
+    pub Data: *mut c_char,
 }
 
 const _: () = assert!(core::mem::size_of::<STREAMINGBUFFER>() == 16);

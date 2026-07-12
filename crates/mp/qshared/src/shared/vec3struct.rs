@@ -6,7 +6,7 @@ use core::ffi::c_float;
 /// efficient `VectorCopy` (defined under `#ifdef __LCC__`; ported as a plain
 /// struct).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1389-1391`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1389-1391`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct vec3struct_t {

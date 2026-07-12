@@ -11,7 +11,7 @@ use super::sphere_t::sphere_t;
 /// Raven `traceWork_t` — working state for a single trace/sweep through the
 /// collision model.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:236-263`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:236-263`
 #[repr(C)]
 pub struct traceWork_t {
     pub start: vec3_t,

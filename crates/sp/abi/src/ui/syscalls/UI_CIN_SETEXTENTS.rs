@@ -1,14 +1,16 @@
 use core::ffi::c_int;
 
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `UI_CIN_SETEXTENTS` SP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:231`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp:488-489`
-/// Output source: `oracle/oracle/code/client/cl_ui.cpp:489`
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:488-489`
+/// Enum value source: `oracle/code/ui/ui_public.h:231`
+/// Args source: `oracle/code/client/cl_ui.cpp:488-489`
+/// Output source: `oracle/code/client/cl_ui.cpp:489`
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:488-489`
 pub struct UiCinSetextents;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

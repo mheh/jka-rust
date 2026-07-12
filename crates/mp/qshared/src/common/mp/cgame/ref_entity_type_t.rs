@@ -4,7 +4,7 @@
 
 /// Raven `refEntityType_t` — reference entity type codes for the renderer.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:83-98`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:83-98`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum refEntityType_t {

@@ -6,15 +6,15 @@ use abi_transport::generic::{
 
 /// `UI_GETCLIENTSTATE` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:196`
-/// Type definition source: `oracle/oracle/codemp/ui/ui_public.h:7-15`
-/// Args source: `oracle/oracle/code/ui/ui_syscalls.cpp:151-153`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:961`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1044-1046`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1044-1046`
+/// Enum source: `oracle/code/ui/ui_public.h:196`
+/// Type definition source: `oracle/codemp/ui/ui_public.h:7-15`
+/// Args source: `oracle/code/ui/ui_syscalls.cpp:151-153`
+/// Args source: `oracle/codemp/ui/ui_local.h:961`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1044-1046`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1044-1046`
 /// SP caveat: `UI_GETCLIENTSTATE` is commented out in
-/// `oracle/oracle/code/ui/ui_syscalls.cpp:148-153` and not active in the current
-/// `oracle/oracle/code/client/cl_ui.cpp` branch.
+/// `oracle/code/ui/ui_syscalls.cpp:148-153` and not active in the current
+/// `oracle/code/client/cl_ui.cpp` branch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiGetclientstateArgs {
     state: *mut uiClientState_t,

@@ -1,6 +1,6 @@
 //! SP `saberTrail_t`.
 //!
-//! Type definition source: `oracle/oracle/code/game/q_shared.h:1616-1630`
+//! Type definition source: `oracle/code/game/q_shared.h:1616-1630`
 
 #![allow(non_camel_case_types)]
 
@@ -12,7 +12,7 @@ use crate::shared::{qboolean, vec3_t};
 ///
 /// Raven: `!!!!!!! loadsave affecting struct !!!!!!!`.
 /// Diverges from MP: SP has **no** `dualbase`/`dualtip` (MP-only dual-blade trail).
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1616-1630`
+/// Type definition source: `oracle/code/game/q_shared.h:1616-1630`
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct saberTrail_t {

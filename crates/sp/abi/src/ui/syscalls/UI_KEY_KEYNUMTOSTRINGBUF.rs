@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_KEY_KEYNUMTOSTRINGBUF, keynum, buf, buflen );`
 /// Raven transport: `Key_KeynumToStringBuf( args[1], (char *)VMA(2), args[3] );`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:185`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp:484-486`
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:484-486`
+/// Enum source: `oracle/code/ui/ui_public.h:185`
+/// Args source: `oracle/code/client/cl_ui.cpp:484-486`
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:484-486`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiKeyKeynumtostringbufArgs {
     keynum: c_int,
@@ -44,7 +44,7 @@ impl UiKeyKeynumtostringbufArgs {
 
 /// `UI_KEY_KEYNUMTOSTRINGBUF` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:185`
+/// Source: `oracle/code/ui/ui_public.h:185`
 pub struct UiKeyKeynumtostringbuf;
 
 impl OutboundSysCall for UiKeyKeynumtostringbuf {

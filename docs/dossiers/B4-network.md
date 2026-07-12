@@ -2,8 +2,8 @@
 
 Scope: raw material for the design session on DEC-06 (full JKA 1.01 wire
 compatibility, protocol 26) — this is the wire-compat backbone doc. Every
-claim cites `oracle/oracle/<path>:<line>`. MP tree = `oracle/oracle/codemp/`,
-SP tree = `oracle/oracle/code/`. Cross-ref: A2 dossier §1f has the netchan
+claim cites `oracle/<path>:<line>`. MP tree = `oracle/codemp/`,
+SP tree = `oracle/code/`. Cross-ref: A2 dossier §1f has the netchan
 globals census (`showpackets`/`showdrop`/`qport`/`net_killdroppedfragments`
 cvars, `loopbacks[2]`).
 
@@ -15,7 +15,7 @@ Status: complete.
 
 ### 1a. Connectionless packets (the `-1` marker)
 
-Raven's own header comment states the rule (`oracle/oracle/codemp/qcommon/net_chan.cpp:15-16`):
+Raven's own header comment states the rule (`oracle/codemp/qcommon/net_chan.cpp:15-16`):
 
 > "if the sequence number is -1, the packet should be handled as an
 > out-of-band message instead of as part of a netcon."
@@ -216,7 +216,7 @@ null-pointer-cast offsetof macro, `NETF(x)` for entities
   by `#ifdef _OPTIMIZED_VEHICLE_NETWORKING` (`msg.cpp:1404`, table at
   `:1410-1568`) vs. `#else` (table at `:1829-1972`, 140 entries).
   **`_OPTIMIZED_VEHICLE_NETWORKING` is unconditionally `#define`d at
-  `oracle/oracle/codemp/game/q_shared.h:2154`** — so the shipped 1.01 build
+  `oracle/codemp/game/q_shared.h:2154`** — so the shipped 1.01 build
   uses the `#ifdef` branch (`:1410`) plus the companion
   `pilotPlayerStateFields[]` (`:1570`) and `vehPlayerStateFields[]`
   (`:1736`), **not** the `:1829` table. A port that transcribes the wrong
@@ -420,7 +420,7 @@ would exceed the 128-slot window.
   `CA_CONNECTING` sends `"getchallenge"` (`:1674`); in `CA_CHALLENGING`
   builds userinfo (`protocol`/`qport`/`challenge` keys) and sends
   `"connect \"%s\""` (`:1679-1715`).
-- **`PROTOCOL_VERSION`**: MP = **26**, `oracle/oracle/codemp/qcommon/qcommon.h:205`.
+- **`PROTOCOL_VERSION`**: MP = **26**, `oracle/codemp/qcommon/qcommon.h:205`.
   Server checks the client's connect request at `sv_client.cpp:242`. Client
   embeds it in the connect userinfo (`cl_main.cpp:1682`) and separately
   checks a server's info-broadcast reply for server-browser pings
@@ -429,7 +429,7 @@ would exceed the 128-slot window.
   (`CL_ConnectionlessPacket`, `:2044-2081`), since the server already
   gates mismatches at connect time.
 - SP's equivalent define is **`PROTOCOL_VERSION 40`**
-  (`oracle/oracle/code/qcommon/qcommon.h:199`) — confirms DEC-06's "protocol
+  (`oracle/code/qcommon/qcommon.h:199`) — confirms DEC-06's "protocol
   26" target is MP-specific; SP has its own (unreachable over real UDP, see
   §7) value.
 
@@ -550,7 +550,7 @@ kept for engine uniformity, but is structurally unreachable over real UDP
   the challenge/response handshake entirely: `if ( !NET_IsLocalAddress
   (from) ) { NET_OutOfBandPrint(...,"print\nNo challenge for
   address.\n"); return; } else { Info_SetValueForKey( userinfo, "ip",
-  "localhost" ); }` (`oracle/oracle/code/server/sv_client.cpp:46-51`).
+  "localhost" ); }` (`oracle/code/server/sv_client.cpp:46-51`).
 - The client-slot loop is hardcoded to **one** slot: `for
   (i=0,cl=svs.clients ; i < 1 ; i++,cl++)` (`code/server/sv_client.cpp:58`,
   again `:81`); `sv_maxclients` is not a live cvar in SP at all — the only

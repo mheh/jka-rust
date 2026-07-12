@@ -10,7 +10,7 @@ use super::le_type_t::leType_t;
 
 /// Raven `localEntity_t` — client side temporary entity, not communicated to server.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:222-248`
+/// Type definition source: `oracle/code/cgame/cg_local.h:222-248`
 #[repr(C)]
 pub struct localEntity_t {
     pub prev: *mut localEntity_t,

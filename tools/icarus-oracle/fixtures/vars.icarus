@@ -1,0 +1,4 @@
+declare ( FLOAT, "health" )
+set ( "health", 42.000 )
+print ( "hello world" )
+wait ( 500.000 )

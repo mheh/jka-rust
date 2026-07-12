@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall( CG_PC_LOAD_SOURCE, filename );`
 /// Raven transport: `return botlib_export->PC_LoadSourceHandle( (const char *)VMA(1) );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:545-546`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1001-1002`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:545-546`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1001-1002`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgPcLoadSourceArgs {
     filename: *const c_char,
@@ -25,10 +25,10 @@ impl CgPcLoadSourceArgs {
 
 /// `CG_PC_LOAD_SOURCE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:200`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:545-546`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1001-1002`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1001-1002`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:200`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:545-546`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1001-1002`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1001-1002`
 pub struct CgPcLoadSource;
 
 impl OutboundSysCall for CgPcLoadSource {

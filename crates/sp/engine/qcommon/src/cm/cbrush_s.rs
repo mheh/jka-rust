@@ -6,7 +6,7 @@ use super::cbrushside_s::cbrushside_t;
 
 /// Raven `cbrush_t` — a collision-model brush (convex hull of `cbrushside_t` planes).
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:64-71`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:64-71`
 #[repr(C)]
 pub struct cbrush_s {
     pub shaderNum: i32, // the shader that determined the contents

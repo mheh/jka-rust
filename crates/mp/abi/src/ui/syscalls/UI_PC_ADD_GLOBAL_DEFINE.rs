@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_PC_ADD_GLOBAL_DEFINE, define );`
 /// Raven transport: `return botlib_export->PC_AddGlobalDefine( (char *)VMA(1) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:362-363`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1157-1158`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:362-363`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1157-1158`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiPcAddGlobalDefineArgs {
     define: *mut c_char,
@@ -32,11 +32,11 @@ impl UiPcAddGlobalDefineArgs {
 /// Raven wrapper: `int trap_PC_AddGlobalDefine( char *define ) { return syscall( UI_PC_ADD_GLOBAL_DEFINE, define ); }`
 /// Raven transport: `return botlib_export->PC_AddGlobalDefine( (char *)VMA(1) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:84`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:82-90`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:362-363`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1157-1158`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1157-1158`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:84`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:82-90`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:362-363`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1157-1158`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1157-1158`
 pub struct UiPcAddGlobalDefine;
 
 impl OutboundSysCall for UiPcAddGlobalDefine {

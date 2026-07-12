@@ -2,7 +2,7 @@
 
 /// Raven `touchFunc_t` — enumeration of entity touch/collision callback function IDs.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_functions.h:286-308`
+/// Type definition source: `oracle/code/game/g_functions.h:286-308`
 #[repr(i32)]
 pub enum touchFunc_t {
     touchF_NULL = 0,

@@ -34,12 +34,12 @@ use crate::engine::Engine;
 /// argument widened per the checkpoint-2 resolution. `ctx` is null pending the
 /// `ServerGame` reborrow wiring (its concrete shape is unpinned — finding).
 ///
-/// Source: `oracle/oracle/codemp/server/sv_game.cpp:1734-1753`
+/// Source: `oracle/codemp/server/sv_game.cpp:1734-1753`
 pub fn sv_init_game_progs(engine: &mut Engine, policy: &ModuleSearchPolicy) -> SlotId {
     // The raw C trampoline address (VM_DllSyscall dual) for dllEntry's hand-off.
-    let syscall: RawSyscall =
-        game_syscall_trampoline as unsafe extern "C-unwind" fn(isize, ...) -> isize as usize
-            as *const c_void;
+    let syscall: RawSyscall = game_syscall_trampoline
+        as unsafe extern "C-unwind" fn(isize, ...) -> isize as usize
+        as *const c_void;
     //TODO: Port SV_InitGameProgs ctx injection (&mut Engine.sv into the game slot)
     // Source: docs/architecture/engine-seam.md § Engine-side dispatchers
     let ctx: *mut c_void = core::ptr::null_mut();

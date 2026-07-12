@@ -6,6 +6,12 @@ canonical bit-exact dumps under `golden/`. The Rust ports
 (`crates/mp/game/src/q_math.rs`, `bg_lib.rs`, `bg_channel/rng.rs`) must reproduce
 the goldens byte-for-byte via `crates/mp/game/tests/jampgame_parity.rs`.
 
+The committed parity data lives **inside the `mp_game` crate** —
+`crates/mp/game/tests/oracle/{fixtures,golden}/` — so the crate (and its
+`cargo test`) is self-contained; this directory holds only the generator.
+`fixtures/` and `golden/` throughout this README refer to that data root
+(`$DATA` in the run scripts).
+
 Every float is dumped as its IEEE-754 **bit pattern** (`%08x` for `f32`,
 `%016llx` for `f64`) — no textual float rounding is ever involved on either side;
 the Rust test uses `f32::to_bits()` / `f64::to_bits()`.
@@ -176,7 +182,7 @@ these; the linker demands them):
 | --- | --- |
 | `trap_FS_GetFileList` / `FOpenFile` / `Read` / `FCloseFile` | backed by `fixtures/sabers/`; vpaths (`ext_data/sabers[/name]`) mapped by stripping `ext_data/` and prefixing the fixture dir. Listing is **sorted** (byte-lexicographic) since `readdir` is unordered — the Rust `TestTraps` sorts identically, so `SaberParms` is byte-identical on both sides. `FS_Write` is a no-op (never on the load path). |
 | `trap_R_RegisterSkin` | name-logging counter (per-saber, from 1). Skins genuinely cross the observable `BgTraps` seam, so both sides mint the same deterministic handle — the `customSkin` field carries it and the name is logged (`regskin`). |
-| `G_SoundIndex` (behind `BG_SoundIndex`) | name-logging observer that returns **0** — see normalization below. |
+| `G_SoundIndex` (behind `BG_SoundIndex`) | name-logging **configstring registry**: the engine semantics of the port's `G_FindConfigstringIndex` over `CS_SOUNDS` (`g_utils.c:66-95,138-141`) — persists across the whole run, dedups by exact name, mints 1,2,3… for distinct non-empty names, 0 for null/empty. The Rust parity test serves the same semantics through a configstring-servicing mock engine behind the `g_strap` seam. |
 | `FPTable` | the force-power name/id table, written with Raven's `ENUM2STRING` macro (oracle `bg_saga.c:100-121`); matches the port's `bg_saga::FPTable`. |
 | `animTable` | supplied by `animtable_def.c` (the real `cgame/animtable.h`). |
 | `Com_Printf` / `Com_Error` | routed to **stderr** so parser diagnostics never enter the golden (stdout). `Com_Error` additionally `exit(3)`s (mirrors the port's `panic!`); fixtures never trigger it (`numBlades` kept valid, buffer small). |
@@ -184,20 +190,21 @@ these; the linker demands them):
 
 ## Normalizations (documented divergences — porting-rules §19)
 
-- **Sound-index return values are 0 on both sides; only the registration
-  *names* are observable.** The port's `G_SoundIndex` is a documented
-  placeholder returning 0 (the configstring architecture is unwired), so every
-  `saberInfo_t` sound field (`soundOn`, `swingSound[]`, `hitSound[]`, …) is 0.
-  The oracle dumper's `G_SoundIndex` stub matches (returns 0). What *is*
-  pinned is the sequence of names `BG_SoundIndex` is called with (the `regsound`
-  log) — real parser behavior, identical on both sides. The port exposes this
-  order through a dormant thread-local observation seam (`saber_snd_tape_*` in
-  `bg_saberLoad.rs`); it only *observes* (return value unchanged), so production
-  behavior is byte-identical whether or not the tape is installed. Skins, by
-  contrast, cross the real `BgTraps` seam and so carry a genuine per-saber
-  counter (`skin` field + `regskin` log). This asymmetry — skins observable via
-  the wired seam, sounds only name-observable pending `G_SoundIndex` — is itself
-  the surfaced divergence.
+- **Sound indices are real configstring indices on both sides.** The port's
+  `G_SoundIndex` is the real configstring registration
+  (`G_FindConfigstringIndex` over `CS_SOUNDS`), reached ctx-free through the
+  `g_strap` seam; the Rust parity test arms that seam with a
+  configstring-servicing mock engine, and the dumper's `G_SoundIndex` stub
+  implements the same engine semantics (see the stub table above). Every
+  `saberInfo_t` sound field therefore carries a real deduplicated index
+  (defaults `1/2/3`, then `4,5,6…` as fixtures name new files), and the golden
+  pins both the indices and the sequence of names `BG_SoundIndex` is called
+  with (the `regsound` log, observed through the port's `saber_snd_tape_*`
+  seam — a pure observer; production behavior is byte-identical whether or not
+  the tape is installed). Skins cross the `BgTraps` seam instead and carry a
+  per-saber counter (`skin` field + `regskin` log). Not a §19 divergence
+  anymore — kept here as the contract note for the sound/skin registration
+  asymmetry.
 - **The unclosed `broken_saber` block poisons not-found searches.** In the
   concatenated `SaberParms` buffer the truncated block has no closing `}`, so
   any full traversal (`SkipBracedSection`) runs `p` to `NULL` and the search

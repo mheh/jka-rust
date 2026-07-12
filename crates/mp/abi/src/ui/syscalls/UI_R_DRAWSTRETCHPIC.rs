@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `UI_R_DRAWSTRETCHPIC`.
@@ -9,9 +11,9 @@ use abi_transport::pass_float;
 /// Raven wrapper packs each float with `PASSFLOAT`.
 /// Raven transport reads each float with `VMF`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:194-195`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:945`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:984-986`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:194-195`
+/// Args source: `oracle/codemp/ui/ui_local.h:945`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:984-986`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UiRDrawstretchpicArgs {
     x: f32,
@@ -53,10 +55,10 @@ impl UiRDrawstretchpicArgs {
 
 /// `UI_R_DRAWSTRETCHPIC` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:46`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:194-195`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:984-986`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:984-986`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:46`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:194-195`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:984-986`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:984-986`
 pub struct UiRDrawstretchpic;
 
 impl OutboundSysCall for UiRDrawstretchpic {

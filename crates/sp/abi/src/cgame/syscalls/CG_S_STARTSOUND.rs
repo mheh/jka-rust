@@ -11,9 +11,9 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall(CG_S_STARTSOUND, origin, entityNum, entchannel, sfx);`
 /// Raven transport: `S_StartSound((float *)VMA(1), args[2], (soundChannel_t)args[3], args[4]);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:185-186`
-/// Args source: `oracle/oracle/code/game/q_shared.h:186`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:553-561`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:185-186`
+/// Args source: `oracle/code/game/q_shared.h:186`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:553-561`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSStartsoundArgs {
     origin: *const vec3_t,
@@ -56,11 +56,11 @@ impl CgSStartsoundArgs {
 
 /// `CG_S_STARTSOUND` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:91`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:185-186`
-/// Args source: `oracle/oracle/code/game/q_shared.h:186`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:553-561`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:553-561`
+/// Enum value source: `oracle/code/cgame/cg_public.h:91`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:185-186`
+/// Args source: `oracle/code/game/q_shared.h:186`
+/// Output source: `oracle/code/client/cl_cgame.cpp:553-561`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:553-561`
 pub struct CgSStartsound;
 
 impl OutboundSysCall for CgSStartsound {

@@ -1,18 +1,20 @@
 use core::ffi::{c_int, c_void};
 
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::cgame::types::memtag_t;
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_Z_MALLOC`.
 ///
 /// Raven wrapper: `return (void *)syscall(CG_Z_MALLOC,size,tag);`
 /// Raven transport: `return (int)Z_Malloc(args[1], (memtag_t) args[2], qfalse);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:548-550`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:834-835`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:834-835`
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2688`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:548-550`
+/// Output source: `oracle/code/client/cl_cgame.cpp:834-835`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:834-835`
+/// Type definition source: `oracle/code/game/q_shared.h:2688`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgZMallocArgs {
     size: c_int,
@@ -35,11 +37,11 @@ impl CgZMallocArgs {
 
 /// `CG_Z_MALLOC` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:190`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:548-550`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:834-835`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:834-835`
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2688`
+/// Enum value source: `oracle/code/cgame/cg_public.h:190`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:548-550`
+/// Output source: `oracle/code/client/cl_cgame.cpp:834-835`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:834-835`
+/// Type definition source: `oracle/code/game/q_shared.h:2688`
 pub struct CgZMalloc;
 
 impl OutboundSysCall for CgZMalloc {

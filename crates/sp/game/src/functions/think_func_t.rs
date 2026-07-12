@@ -2,7 +2,7 @@
 
 /// Raven `thinkFunc_t` — enumeration of entity think/update callback function IDs.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_functions.h:17-123`
+/// Type definition source: `oracle/code/game/g_functions.h:17-123`
 #[repr(i32)]
 pub enum thinkFunc_t {
     thinkF_NULL = 0,

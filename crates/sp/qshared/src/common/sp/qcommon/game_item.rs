@@ -1,6 +1,6 @@
 //! SP `gitem_t` copied from Raven `code/game/bg_public.h`.
 //!
-//! Source: `oracle/oracle/code/game/bg_public.h:622-658`
+//! Source: `oracle/code/game/bg_public.h:622-658`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -10,12 +10,12 @@ use crate::shared::vec3_t;
 
 /// Raven SP `itemType_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/bg_public.h:622-634`
+/// Type definition source: `oracle/code/game/bg_public.h:622-634`
 pub type itemType_t = c_int;
 
 /// Raven SP `gitem_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/bg_public.h:638-658`
+/// Type definition source: `oracle/code/game/bg_public.h:638-658`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct gitem_t {

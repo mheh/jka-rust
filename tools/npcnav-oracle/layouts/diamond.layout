@@ -1,0 +1,16 @@
+# diamond — 4 nodes, two equal-cost paths from 0 to 3 (0-1-3 and 0-2-3, each
+# 200). The equal cumulative costs collide in CalculatePath's priority queue,
+# so this fixture is the minimal witness for the libstdc++ push_heap/pop_heap
+# equal-cost tie order (NAV-D2 / RULING 45) baked into every node's rank table.
+# Axis-aligned edges -> every edge cost is exactly 100 (no sqrt rounding).
+checksum 222
+
+node    0   0 0   0   16
+node  100   0 0   2   24     # flags = NF_CLEAR_PATH (0x2), just to vary the field
+node    0 100 0   0   24
+node  100 100 0   0   16
+
+connect 0 1
+connect 0 2
+connect 1 3
+connect 2 3

@@ -8,10 +8,10 @@ use abi_transport::generic::{
 
 /// `GAME_GETITEMINDEXBYTAG` MP game exports vmMain ABI token.
 ///
-/// Source (enum): `oracle/oracle/codemp/game/g_public.h:798`
-/// Source (args): `oracle/oracle/codemp/game/g_main.c:691`
-/// Source (output): `oracle/oracle/codemp/game/g_main.c:691`
-/// Source (call site): no VM_Call site currently found for `GAME_GETITEMINDEXBYTAG` in tracked sources; dispatch is defined in `oracle/oracle/codemp/game/g_main.c:691`
+/// Source (enum): `oracle/codemp/game/g_public.h:798`
+/// Source (args): `oracle/codemp/game/g_main.c:691`
+/// Source (output): `oracle/codemp/game/g_main.c:691`
+/// Source (call site): no VM_Call site currently found for `GAME_GETITEMINDEXBYTAG` in tracked sources; dispatch is defined in `oracle/codemp/game/g_main.c:691`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GameGetitemindexbytagArgs {
     tag: c_int,

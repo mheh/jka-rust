@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_DEBUG_POLYGON_DELETE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,7 +23,7 @@ impl GDebugPolygonDeleteArgs {
 
 /// `G_DEBUG_POLYGON_DELETE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:231`
+/// Source: `oracle/codemp/game/g_public.h:231`
 pub struct GDebugPolygonDelete;
 
 impl OutboundSysCall for GDebugPolygonDelete {

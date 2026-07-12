@@ -18,9 +18,9 @@ use mp_qshared::shared::vec3_t;
 /// the two integer operands, then calls `CM_TransformedBoxTrace(..., qtrue)`.
 /// The trace is written through `results`; the syscall return word is always 0.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:171-174`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:171-174`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:802-804`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:171-174`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:171-174`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:802-804`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmTransformedcapsuletraceArgs {
     /// Output trace buffer, decoded by Raven as `(trace_t *)VMA(1)`.
@@ -112,11 +112,11 @@ impl CgCmTransformedcapsuletraceArgs {
 /// Raven transport: `CM_TransformedBoxTrace(..., /*int capsule*/ qtrue);
 /// return 0;`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:93`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:171-174`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:171-174`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:802-804`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:802-804`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:93`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:171-174`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:171-174`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:802-804`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:802-804`
 pub struct CgCmTransformedcapsuletrace;
 
 impl OutboundSysCall for CgCmTransformedcapsuletrace {

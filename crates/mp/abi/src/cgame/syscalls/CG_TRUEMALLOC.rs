@@ -11,9 +11,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall(CG_TRUEMALLOC, ptr, size);`
 /// Raven transport: `VM_Shifted_Alloc((void **)VMA(1), args[2]); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:756-759`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2436-2437`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1284-1287`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:756-759`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2436-2437`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1284-1287`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgTruemallocArgs {
     ptr: *mut *mut c_void,
@@ -29,10 +29,10 @@ impl CgTruemallocArgs {
 /// `CG_TRUEMALLOC` MP cgame imports syscall ABI token.
 ///
 /// Raven: rww - dynamic vm memory allocation!
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:249-250`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:756-759`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1284-1287`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1284-1287`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:249-250`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:756-759`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1284-1287`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1284-1287`
 pub struct CgTruemalloc;
 
 impl OutboundSysCall for CgTruemalloc {

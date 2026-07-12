@@ -6,7 +6,7 @@ use super::qfile_gus::qfile_gut;
 /// Raven `qfile_ut` — a file handle paired with its "unique" (not part of a
 /// pak) flag.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/files.h:78-81`
+/// Type definition source: `oracle/codemp/qcommon/files.h:78-81`
 #[repr(C)]
 pub struct qfile_ut {
     pub file: qfile_gut,

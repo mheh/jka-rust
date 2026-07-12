@@ -4,7 +4,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `glstate_t` — cached OpenGL bind/state to avoid redundant GL calls.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:1253-1260`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:1253-1260`
 #[repr(C)]
 pub struct glstate_t {
     pub currenttextures: [i32; 2],

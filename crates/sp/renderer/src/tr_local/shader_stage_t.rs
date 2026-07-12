@@ -10,43 +10,43 @@ use super::wave_form_t::waveForm_t;
 
 /// Number of texture bundles per shader stage.
 ///
-/// Source: `oracle/oracle/code/renderer/tr_local.h:378` (`NUM_TEXTURE_BUNDLES`)
+/// Source: `oracle/code/renderer/tr_local.h:378` (`NUM_TEXTURE_BUNDLES`)
 pub const NUM_TEXTURE_BUNDLES: usize = 2;
 
 /// Raven `shaderStage_t`.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:380-413`
+/// Type definition source: `oracle/code/renderer/tr_local.h:380-413`
 #[repr(C)]
 pub struct shaderStage_t {
-	pub active: bool,
-	pub isDetail: bool,
+    pub active: bool,
+    pub isDetail: bool,
 
-	/// index of stage
-	pub index: u8,
-	pub lightmapStyle: u8,
+    /// index of stage
+    pub index: u8,
+    pub lightmapStyle: u8,
 
-	pub bundle: [textureBundle_t; NUM_TEXTURE_BUNDLES],
+    pub bundle: [textureBundle_t; NUM_TEXTURE_BUNDLES],
 
-	pub rgbWave: waveForm_t,
-	pub rgbGen: colorGen_t,
+    pub rgbWave: waveForm_t,
+    pub rgbGen: colorGen_t,
 
-	pub alphaWave: waveForm_t,
-	pub alphaGen: alphaGen_t,
+    pub alphaWave: waveForm_t,
+    pub alphaGen: alphaGen_t,
 
-	/// for CGEN_CONST and AGEN_CONST
-	pub constantColor: [u8; 4],
+    /// for CGEN_CONST and AGEN_CONST
+    pub constantColor: [u8; 4],
 
-	/// GLS_xxxx mask
-	pub stateBits: u32,
+    /// GLS_xxxx mask
+    pub stateBits: u32,
 
-	pub adjustColorsForFog: acff_t,
+    pub adjustColorsForFog: acff_t,
 
-	pub mGLFogColorOverride: EGLFogOverride,
+    pub mGLFogColorOverride: EGLFogOverride,
 
-	pub ss: *mut surfaceSprite_t,
+    pub ss: *mut surfaceSprite_t,
 
-	/// Whether this object emits a glow or not.
-	pub glow: bool,
+    /// Whether this object emits a glow or not.
+    pub glow: bool,
 }
 
 const _: () = assert!(core::mem::size_of::<shaderStage_t>() == 184);

@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall( CG_AS_GETBMODELSOUND, name, stage );`
 /// Raven transport: `return AS_GetBModelSound((const char *) VMA(1), args[2]);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:205-206`
-/// Args source: `oracle/oracle/code/game/q_shared.h:186`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:578-579`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:205-206`
+/// Args source: `oracle/code/game/q_shared.h:186`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:578-579`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgAsGetbmodelsoundArgs {
     name: *const c_char,
@@ -27,11 +27,11 @@ impl CgAsGetbmodelsoundArgs {
 
 /// `CG_AS_GETBMODELSOUND` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:166`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:205-206`
-/// Args source: `oracle/oracle/code/game/q_shared.h:186`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:578-579`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:578-579`
+/// Enum value source: `oracle/code/cgame/cg_public.h:166`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:205-206`
+/// Args source: `oracle/code/game/q_shared.h:186`
+/// Output source: `oracle/code/client/cl_cgame.cpp:578-579`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:578-579`
 pub struct CgAsGetbmodelsound;
 
 impl OutboundSysCall for CgAsGetbmodelsound {

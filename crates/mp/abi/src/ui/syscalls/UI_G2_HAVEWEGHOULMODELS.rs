@@ -29,7 +29,7 @@ impl UiG2HaveweghoulmodelsArgs {
 
 /// `UI_G2_HAVEWEGHOULMODELS` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:509`
+/// Source: `oracle/codemp/ui/ui_public.h:509`
 pub struct UiG2Haveweghoulmodels;
 
 impl OutboundSysCall for UiG2Haveweghoulmodels {

@@ -4,5 +4,5 @@ use ::core::ffi::c_uint;
 
 /// Raven `glIndex_t` — OpenGL index type.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:22`
+/// Type definition source: `oracle/code/renderer/tr_local.h:22`
 pub type glIndex_t = c_uint;

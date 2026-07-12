@@ -5,23 +5,23 @@ use sp_qshared::shared::{qboolean, qhandle_t};
 
 /// Raven `uiStatic_t` — per-frame UI module state.
 ///
-/// Type definition source: `oracle/oracle/code/ui/ui_local.h:66-81`
+/// Type definition source: `oracle/code/ui/ui_local.h:66-81`
 #[repr(C)]
 pub struct uiStatic_t {
-	pub frametime: i32,
-	pub realtime: i32,
-	pub cursorx: i32,
-	pub cursory: i32,
+    pub frametime: i32,
+    pub realtime: i32,
+    pub cursorx: i32,
+    pub cursory: i32,
 
-	pub glconfig: glconfig_t,
-	pub debugMode: qboolean,
-	pub whiteShader: qhandle_t,
-	pub menuBackShader: qhandle_t,
-	pub cursor: qhandle_t,
-	pub scalex: f32,
-	pub scaley: f32,
-	//float				bias;
-	pub firstdraw: qboolean,
+    pub glconfig: glconfig_t,
+    pub debugMode: qboolean,
+    pub whiteShader: qhandle_t,
+    pub menuBackShader: qhandle_t,
+    pub cursor: qhandle_t,
+    pub scalex: f32,
+    pub scaley: f32,
+    //float				bias;
+    pub firstdraw: qboolean,
 }
 
 const _: () = assert!(core::mem::size_of::<uiStatic_t>() == 144);

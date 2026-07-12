@@ -6,22 +6,22 @@ use super::menucommon_s::menucommon_s;
 
 /// Raven `menulist_s`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:204-219`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:204-219`
 #[repr(C)]
 pub struct menulist_s {
-	pub generic: menucommon_s,
+    pub generic: menucommon_s,
 
-	pub oldvalue: i32,
-	pub curvalue: i32,
-	pub numitems: i32,
-	pub top: i32,
+    pub oldvalue: i32,
+    pub curvalue: i32,
+    pub numitems: i32,
+    pub top: i32,
 
-	pub itemnames: *mut *const c_char,
+    pub itemnames: *mut *const c_char,
 
-	pub width: i32,
-	pub height: i32,
-	pub columns: i32,
-	pub seperation: i32,
+    pub width: i32,
+    pub height: i32,
+    pub columns: i32,
+    pub seperation: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<menulist_s>() == 128);

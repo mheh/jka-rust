@@ -35,7 +35,7 @@ impl BotlibAiGetMapLocationGoalArgs {
 
 /// `BOTLIB_AI_GET_MAP_LOCATION_GOAL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:486`
+/// Source: `oracle/codemp/game/g_public.h:486`
 pub struct BotlibAiGetMapLocationGoal;
 
 impl OutboundSysCall for BotlibAiGetMapLocationGoal {

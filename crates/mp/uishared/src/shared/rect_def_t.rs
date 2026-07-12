@@ -4,7 +4,7 @@ use core::ffi::c_float;
 
 /// Raven `rectDef_t` — a screen-space rectangle (position + size).
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:112-117`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:112-117`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct rectDef_t {

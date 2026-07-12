@@ -1,7 +1,7 @@
 # jampgame pre-port fork discovery (2026-07-03) — ALL RULINGS SETTLED
 
 Read-only investigation of the three broadest call trees in
-`oracle/oracle/codemp/game/` (G_RunFrame 887 in-module fns; ClientThink_real
+`oracle/codemp/game/` (G_RunFrame 887 in-module fns; ClientThink_real
 722; ClientSpawn chain 721; combined distinct reach 986 of ~2,000-2,500 —
 ~40-50% of the module and effectively all gameplay-visible code). Seam stops
 clean at ≤77 distinct trap_* — no surprise seam surface. Heavy bg_ crossing:
@@ -66,7 +66,8 @@ gSharedBuffer typed structs (SEAM-D4's known high-arity escape).
 ## Post-mega-pass rulings (2026-07-03, pass-1 escalation triage — accepted-for-now, user)
 
 Pass 1 (wf_55d03832-2c3): 88 files, 717 fns ported, 1,875 parked, 619
-escalations (clustered in `docs/handoffs/jampgame-escalations.json`). ~95% of
+escalations (clustered in `docs/handoffs/jampgame-escalations.json`, removed
+2026-07-08; see git history). ~95% of
 parks trace to the generated signatures not carrying already-settled rulings.
 
 8. **Context threading in generated signatures** (~450 escalations:
@@ -227,6 +228,20 @@ mirror wherever it registers/refreshes the cvar (`g_main.rs:198,268`); bg reads
 `bg.bg_fighterAltControl` (`bg_pmove.rs:7855`). This is the standard pattern for
 any future bg-visible cvar: game-tier `vmCvar_t` + a `BgState` mirror updated at
 register/update time.
+
+## Referee-era rulings (post-integration)
+
+**holdrand width = `c_ulong` (platform-faithful).** RULING (user, 2026-07-09):
+`Rng::holdrand` is `core::ffi::c_ulong`, matching Raven's
+`static unsigned long holdrand` (`oracle/codemp/game/q_math.c:1432`) at
+whatever width the target compiles it — 32-bit on the retail i686 ship
+(retail parity kept), 64-bit on LP64 referee/native builds (referee parity
+gained). Reverses the 2026-07 u32 normalization (rng.rs assert + the
+jampgame-oracle `unsigned int` rewrite): the referee A/B oracle proved the
+64-bit stream is ground truth on LP64 — t2_wedge `Q_irand` NPC-type picks
+diverged under the u32 model even though the low 32 bits of the stream
+agreed. `tools/jampgame-oracle/run.sh` now extracts the LCG at native width;
+the qmath golden's rng section is host-width by construction.
 
 ## Already covered — no decision (bless-the-rule appendix)
 

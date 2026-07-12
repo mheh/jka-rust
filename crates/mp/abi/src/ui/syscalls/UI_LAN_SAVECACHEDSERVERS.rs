@@ -1,15 +1,17 @@
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `UI_LAN_SAVECACHEDSERVERS` MP UI imports syscall ABI token.
 ///
 /// Raven wrapper: `syscall( UI_LAN_SAVECACHEDSERVERS );`
 /// Raven transport: `LAN_SaveServersToCache();`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:102`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:294-295`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:973`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1059-1061`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:102`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:294-295`
+/// Output source: `oracle/codemp/ui/ui_local.h:973`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1059-1061`
 pub struct UiLanSavecachedservers;
 
 impl OutboundSysCall for UiLanSavecachedservers {

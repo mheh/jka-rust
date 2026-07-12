@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build the jampgame q_shared oracle dumper from the UNMODIFIED Raven
 # codemp/game/q_shared.c and check (or, with --regen, regenerate) the golden
-# dump golden/qshared.txt.
+# dump crates/mp/game/tests/oracle/golden/qshared.txt.
 #
 # Self-contained: uses its OWN build dir (build-qshared/) and does not touch
 # run.sh or build/. The oracle q_shared.c + the full game/qcommon header
@@ -16,7 +16,11 @@
 set -eu
 cd "$(dirname "$0")"
 
-ORACLE=../../oracle/oracle
+# Committed parity data (fixtures + goldens) lives inside the mp_game crate so
+# the crate is self-contained; this harness only generates/checks it.
+DATA=../../crates/mp/game/tests/oracle
+
+ORACLE=../../oracle
 G=$ORACLE/codemp/game
 Q=$ORACLE/codemp/qcommon
 
@@ -41,13 +45,13 @@ CFLAGS="-w -std=gnu11 -D__linux__ -D_FORTIFY_SOURCE=0 -ffp-contract=off \
 # shellcheck disable=SC2086
 cc $CFLAGS -o build-qshared/qshared_dump main_qshared.c build-qshared/codemp/game/q_shared.c
 
-mkdir -p golden
+mkdir -p "$DATA/golden"
 status=0
 if [ "${1:-}" = "--regen" ]; then
-	build-qshared/qshared_dump fixtures > golden/qshared.txt
+	build-qshared/qshared_dump "$DATA/fixtures" > "$DATA/golden/qshared.txt"
 	echo "regenerated qshared"
 else
-	build-qshared/qshared_dump fixtures | diff -u golden/qshared.txt - || status=1
+	build-qshared/qshared_dump "$DATA/fixtures" | diff -u "$DATA/golden/qshared.txt" - || status=1
 fi
 
 [ "$status" -eq 0 ] && echo "jampgame-oracle qshared: OK"

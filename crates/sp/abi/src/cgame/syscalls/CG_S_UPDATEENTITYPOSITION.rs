@@ -11,8 +11,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_S_UPDATEENTITYPOSITION, entityNum, origin );`
 /// Raven transport: `S_UpdateEntityPosition( args[1], (const float *)VMA(2) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:222-223`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:599-601`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:222-223`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:599-601`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSUpdateentitypositionArgs {
     entity_num: c_int,
@@ -35,10 +35,10 @@ impl CgSUpdateentitypositionArgs {
 
 /// `CG_S_UPDATEENTITYPOSITION` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:96`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:222-223`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:599-601`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:599-601`
+/// Enum value source: `oracle/code/cgame/cg_public.h:96`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:222-223`
+/// Output source: `oracle/code/client/cl_cgame.cpp:599-601`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:599-601`
 pub struct CgSUpdateentityposition;
 
 impl OutboundSysCall for CgSUpdateentityposition {

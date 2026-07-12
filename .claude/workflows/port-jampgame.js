@@ -18,7 +18,7 @@ const MANIFEST = (args && args.manifestPath) || `${MAIN}/tools/closure-prototype
 const MAX_FILES = (args && args.maxFiles) || 999
 const FIXER_ROUNDS = (args && args.fixerRounds) || 4
 
-const STYLE = `HOUSE RULES: doc-comment + Source cite on every item (oracle/oracle/codemp/game/<file>:<lines>); preserve Raven comments that clarify behavior; state conclusions not derivations; //TODO: Port <subject> + // Source: for anything unported; behavioral parity per porting-rules SA — no speculative behavior, port faithfully even if ugly; UB sites get the one defined behavior + <=2-line note per S19. NEVER touch oracle/. NEVER add a co-author trailer.`
+const STYLE = `HOUSE RULES: doc-comment + Source cite on every item (oracle/codemp/game/<file>:<lines>); preserve Raven comments that clarify behavior; state conclusions not derivations; //TODO: Port <subject> + // Source: for anything unported; behavioral parity per porting-rules SA — no speculative behavior, port faithfully even if ugly; UB sites get the one defined behavior + <=2-line note per S19. NEVER touch oracle/. NEVER add a co-author trailer.`
 
 const PARK = `PARK PROTOCOL: if something genuinely cannot be decided from the frozen docs + rulings + porting rules, DO NOT BLOCK and DO NOT INVENT: leave that function's body todo!("Port <Fn> — parked: <topic>"), add // PORT-ESCALATION(<topic>): <one-line question> above it, count it, and continue with the rest of the file. Escalations are expected and cheap; wrong inventions are expensive.`
 

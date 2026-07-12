@@ -1,14 +1,16 @@
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `UI_UPDATESCREEN`.
 ///
 /// Raven wrapper: `syscall( UI_UPDATESCREEN );`
 /// Raven transport: `SCR_UpdateScreen(); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:202-203`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:947`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:992-994`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:202-203`
+/// Args source: `oracle/codemp/ui/ui_local.h:947`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:992-994`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct UiUpdatescreenArgs;
 
@@ -20,11 +22,11 @@ impl UiUpdatescreenArgs {
 
 /// `UI_UPDATESCREEN` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:47`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:202-203`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:202-203`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:992-994`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:992-994`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:47`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:202-203`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:202-203`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:992-994`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:992-994`
 pub struct UiUpdatescreen;
 
 impl OutboundSysCall for UiUpdatescreen {

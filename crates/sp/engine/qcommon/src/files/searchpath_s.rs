@@ -6,7 +6,7 @@ use super::pack_t::pack_t;
 /// Raven `searchpath_t` — one entry in the search-path chain (a pak or a loose directory).
 ///
 /// Raven: only one of pack / dir will be non NULL.
-/// Type definition source: `oracle/oracle/code/qcommon/files.h:50-55`
+/// Type definition source: `oracle/code/qcommon/files.h:50-55`
 #[repr(C)]
 pub struct searchpath_t {
     pub next: *mut searchpath_t,

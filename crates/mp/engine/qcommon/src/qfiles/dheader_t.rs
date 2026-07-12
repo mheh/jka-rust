@@ -4,18 +4,18 @@ use super::lump_t::lump_t;
 
 /// Number of lumps in a `dheader_t`.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:432`
+/// Source: `oracle/codemp/qcommon/../qcommon/qfiles.h:432`
 pub const HEADER_LUMPS: usize = 18;
 
 /// Raven `dheader_t` — BSP file header.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:434-439`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:434-439`
 #[repr(C)]
 pub struct dheader_t {
-	pub ident: i32,
-	pub version: i32,
+    pub ident: i32,
+    pub version: i32,
 
-	pub lumps: [lump_t; HEADER_LUMPS],
+    pub lumps: [lump_t; HEADER_LUMPS],
 }
 
 const _: () = assert!(core::mem::size_of::<dheader_t>() == 152);

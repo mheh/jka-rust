@@ -13,8 +13,8 @@ use sp_qshared::shared::qhandle_t;
 /// Raven wrapper: `qhandle_t hShader = syscall( CG_R_REGISTERSHADER, name );`
 /// Raven transport: `return re.RegisterShader( (const char *) VMA(1) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:311-314`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:659-660`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:311-314`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:659-660`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRRegistershaderArgs {
     name: *const c_char,
@@ -28,10 +28,10 @@ impl CgRRegistershaderArgs {
 
 /// `CG_R_REGISTERSHADER` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:120`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:311-314`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:659-660`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:659-660`
+/// Enum value source: `oracle/code/cgame/cg_public.h:120`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:311-314`
+/// Output source: `oracle/code/client/cl_cgame.cpp:659-660`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:659-660`
 /// Raven comment: `assert (hShader);`
 pub struct CgRRegistershader;
 

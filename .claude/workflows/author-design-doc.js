@@ -22,7 +22,7 @@ const STANDING = A.standingDocs || [
 const LEDGER = A.decisionsPath || 'docs/decisions.md'
 
 const COMMON = `GROUND RULES:
-- NEVER touch oracle/oracle/ or any source under crates/. Never commit.
+- NEVER touch oracle/ or any source under crates/. Never commit.
 - The doc template, style rules, and gates are docs/doc-standards.md — follow it
   exactly (fixed H2 skeleton, cite-or-omit, greppable IDs, no duplication of
   standing docs).

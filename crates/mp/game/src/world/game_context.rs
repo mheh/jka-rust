@@ -33,7 +33,9 @@ pub struct GameContext<'e> {
 use core::ffi::{c_char, c_int};
 
 use mp_qshared::common::mp::gentity::gentity_t;
-use mp_qshared::shared::{qboolean, vec3_t, QFALSE, QTRUE};
+use mp_qshared::shared::{qboolean, vec3_t};
+
+use crate::prelude::*;
 
 use mp_abi::game::vmcalls::BOTAI_START_FRAME::{BotAiStartFrame, BotAiStartFrameArgs};
 use mp_abi::game::vmcalls::GAME_CLIENT_BEGIN::{GameClientBegin, GameClientBeginArgs};
@@ -121,12 +123,12 @@ use mp_qshared::common::mp::qcommon::t_g_icarus_soundindex::T_G_ICARUS_SOUNDINDE
 use mp_qshared::common::mp::qcommon::t_g_icarus_use::T_G_ICARUS_USE;
 use mp_qshared::shared::string_id_table::stringID_table_t;
 
-use crate::g_icarus_set_type::setTable;
-use crate::g_utils::G_SoundIndex;
 use crate::g_ICARUScb::{
     Q3_GetFloat, Q3_GetString, Q3_GetTag, Q3_GetVector, Q3_Kill, Q3_Lerp2Angles, Q3_Lerp2End,
     Q3_Lerp2Origin, Q3_Lerp2Pos, Q3_Lerp2Start, Q3_Play, Q3_PlaySound, Q3_Remove, Q3_Set, Q3_Use,
 };
+use crate::g_icarus_set_type::setTable;
+use crate::g_utils::G_SoundIndex;
 use crate::q_shared::GetIDForString;
 
 /// `GAME_INIT` → `G_InitGame( arg0, arg1, arg2 )` (`g_main.c:517-519`).
@@ -177,7 +179,7 @@ impl Dispatch<GameClientDisconnect> for GameContext<'_> {
 /// `GAME_CLIENT_BEGIN` → `ClientBegin( arg0, qtrue )` (`g_main.c:534-536`).
 impl Dispatch<GameClientBegin> for GameContext<'_> {
     fn dispatch(&self, args: GameClientBeginArgs) {
-        crate::g_client::ClientBegin(*self, args.client_num(), QTRUE)
+        crate::g_client::ClientBegin(*self, args.client_num(), qtrue)
     }
 }
 
@@ -226,8 +228,8 @@ impl Dispatch<GameRoffNotetrackCallback> for GameContext<'_> {
 /// (`g_main.c:550-555`).
 impl Dispatch<GameSpawnRmgEntity> for GameContext<'_> {
     fn dispatch(&self, _args: ()) {
-        if crate::g_spawn::G_ParseSpawnVars(*self, QFALSE) != QFALSE {
-            crate::g_spawn::G_SpawnGEntityFromSpawnVars(*self, QFALSE);
+        if crate::g_spawn::G_ParseSpawnVars(*self, qfalse) != qfalse {
+            crate::g_spawn::G_SpawnGEntityFromSpawnVars(*self, qfalse);
         }
     }
 }
@@ -359,7 +361,7 @@ impl Dispatch<GameGetitemindexbytag> for GameContext<'_> {
 // reads/writes fields in place; the module and engine address the SAME bytes, so
 // out-params (e.g. `GETFLOAT.value`) land back in the engine's view. Each arm
 // reproduces that cast: `&mut gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_X`.
-// Source: `oracle/oracle/codemp/game/g_main.c:557-670`.
+// Source: `oracle/codemp/game/g_main.c:557-670`.
 
 /// libc `strcpy` mirror for the `GAME_ICARUS_GETSTRING` write-back
 /// (`g_main.c:654`, `strcpy(sharedMem->value, crap)`); copies through the NUL.
@@ -400,8 +402,9 @@ impl Dispatch<GameIcarusPlaysound> for GameContext<'_> {
 impl Dispatch<GameIcarusSet> for GameContext<'_> {
     fn dispatch(&self, _args: ()) -> qboolean {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
-        let m =
-            unsafe { &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_SET) };
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_SET)
+        };
         Q3_Set(
             *self,
             m.taskID,
@@ -423,7 +426,7 @@ impl Dispatch<GameIcarusLerp2Pos> for GameContext<'_> {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2POS)
         };
         let (task_id, ent_id, duration) = (m.taskID, m.entID, m.duration);
-        if m.nullAngles != QFALSE {
+        if m.nullAngles != qfalse {
             Q3_Lerp2Pos(*self, task_id, ent_id, &mut m.origin, None, duration);
         } else {
             Q3_Lerp2Pos(
@@ -507,8 +510,9 @@ impl Dispatch<GameIcarusLerp2End> for GameContext<'_> {
 impl Dispatch<GameIcarusUse> for GameContext<'_> {
     fn dispatch(&self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
-        let m =
-            unsafe { &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_USE) };
+        let m = unsafe {
+            &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_USE)
+        };
         Q3_Use(*self, m.entID, m.target.as_ptr() as *const c_char);
     }
 }

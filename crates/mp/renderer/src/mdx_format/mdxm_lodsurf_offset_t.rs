@@ -3,7 +3,7 @@
 /// Raven `mdxmLODSurfOffset_t` — added in GLM version 3 for ingame use at Jake's request.
 ///
 /// Raven: variable sized (mdxmHeader_t->numSurfaces), each offset points to surfaces below.
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:210-212`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:210-212`
 #[repr(C)]
 pub struct mdxmLODSurfOffset_t {
     pub offsets: [i32; 1],

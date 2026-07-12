@@ -33,7 +33,7 @@ impl GAdjustAreaPortalStateArgs {
 /// `G_ADJUST_AREA_PORTAL_STATE` MP game imports syscall ABI token.
 ///
 /// Raven: ( gentity_t *ent, qboolean open );
-/// Source: `oracle/oracle/codemp/game/g_public.h:195`
+/// Source: `oracle/codemp/game/g_public.h:195`
 pub struct GAdjustAreaPortalState;
 
 impl OutboundSysCall for GAdjustAreaPortalState {

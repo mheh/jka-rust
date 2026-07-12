@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall(CG_G2_SETBOLTON, ghoul2, modelIndex, boltInfo);`
 /// Raven transport: `G2API_SetBoltInfo(*((CGhoul2Info_v *)args[1]), args[2], args[3]);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:950-952`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1486-1488`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:950-952`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1486-1488`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SetboltonArgs {
     ghoul2: *mut c_void,
@@ -33,10 +33,10 @@ impl CgG2SetboltonArgs {
 ///
 /// Raven transport: `ghoul2` is passed as a raw `args[1]` pointer word, not VMA.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:285`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:950-952`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1486-1488`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1486-1488`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:285`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:950-952`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1486-1488`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1486-1488`
 pub struct CgG2Setbolton;
 
 impl OutboundSysCall for CgG2Setbolton {

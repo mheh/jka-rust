@@ -10,3 +10,9 @@ name = "native_platform"
 # LOAD-D12d: used only by module_loader/loader.rs's sys_load_dll (LOAD-D1 loader
 # mechanism, confined to this crate per LOAD-D4).
 libloading = "0.8"
+# Raven-free scalar/handle primitives (`qboolean`, `fileHandle_t`, `MAX_QPATH`)
+# the native `Sys_*` platform surface is written in terms of.
+native_types = { path = "../types" }
+# The deliberately-native OS surface (`Sys_ListFiles`/`Sys_Mkdir`/default paths/
+# `Sys_UnloadDll`) is a direct libc transcription of Raven's unix tree.
+libc = "0.2"

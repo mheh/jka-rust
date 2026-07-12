@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_FREE_GOAL_STATE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -22,7 +24,7 @@ impl BotlibAiFreeGoalStateArgs {
 
 /// `BOTLIB_AI_FREE_GOAL_STATE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:462`
+/// Source: `oracle/codemp/game/g_public.h:462`
 pub struct BotlibAiFreeGoalState;
 
 impl OutboundSysCall for BotlibAiFreeGoalState {

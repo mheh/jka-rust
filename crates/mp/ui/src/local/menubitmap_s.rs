@@ -8,17 +8,17 @@ use super::menucommon_s::menucommon_s;
 
 /// Raven `menubitmap_s`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:232-242`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:232-242`
 #[repr(C)]
 pub struct menubitmap_s {
-	pub generic: menucommon_s,
-	pub focuspic: *mut c_char,
-	pub errorpic: *mut c_char,
-	pub shader: qhandle_t,
-	pub focusshader: qhandle_t,
-	pub width: i32,
-	pub height: i32,
-	pub focuscolor: *mut f32,
+    pub generic: menucommon_s,
+    pub focuspic: *mut c_char,
+    pub errorpic: *mut c_char,
+    pub shader: qhandle_t,
+    pub focusshader: qhandle_t,
+    pub width: i32,
+    pub height: i32,
+    pub focuscolor: *mut f32,
 }
 
 const _: () = assert!(core::mem::size_of::<menubitmap_s>() == 128);

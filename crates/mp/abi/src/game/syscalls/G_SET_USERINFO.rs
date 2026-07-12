@@ -33,7 +33,7 @@ impl GSetUserinfoArgs {
 /// `G_SET_USERINFO` MP game imports syscall ABI token.
 ///
 /// Raven: ( int num, const char *buffer );
-/// Source: `oracle/oracle/codemp/game/g_public.h:171`
+/// Source: `oracle/codemp/game/g_public.h:171`
 pub struct GSetUserinfo;
 
 impl OutboundSysCall for GSetUserinfo {

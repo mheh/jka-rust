@@ -9,7 +9,7 @@ use super::orientationr_t::orientationr_t;
 /// Raven `viewParms_t` — per-view render parameters (orientation, culling
 /// frustum, viewport, projection).
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:629-644`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:629-644`
 #[repr(C)]
 pub struct viewParms_t {
     /// Can't use "or" as it is a reserved word with gcc DREWS 2/2/2002

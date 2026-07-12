@@ -8,7 +8,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `srfGridMesh_t` — a bi-cubic patch (curved surface) mesh.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:652-674`
+/// Type definition source: `oracle/code/renderer/tr_local.h:652-674`
 #[repr(C)]
 pub struct srfGridMesh_s {
     pub surfaceType: surfaceType_t,

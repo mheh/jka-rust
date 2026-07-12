@@ -5,7 +5,7 @@ use std::os::raw::c_int;
 /// Raven `uiMenuCommand_t` — menu command type.
 ///
 /// Raven: Typedef for int menu command enumeration.
-/// Type definition source: `oracle/oracle/codemp/ui/ui_public.h:194-208`
+/// Type definition source: `oracle/codemp/ui/ui_public.h:194-208`
 pub type uiMenuCommand_t = c_int;
 
 pub const UIMENU_NONE: uiMenuCommand_t = 0;

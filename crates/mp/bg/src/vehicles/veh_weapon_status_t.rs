@@ -4,18 +4,18 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `vehWeaponStatus_t` — per-weapon-slot runtime vehicle weapon state.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:450-460`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:450-460`
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct vehWeaponStatus_t {
-	//linked firing mode
-	pub linked: qboolean, //weapon 1's muzzles are in linked firing mode
-	//current weapon ammo
-	pub ammo: i32,
-	//debouncer for ammo recharge
-	pub lastAmmoInc: i32,
-	//which muzzle will fire next
-	pub nextMuzzle: i32,
+    //linked firing mode
+    pub linked: qboolean, //weapon 1's muzzles are in linked firing mode
+    //current weapon ammo
+    pub ammo: i32,
+    //debouncer for ammo recharge
+    pub lastAmmoInc: i32,
+    //which muzzle will fire next
+    pub nextMuzzle: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<vehWeaponStatus_t>() == 16);

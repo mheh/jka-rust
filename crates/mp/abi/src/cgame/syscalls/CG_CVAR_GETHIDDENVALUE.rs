@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `int trap_Cvar_GetHiddenVarValue(const char *name)`.
 /// Raven transport: `CL_GetValueForHidden((const char *)VMA(1))`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:66-68`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:726-727`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:66-68`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:726-727`
 #[derive(Debug)]
 pub struct CgCvarGethiddenvalueArgs {
     name: *const c_char,
@@ -37,10 +37,10 @@ impl CgCvarGethiddenvalueArgs {
 /// Raven wrapper: `return syscall(CG_CVAR_GETHIDDENVALUE, name);`
 /// Raven transport: `return CL_GetValueForHidden((const char *)VMA(1));`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:69`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:66-68`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:726-727`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:726-727`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:69`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:66-68`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:726-727`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:726-727`
 pub struct CgCvarGethiddenvalue;
 
 impl OutboundSysCall for CgCvarGethiddenvalue {

@@ -11,8 +11,8 @@ use abi_transport::generic::{
 /// switch decodes that first argument as `(gameState_t *)VMA(1)`, fills it via
 /// `CL_GetGameState`, and returns `0`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:465-466`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:957-959`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:465-466`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:957-959`
 #[derive(Debug)]
 pub struct CgGetgamestateArgs {
     gamestate: *mut c_void,
@@ -36,10 +36,10 @@ impl CgGetgamestateArgs {
 /// `CG_GETGAMESTATE` MP cgame imports syscall ABI token.
 ///
 /// Raven: `( gameState_t *gamestate )`; result is written into the out pointer.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:180`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:465-466`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:957-959`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:957-959`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:180`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:465-466`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:957-959`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:957-959`
 pub struct CgGetgamestate;
 
 impl OutboundSysCall for CgGetgamestate {

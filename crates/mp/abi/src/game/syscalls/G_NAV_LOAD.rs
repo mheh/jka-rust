@@ -30,7 +30,7 @@ impl GNavLoadArgs {
 
 /// `G_NAV_LOAD` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:300`
+/// Source: `oracle/codemp/game/g_public.h:300`
 pub struct GNavLoad;
 
 impl OutboundSysCall for GNavLoad {

@@ -3,7 +3,7 @@
 /// Raven `symmetry_t` — which corner holds the first node on a symmetric map.
 ///
 /// Raven: on a symmetric map which corner is the first node.
-/// Type definition source: `oracle/oracle/codemp/RMG/RM_Headers.h:29-35`
+/// Type definition source: `oracle/codemp/RMG/RM_Headers.h:29-35`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum symmetry_t {

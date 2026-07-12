@@ -13,9 +13,9 @@ use abi_transport::generic::{
 /// Raven transport:
 /// `CIN_PlayCinematic((const char *)VMA(1), args[2], args[3], args[4], args[5], args[6])`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:584-585`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2381`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1025-1026`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:584-585`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2381`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1025-1026`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCinPlaycinematicArgs {
     arg0: *const c_char,
@@ -72,11 +72,11 @@ impl CgCinPlaycinematicArgs {
 
 /// `CG_CIN_PLAYCINEMATIC` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:210`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:584-585`
-/// Output source: `oracle/oracle/codemp/cgame/cg_local.h:2381`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1025-1026`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1025-1026`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:210`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:584-585`
+/// Output source: `oracle/codemp/cgame/cg_local.h:2381`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1025-1026`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1025-1026`
 pub struct CgCinPlaycinematic;
 
 impl OutboundSysCall for CgCinPlaycinematic {

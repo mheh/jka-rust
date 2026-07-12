@@ -1,9 +1,10 @@
 // PORT-COMPLETE: NPC_AI_ImperialProbe.c 12/12
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_ImperialProbe.c`.
 //!
 //! Imperial Probe droid AI behavior: idle, patrol, hunt, strafe, ranged attack.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 use crate::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon};
 use crate::g_combat::G_Damage;
 use crate::g_items::RegisterItem;
@@ -20,7 +21,6 @@ use crate::q_shared::va;
 use crate::trap;
 use crate::world::{ent_id, ent_id_opt};
 use crate::NPC_AI_Default::NPC_BSIdle;
-use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 use crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth;
 use crate::NPC_goal::UpdateGoal;
 use crate::NPC_move::{NPC_GetMoveDirection, NPC_MoveToGoal};
@@ -31,7 +31,7 @@ use crate::NPC_utils::{
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 
 // Local state enums
-// Source: oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:10-17
+// Source: oracle/codemp/game/NPC_AI_ImperialProbe.c:10-17
 const LSTATE_NONE: i32 = 0;
 const LSTATE_BACKINGUP: i32 = 1;
 const LSTATE_SPINNING: i32 = 2;
@@ -39,22 +39,22 @@ const LSTATE_PAIN: i32 = 3;
 const LSTATE_DROP: i32 = 4;
 
 // Height maintenance
-// Source: oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:124-127
+// Source: oracle/codemp/game/NPC_AI_ImperialProbe.c:47
 pub const VELOCITY_DECAY: f32 = 0.85;
 
 // Strafe parameters
-// Source: oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:178-181
+// Source: oracle/codemp/game/NPC_AI_ImperialProbe.c:178-181
 pub const HUNTER_STRAFE_VEL: c_int = 256;
 pub const HUNTER_STRAFE_DIS: c_int = 200;
 pub const HUNTER_UPWARD_PUSH: c_int = 32;
 
 // Hunt parameters
-// Source: oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:294-296
+// Source: oracle/codemp/game/NPC_AI_ImperialProbe.c:217-218
 pub const HUNTER_FORWARD_BASE_SPEED: c_int = 10;
 pub const HUNTER_FORWARD_MULTIPLIER: c_int = 5;
 
 // Melee range
-// Source: oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:448-452
+// Source: oracle/codemp/game/NPC_AI_ImperialProbe.c:371-375
 const MIN_MELEE_RANGE: c_int = 320;
 const MIN_MELEE_RANGE_SQR: c_int = MIN_MELEE_RANGE * MIN_MELEE_RANGE;
 const MIN_DISTANCE: c_int = 128;
@@ -62,7 +62,7 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 
 /// Raven `NPC_Probe_Precache`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:21-40`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:21-40`
 pub fn NPC_Probe_Precache(ctx: GameContext<'_>) {
     for i in 1..4 {
         let s = format!("sound/chars/probe/misc/probetalk{}", i);
@@ -84,7 +84,7 @@ pub fn NPC_Probe_Precache(ctx: GameContext<'_>) {
 
 /// Raven `ImperialProbe_MaintainHeight`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:49-170`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:49-170`
 pub fn ImperialProbe_MaintainHeight(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -163,7 +163,7 @@ pub fn ImperialProbe_MaintainHeight(ctx: GameContext<'_>) {
 
 /// Raven `ImperialProbe_Strafe`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:182-209`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:182-209`
 pub fn ImperialProbe_Strafe(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -228,7 +228,7 @@ pub fn ImperialProbe_Strafe(ctx: GameContext<'_>) {
 
 /// Raven `ImperialProbe_Hunt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:220-261`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:220-261`
 pub fn ImperialProbe_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         let world = &mut *ctx.world;
@@ -267,7 +267,7 @@ pub fn ImperialProbe_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboo
             (*npc_info).goalRadius = 12;
 
             // Get our direction from the navigator if we can't see our target
-            if NPC_GetMoveDirection(ctx, forward, &mut distance as *mut f32) == 0 {
+            if NPC_GetMoveDirection(ctx, &mut forward, &mut distance as *mut f32) == 0 {
                 return;
             }
         } else {
@@ -295,7 +295,7 @@ pub fn ImperialProbe_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboo
 
 /// Raven `ImperialProbe_FireBlaster`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:268-324`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:268-324`
 pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -395,7 +395,7 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
 
 /// Raven `ImperialProbe_Ranged`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:331-363`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:331-363`
 pub fn ImperialProbe_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         let world = &mut *ctx.world;
@@ -428,7 +428,7 @@ pub fn ImperialProbe_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qb
 
 /// Raven `ImperialProbe_AttackDecision`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:377-426`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:377-426`
 pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -504,7 +504,7 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
 
 /// Raven `NPC_Probe_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:433-498`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:433-498`
 pub fn NPC_Probe_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -594,7 +594,7 @@ pub fn NPC_Probe_Pain(
 
 /// Raven `ImperialProbe_Idle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:506-511`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:506-511`
 pub fn ImperialProbe_Idle(ctx: GameContext<'_>) {
     ImperialProbe_MaintainHeight(ctx);
     NPC_BSIdle(ctx);
@@ -602,7 +602,7 @@ pub fn ImperialProbe_Idle(ctx: GameContext<'_>) {
 
 /// Raven `ImperialProbe_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:518-556`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:518-556`
 pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -667,7 +667,7 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
 
 /// Raven `ImperialProbe_Wait`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:563-582`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:563-582`
 pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
@@ -723,7 +723,7 @@ pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSImperialProbe_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:589-609`
+/// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:589-609`
 pub fn NPC_BSImperialProbe_Default(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;

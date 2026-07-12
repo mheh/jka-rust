@@ -1,6 +1,6 @@
 //! MP `usercmd_t` copied from Raven `codemp/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/q_shared.h:2523-2533`
+//! Source: `oracle/codemp/game/q_shared.h:2523-2533`
 
 #![allow(non_camel_case_types)]
 

@@ -14,7 +14,7 @@ use std::ffi::CStr;
 
 /// `sscanf(..., "%f", ...)` scanner matching the **native libc** `sscanf`
 /// linked by the oracle DLL (`nm` shows `_sscanf` U) — not the QVM-only
-/// bytecode `sscanf`/`_atof` in `oracle/oracle/codemp/game/bg_lib.c`, which
+/// bytecode `sscanf`/`_atof` in `oracle/codemp/game/bg_lib.c`, which
 /// is never linked into the game DLL build. One shared implementation for
 /// the ~12 `sscanf(s, "%f %f %f", ...)`-shaped call sites across
 /// `g_spawn.rs`/`bg_vehicleLoad.rs`/`bg_misc.rs`/`g_ICARUScb.rs`.
@@ -155,7 +155,7 @@ mod sscanf_f32s_tests {
 
 /// `atoi()` matching the **native libc** `atoi` linked by the oracle DLL
 /// (`nm` shows `_atoi` U) — not `bg_lib::atoi`, which is the QVM-only
-/// bytecode port of `oracle/oracle/codemp/game/bg_lib.c:914-1318`
+/// bytecode port of `oracle/codemp/game/bg_lib.c:914-1318`
 /// (`#if defined(Q3_VM)`), never compiled into the native game DLL build.
 /// macOS libc `atoi` is `(int)strtol(s, NULL, 10)`: skip libc `isspace`
 /// whitespace, optional single sign, decimal-digit prefix (stopping at the
@@ -287,7 +287,7 @@ mod atoi_tests {
 /// `va`/`Com_sprintf` where the original C code took a `char*`.
 ///
 /// Source: moved from `g_cmds.rs` (and a duplicate private copy in
-/// `g_active.rs`); `oracle/oracle/codemp/game/g_cmds.c`.
+/// `g_active.rs`); `oracle/codemp/game/g_cmds.c`.
 #[inline]
 pub fn cstr(s: &str) -> std::ffi::CString {
     std::ffi::CString::new(s).unwrap()
@@ -295,7 +295,7 @@ pub fn cstr(s: &str) -> std::ffi::CString {
 
 /// Read a NUL-terminated `*const c_char` into an owned `String` (lossy).
 ///
-/// Source: pattern used throughout `oracle/oracle/codemp/game/` for string
+/// Source: pattern used throughout `oracle/codemp/game/` for string
 /// conversion; moved from `bg_misc.rs`.
 #[inline]
 pub unsafe fn cstr_to_str(p: *const c_char) -> String {

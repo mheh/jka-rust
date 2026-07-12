@@ -1,6 +1,6 @@
 //! SP `saberInfo_t` and `MAX_SABERS`.
 //!
-//! Type definition source: `oracle/oracle/code/game/q_shared.h:1724-1944`
+//! Type definition source: `oracle/code/game/q_shared.h:1724-1944`
 
 #![allow(non_camel_case_types)]
 
@@ -22,7 +22,7 @@ use super::saber_type::saberType_t;
 /// `g2MarksShader*` are `char[MAX_QPATH]` strings (MP: `int` handles); SP adds
 /// `fallSound[3]` and keeps `brokenSaber1/2` live (dead code in MP). Pointer-
 /// bearing => arch-dependent layout; asserts pin the host-64-bit size/offsets.
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1724-1944`
+/// Type definition source: `oracle/code/game/q_shared.h:1724-1944`
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct saberInfo_t {
@@ -76,7 +76,7 @@ pub struct saberInfo_t {
 
     // ===PRIMARY BLADES=====================
     pub trailStyle: c_int,
-    pub g2MarksShader: [c_char; MAX_QPATH],       // SP: raw shader-name string, not a handle
+    pub g2MarksShader: [c_char; MAX_QPATH], // SP: raw shader-name string, not a handle
     pub g2WeaponMarkShader: [c_char; MAX_QPATH],
     pub hitSound: [qhandle_t; 3],
     pub blockSound: [qhandle_t; 3],
@@ -119,5 +119,5 @@ const _: () = assert!(core::mem::size_of::<saberInfo_t>() == 1952);
 
 /// Raven SP `MAX_SABERS`.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:2064`
+/// Source: `oracle/code/game/q_shared.h:2064`
 pub const MAX_SABERS: usize = 2;

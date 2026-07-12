@@ -1,7 +1,9 @@
 use super::super::MpGameImport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ROFF_CLEAN` outbound game-to-engine syscall.
 ///
@@ -19,7 +21,7 @@ impl GRoffCleanArgs {
 /// `G_ROFF_CLEAN` MP game imports syscall ABI token.
 ///
 /// Raven: qboolean	ROFF_Clean(void);
-/// Source: `oracle/oracle/codemp/game/g_public.h:241`
+/// Source: `oracle/codemp/game/g_public.h:241`
 pub struct GRoffClean;
 
 impl OutboundSysCall for GRoffClean {

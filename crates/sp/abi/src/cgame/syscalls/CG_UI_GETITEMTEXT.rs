@@ -11,8 +11,8 @@ use sp_qshared::shared::qboolean;
 /// Raven wrapper: `cgi_UI_GetItemText(menuFile,itemName,text);`
 /// Raven transport: `Q_strncpyz((char *) VMA(3), item->text, 256); return qtrue/qfalse`.
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:633-635`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:919-941`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:633-635`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:919-941`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiGetitemtextArgs {
     menu_file: *const c_char,
@@ -50,10 +50,10 @@ impl CgUiGetitemtextArgs {
 
 /// `CG_UI_GETITEMTEXT` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:207`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:633-635`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:919-941`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:919-941`
+/// Enum value source: `oracle/code/cgame/cg_public.h:207`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:633-635`
+/// Output source: `oracle/code/client/cl_cgame.cpp:919-941`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:919-941`
 pub struct CgUiGetitemtext;
 
 impl OutboundSysCall for CgUiGetitemtext {

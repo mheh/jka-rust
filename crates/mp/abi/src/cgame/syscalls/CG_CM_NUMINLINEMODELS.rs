@@ -1,16 +1,18 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_CM_NUMINLINEMODELS`.
 ///
 /// `trap_CM_NumInlineModels` takes no arguments; the transport carries only the
 /// syscall token.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:127`
-/// Transport source: `oracle/oracle/codemp/cgame/cg_syscalls.c:128`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:781`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:127`
+/// Transport source: `oracle/codemp/cgame/cg_syscalls.c:128`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:781`
 #[derive(Debug, Default)]
 pub struct CgCmNuminlinemodelsArgs;
 
@@ -24,12 +26,12 @@ impl CgCmNuminlinemodelsArgs {
 ///
 /// C signature: `int trap_CM_NumInlineModels(void)`.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:84`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:127`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:127`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:128`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:782`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:781`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:84`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:127`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:127`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:128`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:782`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:781`
 pub struct CgCmNuminlinemodels;
 
 impl OutboundSysCall for CgCmNuminlinemodels {

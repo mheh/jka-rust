@@ -6,7 +6,7 @@ use mp_qshared::shared::MAX_QPATH;
 
 /// Raven `mdxaHeader_t` — GLA animation-file header.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:351-371`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:351-371`
 #[repr(C)]
 pub struct mdxaHeader_t {
     // ( first 3 fields are same format as MD3/MDR so we can apply easy model-format-type checks )
@@ -19,10 +19,10 @@ pub struct mdxaHeader_t {
     // frames and bones are shared by all levels of detail
     //
     pub numFrames: i32,
-    pub ofsFrames: i32, // points at mdxaFrame_t array
-    pub numBones: i32,  // (no offset to these since they're inside the frames array)
+    pub ofsFrames: i32,       // points at mdxaFrame_t array
+    pub numBones: i32,        // (no offset to these since they're inside the frames array)
     pub ofsCompBonePool: i32, // offset to global compressed-bone pool that all frames use
-    pub ofsSkel: i32,   // offset to mdxaSkel_t info
+    pub ofsSkel: i32,         // offset to mdxaSkel_t info
 
     pub ofsEnd: i32, // EOF, which of course gives overall file size
 }

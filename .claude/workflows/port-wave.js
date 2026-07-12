@@ -38,7 +38,7 @@ if (!MP.length && !SP.length) throw new Error('args.mp / args.sp packet lists ar
 const SWEEP = 'tools/closure-prototype/.venv/bin/python tools/closure-prototype/sweep.py'
 
 const RULES = `HOUSE RULES (binding — docs/porting-rules.md):
-- NEVER edit anything under oracle/oracle/.
+- NEVER edit anything under oracle/.
 - Enum-vs-alias fidelity: "typedef enum {...} X" -> #[repr(i32)] pub enum X;
   "typedef int X" + separate anon enum -> pub type X = c_int + pub const items.
   NEVER flatten a named enum to an int alias. (The packet's "kind" field tells
@@ -63,7 +63,7 @@ const RULES = `HOUSE RULES (binding — docs/porting-rules.md):
     /// Raven \`X\` — <one-line description>.
     ///
     /// Raven: <original Raven comment, if any>.
-    /// Type definition source: \`oracle/oracle/codemp/game/bg_public.h:NNN-MMM\`
+    /// Type definition source: \`oracle/codemp/game/bg_public.h:NNN-MMM\`
 - #[repr(C)] structs: exact Raven field names/order; paste the provided assert
   block verbatim; gate pointer-width-dependent asserts with
   #[cfg(target_pointer_width = "64")].
@@ -167,7 +167,7 @@ const skeletonSpec = [
 }))
 await agent(
 `Prepare crate skeletons for a type-port wave (repo root cwd). NEVER touch
-oracle/oracle/. For each entry below:
+oracle/. For each entry below:
 1. Ensure the folder exists with a mod.rs registered up to the crate's lib.rs
    (folders are subsystem dirs; match the existing style of sibling mod.rs
    files — a //! doc line then pub mod lines, alphabetical).

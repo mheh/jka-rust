@@ -5,7 +5,7 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `qkey_t` — per-key input state (down, autorepeat count, bound command).
 ///
-/// Type definition source: `oracle/oracle/codemp/client/keys.h:3-7`
+/// Type definition source: `oracle/codemp/client/keys.h:3-7`
 #[repr(C)]
 pub struct qkey_t {
     pub down: qboolean,

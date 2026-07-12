@@ -2,7 +2,7 @@
 
 /// Raven `leType_t` — local entity types.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:195-206`
+/// Type definition source: `oracle/code/cgame/cg_local.h:195-206`
 #[repr(i32)]
 pub enum leType_t {
     LE_MARK = 0,

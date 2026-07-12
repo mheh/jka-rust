@@ -2,7 +2,7 @@
 
 /// Raven `T_G_ICARUS_LERP2START` — ICARUS lerp-to-start task args for an entity.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:852-857`
+/// Type definition source: `oracle/codemp/game/g_public.h:852-857`
 #[repr(C)]
 pub struct T_G_ICARUS_LERP2START {
     pub entID: i32,

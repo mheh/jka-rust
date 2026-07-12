@@ -5,7 +5,7 @@ use sp_qshared::shared::collision::cplane_t;
 
 /// Raven `cbrushside_t` — one side (plane + shader) of a collision-model brush.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:57-60`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:57-60`
 #[repr(C)]
 pub struct cbrushside_s {
     pub plane: *mut cplane_t,

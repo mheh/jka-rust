@@ -44,7 +44,7 @@ impl BotlibAiMoveInDirectionArgs {
 
 /// `BOTLIB_AI_MOVE_IN_DIRECTION` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:466`
+/// Source: `oracle/codemp/game/g_public.h:466`
 pub struct BotlibAiMoveInDirection;
 
 impl OutboundSysCall for BotlibAiMoveInDirection {

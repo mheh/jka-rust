@@ -2,20 +2,20 @@
 
 /// Raven `vehTurretStatus_t` — per-turret runtime firing/targeting state.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:462-474`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:462-474`
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct vehTurretStatus_t {
-	//current weapon ammo
-	pub ammo: i32,
-	//debouncer for ammo recharge
-	pub lastAmmoInc: i32,
-	//which muzzle will fire next
-	pub nextMuzzle: i32,
-	//which entity they're after
-	pub enemyEntNum: i32,
-	//how long to hold on to our current enemy
-	pub enemyHoldTime: i32,
+    //current weapon ammo
+    pub ammo: i32,
+    //debouncer for ammo recharge
+    pub lastAmmoInc: i32,
+    //which muzzle will fire next
+    pub nextMuzzle: i32,
+    //which entity they're after
+    pub enemyEntNum: i32,
+    //how long to hold on to our current enemy
+    pub enemyHoldTime: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<vehTurretStatus_t>() == 20);

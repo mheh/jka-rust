@@ -7,7 +7,7 @@
 /// integer value / floating point value / start of white space before token /
 /// start of white space before token / line the token was on / lines crossed
 /// in white space / next token in chain.
-/// Type definition source: `oracle/oracle/codemp/botlib/l_script.h:141-155`
+/// Type definition source: `oracle/codemp/botlib/l_script.h:141-155`
 #[repr(C)]
 pub struct token_t {
     /// available token

@@ -6,13 +6,13 @@ use native_types::MAX_QPATH;
 
 /// Raven `MAX_PARSEFILES`.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:2655`
+/// Source: `oracle/code/game/q_shared.h:2655`
 pub const MAX_PARSEFILES: usize = 16;
 
 /// Raven `parseData_t` (`parseData_s`) — SP text-parser file state.
 ///
 /// SP-only (not present in MP `q_shared.h`).
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2656-2662`
+/// Type definition source: `oracle/code/game/q_shared.h:2656-2662`
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct parseData_t {

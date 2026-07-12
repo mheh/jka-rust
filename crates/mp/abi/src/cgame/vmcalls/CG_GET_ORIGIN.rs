@@ -9,8 +9,8 @@ use mp_qshared::shared::vec3_t;
 
 /// Arguments for `CG_GET_ORIGIN`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:285-287`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:285-287`
+/// Args source: `oracle/codemp/cgame/cg_main.c:285-287`
+/// Output source: `oracle/codemp/cgame/cg_main.c:285-287`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgGetOriginArgs {
     ent_num: c_int,
@@ -34,9 +34,9 @@ impl CgGetOriginArgs {
 /// `CG_GET_ORIGIN` MP cgame exports vmMain ABI token.
 ///
 /// Raven: int entnum, vec3_t origin
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:418`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:285-287`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:285-287`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:418`
+/// Args source: `oracle/codemp/cgame/cg_main.c:285-287`
+/// Output source: `oracle/codemp/cgame/cg_main.c:285-287`
 /// Transport/call-site source: no engine call-site found in initial search; module vmMain switch proves arg slots.
 pub struct CgGetOrigin;
 

@@ -8,8 +8,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `cgi_UI_Parse_Float(value);`
 /// Raven transport: `PC_ParseFloat((float *) VMA(1));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:588-590`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:865-867`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:588-590`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:865-867`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiParseFloatArgs {
     value: *mut f32,
@@ -29,10 +29,10 @@ impl CgUiParseFloatArgs {
 
 /// `CG_UI_PARSE_FLOAT` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:198`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:588-590`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:865-867`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:865-867`
+/// Enum value source: `oracle/code/cgame/cg_public.h:198`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:588-590`
+/// Output source: `oracle/code/client/cl_cgame.cpp:865-867`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:865-867`
 pub struct CgUiParseFloat;
 
 impl OutboundSysCall for CgUiParseFloat {

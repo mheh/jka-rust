@@ -1,5 +1,5 @@
 // PORT-COMPLETE: q_math.c 54/54
-//! Ported from `oracle/oracle/codemp/game/q_math.c`.
+//! Ported from `oracle/codemp/game/q_math.c`.
 //!
 //! Signature note: the fnskel generator emits Raven's `vec3_t`/`vec4_t`
 //! (`[f32; N]`) out-params by value. In C those parameters decay to pointers
@@ -18,13 +18,13 @@
 use crate::prelude::*;
 
 /// Raven angle-vector indices (`PITCH`/`YAW`/`ROLL`).
-/// Source: `oracle/oracle/codemp/game/q_shared.h:374-376`
+/// Source: `oracle/codemp/game/q_shared.h:374-376`
 pub const PITCH: usize = 0;
 pub const YAW: usize = 1;
 pub const ROLL: usize = 2;
 
 /// Raven `vec3_origin`.
-/// Source: `oracle/oracle/codemp/game/q_math.c:7`
+/// Source: `oracle/codemp/game/q_math.c:7`
 pub const VEC3_ORIGIN: vec3_t = [0.0, 0.0, 0.0];
 
 // Integration round-1: the mega-pass fnskel packets transcribe this constant
@@ -35,7 +35,7 @@ pub const vec3_origin: vec3_t = VEC3_ORIGIN;
 
 /// Raven `bytedirs[NUMVERTEXNORMALS]` — precomputed icosahedron-subdivision
 /// unit normals used by `DirToByte`/`ByteToDir`.
-/// Source: `oracle/oracle/codemp/game/q_math.c:39-122`
+/// Source: `oracle/codemp/game/q_math.c:39-122`
 pub const BYTEDIRS: [vec3_t; 162] = [
     [-0.525731f32, 0.000000f32, 0.850651f32],
     [-0.442863f32, 0.238856f32, 0.864188f32],
@@ -227,12 +227,12 @@ fn vec_length_sq(v: vec3_t) -> f32 {
 }
 
 /// Raven `qboolean` true/false values.
-/// Source: `oracle/oracle/codemp/game/q_shared.h` (`qtrue`/`qfalse`).
+/// Source: `oracle/codemp/game/q_shared.h` (`qtrue`/`qfalse`).
 const Q_TRUE: qboolean = 1;
 const Q_FALSE: qboolean = 0;
 
 /// Raven `CrossProduct` (header-inline helper).
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1553-1557`
+/// Source: `oracle/codemp/game/q_shared.h:1553-1557`
 pub fn CrossProduct(v1: vec3_t, v2: vec3_t, cross: &mut vec3_t) {
     cross[0] = v1[1] * v2[2] - v1[2] * v2[1];
     cross[1] = v1[2] * v2[0] - v1[0] * v2[2];
@@ -241,7 +241,7 @@ pub fn CrossProduct(v1: vec3_t, v2: vec3_t, cross: &mut vec3_t) {
 
 /// Raven `VectorLength` (header-inline helper; `_XBOX` asm branch dropped, the
 /// plain-C branch is the compiled one).
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1460-1489`
+/// Source: `oracle/codemp/game/q_shared.h:1460-1489`
 pub fn VectorLength(v: vec3_t) -> vec_t {
     // Raven: `(vec_t)sqrt(..)`. The sum is float; `sqrt` is the double libm call
     // rounded back to float. An f32 sqrt double-rounds and diverges from the
@@ -250,20 +250,20 @@ pub fn VectorLength(v: vec3_t) -> vec_t {
 }
 
 /// Raven `VectorLengthSquared` (header-inline helper; `_XBOX` asm branch dropped).
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1491-1518`
+/// Source: `oracle/codemp/game/q_shared.h:1491-1518`
 pub fn VectorLengthSquared(v: vec3_t) -> vec_t {
     v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
 }
 
 /// Raven `Distance` (header-inline helper).
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1520-1525`
+/// Source: `oracle/codemp/game/q_shared.h:1520-1525`
 pub fn Distance(p1: vec3_t, p2: vec3_t) -> vec_t {
     VectorLength(vec_sub(p2, p1))
 }
 
 /// Raven `VectorCompare` (header-inline helper).
 /// Returns 1 if vectors are equal, 0 otherwise.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1527-1532`
+/// Source: `oracle/codemp/game/q_shared.h:1527-1532`
 pub fn VectorCompare(v1: vec3_t, v2: vec3_t) -> qboolean {
     if v1[0] != v2[0] || v1[1] != v2[1] || v1[2] != v2[2] {
         return 0;
@@ -273,7 +273,7 @@ pub fn VectorCompare(v1: vec3_t, v2: vec3_t) -> qboolean {
 
 /// Raven `VectorClear` (`q_shared.h` macro; canonical home for the per-file
 /// transcriptions that porters had been re-deriving).
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1397`
+/// Source: `oracle/codemp/game/q_shared.h:1397`
 #[inline]
 pub fn VectorClear(a: &mut vec3_t) {
     a[0] = 0.0;
@@ -283,7 +283,7 @@ pub fn VectorClear(a: &mut vec3_t) {
 
 /// Raven `VectorSet` (`q_shared.h` macro). Out-param, matching the macro's
 /// `(v)[0]=(x),…` write-through shape.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1399`
+/// Source: `oracle/codemp/game/q_shared.h:1399`
 #[inline]
 pub fn VectorSet(v: &mut vec3_t, x: f32, y: f32, z: f32) {
     v[0] = x;
@@ -292,7 +292,7 @@ pub fn VectorSet(v: &mut vec3_t, x: f32, y: f32, z: f32) {
 }
 
 /// Raven `DistanceSquared` (header-inline helper).
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1527-1532`
+/// Source: `oracle/codemp/game/q_shared.h:1527-1532`
 #[inline]
 pub fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> vec_t {
     let v = vec_sub(p2, p1);
@@ -301,7 +301,7 @@ pub fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> vec_t {
 
 /// Raven `Q_rand`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:126-129`
+/// Source: `oracle/codemp/game/q_math.c:126-129`
 pub fn Q_rand(seed: *mut c_int) -> c_int {
     unsafe {
         *seed = (69069i32).wrapping_mul(*seed).wrapping_add(1);
@@ -311,14 +311,14 @@ pub fn Q_rand(seed: *mut c_int) -> c_int {
 
 /// Raven `Q_random`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:131-133`
+/// Source: `oracle/codemp/game/q_math.c:131-133`
 pub fn Q_random(seed: *mut c_int) -> f32 {
     (Q_rand(seed) & 0xffff) as f32 / 0x10000 as f32
 }
 
 /// Raven `Q_crandom`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:135-137`
+/// Source: `oracle/codemp/game/q_math.c:135-137`
 pub fn Q_crandom(seed: *mut c_int) -> f32 {
     2.0 * (Q_random(seed) - 0.5)
 }
@@ -328,7 +328,7 @@ pub fn Q_crandom(seed: *mut c_int) -> f32 {
 
 /// Raven `ClampChar`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:279-287`
+/// Source: `oracle/codemp/game/q_math.c:279-287`
 pub fn ClampChar(i: c_int) -> c_schar {
     if i < -128 {
         return -128;
@@ -341,7 +341,7 @@ pub fn ClampChar(i: c_int) -> c_schar {
 
 /// Raven `ClampShort`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:289-297`
+/// Source: `oracle/codemp/game/q_math.c:289-297`
 pub fn ClampShort(i: c_int) -> c_short {
     if i < -32768 {
         return -32768;
@@ -356,7 +356,7 @@ pub fn ClampShort(i: c_int) -> c_short {
 ///
 /// Raven checks `!dir` for a null pointer; a Rust `vec3_t` value can't be
 /// null, so that branch is unreachable here (S19: diverges only on Raven UB).
-/// Source: `oracle/oracle/codemp/game/q_math.c:301-322`
+/// Source: `oracle/codemp/game/q_math.c:301-322`
 pub fn DirToByte(dir: vec3_t) -> c_int {
     let mut bestd = 0.0f32;
     let mut best = 0i32;
@@ -372,7 +372,7 @@ pub fn DirToByte(dir: vec3_t) -> c_int {
 
 /// Raven `ByteToDir`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:324-330`
+/// Source: `oracle/codemp/game/q_math.c:324-330`
 pub fn ByteToDir(b: c_int, dir: &mut vec3_t) {
     if b < 0 || b as usize >= BYTEDIRS.len() {
         *dir = VEC3_ORIGIN;
@@ -383,7 +383,7 @@ pub fn ByteToDir(b: c_int, dir: &mut vec3_t) {
 
 /// Raven `ColorBytes3`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:333-341`
+/// Source: `oracle/codemp/game/q_math.c:333-341`
 pub fn ColorBytes3(r: f32, g: f32, b: f32) -> c_uint {
     let bytes = [(r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8, 0u8];
     u32::from_ne_bytes(bytes) as c_uint
@@ -391,7 +391,7 @@ pub fn ColorBytes3(r: f32, g: f32, b: f32) -> c_uint {
 
 /// Raven `ColorBytes4`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:343-352`
+/// Source: `oracle/codemp/game/q_math.c:343-352`
 pub fn ColorBytes4(r: f32, g: f32, b: f32, a: f32) -> c_uint {
     let bytes = [
         (r * 255.0) as u8,
@@ -404,7 +404,7 @@ pub fn ColorBytes4(r: f32, g: f32, b: f32, a: f32) -> c_uint {
 
 /// Raven `NormalizeColor`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:354-373`
+/// Source: `oracle/codemp/game/q_math.c:354-373`
 pub fn NormalizeColor(r#in: vec3_t, out: &mut vec3_t) -> f32 {
     let mut max = r#in[0];
     if r#in[1] > max {
@@ -428,7 +428,7 @@ pub fn NormalizeColor(r#in: vec3_t, out: &mut vec3_t) -> f32 {
 ///
 /// Returns false if the triangle is degenerate. The normal points out of the
 /// clock for clockwise ordered points.
-/// Source: `oracle/oracle/codemp/game/q_math.c:384-396`
+/// Source: `oracle/codemp/game/q_math.c:384-396`
 pub fn PlaneFromPoints(plane: &mut vec4_t, a: vec3_t, b: vec3_t, c: vec3_t) -> qboolean {
     let d1 = vec_sub(b, a);
     let d2 = vec_sub(c, a);
@@ -448,7 +448,7 @@ pub fn PlaneFromPoints(plane: &mut vec4_t, a: vec3_t, b: vec3_t, c: vec3_t) -> q
 /// Raven `RotatePointAroundVector`.
 ///
 /// This is not implemented very well...
-/// Source: `oracle/oracle/codemp/game/q_math.c:405-459`
+/// Source: `oracle/codemp/game/q_math.c:405-459`
 pub fn RotatePointAroundVector(dst: &mut vec3_t, dir: vec3_t, point: vec3_t, degrees: f32) {
     let mut m = [[0f32; 3]; 3];
     let mut zrot = [[0f32; 3]; 3];
@@ -507,7 +507,7 @@ pub fn RotatePointAroundVector(dst: &mut vec3_t, dir: vec3_t, point: vec3_t, deg
 
 /// Raven `RotateAroundDirection`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:466-481`
+/// Source: `oracle/codemp/game/q_math.c:466-481`
 pub fn RotateAroundDirection(axis: *mut vec3_t, yaw: f32) {
     // `axis` points at a 3-row `vec3_t axis[3]` matrix; reinterpret as a
     // fixed-size array so the rows can be indexed/borrowed safely below.
@@ -532,7 +532,7 @@ pub fn RotateAroundDirection(axis: *mut vec3_t, yaw: f32) {
 
 /// Raven `vectoangles`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:485-522`
+/// Source: `oracle/codemp/game/q_math.c:485-522`
 pub fn vectoangles(value1: vec3_t, angles: &mut vec3_t) {
     let yaw;
     let mut pitch;
@@ -569,7 +569,7 @@ pub fn vectoangles(value1: vec3_t, angles: &mut vec3_t) {
 
 /// Raven `AnglesToAxis`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:530-536`
+/// Source: `oracle/codemp/game/q_math.c:530-536`
 pub fn AnglesToAxis(angles: vec3_t, axis: *mut vec3_t) {
     let axis: &mut [vec3_t; 3] = unsafe { &mut *(axis as *mut [vec3_t; 3]) };
     let mut right: vec3_t = [0.0; 3];
@@ -589,7 +589,7 @@ pub fn AnglesToAxis(angles: vec3_t, axis: *mut vec3_t) {
 
 /// Raven `AxisClear`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:538-548`
+/// Source: `oracle/codemp/game/q_math.c:538-548`
 pub fn AxisClear(axis: *mut vec3_t) {
     let axis: &mut [vec3_t; 3] = unsafe { &mut *(axis as *mut [vec3_t; 3]) };
     axis[0] = [1.0, 0.0, 0.0];
@@ -599,7 +599,7 @@ pub fn AxisClear(axis: *mut vec3_t) {
 
 /// Raven `AxisCopy`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:550-554`
+/// Source: `oracle/codemp/game/q_math.c:550-554`
 pub fn AxisCopy(r#in: *mut vec3_t, out: *mut vec3_t) {
     let r#in: &[vec3_t; 3] = unsafe { &*(r#in as *const [vec3_t; 3]) };
     let out: &mut [vec3_t; 3] = unsafe { &mut *(out as *mut [vec3_t; 3]) };
@@ -610,7 +610,7 @@ pub fn AxisCopy(r#in: *mut vec3_t, out: *mut vec3_t) {
 
 /// Raven `ProjectPointOnPlane`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:556-577`
+/// Source: `oracle/codemp/game/q_math.c:556-577`
 pub fn ProjectPointOnPlane(dst: &mut vec3_t, p: vec3_t, normal: vec3_t) {
     let mut inv_denom = vec_dot(normal, normal);
     // Raven's debug assert (`Q_fabs(inv_denom) != 0.0f`) catches a zero
@@ -635,7 +635,7 @@ pub fn ProjectPointOnPlane(dst: &mut vec3_t, p: vec3_t, normal: vec3_t) {
 /// Raven `MakeNormalVectors`.
 ///
 /// Given a normalized forward vector, create two other perpendicular vectors.
-/// Source: `oracle/oracle/codemp/game/q_math.c:587-600`
+/// Source: `oracle/codemp/game/q_math.c:587-600`
 pub fn MakeNormalVectors(forward: vec3_t, right: &mut vec3_t, up: &mut vec3_t) {
     // this rotate and negate guarantees a vector not colinear with the original
     right[1] = -forward[0];
@@ -650,7 +650,7 @@ pub fn MakeNormalVectors(forward: vec3_t, right: &mut vec3_t, up: &mut vec3_t) {
 
 /// Raven `VectorRotate`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:603-608`
+/// Source: `oracle/codemp/game/q_math.c:603-608`
 pub fn VectorRotate(r#in: vec3_t, matrix: *mut vec3_t, out: &mut vec3_t) {
     let matrix: &[vec3_t; 3] = unsafe { &*(matrix as *const [vec3_t; 3]) };
     out[0] = vec_dot(r#in, matrix[0]);
@@ -661,7 +661,7 @@ pub fn VectorRotate(r#in: vec3_t, matrix: *mut vec3_t, out: &mut vec3_t) {
 /// Raven `Q_rsqrt` ("fast inverse square root"; evil floating point bit level
 /// hacking).
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:616-636`
+/// Source: `oracle/codemp/game/q_math.c:616-636`
 pub fn Q_rsqrt(number: f32) -> f32 {
     let threehalfs = 1.5f32;
     let x2 = number * 0.5;
@@ -676,7 +676,7 @@ pub fn Q_rsqrt(number: f32) -> f32 {
 
 /// Raven `Q_fabs`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:638-642`
+/// Source: `oracle/codemp/game/q_math.c:638-642`
 pub fn Q_fabs(f: f32) -> f32 {
     let tmp = (f.to_bits() as i32) & 0x7FFFFFFF;
     f32::from_bits(tmp as u32)
@@ -684,7 +684,7 @@ pub fn Q_fabs(f: f32) -> f32 {
 
 /// Raven `LerpAngle`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:653-665`
+/// Source: `oracle/codemp/game/q_math.c:653-665`
 pub fn LerpAngle(from: f32, to: f32, frac: f32) -> f32 {
     let mut to = to;
     if to - from > 180.0 {
@@ -699,7 +699,7 @@ pub fn LerpAngle(from: f32, to: f32, frac: f32) -> f32 {
 /// Raven `AngleSubtract`.
 ///
 /// Always returns a value from -180 to 180.
-/// Source: `oracle/oracle/codemp/game/q_math.c:675-687`
+/// Source: `oracle/codemp/game/q_math.c:675-687`
 pub fn AngleSubtract(a1: f32, a2: f32) -> f32 {
     let mut a = a1 - a2;
     a %= 360.0; // chop it down quickly, then level it out (Rust `%` matches C `fmod`)
@@ -714,7 +714,7 @@ pub fn AngleSubtract(a1: f32, a2: f32) -> f32 {
 
 /// Raven `AnglesSubtract`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:690-694`
+/// Source: `oracle/codemp/game/q_math.c:690-694`
 pub fn AnglesSubtract(v1: vec3_t, v2: vec3_t, v3: &mut vec3_t) {
     v3[0] = AngleSubtract(v1[0], v2[0]);
     v3[1] = AngleSubtract(v1[1], v2[1]);
@@ -723,7 +723,7 @@ pub fn AnglesSubtract(v1: vec3_t, v2: vec3_t, v3: &mut vec3_t) {
 
 /// Raven `AngleMod`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:697-700`
+/// Source: `oracle/codemp/game/q_math.c:697-700`
 pub fn AngleMod(a: f32) -> f32 {
     // Raven's `65536/360.0` and `360.0/65536` are double literals, so the
     // scale and product evaluate in f64 (rounded to the float result); an
@@ -734,7 +734,7 @@ pub fn AngleMod(a: f32) -> f32 {
 /// Raven `AngleNormalize360`.
 ///
 /// Returns angle normalized to the range [0 <= angle < 360].
-/// Source: `oracle/oracle/codemp/game/q_math.c:710-712`
+/// Source: `oracle/codemp/game/q_math.c:710-712`
 pub fn AngleNormalize360(angle: f32) -> f32 {
     // f64 constant math, matching Raven's double literals (see `AngleMod`).
     ((360.0f64 / 65536.0) * (((angle as f64 * (65536.0 / 360.0)) as i32) & 65535) as f64) as f32
@@ -743,7 +743,7 @@ pub fn AngleNormalize360(angle: f32) -> f32 {
 /// Raven `AngleNormalize180`.
 ///
 /// Returns angle normalized to the range [-180 < angle <= 180].
-/// Source: `oracle/oracle/codemp/game/q_math.c:722-728`
+/// Source: `oracle/codemp/game/q_math.c:722-728`
 pub fn AngleNormalize180(angle: f32) -> f32 {
     let mut angle = AngleNormalize360(angle);
     if angle > 180.0 {
@@ -755,14 +755,14 @@ pub fn AngleNormalize180(angle: f32) -> f32 {
 /// Raven `AngleDelta`.
 ///
 /// Returns the normalized delta from angle1 to angle2.
-/// Source: `oracle/oracle/codemp/game/q_math.c:738-740`
+/// Source: `oracle/codemp/game/q_math.c:738-740`
 pub fn AngleDelta(angle1: f32, angle2: f32) -> f32 {
     AngleNormalize180(angle1 - angle2)
 }
 
 /// Raven `SetPlaneSignbits`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:751-762`
+/// Source: `oracle/codemp/game/q_math.c:751-762`
 pub fn SetPlaneSignbits(out: *mut cplane_t) {
     let out = unsafe { &mut *out };
     // for fast box on planeside test
@@ -780,7 +780,7 @@ pub fn SetPlaneSignbits(out: *mut cplane_t) {
 /// Returns 1, 2, or 1 + 2. This is the fast axial/general-case version (the
 /// naked-asm variant is dropped per the frozen fork ruling; the plain-C
 /// fallback path is the one that ships).
-/// Source: `oracle/oracle/codemp/game/q_math.c:809-871`
+/// Source: `oracle/codemp/game/q_math.c:809-871`
 pub fn BoxOnPlaneSide(emins: vec3_t, emaxs: vec3_t, p: *mut cplane_t) -> c_int {
     let p = unsafe { &*p };
 
@@ -845,7 +845,7 @@ pub fn BoxOnPlaneSide(emins: vec3_t, emaxs: vec3_t, p: *mut cplane_t) -> c_int {
 
 /// Raven `RadiusFromBounds`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1114-1126`
+/// Source: `oracle/codemp/game/q_math.c:1114-1126`
 pub fn RadiusFromBounds(mins: vec3_t, maxs: vec3_t) -> f32 {
     let mut corner: vec3_t = [0.0; 3];
     for i in 0..3 {
@@ -858,7 +858,7 @@ pub fn RadiusFromBounds(mins: vec3_t, maxs: vec3_t) -> f32 {
 
 /// Raven `ClearBounds`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1129-1132`
+/// Source: `oracle/codemp/game/q_math.c:1129-1132`
 pub fn ClearBounds(mins: &mut vec3_t, maxs: &mut vec3_t) {
     mins[0] = 99999.0;
     mins[1] = 99999.0;
@@ -870,7 +870,7 @@ pub fn ClearBounds(mins: &mut vec3_t, maxs: &mut vec3_t) {
 
 /// Raven `DistanceHorizontal`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1134-1139`
+/// Source: `oracle/codemp/game/q_math.c:1134-1139`
 pub fn DistanceHorizontal(p1: vec3_t, p2: vec3_t) -> vec_t {
     let v = vec_sub(p2, p1);
     ((v[0] * v[0] + v[1] * v[1]) as f64).sqrt() as f32 // z left off; sqrt in f64 (Raven double libm)
@@ -878,7 +878,7 @@ pub fn DistanceHorizontal(p1: vec3_t, p2: vec3_t) -> vec_t {
 
 /// Raven `DistanceHorizontalSquared`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1141-1146`
+/// Source: `oracle/codemp/game/q_math.c:1141-1146`
 pub fn DistanceHorizontalSquared(p1: vec3_t, p2: vec3_t) -> vec_t {
     let v = vec_sub(p2, p1);
     v[0] * v[0] + v[1] * v[1] // Leave off the z component
@@ -886,7 +886,7 @@ pub fn DistanceHorizontalSquared(p1: vec3_t, p2: vec3_t) -> vec_t {
 
 /// Raven `AddPointToBounds`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1148-1169`
+/// Source: `oracle/codemp/game/q_math.c:1148-1169`
 pub fn AddPointToBounds(v: vec3_t, mins: &mut vec3_t, maxs: &mut vec3_t) {
     if v[0] < mins[0] {
         mins[0] = v[0];
@@ -912,7 +912,7 @@ pub fn AddPointToBounds(v: vec3_t, mins: &mut vec3_t, maxs: &mut vec3_t) {
 
 /// Raven `VectorNormalize`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1172-1186`
+/// Source: `oracle/codemp/game/q_math.c:1172-1186`
 pub fn VectorNormalize(v: &mut vec3_t) -> vec_t {
     let mut length = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
     length = (length as f64).sqrt() as f32; // Raven `sqrt` is double libm rounded to float
@@ -929,7 +929,7 @@ pub fn VectorNormalize(v: &mut vec3_t) -> vec_t {
 
 /// Raven `VectorNormalize2`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1188-1212`
+/// Source: `oracle/codemp/game/q_math.c:1188-1212`
 pub fn VectorNormalize2(v: vec3_t, out: &mut vec3_t) -> vec_t {
     let mut length = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
     length = (length as f64).sqrt() as f32; // Raven `sqrt` is double libm rounded to float
@@ -948,7 +948,7 @@ pub fn VectorNormalize2(v: vec3_t, out: &mut vec3_t) -> vec_t {
 
 /// Raven `_VectorMA`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1214-1218`
+/// Source: `oracle/codemp/game/q_math.c:1214-1218`
 pub fn _VectorMA(veca: vec3_t, scale: f32, vecb: vec3_t, vecc: &mut vec3_t) {
     vecc[0] = veca[0] + scale * vecb[0];
     vecc[1] = veca[1] + scale * vecb[1];
@@ -957,14 +957,14 @@ pub fn _VectorMA(veca: vec3_t, scale: f32, vecb: vec3_t, vecc: &mut vec3_t) {
 
 /// Raven `_DotProduct`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1221-1223`
+/// Source: `oracle/codemp/game/q_math.c:1221-1223`
 pub fn _DotProduct(v1: vec3_t, v2: vec3_t) -> vec_t {
     v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2]
 }
 
 /// Raven `_VectorSubtract`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1225-1229`
+/// Source: `oracle/codemp/game/q_math.c:1225-1229`
 pub fn _VectorSubtract(veca: vec3_t, vecb: vec3_t, out: &mut vec3_t) {
     out[0] = veca[0] - vecb[0];
     out[1] = veca[1] - vecb[1];
@@ -973,7 +973,7 @@ pub fn _VectorSubtract(veca: vec3_t, vecb: vec3_t, out: &mut vec3_t) {
 
 /// Raven `_VectorAdd`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1231-1235`
+/// Source: `oracle/codemp/game/q_math.c:1231-1235`
 pub fn _VectorAdd(veca: vec3_t, vecb: vec3_t, out: &mut vec3_t) {
     out[0] = veca[0] + vecb[0];
     out[1] = veca[1] + vecb[1];
@@ -982,7 +982,7 @@ pub fn _VectorAdd(veca: vec3_t, vecb: vec3_t, out: &mut vec3_t) {
 
 /// Raven `_VectorCopy`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1237-1241`
+/// Source: `oracle/codemp/game/q_math.c:1237-1241`
 pub fn _VectorCopy(r#in: vec3_t, out: &mut vec3_t) {
     out[0] = r#in[0];
     out[1] = r#in[1];
@@ -991,7 +991,7 @@ pub fn _VectorCopy(r#in: vec3_t, out: &mut vec3_t) {
 
 /// Raven `_VectorScale`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1243-1247`
+/// Source: `oracle/codemp/game/q_math.c:1243-1247`
 pub fn _VectorScale(r#in: vec3_t, scale: vec_t, out: &mut vec3_t) {
     out[0] = r#in[0] * scale;
     out[1] = r#in[1] * scale;
@@ -1000,7 +1000,7 @@ pub fn _VectorScale(r#in: vec3_t, scale: vec_t, out: &mut vec3_t) {
 
 /// Raven `VectorInverse`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1547-1550`
+/// Source: `oracle/codemp/game/q_shared.h:1547-1550`
 pub fn VectorInverse(v: &mut vec3_t) {
     v[0] = -v[0];
     v[1] = -v[1];
@@ -1009,7 +1009,7 @@ pub fn VectorInverse(v: &mut vec3_t) {
 
 /// Raven `Vector4Scale`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1249-1254`
+/// Source: `oracle/codemp/game/q_math.c:1249-1254`
 pub fn Vector4Scale(r#in: vec4_t, scale: vec_t, out: &mut vec4_t) {
     out[0] = r#in[0] * scale;
     out[1] = r#in[1] * scale;
@@ -1019,7 +1019,7 @@ pub fn Vector4Scale(r#in: vec4_t, scale: vec_t, out: &mut vec4_t) {
 
 /// Raven `Q_log2`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1257-1265`
+/// Source: `oracle/codemp/game/q_math.c:1257-1265`
 pub fn Q_log2(val: c_int) -> c_int {
     let mut val = val;
     let mut answer = 0;
@@ -1035,7 +1035,7 @@ pub fn Q_log2(val: c_int) -> c_int {
 
 /// Raven `MatrixMultiply`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1293-1312`
+/// Source: `oracle/codemp/game/q_math.c:1293-1312`
 pub fn MatrixMultiply(in1: &[[f32; 3]; 3], in2: &[[f32; 3]; 3], out: &mut [[f32; 3]; 3]) {
     out[0][0] = in1[0][0] * in2[0][0] + in1[0][1] * in2[1][0] + in1[0][2] * in2[2][0];
     out[0][1] = in1[0][0] * in2[0][1] + in1[0][1] * in2[1][1] + in1[0][2] * in2[2][1];
@@ -1055,7 +1055,7 @@ pub fn MatrixMultiply(in1: &[[f32; 3]; 3], in2: &[[f32; 3]; 3], out: &mut [[f32;
 /// Raven's `static float sr, sp, sy, cr, cp, cy` are recomputed unconditionally
 /// on every call before use (kept only for an old MS-compiler FP bug per the
 /// oracle comment), so they carry no cross-call state; plain locals suffice.
-/// Source: `oracle/oracle/codemp/game/q_math.c:1315-1348`
+/// Source: `oracle/codemp/game/q_math.c:1315-1348`
 pub fn AngleVectors(
     angles: vec3_t,
     forward: Option<&mut vec3_t>,
@@ -1095,7 +1095,7 @@ pub fn AngleVectors(
 /// Raven `PerpendicularVector`.
 ///
 /// Assumes "src" is normalized.
-/// Source: `oracle/oracle/codemp/game/q_math.c:1353-1383`
+/// Source: `oracle/codemp/game/q_math.c:1353-1383`
 pub fn PerpendicularVector(dst: &mut vec3_t, src: vec3_t) {
     // find the smallest magnitude axially aligned vector
     let mut pos = 0usize;
@@ -1121,7 +1121,7 @@ pub fn PerpendicularVector(dst: &mut vec3_t, src: vec3_t) {
 /// We use two byte encoded normals in some space critical applications. Lat =
 /// 0 at (1,0,0) to 360 (-1,0,0), encoded in 8-bit sine table format. Lng = 0
 /// at (0,0,1) to 180 (0,0,-1), encoded in 8-bit sine table format.
-/// Source: `oracle/oracle/codemp/game/q_math.c:1394-1423`
+/// Source: `oracle/codemp/game/q_math.c:1394-1423`
 pub fn NormalToLatLong(normal: vec3_t, bytes: *mut byte) {
     let bytes = unsafe { std::slice::from_raw_parts_mut(bytes, 2) };
     // check for singularities
@@ -1150,11 +1150,11 @@ pub fn NormalToLatLong(normal: vec3_t, bytes: *mut byte) {
 
 // RNG functions (Rand_Init/flrand/Q_flrand/irand/Q_irand) are ported as methods
 // on bg_channel::rng::Rng (BgState.rng).
-// Source: `oracle/oracle/codemp/game/q_math.c:1434-1474` → `bg_channel/rng.rs`
+// Source: `oracle/codemp/game/q_math.c:1434-1474` → `bg_channel/rng.rs`
 
 /// Raven `powf`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1476-1482`
+/// Source: `oracle/codemp/game/q_math.c:1476-1482`
 pub fn powf(x: f32, y: c_int) -> f32 {
     let mut r = x;
     let mut y = y - 1;
@@ -1167,7 +1167,7 @@ pub fn powf(x: f32, y: c_int) -> f32 {
 
 /// Raven `DotProductNormalize`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1508-1516`
+/// Source: `oracle/codemp/game/q_math.c:1508-1516`
 pub fn DotProductNormalize(inVec1: vec3_t, inVec2: vec3_t) -> f32 {
     let mut v1: vec3_t = [0.0; 3];
     let mut v2: vec3_t = [0.0; 3];
@@ -1178,7 +1178,7 @@ pub fn DotProductNormalize(inVec1: vec3_t, inVec2: vec3_t) -> f32 {
 
 /// Raven `G_FindClosestPointOnLineSegment`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1524-1604`
+/// Source: `oracle/codemp/game/q_math.c:1524-1604`
 pub fn G_FindClosestPointOnLineSegment(
     start: vec3_t,
     end: vec3_t,
@@ -1248,7 +1248,7 @@ pub fn G_FindClosestPointOnLineSegment(
 
 /// Raven `G_PointDistFromLineSegment`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_math.c:1606-1670`
+/// Source: `oracle/codemp/game/q_math.c:1606-1670`
 pub fn G_PointDistFromLineSegment(start: vec3_t, end: vec3_t, from: vec3_t) -> f32 {
     // Find the perpendicular vector to vec from start to end
     let vec_start2from = vec_sub(from, start);

@@ -1,6 +1,6 @@
 //! MP `bg_public.h` saber move name type alias and constants.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:1289-1482`
+//! Type definition source: `oracle/codemp/game/bg_public.h:1289-1482`
 
 #![allow(non_camel_case_types)]
 
@@ -10,7 +10,7 @@ use core::ffi::c_int;
 ///
 /// Raven: NOTE: Names the saber moves via an anonymous `enum { LS_INVALID..LS_MOVE_MAX }`,
 /// then `typedef int saberMoveName_t` for storage.
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:1482`
+/// Type definition source: `oracle/codemp/game/bg_public.h:1482`
 pub type saberMoveName_t = c_int;
 
 pub const LS_INVALID: saberMoveName_t = -1;

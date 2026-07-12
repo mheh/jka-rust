@@ -6,7 +6,7 @@ use mp_qshared::shared::{connstate_t, MAX_STRING_CHARS};
 
 /// Raven `uiClientState_t` — client connection state as seen by the UI module.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_public.h:8-15`
+/// Type definition source: `oracle/codemp/ui/ui_public.h:8-15`
 #[repr(C)]
 pub struct uiClientState_t {
     pub connState: connstate_t,

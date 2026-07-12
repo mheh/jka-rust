@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall( CG_PC_ADD_GLOBAL_DEFINE, define );`
 /// Raven transport: `return botlib_export->PC_AddGlobalDefine( (char *)VMA(1) );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:541-542`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:999-1000`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:541-542`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:999-1000`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgPcAddGlobalDefineArgs {
     define: *mut c_char,
@@ -25,10 +25,10 @@ impl CgPcAddGlobalDefineArgs {
 
 /// `CG_PC_ADD_GLOBAL_DEFINE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:199`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:541-542`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:999-1000`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:999-1000`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:199`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:541-542`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:999-1000`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:999-1000`
 pub struct CgPcAddGlobalDefine;
 
 impl OutboundSysCall for CgPcAddGlobalDefine {

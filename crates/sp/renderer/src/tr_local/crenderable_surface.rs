@@ -8,12 +8,12 @@ use crate::mdx_format::mdxm_surface_t::mdxmSurface_t;
 ///
 /// Raven: ident of this surface - required so the materials renderer knows
 /// what sort of surface this refers to.
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:1840-1894`
+/// Type definition source: `oracle/code/renderer/tr_local.h:1840-1894`
 #[repr(C)]
 pub struct CRenderableSurface {
     pub ident: c_int,
     //TODO: Port CBoneCache
-    // Source: oracle/oracle/code/renderer/tr_local.h:1848
+    // Source: oracle/code/renderer/tr_local.h:1848
     pub boneCache: *mut core::ffi::c_void,
     // pointer to surface data loaded into file - only used by client
     // renderer DO NOT USE IN GAME SIDE - if there is a vid restart this

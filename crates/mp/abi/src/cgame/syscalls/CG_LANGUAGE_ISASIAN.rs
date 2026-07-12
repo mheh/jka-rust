@@ -1,5 +1,7 @@
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use mp_qshared::shared::qboolean;
 
 /// Arguments for `CG_LANGUAGE_ISASIAN`.
@@ -7,9 +9,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( CG_LANGUAGE_ISASIAN );`
 /// Raven transport: `return re.Language_IsAsian();`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:307-309`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2258`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:882-883`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:307-309`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2258`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:882-883`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgLanguageIsasianArgs;
 
@@ -21,11 +23,11 @@ impl CgLanguageIsasianArgs {
 
 /// `CG_LANGUAGE_ISASIAN` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:126`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:307-309`
-/// Output source: `oracle/oracle/codemp/cgame/cg_local.h:2258`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:882-883`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:882-883`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:126`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:307-309`
+/// Output source: `oracle/codemp/cgame/cg_local.h:2258`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:882-883`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:882-883`
 pub struct CgLanguageIsasian;
 
 impl OutboundSysCall for CgLanguageIsasian {

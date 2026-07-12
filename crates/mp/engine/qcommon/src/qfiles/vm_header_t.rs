@@ -2,7 +2,7 @@
 
 /// Raven `vmHeader_t` — compiled QVM bytecode file header.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:26-38`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:26-38`
 #[repr(C)]
 pub struct vmHeader_t {
     pub vmMagic: i32,

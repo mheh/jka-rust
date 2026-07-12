@@ -11,9 +11,9 @@ use abi_transport::generic::{
 /// Raven transport: `return re.RegisterSkin( (const char *)VMA(1) );`
 ///
 /// Raven comment: `returns all white if not found`.
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:270-271`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2250`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:865-866`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:270-271`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2250`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:865-866`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRRegisterskinArgs {
     name: *const c_char,
@@ -27,11 +27,11 @@ impl CgRRegisterskinArgs {
 
 /// `CG_R_REGISTERSKIN` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:118`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:270-271`
-/// Output source: `oracle/oracle/codemp/cgame/cg_local.h:2250`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:865-866`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:865-866`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:118`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:270-271`
+/// Output source: `oracle/codemp/cgame/cg_local.h:2250`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:865-866`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:865-866`
 pub struct CgRRegisterskin;
 
 impl OutboundSysCall for CgRRegisterskin {

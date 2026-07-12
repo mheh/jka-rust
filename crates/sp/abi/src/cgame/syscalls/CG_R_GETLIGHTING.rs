@@ -11,8 +11,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_R_GETLIGHTING, origin, ambientLight, directedLight, ligthDir );`
 /// Raven transport: `return re.GetLighting((const float *) VMA(1), (float *) VMA(2), (float *) VMA(3), (float *) VMA(4));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:376-377`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:696-697`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:376-377`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:696-697`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRGetlightingArgs {
     origin: *const vec3_t,
@@ -55,10 +55,10 @@ impl CgRGetlightingArgs {
 
 /// `CG_R_GETLIGHTING` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:136`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:376-377`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:696-697`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:696-697`
+/// Enum value source: `oracle/code/cgame/cg_public.h:136`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:376-377`
+/// Output source: `oracle/code/client/cl_cgame.cpp:696-697`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:696-697`
 pub struct CgRGetlighting;
 
 impl OutboundSysCall for CgRGetlighting {

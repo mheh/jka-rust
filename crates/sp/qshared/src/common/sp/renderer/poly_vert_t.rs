@@ -4,7 +4,7 @@ use crate::shared::vec3_t;
 
 /// Raven `polyVert_t` — a single vertex of a dynamically-added polygon.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:70-74`
+/// Type definition source: `oracle/code/renderer/tr_types.h:70-74`
 #[repr(C)]
 pub struct polyVert_t {
     pub xyz: vec3_t,

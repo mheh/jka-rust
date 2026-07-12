@@ -9,8 +9,8 @@ use abi_transport::generic::{
 ///
 /// Raven vmMain: `CG_DrawActiveFrame( arg0, (stereoFrame_t) arg1 );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:107`
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:183-187`
+/// Args source: `oracle/code/cgame/cg_main.cpp:107`
+/// Type definition source: `oracle/code/renderer/tr_types.h:183-187`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgDrawActiveFrameArgs {
     server_time: c_int,
@@ -37,10 +37,10 @@ impl CgDrawActiveFrameArgs {
 /// `CG_DRAW_ACTIVE_FRAME` SP cgame exports vmMain ABI token.
 ///
 /// Raven: `void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView );`
-/// Enum value source: `oracle/oracle/code/client/vmachine.h:17`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:663`, `oracle/oracle/code/cgame/cg_main.cpp:107`
-/// Output source: `oracle/oracle/code/cgame/cg_local.h:663`, `oracle/oracle/code/cgame/cg_main.cpp:107`
-/// VM_Call/vmMain switch source: `oracle/oracle/code/client/cl_cgame.cpp:1109`, `oracle/oracle/code/cgame/cg_main.cpp:94-115`
+/// Enum value source: `oracle/code/client/vmachine.h:17`
+/// Args source: `oracle/code/cgame/cg_local.h:663`, `oracle/code/cgame/cg_main.cpp:107`
+/// Output source: `oracle/code/cgame/cg_local.h:663`, `oracle/code/cgame/cg_main.cpp:107`
+/// VM_Call/vmMain switch source: `oracle/code/client/cl_cgame.cpp:1109`, `oracle/code/cgame/cg_main.cpp:94-115`
 pub struct CgDrawActiveFrame;
 
 impl InboundVmCall for CgDrawActiveFrame {

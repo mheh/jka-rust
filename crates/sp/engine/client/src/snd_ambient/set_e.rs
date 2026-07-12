@@ -2,7 +2,7 @@
 
 /// Raven `set_e` — ambient set types.
 ///
-/// Type definition source: `oracle/oracle/code/client/snd_ambient.h:33-40`
+/// Type definition source: `oracle/code/client/snd_ambient.h:33-40`
 #[repr(i32)]
 pub enum set_e {
     /// General sets

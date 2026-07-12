@@ -1,0 +1,19 @@
+== fresh new / initial generation ==
+new h0                   handle=1024 idx=0 gen=1 valid=1
+new h1                   handle=1025 idx=1 gen=1 valid=1
+new h2                   handle=1026 idx=2 gen=1 valid=1
+
+== IsValid predicate ==
+IsValid(0)       = 0  (null handle -> false)
+IsValid(h0)      = 1
+IsValid(h0|junk) = 0  (stale generation -> false)
+
+== delete + LIFO reuse + generation bump ==
+after delete h1          handle=1025 idx=1 gen=1 valid=0
+reuse -> new r1          handle=2049 idx=1 gen=2 valid=1
+reuse -> new r2          handle=3073 idx=1 gen=3 valid=1
+reuse -> new r3          handle=4097 idx=1 gen=4 valid=1
+
+== multi-slot free-list ordering ==
+new after 2 deletes      handle=2050 idx=2 gen=2 valid=1
+new again                handle=2048 idx=0 gen=2 valid=1

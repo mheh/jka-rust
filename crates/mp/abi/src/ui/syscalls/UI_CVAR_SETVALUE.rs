@@ -11,9 +11,9 @@ use abi_transport::pass_float;
 /// Raven wrapper: `syscall( UI_CVAR_SETVALUE, var_name, PASSFLOAT( value ) );`
 /// Raven transport: `Cvar_SetValue( (const char *)VMA(1), VMF(2) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:55-56`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:923`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:887-889`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:55-56`
+/// Args source: `oracle/codemp/ui/ui_local.h:923`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:887-889`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UiCvarSetvalueArgs {
     var_name: *const c_char,
@@ -36,10 +36,10 @@ impl UiCvarSetvalueArgs {
 
 /// `UI_CVAR_SETVALUE` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:24`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:55-56`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:887-889`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:887-889`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:24`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:55-56`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:887-889`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:887-889`
 pub struct UiCvarSetvalue;
 
 impl OutboundSysCall for UiCvarSetvalue {

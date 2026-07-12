@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build the jampgame "wsaber" oracle dumper from the UNMODIFIED Raven sources
-# and check (or, with --regen, regenerate) the golden dump golden/wsaber.txt.
+# and check (or, with --regen, regenerate) the golden dump
+# crates/mp/game/tests/oracle/golden/wsaber.txt.
 #
 # The dumper drives TWO pure integer leaf functions of w_saber.c —
 # G_SaberLockAnim and G_KnockawayForParry — linked against the UNMODIFIED
@@ -14,7 +15,11 @@
 set -eu
 cd "$(dirname "$0")"
 
-ORACLE=../../oracle/oracle
+# Committed parity data (fixtures + goldens) lives inside the mp_game crate so
+# the crate is self-contained; this harness only generates/checks it.
+DATA=../../crates/mp/game/tests/oracle
+
+ORACLE=../../oracle
 G=$ORACLE/codemp/game
 Q=$ORACLE/codemp/qcommon
 B=build-wsaber
@@ -55,13 +60,13 @@ cc -w -std=gnu11 -c stubs_wsaber.c -o "$B/stubs.o"
 # shellcheck disable=SC2086
 cc "$B/main.o" $OBJS "$B/stubs.o" -lm -o "$B/wsaber_dump"
 
-mkdir -p golden
+mkdir -p "$DATA/golden"
 status=0
 if [ "${1:-}" = "--regen" ]; then
-	"$B/wsaber_dump" fixtures/wsaber > golden/wsaber.txt
+	"$B/wsaber_dump" "$DATA/fixtures/wsaber" > "$DATA/golden/wsaber.txt"
 	echo "regenerated wsaber"
 else
-	"$B/wsaber_dump" fixtures/wsaber | diff -u golden/wsaber.txt - || status=1
+	"$B/wsaber_dump" "$DATA/fixtures/wsaber" | diff -u "$DATA/golden/wsaber.txt" - || status=1
 fi
 
 [ "$status" -eq 0 ] && echo "jampgame-oracle wsaber: OK"

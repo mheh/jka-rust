@@ -2,7 +2,7 @@
 
 /// Raven `spot_t` — body spot enum for targeting.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/b_public.h:69-69`
+/// Type definition source: `oracle/codemp/game/b_public.h:69-69`
 #[repr(i32)]
 pub enum spot_t {
     SPOT_ORIGIN,

@@ -6,8 +6,8 @@ use crate::shared::vec3_t;
 ///
 /// Raven comment: `rww - update parms for ik bone stuff`
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2578`
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:933`
+/// Type definition source: `oracle/code/game/q_shared.h:2578`
+/// Type definition source: `oracle/codemp/game/q_shared.h:933`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct sharedIKMoveParams_t {

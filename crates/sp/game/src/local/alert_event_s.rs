@@ -8,29 +8,29 @@ use super::alert_event_type_e::alertEventType_e;
 
 /// Raven `alertEvent_s` — an AI awareness alert event (sight/sound).
 ///
-/// Type definition source: `oracle/oracle/code/game/g_local.h:125-137`
+/// Type definition source: `oracle/code/game/g_local.h:125-137`
 #[repr(C)]
 pub struct alertEvent_t {
-	/// Where the event is located
-	pub position: vec3_t,
-	/// Consideration radius
-	pub radius: f32,
-	/// Priority level of the event
-	pub level: alertEventLevel_e,
-	/// Event type (sound,sight)
-	pub r#type: alertEventType_e,
-	/// Who made the sound
-	pub owner: *mut gentity_t,
-	/// ambient light level at point
-	pub light: f32,
-	/// additional light- makes it more noticable, even in darkness
-	pub addLight: f32,
-	/// unique... if get a ridiculous number, this will repeat, but should not be a problem as it's just comparing it to your lastAlertID
-	pub ID: i32,
-	/// when it was created
-	pub timestamp: i32,
-	/// alert is on the ground (only used for sounds)
-	pub onGround: qboolean,
+    /// Where the event is located
+    pub position: vec3_t,
+    /// Consideration radius
+    pub radius: f32,
+    /// Priority level of the event
+    pub level: alertEventLevel_e,
+    /// Event type (sound,sight)
+    pub r#type: alertEventType_e,
+    /// Who made the sound
+    pub owner: *mut gentity_t,
+    /// ambient light level at point
+    pub light: f32,
+    /// additional light- makes it more noticable, even in darkness
+    pub addLight: f32,
+    /// unique... if get a ridiculous number, this will repeat, but should not be a problem as it's just comparing it to your lastAlertID
+    pub ID: i32,
+    /// when it was created
+    pub timestamp: i32,
+    /// alert is on the ground (only used for sounds)
+    pub onGround: qboolean,
 }
 
 #[cfg(target_pointer_width = "64")]

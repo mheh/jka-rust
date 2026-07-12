@@ -2,7 +2,7 @@
 
 /// Raven `spot_t` — body spot enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/game/b_public.h:89-89`
+/// Type definition source: `oracle/code/game/b_public.h:89-89`
 #[repr(i32)]
 pub enum spot_t {
     SPOT_ORIGIN = 0,

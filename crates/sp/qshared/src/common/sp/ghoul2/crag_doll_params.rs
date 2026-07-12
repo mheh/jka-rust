@@ -6,7 +6,7 @@ use crate::shared::vec3_t;
 
 /// Raven `CRagDollParams::ERagPhase` — ragdoll update callback phases.
 ///
-/// Type definition source: `oracle/oracle/code/ghoul2/ghoul2_gore.h:124-133`
+/// Type definition source: `oracle/code/ghoul2/ghoul2_gore.h:124-133`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ERagPhase {
@@ -25,7 +25,7 @@ pub enum ERagPhase {
 /// Raven `CRagDollParams::ERagEffector` — ragdoll effector bone bit flags,
 /// used for the `RP_DISABLE_EFFECTORS` call.
 ///
-/// Type definition source: `oracle/oracle/code/ghoul2/ghoul2_gore.h:159-186`
+/// Type definition source: `oracle/code/ghoul2/ghoul2_gore.h:159-186`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ERagEffector {
@@ -59,7 +59,7 @@ pub enum ERagEffector {
 /// Raven `CRagDollParams` — argument/return block passed to the ragdoll
 /// update callback across all ragdoll phases.
 ///
-/// Type definition source: `oracle/oracle/code/ghoul2/ghoul2_gore.h:120-190`
+/// Type definition source: `oracle/code/ghoul2/ghoul2_gore.h:120-190`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CRagDollParams {

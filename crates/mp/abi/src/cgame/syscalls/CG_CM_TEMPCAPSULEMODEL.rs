@@ -13,10 +13,10 @@ use mp_qshared::shared::vec3_t;
 /// `VMA` as read-only `const float *` vectors, then calls `CM_TempBoxModel`
 /// with `qtrue` for the capsule flag.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:139-140`
-/// Args source: `oracle/oracle/codemp/client/cl_cgame.cpp:787-788`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:139-140`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:787-788`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:139-140`
+/// Args source: `oracle/codemp/client/cl_cgame.cpp:787-788`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:139-140`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:787-788`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmTempcapsulemodelArgs {
     /// Minimum bounds vector, decoded by Raven as `(const float *)VMA(1)`.
@@ -45,12 +45,12 @@ impl CgCmTempcapsulemodelArgs {
 /// Raven transport: `return CM_TempBoxModel( (const float *)VMA(1),
 /// (const float *)VMA(2), /*int capsule*/ qtrue );`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:87`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:139-140`
-/// Args source: `oracle/oracle/codemp/client/cl_cgame.cpp:787-788`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:139-140`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:787-788`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:787-788`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:87`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:139-140`
+/// Args source: `oracle/codemp/client/cl_cgame.cpp:787-788`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:139-140`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:787-788`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:787-788`
 pub struct CgCmTempcapsulemodel;
 
 impl OutboundSysCall for CgCmTempcapsulemodel {

@@ -1,5 +1,7 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 use sp_qshared::shared::qhandle_t;
 
@@ -8,8 +10,8 @@ use sp_qshared::shared::qhandle_t;
 /// Raven wrapper packs the coordinates and UVs with `PASSFLOAT`.
 /// Raven transport: `re.DrawRotatePic2(VMF(1), ..., VMF(9), args[10]);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:420-423`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:729-731`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:420-423`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:729-731`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRDrawrotatepic2Args {
     x: f32,
@@ -55,10 +57,10 @@ impl CgRDrawrotatepic2Args {
 
 /// `CG_R_DRAWROTATEPIC2` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:146`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:420-423`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:729-731`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:729-731`
+/// Enum value source: `oracle/code/cgame/cg_public.h:146`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:420-423`
+/// Output source: `oracle/code/client/cl_cgame.cpp:729-731`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:729-731`
 pub struct CgRDrawrotatepic2;
 
 impl OutboundSysCall for CgRDrawrotatepic2 {

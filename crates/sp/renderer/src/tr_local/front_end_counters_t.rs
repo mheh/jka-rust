@@ -2,7 +2,7 @@
 
 /// Raven `frontEndCounters_t` — per-frame culling/surface statistics.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:1047-1056`
+/// Type definition source: `oracle/code/renderer/tr_local.h:1047-1056`
 #[repr(C)]
 pub struct frontEndCounters_t {
     pub c_sphere_cull_patch_in: i32,
@@ -24,12 +24,9 @@ pub struct frontEndCounters_t {
 }
 
 const _: () = assert!(core::mem::size_of::<frontEndCounters_t>() == 60);
-const _: () =
-    assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_in) == 0);
-const _: () =
-    assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_clip) == 4);
-const _: () =
-    assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_out) == 8);
+const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_in) == 0);
+const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_clip) == 4);
+const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_sphere_cull_patch_out) == 8);
 const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_box_cull_patch_in) == 12);
 const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_box_cull_patch_clip) == 16);
 const _: () = assert!(core::mem::offset_of!(frontEndCounters_t, c_box_cull_patch_out) == 20);

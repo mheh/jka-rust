@@ -1,7 +1,7 @@
 //! GP2 ("Generic Parser 2") — Raven's `{`/`[` text format parser, used by the
 //! FX system, ambient music sets, and terrain/RMG instance files.
 //!
-//! C++-track idiomatic reimplementation of `oracle/oracle/codemp/qcommon/GenericParser2.{h,cpp}`:
+//! C++-track idiomatic reimplementation of `oracle/codemp/qcommon/GenericParser2.{h,cpp}`:
 //!
 //! - `CGenericParser2` → [`generic_parser2::GenericParser2`] (owns all nodes in
 //!   an arena), `CGPGroup` → [`gp_group::GpGroup`] (id + borrow wrapper),

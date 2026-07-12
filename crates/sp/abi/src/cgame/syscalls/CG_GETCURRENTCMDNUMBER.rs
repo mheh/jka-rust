@@ -1,15 +1,17 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_GETCURRENTCMDNUMBER`.
 ///
 /// Raven wrapper: `return syscall( CG_GETCURRENTCMDNUMBER );`
 /// Raven transport: `return CL_GetCurrentCmdNumber();`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:467-468`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:766-767`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:467-468`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:766-767`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgGetcurrentcmdnumberArgs;
 
@@ -21,10 +23,10 @@ impl CgGetcurrentcmdnumberArgs {
 
 /// `CG_GETCURRENTCMDNUMBER` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:158`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:467-468`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:766-767`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:766-767`
+/// Enum value source: `oracle/code/cgame/cg_public.h:158`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:467-468`
+/// Output source: `oracle/code/client/cl_cgame.cpp:766-767`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:766-767`
 pub struct CgGetcurrentcmdnumber;
 
 impl OutboundSysCall for CgGetcurrentcmdnumber {

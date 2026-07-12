@@ -2,7 +2,7 @@
 
 /// Raven `movetype_t` — entity movement type.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:374-381`
+/// Type definition source: `oracle/code/game/g_shared.h:374-381`
 #[repr(i32)]
 pub enum movetype_t {
     MT_STATIC = 0,

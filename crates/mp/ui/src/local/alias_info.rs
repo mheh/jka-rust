@@ -4,12 +4,12 @@ use core::ffi::c_char;
 
 /// Raven `aliasInfo`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:608-612`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:608-612`
 #[repr(C)]
 pub struct aliasInfo {
-	pub name: *const c_char,
-	pub ai: *const c_char,
-	pub action: *const c_char,
+    pub name: *const c_char,
+    pub ai: *const c_char,
+    pub action: *const c_char,
 }
 
 const _: () = assert!(core::mem::size_of::<aliasInfo>() == 24);

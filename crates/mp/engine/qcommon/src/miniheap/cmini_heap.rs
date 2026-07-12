@@ -4,7 +4,7 @@ use std::os::raw::{c_char, c_int};
 /// Raven `CMiniHeap` — bump-pointer heap allocator over a fixed malloc'd block.
 ///
 /// Raven: no class-level comment.
-/// Type definition source: `oracle/oracle/codemp/qcommon/MiniHeap.h:5-51`
+/// Type definition source: `oracle/codemp/qcommon/MiniHeap.h:5-51`
 #[repr(C)]
 pub struct CMiniHeap {
     mHeap: *mut c_char,

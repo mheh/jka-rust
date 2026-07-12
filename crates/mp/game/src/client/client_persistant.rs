@@ -1,6 +1,6 @@
 //! MP `clientPersistant_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/g_local.h:441-458`
+//! Type definition source: `oracle/codemp/game/g_local.h:441-458`
 
 #![allow(non_camel_case_types)]
 
@@ -16,15 +16,15 @@ use super::player_team_state::playerTeamState_t;
 pub const PSG_VOTED: c_int = 1 << 0; // already cast a vote
 pub const PSG_TEAMVOTED: c_int = 1 << 1; // already cast a team vote
 
-/// Raven `MAX_NETNAME`. Source: `oracle/oracle/codemp/game/g_local.h:438`
+/// Raven `MAX_NETNAME`. Source: `oracle/codemp/game/g_local.h:438`
 pub const MAX_NETNAME: usize = 36;
-/// Raven `MAX_VOTE_COUNT`. Source: `oracle/oracle/codemp/game/g_local.h:439`
+/// Raven `MAX_VOTE_COUNT`. Source: `oracle/codemp/game/g_local.h:439`
 pub const MAX_VOTE_COUNT: c_int = 3;
 
 /// Raven `clientPersistant_t` — client data that stays across respawns, cleared
 /// on each level/team change at `ClientBegin()`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:443-458`
+/// Type definition source: `oracle/codemp/game/g_local.h:443-458`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct clientPersistant_t {

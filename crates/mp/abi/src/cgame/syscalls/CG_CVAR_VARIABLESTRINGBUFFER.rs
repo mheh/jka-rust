@@ -11,8 +11,8 @@ use abi_transport::generic::{
 /// The client switch decodes `var_name` and `buffer` with `VMA`, reads `bufsize`
 /// directly from `args[3]`, and writes the cvar string into the provided buffer.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:62-63`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:723-724`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:62-63`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:723-724`
 #[derive(Debug)]
 pub struct CgCvarVariablestringbufferArgs {
     var_name: *const c_char,
@@ -51,10 +51,10 @@ impl CgCvarVariablestringbufferArgs {
 /// `CG_CVAR_VARIABLESTRINGBUFFER` MP cgame imports syscall ABI token.
 ///
 /// Raven: `( const char *var_name, char *buffer, int bufsize )`.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:68`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:62-63`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:725`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:723-724`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:68`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:62-63`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:725`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:723-724`
 pub struct CgCvarVariablestringbuffer;
 
 impl OutboundSysCall for CgCvarVariablestringbuffer {

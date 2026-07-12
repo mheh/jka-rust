@@ -30,7 +30,7 @@ impl GNavGetprojectednodeArgs {
 
 /// `G_NAV_GETPROJECTEDNODE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:317`
+/// Source: `oracle/codemp/game/g_public.h:317`
 pub struct GNavGetprojectednode;
 
 impl OutboundSysCall for GNavGetprojectednode {

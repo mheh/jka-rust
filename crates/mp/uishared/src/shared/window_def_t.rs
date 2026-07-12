@@ -8,7 +8,7 @@ use super::rect_def_t::rectDef_t;
 
 /// Raven `windowDef_t` — base UI window definition shared by menus and items.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:122-144`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:122-144`
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct windowDef_t {

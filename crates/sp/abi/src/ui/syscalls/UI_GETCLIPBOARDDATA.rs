@@ -6,7 +6,7 @@ use core::ffi::{c_char, c_int};
 
 /// `UI_GETCLIPBOARDDATA` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:194`
+/// Source: `oracle/code/ui/ui_public.h:194`
 pub struct UiGetclipboarddata;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,10 +33,10 @@ impl OutboundSysCall for UiGetclipboarddata {
     type Import = SpUiImport;
     /// Raven wrapper: `syscall( UI_GETCLIPBOARDDATA, buf, bufsize );`
     ///
-    /// Args source: `oracle/oracle/code/ui/ui_syscalls.cpp:147-149`
-    /// Output source: `oracle/oracle/code/ui/ui_syscalls.cpp:147-149`
+    /// Args source: `oracle/code/ui/ui_syscalls.cpp:147-149`
+    /// Output source: `oracle/code/ui/ui_syscalls.cpp:147-149`
     ///
-    /// Transport/switch source: `oracle/oracle/code/ui/ui_syscalls.cpp:147-149`
+    /// Transport/switch source: `oracle/code/ui/ui_syscalls.cpp:147-149`
     type Args = UiGetclipboarddataArgs;
     /// This call writes into the caller-provided buffer and does not return a value.
     type Output = ();

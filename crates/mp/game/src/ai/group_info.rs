@@ -1,6 +1,6 @@
 //! MP `AIGroupInfo_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/ai.h:96-116`
+//! Type definition source: `oracle/codemp/game/ai.h:96-116`
 
 #![allow(non_camel_case_types)]
 
@@ -18,7 +18,7 @@ use super::group_member::AIGroupMember_t;
 /// Raven: `!!!!!!!!!! LOADSAVE-affecting structure !!!!!!!!!!`
 /// Pointer-bearing (`gentity_t *`) => arch-dependent layout; the `size_of`
 /// assert pins the host-64-bit size.
-/// Type definition source: `oracle/oracle/codemp/game/ai.h:97-116`
+/// Type definition source: `oracle/codemp/game/ai.h:97-116`
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct AIGroupInfo_t {

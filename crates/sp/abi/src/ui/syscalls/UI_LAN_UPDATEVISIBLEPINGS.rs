@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use sp_qshared::shared::qboolean;
 
 /// Arguments for `UI_LAN_UPDATEVISIBLEPINGS`.
@@ -9,11 +11,11 @@ use sp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( UI_LAN_UPDATEVISIBLEPINGS, source );`
 /// Raven transport: `return LAN_UpdateVisiblePings( args[1] );`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:221`
-/// Args source (SP fallback): `oracle/oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_UPDATEVISIBLEPINGS`.
-/// Args source (fallback): `oracle/oracle/codemp/ui/ui_local.h:976`
-/// Transport/switch source (fallback): `oracle/oracle/codemp/client/cl_ui.cpp:1106-1107`
-/// Output source fallback: `oracle/oracle/codemp/ui/ui_local.h:976`
+/// Enum source: `oracle/code/ui/ui_public.h:221`
+/// Args source (SP fallback): `oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_UPDATEVISIBLEPINGS`.
+/// Args source (fallback): `oracle/codemp/ui/ui_local.h:976`
+/// Transport/switch source (fallback): `oracle/codemp/client/cl_ui.cpp:1106-1107`
+/// Output source fallback: `oracle/codemp/ui/ui_local.h:976`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiLanUpdatevisiblepingsArgs {
     source: c_int,
@@ -31,7 +33,7 @@ impl UiLanUpdatevisiblepingsArgs {
 
 /// `UI_LAN_UPDATEVISIBLEPINGS` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:221`
+/// Source: `oracle/code/ui/ui_public.h:221`
 pub struct UiLanUpdatevisiblepings;
 
 impl OutboundSysCall for UiLanUpdatevisiblepings {

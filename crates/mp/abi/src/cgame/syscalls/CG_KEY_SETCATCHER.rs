@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_KEY_SETCATCHER`.
 ///
@@ -9,8 +11,8 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// The MP client switch reads the catcher mask from `args[1]`, calls
 /// `Key_SetCatcher(args[1])`, and returns `0`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:533-534`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:993-995`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:533-534`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:993-995`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgKeySetcatcherArgs {
     /// Key catcher mask, read by Raven as `args[1]`.
@@ -32,10 +34,10 @@ impl CgKeySetcatcherArgs {
 /// Raven wrapper: `syscall( CG_KEY_SETCATCHER, catcher );`
 /// Raven transport: `Key_SetCatcher( args[1] ); return 0;`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:196`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:533-534`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:993-995`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:993-995`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:196`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:533-534`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:993-995`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:993-995`
 pub struct CgKeySetcatcher;
 
 impl OutboundSysCall for CgKeySetcatcher {

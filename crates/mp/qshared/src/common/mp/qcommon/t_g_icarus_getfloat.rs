@@ -3,13 +3,13 @@
 /// Raven `T_G_ICARUS_GETFLOAT` — ICARUS `getfloat` task data passed across
 /// the game ABI seam.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:892-898`
+/// Type definition source: `oracle/codemp/game/g_public.h:892-898`
 #[repr(C)]
 pub struct T_G_ICARUS_GETFLOAT {
-	pub entID: i32,
-	pub r#type: i32,
-	pub name: [u8; 2048],
-	pub value: f32,
+    pub entID: i32,
+    pub r#type: i32,
+    pub name: [u8; 2048],
+    pub value: f32,
 }
 
 const _: () = assert!(core::mem::size_of::<T_G_ICARUS_GETFLOAT>() == 2060);

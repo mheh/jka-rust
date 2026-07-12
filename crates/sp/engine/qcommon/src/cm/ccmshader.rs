@@ -1,12 +1,12 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use sp_qshared::shared::MAX_QPATH;
 use core::ffi::c_char;
+use sp_qshared::shared::MAX_QPATH;
 
 /// Raven `CCMShader` — a collision-model shader entry (name + surface/content flags),
 /// linked into a hash-bucket chain via `mNext`.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_local.h:73-85`
+/// Type definition source: `oracle/code/qcommon/cm_local.h:73-85`
 #[repr(C)]
 pub struct CCMShader {
     pub shader: [c_char; MAX_QPATH as usize],

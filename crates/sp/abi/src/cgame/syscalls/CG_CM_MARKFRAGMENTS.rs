@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
+use crate::cgame::types::markFragment_t;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::cgame::types::markFragment_t;
 use sp_qshared::shared::vec3_t;
 
 /// Arguments for `CG_CM_MARKFRAGMENTS`.
@@ -12,12 +12,12 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `int trap_CM_MarkFragments(int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer);`
 /// Raven transport: `return re.MarkFragments(args[1], (float(*)[3]) VMA(2), (const float *) VMA(3), args[4], (float *) VMA(5), args[6], (markFragment_t *) VMA(7));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:168-172`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:966`
-/// Output source: `oracle/oracle/code/renderer/tr_public.h:102`
-/// Buffer semantics source: `oracle/oracle/code/renderer/tr_marks.cpp:197-222`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:545-546`
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1402-1405`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:168-172`
+/// Args source: `oracle/code/cgame/cg_local.h:966`
+/// Output source: `oracle/code/renderer/tr_public.h:102`
+/// Buffer semantics source: `oracle/code/renderer/tr_marks.cpp:197-222`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:545-546`
+/// Type definition source: `oracle/code/game/q_shared.h:1402-1405`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmMarkfragmentsArgs {
     num_points: c_int,
@@ -81,12 +81,12 @@ impl CgCmMarkfragmentsArgs {
 
 /// `CG_CM_MARKFRAGMENTS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:89`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:168-172`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:545-546`
-/// Output source: `oracle/oracle/code/renderer/tr_public.h:102`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:545-546`
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1402-1405`
+/// Enum value source: `oracle/code/cgame/cg_public.h:89`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:168-172`
+/// Output source: `oracle/code/client/cl_cgame.cpp:545-546`
+/// Output source: `oracle/code/renderer/tr_public.h:102`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:545-546`
+/// Type definition source: `oracle/code/game/q_shared.h:1402-1405`
 pub struct CgCmMarkfragments;
 
 impl OutboundSysCall for CgCmMarkfragments {

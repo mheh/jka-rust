@@ -5,16 +5,16 @@ use crate::shared::{qboolean, vec3_t};
 /// Raven `T_G_ICARUS_LERP2POS` — ICARUS `lerp2pos` task data passed across
 /// the game ABI seam.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:818-826`
+/// Type definition source: `oracle/codemp/game/g_public.h:818-826`
 #[repr(C)]
 pub struct T_G_ICARUS_LERP2POS {
-	pub taskID: i32,
-	pub entID: i32,
-	pub origin: vec3_t,
-	pub angles: vec3_t,
-	pub duration: f32,
-	/// special case
-	pub nullAngles: qboolean,
+    pub taskID: i32,
+    pub entID: i32,
+    pub origin: vec3_t,
+    pub angles: vec3_t,
+    pub duration: f32,
+    /// special case
+    pub nullAngles: qboolean,
 }
 
 const _: () = assert!(core::mem::size_of::<T_G_ICARUS_LERP2POS>() == 40);

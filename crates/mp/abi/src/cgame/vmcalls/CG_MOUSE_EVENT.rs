@@ -7,8 +7,8 @@ use abi_transport::generic::{
 
 /// Arguments for `CG_MOUSE_EVENT`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:211-215`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_input.cpp:1005-1008`
+/// Args source: `oracle/codemp/cgame/cg_main.c:211-215`
+/// Transport/call-site source: `oracle/codemp/client/cl_input.cpp:1005-1008`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgMouseEventArgs {
     dx: c_int,
@@ -32,10 +32,10 @@ impl CgMouseEventArgs {
 /// `CG_MOUSE_EVENT` MP cgame exports vmMain ABI token.
 ///
 /// Raven: void (*CG_MouseEvent)( int dx, int dy );
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:387-388`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:211-215`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:211-215`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_input.cpp:1005-1008`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:387-388`
+/// Args source: `oracle/codemp/cgame/cg_main.c:211-215`
+/// Output source: `oracle/codemp/cgame/cg_main.c:211-215`
+/// Transport/call-site source: `oracle/codemp/client/cl_input.cpp:1005-1008`
 pub struct CgMouseEvent;
 
 impl InboundVmCall for CgMouseEvent {

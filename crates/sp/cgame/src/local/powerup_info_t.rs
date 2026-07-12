@@ -2,7 +2,7 @@
 
 /// Raven `powerupInfo_t` — active powerup tracking info.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:263-265`
+/// Type definition source: `oracle/code/cgame/cg_local.h:263-265`
 #[repr(C)]
 pub struct powerupInfo_t {
     pub itemNum: i32,

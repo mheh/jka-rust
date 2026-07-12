@@ -6,43 +6,43 @@ use crate::shared::vec3_t;
 
 /// Raven `bot_entitystate_t` — a snapshot of an entity's state as seen by the bot AI.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/botlib.h:134-154`
+/// Type definition source: `oracle/codemp/game/botlib.h:134-154`
 #[repr(C)]
 pub struct bot_entitystate_t {
-	/// entity type
-	pub r#type: c_int,
-	/// entity flags
-	pub flags: c_int,
-	/// origin of the entity
-	pub origin: vec3_t,
-	/// angles of the model
-	pub angles: vec3_t,
-	/// for lerping
-	pub old_origin: vec3_t,
-	/// bounding box minimums
-	pub mins: vec3_t,
-	/// bounding box maximums
-	pub maxs: vec3_t,
-	/// ground entity
-	pub groundent: c_int,
-	/// solid type
-	pub solid: c_int,
-	/// model used
-	pub modelindex: c_int,
-	/// weapons, CTF flags, etc
-	pub modelindex2: c_int,
-	/// model frame number
-	pub frame: c_int,
-	/// impulse events -- muzzle flashes, footsteps, etc
-	pub event: c_int,
-	/// even parameter
-	pub eventParm: c_int,
-	/// bit flags
-	pub powerups: c_int,
-	/// determines weapon and flash model, etc
-	pub weapon: c_int,
-	pub legsAnim: c_int,
-	pub torsoAnim: c_int,
+    /// entity type
+    pub r#type: c_int,
+    /// entity flags
+    pub flags: c_int,
+    /// origin of the entity
+    pub origin: vec3_t,
+    /// angles of the model
+    pub angles: vec3_t,
+    /// for lerping
+    pub old_origin: vec3_t,
+    /// bounding box minimums
+    pub mins: vec3_t,
+    /// bounding box maximums
+    pub maxs: vec3_t,
+    /// ground entity
+    pub groundent: c_int,
+    /// solid type
+    pub solid: c_int,
+    /// model used
+    pub modelindex: c_int,
+    /// weapons, CTF flags, etc
+    pub modelindex2: c_int,
+    /// model frame number
+    pub frame: c_int,
+    /// impulse events -- muzzle flashes, footsteps, etc
+    pub event: c_int,
+    /// even parameter
+    pub eventParm: c_int,
+    /// bit flags
+    pub powerups: c_int,
+    /// determines weapon and flash model, etc
+    pub weapon: c_int,
+    pub legsAnim: c_int,
+    pub torsoAnim: c_int,
 }
 
 pub type bot_entitystate_s = bot_entitystate_t;

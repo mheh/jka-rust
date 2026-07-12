@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use super::super::MpGameImport;
 use abi_transport::pass_float;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_EA_END_REGULAR` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -28,7 +30,7 @@ impl BotlibEaEndRegularArgs {
 
 /// `BOTLIB_EA_END_REGULAR` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:408`
+/// Source: `oracle/codemp/game/g_public.h:408`
 pub struct BotlibEaEndRegular;
 
 impl OutboundSysCall for BotlibEaEndRegular {

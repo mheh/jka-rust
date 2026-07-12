@@ -4,28 +4,28 @@ use core::ffi::c_char;
 
 /// `MAX_STRINGFIELD`.
 ///
-/// Source: `oracle/oracle/codemp/botlib/l_struct.h:16`
+/// Source: `oracle/codemp/botlib/l_struct.h:16`
 const MAX_STRINGFIELD: usize = 80;
 
 /// Raven `projectileinfo_t` — bot AI weapon projectile info.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_ai_weap.h:27-43`
+/// Type definition source: `oracle/codemp/game/be_ai_weap.h:27-43`
 #[repr(C)]
 pub struct projectileinfo_t {
-	pub name: [c_char; MAX_STRINGFIELD],
-	pub model: [c_char; MAX_STRINGFIELD],
-	pub flags: i32,
-	pub gravity: f32,
-	pub damage: i32,
-	pub radius: f32,
-	pub visdamage: i32,
-	pub damagetype: i32,
-	pub healthinc: i32,
-	pub push: f32,
-	pub detonation: f32,
-	pub bounce: f32,
-	pub bouncefric: f32,
-	pub bouncestop: f32,
+    pub name: [c_char; MAX_STRINGFIELD],
+    pub model: [c_char; MAX_STRINGFIELD],
+    pub flags: i32,
+    pub gravity: f32,
+    pub damage: i32,
+    pub radius: f32,
+    pub visdamage: i32,
+    pub damagetype: i32,
+    pub healthinc: i32,
+    pub push: f32,
+    pub detonation: f32,
+    pub bounce: f32,
+    pub bouncefric: f32,
+    pub bouncestop: f32,
 }
 
 pub type projectileinfo_s = projectileinfo_t;

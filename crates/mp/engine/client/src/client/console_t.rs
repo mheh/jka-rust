@@ -4,17 +4,17 @@ use mp_qshared::shared::{qboolean, vec4_t};
 
 /// `CON_TEXTSIZE`.
 ///
-/// Source: `oracle/oracle/codemp/client/client.h:354`
+/// Source: `oracle/codemp/client/client.h:354`
 pub const CON_TEXTSIZE: usize = 32768;
 
 /// `NUM_CON_TIMES`.
 ///
-/// Source: `oracle/oracle/codemp/client/client.h:356`
+/// Source: `oracle/codemp/client/client.h:356`
 pub const NUM_CON_TIMES: usize = 4;
 
 /// Raven `console_t` — the client console scrollback buffer and display state.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/client.h:358-380`
+/// Type definition source: `oracle/codemp/client/client.h:358-380`
 #[repr(C)]
 pub struct console_t {
     pub initialized: qboolean,

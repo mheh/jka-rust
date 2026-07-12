@@ -87,7 +87,7 @@ impl GG2TraceArgs {
 ///
 /// Raven: ( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask );
 /// Raven: collision detection against all linked entities with ghoul2 check
-/// Source: `oracle/oracle/codemp/game/g_public.h:185`
+/// Source: `oracle/codemp/game/g_public.h:185`
 pub struct GG2Trace;
 
 impl OutboundSysCall for GG2Trace {

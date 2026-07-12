@@ -7,7 +7,7 @@ use mp_qshared::shared::MAX_QPATH;
 /// Raven `CCMShader` — a collision-model shader record (name + surface/content flags),
 /// intrusive-linked into a per-name hash chain via `mNext`.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_local.h:77-89`
+/// Type definition source: `oracle/codemp/qcommon/cm_local.h:77-89`
 #[repr(C)]
 pub struct CCMShader {
     pub shader: [c_char; MAX_QPATH],
@@ -19,21 +19,21 @@ pub struct CCMShader {
 impl CCMShader {
     /// Raven `CCMShader::GetName`.
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/cm_local.h:85`
+    /// Source: `oracle/codemp/qcommon/cm_local.h:85`
     pub fn GetName(&self) -> *const c_char {
         self.shader.as_ptr()
     }
 
     /// Raven `CCMShader::GetNext`.
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/cm_local.h:86`
+    /// Source: `oracle/codemp/qcommon/cm_local.h:86`
     pub fn GetNext(&self) -> *mut CCMShader {
         self.mNext
     }
 
     /// Raven `CCMShader::SetNext`.
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/cm_local.h:87`
+    /// Source: `oracle/codemp/qcommon/cm_local.h:87`
     pub fn SetNext(&mut self, next: *mut CCMShader) {
         self.mNext = next;
     }
@@ -41,7 +41,7 @@ impl CCMShader {
     /// Raven `CCMShader::Destroy`.
     ///
     /// Raven: no-op.
-    /// Source: `oracle/oracle/codemp/qcommon/cm_local.h:88`
+    /// Source: `oracle/codemp/qcommon/cm_local.h:88`
     pub fn Destroy(&mut self) {}
 }
 

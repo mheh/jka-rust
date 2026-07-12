@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use super::super::MpGameImport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for the `G_NAV_CONNECTED` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -28,7 +30,7 @@ impl GNavConnectedArgs {
 
 /// `G_NAV_CONNECTED` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:314`
+/// Source: `oracle/codemp/game/g_public.h:314`
 pub struct GNavConnected;
 
 impl OutboundSysCall for GNavConnected {

@@ -1,15 +1,17 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_FF_STARTFX`.
 ///
 /// Raven wrapper: `syscall( CG_FF_STARTFX, iFX );`
 /// Raven transport: `FFFX_START((ffFX_e) args[1]);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:269-270`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:631-633`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:269-270`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:631-633`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFfStartfxArgs {
     i_fx: c_int,
@@ -27,10 +29,10 @@ impl CgFfStartfxArgs {
 
 /// `CG_FF_STARTFX` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:108`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:269-270`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:631-633`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:631-633`
+/// Enum value source: `oracle/code/cgame/cg_public.h:108`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:269-270`
+/// Output source: `oracle/code/client/cl_cgame.cpp:631-633`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:631-633`
 pub struct CgFfStartfx;
 
 impl OutboundSysCall for CgFfStartfx {

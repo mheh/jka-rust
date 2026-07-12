@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 /// Raven `T_G_ICARUS_GETSTRING` — ICARUS `G_ICARUS_GetString` in/out param block.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:908-914`
+/// Type definition source: `oracle/codemp/game/g_public.h:908-914`
 #[repr(C)]
 pub struct T_G_ICARUS_GETSTRING {
     pub entID: c_int,

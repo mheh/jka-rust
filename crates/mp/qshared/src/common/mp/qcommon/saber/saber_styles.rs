@@ -1,13 +1,13 @@
 //! MP `saber_styles_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/q_shared.h:671-683`
+//! Type definition source: `oracle/codemp/game/q_shared.h:671-683`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `saber_styles_t` — fast, medium, strong, etc.
 ///
 /// `typedef enum` → int-wide discriminants.
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:671-683`
+/// Type definition source: `oracle/codemp/game/q_shared.h:671-683`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum saber_styles_t {

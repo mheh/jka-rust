@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::cgame::types::e_status;
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_CIN_RUNCINEMATIC`.
 ///
@@ -11,9 +13,9 @@ use crate::cgame::types::e_status;
 /// Raven wrapper: `syscall(CG_CIN_RUNCINEMATIC, handle)`.
 /// Raven transport: `return CIN_RunCinematic(args[1]);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:531-533`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1200`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:823-824`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:531-533`
+/// Args source: `oracle/code/cgame/cg_local.h:1200`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:823-824`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCinRuncinematicArgs {
     handle: c_int,
@@ -32,13 +34,13 @@ impl CgCinRuncinematicArgs {
 /// `CG_CIN_RUNCINEMATIC` SP cgame imports syscall ABI token.
 ///
 /// Raven `e_status` is an integer transport value.
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:187`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:531-533`
-/// Output source: `oracle/oracle/code/cgame/cg_syscalls.cpp:531-533`
-/// Output source: `oracle/oracle/code/cgame/cg_local.h:1200`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:823-824`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:823-824`
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2670-2679`
+/// Enum value source: `oracle/code/cgame/cg_public.h:187`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:531-533`
+/// Output source: `oracle/code/cgame/cg_syscalls.cpp:531-533`
+/// Output source: `oracle/code/cgame/cg_local.h:1200`
+/// Output source: `oracle/code/client/cl_cgame.cpp:823-824`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:823-824`
+/// Type definition source: `oracle/code/game/q_shared.h:2670-2679`
 pub struct CgCinRuncinematic;
 
 impl OutboundSysCall for CgCinRuncinematic {

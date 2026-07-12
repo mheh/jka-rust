@@ -1,6 +1,6 @@
 //! `distance_e`.
 //!
-//! Source: `oracle/oracle/codemp/game/ai.h:4-9`
+//! Source: `oracle/codemp/game/ai.h:4-9`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum distance_e {

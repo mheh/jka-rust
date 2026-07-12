@@ -2,5 +2,5 @@
 
 /// Raven `TGPValue` — opaque handle to a generic parser value.
 ///
-/// Type definition source: `oracle/oracle/code/game/genericparser2.h:174-174`
+/// Type definition source: `oracle/code/game/genericparser2.h:174-174`
 pub type TGPValue = *mut ::core::ffi::c_void;

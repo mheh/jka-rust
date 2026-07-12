@@ -4,12 +4,12 @@ use sp_qshared::shared::{qboolean, qhandle_t};
 
 /// Raven `itemInfo_t` — cgame-side per-item model/icon cache entry.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:256-260`
+/// Type definition source: `oracle/code/cgame/cg_local.h:256-260`
 #[repr(C)]
 pub struct itemInfo_t {
-	pub registered: qboolean,
-	pub models: qhandle_t,
-	pub icon: qhandle_t,
+    pub registered: qboolean,
+    pub models: qhandle_t,
+    pub icon: qhandle_t,
 }
 
 const _: () = assert!(core::mem::size_of::<itemInfo_t>() == 12);

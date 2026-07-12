@@ -1,5 +1,5 @@
 // PORT-COMPLETE: bg_vehicleLoad.c 12/12 (pass 3)
-//! Port of `oracle/oracle/codemp/game/bg_vehicleLoad.c` — the `.veh`/`.vwp`
+//! Port of `oracle/codemp/game/bg_vehicleLoad.c` — the `.veh`/`.vwp`
 //! vehicle/vehicle-weapon text-format loader.
 //!
 //! bg-tier fns that touch mutable `BgState` route through `bg: &mut BgState`
@@ -20,7 +20,7 @@ use mp_bg::vehicles::vehicle_s::VEH_MAX_PASSENGERS;
 
 /// Raven `BG_ClearVehicleParseParms`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:79-84`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:79-84`
 pub fn BG_ClearVehicleParseParms(bg: &mut BgState) {
     // MISSING-SYMBOL: `BgState::VehWeaponParms`/`VehicleParms` (the `.vwp`/`.veh`
     // scratch text buffers) are not yet fields on `BgState`; referenced here as
@@ -31,7 +31,7 @@ pub fn BG_ClearVehicleParseParms(bg: &mut BgState) {
 
 /// Raven `BG_ParseVehWeaponParm`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:167-307`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:167-307`
 // MISSING-SYMBOL: `vehWeaponFields` (the `VWFOFS`-encoded field-descriptor
 // table), its `VF_*` type-tag consts, and `VehicleTable` are not yet ported.
 // Referenced here exactly as the oracle names them; see missing_symbols.
@@ -65,7 +65,7 @@ pub fn BG_ParseVehWeaponParm(
                         if (*slot).is_null() {
                             // Raven `_JK2MP` (MP) branch: a fixed 1024-byte bg-pool block
                             // (overwritable later), NOT SP's `G_NewString` — bg-tier code has
-                            // no game pool. Source: oracle/oracle/codemp/game/bg_vehicleLoad.c:195-197
+                            // no game pool. Source: oracle/codemp/game/bg_vehicleLoad.c:195-197
                             let dest = crate::bg_misc::BG_Alloc(1024, bg) as *mut c_char;
                             Q_strncpyz(dest, cstr(&value).as_ptr(), 1024);
                             *slot = dest;
@@ -129,10 +129,15 @@ pub fn BG_ParseVehWeaponParm(
                     VF_SHADER | VF_SHADER_NOMIP => {
                         // QAGAME: neither `WE_ARE_IN_THE_UI` nor `CGAME`; dead here.
                     }
-                    VF_SOUND | VF_SOUND_CLIENT => {
+                    VF_SOUND => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
                             G_SoundIndex(cstr(&value).as_ptr());
                     }
+                    // `VF_SOUND_CLIENT` (MP cgame only): the `#elif QAGAME` branch
+                    // comments out the `G_SoundIndex` — the game module leaves the
+                    // field untouched (cgame registers it via `trap_S_RegisterSound`).
+                    // Source: `oracle/codemp/game/bg_vehicleLoad.c:282-290`
+                    VF_SOUND_CLIENT => {}
                     _ => return qfalse,
                 }
                 break;
@@ -149,7 +154,7 @@ pub fn BG_ParseVehWeaponParm(
 
 /// Raven `VEH_LoadVehWeapon`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:309-411`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:309-411`
 // MISSING-SYMBOL: `BgState::VehWeaponParms` scratch buffer field (see
 // `BG_ClearVehicleParseParms`); referenced as `bg.VehWeaponParms`.
 pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_int {
@@ -245,7 +250,7 @@ pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_in
 
 /// Raven `VEH_VehWeaponIndexForName`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:413-443`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:413-443`
 // MISSING-SYMBOL: `crate::shared::VEH_WEAPON_NONE`/`VEH_WEAPON_BASE`/
 // `MAX_VEH_WEAPONS` (referenced elsewhere in this crate, e.g. `g_weapon.rs`,
 // but not resolvable from this file without an import path); see
@@ -308,7 +313,7 @@ pub fn VEH_VehWeaponIndexForName(vehWeaponName: *const c_char, bg: &mut BgState)
 /// per-vehicle function setup left to do. The call is kept in the load sequence
 /// (`BG_VehicleLoadParms`/`BG_VehicleClampData`) to mirror Raven's shape.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:683-707`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:683-707`
 pub fn BG_SetSharedVehicleFunctions(_pVehInfo: *mut vehicleInfo_t) {}
 
 /// Raven `BG_VehicleSetDefaults`.
@@ -318,7 +323,7 @@ pub fn BG_SetSharedVehicleFunctions(_pVehInfo: *mut vehicleInfo_t) {}
 /// — only the `memset` is live code. Faithful transcription is the memset
 /// alone.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:709-810`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:709-810`
 pub fn BG_VehicleSetDefaults(vehicle: *mut vehicleInfo_t) {
     unsafe {
         std::ptr::write_bytes(vehicle, 0, 1);
@@ -329,7 +334,7 @@ pub fn BG_VehicleSetDefaults(vehicle: *mut vehicleInfo_t) {
 ///
 /// Raven: sanity check and clamp the vehicle's data.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:812-837`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:812-837`
 pub fn BG_VehicleClampData(vehicle: *mut vehicleInfo_t) {
     unsafe {
         for i in 0..3usize {
@@ -351,7 +356,7 @@ pub fn BG_VehicleClampData(vehicle: *mut vehicleInfo_t) {
 
 /// Raven `BG_ParseVehicleParm`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:839-981`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:839-981`
 // MISSING-SYMBOL: `vehicleFields` (the `VFOFS`-encoded field-descriptor
 // table, sentinel-terminated by `.ofs == -1`) and the `VF_*` consts; see
 // missing_symbols. QAGAME-only (porting-rules §20): `#elif CGAME`/`#else`
@@ -385,7 +390,7 @@ pub fn BG_ParseVehicleParm(
                         if (*slot).is_null() {
                             // Raven `_JK2MP` (MP) branch: a fixed 128-byte bg-pool block
                             // (overwritable later), NOT SP's `G_NewString` — bg-tier code has
-                            // no game pool. Source: oracle/oracle/codemp/game/bg_vehicleLoad.c:195-197
+                            // no game pool. Source: oracle/codemp/game/bg_vehicleLoad.c:195-197
                             let dest = crate::bg_misc::BG_Alloc(128, bg) as *mut c_char;
                             Q_strncpyz(dest, cstr(&value).as_ptr(), 128);
                             *slot = dest;
@@ -441,7 +446,7 @@ pub fn BG_ParseVehicleParm(
                     VF_WEAPON => {
                         // Raven: assignment is commented out in the oracle — the
                         // VF_WEAPON case is a no-op `break;`.
-                        // Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:228-230`
+                        // Source: `oracle/codemp/game/bg_vehicleLoad.c:228-230`
                         //*(b.add(field.ofs as usize) as *mut c_int) =
                         //    VEH_VehWeaponIndexForName(cstr(&value).as_ptr(), bg);
                     }
@@ -456,10 +461,15 @@ pub fn BG_ParseVehicleParm(
                     VF_SHADER | VF_SHADER_NOMIP => {
                         // QAGAME: dead (neither WE_ARE_IN_THE_UI nor CGAME).
                     }
-                    VF_SOUND | VF_SOUND_CLIENT => {
+                    VF_SOUND => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
                             G_SoundIndex(cstr(&value).as_ptr());
                     }
+                    // `VF_SOUND_CLIENT` (MP cgame only): the `#elif QAGAME` branch
+                    // comments out the `G_SoundIndex` — the game module leaves the
+                    // field untouched (cgame registers it via `trap_S_RegisterSound`).
+                    // Source: `oracle/codemp/game/bg_vehicleLoad.c:956-964`
+                    VF_SOUND_CLIENT => {}
                     _ => return qfalse,
                 }
                 break;
@@ -476,7 +486,7 @@ pub fn BG_ParseVehicleParm(
 
 /// Raven `VEH_LoadVehicle`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:983-1362`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:983-1362`
 // MISSING-SYMBOL: `BgState::VehicleParms` scratch buffer field; see
 // `BG_ClearVehicleParseParms`/missing_symbols.
 pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn BgTraps) -> c_int {
@@ -695,7 +705,7 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
 
 /// Raven `VEH_VehicleIndexForName`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1364-1394`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:1364-1394`
 // MISSING-SYMBOL: `MAX_VEHICLES` resolves (bg/vehicles/vehicle_s.rs), but is
 // re-cited here for clarity; `VEHICLE_BASE`/`VEHICLE_NONE` resolve via the
 // game prelude.
@@ -753,7 +763,7 @@ pub fn VEH_VehicleIndexForName(
 
 /// Raven `BG_VehWeaponLoadParms`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1396-1485`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:1396-1485`
 // MISSING-SYMBOL: `BgState::VehWeaponParms` scratch buffer field (as usual);
 // `MAX_VEH_WEAPON_DATA_SIZE` const; see missing_symbols. `_JK2MP` is always
 // true (MP crate), so the `trap_FS_*`/`BG_TempAlloc`/`BG_TempFree` arm is the
@@ -818,7 +828,7 @@ pub fn BG_VehWeaponLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
 /// Raven `BG_VehicleLoadParms`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1487-1588`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:1487-1588`
 // MISSING-SYMBOL: `BgState::VehicleParms` scratch buffer field;
 // `MAX_VEHICLE_DATA_SIZE` const; see missing_symbols. `_JK2MP` always true
 // (MP crate) so the `trap_FS_*` arm is live; SP `gi.*` arm dropped.
@@ -887,7 +897,7 @@ pub fn BG_VehicleLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
 /// Raven `BG_VehicleGetIndex`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1590-1593`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:1590-1593`
 pub fn BG_VehicleGetIndex(
     vehicleName: *const c_char,
     bg: &mut BgState,
@@ -902,7 +912,7 @@ pub fn BG_VehicleGetIndex(
 /// front of it; we are expected to then get the model for the vehicle and
 /// stomp over `modelname` with it.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1599-1611`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:1599-1611`
 // PORT-NOTE(traps-cascade): gained `traps: &dyn BgTraps` so `BG_VehicleGetIndex`
 // (now `(name, bg, traps)`) can load an as-yet-unregistered vehicle.
 pub fn BG_GetVehicleModelName(modelname: *mut c_char, bg: &mut BgState, traps: &dyn BgTraps) {
@@ -935,7 +945,7 @@ pub fn BG_GetVehicleModelName(modelname: *mut c_char, bg: &mut BgState, traps: &
 
 /// Raven `BG_GetVehicleSkinName`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1613-1633`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:1613-1633`
 // MISSING-SYMBOL: `ERR_DROP` (`Com_Error` level const) not yet ported; see
 // missing_symbols.
 // PORT-NOTE(traps-cascade): gained `traps: &dyn BgTraps` for `BG_VehicleGetIndex`.
@@ -973,7 +983,7 @@ pub fn BG_GetVehicleSkinName(skinname: *mut c_char, bg: &mut BgState, traps: &dy
 
 /// Raven `AttachRidersGeneric`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1643-1664`
+/// Source: `oracle/codemp/game/bg_vehicleLoad.c:1643-1664`
 // MISSING-SYMBOL: `BgTraps::g2api_add_bolt` (`trap_G2API_AddBolt`) is not on
 // the `BgTraps` trait (only `g2api_get_bolt_matrix*` variants are); see
 // missing_symbols.

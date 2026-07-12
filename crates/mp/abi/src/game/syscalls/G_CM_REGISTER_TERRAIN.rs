@@ -25,7 +25,7 @@ impl GCmRegisterTerrainArgs {
 
 /// `G_CM_REGISTER_TERRAIN` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:572`
+/// Source: `oracle/codemp/game/g_public.h:572`
 pub struct GCmRegisterTerrain;
 
 impl OutboundSysCall for GCmRegisterTerrain {

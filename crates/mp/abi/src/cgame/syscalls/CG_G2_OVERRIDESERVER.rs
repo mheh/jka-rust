@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall(CG_G2_OVERRIDESERVER, serverInstance);`
 /// Raven transport: `return G2API_OverrideServerWithClientData(&g2[0]);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1075-1077`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2590`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1631-1635`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1075-1077`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2590`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1631-1635`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2OverrideserverArgs {
     server_instance: *mut c_void,
@@ -27,10 +27,10 @@ impl CgG2OverrideserverArgs {
 
 /// `CG_G2_OVERRIDESERVER` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:324`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1075-1077`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1631-1635`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1631-1635`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:324`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:1075-1077`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1631-1635`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1631-1635`
 pub struct CgG2Overrideserver;
 
 impl OutboundSysCall for CgG2Overrideserver {

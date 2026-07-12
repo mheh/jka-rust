@@ -3,7 +3,7 @@
 /// Raven `id3v1_1` — ID3v1.1 MP3 tag layout.
 ///
 /// Raven: 128 bytes in size.
-/// Type definition source: `oracle/oracle/codemp/client/snd_mp3.h:15-25`
+/// Type definition source: `oracle/codemp/client/snd_mp3.h:15-25`
 #[repr(C)]
 pub struct id3v1_1 {
     pub id: [core::ffi::c_char; 3],

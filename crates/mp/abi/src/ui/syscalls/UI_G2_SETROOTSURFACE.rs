@@ -2,8 +2,8 @@ use super::super::MpUiImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::shared::qboolean;
 use core::ffi::c_int;
+use mp_qshared::shared::qboolean;
 use std::ffi::CString;
 
 /// `UI_G2_SETROOTSURFACE` outbound game-to-engine syscall.
@@ -36,7 +36,7 @@ impl UiG2SetrootsurfaceArgs {
 
 /// `UI_G2_SETROOTSURFACE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:533`
+/// Source: `oracle/codemp/ui/ui_public.h:533`
 pub struct UiG2Setrootsurface;
 
 impl OutboundSysCall for UiG2Setrootsurface {

@@ -13,10 +13,12 @@
 //
 // Registration observability: trap_R_RegisterSkin is a name-logging counter
 // (skins genuinely cross the observable BgTraps seam, so both sides return a
-// deterministic per-saber counter). G_SoundIndex (behind BG_SoundIndex) is a
-// name-logging observer that returns 0 — matching the port, whose
-// G_SoundIndex is still a documented placeholder returning 0 (configstring
-// architecture unwired). See README.md.
+// deterministic per-saber counter). G_SoundIndex (behind BG_SoundIndex) logs
+// the name and mints a real configstring sound index — the engine semantics
+// of the port's G_FindConfigstringIndex over the CS_SOUNDS range (oracle
+// g_utils.c:66-95,138-141): dedup by exact name, distinct non-empty names return
+// 1,2,3…, null/empty returns 0. The Rust parity test serves the same
+// semantics through a configstring-servicing mock engine. See README.md.
 #include "q_shared.h"
 #include "bg_public.h"
 #include "dumpcommon.h"
@@ -169,11 +171,26 @@ static char g_skn[64][256];  static int g_sknid[64]; static int g_sknn, g_sknctr
 
 static void reg_reset(void) { g_sndn = 0; g_sknn = 0; g_sknctr = 0; }
 
-// G_SoundIndex — QAGAME target of BG_SoundIndex. Observer: logs the name,
-// returns 0 (matches the port's placeholder G_SoundIndex).
+// G_SoundIndex — QAGAME target of BG_SoundIndex. Logs the name (per-saber
+// regsound log), then mints a real sound index with the engine semantics of
+// the port's G_FindConfigstringIndex over CS_SOUNDS (oracle g_utils.c:66-95,
+// 138-141): the registry PERSISTS across the whole run (a real engine's
+// configstring table), dedups by exact name (Q_strcmp == strcmp), mints
+// 1,2,3… for distinct non-empty names, and returns 0 for null/empty.
+#define CS_SOUNDS_MAX 256 /* MAX_SOUNDS, oracle q_shared.h */
+static char g_cs_sounds[CS_SOUNDS_MAX][256]; // slot 0 unused, "" = free
 int G_SoundIndex(const char *name) {
 	if (g_sndn < 512) { strncpy(g_snd[g_sndn], name ? name : "", 255); g_snd[g_sndn][255] = 0; g_sndn++; }
-	return 0;
+	if (!name || !name[0]) return 0;
+	int i;
+	for (i = 1; i < CS_SOUNDS_MAX; i++) {
+		if (!g_cs_sounds[i][0]) break;
+		if (strcmp(g_cs_sounds[i], name) == 0) return i;
+	}
+	if (i == CS_SOUNDS_MAX) Com_Error(ERR_FATAL, "G_FindConfigstringIndex: overflow");
+	strncpy(g_cs_sounds[i], name, sizeof(g_cs_sounds[i]) - 1);
+	g_cs_sounds[i][sizeof(g_cs_sounds[i]) - 1] = 0;
+	return i;
 }
 
 // trap_R_RegisterSkin — observable BgTraps seam. Per-saber counter (skins

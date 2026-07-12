@@ -38,7 +38,7 @@ impl GFsReadArgs {
 /// `G_FS_READ` MP game imports syscall ABI token.
 ///
 /// Raven: ( void *buffer, int len, fileHandle_t f );
-/// Source: `oracle/oracle/codemp/game/g_public.h:134`
+/// Source: `oracle/codemp/game/g_public.h:134`
 pub struct GFsRead;
 
 impl OutboundSysCall for GFsRead {

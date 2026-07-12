@@ -6,7 +6,7 @@ use super::e_dlight_types::eDLightTypes;
 
 /// Raven `dlight_s` (typedef `dlight_t`) — dynamic light.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:59-82`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:59-82`
 #[repr(C)]
 pub struct dlight_t {
     pub mType: eDLightTypes,

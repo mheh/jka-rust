@@ -53,7 +53,7 @@ impl GG2SetskinArgs {
 
 /// `G_G2_SETSKIN` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:515`
+/// Source: `oracle/codemp/game/g_public.h:515`
 pub struct GG2Setskin;
 
 impl OutboundSysCall for GG2Setskin {

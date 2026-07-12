@@ -5,7 +5,11 @@ use mp_qshared::shared::mdxaBone_t;
 /// Raven `boltInfo_t` — per-bolt attachment info for a Ghoul2 model instance.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/codemp/ghoul2/ghoul2_shared.h:170-182`
+/// Type definition source: `oracle/codemp/ghoul2/ghoul2_shared.h:170-182`
+///
+/// `Clone` matches Raven's trivial copy (POD in a `vector` copied by
+/// `CGhoul2Info::mBltlist`'s copy during `DeepCopy`).
+#[derive(Clone)]
 #[repr(C)]
 pub struct boltInfo_t {
     /// bone number bolt attaches to

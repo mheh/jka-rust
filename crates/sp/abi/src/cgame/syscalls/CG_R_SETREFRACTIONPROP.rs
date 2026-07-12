@@ -1,5 +1,7 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 use sp_qshared::shared::qboolean;
 
@@ -11,8 +13,8 @@ use sp_qshared::shared::qboolean;
 /// Raven wrapper: `syscall(CG_R_SETREFRACTIONPROP, PASSFLOAT(alpha), PASSFLOAT(stretch), prepost, negate);`
 /// Raven transport: `tr_distortionAlpha = VMF(1); tr_distortionStretch = VMF(2); tr_distortionPrePost = (qboolean)args[3]; tr_distortionNegate = (qboolean)args[4]; return 0;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:356-359`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:680-685`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:356-359`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:680-685`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRSetrefractionpropArgs {
     alpha: f32,
@@ -50,10 +52,10 @@ impl CgRSetrefractionpropArgs {
 
 /// `CG_R_SETREFRACTIONPROP` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:130`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:356-359`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:680-685`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:680-685`
+/// Enum value source: `oracle/code/cgame/cg_public.h:130`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:356-359`
+/// Output source: `oracle/code/client/cl_cgame.cpp:680-685`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:680-685`
 pub struct CgRSetrefractionprop;
 
 impl OutboundSysCall for CgRSetrefractionprop {

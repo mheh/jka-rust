@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `UI_CIN_SETEXTENTS`.
 ///
@@ -9,9 +11,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven wrapper: `syscall(UI_CIN_SETEXTENTS, handle, x, y, w, h)`.
 /// Raven transport: `CIN_SetExtents(args[1], args[2], args[3], args[4], args[5]); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:428-430`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:1006`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1197-1199`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:428-430`
+/// Args source: `oracle/codemp/ui/ui_local.h:1006`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1197-1199`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCinSetextentsArgs {
     handle: c_int,
@@ -49,11 +51,11 @@ impl UiCinSetextentsArgs {
 
 /// `UI_CIN_SETEXTENTS` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:109`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:105-109`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:428-430`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1197-1199`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1197-1199`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:109`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:105-109`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:428-430`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1197-1199`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1197-1199`
 pub struct UiCinSetextents;
 
 impl OutboundSysCall for UiCinSetextents {

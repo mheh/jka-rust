@@ -6,10 +6,10 @@ use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, Vm
 /// Raven: this trap map be called more than once for a given map change, as the
 /// Raven: server is going to attempt to send out multiple broadcasts in hopes that
 /// Raven: the client will receive one of them
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:431`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:307-312`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:307-312`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_parse.cpp:918-922`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:431`
+/// Args source: `oracle/codemp/cgame/cg_main.c:307-312`
+/// Output source: `oracle/codemp/cgame/cg_main.c:307-312`
+/// Transport/call-site source: `oracle/codemp/client/cl_parse.cpp:918-922`
 pub struct CgMapChange;
 
 impl InboundVmCall for CgMapChange {

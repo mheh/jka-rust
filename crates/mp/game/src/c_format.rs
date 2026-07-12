@@ -5,13 +5,13 @@
 //! explicit `&[FmtArg]` argument channel and format through [`c_vsprintf`] here.
 //! The target is **native libc `printf` parity** — Raven's DLL build links the
 //! real `vsprintf`, not the QVM bytecode fallback in
-//! `oracle/oracle/codemp/game/bg_lib.c`. That bytecode `vsprintf` is only the
+//! `oracle/codemp/game/bg_lib.c`. That bytecode `vsprintf` is only the
 //! reference for *which* directives game code relies on (`%d %i %u %o %x %X %c
 //! %s %f %%` with `-`/`0`/`+`/` `/`#` flags, width and precision); its float
 //! digit-truncation and unsigned fallbacks are not reproduced here because the
 //! shipped DLL never used them.
-//! Source: `oracle/oracle/codemp/game/bg_lib.c:1183-1288` (directive set);
-//! `oracle/oracle/codemp/game/q_shared.c:985-1032` (the `vsprintf` callers).
+//! Source: `oracle/codemp/game/bg_lib.c:1183-1288` (directive set);
+//! `oracle/codemp/game/q_shared.c:985-1032` (the `vsprintf` callers).
 
 use core::ffi::{c_char, c_int, c_uint};
 use std::ffi::CStr;
@@ -75,7 +75,7 @@ struct Spec {
 /// panics naming the directive rather than echoing it — the survey of live
 /// `va`/`Com_sprintf` format strings finds none, and a silent echo would hide a
 /// real mismatch. Argument shortfall/type-mismatch likewise panics.
-/// Source: `oracle/oracle/codemp/game/bg_lib.c:1183-1288`.
+/// Source: `oracle/codemp/game/bg_lib.c:1183-1288`.
 pub fn c_vsprintf(fmt: &[u8], args: &[FmtArg]) -> Vec<u8> {
     let mut out = Vec::with_capacity(fmt.len() + 16);
     let mut ai = 0usize;
@@ -481,7 +481,10 @@ mod tests {
         assert_eq!(f("%-8s|", &[FmtArg::Str(Some(s))]), "hello   |");
         assert_eq!(f("%.3s", &[FmtArg::Str(Some(s))]), "hel");
         assert_eq!(f("%8.3s", &[FmtArg::Str(Some(s))]), "     hel");
-        assert_eq!(f("%-20s|", &[FmtArg::Str(Some(s))]), "hello               |");
+        assert_eq!(
+            f("%-20s|", &[FmtArg::Str(Some(s))]),
+            "hello               |"
+        );
         assert_eq!(f("%s", &[FmtArg::Str(None)]), "(null)");
     }
 
@@ -523,7 +526,11 @@ mod tests {
         assert_eq!(
             f(
                 "%s has %d frags (%.1f%% acc)",
-                &[FmtArg::Str(Some(name)), FmtArg::Int(15), FmtArg::Float(42.5)]
+                &[
+                    FmtArg::Str(Some(name)),
+                    FmtArg::Int(15),
+                    FmtArg::Float(42.5)
+                ]
             ),
             "Kyle has 15 frags (42.5% acc)"
         );

@@ -6,10 +6,10 @@ use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, Vm
 ///
 /// Raven: rwwRMG - added
 /// Raven: rww - icarus callbacks
-/// Source (enum): `oracle/oracle/codemp/game/g_public.h:768`
-/// Source (args): `oracle/oracle/codemp/game/g_main.c:550`
-/// Source (output): `oracle/oracle/codemp/game/g_main.c:553`
-/// Source (call site): `oracle/oracle/RMG/RM_Instance_BSP.cpp:264`
+/// Source (enum): `oracle/codemp/game/g_public.h:768`
+/// Source (args): `oracle/codemp/game/g_main.c:550`
+/// Source (output): `oracle/codemp/game/g_main.c:553`
+/// Source (call site): `oracle/RMG/RM_Instance_BSP.cpp:264`
 pub struct GameSpawnRmgEntity;
 
 impl InboundVmCall for GameSpawnRmgEntity {

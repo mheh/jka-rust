@@ -6,15 +6,15 @@ use mp_qshared::shared::{qboolean, qhandle_t};
 
 /// Raven `characterInfo`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:599-606`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:599-606`
 #[repr(C)]
 pub struct characterInfo {
-	pub name: *const c_char,
-	pub imageName: *const c_char,
-	pub headImage: qhandle_t,
-	pub base: *const c_char,
-	pub active: qboolean,
-	pub reference: i32,
+    pub name: *const c_char,
+    pub imageName: *const c_char,
+    pub headImage: qhandle_t,
+    pub base: *const c_char,
+    pub active: qboolean,
+    pub reference: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<characterInfo>() == 40);

@@ -10,7 +10,7 @@ use crate::local::level_locals_t::level_locals_t;
 /// SP has **no `clients` box** — `g_clients` does not exist in the SP tree
 /// (`MAX_CLIENTS = 1`; divergence preserved, STATE-D2/DEC-04).
 ///
-/// Source: `oracle/oracle/code/game/g_main.cpp:46,49` (`level`, `g_entities`).
+/// Source: `oracle/code/game/g_main.cpp:46,49` (`level`, `g_entities`).
 pub struct GameWorld {
     /// `level` (`level_locals_t`, `g_main.cpp:46`).
     pub level: level_locals_t,
@@ -26,7 +26,7 @@ impl GameWorld {
     /// Source: `docs/architecture/state-ownership.md` § `GameWorld::zeroed` (STATE-D9).
     pub fn zeroed() -> Self {
         //TODO: Port GameWorld::zeroed (SP) — native_platform::zeroed_box for entities/level
-        // Source: oracle/oracle/code/game/g_main.cpp:715-749 (InitGame entity block)
-        todo!("Port SP GameWorld::zeroed — oracle/oracle/code/game/g_main.cpp:715-749 (STATE-D9)")
+        // Source: oracle/code/game/g_main.cpp:715-749 (InitGame entity block)
+        todo!("Port SP GameWorld::zeroed — oracle/code/game/g_main.cpp:715-749 (STATE-D9)")
     }
 }

@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_KEY_SETBINDING, keynum, binding );`
 /// Raven transport: `Key_SetBinding( args[1], (const char *)VMA(2) ); return 0;`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:187`
-/// Args source (SP): `oracle/oracle/code/client/cl_ui.cpp:480-481`
-/// Transport/switch source (SP): `oracle/oracle/code/client/cl_ui.cpp:480-482`
+/// Enum source: `oracle/code/ui/ui_public.h:187`
+/// Args source (SP): `oracle/code/client/cl_ui.cpp:480-481`
+/// Transport/switch source (SP): `oracle/code/client/cl_ui.cpp:480-482`
 pub struct UiKeySetbindingArgs {
     keynum: c_int,
     binding: *const c_char,
@@ -34,7 +34,7 @@ impl UiKeySetbindingArgs {
 
 /// `UI_KEY_SETBINDING` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:187`
+/// Source: `oracle/code/ui/ui_public.h:187`
 pub struct UiKeySetbinding;
 
 impl OutboundSysCall for UiKeySetbinding {

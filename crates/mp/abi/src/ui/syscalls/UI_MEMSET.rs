@@ -10,10 +10,10 @@ use abi_transport::generic::{
 /// Raven's cgame switch reads `dest` through `VMA(1)` and passes the remaining
 /// words directly to `Com_Memset(VMA(1), args[2], args[3])`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:650`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:624`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:649`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:282`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:650`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:624`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:649`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:282`
 #[derive(Debug)]
 pub struct UiMemsetArgs {
     /// Destination buffer pointer, decoded by Raven as `VMA(1)`.
@@ -46,11 +46,11 @@ impl UiMemsetArgs {
 ///
 /// Raven: `Com_Memset(VMA(1), args[2], args[3])`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:130`
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:650`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:651`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:649`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:282`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:130`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:650`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:651`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:649`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:282`
 pub struct UiMemset;
 
 impl OutboundSysCall for UiMemset {

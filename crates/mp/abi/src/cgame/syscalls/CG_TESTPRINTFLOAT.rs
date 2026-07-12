@@ -28,14 +28,14 @@ impl CgTestprintfloatArgs {
 
 /// `CG_TESTPRINTFLOAT` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:191-192`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:517-518`
-/// Transport enum/source: `oracle/oracle/codemp/qcommon/qcommon.h:295-296`
-/// Engine switch/source: `oracle/oracle/codemp/client/cl_cgame.cpp:678-681`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:678-681`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:191-192`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:517-518`
+/// Transport enum/source: `oracle/codemp/qcommon/qcommon.h:295-296`
+/// Engine switch/source: `oracle/codemp/client/cl_cgame.cpp:678-681`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:678-681`
 ///
 /// Raven's searched MP cgame engine switch handles shared `TRAP_TESTPRINTFLOAT`
-/// at `oracle/oracle/codemp/client/cl_cgame.cpp:680-681`, which corresponds to
+/// at `oracle/codemp/client/cl_cgame.cpp:680-681`, which corresponds to
 /// `CGAME_TESTPRINTFLOAT`, while this ABI token appears later in
 /// `cg_public.h` and keeps the exported ABI index.
 pub struct CgTestprintfloat;

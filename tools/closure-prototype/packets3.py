@@ -106,7 +106,7 @@ VEC = {"vec3_t", "vec5_t", "vec4_t", "vec2_t"}
 # ---- vec3 macro out-slots (fork 9): a param written ONLY through one of these
 # macros is still a WRITTEN out-param (`&mut`), not a read-only by-value input.
 # Slot = 0-based index of the macro argument the macro ASSIGNS INTO. Verified
-# against oracle/oracle/codemp/game/q_shared.h:1358-1365 (Subtract/Add/Scale/
+# against oracle/codemp/game/q_shared.h:1358-1365 (Subtract/Add/Scale/
 # Copy/MA), 1397-1399 (Clear/Set), 1578-1579 (VectorNormalize mutates its one
 # arg in place and returns the length; VectorNormalize2 writes arg 1).
 VEC_MACRO_OUT = {
@@ -822,7 +822,7 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
                 o.append(f"// {tag}: {r['path'].name}")
                 o.append(sh["sig"] + ";")
         else:
-            o.append(f"//TODO: Port {name}  // Source: oracle/oracle/codemp/game/ (unresolved)")
+            o.append(f"//TODO: Port {name}  // Source: oracle/codemp/game/ (unresolved)")
     o.append("```")
     o.append("")
 

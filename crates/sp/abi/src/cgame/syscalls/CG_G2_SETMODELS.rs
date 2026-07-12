@@ -1,8 +1,8 @@
 use super::super::SpCgameImport;
+use crate::cgame::types::CGhoul2Info_v;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::cgame::types::CGhoul2Info_v;
 use sp_qshared::shared::qhandle_t;
 
 /// Arguments for `CG_G2_SETMODELS`.
@@ -10,10 +10,10 @@ use sp_qshared::shared::qhandle_t;
 /// Raven wrapper: `syscall( CG_G2_SETMODELS, &ghoul2, modelList, skinList );`
 /// Raven transport: `G2API_SetGhoul2ModelIndexes( *((CGhoul2Info_v *)VMA(1) ),(qhandle_t *)VMA(2),(qhandle_t *)VMA(3));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:486`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1186`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:794-796`
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:311`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:486`
+/// Args source: `oracle/code/cgame/cg_local.h:1186`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:794-796`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:311`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SetmodelsArgs {
     /// Opaque Raven `CGhoul2Info_v *`, dereferenced by the engine switch.
@@ -50,11 +50,11 @@ impl CgG2SetmodelsArgs {
 
 /// `CG_G2_SETMODELS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:175`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:486`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:794-796`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:794-796`
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:311`
+/// Enum value source: `oracle/code/cgame/cg_public.h:175`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:486`
+/// Output source: `oracle/code/client/cl_cgame.cpp:794-796`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:794-796`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:311`
 pub struct CgG2Setmodels;
 
 impl OutboundSysCall for CgG2Setmodels {

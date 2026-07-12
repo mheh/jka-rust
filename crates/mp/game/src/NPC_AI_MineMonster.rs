@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_MineMonster.c 1/9
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_MineMonster.c` (MP `_JK2MP` +
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_MineMonster.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!
 //! Generated from the `fnskel.py` signature skeleton; bodies transcribed per
@@ -50,7 +50,7 @@ const LSTATE_WAITING: i32 = 1;
 /// Raven `NPC_MineMonster_Precache`.
 ///
 /// Precaches the MineMonster's sound effects.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:18-27`
+/// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:18-27`
 pub fn NPC_MineMonster_Precache(ctx: GameContext<'_>) {
     unsafe {
         for i in 0..4 {
@@ -64,7 +64,7 @@ pub fn NPC_MineMonster_Precache(ctx: GameContext<'_>) {
 
 /// Raven `MineMonster_Idle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:35-42`
+/// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:35-42`
 pub fn MineMonster_Idle(ctx: GameContext<'_>) {
     unsafe {
         if !UpdateGoal(ctx).is_null() {
@@ -76,7 +76,7 @@ pub fn MineMonster_Idle(ctx: GameContext<'_>) {
 
 /// Raven `MineMonster_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:50-83`
+/// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:50-83`
 pub fn MineMonster_Patrol(ctx: GameContext<'_>) {
     unsafe {
         let mut dif: vec3_t = [0.0; 3];
@@ -115,7 +115,7 @@ pub fn MineMonster_Patrol(ctx: GameContext<'_>) {
 
 /// Raven `MineMonster_Move`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:90-98`
+/// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:90-98`
 pub fn MineMonster_Move(ctx: GameContext<'_>, visible: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -131,7 +131,7 @@ pub fn MineMonster_Move(ctx: GameContext<'_>, visible: qboolean) {
 
 /// Raven `MineMonster_TryDamage`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:101-126`
+/// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:101-126`
 pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: *mut gentity_t, damage: c_int) {
     unsafe {
         if enemy.is_null() {
@@ -196,7 +196,7 @@ pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: *mut gentity_t, damage
 
 /// Raven `MineMonster_Attack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:129-186`
+/// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:129-186`
 pub fn MineMonster_Attack(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -282,7 +282,7 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
 
 /// Raven `MineMonster_Combat`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:189-227`
+/// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:189-227`
 pub fn MineMonster_Combat(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -331,7 +331,7 @@ pub fn MineMonster_Combat(ctx: GameContext<'_>) {
 /// Raven `NPC_MineMonster_Pain`.
 ///
 /// Handles pain/damage response for the MineMonster.
-/// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:234-254`
+/// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:234-254`
 pub fn NPC_MineMonster_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -373,7 +373,7 @@ pub fn NPC_MineMonster_Pain(
 
 /// Raven `NPC_BSMineMonster_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:262-278`
+/// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:262-278`
 pub fn NPC_BSMineMonster_Default(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;

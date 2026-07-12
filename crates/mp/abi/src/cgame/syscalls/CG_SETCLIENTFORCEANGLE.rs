@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_SETCLIENTFORCEANGLE, time, angle );`
 /// Raven transport: `CL_SetClientForceAngle(args[1], (float *)VMA(2)); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:498-500`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2351`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:977-979`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:498-500`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2351`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:977-979`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSetclientforceangleArgs {
     time: c_int,
@@ -28,10 +28,10 @@ impl CgSetclientforceangleArgs {
 
 /// `CG_SETCLIENTFORCEANGLE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:188`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:498-500`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:977-979`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:977-979`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:188`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:498-500`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:977-979`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:977-979`
 pub struct CgSetclientforceangle;
 
 impl OutboundSysCall for CgSetclientforceangle {

@@ -2,7 +2,7 @@
 
 /// Raven `reachedFunc_t` — enumeration of mover reached-destination callback function IDs.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_functions.h:249-258`
+/// Type definition source: `oracle/code/game/g_functions.h:249-258`
 #[repr(i32)]
 pub enum reachedFunc_t {
     reachedF_NULL = 0,

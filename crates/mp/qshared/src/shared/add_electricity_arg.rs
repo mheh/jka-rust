@@ -6,7 +6,7 @@ use native_types::qhandle_t;
 
 /// Raven `addElectricityArgStruct_t` — `CG_ADDELECTRICITY` VM syscall args.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2622-2640`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2622-2640`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct addElectricityArgStruct_t {

@@ -1,0 +1,17 @@
+rem ( "control-flow + task coverage" )
+declare ( FLOAT, "count" )
+set ( "count", 0.000 )
+loop ( 3.000 )
+{
+	print ( "tick" )
+	wait ( 100.000 )
+}
+task ( "greet" )
+{
+	print ( "hello from task" )
+	sound ( CHAN_VOICE, "sound/hello.wav" )
+}
+do ( "greet" )
+dowait ( "greet" )
+signal ( "ready" )
+waitsignal ( "ready" )

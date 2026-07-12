@@ -1,0 +1,14 @@
+== icarus_endtoend fixtures/e2e ==
+init ok
+runscript ret=1
+-- vm_call trace (4) --
+  0 SET
+  1 PLAYSOUND
+  2 USE
+  3 KILL
+-- variables --
+  F |hp|=0.000
+-- signals --
+  |go|=1
+  |ready|=0
+== end ==

@@ -32,7 +32,7 @@ impl CgRGetLightStyleArgs {
 
 /// `CG_R_GET_LIGHT_STYLE` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:168`
+/// Source: `oracle/codemp/cgame/cg_public.h:168`
 pub struct CgRGetLightStyle;
 
 impl OutboundSysCall for CgRGetLightStyle {

@@ -9,8 +9,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `void COM_SetOrgAngles( const vec3_t org, const vec3_t angles );`
 /// Raven transport: `Com_SetOrgAngles((float *) VMA(1), (float *) VMA(2));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:494-496`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:776-778`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:494-496`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:776-778`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ComSetorganglesArgs {
     org: *const vec3_t,
@@ -33,10 +33,10 @@ impl ComSetorganglesArgs {
 
 /// `COM_SETORGANGLES` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:168`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:494-496`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:776-778`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:776-778`
+/// Enum value source: `oracle/code/cgame/cg_public.h:168`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:494-496`
+/// Output source: `oracle/code/client/cl_cgame.cpp:776-778`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:776-778`
 pub struct ComSetorgangles;
 
 impl OutboundSysCall for ComSetorgangles {

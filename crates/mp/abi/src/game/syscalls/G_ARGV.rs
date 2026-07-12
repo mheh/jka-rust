@@ -43,7 +43,7 @@ impl GArgvArgs {
 /// `G_ARGV` MP game imports syscall ABI token.
 ///
 /// Raven: ( int n, char *buffer, int bufferLength );
-/// Source: `oracle/oracle/codemp/game/g_public.h:131`
+/// Source: `oracle/codemp/game/g_public.h:131`
 pub struct GArgv;
 
 impl OutboundSysCall for GArgv {

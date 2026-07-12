@@ -2,7 +2,7 @@
 
 /// Raven `IN_OUT` — byte counters for an mp3 decode call.
 ///
-/// Type definition source: `oracle/oracle/code/client/../mp3code/small_header.h:18-22`
+/// Type definition source: `oracle/code/client/../mp3code/small_header.h:18-22`
 #[repr(C)]
 pub struct IN_OUT {
     pub in_bytes: i32,

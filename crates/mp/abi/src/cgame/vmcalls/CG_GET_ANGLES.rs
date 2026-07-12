@@ -9,8 +9,8 @@ use mp_qshared::shared::vec3_t;
 
 /// Arguments for `CG_GET_ANGLES`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:289-291`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:289-291`
+/// Args source: `oracle/codemp/cgame/cg_main.c:289-291`
+/// Output source: `oracle/codemp/cgame/cg_main.c:289-291`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgGetAnglesArgs {
     ent_num: c_int,
@@ -34,9 +34,9 @@ impl CgGetAnglesArgs {
 /// `CG_GET_ANGLES` MP cgame exports vmMain ABI token.
 ///
 /// Raven: int entnum, vec3_t angle
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:419`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:289-291`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:289-291`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:419`
+/// Args source: `oracle/codemp/cgame/cg_main.c:289-291`
+/// Output source: `oracle/codemp/cgame/cg_main.c:289-291`
 /// Transport/call-site source: no engine call-site found in initial search; module vmMain switch proves arg slots.
 pub struct CgGetAngles;
 

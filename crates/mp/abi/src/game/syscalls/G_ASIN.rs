@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ASIN` outbound game-to-engine syscall.
 ///
@@ -23,7 +25,7 @@ impl GAsinArgs {
 ///
 /// Raven: END VM STUFF
 /// Raven: rww - BEGIN NPC NAV TRAPS
-/// Source: `oracle/oracle/codemp/game/g_public.h:293`
+/// Source: `oracle/codemp/game/g_public.h:293`
 pub struct GAsin;
 
 impl OutboundSysCall for GAsin {

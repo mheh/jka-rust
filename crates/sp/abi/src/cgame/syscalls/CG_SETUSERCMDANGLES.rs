@@ -1,5 +1,7 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `CG_SETUSERCMDANGLES`.
@@ -7,8 +9,8 @@ use abi_transport::pass_float;
 /// Raven wrapper sends three `PASSFLOAT` angle override values.
 /// Raven transport: `CL_SetUserCmdAngles(VMF(1), VMF(2), VMF(3));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:479-480`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:773-775`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:479-480`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:773-775`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgSetusercmdanglesArgs {
     pitch_override: f32,
@@ -28,10 +30,10 @@ impl CgSetusercmdanglesArgs {
 
 /// `CG_SETUSERCMDANGLES` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:161`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:479-480`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:773-775`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:773-775`
+/// Enum value source: `oracle/code/cgame/cg_public.h:161`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:479-480`
+/// Output source: `oracle/code/client/cl_cgame.cpp:773-775`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:773-775`
 pub struct CgSetusercmdangles;
 
 impl OutboundSysCall for CgSetusercmdangles {

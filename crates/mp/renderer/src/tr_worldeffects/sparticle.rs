@@ -3,7 +3,7 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `SParticle` — a single world-effects particle.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_WorldEffects.h:13-18`
+/// Type definition source: `oracle/codemp/renderer/tr_WorldEffects.h:13-18`
 #[repr(C)]
 pub struct SParticle {
     pub pos: vec3_t,

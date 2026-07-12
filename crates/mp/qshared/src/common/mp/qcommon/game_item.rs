@@ -1,6 +1,6 @@
 //! MP `gitem_t` copied from Raven `codemp/game/bg_public.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/bg_public.h:1105-1138`
+//! Source: `oracle/codemp/game/bg_public.h:1105-1138`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -10,12 +10,12 @@ pub const MAX_ITEM_MODELS: usize = 4;
 
 /// Raven MP `itemType_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:1105-1118`
+/// Type definition source: `oracle/codemp/game/bg_public.h:1105-1118`
 pub type itemType_t = c_int;
 
 /// Raven MP `gitem_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:1122-1138`
+/// Type definition source: `oracle/codemp/game/bg_public.h:1122-1138`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct gitem_t {

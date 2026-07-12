@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall(CG_G2_COPYGHOUL2INSTANCE, g2From, g2To, modelIndex);`
 /// Raven transport: `return (int)G2API_CopyGhoul2Instance(*((CGhoul2Info_v *)args[1]), *((CGhoul2Info_v *)args[2]), args[3]);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:890-892`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2529`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1419-1420`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:890-892`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2529`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1419-1420`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2Copyghoul2instanceArgs {
     g2_from: *mut c_void,
@@ -32,10 +32,10 @@ impl CgG2Copyghoul2instanceArgs {
 
 /// `CG_G2_COPYGHOUL2INSTANCE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:273`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:890-892`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1419-1420`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1419-1420`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:273`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:890-892`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1419-1420`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1419-1420`
 pub struct CgG2Copyghoul2instance;
 
 impl OutboundSysCall for CgG2Copyghoul2instance {

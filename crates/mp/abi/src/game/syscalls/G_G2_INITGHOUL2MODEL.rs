@@ -71,7 +71,7 @@ impl GG2Initghoul2ModelArgs {
 
 /// `G_G2_INITGHOUL2MODEL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:514`
+/// Source: `oracle/codemp/game/g_public.h:514`
 pub struct GG2Initghoul2Model;
 
 impl OutboundSysCall for GG2Initghoul2Model {

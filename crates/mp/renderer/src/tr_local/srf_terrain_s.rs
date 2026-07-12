@@ -6,7 +6,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `srfTerrain_s` (typedef `srfTerrain_t`) — terrain surface.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:744-748`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:744-748`
 #[repr(C)]
 pub struct srfTerrain_t {
     pub surfaceType: surfaceType_t,

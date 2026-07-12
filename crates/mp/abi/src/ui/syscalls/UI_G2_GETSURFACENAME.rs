@@ -49,7 +49,7 @@ impl UiG2GetsurfacenameArgs {
 
 /// `UI_G2_GETSURFACENAME` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:569`
+/// Source: `oracle/codemp/ui/ui_public.h:569`
 pub struct UiG2Getsurfacename;
 
 impl OutboundSysCall for UiG2Getsurfacename {

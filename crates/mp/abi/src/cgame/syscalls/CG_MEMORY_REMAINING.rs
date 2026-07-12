@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_MEMORY_REMAINING`.
 ///
@@ -9,9 +11,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven transport: `return Hunk_MemoryRemaining();`
 ///
 /// Raven comment: `aids for VM testing`.
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:521-522`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2356-2360`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:987-988`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:521-522`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2356-2360`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:987-988`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgMemoryRemainingArgs;
 
@@ -23,10 +25,10 @@ impl CgMemoryRemainingArgs {
 
 /// `CG_MEMORY_REMAINING` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:193`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:521-522`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:987-988`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:987-988`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:193`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:521-522`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:987-988`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:987-988`
 pub struct CgMemoryRemaining;
 
 impl OutboundSysCall for CgMemoryRemaining {

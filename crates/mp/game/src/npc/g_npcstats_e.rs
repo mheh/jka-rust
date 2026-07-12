@@ -3,7 +3,7 @@
 /// Raven `gNPCstats_t` — NPC stats, loaded in, and can be set by scripts.
 ///
 /// Raven: Stats, loaded in, and can be set by scripts.
-/// Type definition source: `oracle/oracle/codemp/game/b_public.h:86-107`
+/// Type definition source: `oracle/codemp/game/b_public.h:86-107`
 #[repr(C)]
 pub struct gNPCstats_t {
     //AI

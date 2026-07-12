@@ -1,6 +1,8 @@
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_INIT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,7 +16,7 @@ impl GNavInitArgs {
 
 /// `G_NAV_INIT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:298`
+/// Source: `oracle/codemp/game/g_public.h:298`
 pub struct GNavInit;
 
 impl OutboundSysCall for GNavInit {

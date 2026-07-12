@@ -1,0 +1,27 @@
+== CCMLandScape construction (DEDICATED) ==
+dims: width=64 height=64 realArea=4225 blockW=16 blockH=16 blockCount=256 terxels=4
+patchScalarSize=181.022095
+get_rand_seed=0x89abcdef
+flattenMap: 4225 bytes, sum=0, all-zero=yes
+heightMap: EXCLUDED from golden (F.19 UB: unpopulated non-zeroing alloc)
+water: baseHeight=32 height=64.250984 contents=4476 surfaceFlags=41390
+altitude flags by height:
+  h=  0 surfaceFlags=6526 contentFlags=31074
+  h= 16 surfaceFlags=6526 contentFlags=31074
+  h= 32 surfaceFlags=6526 contentFlags=31074
+  h= 63 surfaceFlags=6526 contentFlags=31074
+  h= 64 surfaceFlags=60732 contentFlags=53645
+  h=128 surfaceFlags=60732 contentFlags=53645
+  h=255 surfaceFlags=60732 contentFlags=53645
+== RmManager lifecycle (LoadMission early-out) ==
+--------- Random Mission Manager ---------
+
+RMG version : 1.01
+
+LoadMission returned=false
+automapSymbolCount=0
+== ctor empty-heightMap error path ==
+caught: ERR(0): Terrain has no heightmap specified
+
+== end ==
+... Shutting down TheRandomMissionManager

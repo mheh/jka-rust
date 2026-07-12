@@ -2,8 +2,8 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::common::mp::qcommon::usercmd_t;
 use core::ffi::c_int;
+use mp_qshared::common::mp::qcommon::usercmd_t;
 
 /// `BOTLIB_USER_COMMAND` outbound game-to-engine syscall.
 ///
@@ -32,7 +32,7 @@ impl BotlibUserCommandArgs {
 /// `BOTLIB_USER_COMMAND` MP game imports syscall ABI token.
 ///
 /// Raven: ( int client, usercmd_t *ucmd );
-/// Source: `oracle/oracle/codemp/game/g_public.h:354`
+/// Source: `oracle/codemp/game/g_public.h:354`
 pub struct BotlibUserCommand;
 
 impl OutboundSysCall for BotlibUserCommand {

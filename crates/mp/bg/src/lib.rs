@@ -2,7 +2,7 @@
 //!
 //! //TODO: Port module mp_bg (only the types needed by the game-code migration
 //! are ported so far).
-//! Source: oracle/oracle/codemp/game/bg_public.h:3
+//! Source: oracle/codemp/game/bg_public.h:3
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 

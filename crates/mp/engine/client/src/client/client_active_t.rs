@@ -11,7 +11,7 @@ use super::out_packet_t::outPacket_t;
 /// Raven `clientActive_t` — the client's active game state (parsed from the
 /// server, plus cgame-communicated values); reset on every level change.
 ///
-/// Type definition source: `oracle/oracle/codemp/client/client.h:75-137`
+/// Type definition source: `oracle/codemp/client/client.h:75-137`
 #[repr(C)]
 pub struct clientActive_t {
     /// it requres several frames in a timeout condition

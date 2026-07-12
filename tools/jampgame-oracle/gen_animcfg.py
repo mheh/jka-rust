@@ -15,7 +15,7 @@
 import re, sys, pathlib
 
 ANIMTABLE = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else \
-    pathlib.Path("../../oracle/oracle/codemp/cgame/animtable.h")
+    pathlib.Path("../../oracle/codemp/cgame/animtable.h")
 
 names = []
 for m in re.finditer(r"ENUM2STRING\(([A-Z0-9_]+)\)", ANIMTABLE.read_text()):

@@ -12,7 +12,7 @@
  * Rust `extern "C-unwind"` half (`game_syscall_trampoline_words`,
  * src/vm/trampoline.rs), our `currentVM->systemCall( args )` equivalent.
  *
- * Source: oracle/oracle/codemp/qcommon/vm.cpp:363-377 (VM_DllSyscall; array
+ * Source: oracle/codemp/qcommon/vm.cpp:363-377 (VM_DllSyscall; array
  * unpack `:366-375`, forward `:377`; the 15-arg rationale `:358-360`).
  */
 #include <stdarg.h>

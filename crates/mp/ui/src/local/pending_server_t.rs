@@ -6,14 +6,14 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `pendingServer_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:690-696`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:690-696`
 #[repr(C)]
 pub struct pendingServer_t {
-	pub adrstr: [c_char; 64],
-	pub name: [c_char; 64],
-	pub startTime: i32,
-	pub serverNum: i32,
-	pub valid: qboolean,
+    pub adrstr: [c_char; 64],
+    pub name: [c_char; 64],
+    pub startTime: i32,
+    pub serverNum: i32,
+    pub valid: qboolean,
 }
 
 const _: () = assert!(core::mem::size_of::<pendingServer_t>() == 140);

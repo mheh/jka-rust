@@ -8,7 +8,7 @@ use super::patch_plane_t::patchPlane_t;
 /// Raven `patchCollide_t` — a patch mesh's collision representation: bounding
 /// box plus its planes and facets.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_patch.h:93-99`
+/// Type definition source: `oracle/code/qcommon/cm_patch.h:93-99`
 #[repr(C)]
 pub struct patchCollide_s {
     pub bounds: [vec3_t; 2],

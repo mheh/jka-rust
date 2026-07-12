@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `cgi_UI_Parse_Int(value);`
 /// Raven transport: `PC_ParseInt((int *) VMA(1));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:578-580`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:857-859`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:578-580`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:857-859`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiParseIntArgs {
     value: *mut c_int,
@@ -31,10 +31,10 @@ impl CgUiParseIntArgs {
 
 /// `CG_UI_PARSE_INT` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:196`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:578-580`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:857-859`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:857-859`
+/// Enum value source: `oracle/code/cgame/cg_public.h:196`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:578-580`
+/// Output source: `oracle/code/client/cl_cgame.cpp:857-859`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:857-859`
 pub struct CgUiParseInt;
 
 impl OutboundSysCall for CgUiParseInt {

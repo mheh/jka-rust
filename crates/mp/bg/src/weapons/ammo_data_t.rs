@@ -2,12 +2,12 @@
 
 /// Raven `ammoData_t` — per-ammo-type data.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_weapons.h:87-91`
+/// Type definition source: `oracle/codemp/game/bg_weapons.h:87-91`
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct ammoData_t {
-	//	char	icon[32];	// Name of ammo icon file
-	pub max: i32, // Max amount player can hold of ammo
+    //	char	icon[32];	// Name of ammo icon file
+    pub max: i32, // Max amount player can hold of ammo
 }
 
 const _: () = assert!(core::mem::size_of::<ammoData_t>() == 4);

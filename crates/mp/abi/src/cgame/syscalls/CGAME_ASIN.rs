@@ -1,5 +1,7 @@
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `CGAME_ASIN`.
@@ -7,11 +9,11 @@ use abi_transport::pass_float;
 /// The engine handler reads a single `VMF(1)` float and returns
 /// `FloatAsInt( Q_asin( VMF(1) ) )`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_cgame.cpp:685`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:685`
-/// Transport source: `oracle/oracle/codemp/cgame/cg_syscalls.c:15`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:684`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:299`
+/// Args source: `oracle/codemp/client/cl_cgame.cpp:685`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:685`
+/// Transport source: `oracle/codemp/cgame/cg_syscalls.c:15`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:684`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:299`
 #[derive(Debug)]
 pub struct CgameAsinArgs {
     value: f32,
@@ -29,10 +31,10 @@ impl CgameAsinArgs {
 
 /// `CGAME_ASIN` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:147`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:685`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:684`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:299`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:147`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:685`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:684`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:299`
 pub struct CgameAsin;
 
 impl OutboundSysCall for CgameAsin {

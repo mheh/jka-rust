@@ -9,10 +9,10 @@ use sp_qshared::shared::fsMode_t;
 
 /// `UI_FS_FOPENFILE` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:165`
-/// Args source: `oracle/oracle/code/ui/ui_public.h:36`
-/// Output source: `oracle/oracle/code/ui/ui_public.h:36` (engine contract), `oracle/oracle/codemp/client/cl_ui.cpp:914-915`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:914-915`
+/// Enum source: `oracle/code/ui/ui_public.h:165`
+/// Args source: `oracle/code/ui/ui_public.h:36`
+/// Output source: `oracle/code/ui/ui_public.h:36` (engine contract), `oracle/codemp/client/cl_ui.cpp:914-915`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:914-915`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiFsFopenfileArgs {
     qpath: *const c_char,

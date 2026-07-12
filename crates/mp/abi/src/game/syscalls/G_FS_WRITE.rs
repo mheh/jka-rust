@@ -41,7 +41,7 @@ impl GFsWriteArgs {
 /// `G_FS_WRITE` MP game imports syscall ABI token.
 ///
 /// Raven: ( const void *buffer, int len, fileHandle_t f );
-/// Source: `oracle/oracle/codemp/game/g_public.h:135`
+/// Source: `oracle/codemp/game/g_public.h:135`
 pub struct GFsWrite;
 
 impl OutboundSysCall for GFsWrite {

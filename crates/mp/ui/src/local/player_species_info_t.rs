@@ -4,24 +4,24 @@ use core::ffi::c_char;
 
 /// `MAX_PLAYERMODELS`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:594`
+/// Source: `oracle/codemp/ui/ui_local.h:594`
 const MAX_PLAYERMODELS: usize = 32;
 
 /// Raven `playerSpeciesInfo_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:716-727`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:716-727`
 #[repr(C)]
 pub struct playerSpeciesInfo_t {
-	pub Name: [c_char; 64],
-	pub SkinHeadCount: i32,
-	pub SkinHeadNames: [[c_char; 16]; MAX_PLAYERMODELS],
-	pub SkinTorsoCount: i32,
-	pub SkinTorsoNames: [[c_char; 16]; MAX_PLAYERMODELS],
-	pub SkinLegCount: i32,
-	pub SkinLegNames: [[c_char; 16]; MAX_PLAYERMODELS],
-	pub ColorShader: [[c_char; 64]; MAX_PLAYERMODELS],
-	pub ColorCount: i32,
-	pub ColorActionText: [[c_char; 128]; MAX_PLAYERMODELS],
+    pub Name: [c_char; 64],
+    pub SkinHeadCount: i32,
+    pub SkinHeadNames: [[c_char; 16]; MAX_PLAYERMODELS],
+    pub SkinTorsoCount: i32,
+    pub SkinTorsoNames: [[c_char; 16]; MAX_PLAYERMODELS],
+    pub SkinLegCount: i32,
+    pub SkinLegNames: [[c_char; 16]; MAX_PLAYERMODELS],
+    pub ColorShader: [[c_char; 64]; MAX_PLAYERMODELS],
+    pub ColorCount: i32,
+    pub ColorActionText: [[c_char; 128]; MAX_PLAYERMODELS],
 }
 
 const _: () = assert!(core::mem::size_of::<playerSpeciesInfo_t>() == 7760);

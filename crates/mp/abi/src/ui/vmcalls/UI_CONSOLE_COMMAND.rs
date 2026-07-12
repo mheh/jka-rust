@@ -9,10 +9,10 @@ use mp_qshared::shared::qboolean;
 /// Raven enum comment is currently shifted in this snapshot; this call uses
 /// `qboolean UI_ConsoleCommand( int realTime )`.
 ///
-/// Source (enum): `oracle/oracle/codemp/ui/ui_public.h:240`
-/// Source (args): `oracle/oracle/codemp/ui/ui_main.c:612`
-/// Source (output): `oracle/oracle/codemp/ui/ui_main.c:612`
-/// Source (call site/transport): `oracle/oracle/codemp/client/cl_ui.cpp:1518`
+/// Source (enum): `oracle/codemp/ui/ui_public.h:240`
+/// Source (args): `oracle/codemp/ui/ui_main.c:612`
+/// Source (output): `oracle/codemp/ui/ui_main.c:612`
+/// Source (call site/transport): `oracle/codemp/client/cl_ui.cpp:1518`
 pub struct UiConsoleCommand;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

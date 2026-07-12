@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `CG_R_DRAWSTRETCHPIC`.
@@ -9,9 +11,9 @@ use abi_transport::pass_float;
 /// Raven wrapper packs floats with `PASSFLOAT`; the client switch decodes them
 /// with `VMF`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:368-370`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2278-2279`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:928-930`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:368-370`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2278-2279`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:928-930`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRDrawstretchpicArgs {
     x: f32,
@@ -53,10 +55,10 @@ impl CgRDrawstretchpicArgs {
 
 /// `CG_R_DRAWSTRETCHPIC` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:160`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:368-370`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:928-930`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:928-930`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:160`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:368-370`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:928-930`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:928-930`
 pub struct CgRDrawstretchpic;
 
 impl OutboundSysCall for CgRDrawstretchpic {

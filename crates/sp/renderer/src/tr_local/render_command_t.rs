@@ -2,7 +2,7 @@
 
 /// Raven `renderCommand_t` — render command types.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:2048-2059`
+/// Type definition source: `oracle/code/renderer/tr_local.h:2048-2059`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum renderCommand_t {

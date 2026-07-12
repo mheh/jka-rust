@@ -1,5 +1,7 @@
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use mp_qshared::shared::qboolean;
 
 /// Arguments for `CG_R_INITWIREFRAMEAUTO`.
@@ -8,9 +10,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( CG_R_INITWIREFRAMEAUTO );`
 /// Raven transport: `return R_InitializeWireframeAutomap();`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:445-448`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2305`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1079-1080`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:445-448`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2305`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1079-1080`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgRInitwireframeautoArgs;
 
@@ -23,10 +25,10 @@ impl CgRInitwireframeautoArgs {
 /// `CG_R_INITWIREFRAMEAUTO` MP cgame imports syscall ABI token.
 ///
 /// Raven: initialize automap -rww
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:175`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:445-448`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1079-1080`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1079-1080`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:175`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:445-448`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1079-1080`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1079-1080`
 pub struct CgRInitwireframeauto;
 
 impl OutboundSysCall for CgRInitwireframeauto {

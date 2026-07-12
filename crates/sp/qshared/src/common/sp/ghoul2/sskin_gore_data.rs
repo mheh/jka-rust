@@ -10,7 +10,7 @@ use crate::shared::vec3_t;
 /// `firstModel`, drops `baseModelOnly`/`shrinkOutTime`/`alphaModulate`/`tint`/
 /// `impactStrength`, and writes the four flags as C++ `bool` (1 byte), not the
 /// int-wide `qboolean` MP uses.
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2530-2568`
+/// Type definition source: `oracle/code/game/q_shared.h:2530-2568`
 #[repr(C)]
 pub struct SSkinGoreData {
     pub angles: vec3_t,

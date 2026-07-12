@@ -4,7 +4,7 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, SysCallTranspor
 
 /// `UI_LAN_SAVECACHEDSERVERS` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:224`
+/// Source: `oracle/code/ui/ui_public.h:224`
 pub struct UiLanSavecachedservers;
 
 impl OutboundSysCall for UiLanSavecachedservers {
@@ -18,9 +18,9 @@ impl OutboundSysCall for UiLanSavecachedservers {
 /// Raven wrapper: `trap_LAN_SaveCachedServers();`
 /// Raven transport: `LAN_SaveServersToCache(); return 0;`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:224`
-/// SP args/output source: `oracle/oracle/code/ui/ui_public.h:224`, `oracle/oracle/codemp/ui/ui_local.h:973`
-/// Fallback transport/source evidence: `oracle/oracle/codemp/client/cl_ui.cpp:1059-1061`
+/// Enum source: `oracle/code/ui/ui_public.h:224`
+/// SP args/output source: `oracle/code/ui/ui_public.h:224`, `oracle/codemp/ui/ui_local.h:973`
+/// Fallback transport/source evidence: `oracle/codemp/client/cl_ui.cpp:1059-1061`
 impl EncodeSysCall for UiLanSavecachedservers {
     fn encode_syscall(_: &Self::Args) -> SysCallTransport {
         SysCallTransport::empty()

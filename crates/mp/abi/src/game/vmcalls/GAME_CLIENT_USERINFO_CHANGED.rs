@@ -34,7 +34,7 @@ impl GameClientUserinfoChangedArgs {
 /// `GAME_CLIENT_USERINFO_CHANGED` MP game exports vmMain ABI token.
 ///
 /// Raven: ( int clientNum );
-/// Source: `oracle/oracle/codemp/game/g_public.h:748`
+/// Source: `oracle/codemp/game/g_public.h:748`
 pub struct GameClientUserinfoChanged;
 
 impl InboundVmCall for GameClientUserinfoChanged {

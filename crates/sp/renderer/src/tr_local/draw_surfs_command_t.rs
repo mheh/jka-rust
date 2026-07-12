@@ -8,7 +8,7 @@ use super::view_parms_t::viewParms_t;
 /// surfaces to draw for a view, along with the view's refdef and viewParms.
 ///
 /// Raven: none.
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:2040-2046`
+/// Type definition source: `oracle/code/renderer/tr_local.h:2040-2046`
 #[repr(C)]
 pub struct drawSurfsCommand_t {
     pub commandId: i32,

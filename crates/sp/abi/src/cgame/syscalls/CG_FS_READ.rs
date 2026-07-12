@@ -11,8 +11,8 @@ use sp_qshared::shared::fileHandle_t;
 /// Raven wrapper: `return syscall( CG_FS_READ, buffer, len, f );`
 /// Raven transport: `FS_Read( VMA(1), args[2], args[3] );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:86-88`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:464-466`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:86-88`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:464-466`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFsReadArgs {
     buffer: *mut c_void,
@@ -30,10 +30,10 @@ impl CgFsReadArgs {
 
 /// `CG_FS_READ` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:71`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:86-88`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:464-466`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:464-466`
+/// Enum value source: `oracle/code/cgame/cg_public.h:71`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:86-88`
+/// Output source: `oracle/code/client/cl_cgame.cpp:464-466`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:464-466`
 pub struct CgFsRead;
 
 impl OutboundSysCall for CgFsRead {

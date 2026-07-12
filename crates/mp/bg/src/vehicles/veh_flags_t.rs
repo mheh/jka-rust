@@ -2,7 +2,7 @@
 
 /// Raven `vehFlags_t` — vehicle behavior flags.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:417-424`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:417-424`
 #[allow(non_camel_case_types)]
 #[repr(i32)]
 pub enum vehFlags_t {

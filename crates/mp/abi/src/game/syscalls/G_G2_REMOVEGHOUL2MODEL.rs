@@ -2,9 +2,9 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::shared::qboolean;
 use core::ffi::c_int;
 use core::ffi::c_void;
+use mp_qshared::shared::qboolean;
 
 /// `G_G2_REMOVEGHOUL2MODEL` outbound game-to-engine syscall.
 ///
@@ -34,7 +34,7 @@ impl GG2Removeghoul2ModelArgs {
 
 /// `G_G2_REMOVEGHOUL2MODEL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:527`
+/// Source: `oracle/codemp/game/g_public.h:527`
 pub struct GG2Removeghoul2Model;
 
 impl OutboundSysCall for GG2Removeghoul2Model {

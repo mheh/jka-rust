@@ -1,0 +1,11 @@
+# line3 — trivial 3-node chain. Sanity: linear ranks, one path each way.
+# Format:  checksum <int> | node <x> <y> <z> <flags> <radius> | connect <a> <b>
+# node ids are assigned in file order starting at 0.
+checksum 111
+
+node    0 0 0   0   16
+node  100 0 0   0   16
+node  200 0 0   0   16
+
+connect 0 1
+connect 1 2

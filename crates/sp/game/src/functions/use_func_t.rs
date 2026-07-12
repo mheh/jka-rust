@@ -2,7 +2,7 @@
 
 /// Raven `useFunc_t` — enumeration of entity use/activation callback function IDs.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_functions.h:333-415`
+/// Type definition source: `oracle/code/game/g_functions.h:333-415`
 #[repr(i32)]
 pub enum useFunc_t {
     useF_NULL = 0,

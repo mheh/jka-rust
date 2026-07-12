@@ -2,8 +2,8 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::common::mp::qcommon::sharedRagDollParams_t;
 use core::ffi::c_void;
+use mp_qshared::common::mp::qcommon::sharedRagDollParams_t;
 
 /// `G_G2_SETRAGDOLL` outbound game-to-engine syscall.
 ///
@@ -30,7 +30,7 @@ impl GG2SetragdollArgs {
 
 /// `G_G2_SETRAGDOLL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:544`
+/// Source: `oracle/codemp/game/g_public.h:544`
 pub struct GG2Setragdoll;
 
 impl OutboundSysCall for GG2Setragdoll {

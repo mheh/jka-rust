@@ -7,7 +7,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `srfTriangles_t` — Q3 BSP/MD3 triangle soup surface.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:818-836`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:818-836`
 #[repr(C)]
 pub struct srfTriangles_t {
     pub surfaceType: surfaceType_t,

@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( CG_GET_ENTITY_TOKEN, buffer, bufferSize );`
 /// Raven transport: `return re.GetEntityToken( (char *)VMA(1), args[2] );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:612-613`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2393`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1093-1094`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:612-613`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2393`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1093-1094`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgGetEntityTokenArgs {
     buffer: *mut c_char,
@@ -31,11 +31,11 @@ impl CgGetEntityTokenArgs {
 
 /// `CG_GET_ENTITY_TOKEN` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:216`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:612-613`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:612-613`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1093-1094`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1093-1094`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:216`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:612-613`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:612-613`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1093-1094`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1093-1094`
 pub struct CgGetEntityToken;
 
 impl OutboundSysCall for CgGetEntityToken {

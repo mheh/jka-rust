@@ -24,7 +24,7 @@ impl GUnlinkentityArgs {
 ///
 /// Raven: ( gentity_t *ent );
 /// Raven: call before removing an interactive entity
-/// Source: `oracle/oracle/codemp/game/g_public.h:204`
+/// Source: `oracle/codemp/game/g_public.h:204`
 pub struct GUnlinkentity;
 
 impl OutboundSysCall for GUnlinkentity {

@@ -2,7 +2,7 @@
 
 /// Raven `cgameImport_t` — Cgame engine imports (syscall opcodes).
 ///
-/// Type definition source: `oracle/oracle/code/cgame/../game/../cgame/cg_public.h:60-210`
+/// Type definition source: `oracle/code/cgame/../game/../cgame/cg_public.h:60-210`
 #[repr(i32)]
 pub enum cgameImport_t {
     CG_PRINT = 0,

@@ -1,6 +1,7 @@
 //! `qfiles` types.
 
 pub mod _targa_header;
+pub mod bsp_limits;
 pub mod dbrush_t;
 pub mod dbrushside_t;
 pub mod dfog_t;
@@ -12,14 +13,19 @@ pub mod dmodel_t;
 pub mod dnode_t;
 pub mod dplane_t;
 pub mod draw_vert_t;
+pub mod drawvert_scale;
 pub mod dshader_t;
 pub mod dsurface_t;
+pub mod font_style;
 pub mod glyph_info_t;
+pub mod light_style_limits;
+pub mod lump_indices;
 pub mod lump_t;
 pub mod map_surface_type_t;
 pub mod map_vert_t;
 pub mod md3_frame_s;
 pub mod md3_header_t;
+pub mod md3_limits;
 pub mod md3_shader_t;
 pub mod md3_st_t;
 pub mod md3_surface_t;
@@ -28,3 +34,4 @@ pub mod md3_triangle_t;
 pub mod md3_xyz_normal_t;
 pub mod pcx_t;
 pub mod vm_header_t;
+pub mod vm_magic;

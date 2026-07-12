@@ -2,7 +2,7 @@
 //!
 //! `moverState_t` itself lives in `mp_qshared` (as a `c_int` alias, since
 //! `gentity_t.moverState` needs it); these are the named states.
-//! Source: `oracle/oracle/codemp/game/g_local.h:88-94`
+//! Source: `oracle/codemp/game/g_local.h:88-94`
 
 pub use mp_qshared::common::mp::gentity::moverState_t;
 

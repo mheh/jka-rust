@@ -11,8 +11,8 @@ use abi_transport::generic::{
 /// decodes that argument as `(glconfig_t *)VMA(1)` and fills it via
 /// `CL_GetGlconfig`.
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:442-443`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:749-751`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:442-443`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:749-751`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgGetglconfigArgs {
     glconfig: *mut c_void,
@@ -30,10 +30,10 @@ impl CgGetglconfigArgs {
 
 /// `CG_GETGLCONFIG` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:150`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:442-443`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:749-751`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:749-751`
+/// Enum value source: `oracle/code/cgame/cg_public.h:150`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:442-443`
+/// Output source: `oracle/code/client/cl_cgame.cpp:749-751`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:749-751`
 pub struct CgGetglconfig;
 
 impl OutboundSysCall for CgGetglconfig {

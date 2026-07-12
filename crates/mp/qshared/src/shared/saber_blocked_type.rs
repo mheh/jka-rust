@@ -2,7 +2,7 @@
 
 /// Raven `saberBlockedType_t` saber block-direction states.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:558-573`
+/// Type definition source: `oracle/codemp/game/q_shared.h:558-573`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum saberBlockedType_t {

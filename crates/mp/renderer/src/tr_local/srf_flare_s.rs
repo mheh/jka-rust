@@ -6,13 +6,13 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `srfFlare_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:715-720`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:715-720`
 #[repr(C)]
 pub struct srfFlare_t {
-	pub surfaceType: surfaceType_t,
-	pub origin: vec3_t,
-	pub normal: vec3_t,
-	pub color: vec3_t,
+    pub surfaceType: surfaceType_t,
+    pub origin: vec3_t,
+    pub normal: vec3_t,
+    pub color: vec3_t,
 }
 
 /// Raven `srfFlare_s` is the C tag; `srfFlare_t` is the typedef used everywhere.

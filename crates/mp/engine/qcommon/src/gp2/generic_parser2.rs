@@ -15,8 +15,8 @@ use super::tokenizer::Tokenizer;
 /// `mWriteable` flag is read by nothing in either tree and is dropped, and
 /// `CGPGroup::Duplicate`/`CGPValue::Duplicate` collapse to `Clone` of the
 /// document. A failed parse keeps the partially built tree, as in Raven.
-/// Class definition source: `oracle/oracle/codemp/qcommon/GenericParser2.h:136-158`
-/// Method source: `oracle/oracle/codemp/qcommon/GenericParser2.cpp:860-914`
+/// Class definition source: `oracle/codemp/qcommon/GenericParser2.h:136-158`
+/// Method source: `oracle/codemp/qcommon/GenericParser2.cpp:860-914`
 #[derive(Debug, Clone)]
 pub struct GenericParser2 {
     pub(crate) groups: Vec<GpGroupNode>,
@@ -84,7 +84,12 @@ impl GenericParser2 {
     /// Raven `CGPGroup::AddPair(name, value, textPool)` — appends a pair,
     /// with one initial value if given. Returns the pair's index within the
     /// group, in insertion order.
-    pub fn add_pair(&mut self, group: GpGroupId, name: impl Into<String>, value: Option<&str>) -> usize {
+    pub fn add_pair(
+        &mut self,
+        group: GpGroupId,
+        name: impl Into<String>,
+        value: Option<&str>,
+    ) -> usize {
         let mut pair = GpValue::new(name);
         if let Some(value) = value {
             pair.add_value(value);
@@ -107,7 +112,11 @@ impl GenericParser2 {
     }
 
     /// Raven `CGPGroup::Parse`.
-    fn parse_group(&mut self, group: GpGroupId, tokenizer: &mut Tokenizer) -> Result<(), Gp2ParseError> {
+    fn parse_group(
+        &mut self,
+        group: GpGroupId,
+        tokenizer: &mut Tokenizer,
+    ) -> Result<(), Gp2ParseError> {
         loop {
             let token = tokenizer.get_token(true, false);
 
@@ -337,7 +346,10 @@ outer\n\
     #[test]
     fn unclosed_group_is_an_error_in_mp() {
         let mut parser = GenericParser2::new();
-        assert_eq!(parser.parse("outer\n{\nkey value\n", true), Err(Gp2ParseError));
+        assert_eq!(
+            parser.parse("outer\n{\nkey value\n", true),
+            Err(Gp2ParseError)
+        );
         // The partial tree survives, as in Raven.
         assert_eq!(parser.top_level().num_sub_groups(), 1);
     }

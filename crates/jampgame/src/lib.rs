@@ -4,9 +4,12 @@
 //! that delegates into `mp_game` (`GameContext` receiver, SEAM-Q12). The logic
 //! crate `mp_game` has no entrypoint/`OnceLock`/`WorldCell` code of its own.
 
-use std::ffi::c_char;
+use std::ffi::{c_char, CString};
+use std::panic::AssertUnwindSafe;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
+mod panic_guard;
 mod world_cell;
 
 use abi_transport::entrypoints::{AbiCommand, AbiWord, RawSyscall};
@@ -16,6 +19,10 @@ use mp_game::com_boundary::{route_error, route_print, set_com_error_sink, set_co
 use mp_game::vmcalls::{
     BotAiStartFrame, GameClientBegin, GameClientCommand, GameClientConnect, GameClientDisconnect,
     GameClientThink, GameClientUserinfoChanged, GameConsoleCommand, GameGetitemindexbytag,
+    GameIcarusGetfloat, GameIcarusGetsetidforstring, GameIcarusGetstring, GameIcarusGettag,
+    GameIcarusGetvector, GameIcarusKill, GameIcarusLerp2Angles, GameIcarusLerp2End,
+    GameIcarusLerp2Origin, GameIcarusLerp2Pos, GameIcarusLerp2Start, GameIcarusPlay,
+    GameIcarusPlaysound, GameIcarusRemove, GameIcarusSet, GameIcarusSoundindex, GameIcarusUse,
     GameInit, GameNavChecknodefailedforent, GameNavClearlos, GameNavClearpathbetweenpoints,
     GameNavClearpathtopoint, GameNavEntIsBreakable, GameNavEntIsDoor, GameNavEntIsRemovableUsable,
     GameNavEntIsUnlockedDoor, GameNavFindcombatpointwaypoints, GameRoffNotetrackCallback,
@@ -35,11 +42,26 @@ static WORLD: WorldCell = WorldCell::new();
 
 /// Raven `dllEntry` (`g_syscalls.c:14-16`). Stores the engine syscall trampoline
 /// into the one `OnceLock<CEngine>`. `extern "C-unwind"` (SEAM-D12).
+///
+/// PANIC POLICY (2026-07-08): `dllEntry` runs BEFORE the engine syscall pointer
+/// is armed, so there is no `Com_Error`/`G_ERROR` path to route a failure
+/// through yet. Its only sound failure mode is `eprintln!` + `std::process::
+/// abort()` — a panic must never unwind raw across the `extern "C-unwind"`
+/// boundary into the C engine (UB). The capture hook is installed FIRST so any
+/// panic in the remaining setup is still recorded with `file:line`.
 #[no_mangle]
 pub extern "C-unwind" fn dllEntry(syscall: RawSyscall) {
-    ENGINE.set(CEngine::new(syscall)).ok();
-    set_com_print_sink(com_print_sink);
-    set_com_error_sink(com_error_sink);
+    let armed = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        panic_guard::install_hook();
+        ENGINE.set(CEngine::new(syscall)).ok();
+        set_com_print_sink(com_print_sink);
+        set_com_error_sink(com_error_sink);
+    }));
+    if armed.is_err() {
+        let msg = panic_guard::take().unwrap_or_else(|| "panic in dllEntry".to_string());
+        eprintln!("jampgame: fatal panic during dllEntry (engine error path not yet armed): {msg}");
+        std::process::abort();
+    }
 }
 
 /// The registered `Com_Printf` route (SEAM-D1 narrow extension): reads the
@@ -58,10 +80,15 @@ fn com_error_sink(msg: *const c_char) {
     route_error(engine, msg);
 }
 
-/// Raven `vmMain` (`g_main.c:515`). Bootstraps/derives the `WORLD` pointer,
-/// constructs a `GameContext` per call from `WORLD` + `ENGINE.get()` (SEAM-Q12),
-/// and routes the decoded `MpGameExport` command through the exhaustive match to
-/// its `Dispatch<C>` impl. `extern "C-unwind"` (SEAM-D12).
+/// Raven `vmMain` (`g_main.c:515`) — the single engine→game choke point AND the
+/// ABI panic firewall (panic policy, 2026-07-08). Every engine call flows
+/// through here; the decoded dispatch itself lives in [`vm_main_dispatch`],
+/// wrapped in `std::panic::catch_unwind` so NO Rust panic ever unwinds raw
+/// across the `extern "C-unwind"` boundary into the C engine (that is UB, or at
+/// best an abort with no context). On a caught panic we report a readable
+/// `file:line — message` through the engine's `Com_Error`/`G_ERROR` path (see
+/// [`report_panic_and_die`], which then never returns). `extern "C-unwind"`
+/// (SEAM-D12).
 #[no_mangle]
 #[allow(clippy::too_many_arguments)]
 pub extern "C-unwind" fn vmMain(
@@ -79,26 +106,109 @@ pub extern "C-unwind" fn vmMain(
     arg10: AbiWord,
     arg11: AbiWord,
 ) -> AbiWord {
+    let dispatched = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        vm_main_dispatch(
+            command, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11,
+        )
+    }));
+    match dispatched {
+        Ok(word) => word,
+        Err(_) => {
+            // The hook (installed at dllEntry) already recorded the payload +
+            // file:line into a thread-local — catch_unwind's `Any` is lossy, so
+            // prefer that record. report_panic_and_die never returns.
+            let msg = panic_guard::take()
+                .unwrap_or_else(|| "panic with no captured payload/location".to_string());
+            report_panic_and_die(&msg)
+        }
+    }
+}
+
+/// Set for the duration of a panic report. A second panic reaching
+/// [`report_panic_and_die`] while this is set means the engine error path
+/// itself failed, so we abort rather than loop forever.
+static PANIC_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
+/// Report a panic caught at [`vmMain`] through the engine's `Com_Error`/
+/// `G_ERROR` path, then never return.
+///
+/// The engine's `Com_Error` longjmps back into the engine and NEVER returns —
+/// that is the exact contract C game code relies on when it calls `G_Error`
+/// (`oracle/codemp/game/g_main.c:1208`). So on success this call does not
+/// come back; the game dies with a readable message, same as a C-side fatal.
+/// If the error trap is unavailable (engine pointer not yet armed, or the
+/// message held an interior NUL), or the trap itself panics, or we are already
+/// inside a panic report (recursion), there is nothing sound left to do but
+/// `std::process::abort()` — after printing `file:line — reason` so the operator
+/// still gets context.
+fn report_panic_and_die(msg: &str) -> ! {
+    if PANIC_IN_PROGRESS.swap(true, Ordering::SeqCst) {
+        eprintln!("jampgame: recursive panic while reporting a panic; aborting");
+        std::process::abort();
+    }
+    let full = format!("jampgame panic: {msg}");
+    if ENGINE.get().is_some() {
+        if let Ok(cmsg) = CString::new(full.clone()) {
+            // Route through Com_Error (G_ERROR): longjmps, never returns.
+            // Guarded so a panic *inside* the trap falls through to abort
+            // instead of unwinding across the boundary a second time.
+            let _ = std::panic::catch_unwind(|| com_error_sink(cmsg.as_ptr()));
+        }
+    }
+    // Reached only if the engine error path was unavailable or (impossibly)
+    // returned. Print and abort — never let the panic escape the boundary.
+    eprintln!("{full}");
+    eprintln!("jampgame: engine error path unavailable or returned; aborting");
+    std::process::abort();
+}
+
+/// The decoded-dispatch body of [`vmMain`], factored out so the export can wrap
+/// it in `catch_unwind`. Bootstraps/derives the `WORLD` pointer, constructs a
+/// `GameContext` per call from `WORLD` + `ENGINE.get()` (SEAM-Q12), and routes
+/// the decoded `MpGameExport` command through the exhaustive match to its
+/// `Dispatch<C>` impl.
+#[allow(clippy::too_many_arguments)]
+fn vm_main_dispatch(
+    command: AbiCommand,
+    arg0: AbiWord,
+    arg1: AbiWord,
+    arg2: AbiWord,
+    arg3: AbiWord,
+    arg4: AbiWord,
+    arg5: AbiWord,
+    arg6: AbiWord,
+    arg7: AbiWord,
+    arg8: AbiWord,
+    arg9: AbiWord,
+    arg10: AbiWord,
+    arg11: AbiWord,
+) -> AbiWord {
     // BOOTSTRAP (STATE-D6): GAME_INIT is the ONE command that WRITES the cell
-    // before reading it — it stores a zeroed GameWorld (GameWorld::zeroed,
-    // STATE-D9), THEN falls through so the dispatched GAME_INIT arm runs
-    // G_InitGame's init against it (g_main.c:515,979). The pre-decode compare
-    // is the frozen round-6 pinning spelling.
+    // before reading it — it stores a heap-boxed zeroed GameWorld
+    // (GameWorld::zeroed_boxed, STATE-D9), THEN falls through so the dispatched
+    // GAME_INIT arm runs G_InitGame's init against it (g_main.c:515,979).
+    // `zeroed_boxed` builds the ~1.4 MB island directly on the heap so it never
+    // transits this deep engine-called frame by value (an inline
+    // `Some(GameWorld::zeroed())` overflowed the guard page). The pre-decode
+    // compare is the frozen round-6 pinning spelling.
     if command == MpGameExport::GAME_INIT as AbiCommand {
         // SAFETY: single-threaded init; no reentrancy is possible before the
         // world exists (STATE-D6).
         unsafe {
-            *WORLD.0.get() = Some(GameWorld::zeroed());
+            *WORLD.0.get() = Some(GameWorld::zeroed_boxed());
         }
     }
 
     // SAFETY: single-threaded per Raven's contract; each (possibly reentrant)
     // entry derives its OWN raw `*mut GameWorld` — aliasing raw pointers are
-    // sound; a dispatch-spanning `&mut` would be UB (STATE-D6 discipline).
+    // sound; a dispatch-spanning `&mut` would be UB (STATE-D6 discipline). The
+    // cell holds `Box<GameWorld>`; `&mut **b` reborrows through the Box to the
+    // same `*mut GameWorld` the whole downstream (`GameContext`) expects.
     let world = unsafe {
-        (*WORLD.0.get())
+        let b = (*WORLD.0.get())
             .as_mut()
-            .expect("GAME_INIT built the world") as *mut GameWorld
+            .expect("GAME_INIT built the world");
+        &mut **b as *mut GameWorld
     };
     // Per-call receiver from WORLD + ENGINE.get() (SEAM-Q12) — plain struct
     // literal, pub fields (round-5 resolution; WorldPtr precedent, STATE-D8).
@@ -218,35 +328,104 @@ pub extern "C-unwind" fn vmMain(
                 GameSpawnRmgEntity::decode_vm_main(transport),
             ))
         }
-        // ESCALATION: the 17 ICARUS callback cases (g_main.c:558-668) read their
-        // `T_G_ICARUS_*` payloads out of the module's `gSharedBuffer`
-        // shared-memory region, which is not yet modeled in `GameWorld`. Wiring
-        // them needs a design decision (where the registered buffer lives and how
-        // it is typed at the seam), so they stay a single loud todo!() rather than
-        // a fake. Source: oracle/oracle/codemp/game/g_main.c:558-668.
-        MpGameExport::GAME_ICARUS_PLAYSOUND
-        | MpGameExport::GAME_ICARUS_SET
-        | MpGameExport::GAME_ICARUS_LERP2POS
-        | MpGameExport::GAME_ICARUS_LERP2ORIGIN
-        | MpGameExport::GAME_ICARUS_LERP2ANGLES
-        | MpGameExport::GAME_ICARUS_GETTAG
-        | MpGameExport::GAME_ICARUS_LERP2START
-        | MpGameExport::GAME_ICARUS_LERP2END
-        | MpGameExport::GAME_ICARUS_USE
-        | MpGameExport::GAME_ICARUS_KILL
-        | MpGameExport::GAME_ICARUS_REMOVE
-        | MpGameExport::GAME_ICARUS_PLAY
-        | MpGameExport::GAME_ICARUS_GETFLOAT
-        | MpGameExport::GAME_ICARUS_GETVECTOR
-        | MpGameExport::GAME_ICARUS_GETSTRING
-        | MpGameExport::GAME_ICARUS_SOUNDINDEX
-        | MpGameExport::GAME_ICARUS_GETSETIDFORSTRING => {
-            todo!(
-                "Port GAME_ICARUS_* dispatch — gSharedBuffer module shared-memory \
-                 transport is unmodeled (T_G_ICARUS_* payloads); \
-                 oracle/oracle/codemp/game/g_main.c:558-668"
-            )
+        // The 17 ICARUS callback cases (g_main.c:558-668). Each reads its
+        // `T_G_ICARUS_*` payload out of the engine-registered `gSharedBuffer`
+        // shared-memory region (registered in G_InitGame via
+        // trap::SV_RegisterSharedMemory); the per-command `Dispatch<C> for
+        // GameContext` impls (game_context.rs) overlay-cast that buffer and thread
+        // into the ported Q3_* handlers. `Args = ()` — the payload arrives
+        // out-of-band, not through the vmMain arg words.
+        // Source: oracle/codemp/game/g_main.c:558-668.
+        MpGameExport::GAME_ICARUS_PLAYSOUND => {
+            GameIcarusPlaysound::encode_return(Dispatch::<GameIcarusPlaysound>::dispatch(
+                &ctx,
+                GameIcarusPlaysound::decode_vm_main(transport),
+            ))
         }
+        MpGameExport::GAME_ICARUS_SET => GameIcarusSet::encode_return(
+            Dispatch::<GameIcarusSet>::dispatch(&ctx, GameIcarusSet::decode_vm_main(transport)),
+        ),
+        MpGameExport::GAME_ICARUS_LERP2POS => {
+            GameIcarusLerp2Pos::encode_return(Dispatch::<GameIcarusLerp2Pos>::dispatch(
+                &ctx,
+                GameIcarusLerp2Pos::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_LERP2ORIGIN => {
+            GameIcarusLerp2Origin::encode_return(Dispatch::<GameIcarusLerp2Origin>::dispatch(
+                &ctx,
+                GameIcarusLerp2Origin::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_LERP2ANGLES => {
+            GameIcarusLerp2Angles::encode_return(Dispatch::<GameIcarusLerp2Angles>::dispatch(
+                &ctx,
+                GameIcarusLerp2Angles::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_GETTAG => {
+            GameIcarusGettag::encode_return(Dispatch::<GameIcarusGettag>::dispatch(
+                &ctx,
+                GameIcarusGettag::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_LERP2START => {
+            GameIcarusLerp2Start::encode_return(Dispatch::<GameIcarusLerp2Start>::dispatch(
+                &ctx,
+                GameIcarusLerp2Start::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_LERP2END => {
+            GameIcarusLerp2End::encode_return(Dispatch::<GameIcarusLerp2End>::dispatch(
+                &ctx,
+                GameIcarusLerp2End::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_USE => GameIcarusUse::encode_return(
+            Dispatch::<GameIcarusUse>::dispatch(&ctx, GameIcarusUse::decode_vm_main(transport)),
+        ),
+        MpGameExport::GAME_ICARUS_KILL => GameIcarusKill::encode_return(
+            Dispatch::<GameIcarusKill>::dispatch(&ctx, GameIcarusKill::decode_vm_main(transport)),
+        ),
+        MpGameExport::GAME_ICARUS_REMOVE => {
+            GameIcarusRemove::encode_return(Dispatch::<GameIcarusRemove>::dispatch(
+                &ctx,
+                GameIcarusRemove::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_PLAY => GameIcarusPlay::encode_return(
+            Dispatch::<GameIcarusPlay>::dispatch(&ctx, GameIcarusPlay::decode_vm_main(transport)),
+        ),
+        MpGameExport::GAME_ICARUS_GETFLOAT => {
+            GameIcarusGetfloat::encode_return(Dispatch::<GameIcarusGetfloat>::dispatch(
+                &ctx,
+                GameIcarusGetfloat::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_GETVECTOR => {
+            GameIcarusGetvector::encode_return(Dispatch::<GameIcarusGetvector>::dispatch(
+                &ctx,
+                GameIcarusGetvector::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_GETSTRING => {
+            GameIcarusGetstring::encode_return(Dispatch::<GameIcarusGetstring>::dispatch(
+                &ctx,
+                GameIcarusGetstring::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_SOUNDINDEX => {
+            GameIcarusSoundindex::encode_return(Dispatch::<GameIcarusSoundindex>::dispatch(
+                &ctx,
+                GameIcarusSoundindex::decode_vm_main(transport),
+            ))
+        }
+        MpGameExport::GAME_ICARUS_GETSETIDFORSTRING => GameIcarusGetsetidforstring::encode_return(
+            Dispatch::<GameIcarusGetsetidforstring>::dispatch(
+                &ctx,
+                GameIcarusGetsetidforstring::decode_vm_main(transport),
+            ),
+        ),
         // `case GAME_NAV_CLEARPATHTOPOINT: return NAV_ClearPathToPoint(...);`
         // (g_main.c:672-673).
         MpGameExport::GAME_NAV_CLEARPATHTOPOINT => {

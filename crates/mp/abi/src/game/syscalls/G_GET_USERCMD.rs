@@ -35,7 +35,7 @@ impl GGetUsercmdArgs {
 /// `G_GET_USERCMD` MP game imports syscall ABI token.
 ///
 /// Raven: ( int clientNum, usercmd_t *cmd )
-/// Source: `oracle/oracle/codemp/game/g_public.h:219`
+/// Source: `oracle/codemp/game/g_public.h:219`
 pub struct GGetUsercmd;
 
 impl OutboundSysCall for GGetUsercmd {

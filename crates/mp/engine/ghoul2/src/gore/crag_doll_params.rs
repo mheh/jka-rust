@@ -10,9 +10,9 @@ use mp_qshared::shared::{qboolean, sharedERagEffector, sharedERagPhase, vec3_t};
 /// verbatim (same variants/values) by `q_shared.h`'s "C-ified" `sharedERagPhase`
 /// / `sharedERagEffector` — already ported at `mp_qshared::shared` — and reused
 /// here rather than re-declaring identical enums.
-/// Type definition source: `oracle/oracle/codemp/ghoul2/G2_gore.h:131-199`
+/// Type definition source: `oracle/codemp/ghoul2/G2_gore.h:131-199`
 /// (`ERagPhase`: 135-144, `ERagEffector`: 168-195; cf.
-/// `oracle/oracle/codemp/game/q_shared.h:856-894`)
+/// `oracle/codemp/game/q_shared.h:856-894`)
 #[repr(C)]
 pub struct CRagDollParams {
     pub angles: vec3_t,

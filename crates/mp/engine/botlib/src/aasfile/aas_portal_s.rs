@@ -2,17 +2,17 @@
 
 /// Raven `aas_portal_t` — AAS portal connecting two clusters.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:132-138`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:132-138`
 #[repr(C)]
 pub struct aas_portal_t {
-	/// area that is the actual portal
-	pub areanum: i32,
-	/// cluster at front of portal
-	pub frontcluster: i32,
-	/// cluster at back of portal
-	pub backcluster: i32,
-	/// number of the area in the front and back cluster
-	pub clusterareanum: [i32; 2],
+    /// area that is the actual portal
+    pub areanum: i32,
+    /// cluster at front of portal
+    pub frontcluster: i32,
+    /// cluster at back of portal
+    pub backcluster: i32,
+    /// number of the area in the front and back cluster
+    pub clusterareanum: [i32; 2],
 }
 
 pub type aas_portal_s = aas_portal_t;

@@ -24,7 +24,7 @@ impl UiG2ListsurfacesArgs {
 
 /// `UI_G2_LISTSURFACES` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:508`
+/// Source: `oracle/codemp/ui/ui_public.h:508`
 pub struct UiG2Listsurfaces;
 
 impl OutboundSysCall for UiG2Listsurfaces {

@@ -1,5 +1,5 @@
 // PORT-COMPLETE: AnimalNPC.c 2/7
-//! FAITHFUL port of `oracle/oracle/codemp/game/AnimalNPC.c` (MP `_JK2MP` +
+//! FAITHFUL port of `oracle/codemp/game/AnimalNPC.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!
 //! Generated from the `fnskel.py` signature skeleton; bodies transcribed per
@@ -19,12 +19,11 @@
 use crate::g_main::level_time;
 use crate::prelude::*;
 
-// Raven angle-vector index (`q_shared.h`): YAW=1.
-const YAW: usize = 1;
+// `YAW` (angle-vector index) comes from the prelude (`crate::q_math::YAW`).
 
 /// Raven `DeathUpdate` — update death sequence.
 ///
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:97-148`
+/// Source: `oracle/codemp/game/AnimalNPC.c:97-148`
 pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let level_time = level_time(ctx);
@@ -41,7 +40,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven `Update` — like a think or move command, this updates various
 /// vehicle properties.
 ///
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:151-154`
+/// Source: `oracle/codemp/game/AnimalNPC.c:151-154`
 pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
         // Animal `Update` delegates to the generic base body.
@@ -55,7 +54,7 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_
 /// If you really need to violate this rule for SP, then use ifdefs.
 /// By BG-compatible, I mean no use of game-specific data - ONLY use
 /// stuff available in the MP bgEntity.
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:168-329`
+/// Source: `oracle/codemp/game/AnimalNPC.c:168-329`
 pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut speedInc: f32;
@@ -153,7 +152,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// If you really need to violate this rule for SP, then use ifdefs.
 /// By BG-compatible, I mean no use of game-specific data - ONLY use
 /// stuff available in the MP bgEntity.
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:338-464`
+/// Source: `oracle/codemp/game/AnimalNPC.c:338-464`
 pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity;
@@ -231,14 +230,14 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven `AnimalProcessOri` — temp hack til mp speeder controls are sorted
 /// (`_JK2MP` only).
 ///
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:467-470`
+/// Source: `oracle/codemp/game/AnimalNPC.c:467-470`
 pub fn AnimalProcessOri(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     ProcessOrientCommands(ctx, pVeh);
 }
 
 /// Raven `AnimateVehicle`.
 ///
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:474-615`
+/// Source: `oracle/codemp/game/AnimalNPC.c:474-615`
 pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut anim: animNumber_t = BOTH_VT_IDLE;
@@ -266,7 +265,14 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
             anim = BOTH_VT_BUCK;
             iBlend = 500;
-            Vehicle_SetAnim(parent, SETANIM_LEGS, BOTH_VT_BUCK as c_int, iFlags, iBlend);
+            Vehicle_SetAnim(
+                ctx,
+                parent,
+                SETANIM_LEGS,
+                BOTH_VT_BUCK as c_int,
+                iFlags,
+                iBlend,
+            );
             return;
         }
 
@@ -292,9 +298,9 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 (*pVeh).m_iBoarding = level_time + iAnimLen;
 
                 iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
-                Vehicle_SetAnim(parent, SETANIM_LEGS, anim as c_int, iFlags, iBlend);
+                Vehicle_SetAnim(ctx, parent, SETANIM_LEGS, anim as c_int, iFlags, iBlend);
                 if !pilot.is_null() {
-                    Vehicle_SetAnim(pilot, SETANIM_BOTH, anim as c_int, iFlags, iBlend);
+                    Vehicle_SetAnim(ctx, pilot, SETANIM_BOTH, anim as c_int, iFlags, iBlend);
                 }
                 return;
             } else if (*pVeh).m_iBoarding <= level_time {
@@ -341,7 +347,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             }
         }
 
-        Vehicle_SetAnim(parent, SETANIM_LEGS, anim as c_int, iFlags, iBlend);
+        Vehicle_SetAnim(ctx, parent, SETANIM_LEGS, anim as c_int, iFlags, iBlend);
     }
 }
 
@@ -350,7 +356,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 ///
 /// Raven: rwwFIXMEFIXME: This is all going to have to be predicted I think,
 /// or it will feel awful and lagged.
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:620-849`
+/// Source: `oracle/codemp/game/AnimalNPC.c:620-849`
 pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut anim: animNumber_t = BOTH_VT_IDLE;
@@ -535,7 +541,7 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             }
         }
 
-        Vehicle_SetAnim(pilot, SETANIM_BOTH, anim as c_int, iFlags, iBlend);
+        Vehicle_SetAnim(ctx, pilot, SETANIM_BOTH, anim as c_int, iFlags, iBlend);
     }
 }
 
@@ -547,7 +553,7 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// (initializing it as well).
 ///
 /// Raven: this is a BG function too in MP so don't un-bg-compatibilify it.
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:904-925`
+/// Source: `oracle/codemp/game/AnimalNPC.c:904-925`
 pub fn G_CreateAnimalNPC(
     ctx: GameContext<'_>,
     pVeh: *mut *mut Vehicle_t,

@@ -13,7 +13,7 @@
 //! implicit-zero-fills unused tail slots past the sentinel — dead weight,
 //! since no caller reads past the sentinel).
 //!
-//! Source: `oracle/oracle/codemp/cgame/animtable.h:9-1789`
+//! Source: `oracle/codemp/cgame/animtable.h:9-1789`
 
 #![allow(non_upper_case_globals)]
 

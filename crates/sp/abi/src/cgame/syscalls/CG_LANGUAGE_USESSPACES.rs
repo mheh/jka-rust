@@ -1,5 +1,7 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use sp_qshared::shared::qboolean;
 
 /// `CG_LANGUAGE_USESSPACES` SP cgame imports syscall ABI token.
@@ -9,8 +11,8 @@ use sp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( CG_LANGUAGE_USESSPACES );`
 /// Raven transport: `return re.Language_UsesSpaces();`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:342-344`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:676-677`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:342-344`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:676-677`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgLanguageUsesspacesArgs;
 
@@ -22,10 +24,10 @@ impl CgLanguageUsesspacesArgs {
 
 /// `CG_LANGUAGE_USESSPACES` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:128`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:342-344`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:676-677`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:676-677`
+/// Enum value source: `oracle/code/cgame/cg_public.h:128`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:342-344`
+/// Output source: `oracle/code/client/cl_cgame.cpp:676-677`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:676-677`
 pub struct CgLanguageUsesspaces;
 
 impl OutboundSysCall for CgLanguageUsesspaces {

@@ -2,7 +2,7 @@
 
 /// Raven `fsOrigin_t` filesystem seek origins.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1692-1696`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1692-1696`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum fsOrigin_t {

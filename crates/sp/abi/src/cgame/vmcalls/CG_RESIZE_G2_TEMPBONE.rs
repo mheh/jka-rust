@@ -10,8 +10,8 @@ use abi_transport::generic::{
 ///
 /// Raven vmMain: `CG_ResizeG2TempBone((mdxaBone_v *)arg0, arg1);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:130-131`
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:204`
+/// Args source: `oracle/code/cgame/cg_main.cpp:130-131`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:204`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgResizeG2TempboneArgs {
     temp_bone: *mut mdxaBone_v,
@@ -38,11 +38,11 @@ impl CgResizeG2TempboneArgs {
 /// `CG_RESIZE_G2_TEMPBONE` SP cgame exports vmMain ABI token.
 ///
 /// Raven: `void CG_ResizeG2TempBone( mdxaBone_v *tempBone, int newCount );`
-/// Enum value source: `oracle/oracle/code/client/vmachine.h:29`
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:44`, `oracle/oracle/code/cgame/cg_main.cpp:130-131`
-/// Output source: `oracle/oracle/code/cgame/cg_main.cpp:202-204`
-/// VM_Main switch source: `oracle/oracle/code/cgame/cg_main.cpp:118-132`
-/// Raven: `mdxaBone_v` is a vector type in `oracle/oracle/code/game/ghoul2_shared.h:204`.
+/// Enum value source: `oracle/code/client/vmachine.h:29`
+/// Args source: `oracle/code/cgame/cg_main.cpp:44`, `oracle/code/cgame/cg_main.cpp:130-131`
+/// Output source: `oracle/code/cgame/cg_main.cpp:202-204`
+/// VM_Main switch source: `oracle/code/cgame/cg_main.cpp:118-132`
+/// Raven: `mdxaBone_v` is a vector type in `oracle/code/game/ghoul2_shared.h:204`.
 pub struct CgResizeG2Tempbone;
 
 impl InboundVmCall for CgResizeG2Tempbone {

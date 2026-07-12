@@ -1,6 +1,6 @@
 //! MP `sharedSetBoneIKStateParams_t` copied from Raven `codemp/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/q_shared.h:946-958`
+//! Source: `oracle/codemp/game/q_shared.h:946-958`
 
 #![allow(non_camel_case_types)]
 
@@ -42,4 +42,5 @@ const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, origin
 const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, scale) == 48);
 const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, radius) == 60);
 const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, start_frame) == 72);
-const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, force_anim_on_bone) == 80);
+const _: () =
+    assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, force_anim_on_bone) == 80);

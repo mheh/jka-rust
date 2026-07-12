@@ -1,6 +1,6 @@
 //! MP `bladeInfo_t` and `MAX_BLADES`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/q_shared.h:652-670`
+//! Type definition source: `oracle/codemp/game/q_shared.h:652-670`
 
 #![allow(non_camel_case_types)]
 
@@ -13,7 +13,7 @@ use super::saber_trail::saberTrail_t;
 
 /// Raven `bladeInfo_t` — one blade of a saber.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:652-669`
+/// Type definition source: `oracle/codemp/game/q_shared.h:652-669`
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct bladeInfo_t {
@@ -37,5 +37,5 @@ const _: () = assert!(core::mem::size_of::<bladeInfo_t>() == 204);
 
 /// Raven `MAX_BLADES`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:670`
+/// Source: `oracle/codemp/game/q_shared.h:670`
 pub const MAX_BLADES: usize = 8;

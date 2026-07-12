@@ -10,10 +10,10 @@ use abi_transport::generic::{
 /// Raven wrapper: `int trap_G2API_Ghoul2Size(void* ghlInfo)`.
 /// Raven transport: `return G2API_Ghoul2Size(*((CGhoul2Info_v *)args[1]));`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:282`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:935-937`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1471-1473`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1471-1473`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:282`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:935-937`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1471-1473`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1471-1473`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SizeArgs {
     /// Raw Ghoul2 handle word, decoded by Raven as `args[1]`.
@@ -31,10 +31,10 @@ impl CgG2SizeArgs {
 /// Raven transport: `ghlInfo` is passed as a raw `args[1]` pointer word and
 /// the switch returns the int size directly.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:282`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:935-937`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1471-1473`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1471-1473`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:282`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:935-937`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1471-1473`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1471-1473`
 pub struct CgG2Size;
 
 impl OutboundSysCall for CgG2Size {

@@ -1,7 +1,7 @@
 # B1 — cvar / cmd ground-truth dossier
 
-Scope: `Cvar_*` and `Cmd_*`/`Cbuf_*` semantics, MP (`oracle/oracle/codemp/qcommon/{cvar,cmd_common,cmd_pc}.cpp`)
-and SP (`oracle/oracle/code/qcommon/{cvar,cmd}.cpp`). Global census (who owns
+Scope: `Cvar_*` and `Cmd_*`/`Cbuf_*` semantics, MP (`oracle/codemp/qcommon/{cvar,cmd_common,cmd_pc}.cpp`)
+and SP (`oracle/code/qcommon/{cvar,cmd}.cpp`). Global census (who owns
 `cvar_vars`, `cmd_functions`, the tokenizer scratch buffer, etc.) is already
 done in `docs/dossiers/A2-state-ownership.md` §1b–1c — this doc cites that
 census rather than repeating it, and focuses on *behavior*: ordering,

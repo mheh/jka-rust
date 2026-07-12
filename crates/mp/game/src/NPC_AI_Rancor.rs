@@ -1,5 +1,5 @@
 // PORT-COMPLETE: NPC_AI_Rancor.c 4/12
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_Rancor.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Rancor.c`.
 //!
 //! Landed from the `fnskel.py` signature skeleton. 4 functions are transcribed
 //! faithfully from packet + prelude alone; the remaining 12 are parked (see
@@ -28,7 +28,7 @@ const LSTATE_WAITING: c_int = 1;
 
 /// Raven `Rancor_SetBolts`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:19-29`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:19-29`
 pub fn Rancor_SetBolts(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if !self_.is_null() && !(*self_).client.is_null() {
@@ -73,7 +73,7 @@ pub fn Rancor_SetBolts(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `NPC_Rancor_Precache`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:36-45`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:36-45`
 pub fn NPC_Rancor_Precache(ctx: GameContext<'_>) {
     for i in 1..3 {
         crate::g_utils::G_SoundIndex(
@@ -88,7 +88,7 @@ pub fn NPC_Rancor_Precache(ctx: GameContext<'_>) {
 
 /// Raven `Rancor_Idle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:53-63`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:53-63`
 pub fn Rancor_Idle(ctx: GameContext<'_>) {
     unsafe {
         let npc_info = (*ctx.world).globals.NPCInfo;
@@ -106,7 +106,7 @@ pub fn Rancor_Idle(ctx: GameContext<'_>) {
 
 /// Raven `Rancor_CheckRoar`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:66-77`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:66-77`
 pub fn Rancor_CheckRoar(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
     unsafe {
         if (*self_).wait == 0.0 {
@@ -134,7 +134,7 @@ pub fn Rancor_CheckRoar(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean
 
 /// Raven `Rancor_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:83-108`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:83-108`
 pub fn Rancor_Patrol(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -175,7 +175,7 @@ pub fn Rancor_Patrol(ctx: GameContext<'_>) {
 
 /// Raven `Rancor_Move`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:115-130`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:115-130`
 pub fn Rancor_Move(ctx: GameContext<'_>, visible: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -195,7 +195,7 @@ pub fn Rancor_Move(ctx: GameContext<'_>, visible: qboolean) {
 
 /// Raven `Rancor_DropVictim`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:140-194`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:140-194`
 pub fn Rancor_DropVictim(ctx: GameContext<'_>, self_: *mut gentity_t) {
     //FIXME: if Rancor dies, it should drop its victim.
     //FIXME: if Rancor is removed, it must remove its victim.
@@ -255,7 +255,7 @@ pub fn Rancor_DropVictim(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Rancor_Swing`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:196-306`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:196-306`
 pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -414,7 +414,7 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
 
 /// Raven `Rancor_Smash`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:308-367`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:308-367`
 pub fn Rancor_Smash(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -509,7 +509,7 @@ pub fn Rancor_Smash(ctx: GameContext<'_>) {
 
 /// Raven `Rancor_Bite`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:369-428`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:369-428`
 pub fn Rancor_Bite(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -616,7 +616,7 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
 
 /// Raven `Rancor_Attack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:431-614`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:431-614`
 pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -972,7 +972,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
 
 /// Raven `Rancor_Combat`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:617-695`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:617-695`
 pub fn Rancor_Combat(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1060,7 +1060,7 @@ pub fn Rancor_Combat(ctx: GameContext<'_>) {
 
 /// Raven `NPC_Rancor_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:703-782`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:703-782`
 pub fn NPC_Rancor_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -1184,7 +1184,7 @@ pub fn NPC_Rancor_Pain(
 
 /// Raven `Rancor_CheckDropVictim`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:784-802`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:784-802`
 pub fn Rancor_CheckDropVictim(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1232,7 +1232,7 @@ pub fn Rancor_CheckDropVictim(ctx: GameContext<'_>) {
 
 /// Raven `Rancor_Crush`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:805-821`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:805-821`
 pub fn Rancor_Crush(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -1266,7 +1266,7 @@ pub fn Rancor_Crush(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSRancor_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:828-955`
+/// Source: `oracle/codemp/game/NPC_AI_Rancor.c:828-955`
 pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;

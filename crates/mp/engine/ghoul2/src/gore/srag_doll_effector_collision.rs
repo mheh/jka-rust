@@ -9,7 +9,7 @@ use mp_qshared::shared::vec3_t;
 /// `effectorPos` into `effectorPosition`, binds the `tr` reference, and defaults
 /// `useTracePlane` to false. The `tr` reference is modeled here as a raw pointer
 /// since Rust has no ABI-layout reference member.
-/// Type definition source: `oracle/oracle/codemp/ghoul2/G2_gore.h:81-92`
+/// Type definition source: `oracle/codemp/ghoul2/G2_gore.h:81-92`
 #[repr(C)]
 pub struct SRagDollEffectorCollision {
     pub effectorPosition: vec3_t,

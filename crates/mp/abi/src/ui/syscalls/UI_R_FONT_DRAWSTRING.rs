@@ -11,9 +11,9 @@ use abi_transport::pass_float;
 /// Raven wrapper: `syscall( UI_R_FONT_DRAWSTRING, ox, oy, text, rgba, setIndex, iCharLimit, PASSFLOAT(scale));`
 /// Raven transport: `re.Font_DrawString( args[1], args[2], (const char *)VMA(3), (const float *) VMA(4), args[5], args[6], VMF(7) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:131-133`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:996`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1144-1146`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:131-133`
+/// Args source: `oracle/codemp/ui/ui_local.h:996`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1144-1146`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UiRFontDrawstringArgs {
     ox: c_int,
@@ -49,10 +49,10 @@ impl UiRFontDrawstringArgs {
 
 /// `UI_R_FONT_DRAWSTRING` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:79`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:131-133`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1144-1146`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1144-1146`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:79`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:131-133`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1144-1146`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1144-1146`
 pub struct UiRFontDrawstring;
 
 impl OutboundSysCall for UiRFontDrawstring {

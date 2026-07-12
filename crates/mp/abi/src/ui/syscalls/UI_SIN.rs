@@ -1,5 +1,7 @@
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `UI_SIN`.
@@ -7,10 +9,10 @@ use abi_transport::pass_float;
 /// Raven transports the float through the integer syscall ABI with `PASSFLOAT`
 /// semantics on the module side and reads it with `VMF(1)` on the engine side.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:658`
-/// Transport source: `oracle/oracle/codemp/ui/ui_syscalls.c:15`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:657`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:285`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:658`
+/// Transport source: `oracle/codemp/ui/ui_syscalls.c:15`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:657`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:285`
 #[derive(Debug)]
 pub struct UiSinArgs {
     value: f32,
@@ -28,10 +30,10 @@ impl UiSinArgs {
 
 /// `UI_SIN` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:133`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:658`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:657`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:285`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:133`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:658`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:657`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:285`
 pub struct UiSin;
 
 impl OutboundSysCall for UiSin {

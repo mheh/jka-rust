@@ -6,12 +6,12 @@ use core::ffi::{c_char, c_int};
 
 /// Raven `clipHandle_t` collision model handle.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:188`
+/// Type definition source: `oracle/code/game/q_shared.h:188`
 pub type clipHandle_t = c_int;
 
 /// Raven `memtag_t` zone tag wire value.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2688`
+/// Type definition source: `oracle/code/game/q_shared.h:2688`
 ///
 /// Kept as a transparent `char`-sized value matching Raven's typedef. Syscalls
 /// still carry it in an integer word before the engine casts to `memtag_t`.
@@ -31,7 +31,7 @@ impl memtag_t {
 
 /// Raven cinematic status wire value.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2670-2679`
+/// Type definition source: `oracle/code/game/q_shared.h:2670-2679`
 ///
 /// Kept as a transparent integer rather than a Rust enum so decoding syscall
 /// return words remains ABI-safe even if an engine sends an out-of-range value.
@@ -66,7 +66,7 @@ impl e_status {
 
 /// `markFragment_t` ABI record returned through `fragmentBuffer`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1402-1405`
+/// Type definition source: `oracle/code/game/q_shared.h:1402-1405`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct markFragment_t {
@@ -80,7 +80,7 @@ const _: () = assert!(core::mem::offset_of!(markFragment_t, numPoints) == 4);
 
 /// Raven `stereoFrame_t` wire value.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:183-187`
+/// Type definition source: `oracle/code/renderer/tr_types.h:183-187`
 ///
 /// Kept as a transparent integer rather than a Rust enum so decoding vmMain
 /// words remains ABI-safe even if an engine sends an out-of-range value.
@@ -111,7 +111,7 @@ pub use sp_qshared::common::sp::ghoul2::cghoul2_info_v::CGhoul2Info_v;
 
 /// Opaque Raven `surfaceInfo_v` C++ vector alias.
 ///
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:201`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:201`
 #[repr(C)]
 pub struct surfaceInfo_v {
     _private: [u8; 0],
@@ -119,7 +119,7 @@ pub struct surfaceInfo_v {
 
 /// Opaque Raven `boneInfo_v` C++ vector alias.
 ///
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:202`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:202`
 #[repr(C)]
 pub struct boneInfo_v {
     _private: [u8; 0],
@@ -127,7 +127,7 @@ pub struct boneInfo_v {
 
 /// Opaque Raven `boltInfo_v` C++ vector alias.
 ///
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:203`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:203`
 #[repr(C)]
 pub struct boltInfo_v {
     _private: [u8; 0],
@@ -135,7 +135,7 @@ pub struct boltInfo_v {
 
 /// Opaque Raven `mdxaBone_v` C++ vector alias.
 ///
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:204`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:204`
 #[repr(C)]
 pub struct mdxaBone_v {
     _private: [u8; 0],

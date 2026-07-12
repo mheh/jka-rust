@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `CG_R_FONT_STRHEIGHTPIXELS`.
@@ -27,7 +29,7 @@ impl CgRFontStrheightpixelsArgs {
 
 /// `CG_R_FONT_STRHEIGHTPIXELS` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:124`
+/// Source: `oracle/codemp/cgame/cg_public.h:124`
 pub struct CgRFontStrheightpixels;
 
 impl OutboundSysCall for CgRFontStrheightpixels {

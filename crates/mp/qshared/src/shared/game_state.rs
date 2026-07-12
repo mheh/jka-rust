@@ -5,17 +5,17 @@ use core::ffi::{c_char, c_int};
 
 /// Raven `MAX_CONFIGSTRINGS`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2037`
+/// Source: `oracle/codemp/game/q_shared.h:2037`
 pub const MAX_CONFIGSTRINGS: usize = 1700;
 
 /// Raven `MAX_GAMESTATE_CHARS`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2046`
+/// Source: `oracle/codemp/game/q_shared.h:2046`
 pub const MAX_GAMESTATE_CHARS: usize = 16000;
 
 /// Raven `gameState_t` — the config-string table exchanged server→client.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2047-2051`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2047-2051`
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct gameState_t {

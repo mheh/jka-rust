@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 /// Raven `dbrush_t` — on-disk BSP brush.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:487-491`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:487-491`
 #[repr(C)]
 pub struct dbrush_t {
     pub firstSide: c_int,

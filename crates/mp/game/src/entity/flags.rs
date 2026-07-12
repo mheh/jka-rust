@@ -1,6 +1,6 @@
 //! MP `FL_*` game entity flags (`gentity->flags`).
 //!
-//! Source: `oracle/oracle/codemp/game/g_local.h:52-59`
+//! Source: `oracle/codemp/game/g_local.h:52-59`
 
 use core::ffi::c_int;
 

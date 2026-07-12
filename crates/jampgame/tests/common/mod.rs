@@ -191,10 +191,20 @@ impl MockEngine {
         // point")` drops the game (g_client.c SelectSpawnPoint). After the stream
         // `G_GET_ENTITY_TOKEN` returns qfalse (end of entity string).
         // Contract: `qboolean trap_GetEntityToken( char *buffer, int bufferSize )`
-        // — Source: oracle/oracle/codemp/game/g_public.h:221.
+        // — Source: oracle/codemp/game/g_public.h:221.
         let tokens = [
-            "{", "classname", "worldspawn", "}", //
-            "{", "classname", "info_player_deathmatch", "origin", "0 0 100", "angle", "0", "}",
+            "{",
+            "classname",
+            "worldspawn",
+            "}", //
+            "{",
+            "classname",
+            "info_player_deathmatch",
+            "origin",
+            "0 0 100",
+            "angle",
+            "0",
+            "}",
         ]
         .into_iter()
         .map(|s| CString::new(s).unwrap())
@@ -373,7 +383,7 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
             // ---- command args ----------------------------------------------
             // `int trap_Argc( void )` / `void trap_Argv( int n, char *buffer,
             // int bufferSize )` — the module's tokenized view of the current
-            // command. Source: oracle/oracle/codemp/game/g_public.h (trap_Argc/Argv).
+            // command. Source: oracle/codemp/game/g_public.h (trap_Argc/Argv).
             G_ARGC => m.cmd_args.len() as isize,
             G_ARGV => {
                 let idx = unsafe { word(args, 1) } as usize;
@@ -414,7 +424,7 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
                 // A realistic client userinfo drives ClientUserinfoChanged's key
                 // reads (name/model/color/sex/handicap/cg_predictItems/team_model
                 // /snaps/rate) faithfully; unknown clients get an empty string.
-                // Source: oracle/oracle/codemp/game/g_client.c:1912,2269 (trap_GetUserinfo).
+                // Source: oracle/codemp/game/g_client.c:1912,2269 (trap_GetUserinfo).
                 let num = unsafe { word(args, 1) } as c_int;
                 let s = m.userinfos.get(&num).cloned().unwrap_or_default();
                 unsafe { write_c_buffer(word(args, 2), word(args, 3), &s) };
@@ -422,7 +432,7 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
             }
             G_SET_USERINFO => {
                 // `void trap_SetUserinfo( int num, const char *buffer )`.
-                // Source: oracle/oracle/codemp/game/g_public.h (trap_SetUserinfo).
+                // Source: oracle/codemp/game/g_public.h (trap_SetUserinfo).
                 let num = unsafe { word(args, 1) } as c_int;
                 let s = unsafe { c_str(word(args, 2)) };
                 m.userinfos.insert(num, s);
@@ -439,7 +449,7 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
             // `void trap_GetUsercmd( int clientNum, usercmd_t *cmd )` — fill the
             // out-param from the per-client cmd the referee injected for this
             // frame (all-zero for unset clients — a valid idle cmd).
-            // Source: oracle/oracle/codemp/game/g_public.h:219.
+            // Source: oracle/codemp/game/g_public.h:219.
             G_GET_USERCMD => {
                 let num = unsafe { word(args, 1) } as c_int;
                 let out = unsafe { word(args, 2) } as *mut usercmd_t;
@@ -811,10 +821,7 @@ fn run_lifecycle(dylib: PathBuf) {
     let sd_ret = call_vm(vm_main, MpGameExport::GAME_SHUTDOWN, &[0]);
     assert_eq!(sd_ret, 0, "GAME_SHUTDOWN returned {sd_ret}, expected 0");
     MOCK.with(|m| {
-        assert!(
-            m.borrow().g_error.is_none(),
-            "GAME_SHUTDOWN raised G_ERROR"
-        );
+        assert!(m.borrow().g_error.is_none(), "GAME_SHUTDOWN raised G_ERROR");
     });
     eprintln!("[smoke] GAME_SHUTDOWN clean");
 
@@ -872,7 +879,18 @@ fn call_vm(vm_main: RawVmMain, command: MpGameExport, args: &[AbiWord]) -> AbiWo
     a[..args.len()].copy_from_slice(args);
     vm_main(
         command as c_int,
-        a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11],
+        a[0],
+        a[1],
+        a[2],
+        a[3],
+        a[4],
+        a[5],
+        a[6],
+        a[7],
+        a[8],
+        a[9],
+        a[10],
+        a[11],
     )
 }
 
@@ -886,20 +904,50 @@ fn import_name(n: isize) -> String {
         };
     }
     named!(
-        G_PRINT, G_ERROR, G_MILLISECONDS,
-        G_CVAR_REGISTER, G_CVAR_UPDATE, G_CVAR_SET,
-        G_CVAR_VARIABLE_INTEGER_VALUE, G_CVAR_VARIABLE_STRING_BUFFER,
-        G_ARGC, G_ARGV,
-        G_FS_FOPEN_FILE, G_FS_READ, G_FS_WRITE, G_FS_FCLOSE_FILE, G_FS_GETFILELIST,
-        G_GET_SERVERINFO, G_GET_USERINFO,
-        G_SET_CONFIGSTRING, G_GET_CONFIGSTRING, G_GET_ENTITY_TOKEN, G_LOCATE_GAME_DATA,
-        G_SET_SHARED_BUFFER, G_G2_CLEANENTATTACHMENTS, G_ICARUS_INIT, G_ICARUS_SHUTDOWN,
-        G_NAV_LOAD, G_NAV_SETPATHSCALCULATED, G_SET_SERVER_CULL,
-        G_G2_HAVEWEGHOULMODELS, G_ROFF_CLEAN, G_SEND_SERVER_COMMAND, G_SEND_CONSOLE_COMMAND,
-        G_LINKENTITY, G_UNLINKENTITY, G_GET_USERCMD,
-        G_ROFF_UPDATE_ENTITIES, G_ICARUS_FREEENT, G_ICARUS_INITENT,
-        G_NAV_SAVE, G_NAV_CALCULATEPATHS, G_NAV_CLEARALLFAILEDEDGES,
-        G_NAV_CHECKBLOCKEDEDGES, G_NAV_CLEARCHECKEDNODES, G_G2_INITGHOUL2MODEL,
+        G_PRINT,
+        G_ERROR,
+        G_MILLISECONDS,
+        G_CVAR_REGISTER,
+        G_CVAR_UPDATE,
+        G_CVAR_SET,
+        G_CVAR_VARIABLE_INTEGER_VALUE,
+        G_CVAR_VARIABLE_STRING_BUFFER,
+        G_ARGC,
+        G_ARGV,
+        G_FS_FOPEN_FILE,
+        G_FS_READ,
+        G_FS_WRITE,
+        G_FS_FCLOSE_FILE,
+        G_FS_GETFILELIST,
+        G_GET_SERVERINFO,
+        G_GET_USERINFO,
+        G_SET_CONFIGSTRING,
+        G_GET_CONFIGSTRING,
+        G_GET_ENTITY_TOKEN,
+        G_LOCATE_GAME_DATA,
+        G_SET_SHARED_BUFFER,
+        G_G2_CLEANENTATTACHMENTS,
+        G_ICARUS_INIT,
+        G_ICARUS_SHUTDOWN,
+        G_NAV_LOAD,
+        G_NAV_SETPATHSCALCULATED,
+        G_SET_SERVER_CULL,
+        G_G2_HAVEWEGHOULMODELS,
+        G_ROFF_CLEAN,
+        G_SEND_SERVER_COMMAND,
+        G_SEND_CONSOLE_COMMAND,
+        G_LINKENTITY,
+        G_UNLINKENTITY,
+        G_GET_USERCMD,
+        G_ROFF_UPDATE_ENTITIES,
+        G_ICARUS_FREEENT,
+        G_ICARUS_INITENT,
+        G_NAV_SAVE,
+        G_NAV_CALCULATEPATHS,
+        G_NAV_CLEARALLFAILEDEDGES,
+        G_NAV_CHECKBLOCKEDEDGES,
+        G_NAV_CLEARCHECKEDNODES,
+        G_G2_INITGHOUL2MODEL,
     );
     format!("syscall#{n}")
 }
@@ -949,7 +997,9 @@ pub fn referee_set_map(tokens: &[&str]) {
 /// from its latched usercmd every frame.
 pub fn referee_set_cvar(name: &str, value: &str) {
     MOCK.with(|m| {
-        m.borrow_mut().cvars.insert(name.to_string(), value.to_string());
+        m.borrow_mut()
+            .cvars
+            .insert(name.to_string(), value.to_string());
     });
 }
 

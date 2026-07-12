@@ -2,10 +2,10 @@
 
 /// Raven `md3Triangle_t` — MD3 model triangle indices.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:155-157`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:155-157`
 #[repr(C)]
 pub struct md3Triangle_t {
-	pub indexes: [i32; 3],
+    pub indexes: [i32; 3],
 }
 
 const _: () = assert!(core::mem::size_of::<md3Triangle_t>() == 12);

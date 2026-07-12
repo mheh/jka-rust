@@ -26,25 +26,25 @@ use mp_bg::local::pml_t::pml_t;
 /// unsafe that dereferences them is confined to the pmove methods.
 pub struct PmoveContext<'a> {
     /// Raven `pmove_t *pm` — the in/out move block, assigned per call.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:30`
+    /// Source: `oracle/codemp/game/bg_pmove.c:30`
     pub pm: *mut pmove_t,
     /// Raven `pml_t pml` — pmove-local scratch (BSS-zeroed each call).
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:31`
+    /// Source: `oracle/codemp/game/bg_pmove.c:31`
     pub pml: pml_t,
     /// Raven `bgEntity_t *pm_entSelf`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:33`
+    /// Source: `oracle/codemp/game/bg_pmove.c:33`
     pub pm_entSelf: *mut bgEntity_t,
     /// Raven `bgEntity_t *pm_entVeh`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:34`
+    /// Source: `oracle/codemp/game/bg_pmove.c:34`
     pub pm_entVeh: *mut bgEntity_t,
     /// Raven `static int pm_flying` (`FLY_NONE`/`FLY_NORMAL`/`FLY_VEHICLE`/`FLY_HOVER`).
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:445`
+    /// Source: `oracle/codemp/game/bg_pmove.c:445`
     pub pm_flying: c_int,
     /// Raven `qboolean gPMDoSlowFall`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:36`
+    /// Source: `oracle/codemp/game/bg_pmove.c:36`
     pub gPMDoSlowFall: qboolean,
     /// Raven `qboolean pm_cancelOutZoom`.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:38`
+    /// Source: `oracle/codemp/game/bg_pmove.c:38`
     pub pm_cancelOutZoom: qboolean,
 
     /// Session-lifetime bg state (anim/saber/vehicle tables + RNG), threaded in
@@ -60,7 +60,7 @@ impl<'a> PmoveContext<'a> {
     /// Build a fresh per-call context. Mirrors Raven's file-static reset: `pm`
     /// null until `PmoveSingle` assigns it, `pml` BSS-zeroed, `pm_flying =
     /// FLY_NONE`, the slow-fall/zoom flags cleared.
-    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:30-38,445`
+    /// Source: `oracle/codemp/game/bg_pmove.c:30-38,445`
     pub fn new(
         bg: &'a mut BgState,
         traps: &'a dyn BgTraps,
@@ -74,8 +74,8 @@ impl<'a> PmoveContext<'a> {
             pm_entSelf: core::ptr::null_mut(),
             pm_entVeh: core::ptr::null_mut(),
             pm_flying: 0, // FLY_NONE
-            gPMDoSlowFall: QFALSE,
-            pm_cancelOutZoom: QFALSE,
+            gPMDoSlowFall: qfalse,
+            pm_cancelOutZoom: qfalse,
             bg,
             traps,
             callbacks,

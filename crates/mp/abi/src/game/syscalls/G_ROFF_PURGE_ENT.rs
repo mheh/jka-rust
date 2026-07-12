@@ -1,7 +1,9 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use mp_qshared::shared::qboolean;
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use core::ffi::c_int;
+use mp_qshared::shared::qboolean;
 
 /// `G_ROFF_PURGE_ENT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -23,7 +25,7 @@ impl GRoffPurgeEntArgs {
 ///
 /// Raven: qboolean ROFF_PurgeEnt( int entID )
 /// Raven: rww - dynamic vm memory allocation!
-/// Source: `oracle/oracle/codemp/game/g_public.h:245`
+/// Source: `oracle/codemp/game/g_public.h:245`
 pub struct GRoffPurgeEnt;
 
 impl OutboundSysCall for GRoffPurgeEnt {

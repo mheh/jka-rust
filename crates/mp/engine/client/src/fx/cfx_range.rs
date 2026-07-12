@@ -3,7 +3,7 @@
 /// Raven `CFxRange` — a min/max float range used by the fx scheduler.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/codemp/client/FxScheduler.h:91-113`
+/// Type definition source: `oracle/codemp/client/FxScheduler.h:91-113`
 #[repr(C)]
 pub struct CFxRange {
     mMin: f32,

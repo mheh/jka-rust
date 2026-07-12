@@ -11,8 +11,8 @@ use sp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( CG_GETUSERCMD, cmdNumber, ucmd );`
 /// Raven transport: `return CL_GetUserCmd(args[1], (usercmd_s *)VMA(2));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:471-472`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:768-769`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:471-472`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:768-769`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgGetusercmdArgs {
     cmd_number: c_int,
@@ -27,10 +27,10 @@ impl CgGetusercmdArgs {
 
 /// `CG_GETUSERCMD` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:159`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:471-472`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:768-769`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:768-769`
+/// Enum value source: `oracle/code/cgame/cg_public.h:159`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:471-472`
+/// Output source: `oracle/code/client/cl_cgame.cpp:768-769`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:768-769`
 pub struct CgGetusercmd;
 
 impl OutboundSysCall for CgGetusercmd {

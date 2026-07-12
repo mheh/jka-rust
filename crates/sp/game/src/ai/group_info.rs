@@ -1,6 +1,6 @@
 //! SP `AIGroupInfo_t`.
 //!
-//! Type definition source: `oracle/oracle/code/game/ai.h:106-125`
+//! Type definition source: `oracle/code/game/ai.h:106-125`
 
 #![allow(non_camel_case_types)]
 
@@ -19,7 +19,7 @@ use crate::teams::team_t;
 /// Byte-identical layout to MP (SP is the origin); differs only in that `team`
 /// is SP's faction `team_t`. Pointer-bearing => arch-dependent; the assert pins
 /// the host-64-bit size.
-/// Type definition source: `oracle/oracle/code/game/ai.h:106-125`
+/// Type definition source: `oracle/code/game/ai.h:106-125`
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct AIGroupInfo_t {

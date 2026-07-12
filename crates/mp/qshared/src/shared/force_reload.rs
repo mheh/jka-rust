@@ -2,7 +2,7 @@
 
 /// Raven `ForceReload_e` development force-reload/uncache selector.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:3166-3173`
+/// Type definition source: `oracle/codemp/game/q_shared.h:3166-3173`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ForceReload_e {

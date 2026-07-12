@@ -11,8 +11,8 @@ use sp_qshared::shared::qhandle_t;
 /// Raven wrapper: `return syscall( CG_R_REGISTERSKIN, name );`
 /// Raven transport: `return re.RegisterSkin( (const char *) VMA(1) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:307-308`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:657-658`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:307-308`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:657-658`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRRegisterskinArgs {
     name: *const c_char,
@@ -26,10 +26,10 @@ impl CgRRegisterskinArgs {
 
 /// `CG_R_REGISTERSKIN` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:119`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:307-308`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:657-658`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:657-658`
+/// Enum value source: `oracle/code/cgame/cg_public.h:119`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:307-308`
+/// Output source: `oracle/code/client/cl_cgame.cpp:657-658`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:657-658`
 pub struct CgRRegisterskin;
 
 impl OutboundSysCall for CgRRegisterskin {

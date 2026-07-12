@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall(CG_G2_ATTACHENT, boltInfo, ghlInfoTo, toBoltIndex, entNum, toModelNum);`
 /// Raven transport: `return G2API_AttachEnt( (int*)VMA(1), &g2[0], args[3], args[4], args[5] );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:945-947`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2546`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1479-1484`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:945-947`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2546`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1479-1484`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2AttachentArgs {
     bolt_info: *mut c_int,
@@ -43,10 +43,10 @@ impl CgG2AttachentArgs {
 
 /// `CG_G2_ATTACHENT` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:284`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:945-947`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1479-1484`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1479-1484`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:284`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:945-947`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1479-1484`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1479-1484`
 pub struct CgG2Attachent;
 
 impl OutboundSysCall for CgG2Attachent {

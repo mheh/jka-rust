@@ -11,11 +11,11 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall(CG_G2_GETBONEANIM, ghoul2, boneName, currentTime, currentFrame, startFrame, endFrame, flags, animSpeed, modelList, modelIndex);`
 /// Raven transport: `CGhoul2Info_v &g2 = *((CGhoul2Info_v *)args[1]); int modelIndex = args[10]; return G2API_GetBoneAnim(&g2[modelIndex], (const char*)VMA(2), args[3], (float *)VMA(4), (int *)VMA(5), (int *)VMA(6), (int *)VMA(7), (float *)VMA(8), (int *)VMA(9));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:874-877`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2555-2556`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:874,877`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1386-1392`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1386-1392`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:874-877`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2555-2556`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:874,877`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1386-1392`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1386-1392`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2GetboneanimArgs {
     ghoul2: *mut c_void,
@@ -60,7 +60,7 @@ impl CgG2GetboneanimArgs {
 
 /// `CG_G2_GETBONEANIM` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:270`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:270`
 pub struct CgG2Getboneanim;
 
 impl OutboundSysCall for CgG2Getboneanim {

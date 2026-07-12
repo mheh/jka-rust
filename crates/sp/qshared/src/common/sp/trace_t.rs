@@ -1,6 +1,6 @@
 //! SP trace result definition copied from Raven `code/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/code/game/q_shared.h:1380-1395`
+//! Source: `oracle/code/game/q_shared.h:1380-1395`
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]

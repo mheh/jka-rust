@@ -8,8 +8,8 @@ use abi_transport::generic::{
 
 /// Arguments for `CG_ROFF_NOTETRACK_CALLBACK`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:299-301`
-/// Function source: `oracle/oracle/codemp/cgame/cg_ents.c:3555`
+/// Args source: `oracle/codemp/cgame/cg_main.c:299-301`
+/// Function source: `oracle/codemp/cgame/cg_ents.c:3555`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgRoffNotetrackCallbackArgs {
     ent_num: c_int,
@@ -33,9 +33,9 @@ impl CgRoffNotetrackCallbackArgs {
 /// `CG_ROFF_NOTETRACK_CALLBACK` MP cgame exports vmMain ABI token.
 ///
 /// Raven: int entnum, char *notetrack
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:424`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:299-301`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:299-301`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:424`
+/// Args source: `oracle/codemp/cgame/cg_main.c:299-301`
+/// Output source: `oracle/codemp/cgame/cg_main.c:299-301`
 /// Transport/call-site source: no engine call-site found in initial search; module vmMain switch proves arg slots.
 pub struct CgRoffNotetrackCallback;
 

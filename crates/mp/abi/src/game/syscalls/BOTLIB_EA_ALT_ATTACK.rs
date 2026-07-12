@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use core::ffi::c_int;
 
 /// `BOTLIB_EA_ALT_ATTACK` outbound game-to-engine syscall.
@@ -20,7 +22,7 @@ impl BotlibEaAltAttackArgs {
 
 /// `BOTLIB_EA_ALT_ATTACK` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:390`
+/// Source: `oracle/codemp/game/g_public.h:390`
 pub struct BotlibEaAltAttack;
 
 impl OutboundSysCall for BotlibEaAltAttack {

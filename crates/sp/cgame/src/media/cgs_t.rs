@@ -12,32 +12,32 @@ use super::cg_media_t::cgMedia_t;
 /// Raven `STRIPED_LEVELNAME_VARIATIONS` — to cope with levels that use text
 /// from more than one SP file (plus 1 for common).
 ///
-/// Source: `oracle/oracle/code/cgame/cg_media.h:369`
+/// Source: `oracle/code/cgame/cg_media.h:369`
 pub const STRIPED_LEVELNAME_VARIATIONS: usize = 3;
 
 /// Raven `MAX_MODELS` (SP).
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:1461`
+/// Source: `oracle/code/game/q_shared.h:1461`
 pub const MAX_MODELS: usize = 256;
 
 /// Raven `MAX_SOUNDS` (SP).
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:1462`
+/// Source: `oracle/code/game/q_shared.h:1462`
 pub const MAX_SOUNDS: usize = 380;
 
 /// Raven `MAX_FORCES`.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:1467`
+/// Source: `oracle/code/game/q_shared.h:1467`
 pub const MAX_FORCES: usize = 96;
 
 /// Raven `MAX_CHARSKINS` — character skins.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:1477`
+/// Source: `oracle/code/game/q_shared.h:1477`
 pub const MAX_CHARSKINS: usize = 64;
 
 /// Raven `MAX_SUBMODELS` — nine bits.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:1469`
+/// Source: `oracle/code/game/q_shared.h:1469`
 pub const MAX_SUBMODELS: usize = 512;
 
 /// Raven `clientInfo_t` — per-client rendering info shared between game and
@@ -46,7 +46,7 @@ pub const MAX_SUBMODELS: usize = 512;
 /// `[u64; 62]` preserves the real type's exact size (496 B) and its 8-byte
 /// pointer alignment.
 //TODO: Port clientInfo_t (cross-crate, sp_game -> sp_cgame not wired)
-// Source: oracle/oracle/code/game/g_shared.h:76-103
+// Source: oracle/code/game/g_shared.h:76-103
 type OpaqueClientInfo_t = [u64; 62];
 
 /// Raven `cgs_t` — the client game static structure, holding everything
@@ -55,7 +55,7 @@ type OpaqueClientInfo_t = [u64; 62];
 /// Raven: The client game static (cgs) structure hold everything loaded or
 /// calculated from the gamestate. It will NOT be cleared when a tournement
 /// restart is done, allowing all clients to begin playing instantly.
-/// Type definition source: `oracle/oracle/code/cgame/cg_media.h:370-409`
+/// Type definition source: `oracle/code/cgame/cg_media.h:370-409`
 #[repr(C)]
 pub struct cgs_t {
     /// gamestate from server

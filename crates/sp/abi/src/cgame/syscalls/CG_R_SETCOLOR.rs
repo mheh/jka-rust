@@ -8,8 +8,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_R_SETCOLOR, rgba );`
 /// Raven transport: `re.SetColor((const float *) VMA(1));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:392-393`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:711-713`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:392-393`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:711-713`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRSetcolorArgs {
     rgba: *const f32,
@@ -27,10 +27,10 @@ impl CgRSetcolorArgs {
 
 /// `CG_R_SETCOLOR` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:140`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:392-393`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:711-713`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:711-713`
+/// Enum value source: `oracle/code/cgame/cg_public.h:140`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:392-393`
+/// Output source: `oracle/code/client/cl_cgame.cpp:711-713`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:711-713`
 pub struct CgRSetcolor;
 
 impl OutboundSysCall for CgRSetcolor {

@@ -6,15 +6,15 @@ use super::gen_func_t::genFunc_t;
 
 /// Raven `waveForm_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:287-294`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:287-294`
 #[repr(C)]
 pub struct waveForm_t {
-	pub func: genFunc_t,
+    pub func: genFunc_t,
 
-	pub base: c_float,
-	pub amplitude: c_float,
-	pub phase: c_float,
-	pub frequency: c_float,
+    pub base: c_float,
+    pub amplitude: c_float,
+    pub phase: c_float,
+    pub frequency: c_float,
 }
 
 const _: () = assert!(core::mem::size_of::<waveForm_t>() == 20);

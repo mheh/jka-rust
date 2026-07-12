@@ -62,7 +62,7 @@ Raven's `jampgamex86.dll`:
   is the per-file audit and referee replay below).
 - [x] Audit every ported game-tier file against its oracle TU (the per-file
   oracle review): all 107 files compared line-level against
-  `oracle/oracle/codemp/game/*.c` (waves 1-2, 2026-07-06; ~160 findings,
+  `oracle/codemp/game/*.c` (waves 1-2, 2026-07-06; ~160 findings,
   ~102 confirmed fixed, follow-up ports resolved). Ledger + findings log:
   `docs/audits/per-file-oracle-audit.md`. Honestly-skimmed functions listed
   there remain an optional second-pass tail, not a gate.
@@ -71,7 +71,10 @@ Raven's `jampgamex86.dll`:
   load, frame loop, client connect, and shutdown.
 - [ ] Referee replay gate (Stage R, `docs/roadmap-final-stages.md`): recorded
   usercmd streams replayed through oracle DLL and Rust DLL under the same
-  harness, byte-diffing every playerState/entityState per frame.
+  harness, byte-diffing every playerState/entityState per frame. The in-repo
+  mock-engine referee (`crates/jampgame/tests/referee.rs`) is live locally;
+  what remains is the external real-engine variant (parked plan,
+  `docs/plans/2026-07-07-rust-referee.md`).
 
 So the ABI target is:
 

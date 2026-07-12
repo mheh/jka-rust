@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use mp_qshared::shared::qboolean;
 
 /// Arguments for `UI_KEY_ISDOWN`.
@@ -10,8 +12,8 @@ use mp_qshared::shared::qboolean;
 /// Raven's wrapper forwards the key number as the only payload word, and the
 /// client switch reads it from `args[1]`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:525-526`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:989-990`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:525-526`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:989-990`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgKeyIsdownArgs {
     /// Key number, read by Raven as `args[1]`.
@@ -33,10 +35,10 @@ impl CgKeyIsdownArgs {
 /// Raven wrapper: `return syscall( UI_KEY_ISDOWN, keynum );`
 /// Raven transport: `return Key_IsDown( args[1] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:194`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:525-526`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:525-526`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:989-990`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:194`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:525-526`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:525-526`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:989-990`
 pub struct CgKeyIsdown;
 
 impl OutboundSysCall for CgKeyIsdown {

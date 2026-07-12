@@ -11,9 +11,9 @@ use mp_qshared::common::mp::qcommon::qtime_t;
 /// Raven wrapper: `return syscall( CG_REAL_TIME, qtime );`
 /// Raven transport: `return Com_RealTime( (struct qtime_s *)VMA(1) );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:575-576`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:575-576`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1019-1020`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:575-576`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:575-576`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1019-1020`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRealTimeArgs {
     qtime: *mut qtime_t,
@@ -27,11 +27,11 @@ impl CgRealTimeArgs {
 
 /// `CG_REAL_TIME` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:208`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:575-576`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:575-576`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1019-1020`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1019-1020`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:208`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:575-576`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:575-576`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1019-1020`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1019-1020`
 pub struct CgRealTime;
 
 impl OutboundSysCall for CgRealTime {

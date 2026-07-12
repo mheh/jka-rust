@@ -12,9 +12,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_FX_ADDLINE, start, end, PASSFLOAT(size1), PASSFLOAT(size2), PASSFLOAT(sizeParm), PASSFLOAT(alpha1), PASSFLOAT(alpha2), PASSFLOAT(alphaParm), sRGB, eRGB, PASSFLOAT(rgbParm), killTime, shader, flags);`
 /// Raven transport: `FX_AddLine( (float *)VMA(1), (float *)VMA(2), VMF(3), VMF(4), VMF(5), VMF(6), VMF(7), VMF(8), (float *)VMA(9), (float *)VMA(10), VMF(11), args[12], args[13], args[14]);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:450-459`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2308-2311`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1099-1104`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:450-459`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2308-2311`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1099-1104`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgFxAddlineArgs {
     start: *const vec3_t,
@@ -72,10 +72,10 @@ impl CgFxAddlineArgs {
 
 /// `CG_FX_ADDLINE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:177`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:450-459`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1099-1104`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1099-1104`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:177`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:450-459`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1099-1104`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1099-1104`
 pub struct CgFxAddline;
 
 impl OutboundSysCall for CgFxAddline {

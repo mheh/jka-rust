@@ -1,6 +1,6 @@
 //! Raven `entityShared_t` shared server/entity linkage state.
 //!
-//! Source: `oracle/oracle/codemp/game/g_public.h:60-95`
+//! Source: `oracle/codemp/game/g_public.h:60-95`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -10,7 +10,7 @@ use crate::shared::{qboolean, vec3_t};
 
 /// Raven `entityShared_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:60-95`
+/// Type definition source: `oracle/codemp/game/g_public.h:60-95`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct entityShared_t {

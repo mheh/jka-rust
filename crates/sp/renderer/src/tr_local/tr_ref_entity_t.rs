@@ -5,25 +5,25 @@ use sp_qshared::shared::{qboolean, vec3_t};
 
 /// Raven `trRefEntity_t`.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:54-66`
+/// Type definition source: `oracle/code/renderer/tr_local.h:54-66`
 #[repr(C)]
 pub struct trRefEntity_t {
-	pub e: refEntity_t,
+    pub e: refEntity_t,
 
-	/// compensate for non-normalized axis
-	pub axisLength: f32,
+    /// compensate for non-normalized axis
+    pub axisLength: f32,
 
-	/// true for bmodels that touch a dlight
-	pub needDlights: qboolean,
-	pub lightingCalculated: qboolean,
-	/// normalized direction towards light
-	pub lightDir: vec3_t,
-	/// color normalized to 0-255
-	pub ambientLight: vec3_t,
-	/// 32 bit rgba packed
-	pub ambientLightInt: i32,
-	pub directedLight: vec3_t,
-	pub dlightBits: i32,
+    /// true for bmodels that touch a dlight
+    pub needDlights: qboolean,
+    pub lightingCalculated: qboolean,
+    /// normalized direction towards light
+    pub lightDir: vec3_t,
+    /// color normalized to 0-255
+    pub ambientLight: vec3_t,
+    /// 32 bit rgba packed
+    pub ambientLightInt: i32,
+    pub directedLight: vec3_t,
+    pub dlightBits: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<trRefEntity_t>() == 232);

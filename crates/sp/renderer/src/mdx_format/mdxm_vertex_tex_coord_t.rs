@@ -3,7 +3,7 @@ use sp_qshared::shared::vec2_t;
 
 /// Raven `mdxmVertexTexCoord_t` — Ghoul2 mesh vertex texture coordinate.
 ///
-/// Type definition source: `oracle/oracle/code/game/../game/../renderer/mdx_format.h:328-334`
+/// Type definition source: `oracle/code/game/../game/../renderer/mdx_format.h:328-334`
 #[repr(C)]
 pub struct mdxmVertexTexCoord_t {
     pub texCoords: vec2_t,

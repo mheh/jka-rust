@@ -6,7 +6,7 @@
 //! manifest records a call to. One thin non-generic fn per call, the
 //! frozen SEAM-D13 shape — copied verbatim from the live exemplar
 //! `crates/mp/game/src/trap.rs` (skeleton branch). C signatures:
-//! `docs/abi-traps.md`; token mapping: `oracle/oracle/codemp/game/g_syscalls.c`.
+//! `docs/abi-traps.md`; token mapping: `oracle/codemp/game/g_syscalls.c`.
 #![allow(non_snake_case, unused)]
 
 use mp_abi::game::syscalls::BOTLIB_AAS_ENTITY_INFO::BotlibAasEntityInfo;

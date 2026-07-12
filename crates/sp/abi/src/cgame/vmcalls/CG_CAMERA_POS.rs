@@ -9,12 +9,12 @@ use sp_qshared::shared::vec3_t;
 /// `CG_CAMERA_POS` SP cgame exports vmMain ABI token.
 ///
 /// Raven: `int CG_GetCameraPos( vec3_t camerapos );`
-/// Enum value source: `oracle/oracle/code/client/vmachine.h:19`
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:28`, `oracle/oracle/code/cgame/cg_main.cpp:112`,
-/// `oracle/oracle/code/game/q_shared.h:316`
-/// Output source: `oracle/oracle/code/cgame/cg_main.cpp:474`
-/// VM_Call/vmMain switch source: `oracle/oracle/code/server/sv_snapshot.cpp:281-283`,
-/// `oracle/oracle/code/server/sv_snapshot.cpp:541`, `oracle/oracle/code/cgame/cg_main.cpp:94-115`
+/// Enum value source: `oracle/code/client/vmachine.h:19`
+/// Args source: `oracle/code/cgame/cg_main.cpp:28`, `oracle/code/cgame/cg_main.cpp:112`,
+/// `oracle/code/game/q_shared.h:316`
+/// Output source: `oracle/code/cgame/cg_main.cpp:474`
+/// VM_Call/vmMain switch source: `oracle/code/server/sv_snapshot.cpp:281-283`,
+/// `oracle/code/server/sv_snapshot.cpp:541`, `oracle/code/cgame/cg_main.cpp:94-115`
 pub struct CgCameraPos;
 
 impl InboundVmCall for CgCameraPos {

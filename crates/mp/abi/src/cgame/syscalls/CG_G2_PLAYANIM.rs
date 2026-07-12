@@ -14,11 +14,11 @@ use mp_qshared::shared::qboolean;
 /// Raven transport: `return G2API_SetBoneAnim(*((CGhoul2Info_v *)args[1]), args[2], (const char *)VMA(3), args[4], args[5],
 ///     args[6], VMF(7), args[8], VMF(9), args[10]);`.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:269`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:868-871`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2553-2554`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1382-1384`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1382-1384`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:269`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:868-871`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2553-2554`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1382-1384`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1382-1384`
 #[derive(Debug, Clone, PartialEq)]
 pub struct CgG2PlayanimArgs {
     /// Ghoul2 handle, decoded by Raven as `*((CGhoul2Info_v *)args[1])`.
@@ -74,11 +74,11 @@ impl CgG2PlayanimArgs {
 
 /// `CG_G2_PLAYANIM` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:269`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:868-871`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2553-2554`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1382-1384`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1382-1384`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:269`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:868-871`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2553-2554`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1382-1384`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1382-1384`
 pub struct CgG2Playanim;
 
 impl OutboundSysCall for CgG2Playanim {

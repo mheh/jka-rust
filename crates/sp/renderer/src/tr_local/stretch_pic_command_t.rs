@@ -4,7 +4,7 @@ use super::shader_s::shader_s;
 
 /// Raven `stretchPicCommand_t` — render-command to draw a stretched pic.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:2009-2016`
+/// Type definition source: `oracle/code/renderer/tr_local.h:2009-2016`
 #[repr(C)]
 pub struct stretchPicCommand_t {
     pub commandId: i32,

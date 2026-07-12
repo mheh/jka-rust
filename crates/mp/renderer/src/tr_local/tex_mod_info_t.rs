@@ -5,7 +5,7 @@ use super::wave_form_t::waveForm_t;
 
 /// Raven `texModInfo_t` — one texture-coordinate modifier stage.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:323-348`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:323-348`
 #[repr(C)]
 pub struct texModInfo_t {
     pub r#type: texMod_t,

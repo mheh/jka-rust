@@ -2,8 +2,8 @@
 
 Scope: raw material for the design session on porting-rules §B (no `static
 mut`; state threaded not reached; one owned instance per singleton; entities
-by index/handle). Every claim cites `oracle/oracle/<path>:<line>`. MP tree =
-`oracle/oracle/codemp/`, SP tree = `oracle/oracle/code/`.
+by index/handle). Every claim cites `oracle/<path>:<line>`. MP tree =
+`oracle/codemp/`, SP tree = `oracle/code/`.
 
 Status: complete.
 
@@ -12,7 +12,7 @@ Status: complete.
 ## 1. The global census — engine tier
 
 Build-canonical caveat (qcommon): the real PC build (per
-`oracle/oracle/codemp/unix/makefile:302-307`) links `cmd_common.cpp`+
+`oracle/codemp/unix/makefile:302-307`) links `cmd_common.cpp`+
 `cmd_pc.cpp`, `files_common.cpp`+`files_pc.cpp`, and `z_memman_pc.cpp`.
 `files.cpp`, `cmd_console.cpp`, `files_console.cpp`,
 `z_memman_console.cpp` are dead/console-platform duplicates (same globals
@@ -22,7 +22,7 @@ under `static` linkage) and are excluded below.
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `com_frameTime` | `int` | `oracle/oracle/codemp/qcommon/common.cpp:79` | 4B | `Com_Frame` (via `Com_EventLoop`/`Com_Milliseconds`, L1402,1648) | Yes — `client/cl_input.cpp`, `server/sv_ccmds.cpp`, `server/sv_init.cpp` |
+| `com_frameTime` | `int` | `oracle/codemp/qcommon/common.cpp:79` | 4B | `Com_Frame` (via `Com_EventLoop`/`Com_Milliseconds`, L1402,1648) | Yes — `client/cl_input.cpp`, `server/sv_ccmds.cpp`, `server/sv_init.cpp` |
 | `com_frameMsec` | `int` | `common.cpp:80` | 4B | `Com_Frame` L1659 | No |
 | `com_frameNumber` | `int` | `common.cpp:81` | 4B | `Com_Frame` L1754 (`++`) | No |
 | `com_errorEntered` | `qboolean` | `common.cpp:83` | 4B | `Com_Error` L291,305,318,332 | Yes — `server/sv_init.cpp` |
@@ -39,16 +39,16 @@ under `static` linkage) and are excluded below.
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `cmd_text` + `cmd_text_buf[MAX_CMD_BUFFER]` | `cmd_t` (data/maxsize/cursize) + `byte[]` | `oracle/oracle/codemp/qcommon/cmd_common.cpp:17-18` | ~20B header + buffer | `Cbuf_Init`, `Cbuf_AddText`, `Cbuf_InsertText`, `Cbuf_Execute` | Extern'd `qcommon.h`; fed by client/server init and console paths |
+| `cmd_text` + `cmd_text_buf[MAX_CMD_BUFFER]` | `cmd_t` (data/maxsize/cursize) + `byte[]` | `oracle/codemp/qcommon/cmd_common.cpp:17-18` | ~20B header + buffer | `Cbuf_Init`, `Cbuf_AddText`, `Cbuf_InsertText`, `Cbuf_Execute` | Extern'd `qcommon.h`; fed by client/server init and console paths |
 | `cmd_wait` | `int` | `cmd_common.cpp:16` | 4B | `Cmd_Wait_f` / frame decrement | No |
 | `cmd_argc`/`cmd_argv[MAX_STRING_TOKENS]`/`cmd_tokenized[]` | `static int`/`char*[]`/`char[]` | `cmd_common.cpp:290-292` | large tokenize buffer | `Cmd_TokenizeString` | No (file-static; shared tokenizer scratch — a reentrancy hazard in its own right) |
-| `cmd_functions` | `static cmd_function_t*` (linked-list head, heap nodes) | `oracle/oracle/codemp/qcommon/cmd_pc.cpp:11` | 8B head, ~48B/node | `Cmd_AddCommand` L37-38, `Cmd_RemoveCommand` L49+ | No (all access via `Cmd_*` API) |
+| `cmd_functions` | `static cmd_function_t*` (linked-list head, heap nodes) | `oracle/codemp/qcommon/cmd_pc.cpp:11` | 8B head, ~48B/node | `Cmd_AddCommand` L37-38, `Cmd_RemoveCommand` L49+ | No (all access via `Cmd_*` API) |
 
 ### 1c. qcommon — cvar.cpp
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `cvar_vars` | `cvar_t*` (list head) | `oracle/oracle/codemp/qcommon/cvar.cpp:6` | 8B | `Cvar_Get` L271 | No direct (API-only) |
+| `cvar_vars` | `cvar_t*` (list head) | `oracle/codemp/qcommon/cvar.cpp:6` | 8B | `Cvar_Get` L271 | No direct (API-only) |
 | `cvar_cheats` | `cvar_t*` | `cvar.cpp:7` | 8B | Set once (`sv_cheats` handle) | No |
 | `cvar_modifiedFlags` | `int` bitmask | `cvar.cpp:8` | 4B | `Cvar_Get` L220, `Cvar_Set2` L329 (`\|=`) | Yes — `client/cl_ui.cpp`, `cl_main.cpp`, `cl_keys.cpp`, `server/sv_main.cpp`, `sv_init.cpp` |
 | `cvar_indexes[MAX_CVARS=1224]`/`cvar_numIndexes` | `cvar_t[]`/`int` | `cvar.cpp:11-12` | ~78KB | `Cvar_Get` (slot fill, L260 `++`) | No direct |
@@ -59,7 +59,7 @@ under `static` linkage) and are excluded below.
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `fs_searchpaths` | `searchpath_t*` (list head) | `oracle/oracle/codemp/qcommon/files_common.cpp:193` | 8B head + heap nodes | `FS_AddGameDirectory` (`files_pc.cpp:2241-2288`), `FS_Shutdown` (`files_common.cpp:458`) | Extern'd `files.h`; unix dup only |
+| `fs_searchpaths` | `searchpath_t*` (list head) | `oracle/codemp/qcommon/files_common.cpp:193` | 8B head + heap nodes | `FS_AddGameDirectory` (`files_pc.cpp:2241-2288`), `FS_Shutdown` (`files_common.cpp:458`) | Extern'd `files.h`; unix dup only |
 | `fs_gamedir[MAX_OSPATH]` | `char[]` | `files_common.cpp:183` | MAX_OSPATH | gamedir-set code in `files_pc.cpp` | Extern'd `files.h` |
 | `fsh[MAX_FILE_HANDLES=16]` | `fileHandleData_t[16]` | `files_common.cpp:202` | 16 × mid struct | `FS_HandleForFile`, `FS_FOpenFileRead/Write`, `FS_FCloseFile` (`files_pc.cpp:284-322` etc.) | Engine-wide via handle API; symbol itself qcommon-only |
 | `fs_readCount`/`fs_loadCount`/`fs_loadStack`/`fs_packFiles`/`fs_fakeChkSum`/`fs_checksumFeed` | `int` each | `files_common.cpp:194-200` | 4B each | read/load accounting, `FS_LoadZipFile`, `FS_ConditionalRestart` (`files_pc.cpp:~3048`) | Extern'd `files.h` |
@@ -76,7 +76,7 @@ malloc-backed tagged zone plus a hunk emulation layered on tags.
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `TheZone` | `zone_t` (`zoneStats_t` per-tag stats + `zoneHeader_t` list head) | `oracle/oracle/codemp/qcommon/z_memman_pc.cpp:77` | few hundred bytes + heap blocks | `Z_Malloc`, `Zone_FreeBlock`, `Z_Free`, `Z_TagFree` (L276-351) | No (engine-wide via `Z_*` API only) |
+| `TheZone` | `zone_t` (`zoneStats_t` per-tag stats + `zoneHeader_t` list head) | `oracle/codemp/qcommon/z_memman_pc.cpp:77` | few hundred bytes + heap blocks | `Z_Malloc`, `Zone_FreeBlock`, `Z_Free`, `Z_TagFree` (L276-351) | No (engine-wide via `Z_*` API only) |
 | `hunk_tag` | `static memtag_t` | `z_memman_pc.cpp:626` | 4B | `Com_InitHunkMemory` L679, `Hunk_SetMark` L707, `Hunk_Clear` L764 | No (drives `Hunk_Alloc` semantics engine-wide) |
 | `gbMemFreeupOccured` | `qboolean` | `z_memman_pc.cpp:156` | 4B | `Z_Malloc` L159 + freeup-retry path L198-256 | No |
 | `com_validateZone` | `cvar_t*` | `z_memman_pc.cpp:75` | 8B | `Cvar_Get` at init | No |
@@ -85,7 +85,7 @@ malloc-backed tagged zone plus a hunk emulation layered on tags.
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `showpackets`/`showdrop`/`qport`/`net_killdroppedfragments` | `cvar_t*`×4 | `oracle/oracle/codemp/qcommon/net_chan.cpp:40-43` | 8B each | `Netchan_Init` (L58) | `qport` → `client/cl_input.cpp`, `cl_main.cpp`, `server/sv_client.cpp`, `sv_ccmds.cpp`, `sv_main.cpp` |
+| `showpackets`/`showdrop`/`qport`/`net_killdroppedfragments` | `cvar_t*`×4 | `oracle/codemp/qcommon/net_chan.cpp:40-43` | 8B each | `Netchan_Init` (L58) | `qport` → `client/cl_input.cpp`, `cl_main.cpp`, `server/sv_client.cpp`, `sv_ccmds.cpp`, `sv_main.cpp` |
 | `loopbacks[2]` | `loopback_t[2]` (msg ring buffers + get/send cursors) | `net_chan.cpp:486` | 2 × small ring | `NET_SendLoopPacket` L494, `NET_GetLoopPacket` L517 | Yes — `client/cl_input.cpp` |
 
 Per-connection state is otherwise in `netchan_t`, owned by `clc`/`client_t` (as expected).
@@ -94,41 +94,41 @@ Per-connection state is otherwise in `netchan_t`, owned by `clc`/`client_t` (as 
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `cmg` | `clipMap_t` (~30 members: shaders/planes/nodes/leafs/brushes/submodels/vis/entityString/areas/surfaces arrays + `landScape` ptr) | def `oracle/oracle/codemp/qcommon/cm_load.cpp:37`, extern `cm_local.h:220` | large struct, ~30 members, heap-owned arrays | `CM_LoadMap`→`CM_LoadMap_Actual`, `CM_ClearMap` L809-813 | Yes — `client/cl_cgame.cpp`, `server/sv_game.cpp`, `RMG/RM_Terrain.cpp` |
+| `cmg` | `clipMap_t` (~30 members: shaders/planes/nodes/leafs/brushes/submodels/vis/entityString/areas/surfaces arrays + `landScape` ptr) | def `oracle/codemp/qcommon/cm_load.cpp:37`, extern `cm_local.h:220` | large struct, ~30 members, heap-owned arrays | `CM_LoadMap`→`CM_LoadMap_Actual`, `CM_ClearMap` L809-813 | Yes — `client/cl_cgame.cpp`, `server/sv_game.cpp`, `RMG/RM_Terrain.cpp` |
 | `SubBSP[MAX_SUB_BSP=32]`/`NumSubBSP`/`TotalSubModels` | `clipMap_t[32]`/`int`/`int` | `cm_load.cpp:60-61` | 32 × clipMap_t | `CM_LoadSubBSP` L1105, `CM_ClearMap` L816-820 | No |
 | `c_pointcontents`,`c_traces`,`c_brush_traces`,`c_patch_traces` | `int`×4 | `cm_load.cpp:38-39` | 4B each | trace counters in `cm_trace.cpp:503,1590` | No |
 | `gpvCachedMapDiskImage`/`gbUsingCachedMapDataRightNow` | `void*`/`qboolean` | `cm_load.cpp:568,570` | 8B/4B | `CM_LoadMap_Actual` L586-753, `CM_LoadMap` L777-781 | Yes — `renderer/tr_bsp.cpp`, `tr_bsp_xbox.cpp` (CM↔renderer shared map-disk-image cache) |
 | `cm_noAreas`/`cm_noCurves`/`cm_playerCurveClip` | `cvar_t*` | `cm_load.cpp:45-47` | 8B each | `Cvar_Get` at `CM_LoadMap` | No |
 
-### 1h. Server (`oracle/oracle/codemp/server/`)
+### 1h. Server (`oracle/codemp/server/`)
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `sv` | `server_t` (~17 fields; `server.h:53-88`) | def `oracle/oracle/codemp/server/sv_main.cpp:11`, extern `server.h:233` | Large — embeds `svEntities[MAX_GENTITIES]`, `configstrings[MAX_CONFIGSTRINGS]`, `models[MAX_MODELS]`; also `gentities`/`gameClients` raw pointers into the game module (§4.1), `snapshotCounter`, `checksumFeed`, `mSharedMemory` | `sv_init.cpp:649-777` (`SV_SpawnServer`), `sv_main.cpp:852-911` (`SV_Frame`: timeResidual), `sv_snapshot.cpp:525` (`snapshotCounter++`), `sv_ccmds.cpp:283-305` (map_restart), `sv_game.cpp:329-334` (`SV_LocateGameData`, §4.1) | **Yes** — `icarus/GameInterface.cpp:129,402,411`, `icarus/Q3_Interface.cpp` (casts `sv.mSharedMemory`), `qcommon/msg.cpp:1268` (reads `sv.state`), `RMG/RM_Instance_BSP.cpp:262-265` (saves/restores `sv.entityParsePoint`) |
+| `sv` | `server_t` (~17 fields; `server.h:53-88`) | def `oracle/codemp/server/sv_main.cpp:11`, extern `server.h:233` | Large — embeds `svEntities[MAX_GENTITIES]`, `configstrings[MAX_CONFIGSTRINGS]`, `models[MAX_MODELS]`; also `gentities`/`gameClients` raw pointers into the game module (§4.1), `snapshotCounter`, `checksumFeed`, `mSharedMemory` | `sv_init.cpp:649-777` (`SV_SpawnServer`), `sv_main.cpp:852-911` (`SV_Frame`: timeResidual), `sv_snapshot.cpp:525` (`snapshotCounter++`), `sv_ccmds.cpp:283-305` (map_restart), `sv_game.cpp:329-334` (`SV_LocateGameData`, §4.1) | **Yes** — `icarus/GameInterface.cpp:129,402,411`, `icarus/Q3_Interface.cpp` (casts `sv.mSharedMemory`), `qcommon/msg.cpp:1268` (reads `sv.state`), `RMG/RM_Instance_BSP.cpp:262-265` (saves/restores `sv.entityParsePoint`) |
 | `svs` | `serverStatic_t` (~12 fields; `server.h:94,208-228`; persists across maps) | def `sv_main.cpp:10`, extern `server.h:232` | Large — embeds `challenges[MAX_CHALLENGES=1024]`, heap `clients[sv_maxclients]`, `snapshotEntities` ring buffer | `sv_init.cpp:264,338-356,594,965` (client/snapshot alloc, full memset on shutdown), `sv_main.cpp` (`svs.time` per frame), `sv_client.cpp:167-306` (challenge handshake), `sv_snapshot.cpp:604` | **Yes** — `icarus/*` and `qcommon/RoffSystem.cpp:612,828,864-886` read `svs.time`; `server/NPCNav/navigator.cpp:1409-1778` reads `svs.time` |
-| `sv_worldSectors[AREA_NODES=64]`/`sv_numworldSectors` | `worldSector_t[64]`/`int` (file-scope in sv_world.cpp, **not** a field of `sv`) | `oracle/oracle/codemp/server/sv_world.cpp:58-59` (type decl :48-57) | Small fixed array, but each node's `entities` is a mutable intrusive linked list of `svEntity_t` | **`SV_LinkEntity`** `sv_world.cpp:189`, **`SV_UnlinkEntity`** `sv_world.cpp:151` (raw in-place pointer surgery on `nextEntityInWorldSector` chains — the Chain-A reentrancy hot spot, §3), `SV_CreateworldSector` :90, memset reset :135 | No — server-only, reached via `sv.svEntities[n].worldSector` back-pointers |
-| `debugpolygons`/`gWPNum`/`gWPArray[MAX_WPARRAY_SIZE]` | `bot_debugpoly_t*`/`int`/`wpobject_t*[]` | `oracle/oracle/codemp/server/sv_bot.cpp:16-23` | small | bot waypoint/debug functions in `sv_bot.cpp` | No |
+| `sv_worldSectors[AREA_NODES=64]`/`sv_numworldSectors` | `worldSector_t[64]`/`int` (file-scope in sv_world.cpp, **not** a field of `sv`) | `oracle/codemp/server/sv_world.cpp:58-59` (type decl :48-57) | Small fixed array, but each node's `entities` is a mutable intrusive linked list of `svEntity_t` | **`SV_LinkEntity`** `sv_world.cpp:189`, **`SV_UnlinkEntity`** `sv_world.cpp:151` (raw in-place pointer surgery on `nextEntityInWorldSector` chains — the Chain-A reentrancy hot spot, §3), `SV_CreateworldSector` :90, memset reset :135 | No — server-only, reached via `sv.svEntities[n].worldSector` back-pointers |
+| `debugpolygons`/`gWPNum`/`gWPArray[MAX_WPARRAY_SIZE]` | `bot_debugpoly_t*`/`int`/`wpobject_t*[]` | `oracle/codemp/server/sv_bot.cpp:16-23` | small | bot waypoint/debug functions in `sv_bot.cpp` | No |
 | `g_lastResolveTime[MAX_MASTER_SERVERS]` | `static int[]` | `sv_main.cpp:192` | tiny | master-server heartbeat DNS throttle | No |
 
-### 1i. Client (`oracle/oracle/codemp/client/`)
+### 1i. Client (`oracle/codemp/client/`)
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `cl` | `clientActive_t` (~30+ fields; `client.h:58-139`) | def `oracle/oracle/codemp/client/cl_main.cpp:105`, extern `client.h:139` | Very large — `snapshots[PACKET_BACKUP]`, `entityBaselines[MAX_GENTITIES]`, `parseEntities[MAX_PARSE_ENTITIES]`, `cmds[CMD_BACKUP]`, `gameState`, `mSharedMemory` (hundreds of KB) | `CL_ClearState` `cl_main.cpp:820`, `CL_ParseGamestate` `cl_parse.cpp:533`, `CL_ParseServerMessage` `cl_parse.cpp:854`, `CL_CreateNewCommands` `cl_input.cpp:1492`, `CL_WritePacket` `cl_input.cpp:1608` | No — confined to `client/` (incl. `snd_dma.cpp`) |
+| `cl` | `clientActive_t` (~30+ fields; `client.h:58-139`) | def `oracle/codemp/client/cl_main.cpp:105`, extern `client.h:139` | Very large — `snapshots[PACKET_BACKUP]`, `entityBaselines[MAX_GENTITIES]`, `parseEntities[MAX_PARSE_ENTITIES]`, `cmds[CMD_BACKUP]`, `gameState`, `mSharedMemory` (hundreds of KB) | `CL_ClearState` `cl_main.cpp:820`, `CL_ParseGamestate` `cl_parse.cpp:533`, `CL_ParseServerMessage` `cl_parse.cpp:854`, `CL_CreateNewCommands` `cl_input.cpp:1492`, `CL_WritePacket` `cl_input.cpp:1608` | No — confined to `client/` (incl. `snd_dma.cpp`) |
 | `clc` | `clientConnection_t` (`client.h:~140-236`) | def `cl_main.cpp:106`, extern `client.h:236` | Very large — `netchan_t`, reliable-command rings (`MAX_RELIABLE_COMMANDS × MAX_STRING_CHARS`), download state, demo state, MP-only RMG heightmaps (2×16000B) | `CL_Disconnect` `cl_main.cpp:837`, `CL_Connect_f` `cl_main.cpp:1141`, `CL_ConnectionlessPacket` `cl_main.cpp:2028`, `CL_CheckTimeout` `cl_main.cpp:2212` | No — confined to `client/` |
 | `cls` | `clientStatic_t` (`client.h:~240-382`) | def `cl_main.cpp:107`, extern `client.h:382` | Moderate — `state` (connstate_t), `keyCatchers`, server-browser lists, `glconfig_t` copy, frame timing | `CL_MapLoading` `cl_main.cpp:778`, `CL_Disconnect` :837, `CL_Connect_f` :1141; read/written across `cl_scrn.cpp`, `cl_console.cpp`, `cl_cgame.cpp`, `cl_ui.cpp`, `cl_cin*.cpp` | **Yes** — `qcommon/files.cpp:1247,1375` + `files_pc.cpp:848,977` read `cls.state`/`cls.keyCatchers` (pure-pak restart gating); `win32/win_input.cpp:722`, `win_input_console.cpp:209-505`; `unix/linux_glimp.c:479,1499` |
-| `kg` | `keyGlobals_t` (bundles `keys[MAX_KEYS]`, edit-line history, `g_consoleField`, `anykeydown`, `key_overstrikeMode`, `keyDownCount`) | def `oracle/oracle/codemp/client/cl_keys.cpp:22`, decl `keys.h:19,45` | moderate | `Key_SetBinding`, `Key_SetOverstrikeMode`, `Key_ClearStates`, key-event handlers (all `cl_keys.cpp`) | No — already pre-grouped into one struct by Raven (a natural Rust `KeyState`) |
+| `kg` | `keyGlobals_t` (bundles `keys[MAX_KEYS]`, edit-line history, `g_consoleField`, `anykeydown`, `key_overstrikeMode`, `keyDownCount`) | def `oracle/codemp/client/cl_keys.cpp:22`, decl `keys.h:19,45` | moderate | `Key_SetBinding`, `Key_SetOverstrikeMode`, `Key_ClearStates`, key-event handlers (all `cl_keys.cpp`) | No — already pre-grouped into one struct by Raven (a natural Rust `KeyState`) |
 | `chatField`/`chat_team`/`chat_playerNum` | `field_t`/`qboolean`/`int` | `cl_keys.cpp:12-15`, decl `keys.h:55-57` | small | chat input handlers `cl_keys.cpp` | No |
-| `con` | `console_t` (`text[CON_TEXTSIZE=32768]` ring) | def `oracle/oracle/codemp/client/cl_console.cpp:13`, type `client.h:358-380` | ~32KB | console print/scroll in `cl_console.cpp`; read by `SCR_UpdateScreen` `cl_scrn.cpp:479` | No (extern'd into `cl_scrn.cpp:8`, same dir) |
-| `scr_initialized` | `qboolean` | `oracle/oracle/codemp/client/cl_scrn.cpp:9` | 4B | `SCR_Init` `cl_scrn.cpp:376` | No |
+| `con` | `console_t` (`text[CON_TEXTSIZE=32768]` ring) | def `oracle/codemp/client/cl_console.cpp:13`, type `client.h:358-380` | ~32KB | console print/scroll in `cl_console.cpp`; read by `SCR_UpdateScreen` `cl_scrn.cpp:479` | No (extern'd into `cl_scrn.cpp:8`, same dir) |
+| `scr_initialized` | `qboolean` | `oracle/codemp/client/cl_scrn.cpp:9` | 4B | `SCR_Init` `cl_scrn.cpp:376` | No |
 | debug graph: `current`/`values[1024]` | `static int`/`static graphsamp_t[]` | `cl_scrn.cpp:318-319` | small | `SCR_DebugGraph` :326, `SCR_DrawDebugGraph` :338 | No |
 | centerprint: `scr_centertime_off`,`scr_center_y`,`scr_centerstring[1024]`,`scr_center_lines`,`scr_center_widths[]` | `float`/`int`/`char[]` | `cl_scrn.cpp:510-515` | small | `SCR_CenterPrint` :519 | No |
 
-### 1j. Sound (`oracle/oracle/codemp/client/snd_dma.cpp` + `snd_mix.cpp`)
+### 1j. Sound (`oracle/codemp/client/snd_dma.cpp` + `snd_mix.cpp`)
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `s_channels[MAX_CHANNELS]` | `channel_t[]` | `oracle/oracle/codemp/client/snd_dma.cpp:127` | fixed array | `S_StartSound` :1541, `S_StopAllSounds` :1839, `S_PickChannel`/`S_OpenALPickChannel` | No — game/cgame trigger sounds via `trap_S_StartSound`, never touch the array |
+| `s_channels[MAX_CHANNELS]` | `channel_t[]` | `oracle/codemp/client/snd_dma.cpp:127` | fixed array | `S_StartSound` :1541, `S_StopAllSounds` :1839, `S_PickChannel`/`S_OpenALPickChannel` | No — game/cgame trigger sounds via `trap_S_StartSound`, never touch the array |
 | `s_soundStarted`/`s_soundMuted` | `int`/`qboolean` | `snd_dma.cpp:129-130` | 4B each | `S_Init` :419, `S_Shutdown` :650, `S_Update` :2700 | No |
 | `dma` | `dma_t` (device buffer descriptor) | `snd_dma.cpp:132` | small struct | `SNDDMA_*` init/shutdown, `S_Update_` :2787 | No |
 | `listener_number`/`listener_origin`/`listener_axis[3]` | `int`/`vec3_t`/`vec3_t[3]` | `snd_dma.cpp:134-136` | small | `S_Update` :2700 spatialization | No |
@@ -141,11 +141,11 @@ Per-connection state is otherwise in `netchan_t`, owned by `clc`/`client_t` (as 
 | OpenAL/EAX block (`s_UseOpenAL`, `listener_pos/ori`, `s_numChannels`, `s_bEAX`, `s_bInWater`, `s_EnvironmentID`, `s_lpEAXManager`, …) | mixed | `snd_dma.cpp:213-268` | moderate | EAX/OpenAL init + environment update in same file | No — MP-only feature block |
 | dynamic music: `tMusic_Info[]`,`bMusic_IsDynamic`,`eMusic_StateActual/Request`,`sMusic_BackgroundLoop`,… | `static` mixed | `snd_dma.cpp:104-109` | small | `S_SetDynamicMusicState` :100 + music update | No |
 
-### 1k. VM layer (`oracle/oracle/codemp/qcommon/vm.cpp`)
+### 1k. VM layer (`oracle/codemp/qcommon/vm.cpp`)
 
 | Name | Type | File:Line | Size | Mutators | Cross-boundary? |
 |---|---|---|---|---|---|
-| `vmTable[MAX_VM=3]` | `vm_t[3]` (`struct vm_s`, `vm_local.h:111-146`, ~19 fields: ASM-fixed-offset `programStack`/`systemCall` header, `dllHandle`/`entryPoint`, `codeBase`/`dataBase`/`dataMask` sandbox, symbols, debug counters) | `oracle/oracle/codemp/qcommon/vm.cpp:28-29` | 3 × ~19-field struct | `VM_Init` `vm.cpp:60`, `VM_Create` :471 (slot claim :493-503), `VM_Free` :605, `VM_Clear` :628, `VM_Restart` :391-458 | **No** — zero hits outside `qcommon/`. What crosses the boundary is opaque `vm_t*` handles + `VM_Call` |
+| `vmTable[MAX_VM=3]` | `vm_t[3]` (`struct vm_s`, `vm_local.h:111-146`, ~19 fields: ASM-fixed-offset `programStack`/`systemCall` header, `dllHandle`/`entryPoint`, `codeBase`/`dataBase`/`dataMask` sandbox, symbols, debug counters) | `oracle/codemp/qcommon/vm.cpp:28-29` | 3 × ~19-field struct | `VM_Init` `vm.cpp:60`, `VM_Create` :471 (slot claim :493-503), `VM_Free` :605, `VM_Clear` :628, `VM_Restart` :391-458 | **No** — zero hits outside `qcommon/`. What crosses the boundary is opaque `vm_t*` handles + `VM_Call` |
 | `currentVM` | `vm_t*` | `vm.cpp:24`, extern `vm_local.h:169` | ptr | `VM_Call` save/restore :799-800,826-827 (Chain B, §3); nulled in `VM_Free`/`VM_Clear`; consumed by `VM_DllSyscall` :377-379, `VM_ArgPtr` :640-654 | No |
 | `lastVM` | `vm_t*` | `vm.cpp:25` | ptr | same as currentVM; read by `VM_VmProfile_f` :860-864 | No (debug only) |
 | `vm_debugLevel` | `int` | `vm.cpp:26`, extern `vm_local.h:170` | 4B | `VM_Debug` :41-43 | No |
@@ -158,23 +158,23 @@ shape is `Engine` holding `Option<VmHandle>` per module with calls threaded
 explicitly. Consistent with the `Args`/`Output` typed-call model already
 proposed in `docs/engine-plan.md` (§5).
 
-**SP has no VM at all** (`oracle/oracle/code/qcommon/` has no
+**SP has no VM at all** (`oracle/code/qcommon/` has no
 `vm.cpp`/`vm_local.h`). Three different mechanisms, one per module:
 1. **jagame** — classic `GetGameAPI` import/export structs (§4.2), no VM:
    `ge = (game_export_t *)Sys_GetGameAPI(&import);`
-   `oracle/oracle/code/server/sv_game.cpp:669`, then `ge->Init(...)` :690.
+   `oracle/code/server/sv_game.cpp:669`, then `ge->Init(...)` :690.
 2. **cgame** — vestigial VM shell: SP's `vm_t` is gutted to one field,
    `struct vm_s { int (*entryPoint)(int callNum, ...); }`
-   (`oracle/oracle/code/client/vmachine.h:48-52`); single global `vm_t cgvm;`
+   (`oracle/code/client/vmachine.h:48-52`); single global `vm_t cgvm;`
    (`cl_cgame.cpp:24`); `VM_Call(callnum, ...)`
    (`vmachine.cpp:12-24`) takes no vm parameter, always calls
    `cgvm.entryPoint`. Wiring is a direct function-pointer assignment to the
    statically-linked `vmMain` (`cgame/cg_main.cpp:94-115`):
    `*entryPoint = (int(*)(int,...))vmMain;` at
-   `oracle/oracle/code/win32/win_main_console.cpp:564` (mac:
+   `oracle/code/win32/win_main_console.cpp:564` (mac:
    `mac_main.c:70`). No `LoadLibrary` in the shipping path.
 3. **ui** — no indirection at all: direct calls
-   `UI_Init(UI_API_VERSION, &uii, ...)` `oracle/oracle/code/client/cl_ui.cpp:297`,
+   `UI_Init(UI_API_VERSION, &uii, ...)` `oracle/code/client/cl_ui.cpp:297`,
    `UI_ConsoleCommand()` :316, `UI_SetActiveMenu(...)` :325,338. The `uivm`
    global (`cl_ui.cpp:362`) is dead.
 
@@ -182,9 +182,9 @@ proposed in `docs/engine-plan.md` (§5).
 engine binary, their formerly VM-private state is now plain process-wide
 globals in the same static segment as `sv`/`svs`/`cl`: `cg_t cg; cgs_t cgs;
 centity_t cg_entities[MAX_GENTITIES];`
-(`oracle/oracle/code/cgame/cg_main.cpp:210-212`, extern
+(`oracle/code/cgame/cg_main.cpp:210-212`, extern
 `cg_local.h:542-543`) and `uiInfo_t uiInfo;`
-(`oracle/oracle/code/ui/ui_main.cpp:315`, extern `ui_local.h:172`). MP
+(`oracle/code/ui/ui_main.cpp:315`, extern `ui_local.h:172`). MP
 declares the identical globals (`codemp/cgame/cg_main.c:691`,
 `codemp/ui/ui_main.c:875`, §2.2-2.3) but they live inside `vm_t.dataBase`
 (QVM) or a separate DLL image — the difference is isolation, not presence.
@@ -196,18 +196,18 @@ oracle's SP happens to make it a plain global.
 
 | Name | Type | Declared | Defined | Size |
 |---|---|---|---|---|
-| `tr` | `trGlobals_t` | `oracle/oracle/codemp/renderer/tr_local.h:1434` | `oracle/oracle/codemp/renderer/tr_main.cpp:15` | Large, ~50 fields: frame/scene/view counters, `world_t*`, model/image/shader/skin pointer tables, `viewParms_t`, `trRefdef_t`, trig tables, `world_t bspModels[MAX_SUB_BSP]`, RMG `srfTerrain_t landScape`. "Most renderer globals are defined here." |
-| `backEnd` | `backEndState_t` | `tr_local.h:1433` | `oracle/oracle/codemp/renderer/tr_backend.cpp:21` | Medium: `refdef`/`viewParms`/`ori` copies, perf counters, render-mode flags, `currentEntity` — deliberately separated from front-end `tr` state |
-| `glConfig` | `glconfig_t` | `tr_local.h:1435` (type in shared `cgame/tr_types.h:298-325`) | `oracle/oracle/codemp/renderer/tr_init.cpp:33` | Small flat struct, effectively write-once at GL init; kept outside `tr` "so it shouldn't be cleared during ref re-init" |
+| `tr` | `trGlobals_t` | `oracle/codemp/renderer/tr_local.h:1434` | `oracle/codemp/renderer/tr_main.cpp:15` | Large, ~50 fields: frame/scene/view counters, `world_t*`, model/image/shader/skin pointer tables, `viewParms_t`, `trRefdef_t`, trig tables, `world_t bspModels[MAX_SUB_BSP]`, RMG `srfTerrain_t landScape`. "Most renderer globals are defined here." |
+| `backEnd` | `backEndState_t` | `tr_local.h:1433` | `oracle/codemp/renderer/tr_backend.cpp:21` | Medium: `refdef`/`viewParms`/`ori` copies, perf counters, render-mode flags, `currentEntity` — deliberately separated from front-end `tr` state |
+| `glConfig` | `glconfig_t` | `tr_local.h:1435` (type in shared `cgame/tr_types.h:298-325`) | `oracle/codemp/renderer/tr_init.cpp:33` | Small flat struct, effectively write-once at GL init; kept outside `tr` "so it shouldn't be cleared during ref re-init" |
 
 Other file-scope `static` declarations across
-`oracle/oracle/codemp/renderer/*.cpp`: **292 total** (mix of static data/caches
+`oracle/codemp/renderer/*.cpp`: **292 total** (mix of static data/caches
 and static helper functions). Top files: `tr_shader.cpp` (32), `tr_world.cpp`
 (28), `tr_surface.cpp` (25), `tr_font.cpp` (25), `tr_image.cpp` (21),
 `tr_ghoul2.cpp` (21), `tr_shade.cpp` (19), `tr_sky.cpp` (15). Full census
 deliberately out of scope per DEC-01.
 
-### 1m. SP deltas (`oracle/oracle/code/`)
+### 1m. SP deltas (`oracle/code/`)
 
 - **common.cpp** — same core globals; `com_pushedEventsHead/Tail` are
   non-`static` (`code/qcommon/common.cpp:691`). Drops MP-only cvars
@@ -293,7 +293,7 @@ deliberately out of scope per DEC-01.
 
 ## 2. Module-side globals
 
-### 2.1 MP game module (`oracle/oracle/codemp/game/`)
+### 2.1 MP game module (`oracle/codemp/game/`)
 
 | Global | Type | Decl (extern) | Def | Size/shape | Mutators | Cross-file ref |
 |---|---|---|---|---|---|---|
@@ -315,7 +315,7 @@ sizeofGClient)`. Note it passes `&level.clients[0].ps` — the address of the
 `sizeof(gclient_t)` as the stride: the server only ever reads the leading
 `playerState_t` of each client slot, at `gclient_t`-sized strides.
 
-### 2.2 MP cgame module (`oracle/oracle/codemp/cgame/`)
+### 2.2 MP cgame module (`oracle/codemp/cgame/`)
 
 | Global | Type | Decl | Def | Size/shape |
 |---|---|---|---|---|
@@ -326,18 +326,18 @@ sizeofGClient)`. Note it passes `&level.clients[0].ps` — the address of the
 All three are genuine file-scope singletons (classic idTech3 cgame pattern):
 every cgame TU includes `cg_local.h` and touches them directly.
 
-### 2.3 MP ui module (`oracle/oracle/codemp/ui/`, shared widget engine in `oracle/oracle/ui/`)
+### 2.3 MP ui module (`oracle/codemp/ui/`, shared widget engine in `oracle/ui/`)
 
 | Global | Type | Decl | Def | Notes |
 |---|---|---|---|---|
 | `uiInfo` | `uiInfo_t` | `ui_local.h:843` | `ui_main.c:875` | `ui_local.h:729-841` (~112 lines) — menu/UI transient state |
-| `DC` | `displayContextDef_t *` | `oracle/oracle/ui/ui_shared.h` | `oracle/oracle/ui/ui_shared.c:103` | Pointer to the import-function-table struct that all of `ui_shared.c`'s reusable widget code calls through — the mechanism letting the **same** `ui_shared.c` compile into both the MP `ui` module and (statically) SP |
+| `DC` | `displayContextDef_t *` | `oracle/ui/ui_shared.h` | `oracle/ui/ui_shared.c:103` | Pointer to the import-function-table struct that all of `ui_shared.c`'s reusable widget code calls through — the mechanism letting the **same** `ui_shared.c` compile into both the MP `ui` module and (statically) SP |
 
-`oracle/oracle/ui/` (top-level, no `codemp`/`code` prefix) holds the shared
-widget/menu engine compiled into both MP and SP UI; `oracle/oracle/codemp/ui/`
-and `oracle/oracle/code/ui/` hold the per-game specialization.
+`oracle/ui/` (top-level, no `codemp`/`code` prefix) holds the shared
+widget/menu engine compiled into both MP and SP UI; `oracle/codemp/ui/`
+and `oracle/code/ui/` hold the per-game specialization.
 
-### 2.4 SP game module (`oracle/oracle/code/game/`)
+### 2.4 SP game module (`oracle/code/game/`)
 
 | Global | Type | Decl | Def | Notes |
 |---|---|---|---|---|
@@ -347,10 +347,10 @@ and `oracle/oracle/code/ui/` hold the per-game specialization.
 | `globals` | `game_export_t` | `g_local.h:223` | `g_main.cpp:48` | SP's entire analogue of `trap_LocateGameData` — see §4.2 |
 
 SP has **zero** `LocateGameData`/`G_LOCATE_GAME_DATA` call sites (confirmed by
-grep across `oracle/oracle/code/game/`) — the single most important MP/SP
+grep across `oracle/code/game/`) — the single most important MP/SP
 divergence for this doc, detailed in §4.2.
 
-### 2.5 SP cgame/ui (`oracle/oracle/code/cgame/`, `oracle/oracle/code/ui/`)
+### 2.5 SP cgame/ui (`oracle/code/cgame/`, `oracle/code/ui/`)
 
 Same `cg`/`cgs`/`cg_entities` and `uiInfo`/`DC` pattern, declared in
 `code/cgame/cg_local.h` / `code/ui/ui_local.h`, defined in
@@ -363,7 +363,7 @@ but the **calling convention underneath differs completely** — see §4.3.
 
 ### Chain A — `SV_Frame` → game module → back into server world-linking state
 
-1. **`SV_Frame`** — `oracle/oracle/codemp/server/sv_main.cpp:826`. Frame loop,
+1. **`SV_Frame`** — `oracle/codemp/server/sv_main.cpp:826`. Frame loop,
    `sv_main.cpp:909-915`:
    ```c
    while ( sv.timeResidual >= frameMsec ) {
@@ -373,7 +373,7 @@ but the **calling convention underneath differs completely** — see §4.3.
    }
    ```
 2. **`VM_Call(gvm, GAME_RUN_FRAME, ...)`** dispatches into `G_RunFrame`,
-   `oracle/oracle/codemp/game/g_main.c:3582`. The outer entity loop holds a
+   `oracle/codemp/game/g_main.c:3582`. The outer entity loop holds a
    live raw pointer across nested calls, `g_main.c:3741-3742`:
    ```c
    ent = &g_entities[0];
@@ -389,14 +389,14 @@ but the **calling convention underneath differs completely** — see §4.3.
    during `G_RunFrame`'s per-client pass. Wrapper declared
    `g_local.h:1714`.
 3. **Game→engine syscall dispatch**: `SV_GameSystemCalls`,
-   `oracle/oracle/codemp/server/sv_game.cpp:458`, case `G_LINKENTITY` at
+   `oracle/codemp/server/sv_game.cpp:458`, case `G_LINKENTITY` at
    `sv_game.cpp:575-577`:
    ```c
    case G_LINKENTITY:
        SV_LinkEntity( (sharedEntity_t *)VMA(1) );
        return 0;
    ```
-4. **`SV_LinkEntity`** — `oracle/oracle/codemp/server/sv_world.cpp:189`.
+4. **`SV_LinkEntity`** — `oracle/codemp/server/sv_world.cpp:189`.
    Resolves the server-side shadow struct via `SV_SvEntityForGentity`
    (`sv_world.cpp:200`, impl `sv_game.cpp:70-75`), then mutates the
    **world-sector linked list** — a structure entirely separate from
@@ -440,7 +440,7 @@ queued effects applied after the outer borrow ends.
 
 ### Chain B — `Com_Error` unwinding through a reentrant VM call
 
-1. **`Com_Error`** — `oracle/oracle/codemp/qcommon/common.cpp:249`. **Not**
+1. **`Com_Error`** — `oracle/codemp/qcommon/common.cpp:249`. **Not**
    `setjmp`/`longjmp` in this tree (no `jmp_buf`/`abortframe` exists in
    codemp's `common.cpp`) — it uses **C++ exceptions**:
    - `ERR_SERVERDISCONNECT` (`common.cpp:302-312`): `CL_Disconnect` +
@@ -460,14 +460,14 @@ queued effects applied after the outer borrow ends.
      `longjmp' or `vfork'"*) is leftover from the original id Software
      `setjmp`/`longjmp` `Com_Frame`, confirming a conversion to
      `throw`/`catch` happened without updating the comment.
-2. **The catch site**: `Com_Frame`, `oracle/oracle/codemp/qcommon/common.cpp:1593`,
+2. **The catch site**: `Com_Frame`, `oracle/codemp/qcommon/common.cpp:1593`,
    wraps the per-frame body (event loop, `SV_Frame` at line 1669, client
    frame, …) in `try { ... }` (opens 1595) with
    `catch (const char* reason) { Com_Printf(reason); return; }` at
    `common.cpp:1761-1765`. A second `catch` guards `Com_Init`
    (`common.cpp:1439`).
 3. **Concrete deep-nested throw site**: `SV_SvEntityForGentity`,
-   `oracle/oracle/codemp/server/sv_game.cpp:70-75`:
+   `oracle/codemp/server/sv_game.cpp:70-75`:
    ```c
    svEntity_t *SV_SvEntityForGentity( sharedEntity_t *gEnt ) {
        if ( !gEnt || gEnt->s.number < 0 || gEnt->s.number >= MAX_GENTITIES ) {
@@ -480,7 +480,7 @@ queued effects applied after the outer borrow ends.
    exact reentrant call from Chain A can throw `ERR_DROP` from several native
    stack frames deep inside a live `VM_Call(gvm, GAME_RUN_FRAME, ...)`.
 4. **What breaks on unwind**: `VM_Call`,
-   `oracle/oracle/codemp/qcommon/vm.cpp:787-829`, does a manual (non-RAII)
+   `oracle/codemp/qcommon/vm.cpp:787-829`, does a manual (non-RAII)
    global save/restore:
    ```c
    oldVM = currentVM;                              // vm.cpp:799
@@ -529,21 +529,21 @@ out.)
 
 ### Chain C — cgame draw calling back into the renderer (designed-in accumulation)
 
-1. **`CL_CGameRendering`** — `oracle/oracle/codemp/client/cl_cgame.cpp:1830`:
+1. **`CL_CGameRendering`** — `oracle/codemp/client/cl_cgame.cpp:1830`:
    ```c
    VM_Call( cgvm, CG_DRAW_ACTIVE_FRAME, cl.serverTime, stereo, clc.demoplaying );  // cl_cgame.cpp:1842
    ```
-   into `CG_DrawActiveFrame`, `oracle/oracle/codemp/cgame/cg_view.c:2447`.
+   into `CG_DrawActiveFrame`, `oracle/codemp/cgame/cg_view.c:2447`.
 2. **cgame-side reentrant trap calls**: cgame invokes `trap_R_AddRefEntityToScene`
    dozens of times across `cg_ents.c` (e.g. `cg_ents.c:672,677,795,1475,1583,
    1634,2011,2225`) via `CG_AddPacketEntities` (called `cg_view.c:1913` and
    `:2677`), then `trap_R_RenderScene(&cg.refdef)` once at `cg_view.c:1932`
    (portal/skybox scene) and `cg_view.c:2424` (main scene).
 3. **Engine-side dispatch**: `CL_CgameSystemCalls`,
-   `oracle/oracle/codemp/client/cl_cgame.cpp:644`:
+   `oracle/codemp/client/cl_cgame.cpp:644`:
    - `CG_R_ADDREFENTITYTOSCENE` → `re.AddRefEntityToScene(...)`
      (`cl_cgame.cpp:894-896`) → `RE_AddRefEntityToScene`,
-     `oracle/oracle/codemp/renderer/tr_scene.cpp:194`.
+     `oracle/codemp/renderer/tr_scene.cpp:194`.
    - `CG_R_RENDERSCENE` → `re.RenderScene(...)` (`cl_cgame.cpp:922-924`) →
      `RE_RenderScene`, `tr_scene.cpp:706`.
    Both touch the renderer's `tr`/`backEndData` globals (full census
@@ -586,7 +586,7 @@ exclusively-owned builder for the outer call's duration.
 
 ### 4.1 MP: syscall-based `G_LOCATE_GAME_DATA`
 
-- **Enum/doc**: `oracle/oracle/codemp/game/g_public.h:145-148`:
+- **Enum/doc**: `oracle/codemp/game/g_public.h:145-148`:
   ```c
   G_LOCATE_GAME_DATA,   // ( gentity_t *gEnts, int numGEntities, int sizeofGEntity_t,
                          //   playerState_t *clients, int sizeofGameClient );
@@ -594,7 +594,7 @@ exclusively-owned builder for the outer call's duration.
   // are, so it can look at them directly without going through an interface
   ```
 - **Engine-side receiver**: `SV_LocateGameData`,
-  `oracle/oracle/codemp/server/sv_game.cpp:327-335`:
+  `oracle/codemp/server/sv_game.cpp:327-335`:
   ```c
   void SV_LocateGameData( sharedEntity_t *gEnts, int numGEntities, int sizeofGEntity_t,
                          playerState_t *clients, int sizeofGameClient ) {
@@ -607,7 +607,7 @@ exclusively-owned builder for the outer call's duration.
   ```
   Dispatched from the syscall switch, `sv_game.cpp:566-567`:
   `case G_LOCATE_GAME_DATA: SV_LocateGameData((sharedEntity_t*)VMA(1), args[2], args[3], (struct playerState_s*)VMA(4), args[5]);`
-- **Storage**: the `server_t sv` global (`oracle/oracle/codemp/server/server.h:73-78`),
+- **Storage**: the `server_t sv` global (`oracle/codemp/server/server.h:73-78`),
   fields `sharedEntity_t *gentities`, `int gentitySize`, `int num_entities`,
   `playerState_t *gameClients`, `int gameClientSize`. Comment above
   (`server.h:72`): `// the game virtual machine will update these on init and
@@ -628,7 +628,7 @@ exclusively-owned builder for the outer call's duration.
     array.
   - `SV_SvEntityForGentity`, `sv_game.cpp:70-75` — indexes the engine's own
     `sv.svEntities[]` by `gEnt->s.number`, read off the shared struct.
-  - `SV_LinkEntity`/`SV_UnlinkEntity`, `oracle/oracle/codemp/server/sv_world.cpp:151,189` —
+  - `SV_LinkEntity`/`SV_UnlinkEntity`, `oracle/codemp/server/sv_world.cpp:151,189` —
     take `sharedEntity_t *gEnt`, read/write `gEnt->r.bmodel`,
     `gEnt->s.solid`, etc. (`sv_world.cpp:189-206ff`) — engine mutates fields
     inside memory it doesn't own, through the aliased pointer.
@@ -636,13 +636,13 @@ exclusively-owned builder for the outer call's duration.
     `sv_init.cpp:213`, `sv_snapshot.cpp:338` (snapshot building).
 
 **Native-DLL vs QVM — and a latent inconsistency.** `VM_Create`
-(`oracle/oracle/codemp/qcommon/vm.cpp:471+`) supports both `VMI_NATIVE`
+(`oracle/codemp/qcommon/vm.cpp:471+`) supports both `VMI_NATIVE`
 (`Sys_LoadDll`, sets `vm->entryPoint`) and `VMI_COMPILED` (QVM bytecode,
 `dataBase`/`dataMask`-relative interpreter address space). Game VM created
 `sv_game.cpp:1750`: `gvm = VM_Create("jampgame", SV_GameSystemCalls,
 (vmInterpret_t)(int)Cvar_VariableValue("vm_game"));` — a QVM game module is in
 principle still selectable via `vm_game`. The translation function for
-genuine QVM pointers is `VM_ArgPtr`, `oracle/oracle/codemp/qcommon/vm.cpp:640-654`:
+genuine QVM pointers is `VM_ArgPtr`, `oracle/codemp/qcommon/vm.cpp:640-654`:
 ```c
 void *VM_ArgPtr( int intValue ) {
     if ( !intValue ) return NULL;
@@ -659,7 +659,7 @@ a direct pointer cast, **no translation**, used for every `G_*` syscall
 including `G_LOCATE_GAME_DATA`. The MP `game` boundary in `sv_game.cpp` is
 hard-wired to a real native DLL sharing the engine's address space; it never
 calls `VM_ArgPtr`. By contrast, MP's client-side cgame/ui dispatch
-(`oracle/oracle/codemp/client/cl_cgame.cpp:624`) uses
+(`oracle/codemp/client/cl_cgame.cpp:624`) uses
 `#define VMA(x) VM_ArgPtr(args[x])` — properly translating. **For the Rust
 port**: model MP `game` as always-native (real shared memory, pointer-cast
 ABI per porting-rules §D); the QVM path is a legacy branch `jampgame` doesn't
@@ -670,10 +670,10 @@ inconsistency rather than needing to faithfully reproduce it).
 ### 4.2 SP: `GetGameAPI` (classic idTech "hard export" table, no syscall marshaling)
 
 - `Sys_GetGameAPI` (engine side, platform-specific), called
-  `oracle/oracle/code/server/sv_game.cpp:669`:
+  `oracle/code/server/sv_game.cpp:669`:
   `ge = (game_export_t *)Sys_GetGameAPI(&import);`
 - Game module's `GetGameAPI(game_import_t *import)`,
-  `oracle/oracle/code/game/g_main.cpp:875-905`, populates a struct of real
+  `oracle/code/game/g_main.cpp:875-905`, populates a struct of real
   function pointers and data pointers directly:
   ```c
   globals.apiversion = GAME_API_VERSION;
@@ -683,7 +683,7 @@ inconsistency rather than needing to faithfully reproduce it).
   and inside `InitGame` (`g_main.cpp:736,749`):
   `globals.gentities = g_entities; ... globals.num_entities = MAX_CLIENTS;`
 - Engine dereferences `ge->gentities`/`ge->gentitySize` exactly like MP's
-  `sv.gentities` (`oracle/oracle/code/server/sv_game.cpp:46,55`:
+  `sv.gentities` (`oracle/code/server/sv_game.cpp:46,55`:
   `num = ((byte*)ent - (byte*)ge->gentities) / ge->gentitySize;`).
 - Still real pointer aliasing (SP `jagame` is a genuinely separate loadable
   module), but the handshake is one upfront struct-of-pointers return, not an
@@ -694,7 +694,7 @@ inconsistency rather than needing to faithfully reproduce it).
 ### 4.3 Other cross-boundary aliasing
 
 **`cl.snap` — copy-based even for native DLLs.** MP client state: `cl.snap`
-(`clSnapshot_t`, `oracle/oracle/codemp/client/client.h:79`) and
+(`clSnapshot_t`, `oracle/codemp/client/client.h:79`) and
 `cl.gameState` (`gameState_t`, `client.h:90`) live in `clientActive_t`; cgame
 never touches these directly. Trap: `CG_GETSNAPSHOT` (`cg_public.h:182`) →
 `trap_GetSnapshot` (`cg_syscalls.c:473-475`) → engine handler
@@ -708,35 +708,35 @@ is (in practice) a native DLL sharing the process address space, the
 snapshot handoff is a **deliberate copy** — cgame owns its storage,
 decoupled from the client's circular snapshot buffer lifetime. SP is
 structurally identical: `CL_GetSnapshot`,
-`oracle/oracle/code/client/cl_cgame.cpp:135-181`
+`oracle/code/client/cl_cgame.cpp:135-181`
 (`snapshot->entities[i] = cl.parseEntities[entNum];`, line 181), same
 enum-dispatch shape (`cl_cgame.cpp:759`).
 
 **MP vs SP calling convention: trap syscalls all the way down vs a "fake
 VM".** SP cgame/ui still go through the **identical** enum + `int args[]`
 marshaling convention as MP (`cgi_GetSnapshot`,
-`oracle/oracle/code/cgame/cg_syscalls.cpp:454-455`: `return
+`oracle/code/cgame/cg_syscalls.cpp:454-455`: `return
 syscall(CG_GETSNAPSHOT, snapshotNumber, snapshot);` — same shape as MP's
 `trap_GetSnapshot`). What differs is what `syscall`/`VMA` resolve to:
-- SP's `vm_t` (`oracle/oracle/code/client/vmachine.h:47-49`) is reduced to
+- SP's `vm_t` (`oracle/code/client/vmachine.h:47-49`) is reduced to
   just `int (*entryPoint)(int callNum, ...)` — no `dataBase`/`dataMask`,
   because QVM bytecode was never an option for SP.
-- SP's `VM_Call` (`oracle/oracle/code/client/vmachine.cpp:1-24`) — file
+- SP's `VM_Call` (`oracle/code/client/vmachine.cpp:1-24`) — file
   header literally: **"wrapper to fake virtual machine for client"** —
   forwards varargs straight into `cgvm.entryPoint(...)`, a plain compiled-in
   C function call.
-- SP's `VMA` macro (`oracle/oracle/code/client/cl_cgame.cpp:429`):
+- SP's `VMA` macro (`oracle/code/client/cl_cgame.cpp:429`):
   `#define VMA(x) ((void*)args[x])` — direct cast, never `VM_ArgPtr` — no
   address-space translation ever happens (matches MP's `jampgame`, not MP's
   cgame/ui).
-- `CGAME_HARD_LINKED` (`oracle/oracle/code/game/q_shared.h:128,144`) guards
-  out DLL-only bootstrap shims (`oracle/oracle/code/ui/ui_atoms.cpp:305`,
+- `CGAME_HARD_LINKED` (`oracle/code/game/q_shared.h:128,144`) guards
+  out DLL-only bootstrap shims (`oracle/code/ui/ui_atoms.cpp:305`,
   `#ifndef UI_HARD_LINKED`) — code that would call `ui.Printf`/`ui.Error`
   through an import table is compiled out; the hard-linked build lets
   `Com_Printf`/`Com_Error` resolve directly at link time (same binary, no
   indirection needed).
 - SP's legacy `Sys_LoadCgame`
-  (`oracle/oracle/code/win32/win_main.cpp:557-570`, comment: *"Used to hook
+  (`oracle/code/win32/win_main.cpp:557-570`, comment: *"Used to hook
   up a development dll"*) is the only place SP could dlopen a real cgame
   DLL, for hot-reload dev builds — production SP wires `cgvm.entryPoint`
   directly to the statically-linked `vmMain` symbol, no

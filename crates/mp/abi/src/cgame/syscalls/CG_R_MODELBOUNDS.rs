@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_R_MODELBOUNDS, model, mins, maxs );`
 /// Raven transport: `re.ModelBounds( args[1], (float *)VMA(2), (float *)VMA(3) );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:373-374`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2280`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:931-933`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:373-374`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2280`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:931-933`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRModelboundsArgs {
     model: c_int,
@@ -29,10 +29,10 @@ impl CgRModelboundsArgs {
 
 /// `CG_R_MODELBOUNDS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:161`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:373-374`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:931-933`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:931-933`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:161`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:373-374`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:931-933`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:931-933`
 pub struct CgRModelbounds;
 
 impl OutboundSysCall for CgRModelbounds {

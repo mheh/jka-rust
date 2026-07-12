@@ -4,17 +4,17 @@ use sp_qshared::shared::{qboolean, vec4_t};
 
 /// `CON_TEXTSIZE`.
 ///
-/// Source: `oracle/oracle/code/client/client.h:234`
+/// Source: `oracle/code/client/client.h:234`
 pub const CON_TEXTSIZE: usize = 32768;
 
 /// `NUM_CON_TIMES`.
 ///
-/// Source: `oracle/oracle/code/client/client.h:236`
+/// Source: `oracle/code/client/client.h:236`
 pub const NUM_CON_TIMES: usize = 4;
 
 /// Raven `console_t` — the client console scrollback buffer and display state.
 ///
-/// Type definition source: `oracle/oracle/code/client/client.h:238-260`
+/// Type definition source: `oracle/code/client/client.h:238-260`
 #[repr(C)]
 pub struct console_t {
     pub initialized: qboolean,

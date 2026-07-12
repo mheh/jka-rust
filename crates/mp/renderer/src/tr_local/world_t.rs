@@ -13,7 +13,7 @@ use super::msurface_s::msurface_t;
 
 /// Raven `world_t` — the loaded BSP world: geometry, planes, fogs, and light grid.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:1039-1090`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:1039-1090`
 #[repr(C)]
 pub struct world_t {
     /// ie: maps/tim_dm2.bsp

@@ -1,5 +1,7 @@
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use mp_qshared::shared::qboolean;
 
 /// Arguments for `UI_KEY_GETOVERSTRIKEMODE`.
@@ -7,8 +9,8 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `syscall( UI_KEY_GETOVERSTRIKEMODE );`
 /// Raven transport: `return Key_GetOverstrikeMode();`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:234-235`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1022-1023`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:234-235`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1022-1023`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct UiKeyGetoverstrikemodeArgs;
 
@@ -20,12 +22,12 @@ impl UiKeyGetoverstrikemodeArgs {
 
 /// `UI_KEY_GETOVERSTRIKEMODE` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:56`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:52-62`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:234-235`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:234-235`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1022-1023`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1022-1023`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:56`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:52-62`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:234-235`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:234-235`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1022-1023`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1022-1023`
 pub struct UiKeyGetoverstrikemode;
 
 impl OutboundSysCall for UiKeyGetoverstrikemode {

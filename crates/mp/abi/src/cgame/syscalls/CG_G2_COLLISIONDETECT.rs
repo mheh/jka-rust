@@ -13,11 +13,11 @@ use mp_qshared::shared::CollisionRecord_t;
 /// Raven transport: `G2API_CollisionDetect((CollisionRecord_t*)VMA(1), *((CGhoul2Info_v *)args[2]), ...,
 ///     G2VertSpaceClient, args[10], args[11], VMF(12)); return 0;`.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:265`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:820-835`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2508`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1339-1352`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1339-1352`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:265`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:820-835`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2508`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1339-1352`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1339-1352`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgG2CollisiondetectArgs {
     /// `CollisionRecord_t *collRecMap`, decoded by Raven from `VMA(1)`.
@@ -81,11 +81,11 @@ impl CgG2CollisiondetectArgs {
 
 /// `CG_G2_COLLISIONDETECT` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:265`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:820-835`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2508`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1339-1352`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1339-1352`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:265`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:820-835`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2508`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1339-1352`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1339-1352`
 pub struct CgG2Collisiondetect;
 
 impl OutboundSysCall for CgG2Collisiondetect {

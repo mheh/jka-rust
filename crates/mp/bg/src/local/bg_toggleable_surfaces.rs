@@ -8,8 +8,8 @@ use core::ffi::{c_int, CStr};
 /// names that can be toggled on/off (vehicle parts, cyborg canisters, etc.);
 /// scanned by consumers until the `NULL` sentinel (`None`) is hit.
 ///
-/// Definition source: `oracle/oracle/codemp/game/bg_misc.c:34-76`
-/// Extern decl source: `oracle/oracle/codemp/game/bg_public.h:145`
+/// Definition source: `oracle/codemp/game/bg_misc.c:34-76`
+/// Extern decl source: `oracle/codemp/game/bg_public.h:145`
 pub static bgToggleableSurfaces: [Option<&CStr>; 31] = [
     Some(c"l_arm_key"), //0
     Some(c"torso_canister1"),
@@ -57,38 +57,22 @@ pub static bgToggleableSurfaces: [Option<&CStr>; 31] = [
 /// effect index paired 1:1 with `bgToggleableSurfaces`; `-1` marks the
 /// sentinel slot past the real entries.
 ///
-/// Definition source: `oracle/oracle/codemp/game/bg_misc.c:78-111`
-/// Extern decl source: `oracle/oracle/codemp/game/bg_public.h:146`
+/// Definition source: `oracle/codemp/game/bg_misc.c:78-111`
+/// Extern decl source: `oracle/codemp/game/bg_public.h:146`
 pub static bgToggleableSurfaceDebris: [c_int; 31] = [
     0, //0
-    0,
-    0,
-    0,
-    0,
-    0, //5
-    0,
-    0,
-    0,
-    0,
-    0, //10
-    0,
-    0,
-    0,
-    0, //>= 2 means it should create a flame trail when destroyed (for vehicles)
+    0, 0, 0, 0, 0, //5
+    0, 0, 0, 0, 0, //10
+    0, 0, 0, 0, //>= 2 means it should create a flame trail when destroyed (for vehicles)
     3, //15
     5, //rwing2
-    4,
-    6, //lwing2
+    4, 6, //lwing2
     0, //rgear
     0, //lgear //20
     7, //nose
     0, //blah
     0, //blah
-    0,
-    0, //25
-    0,
-    0,
-    0,
-    0, //29
+    0, 0, //25
+    0, 0, 0, 0, //29
     -1,
 ];

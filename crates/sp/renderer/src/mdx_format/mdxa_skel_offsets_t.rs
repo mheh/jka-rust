@@ -4,7 +4,7 @@
 ///
 /// Raven: variable sized (mdxaHeader_t->numBones), each offset points to an
 /// mdxaSkel_t below.
-/// Type definition source: `oracle/oracle/code/game/../game/../renderer/mdx_format.h:376-379`
+/// Type definition source: `oracle/code/game/../game/../renderer/mdx_format.h:376-379`
 #[repr(C)]
 pub struct mdxaSkelOffsets_t {
     pub offsets: [i32; 1],

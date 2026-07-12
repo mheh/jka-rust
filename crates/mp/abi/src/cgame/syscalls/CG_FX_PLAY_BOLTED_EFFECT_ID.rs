@@ -11,9 +11,9 @@ use mp_qshared::shared::{qboolean, vec3_t};
 /// Raven wrapper: `syscall( CG_FX_PLAY_BOLTED_EFFECT_ID, id, org, ghoul2, boltNum, entNum, modelNum, iLooptime, isRelative );`
 /// Raven transport attaches the Ghoul2 entity and returns `1` or `0`; the cgame wrapper ignores that return word.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:653-656`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2404`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1129-1139`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:653-656`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2404`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1129-1139`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxPlayBoltedEffectIdArgs {
     id: c_int,
@@ -52,11 +52,11 @@ impl CgFxPlayBoltedEffectIdArgs {
 
 /// `CG_FX_PLAY_BOLTED_EFFECT_ID` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:225`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:653-656`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:653-657`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1129-1139`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1129-1139`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:225`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:653-656`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:653-657`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1129-1139`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1129-1139`
 pub struct CgFxPlayBoltedEffectId;
 
 impl OutboundSysCall for CgFxPlayBoltedEffectId {

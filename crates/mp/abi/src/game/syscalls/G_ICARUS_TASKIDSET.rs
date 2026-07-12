@@ -36,7 +36,7 @@ impl GIcarusTaskidsetArgs {
 
 /// `G_ICARUS_TASKIDSET` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:265`
+/// Source: `oracle/codemp/game/g_public.h:265`
 pub struct GIcarusTaskidset;
 
 impl OutboundSysCall for GIcarusTaskidset {

@@ -4,7 +4,7 @@
 /// punctuation table linked list.
 ///
 /// Raven: punctuation character(s) / punctuation indication / next punctuation.
-/// Type definition source: `oracle/oracle/codemp/botlib/l_script.h:133-138`
+/// Type definition source: `oracle/codemp/botlib/l_script.h:133-138`
 #[repr(C)]
 pub struct punctuation_t {
     /// punctuation character(s)

@@ -1,14 +1,16 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `UI_LAN_RESETPINGS`.
 ///
 /// Raven wrapper: `syscall( UI_LAN_RESETPINGS, n );`
 /// Raven transport: `LAN_ResetPings( args[1] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:302-303`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:302-303`
 #[derive(Debug)]
 pub struct UiLanResetpingsArgs {
     n: c_int,
@@ -29,10 +31,10 @@ impl UiLanResetpingsArgs {
 /// Raven wrapper: `syscall( UI_LAN_RESETPINGS, n );`
 /// Raven transport: `LAN_ResetPings( args[1] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:100`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:302-303`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:979`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1109-1111`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:100`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:302-303`
+/// Output source: `oracle/codemp/ui/ui_local.h:979`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1109-1111`
 pub struct UiLanResetpings;
 
 impl OutboundSysCall for UiLanResetpings {

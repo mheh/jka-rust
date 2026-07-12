@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `cgi_UI_StartParseSession(menuFile, buf)`
 /// Raven transport: `return(PC_StartParseSession((char *) VMA(1),(char **) VMA(2)));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:593-595`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:869-871`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:593-595`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:869-871`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiStartparsesessionArgs {
     menu_file: *const c_char,
@@ -34,10 +34,10 @@ impl CgUiStartparsesessionArgs {
 
 /// `CG_UI_STARTPARSESESSION` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:199`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:593-595`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:869-871`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:869-871`
+/// Enum value source: `oracle/code/cgame/cg_public.h:199`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:593-595`
+/// Output source: `oracle/code/client/cl_cgame.cpp:869-871`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:869-871`
 pub struct CgUiStartparsesession;
 
 impl OutboundSysCall for CgUiStartparsesession {

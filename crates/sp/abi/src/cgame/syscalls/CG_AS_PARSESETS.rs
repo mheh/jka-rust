@@ -1,13 +1,15 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_AS_PARSESETS`.
 ///
 /// Raven wrapper: `syscall( CG_AS_PARSESETS );`
 /// Raven transport: `AS_ParseSets();`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:189-190`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:572-574`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:189-190`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:572-574`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgAsParsesetsArgs;
 
@@ -19,10 +21,10 @@ impl CgAsParsesetsArgs {
 
 /// `CG_AS_PARSESETS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:164`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:189-190`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:572-574`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:572-574`
+/// Enum value source: `oracle/code/cgame/cg_public.h:164`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:189-190`
+/// Output source: `oracle/code/client/cl_cgame.cpp:572-574`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:572-574`
 pub struct CgAsParsesets;
 
 impl OutboundSysCall for CgAsParsesets {

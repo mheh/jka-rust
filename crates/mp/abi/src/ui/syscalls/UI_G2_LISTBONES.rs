@@ -29,7 +29,7 @@ impl UiG2ListbonesArgs {
 
 /// `UI_G2_LISTBONES` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:507`
+/// Source: `oracle/codemp/ui/ui_public.h:507`
 pub struct UiG2Listbones;
 
 impl OutboundSysCall for UiG2Listbones {

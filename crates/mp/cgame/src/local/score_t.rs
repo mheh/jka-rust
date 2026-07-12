@@ -4,24 +4,24 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `score_t` — scoreboard entry sent from server-side score commands.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:630-646`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:630-646`
 #[repr(C)]
 pub struct score_t {
-	pub client: i32,
-	pub score: i32,
-	pub ping: i32,
-	pub time: i32,
-	pub scoreFlags: i32,
-	pub powerUps: i32,
-	pub accuracy: i32,
-	pub impressiveCount: i32,
-	pub excellentCount: i32,
-	pub guantletCount: i32,
-	pub defendCount: i32,
-	pub assistCount: i32,
-	pub captures: i32,
-	pub perfect: qboolean,
-	pub team: i32,
+    pub client: i32,
+    pub score: i32,
+    pub ping: i32,
+    pub time: i32,
+    pub scoreFlags: i32,
+    pub powerUps: i32,
+    pub accuracy: i32,
+    pub impressiveCount: i32,
+    pub excellentCount: i32,
+    pub guantletCount: i32,
+    pub defendCount: i32,
+    pub assistCount: i32,
+    pub captures: i32,
+    pub perfect: qboolean,
+    pub team: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<score_t>() == 60);

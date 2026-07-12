@@ -33,7 +33,7 @@ impl BotlibAiChooseBestFightWeaponArgs {
 
 /// `BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:475`
+/// Source: `oracle/codemp/game/g_public.h:475`
 pub struct BotlibAiChooseBestFightWeapon;
 
 impl OutboundSysCall for BotlibAiChooseBestFightWeapon {

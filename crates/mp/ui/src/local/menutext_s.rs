@@ -6,13 +6,13 @@ use super::menucommon_s::menucommon_s;
 
 /// Raven `menutext_s` — a static text menu item.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:244-250`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:244-250`
 #[repr(C)]
 pub struct menutext_s {
-	pub generic: menucommon_s,
-	pub string: *mut c_char,
-	pub style: i32,
-	pub color: *mut f32,
+    pub generic: menucommon_s,
+    pub string: *mut c_char,
+    pub style: i32,
+    pub color: *mut f32,
 }
 
 const _: () = assert!(core::mem::size_of::<menutext_s>() == 112);

@@ -7,7 +7,7 @@ use core::ffi::c_int;
 /// Raven declares this as `typedef int` alongside a separate anonymous enum of
 /// power indices, so the alias stays an int and the enumerators are `const`s.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:590-613`
+/// Type definition source: `oracle/codemp/game/q_shared.h:590-613`
 pub type forcePowers_t = c_int;
 
 pub const FP_FIRST: forcePowers_t = 0; // marker
@@ -37,7 +37,7 @@ pub const NUM_FORCE_POWERS: forcePowers_t = 18;
 /// typedef name), so the enumerators are `const`s of the same `c_int` shape
 /// used elsewhere in this file (§C8).
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:842-853`
+/// Source: `oracle/codemp/game/q_shared.h:842-853`
 pub const FORCE_LEVEL_0: c_int = 0;
 pub const FORCE_LEVEL_1: c_int = 1;
 pub const FORCE_LEVEL_2: c_int = 2;
@@ -48,11 +48,11 @@ pub const FORCE_LEVEL_5: c_int = FORCE_LEVEL_4 + 1;
 
 /// Raven `FORCE_LIGHTSIDE`/`FORCE_DARKSIDE` (`forceSide_t`-style bit values).
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2143-2144`
+/// Source: `oracle/codemp/game/q_shared.h:2143-2144`
 pub const FORCE_LIGHTSIDE: c_int = 1;
 pub const FORCE_DARKSIDE: c_int = 2;
 
 /// Raven `FORCE_POWER_MAX` — max value of a single force-power level's point cost.
 ///
-/// Source: `oracle/oracle/codemp/game/w_saber.h:27`
+/// Source: `oracle/codemp/game/w_saber.h:27`
 pub const FORCE_POWER_MAX: c_int = 100;

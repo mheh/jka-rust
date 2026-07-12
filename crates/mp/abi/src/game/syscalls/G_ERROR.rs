@@ -39,7 +39,7 @@ impl GErrorArgs {
 ///
 /// Raven: ( const char *string );
 /// Raven: abort the game
-/// Source: `oracle/oracle/codemp/game/g_public.h:108`
+/// Source: `oracle/codemp/game/g_public.h:108`
 pub struct GError;
 
 impl OutboundSysCall for GError {

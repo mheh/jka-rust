@@ -5,10 +5,10 @@
 
 /// Raven SP `MAX_SPAWN_VARS`.
 ///
-/// Source: `oracle/oracle/code/game/g_local.h:143`
+/// Source: `oracle/code/game/g_local.h:143`
 pub const MAX_SPAWN_VARS: usize = 64;
 
 /// Raven SP `MAX_SPAWN_VARS_CHARS` — half of MP's 4096.
 ///
-/// Source: `oracle/oracle/code/game/g_local.h:144`
+/// Source: `oracle/code/game/g_local.h:144`
 pub const MAX_SPAWN_VARS_CHARS: usize = 2048;

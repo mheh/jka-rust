@@ -1,6 +1,6 @@
 //! MP `sharedRagDollParams_t` copied from Raven `codemp/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/q_shared.h:876-922`
+//! Source: `oracle/codemp/game/q_shared.h:876-922`
 
 #![allow(non_camel_case_types)]
 
@@ -48,8 +48,7 @@ const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, angles) == 0)
 const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, position) == 12);
 const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, scale) == 24);
 const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, pelvis_angles_offset) == 36);
-const _: () =
-    assert!(core::mem::offset_of!(sharedRagDollParams_t, pelvis_position_offset) == 48);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, pelvis_position_offset) == 48);
 const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, f_impact_strength) == 60);
 const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, me) == 68);
 const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, start_frame) == 72);

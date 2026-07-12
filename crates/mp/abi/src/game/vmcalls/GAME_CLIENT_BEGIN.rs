@@ -34,7 +34,7 @@ impl GameClientBeginArgs {
 /// `GAME_CLIENT_BEGIN` MP game exports vmMain ABI token.
 ///
 /// Raven: ( int clientNum );
-/// Source: `oracle/oracle/codemp/game/g_public.h:746`
+/// Source: `oracle/codemp/game/g_public.h:746`
 pub struct GameClientBegin;
 
 impl InboundVmCall for GameClientBegin {

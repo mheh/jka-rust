@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_R_WEATHER_CONTENTS_OVERRIDE`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,7 +23,7 @@ impl CgRWeatherContentsOverrideArgs {
 
 /// `CG_R_WEATHER_CONTENTS_OVERRIDE` MP cgame imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:333`
+/// Source: `oracle/codemp/cgame/cg_public.h:333`
 pub struct CgRWeatherContentsOverride;
 
 impl OutboundSysCall for CgRWeatherContentsOverride {

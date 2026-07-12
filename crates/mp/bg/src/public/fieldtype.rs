@@ -1,12 +1,12 @@
 //! MP `bg_public.h` field type definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:1231-1258`
+//! Type definition source: `oracle/codemp/game/bg_public.h:1231-1258`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `fieldtype_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:1231-1258`
+/// Type definition source: `oracle/codemp/game/bg_public.h:1231-1258`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum fieldtype_t {

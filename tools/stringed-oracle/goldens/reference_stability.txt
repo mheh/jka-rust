@@ -1,0 +1,22 @@
+== BEFORE (english) ==
+m01 str  |Destroy the base.|
+m01 flags 3
+numFlags=3
+FLAG 0 |FLAG_CAPTION| mask=1
+FLAG 1 |FLAG_TYPEMATIC| mask=2
+FLAG 2 |FLAG_VOICED| mask=4
+FLAG oor ||
+FLAG neg ||
+== SE_NewLanguage : Clear(SE_TRUE) ==
+numFlags=3 (name table survives)
+m01 after clear || (entries cleared)
+== reload german (NewLanguage keeps flag masks) ==
+m01 german |Zerstoere die komplette Basis!|
+m02 #same  |Rescue the prisoner.|
+numFlags=3 (masks persist; german entries carry 0)
+m01 flags  0 (rebuilt entry, no FLAGS lines)
+== SE_CheckForLanguageUpdates (cvar_take_modified flow) ==
+m01 after update |Destroy the base.|
+m01 second call  |Destroy the base.| (no-op reload)
+== SE_ShutDown : Clear(SE_FALSE) ==
+numFlags=0 (flags cleared)

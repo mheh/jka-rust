@@ -34,7 +34,7 @@ impl GameClientThinkArgs {
 /// `GAME_CLIENT_THINK` MP game exports vmMain ABI token.
 ///
 /// Raven: ( int clientNum );
-/// Source: `oracle/oracle/codemp/game/g_public.h:754`
+/// Source: `oracle/codemp/game/g_public.h:754`
 pub struct GameClientThink;
 
 impl InboundVmCall for GameClientThink {

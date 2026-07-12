@@ -9,8 +9,8 @@ use abi_transport::generic::{
 ///
 /// Raven wrapper: `void trap_Print( const char *fmt )`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:21`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:688`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:21`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:688`
 #[derive(Debug)]
 pub struct CgPrintArgs {
     message: *const c_char,
@@ -36,10 +36,10 @@ impl CgPrintArgs {
 /// Raven wrapper: `syscall( UI_PRINT, fmt );`
 /// Raven transport: `Com_Printf( "%s", VMA(1) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:57`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:21`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:690`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:688`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:57`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:21`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:690`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:688`
 pub struct CgPrint;
 
 impl OutboundSysCall for CgPrint {

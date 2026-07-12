@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use core::ffi::c_int;
 
 /// `BOTLIB_AI_RESET_WEAPON_STATE` outbound game-to-engine syscall.
@@ -20,7 +22,7 @@ impl BotlibAiResetWeaponStateArgs {
 
 /// `BOTLIB_AI_RESET_WEAPON_STATE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:480`
+/// Source: `oracle/codemp/game/g_public.h:480`
 pub struct BotlibAiResetWeaponState;
 
 impl OutboundSysCall for BotlibAiResetWeaponState {

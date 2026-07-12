@@ -24,7 +24,7 @@ impl BotlibAasSwimmingArgs {
 
 /// `BOTLIB_AAS_SWIMMING` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:379`
+/// Source: `oracle/codemp/game/g_public.h:379`
 pub struct BotlibAasSwimming;
 
 impl OutboundSysCall for BotlibAasSwimming {

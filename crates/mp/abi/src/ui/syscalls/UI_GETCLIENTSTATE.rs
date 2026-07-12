@@ -10,7 +10,7 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_GETCLIENTSTATE, state );`
 /// Raven transport: `GetClientState( (uiClientState_t *)VMA(1) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:258-259`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:258-259`
 #[derive(Debug)]
 pub struct UiGetclientstateArgs {
     state: *mut c_void,
@@ -31,10 +31,10 @@ impl UiGetclientstateArgs {
 /// Raven wrapper: `syscall( UI_GETCLIENTSTATE, state );`
 /// Raven transport: `GetClientState( (uiClientState_t *)VMA(1) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:63`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:258-259`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:961`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1044-1046`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:63`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:258-259`
+/// Output source: `oracle/codemp/ui/ui_local.h:961`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1044-1046`
 pub struct UiGetclientstate;
 
 impl OutboundSysCall for UiGetclientstate {

@@ -4,11 +4,11 @@ use core::ffi::c_char;
 
 /// Raven `gameTypeInfo`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:624-627`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:624-627`
 #[repr(C)]
 pub struct gameTypeInfo {
-	pub gameType: *const c_char,
-	pub gtEnum: i32,
+    pub gameType: *const c_char,
+    pub gtEnum: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<gameTypeInfo>() == 16);

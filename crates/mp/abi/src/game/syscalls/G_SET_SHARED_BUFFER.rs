@@ -29,7 +29,7 @@ impl GSetSharedBufferArgs {
 /// `G_SET_SHARED_BUFFER` MP game imports syscall ABI token.
 ///
 /// Raven: BEGIN VM STUFF
-/// Source: `oracle/oracle/codemp/game/g_public.h:273`
+/// Source: `oracle/codemp/game/g_public.h:273`
 pub struct GSetSharedBuffer;
 
 impl OutboundSysCall for GSetSharedBuffer {

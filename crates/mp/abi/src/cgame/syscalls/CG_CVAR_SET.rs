@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `void trap_Cvar_Set( const char *var_name, const char *value )`.
 /// The MP client switch forwards both strings through `VMA` into `Cvar_Set`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:58-59`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:720-722`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:58-59`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:720-722`
 #[derive(Debug)]
 pub struct CgCvarSetArgs {
     var_name: *const c_char,
@@ -42,10 +42,10 @@ impl CgCvarSetArgs {
 /// Raven wrapper: `syscall( CG_CVAR_SET, var_name, value );`
 /// Raven transport: `Cvar_Set( (const char *)VMA(1), (const char *)VMA(2) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:67`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:58-59`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:722`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:720-722`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:67`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:58-59`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:722`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:720-722`
 pub struct CgCvarSet;
 
 impl OutboundSysCall for CgCvarSet {

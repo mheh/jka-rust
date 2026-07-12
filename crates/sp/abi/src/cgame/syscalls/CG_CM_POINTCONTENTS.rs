@@ -12,8 +12,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_CM_POINTCONTENTS, p, model )`
 /// Raven transport: `CM_PointContents((float *)VMA(1), args[2])`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:147-149`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:535-536`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:147-149`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:535-536`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmPointcontentsArgs {
     point: *const vec3_t,
@@ -36,10 +36,10 @@ impl CgCmPointcontentsArgs {
 
 /// `CG_CM_POINTCONTENTS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:85`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:147-149`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:535-536`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:535-536`
+/// Enum value source: `oracle/code/cgame/cg_public.h:85`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:147-149`
+/// Output source: `oracle/code/client/cl_cgame.cpp:535-536`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:535-536`
 pub struct CgCmPointcontents;
 
 impl OutboundSysCall for CgCmPointcontents {

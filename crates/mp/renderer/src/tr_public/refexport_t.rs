@@ -27,7 +27,7 @@ use mp_qshared::shared::{markFragment_t, orientation_t, qboolean, qhandle_t, vec
 /// calls to R_ClearScene and the various R_Add functions. Nothing is drawn
 /// until R_RenderScene is called. If the pointers are not NULL, timing info
 /// will be returned.
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_public.h:14-110`
+/// Type definition source: `oracle/codemp/renderer/tr_public.h:14-110`
 #[repr(C)]
 pub struct refexport_t {
     /// called before the library is unloaded
@@ -67,7 +67,12 @@ pub struct refexport_t {
     pub AddRefEntityToScene: Option<unsafe extern "C" fn(re: *const refEntity_t)>,
     pub AddMiniRefEntityToScene: Option<unsafe extern "C" fn(re: *const miniRefEntity_t)>,
     pub AddPolyToScene: Option<
-        unsafe extern "C" fn(hShader: qhandle_t, numVerts: c_int, verts: *const polyVert_t, num: c_int),
+        unsafe extern "C" fn(
+            hShader: qhandle_t,
+            numVerts: c_int,
+            verts: *const polyVert_t,
+            num: c_int,
+        ),
     >,
     pub AddDecalToScene: Option<
         unsafe extern "C" fn(
@@ -93,10 +98,22 @@ pub struct refexport_t {
         ) -> c_int,
     >,
     pub AddLightToScene: Option<
-        unsafe extern "C" fn(org: *const vec3_t, intensity: c_float, r: c_float, g: c_float, b: c_float),
+        unsafe extern "C" fn(
+            org: *const vec3_t,
+            intensity: c_float,
+            r: c_float,
+            g: c_float,
+            b: c_float,
+        ),
     >,
     pub AddAdditiveLightToScene: Option<
-        unsafe extern "C" fn(org: *const vec3_t, intensity: c_float, r: c_float, g: c_float, b: c_float),
+        unsafe extern "C" fn(
+            org: *const vec3_t,
+            intensity: c_float,
+            r: c_float,
+            g: c_float,
+            b: c_float,
+        ),
     >,
     pub RenderScene: Option<unsafe extern "C" fn(fd: *const refdef_t)>,
 
@@ -162,7 +179,13 @@ pub struct refexport_t {
         ),
     >,
     pub UploadCinematic: Option<
-        unsafe extern "C" fn(cols: c_int, rows: c_int, data: *const u8, client: c_int, dirty: qboolean),
+        unsafe extern "C" fn(
+            cols: c_int,
+            rows: c_int,
+            data: *const u8,
+            client: c_int,
+            dirty: qboolean,
+        ),
     >,
 
     pub BeginFrame: Option<unsafe extern "C" fn(stereoFrame: stereoFrame_t)>,
@@ -192,11 +215,13 @@ pub struct refexport_t {
             tagName: *const c_char,
         ) -> c_int,
     >,
-    pub ModelBounds: Option<unsafe extern "C" fn(model: qhandle_t, mins: *mut vec3_t, maxs: *mut vec3_t)>,
+    pub ModelBounds:
+        Option<unsafe extern "C" fn(model: qhandle_t, mins: *mut vec3_t, maxs: *mut vec3_t)>,
 
     pub RegisterFont: Option<unsafe extern "C" fn(fontName: *const c_char) -> qhandle_t>,
-    pub Font_StrLenPixels:
-        Option<unsafe extern "C" fn(text: *const c_char, iFontIndex: c_int, scale: c_float) -> c_int>,
+    pub Font_StrLenPixels: Option<
+        unsafe extern "C" fn(text: *const c_char, iFontIndex: c_int, scale: c_float) -> c_int,
+    >,
     pub Font_StrLenChars: Option<unsafe extern "C" fn(text: *const c_char) -> c_int>,
     pub Font_HeightPixels: Option<unsafe extern "C" fn(iFontIndex: c_int, scale: c_float) -> c_int>,
     pub Font_DrawString: Option<
@@ -221,17 +246,25 @@ pub struct refexport_t {
         ) -> c_uint,
     >,
 
-    pub RemapShader:
-        Option<unsafe extern "C" fn(oldShader: *const c_char, newShader: *const c_char, offsetTime: *const c_char)>,
+    pub RemapShader: Option<
+        unsafe extern "C" fn(
+            oldShader: *const c_char,
+            newShader: *const c_char,
+            offsetTime: *const c_char,
+        ),
+    >,
     pub GetEntityToken: Option<unsafe extern "C" fn(buffer: *mut c_char, size: c_int) -> qboolean>,
-    pub inPVS: Option<unsafe extern "C" fn(p1: *const vec3_t, p2: *const vec3_t, mask: *mut u8) -> qboolean>,
+    pub inPVS: Option<
+        unsafe extern "C" fn(p1: *const vec3_t, p2: *const vec3_t, mask: *mut u8) -> qboolean,
+    >,
 
     // Raven declares the param as `color4ub_t color`; a C array typedef decays
     // to `byte *` as a parameter, which is what crosses the call.
     pub GetLightStyle: Option<unsafe extern "C" fn(style: c_int, color: *mut u8)>,
     pub SetLightStyle: Option<unsafe extern "C" fn(style: c_int, color: c_int)>,
 
-    pub GetBModelVerts: Option<unsafe extern "C" fn(bmodelIndex: c_int, vec: *mut vec3_t, normal: *mut vec3_t)>,
+    pub GetBModelVerts:
+        Option<unsafe extern "C" fn(bmodelIndex: c_int, vec: *mut vec3_t, normal: *mut vec3_t)>,
 }
 
 const _: () = assert!(core::mem::size_of::<refexport_t>() == 360);

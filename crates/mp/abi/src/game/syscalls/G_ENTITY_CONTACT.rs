@@ -41,7 +41,7 @@ impl GEntityContactArgs {
 /// Raven: ( const vec3_t mins, const vec3_t maxs, const gentity_t *ent );
 /// Raven: perform an exact check against inline brush models of non-square shape
 /// Raven: access for bots to get and free a server client (FIXME?)
-/// Source: `oracle/oracle/codemp/game/g_public.h:211`
+/// Source: `oracle/codemp/game/g_public.h:211`
 pub struct GEntityContact;
 
 impl OutboundSysCall for GEntityContact {

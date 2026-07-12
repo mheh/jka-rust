@@ -10,7 +10,7 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall( UI_LAN_ADDSERVER, source, name, addr );`
 /// Raven transport: `return LAN_AddServer( args[1], (const char *)VMA(2), (const char *)VMA(3) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:330-331`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:330-331`
 #[derive(Debug)]
 pub struct UiLanAddserverArgs {
     source: c_int,
@@ -41,10 +41,10 @@ impl UiLanAddserverArgs {
 /// Raven wrapper: `return syscall( UI_LAN_ADDSERVER, source, name, addr );`
 /// Raven transport: `return LAN_AddServer( args[1], (const char *)VMA(2), (const char *)VMA(3) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:103`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:330-331`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:977`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1063-1064`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:103`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:330-331`
+/// Output source: `oracle/codemp/ui/ui_local.h:977`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1063-1064`
 pub struct UiLanAddserver;
 
 impl OutboundSysCall for UiLanAddserver {

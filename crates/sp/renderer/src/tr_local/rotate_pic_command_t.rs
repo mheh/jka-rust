@@ -4,7 +4,7 @@ use super::shader_s::shader_s;
 
 /// Raven `rotatePicCommand_t` — render-command to draw a rotated pic.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:2018-2026`
+/// Type definition source: `oracle/code/renderer/tr_local.h:2018-2026`
 #[repr(C)]
 pub struct rotatePicCommand_t {
     pub commandId: i32,

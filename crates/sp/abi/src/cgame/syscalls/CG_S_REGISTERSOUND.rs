@@ -12,9 +12,9 @@ use abi_transport::generic::{
 ///
 /// Raven comment: returns buzz if not found.
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:229-230`
-/// Output type source: `oracle/oracle/code/game/q_shared.h:186`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:605-606`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:229-230`
+/// Output type source: `oracle/code/game/q_shared.h:186`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:605-606`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSRegistersoundArgs {
     sample: *const c_char,
@@ -32,10 +32,10 @@ impl CgSRegistersoundArgs {
 
 /// `CG_S_REGISTERSOUND` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:98`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:229-230`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:605-606`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:605-606`
+/// Enum value source: `oracle/code/cgame/cg_public.h:98`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:229-230`
+/// Output source: `oracle/code/client/cl_cgame.cpp:605-606`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:605-606`
 pub struct CgSRegistersound;
 
 impl OutboundSysCall for CgSRegistersound {

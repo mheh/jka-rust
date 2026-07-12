@@ -6,13 +6,13 @@ use sp_qshared::shared::{vec3_t, MAX_QPATH};
 
 /// Raven `md3Tag_s` — MD3 model attachment tag.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:113-117`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:113-117`
 #[repr(C)]
 pub struct md3Tag_t {
-	/// tag name
-	pub name: [c_char; MAX_QPATH],
-	pub origin: vec3_t,
-	pub axis: [vec3_t; 3],
+    /// tag name
+    pub name: [c_char; MAX_QPATH],
+    pub origin: vec3_t,
+    pub axis: [vec3_t; 3],
 }
 
 /// C tag name for `md3Tag_t`.

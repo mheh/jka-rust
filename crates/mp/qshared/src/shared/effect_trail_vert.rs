@@ -7,7 +7,7 @@ use native_math::vector::vec3_t;
 ///
 /// Raven: color/alpha and ST coords carry current + destination values so a
 /// segment can interpolate as it progresses through its life.
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2595-2614`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2595-2614`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct effectTrailVertStruct_t {

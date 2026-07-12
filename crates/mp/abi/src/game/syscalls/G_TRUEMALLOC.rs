@@ -34,7 +34,7 @@ impl GTruemallocArgs {
 
 /// `G_TRUEMALLOC` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:248`
+/// Source: `oracle/codemp/game/g_public.h:248`
 pub struct GTruemalloc;
 
 impl OutboundSysCall for GTruemalloc {

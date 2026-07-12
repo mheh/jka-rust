@@ -4,7 +4,7 @@ use sp_qshared::shared::qboolean;
 
 /// Raven `objectives_t` — a displayable mission objective.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:292-296`
+/// Type definition source: `oracle/code/game/g_shared.h:292-296`
 #[repr(C)]
 pub struct objectives_t {
     /// A displayable objective?

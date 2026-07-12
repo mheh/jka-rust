@@ -1,22 +1,24 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_S_STOPSOUNDS`.
 ///
 /// Raven wrapper: `syscall(CG_S_STOPSOUNDS);`
 /// Raven transport: `S_StopSounds();`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:180-182`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:550-551`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:180-182`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:550-551`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSStopsoundsArgs;
 
 /// `CG_S_STOPSOUNDS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:95`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:180-182`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:550-551`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:550-551`
+/// Enum value source: `oracle/code/cgame/cg_public.h:95`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:180-182`
+/// Output source: `oracle/code/client/cl_cgame.cpp:550-551`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:550-551`
 pub struct CgSStopsounds;
 
 impl OutboundSysCall for CgSStopsounds {

@@ -5,7 +5,7 @@ use core::ffi::c_int;
 /// contexts, dimensions, and the display texture).
 ///
 /// Raven: Pixel Buffer Rendering and Device Contexts.
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:1156-1197`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:1156-1197`
 #[repr(C)]
 pub struct CPBUFFER {
     // Pixel Buffer Rendering and Device Contexts.

@@ -13,9 +13,9 @@ use mp_qshared::shared::qboolean;
 /// Raven transport:
 /// `S_StartBackgroundTrack( (const char *)VMA(1), (const char *)VMA(2), args[3]?qtrue:qfalse ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:233-234`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2236`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:842-844`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:233-234`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2236`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:842-844`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSStartbackgroundtrackArgs {
     intro: *const c_char,
@@ -51,10 +51,10 @@ impl CgSStartbackgroundtrackArgs {
 
 /// `CG_S_STARTBACKGROUNDTRACK` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:107`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:233-234`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:842-844`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:842-844`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:107`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:233-234`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:842-844`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:842-844`
 pub struct CgSStartbackgroundtrack;
 
 impl OutboundSysCall for CgSStartbackgroundtrack {

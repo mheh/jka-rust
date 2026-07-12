@@ -10,11 +10,11 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall( UI_LAN_ADDSERVER, source, name, addr );`
 /// Raven transport: `return LAN_AddServer( args[1], (const char *)VMA(2), (const char *)VMA(3) );`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:225`
-/// Args source (SP): `oracle/oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_ADDSERVER`.
-/// Fallback args/source: `oracle/oracle/codemp/ui/ui_syscalls.c:331`
-/// Transport/switch source (fallback): `oracle/oracle/codemp/client/cl_ui.cpp:1063-1064`
-/// Output source fallback: `oracle/oracle/codemp/ui/ui_local.h:977`
+/// Enum source: `oracle/code/ui/ui_public.h:225`
+/// Args source (SP): `oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_ADDSERVER`.
+/// Fallback args/source: `oracle/codemp/ui/ui_syscalls.c:331`
+/// Transport/switch source (fallback): `oracle/codemp/client/cl_ui.cpp:1063-1064`
+/// Output source fallback: `oracle/codemp/ui/ui_local.h:977`
 pub struct UiLanAddserverArgs {
     source: c_int,
     name: *const c_char,
@@ -41,7 +41,7 @@ impl UiLanAddserverArgs {
 
 /// `UI_LAN_ADDSERVER` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:225`
+/// Source: `oracle/code/ui/ui_public.h:225`
 pub struct UiLanAddserver;
 
 impl OutboundSysCall for UiLanAddserver {

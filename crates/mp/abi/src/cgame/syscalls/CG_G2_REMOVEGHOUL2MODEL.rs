@@ -11,10 +11,10 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `qboolean trap_G2API_RemoveGhoul2Model(void *ghlInfo, int modelIndex)`.
 /// Raven transport: `return G2API_RemoveGhoul2Model((CGhoul2Info_v **)VMA(1), args[2]);`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:277`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:910-912`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1437-1442`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1437-1442`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:277`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:910-912`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1437-1442`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1437-1442`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2Removeghoul2modelArgs {
     /// Raw Ghoul2 handle word, decoded by Raven as `(CGhoul2Info_v **)VMA(1)`.
@@ -39,10 +39,10 @@ impl CgG2Removeghoul2modelArgs {
 /// `_FULL_G2_LEAK_CHECKING` side effect before returning the int-compatible
 /// `qboolean`.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:277`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:910-912`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1437-1442`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1437-1442`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:277`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:910-912`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1437-1442`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1437-1442`
 pub struct CgG2Removeghoul2model;
 
 impl OutboundSysCall for CgG2Removeghoul2model {

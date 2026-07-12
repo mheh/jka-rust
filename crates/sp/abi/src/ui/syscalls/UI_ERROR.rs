@@ -7,10 +7,10 @@ use abi_transport::generic::{
 
 /// `UI_ERROR` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:152`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp:371`
-/// Output source: `oracle/oracle/code/client/cl_ui.cpp:371`
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:371`
+/// Enum source: `oracle/code/ui/ui_public.h:152`
+/// Args source: `oracle/code/client/cl_ui.cpp:371`
+/// Output source: `oracle/code/client/cl_ui.cpp:371`
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:371`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiErrorArgs {
     message: *const c_char,

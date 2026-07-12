@@ -4,10 +4,10 @@
 /// Raven: init and shutdown will be called every single level
 /// Raven: The game should call G_GET_ENTITY_TOKEN to parse through all the
 /// Raven: entity configuration text and spawn gentities.
-/// Source (enum): `oracle/oracle/codemp/game/g_public.h:735`
-/// Source (args): `oracle/oracle/codemp/game/g_main.c:517`
-/// Source (output): `oracle/oracle/codemp/game/g_main.c:518`
-/// Source (call site): `oracle/oracle/codemp/server/sv_game.cpp:1690`
+/// Source (enum): `oracle/codemp/game/g_public.h:735`
+/// Source (args): `oracle/codemp/game/g_main.c:517`
+/// Source (output): `oracle/codemp/game/g_main.c:518`
+/// Source (call site): `oracle/codemp/server/sv_game.cpp:1690`
 use core::ffi::c_int;
 
 use super::super::MpGameExport;

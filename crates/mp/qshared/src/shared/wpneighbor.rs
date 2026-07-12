@@ -5,7 +5,7 @@ use core::ffi::c_int;
 
 /// Raven `wpneighbor_t` (`wpneighbor_s`) — a waypoint neighbor link.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1001-1005`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1001-1005`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct wpneighbor_t {

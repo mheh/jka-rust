@@ -10,7 +10,7 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_LAN_GETSERVERADDRESSSTRING, source, n, buf, buflen );`
 /// Raven transport: `LAN_GetServerAddressString( args[1], args[2], (char *)VMA(3), args[4] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:274-275`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:274-275`
 #[derive(Debug)]
 pub struct UiLanGetserveraddressstringArgs {
     source: c_int,
@@ -51,10 +51,10 @@ impl UiLanGetserveraddressstringArgs {
 /// Raven wrapper: `syscall( UI_LAN_GETSERVERADDRESSSTRING, source, n, buf, buflen );`
 /// Raven transport: `LAN_GetServerAddressString( args[1], args[2], (char *)VMA(3), args[4] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:96`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:274-275`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:965`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1088-1090`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:96`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:274-275`
+/// Output source: `oracle/codemp/ui/ui_local.h:965`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1088-1090`
 pub struct UiLanGetserveraddressstring;
 
 impl OutboundSysCall for UiLanGetserveraddressstring {

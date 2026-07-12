@@ -2,7 +2,7 @@
 
 /// Raven `exitTo_t` — exit destination on game shutdown.
 ///
-/// Type definition source: `oracle/oracle/code/client/client.h:160-165`
+/// Type definition source: `oracle/code/client/client.h:160-165`
 #[repr(i32)]
 pub enum exitTo_t {
     EXIT_CONSOLE = 0,

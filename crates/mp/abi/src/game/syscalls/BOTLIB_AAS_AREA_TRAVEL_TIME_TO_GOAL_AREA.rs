@@ -47,7 +47,7 @@ impl BotlibAasAreaTravelTimeToGoalAreaArgs {
 
 /// `BOTLIB_AAS_AREA_TRAVEL_TIME_TO_GOAL_AREA` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:377`
+/// Source: `oracle/codemp/game/g_public.h:377`
 pub struct BotlibAasAreaTravelTimeToGoalArea;
 
 impl OutboundSysCall for BotlibAasAreaTravelTimeToGoalArea {

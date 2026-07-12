@@ -4,11 +4,11 @@ use core::ffi::c_char;
 
 /// Raven `serverFilter_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:649-652`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:649-652`
 #[repr(C)]
 pub struct serverFilter_t {
-	pub description: *const c_char,
-	pub basedir: *const c_char,
+    pub description: *const c_char,
+    pub basedir: *const c_char,
 }
 
 #[cfg(target_pointer_width = "64")]

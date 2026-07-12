@@ -7,12 +7,12 @@ use mp_qshared::shared::{qboolean, vec3_t};
 /// `MAX_GRID_SIZE`.
 ///
 /// Raven: max dimensions of a grid mesh in memory (collision-model variant).
-/// Source: `oracle/oracle/codemp/qcommon/cm_patch.h:104`
+/// Source: `oracle/codemp/qcommon/cm_patch.h:104`
 pub const MAX_GRID_SIZE: usize = 129;
 
 /// Raven `cGrid_t` — a collision-model bezier patch control grid.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_patch.h:107-117`
+/// Type definition source: `oracle/codemp/qcommon/cm_patch.h:107-117`
 #[repr(C)]
 pub struct cGrid_t {
     pub width: c_int,

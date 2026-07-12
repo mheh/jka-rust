@@ -5,15 +5,15 @@ use abi_transport::generic::OutboundSysCall;
 
 /// `UI_MEMSET` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:239`
+/// Source: `oracle/code/ui/ui_public.h:239`
 ///
 /// Args source: no SP `UI_MEMSET` case appears in
-/// `oracle/oracle/code/client/cl_ui.cpp`; fallback transport shape from shared MP-side memory-call
-/// handling: `oracle/oracle/codemp/client/cl_ui.cpp:818-819` (`TRAP_MEMSET`
+/// `oracle/code/client/cl_ui.cpp`; fallback transport shape from shared MP-side memory-call
+/// handling: `oracle/codemp/client/cl_ui.cpp:818-819` (`TRAP_MEMSET`
 /// receives `(char *)VMA(1), args[2], args[3]`).
 ///
 /// Output source: shared MP-side `TRAP_MEMSET` handler also returns `0`
-/// (`oracle/oracle/codemp/client/cl_ui.cpp:820`).
+/// (`oracle/codemp/client/cl_ui.cpp:820`).
 pub struct UiMemset;
 
 impl OutboundSysCall for UiMemset {

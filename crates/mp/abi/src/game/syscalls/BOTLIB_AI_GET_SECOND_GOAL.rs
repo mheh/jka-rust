@@ -33,7 +33,7 @@ impl BotlibAiGetSecondGoalArgs {
 
 /// `BOTLIB_AI_GET_SECOND_GOAL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:449`
+/// Source: `oracle/codemp/game/g_public.h:449`
 pub struct BotlibAiGetSecondGoal;
 
 impl OutboundSysCall for BotlibAiGetSecondGoal {

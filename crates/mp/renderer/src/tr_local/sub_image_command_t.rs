@@ -7,7 +7,7 @@ use super::image_s::image_t;
 /// Raven `subImageCommand_t` — render-command to upload a sub-image into a
 /// loaded texture.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:2195-2201`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:2195-2201`
 #[repr(C)]
 pub struct subImageCommand_t {
     pub commandId: i32,

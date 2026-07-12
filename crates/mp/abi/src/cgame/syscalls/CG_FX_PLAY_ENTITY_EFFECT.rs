@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_FX_PLAY_ENTITY_EFFECT, file, org, axis, boltInfo, entNum, vol, rad );`
 /// Raven transport: `assert(0);//gone!` then returns `0`; the original transport line is left commented out.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:631-634`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2400`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1112-1115`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:631-634`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2400`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1112-1115`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxPlayEntityEffectArgs {
     file: *const c_char,
@@ -50,10 +50,10 @@ impl CgFxPlayEntityEffectArgs {
 /// `CG_FX_PLAY_ENTITY_EFFECT` MP cgame imports syscall ABI token.
 ///
 /// Raven: this engine switch arm is marked `assert(0);//gone!` and returns `0`.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:221`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:631-634`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1112-1115`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1112-1115`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:221`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:631-634`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1112-1115`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1112-1115`
 pub struct CgFxPlayEntityEffect;
 
 impl OutboundSysCall for CgFxPlayEntityEffect {

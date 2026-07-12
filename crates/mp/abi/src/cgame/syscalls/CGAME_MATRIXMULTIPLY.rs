@@ -12,10 +12,10 @@ use mp_qshared::shared::vec3_t;
 /// is written through `out`, so it is modeled as an argument rather than
 /// `Output`.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_cgame.cpp:666`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:667`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:665`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:289`
+/// Args source: `oracle/codemp/client/cl_cgame.cpp:666`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:667`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:665`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:289`
 #[derive(Debug)]
 pub struct CgameMatrixmultiplyArgs {
     in1: *const vec3_t,
@@ -43,11 +43,11 @@ impl CgameMatrixmultiplyArgs {
 
 /// `CGAME_MATRIXMULTIPLY` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:137`
-/// Args source: `oracle/oracle/codemp/client/cl_cgame.cpp:666`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:667`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:665`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:289`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:137`
+/// Args source: `oracle/codemp/client/cl_cgame.cpp:666`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:667`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:665`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:289`
 pub struct CgameMatrixmultiply;
 
 impl OutboundSysCall for CgameMatrixmultiply {

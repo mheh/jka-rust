@@ -71,14 +71,14 @@ NAIVE mega-struct:   All { engine, game_world }
 1. **Reborrow-threading** — `&mut Engine` flows *down* the call chain; every
    caller keeps only locals across nested calls. This is the oracle's own
    shape: `SV_Frame` holds `timeResidual` locals while `VM_Call` runs
-   (`oracle/oracle/codemp/server/sv_main.cpp:909-915`).
+   (`oracle/codemp/server/sv_main.cpp:909-915`).
 2. **EntityId re-borrow discipline** — module logic passes `(world, id)` and
    re-indexes per access instead of carrying `&mut entity` across calls
    (rules §B5; the GP2 arena precedent).
 3. **The raw seam** — engine<->module entity aliasing is `unsafe` pointer
    arithmetic behind the `SharedGameData` abstraction in every native
    transport, identical to the oracle's `sv.gentities` contract
-   (`oracle/oracle/codemp/server/sv_game.cpp:327-335`), confined per §D11.
+   (`oracle/codemp/server/sv_game.cpp:327-335`), confined per §D11.
    Rust's guarantees hold *within* each island; the seam is the one audited
    crossing.
 

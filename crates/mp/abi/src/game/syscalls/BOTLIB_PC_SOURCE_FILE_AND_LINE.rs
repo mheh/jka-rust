@@ -37,7 +37,7 @@ impl BotlibPcSourceFileAndLineArgs {
 /// `BOTLIB_PC_SOURCE_FILE_AND_LINE` MP game imports syscall ABI token.
 ///
 /// Raven: Ghoul2 Insert Start
-/// Source: `oracle/oracle/codemp/game/g_public.h:501`
+/// Source: `oracle/codemp/game/g_public.h:501`
 pub struct BotlibPcSourceFileAndLine;
 
 impl OutboundSysCall for BotlibPcSourceFileAndLine {

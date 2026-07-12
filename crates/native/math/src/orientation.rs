@@ -1,8 +1,8 @@
 //! `orientation_t` — a point plus a 3×`vec3_t` rotation basis.
 //!
 //! Identical in SP and MP; a cross-mode math primitive.
-//! Type definition source: `oracle/oracle/code/game/q_shared.h:1409-1412`
-//! Type definition source: `oracle/oracle/codemp/game/q_shared.h:1926-1929`
+//! Type definition source: `oracle/code/game/q_shared.h:1409-1412`
+//! Type definition source: `oracle/codemp/game/q_shared.h:1926-1929`
 
 #![allow(non_camel_case_types)]
 

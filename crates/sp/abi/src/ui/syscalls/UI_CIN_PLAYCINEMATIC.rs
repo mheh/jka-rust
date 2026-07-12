@@ -7,11 +7,11 @@ use abi_transport::generic::{
 
 /// `UI_CIN_PLAYCINEMATIC` SP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:227`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp:466-468`
-/// Args source: `oracle/oracle/code/client/client.h:430`
-/// Output source: `oracle/oracle/code/client/cl_ui.cpp:468`
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:466-468`
+/// Enum value source: `oracle/code/ui/ui_public.h:227`
+/// Args source: `oracle/code/client/cl_ui.cpp:466-468`
+/// Args source: `oracle/code/client/client.h:430`
+/// Output source: `oracle/code/client/cl_ui.cpp:468`
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:466-468`
 pub struct UiCinPlaycinematic;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

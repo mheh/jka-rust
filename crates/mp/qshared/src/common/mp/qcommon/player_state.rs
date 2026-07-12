@@ -1,7 +1,7 @@
 //! MP `playerState_t` copied from Raven `codemp/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/q_shared.h:2068-2123`
-//! Source: `oracle/oracle/codemp/game/q_shared.h:2159-2435`
+//! Source: `oracle/codemp/game/q_shared.h:2068-2123`
+//! Source: `oracle/codemp/game/q_shared.h:2159-2435`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -11,7 +11,7 @@ use crate::shared::{qboolean, vec3_t};
 
 pub const NUM_FORCE_POWERS: usize = 18;
 /// Raven `TRACK_CHANNEL_MAX` = NUM_TRACK_CHANNELS(56) - 50.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:2066`
+/// Source: `oracle/codemp/game/q_shared.h:2066`
 pub const TRACK_CHANNEL_MAX: usize = 6;
 pub const MAX_STATS: usize = 16;
 pub const MAX_PERSISTANT: usize = 16;
@@ -21,7 +21,7 @@ pub const MAX_PS_EVENTS: usize = 2;
 
 /// Raven MP `forcedata_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2068-2123`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2068-2123`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct forcedata_t {
@@ -72,7 +72,7 @@ pub struct forcedata_t {
 
 /// Raven MP `playerState_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2169-2435`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2169-2435`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct playerState_t {
@@ -262,3 +262,7 @@ const _: () = assert!(core::mem::offset_of!(playerState_t, fd) == 804);
 const _: () = assert!(core::mem::offset_of!(playerState_t, forceJumpFlip) == 1268);
 const _: () = assert!(core::mem::offset_of!(playerState_t, lastHitLoc) == 1376);
 const _: () = assert!(core::mem::offset_of!(playerState_t, userVec2) == 1540);
+
+/// Raven's `playerState_s` struct tag (elaborated `struct playerState_s *`
+/// spellings in engine signatures resolve to the `playerState_t` typedef port).
+pub type playerState_s = playerState_t;

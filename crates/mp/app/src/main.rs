@@ -6,7 +6,7 @@
 //! (`sleep_ms(5)`/`console_poll`/`net_poll`/`com_frame`) is NOT yet run — its
 //! `com_frame` body is unported:
 //! //TODO: Port Com_Frame dedicated loop wiring
-//! // Source: oracle/oracle/codemp/null/win_main.cpp:1478-1493
+//! // Source: oracle/codemp/null/win_main.cpp:1478-1493
 
 use mp_abi::game::exports::MpGameExport;
 use mp_engine_core::{com_init, sv_init_game_progs, sys_milliseconds, Engine};
@@ -75,7 +75,7 @@ fn main() {
     // Com_Milliseconds(), restart )` (sv_game.cpp:1690). svs.time and the
     // journaled Com_Milliseconds reader are unported — zeros stand in:
     //TODO: Port SV_InitGameVM GAME_INIT args (svs.time, Com_Milliseconds)
-    // Source: oracle/oracle/codemp/server/sv_game.cpp:1680-1691
+    // Source: oracle/codemp/server/sv_game.cpp:1680-1691
     let _ = engine
         .common
         .modules
@@ -90,5 +90,5 @@ fn main() {
     engine.common.modules.unload(slot);
 
     //TODO: Port the dedicated OS loop (sleep/console_poll/net_poll/com_frame)
-    // Source: oracle/oracle/codemp/null/win_main.cpp:1478-1493 (com_frame body pending)
+    // Source: oracle/codemp/null/win_main.cpp:1478-1493 (com_frame body pending)
 }

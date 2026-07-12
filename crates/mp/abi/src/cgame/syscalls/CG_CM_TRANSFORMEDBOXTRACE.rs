@@ -17,9 +17,9 @@ use mp_qshared::shared::vec3_t;
 /// `brushmask` directly from `args[6]`/`args[7]`, and passes `qfalse` for the
 /// non-capsule trace flag.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:163-167`
-/// Args declaration source: `oracle/oracle/codemp/cgame/cg_local.h:2206-2209`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:799-801`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:163-167`
+/// Args declaration source: `oracle/codemp/cgame/cg_local.h:2206-2209`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:799-801`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmTransformedboxtraceArgs {
     /// Caller-owned trace output, decoded by Raven as `(trace_t *)VMA(1)`.
@@ -116,10 +116,10 @@ impl CgCmTransformedboxtraceArgs {
 /// Raven transport: `CM_TransformedBoxTrace(..., args[6], args[7], ...,
 /// qfalse); return 0;`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:92`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:163-167`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:799-801`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:799-801`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:92`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:163-167`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:799-801`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:799-801`
 pub struct CgCmTransformedboxtrace;
 
 impl OutboundSysCall for CgCmTransformedboxtrace {

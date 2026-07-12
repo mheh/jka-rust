@@ -11,9 +11,9 @@ use abi_transport::pass_float;
 /// Raven wrapper: `syscall (CG_R_FONTDRAWSTRING, ox, oy, text, rgba, setIndex, iMaxPixelWidth, PASSFLOAT(scale) );`
 /// Raven transport: `re.Font_DrawString(args[1], args[2], (const char *) VMA(3), (float*) VMA(4), args[5], args[6], VMF(7));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:352-353`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1025`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:671-673`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:352-353`
+/// Args source: `oracle/code/cgame/cg_local.h:1025`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:671-673`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRFontdrawstringArgs {
     ox: c_int,
@@ -77,10 +77,10 @@ impl CgRFontdrawstringArgs {
 
 /// `CG_R_FONTDRAWSTRING` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:126`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:352-353`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:671-673`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:671-673`
+/// Enum value source: `oracle/code/cgame/cg_public.h:126`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:352-353`
+/// Output source: `oracle/code/client/cl_cgame.cpp:671-673`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:671-673`
 pub struct CgRFontdrawstring;
 
 impl OutboundSysCall for CgRFontdrawstring {

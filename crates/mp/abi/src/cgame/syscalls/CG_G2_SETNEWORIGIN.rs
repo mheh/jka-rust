@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall(CG_G2_SETNEWORIGIN, ghoul2, boltIndex);`
 /// Raven transport: `return G2API_SetNewOrigin(*((CGhoul2Info_v *)args[1]), args[2]);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:965-967`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2561`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1504-1505`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:965-967`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2561`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1504-1505`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SetneworiginArgs {
     ghoul2: *mut c_void,
@@ -28,10 +28,10 @@ impl CgG2SetneworiginArgs {
 
 /// `CG_G2_SETNEWORIGIN` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:288`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:965-967`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1504-1505`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1504-1505`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:288`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:965-967`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1504-1505`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1504-1505`
 pub struct CgG2Setneworigin;
 
 impl OutboundSysCall for CgG2Setneworigin {

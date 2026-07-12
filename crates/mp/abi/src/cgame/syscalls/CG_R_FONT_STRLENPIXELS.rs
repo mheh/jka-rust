@@ -11,9 +11,9 @@ use abi_transport::pass_float;
 /// Raven wrapper: `return syscall( CG_R_FONT_STRLENPIXELS, text, iFontIndex, PASSFLOAT(scale));`
 /// Raven transport: `return re.Font_StrLenPixels( (const char *)VMA(1), args[2], VMF(3) );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:289-291`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2275`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:873-874`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:289-291`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2275`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:873-874`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRFontStrlenpixelsArgs {
     text: *const c_char,
@@ -37,10 +37,10 @@ impl CgRFontStrlenpixelsArgs {
 
 /// `CG_R_FONT_STRLENPIXELS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:122`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:289-291`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:873-874`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:873-874`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:122`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:289-291`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:873-874`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:873-874`
 pub struct CgRFontStrlenpixels;
 
 impl OutboundSysCall for CgRFontStrlenpixels {

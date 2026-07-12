@@ -32,8 +32,37 @@ pub struct Engine {
     pub cm: CollisionWorld,
     /// Client only; `None` on dedicated (`mp_engine_client`).
     pub snd: Option<SoundSystem>,
-    // botlib/ghoul2/icarus/rmg engine-side state is NOT yet a field here — those
-    // four §F subcrates were outside the A2 survey; attachment point is STATE-Q2.
+    /// ICARUS scripting subsystem — a plain, `Default`-initialized field per
+    /// ICARUS-D3 (rulings 12/27; STATE-Q2 CLOSED,
+    /// `docs/architecture/state-ownership.md:1860-1876`): the fork-2 owner of
+    /// every ICARUS file-scope global, reached through the ICARUS-D2
+    /// `EngineHostView`/`icarus_call` split-borrow. Not `Option`/`Box`-wrapped;
+    /// "is ICARUS initialized?" is Raven's own `iICARUS != NULL` NULL-flag
+    /// (`icarus.instance.is_some()`).
+    pub icarus: mp_engine_icarus::Icarus,
+    /// Server-side Ghoul2 (bones/bolts/ragdoll/gore + the Ghoul2InfoArray
+    /// arena) — plain `Default` field per rulings 12/29 (`mp_engine_ghoul2`).
+    pub g2: mp_engine_ghoul2::ghoul2_system::Ghoul2System,
+    /// RMG mission manager — `land: Option<TerrainHandle>` mirrors Raven's
+    /// null-initialized `mLandScape` (rulings 12/28; `mp_engine_rmg`).
+    pub rmg: mp_engine_rmg::rm_manager::RmManager,
+    /// Headless model registry/cache (`tr.models` + CachedModels) — reached by
+    /// ghoul2 only through `EngineHost::model_*` (rulings 52/53; `mp_renderer`).
+    pub render_models: mp_renderer::tr_model::render_models::RenderModels,
+    /// Engine-side nav graph (`CNavigator` twin) — plain `Default` field per
+    /// rulings 12/30 (`mp_engine_server::npcnav`).
+    pub nav: mp_engine_server::npcnav::navigator::Navigator,
+    /// ROFF cache + per-entity playback list — plain `Default` field per
+    /// rulings 12 (`mp_engine_qcommon::roff`).
+    pub roff: mp_engine_qcommon::roff::RoffSystem,
+    /// botlib engine-side state (Raven's scattered `aasworld`/`botimport`/…
+    /// file-scope globals) — a direct, `Default`-initialized field per
+    /// STATE-Q2 CLOSED (engine-fork-discovery rulings 12/13/43), reached via
+    /// the `EngineHostView` split-borrow constructors (ruling 43). All-zero-
+    /// valid (`BotLib::default()` is `mem::zeroed()`, matching Raven's
+    /// zero-initialized BSS globals), so the `alloc_zeroed` mass covers it —
+    /// no explicit `Engine::new` write is required.
+    pub bot: mp_engine_botlib::BotLib,
 }
 
 //TODO: Port ZeroValid for Engine
@@ -89,6 +118,42 @@ impl Engine {
             // Option<Client>/Option<SoundSystem>: same niche non-guarantee.
             addr_of_mut!((*p).cl).write(None);
             addr_of_mut!((*p).snd).write(None);
+            // Icarus holds Box slot-arrays, HashMaps, and a fn-item table — NONE
+            // all-zero-valid — so it is written in place through its hand-written
+            // Default before the Box is exposed (rulings 12/27; the modules /
+            // time_base non-ZeroValid precedent).
+            addr_of_mut!((*p).icarus).write(Default::default());
+            // The five §F aggregates hold Vecs/BTreeMaps/Strings — none
+            // all-zero-valid — so each is written in place through its Default
+            // (rulings 12/28/29/30/53; same precedent as `icarus` above).
+            addr_of_mut!((*p).g2).write(Default::default());
+            addr_of_mut!((*p).rmg).write(Default::default());
+            addr_of_mut!((*p).render_models).write(Default::default());
+            addr_of_mut!((*p).nav).write(Default::default());
+            addr_of_mut!((*p).roff).write(Default::default());
+            // cm.shaderTextTable: BTreeMap<String, usize>, not zero-valid.
+            addr_of_mut!((*p).cm.shaderTextTable).write(Default::default());
+            // cm.cmShaderTable: Vec-backed CmHashTable, not zero-valid.
+            addr_of_mut!((*p).cm.cmShaderTable).write(Default::default());
+            // cm.svInfoParms: real name-pointer/flag lookup table, not zero.
+            addr_of_mut!((*p).cm.svInfoParms).write(CollisionWorld::init_svInfoParms());
+            // cm.svMaterialNames: real C-string pointer table, not zero.
+            addr_of_mut!((*p).cm.svMaterialNames).write(CollisionWorld::init_svMaterialNames());
+            // Common.stringed (ruling 50/55): BTreeMap-backed store, written
+            // through its Default (= Raven's Clear(SE_FALSE)) per the ruling-55
+            // construction story.
+            addr_of_mut!((*p).common.stringed).write(Default::default());
+            // Common.qrand (ruling 21): the engine island's own LCG, whose
+            // Raven static initializer is 0x89abcdef (non-zero), so it is
+            // written through its Default rather than left zeroed.
+            addr_of_mut!((*p).common.qrand).write(Default::default());
+            // Common.hooks (ruling 2026-07-12): the qcommon->server/client/sound
+            // upcall table. Option<fn> is null-niche zero-valid (all None under
+            // the alloc_zeroed mass), but boot installs the null-build client/
+            // sound no-op defaults; SV_*/RE_* stay None until their subsystem
+            // installs them.
+            addr_of_mut!((*p).common.hooks)
+                .write(mp_engine_qcommon::common::EngineHooks::null_dedicated());
             Box::from_raw(p)
         }
     }

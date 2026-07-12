@@ -1,0 +1,43 @@
+== ENTRIES (map-sorted) ==
+E |MENUS_QUIT| str=|Quit| dbg=|[Quit]| flags=0
+E |MENUS_START_GAME| str=|Start Game| dbg=|[Start Game]| flags=0
+E |OBJECTIVES_GREETING| str=|Line one\nLine two| dbg=|[Line one\nLine two]| flags=0
+E |OBJECTIVES_HICHAR| str=|A'B "C" D. E... F-G-H I? J K| dbg=|[A'B "C" D. E... F-G-H I? J K]| flags=0
+E |OBJECTIVES_MISSION01| str=|Destroy the base.| dbg=|[Destroy the base.]| flags=3
+E |OBJECTIVES_MISSION02| str=|Rescue the // prisoner.| dbg=|[Rescue the // prisoner.]| flags=4
+== FLAGS ==
+numFlags=3
+FLAG 0 |FLAG_CAPTION| mask=1
+FLAG 1 |FLAG_TYPEMATIC| mask=2
+FLAG 2 |FLAG_VOICED| mask=4
+FLAG oor ||
+FLAG neg ||
+== LOOKUP se_debug=0 ==
+hit           |Destroy the base.|
+uppercasefold |Destroy the base.|
+2arg          |Destroy the base.|
+2arg menus    |Start Game|
+greeting(crlf)|Line one\nLine two|
+hichar        |A'B "C" D. E... F-G-H I? J K|
+miss          ||
+flags m01     3
+flags m02(2a) 4
+flags miss    0
+== LOOKUP se_debug=1 ==
+dbg m01       |[Destroy the base.]|
+dbg menus     |[Quit]|
+== LEET sp_leet=42 ==
+== ENTRIES-LEET ==
+E |MENUS_QUIT| str=|Qu!7| dbg=|[Quit]| flags=0
+E |MENUS_START_GAME| str=|574r7 G4m3| dbg=|[Start Game]| flags=0
+E |OBJECTIVES_GREETING| str=|1!n3 0n3\n1!n3 7w0| dbg=|[Line one\nLine two]| flags=0
+E |OBJECTIVES_HICHAR| str=|4'B "C" D. 3... F-G-# !? J K| dbg=|[A'B "C" D. E... F-G-H I? J K]| flags=0
+E |OBJECTIVES_MISSION01| str=|D357r0y 7#3 b453.| dbg=|[Destroy the base.]| flags=3
+E |OBJECTIVES_MISSION02| str=|R35cu3 7#3 // pr!50n3r.| dbg=|[Rescue the // prisoner.]| flags=4
+== ERRORS (SE_Load_Actual direct, non-critical) ==
+truncated  |Truncated file, failed to find "ENDMARKER" at file end!|
+badversion |Unexpected version number 9, expecting 1!
+|
+unknownkw  |Unknown keyword at linestart: "BOGUSKEYWORD something"
+|
+missing    |Unable to load "misc/nope.str"!|

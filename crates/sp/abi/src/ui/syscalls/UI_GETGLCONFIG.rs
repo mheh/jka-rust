@@ -6,7 +6,7 @@ use core::ffi::c_void;
 
 /// `UI_GETGLCONFIG` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:195`
+/// Source: `oracle/code/ui/ui_public.h:195`
 pub struct UiGetglconfig;
 
 #[derive(Debug)]
@@ -28,9 +28,9 @@ impl OutboundSysCall for UiGetglconfig {
     type Import = SpUiImport;
     /// Raven wrapper: `syscall( UI_GETGLCONFIG, glconfig );`
     ///
-    /// Args source: `oracle/oracle/code/ui/ui_syscalls.cpp:158-161`
-    /// Output source: `oracle/oracle/code/ui/ui_syscalls.cpp:158-161`
-    /// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:397-399`
+    /// Args source: `oracle/code/ui/ui_syscalls.cpp:158-161`
+    /// Output source: `oracle/code/ui/ui_syscalls.cpp:158-161`
+    /// Transport/switch source: `oracle/code/client/cl_ui.cpp:397-399`
     type Args = UiGetglconfigArgs;
     /// Fills out an engine `glconfig_t` and returns no value.
     type Output = ();

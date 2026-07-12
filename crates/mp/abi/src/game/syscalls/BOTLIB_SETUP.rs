@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use core::ffi::c_int;
 
 /// `BOTLIB_SETUP` outbound game-to-engine syscall.
@@ -15,7 +17,7 @@ impl BotlibSetupArgs {
 /// `BOTLIB_SETUP` MP game imports syscall ABI token.
 ///
 /// Raven: ( void );
-/// Source: `oracle/oracle/codemp/game/g_public.h:342`
+/// Source: `oracle/codemp/game/g_public.h:342`
 pub struct BotlibSetup;
 
 impl OutboundSysCall for BotlibSetup {

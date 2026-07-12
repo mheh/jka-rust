@@ -8,7 +8,7 @@ name = "mp_engine_select"
 
 [features]
 # SEAM-D13: Cargo feature `static` selects the `Static` backend; default is
-# `CEngine` (NativeDll); `cfg(target_arch = "wasm32")` picks the wasm backend.
+# `CEngine` (NativeDll).
 static = []
 
 [dependencies]

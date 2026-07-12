@@ -11,8 +11,8 @@ use sp_qshared::shared::vec3_t;
 /// `syscall( CG_R_ADDLIGHTTOSCENE, org, PASSFLOAT(intensity), PASSFLOAT(r), PASSFLOAT(g), PASSFLOAT(b) );`
 /// Raven transport forwards `org` through `VMA(1)` and scalar values through `VMF(2..5)`.
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:384-385`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:701-707`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:384-385`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:701-707`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRAddlighttosceneArgs {
     org: *const vec3_t,
@@ -56,10 +56,10 @@ impl CgRAddlighttosceneArgs {
 
 /// `CG_R_ADDLIGHTTOSCENE` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:138`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:384-385`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:701-707`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:701-707`
+/// Enum value source: `oracle/code/cgame/cg_public.h:138`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:384-385`
+/// Output source: `oracle/code/client/cl_cgame.cpp:701-707`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:701-707`
 pub struct CgRAddlighttoscene;
 
 impl OutboundSysCall for CgRAddlighttoscene {

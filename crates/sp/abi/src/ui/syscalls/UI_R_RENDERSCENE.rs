@@ -6,14 +6,14 @@ use abi_transport::generic::{
 
 /// `UI_R_RENDERSCENE` SP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:177`
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:103-176`
-/// Args source: `oracle/oracle/code/ui/ui_public.h:80`
-/// Args source: `oracle/oracle/code/ui/ui_local.h:205`
-/// Output source: `oracle/oracle/code/ui/ui_syscalls.cpp:54-58`
-/// Transport/function-table source: `oracle/oracle/code/ui/ui_syscalls.cpp:54-58`
+/// Enum value source: `oracle/code/ui/ui_public.h:177`
+/// Type definition source: `oracle/code/renderer/tr_types.h:103-176`
+/// Args source: `oracle/code/ui/ui_public.h:80`
+/// Args source: `oracle/code/ui/ui_local.h:205`
+/// Output source: `oracle/code/ui/ui_syscalls.cpp:54-58`
+/// Transport/function-table source: `oracle/code/ui/ui_syscalls.cpp:54-58`
 /// SP caveat: Raven's SP wrapper calls `ui.R_RenderScene(fd)` directly; no active
-/// `UI_R_RENDERSCENE` case exists in `oracle/oracle/code/client/cl_ui.cpp`.
+/// `UI_R_RENDERSCENE` case exists in `oracle/code/client/cl_ui.cpp`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiRRendersceneArgs {
     refdef: *const refdef_t,

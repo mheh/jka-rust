@@ -2,11 +2,11 @@
 
 /// Raven `EGLFogOverride` — GL fog override type.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:268-274`
+/// Type definition source: `oracle/code/renderer/tr_local.h:268-274`
 #[repr(i32)]
 pub enum EGLFogOverride {
-	GLFOGOVERRIDE_NONE = 0,
-	GLFOGOVERRIDE_BLACK = 1,
-	GLFOGOVERRIDE_WHITE = 2,
-	GLFOGOVERRIDE_MAX = 3,
+    GLFOGOVERRIDE_NONE = 0,
+    GLFOGOVERRIDE_BLACK = 1,
+    GLFOGOVERRIDE_WHITE = 2,
+    GLFOGOVERRIDE_MAX = 3,
 }

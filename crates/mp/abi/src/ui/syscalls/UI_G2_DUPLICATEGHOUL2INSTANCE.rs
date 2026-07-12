@@ -34,7 +34,7 @@ impl UiG2Duplicateghoul2InstanceArgs {
 
 /// `UI_G2_DUPLICATEGHOUL2INSTANCE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:525`
+/// Source: `oracle/codemp/ui/ui_public.h:525`
 pub struct UiG2Duplicateghoul2Instance;
 
 impl OutboundSysCall for UiG2Duplicateghoul2Instance {

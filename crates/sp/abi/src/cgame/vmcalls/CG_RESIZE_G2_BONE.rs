@@ -10,8 +10,8 @@ use abi_transport::generic::{
 ///
 /// Raven vmMain: `CG_ResizeG2Bone((boneInfo_v *)arg0, arg1);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:125`
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:202`
+/// Args source: `oracle/code/cgame/cg_main.cpp:125`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:202`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgResizeG2BoneArgs {
     bone: *mut boneInfo_v,
@@ -35,10 +35,10 @@ impl CgResizeG2BoneArgs {
 /// `CG_RESIZE_G2_BONE` SP cgame exports vmMain ABI token.
 ///
 /// Raven: `void CG_ResizeG2Bone( boneInfo_v *bone, int newCount );`
-/// Enum value source: `oracle/oracle/code/client/vmachine.h:27`
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:42`, `oracle/oracle/code/cgame/cg_main.cpp:125`
-/// Output source: `oracle/oracle/code/cgame/cg_main.cpp:125`
-/// VM_Main switch source: `oracle/oracle/code/cgame/cg_main.cpp:118-130`
+/// Enum value source: `oracle/code/client/vmachine.h:27`
+/// Args source: `oracle/code/cgame/cg_main.cpp:42`, `oracle/code/cgame/cg_main.cpp:125`
+/// Output source: `oracle/code/cgame/cg_main.cpp:125`
+/// VM_Main switch source: `oracle/code/cgame/cg_main.cpp:118-130`
 /// Raven: `boneInfo_v` is a vector type in `game/ghoul2_shared.h:202`.
 pub struct CgResizeG2Bone;
 

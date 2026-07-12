@@ -2,6 +2,7 @@
 
 pub mod ai_flags;
 pub mod check_flags;
+pub mod combat_point_flags;
 pub mod g_npc_t;
 pub mod g_npcstats_e;
 pub mod jump_state_t;

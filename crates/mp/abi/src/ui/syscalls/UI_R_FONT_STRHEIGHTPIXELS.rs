@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `UI_R_FONT_STRHEIGHTPIXELS`.
@@ -10,9 +12,9 @@ use abi_transport::pass_float;
 /// Raven's client switch reads the font index from `args[1]` and packs the
 /// scale as a float word.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:126-128`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:126-128`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1141-1142`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:126-128`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:126-128`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1141-1142`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRFontStrheightpixelsArgs {
     pub font_index: c_int,
@@ -27,7 +29,7 @@ impl UiRFontStrheightpixelsArgs {
 
 /// `UI_R_FONT_STRHEIGHTPIXELS` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:78`
+/// Source: `oracle/codemp/ui/ui_public.h:78`
 pub struct UiRFontStrheightpixels;
 
 impl OutboundSysCall for UiRFontStrheightpixels {

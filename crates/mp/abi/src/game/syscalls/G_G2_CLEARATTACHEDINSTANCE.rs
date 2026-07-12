@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_CLEARATTACHEDINSTANCE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -22,7 +24,7 @@ impl GG2ClearattachedinstanceArgs {
 
 /// `G_G2_CLEARATTACHEDINSTANCE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:565`
+/// Source: `oracle/codemp/game/g_public.h:565`
 pub struct GG2Clearattachedinstance;
 
 impl OutboundSysCall for GG2Clearattachedinstance {

@@ -40,7 +40,7 @@ impl GG2SetsurfaceonoffArgs {
 
 /// `G_G2_SETSURFACEONOFF` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:534`
+/// Source: `oracle/codemp/game/g_public.h:534`
 pub struct GG2Setsurfaceonoff;
 
 impl OutboundSysCall for GG2Setsurfaceonoff {

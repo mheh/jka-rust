@@ -2,7 +2,7 @@
 
 /// Raven `trackchan_t` sound tracking channels.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2056-2064`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2056-2064`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum trackchan_t {

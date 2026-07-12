@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_G2_LISTSURFACES, ghlInfo);`
 /// Raven transport: `G2API_ListSurfaces( (CGhoul2Info *) args[1] );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:783-784`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:783-785`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:783-784`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:783-785`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2ListsurfacesArgs {
     ghl_info: *mut c_void,
@@ -25,10 +25,10 @@ impl CgG2ListsurfacesArgs {
 
 /// `CG_G2_LISTSURFACES` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:173`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:783-784`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:783-785`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:783-785`
+/// Enum value source: `oracle/code/cgame/cg_public.h:173`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:783-784`
+/// Output source: `oracle/code/client/cl_cgame.cpp:783-785`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:783-785`
 pub struct CgG2Listsurfaces;
 
 impl OutboundSysCall for CgG2Listsurfaces {

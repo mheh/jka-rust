@@ -4,7 +4,7 @@ use std::os::raw::c_char;
 
 /// Raven `keywordArray_t` — a keyword string paired with its token value.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/../icarus/tokenizer.h:77-81`
+/// Type definition source: `oracle/codemp/game/../icarus/tokenizer.h:77-81`
 #[repr(C)]
 pub struct keywordArray_t {
     pub m_keyword: *mut c_char,

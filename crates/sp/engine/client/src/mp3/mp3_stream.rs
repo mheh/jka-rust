@@ -9,13 +9,13 @@ use super::xform_function::XFORM_FUNCTION;
 
 /// `NBUF` — MP3 decode ring-buffer size (Raven `#define NBUF (8*1024)`).
 ///
-/// Source: `oracle/oracle/code/client/../mp3code/mp3struct.h:48`
+/// Source: `oracle/code/client/../mp3code/mp3struct.h:48`
 const NBUF: usize = 8 * 1024;
 
 /// Anonymous struct for `MP3STREAM`'s top union, layer-1/2 branch (Raven names it in a
 /// trailing comment: `};//L1_2;`).
 ///
-/// Type definition source: `oracle/oracle/code/client/../mp3code/mp3struct.h:21-36`
+/// Type definition source: `oracle/code/client/../mp3code/mp3struct.h:21-36`
 #[repr(C)]
 pub struct MP3STREAM_L1_2 {
     pub sbt: SBT_FUNCTION,
@@ -39,7 +39,7 @@ pub struct MP3STREAM_L1_2 {
 /// Raven: `sample` — if this isn't kept per stream then the decode breaks up. `buf` — the
 /// 4k version of `NBUF`/`BUF_TRIGGER` seems to work for everything, but reverting to the
 /// original 8k for safety just in case.
-/// Type definition source: `oracle/oracle/code/client/../mp3code/mp3struct.h:38-74`
+/// Type definition source: `oracle/code/client/../mp3code/mp3struct.h:38-74`
 #[repr(C)]
 pub struct MP3STREAM_L3 {
     pub sbt_L3: SBT_FUNCTION,
@@ -76,7 +76,7 @@ pub struct MP3STREAM_L3 {
 /// Anonymous union for `MP3STREAM`'s top member (no Raven name — anonymous in the header;
 /// only one of the `L1_2`/`L3` branches is live per stream, chosen by MPEG layer).
 ///
-/// Type definition source: `oracle/oracle/code/client/../mp3code/mp3struct.h:19-75`
+/// Type definition source: `oracle/code/client/../mp3code/mp3struct.h:19-75`
 #[repr(C)]
 pub union MP3STREAM_u {
     pub l1_2: ManuallyDrop<MP3STREAM_L1_2>,
@@ -86,7 +86,7 @@ pub union MP3STREAM_u {
 /// Raven `MP3STREAM` (`LP_MP3STREAM` is `*mut MP3STREAM`) — per-stream MP3 decoder state,
 /// owned by the `sfx_t` that streams it.
 ///
-/// Type definition source: `oracle/oracle/code/client/../mp3code/mp3struct.h:17-128`
+/// Type definition source: `oracle/code/client/../mp3code/mp3struct.h:17-128`
 #[repr(C)]
 pub struct MP3STREAM {
     pub u: MP3STREAM_u,
@@ -185,8 +185,7 @@ const _: () = assert!(core::mem::offset_of!(MP3STREAM, iRewind_FinalReductionCod
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(MP3STREAM, iRewind_FinalConvertCode) == 22016);
 #[cfg(target_pointer_width = "64")]
-const _: () =
-    assert!(core::mem::offset_of!(MP3STREAM, iRewind_SourceBytesRemaining) == 22020);
+const _: () = assert!(core::mem::offset_of!(MP3STREAM, iRewind_SourceBytesRemaining) == 22020);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(MP3STREAM, iRewind_SourceReadIndex) == 22024);
 #[cfg(target_pointer_width = "64")]

@@ -10,10 +10,10 @@ use abi_transport::generic::{
 
 /// `GAME_NAV_CLEARPATHTOPOINT` MP game exports vmMain ABI token.
 ///
-/// Source (enum): `oracle/oracle/codemp/game/g_public.h:788`
-/// Source (args): `oracle/oracle/codemp/game/g_main.c:672`
-/// Source (output): `oracle/oracle/codemp/game/g_main.c:672`
-/// Source (call site): `oracle/oracle/codemp/server/NPCNav/gameCallbacks.cpp:8`
+/// Source (enum): `oracle/codemp/game/g_public.h:788`
+/// Source (args): `oracle/codemp/game/g_main.c:672`
+/// Source (output): `oracle/codemp/game/g_main.c:672`
+/// Source (call site): `oracle/codemp/server/NPCNav/gameCallbacks.cpp:8`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GameNavClearpathtopointArgs {
     entity_num: c_int,

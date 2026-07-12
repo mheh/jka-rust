@@ -128,7 +128,7 @@ impl GG2CollisiondetectcacheArgs {
 
 /// `G_G2_COLLISIONDETECTCACHE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:531`
+/// Source: `oracle/codemp/game/g_public.h:531`
 pub struct GG2Collisiondetectcache;
 
 impl OutboundSysCall for GG2Collisiondetectcache {

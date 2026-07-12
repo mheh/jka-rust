@@ -2,21 +2,20 @@
 
 use mp_qshared::shared::vec3_t;
 
-/// Light Style Constants.
-///
-/// Source: `oracle/oracle/codemp/qcommon/qfiles.h:497`
-const MAXLIGHTMAPS: usize = 4;
+// `MAXLIGHTMAPS` (`qfiles.h:500`) imported from its canonical home on
+// `drawVert_t` in the same crate.
+use super::draw_vert_t::MAXLIGHTMAPS;
 
 /// Raven `mapVert_t` — BSP-file map vertex record.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/qfiles.h:506-512`
+/// Type definition source: `oracle/codemp/qcommon/qfiles.h:506-512`
 #[repr(C)]
 pub struct mapVert_t {
-	pub xyz: vec3_t,
-	pub st: [f32; 2],
-	pub lightmap: [[f32; 2]; MAXLIGHTMAPS],
-	pub normal: vec3_t,
-	pub color: [[u8; 4]; MAXLIGHTMAPS],
+    pub xyz: vec3_t,
+    pub st: [f32; 2],
+    pub lightmap: [[f32; 2]; MAXLIGHTMAPS],
+    pub normal: vec3_t,
+    pub color: [[u8; 4]; MAXLIGHTMAPS],
 }
 
 const _: () = assert!(core::mem::size_of::<mapVert_t>() == 80);

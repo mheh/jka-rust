@@ -7,10 +7,10 @@ use abi_transport::generic::{
 
 /// `UI_CVAR_INFOSTRINGBUFFER` SP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:161`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp:428`
-/// Output source: `oracle/oracle/code/client/cl_ui.cpp:428`
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:428`
+/// Enum value source: `oracle/code/ui/ui_public.h:161`
+/// Args source: `oracle/code/client/cl_ui.cpp:428`
+/// Output source: `oracle/code/client/cl_ui.cpp:428`
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:428`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCvarInfostringbufferArgs {
     bit: c_int,

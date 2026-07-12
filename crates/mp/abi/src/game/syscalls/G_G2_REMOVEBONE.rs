@@ -38,7 +38,7 @@ impl GG2RemoveboneArgs {
 
 /// `G_G2_REMOVEBONE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:562`
+/// Source: `oracle/codemp/game/g_public.h:562`
 pub struct GG2Removebone;
 
 impl OutboundSysCall for GG2Removebone {

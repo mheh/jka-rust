@@ -4,7 +4,7 @@ use core::ffi::c_char;
 
 /// Raven `T_G_ICARUS_REMOVE` — ICARUS entity-removal command payload.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:878-882`
+/// Type definition source: `oracle/codemp/game/g_public.h:878-882`
 #[repr(C)]
 pub struct T_G_ICARUS_REMOVE {
     pub entID: i32,

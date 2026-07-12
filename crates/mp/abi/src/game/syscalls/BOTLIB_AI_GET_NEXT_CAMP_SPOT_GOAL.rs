@@ -29,7 +29,7 @@ impl BotlibAiGetNextCampSpotGoalArgs {
 
 /// `BOTLIB_AI_GET_NEXT_CAMP_SPOT_GOAL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:485`
+/// Source: `oracle/codemp/game/g_public.h:485`
 pub struct BotlibAiGetNextCampSpotGoal;
 
 impl OutboundSysCall for BotlibAiGetNextCampSpotGoal {

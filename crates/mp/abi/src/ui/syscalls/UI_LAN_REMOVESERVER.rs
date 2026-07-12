@@ -10,7 +10,7 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_LAN_REMOVESERVER, source, addr );`
 /// Raven transport: `LAN_RemoveServer( args[1], (const char *)VMA(2) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:334-335`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:334-335`
 #[derive(Debug)]
 pub struct UiLanRemoveserverArgs {
     source: c_int,
@@ -36,10 +36,10 @@ impl UiLanRemoveserverArgs {
 /// Raven wrapper: `syscall( UI_LAN_REMOVESERVER, source, addr );`
 /// Raven transport: `LAN_RemoveServer( args[1], (const char *)VMA(2) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:104`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:334-335`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:978`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1066-1067`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:104`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:334-335`
+/// Output source: `oracle/codemp/ui/ui_local.h:978`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1066-1067`
 pub struct UiLanRemoveserver;
 
 impl OutboundSysCall for UiLanRemoveserver {

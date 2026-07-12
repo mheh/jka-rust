@@ -2,7 +2,7 @@
 
 /// Raven `itemUseFail_t` reasons an item use failed.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2126-2131`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2126-2131`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum itemUseFail_t {

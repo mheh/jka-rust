@@ -1,6 +1,6 @@
 //! MP `clientSession_t`.
 //!
-//! Source: `oracle/oracle/codemp/game/g_local.h:408`
+//! Source: `oracle/codemp/game/g_local.h:408`
 
 #![allow(non_camel_case_types)]
 
@@ -21,7 +21,7 @@ pub const FOLLOW_ACTIVE2: c_int = -2;
 /// Raven: achieved by writing all the data to cvar strings at game shutdown and
 /// reading them back at connection time; anything added MUST be handled in
 /// `G_InitSessionData()` / `G_ReadSessionData()` / `G_WriteSessionData()`.
-/// Source: `oracle/oracle/codemp/game/g_local.h:408`
+/// Source: `oracle/codemp/game/g_local.h:408`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct clientSession_t {

@@ -22,4 +22,4 @@
 use sp_abi::game::public::game_import_t::game_import_t;
 
 //TODO: Port gi::* outbound-call wrappers (one per game_import_t member)
-// Source: oracle/oracle/code/game/g_public.h:168-471
+// Source: oracle/code/game/g_public.h:168-471

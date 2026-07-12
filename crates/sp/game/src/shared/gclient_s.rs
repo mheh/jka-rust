@@ -19,7 +19,7 @@ use super::render_info_s::renderInfo_t;
 ///
 /// Raven: `ps` MUST be the first element, because the server expects it; the rest
 /// is private to game.
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:387-488`
+/// Type definition source: `oracle/code/game/g_shared.h:387-488`
 #[repr(C)]
 pub struct gclient_t {
     // ps MUST be the first element, because the server expects it

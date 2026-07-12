@@ -1,15 +1,17 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_G2_GETTIME`.
 ///
 /// Raven wrapper: `return syscall(CG_G2_GETTIME);`
 /// Raven transport: `return G2API_GetTime(0);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:981-983`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1520-1521`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:981-983`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1520-1521`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2GettimeArgs;
 
@@ -21,11 +23,11 @@ impl CgG2GettimeArgs {
 
 /// `CG_G2_GETTIME` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:292`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:981-983`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:981-983`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1520-1521`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1520-1521`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:292`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:981-983`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:981-983`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1520-1521`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1520-1521`
 pub struct CgG2Gettime;
 
 impl OutboundSysCall for CgG2Gettime {

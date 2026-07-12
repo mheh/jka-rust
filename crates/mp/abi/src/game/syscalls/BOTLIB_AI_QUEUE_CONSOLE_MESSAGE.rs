@@ -38,7 +38,7 @@ impl BotlibAiQueueConsoleMessageArgs {
 
 /// `BOTLIB_AI_QUEUE_CONSOLE_MESSAGE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:423`
+/// Source: `oracle/codemp/game/g_public.h:423`
 pub struct BotlibAiQueueConsoleMessage;
 
 impl OutboundSysCall for BotlibAiQueueConsoleMessage {

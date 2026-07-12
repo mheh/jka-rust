@@ -1,6 +1,6 @@
 //! MP `saberTrail_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/q_shared.h:633-650`
+//! Type definition source: `oracle/codemp/game/q_shared.h:633-650`
 
 #![allow(non_camel_case_types)]
 
@@ -10,7 +10,7 @@ use crate::shared::{qboolean, vec3_t};
 
 /// Raven `saberTrail_t` — per-blade motion-trail + mark state.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:633-650`
+/// Type definition source: `oracle/codemp/game/q_shared.h:633-650`
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct saberTrail_t {

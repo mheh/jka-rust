@@ -6,24 +6,24 @@ use mp_qshared::shared::{qboolean, qhandle_t};
 
 /// `MAX_GAMETYPES`.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_local.h:566`
+/// Source: `oracle/codemp/ui/ui_local.h:566`
 const MAX_GAMETYPES: usize = 16;
 
 /// Raven `mapInfo`.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:629-640`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:629-640`
 #[repr(C)]
 pub struct mapInfo {
-	pub mapName: *const c_char,
-	pub mapLoadName: *const c_char,
-	pub imageName: *const c_char,
-	pub opponentName: *const c_char,
-	pub teamMembers: i32,
-	pub typeBits: i32,
-	pub cinematic: i32,
-	pub timeToBeat: [i32; MAX_GAMETYPES],
-	pub levelShot: qhandle_t,
-	pub active: qboolean,
+    pub mapName: *const c_char,
+    pub mapLoadName: *const c_char,
+    pub imageName: *const c_char,
+    pub opponentName: *const c_char,
+    pub teamMembers: i32,
+    pub typeBits: i32,
+    pub cinematic: i32,
+    pub timeToBeat: [i32; MAX_GAMETYPES],
+    pub levelShot: qhandle_t,
+    pub active: qboolean,
 }
 
 const _: () = assert!(core::mem::size_of::<mapInfo>() == 120);

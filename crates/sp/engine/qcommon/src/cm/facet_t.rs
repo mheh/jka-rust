@@ -5,7 +5,7 @@ use sp_qshared::shared::qboolean;
 /// Raven `facet_t` — a single collision facet of a patch collision surface.
 ///
 /// Raven: `numBorders` comment: 3 or four + 6 axial bevels + 4 or 3 * 4 edge bevels.
-/// Type definition source: `oracle/oracle/code/qcommon/cm_patch.h:83-89`
+/// Type definition source: `oracle/code/qcommon/cm_patch.h:83-89`
 #[repr(C)]
 pub struct facet_t {
     pub surfacePlane: i32,

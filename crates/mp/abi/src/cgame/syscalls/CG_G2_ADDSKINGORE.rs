@@ -10,10 +10,10 @@ use abi_transport::generic::{
 /// Raven wrapper: `void trap_G2API_AddSkinGore(void *ghlInfo, SSkinGoreData *gore)`.
 /// Raven transport: `syscall(CG_G2_ADDSKINGORE, ghlInfo, gore);`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:280`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:925-927`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1459-1463`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1459-1463`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:280`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:925-927`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1459-1463`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1459-1463`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2AddskingoreArgs {
     /// Raw Ghoul2 handle word, decoded by Raven as `args[1]`.
@@ -33,11 +33,11 @@ impl CgG2AddskingoreArgs {
 /// Raven transport: both pointer words are passed raw through the syscall and
 /// the `_G2_GORE` switch arm returns `0` after mutating gore state.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:280`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:925-927`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1459-1463`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1459-1463`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1491-1494`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:280`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:925-927`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1459-1463`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1459-1463`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1491-1494`
 pub struct CgG2Addskingore;
 
 impl OutboundSysCall for CgG2Addskingore {

@@ -11,9 +11,9 @@ use mp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_S_ADDREALLOOPINGSOUND, entityNum, origin, velocity, sfx );`
 /// Raven transport calls `S_AddLoopingSound`, with `S_AddRealLoopingSound` commented out.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:212-213`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2228`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:824-828`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:212-213`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2228`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:824-828`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSAddrealloopingsoundArgs {
     entity_num: c_int,
@@ -40,10 +40,10 @@ impl CgSAddrealloopingsoundArgs {
 
 /// `CG_S_ADDREALLOOPINGSOUND` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:102`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:212-213`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:824-828`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:824-828`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:102`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:212-213`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:824-828`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:824-828`
 pub struct CgSAddrealloopingsound;
 
 impl OutboundSysCall for CgSAddrealloopingsound {

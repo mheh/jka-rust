@@ -5,7 +5,7 @@ use mp_qshared::shared::MAX_QPATH;
 
 /// Raven `clightstyle_t` — a compiled cgame lightstyle (base value + per-frame map).
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_lights.h:5-10`
+/// Type definition source: `oracle/codemp/cgame/cg_lights.h:5-10`
 #[repr(C)]
 pub struct clightstyle_t {
     pub length: i32,

@@ -8,9 +8,9 @@ use mp_qshared::shared::qboolean;
 
 /// Arguments for `CG_KEY_EVENT`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:208-210`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_keys.cpp:1564-1568`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_keys.cpp:1577-1584`
+/// Args source: `oracle/codemp/cgame/cg_main.c:208-210`
+/// Transport/call-site source: `oracle/codemp/client/cl_keys.cpp:1564-1568`
+/// Transport/call-site source: `oracle/codemp/client/cl_keys.cpp:1577-1584`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgKeyEventArgs {
     key: c_int,
@@ -34,11 +34,11 @@ impl CgKeyEventArgs {
 /// `CG_KEY_EVENT` MP cgame exports vmMain ABI token.
 ///
 /// Raven: void (*CG_KeyEvent)( int key, qboolean down );
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:384-385`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:208-210`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:208-210`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_keys.cpp:1564-1568`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_keys.cpp:1577-1584`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:384-385`
+/// Args source: `oracle/codemp/cgame/cg_main.c:208-210`
+/// Output source: `oracle/codemp/cgame/cg_main.c:208-210`
+/// Transport/call-site source: `oracle/codemp/client/cl_keys.cpp:1564-1568`
+/// Transport/call-site source: `oracle/codemp/client/cl_keys.cpp:1577-1584`
 pub struct CgKeyEvent;
 
 impl InboundVmCall for CgKeyEvent {

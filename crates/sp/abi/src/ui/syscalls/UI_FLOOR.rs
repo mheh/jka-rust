@@ -1,18 +1,20 @@
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 use super::super::SpUiImport;
 
 /// `UI_FLOOR` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:246`
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:843`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:844`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:843-844`
+/// Enum source: `oracle/code/ui/ui_public.h:246`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:843`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:844`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:843-844`
 ///
-/// TODO: SP `oracle/oracle/code/client/cl_ui.cpp` does not include a `UI_FLOOR` case in its visible switch
+/// TODO: SP `oracle/code/client/cl_ui.cpp` does not include a `UI_FLOOR` case in its visible switch
 /// (function-table ABI for this token is intentionally out-of-scope). The transport shape is inferred from
-/// MP-side `oracle/oracle/codemp/client/cl_ui.cpp` behavior.
+/// MP-side `oracle/codemp/client/cl_ui.cpp` behavior.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UiFloorArgs {
     value: f32,

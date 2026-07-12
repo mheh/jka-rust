@@ -12,9 +12,9 @@ use mp_qshared::shared::qhandle_t;
 /// Raven's client switch forwards the name through `VMA(1)` and returns the
 /// renderer handle word.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:111-113`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:111-113`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1132-1133`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:111-113`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:111-113`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1132-1133`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRRegisterfontArgs {
     pub font_name: *const c_char,
@@ -28,7 +28,7 @@ impl UiRRegisterfontArgs {
 
 /// `UI_R_REGISTERFONT` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:75`
+/// Source: `oracle/codemp/ui/ui_public.h:75`
 pub struct UiRRegisterfont;
 
 impl OutboundSysCall for UiRRegisterfont {

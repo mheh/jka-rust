@@ -1,5 +1,7 @@
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `UI_ACOS`.
@@ -7,10 +9,10 @@ use abi_transport::pass_float;
 /// Raven transports the float through the integer syscall ABI with `PASSFLOAT`
 /// on the module side and `VMF(1)` on the engine side.
 ///
-/// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:683`
-/// Transport source: `oracle/oracle/codemp/ui/ui_syscalls.c:15`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:682`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:298`
+/// Args source: `oracle/codemp/client/cl_ui.cpp:683`
+/// Transport source: `oracle/codemp/ui/ui_syscalls.c:15`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:682`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:298`
 #[derive(Debug)]
 pub struct UiAcosArgs {
     value: f32,
@@ -28,10 +30,10 @@ impl UiAcosArgs {
 
 /// `UI_ACOS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:146`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:683`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:682`
-/// Shared trap token source: `oracle/oracle/codemp/qcommon/qcommon.h:298`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:146`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:683`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:682`
+/// Shared trap token source: `oracle/codemp/qcommon/qcommon.h:298`
 pub struct UiAcos;
 
 impl OutboundSysCall for UiAcos {

@@ -1,6 +1,8 @@
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_INIT` outbound game-to-engine syscall.
 ///
@@ -17,7 +19,7 @@ impl GIcarusInitArgs {
 
 /// `G_ICARUS_INIT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:255`
+/// Source: `oracle/codemp/game/g_public.h:255`
 pub struct GIcarusInit;
 
 impl OutboundSysCall for GIcarusInit {

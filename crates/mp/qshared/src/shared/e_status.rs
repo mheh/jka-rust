@@ -7,7 +7,7 @@ use core::ffi::c_int;
 /// Raven declares this as `typedef int` alongside a separate anonymous enum of
 /// FMV states, so the alias stays an int and the enumerators are `const`s.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:3032-3041`
+/// Type definition source: `oracle/codemp/game/q_shared.h:3032-3041`
 pub type e_status = c_int;
 
 pub const FMV_IDLE: e_status = 0;

@@ -1,6 +1,6 @@
 //! MP `parms_t` copied from Raven `codemp/game/g_public.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/g_public.h:666-671`
+//! Source: `oracle/codemp/game/g_public.h:666-671`
 
 #![allow(non_camel_case_types)]
 
@@ -11,7 +11,7 @@ pub const MAX_PARM_STRING_LENGTH: usize = crate::shared::MAX_QPATH;
 
 /// Raven `parms_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_public.h:666-671`
+/// Type definition source: `oracle/codemp/game/g_public.h:666-671`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct parms_t {

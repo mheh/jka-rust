@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_FX_SET_REFDEF, refdef );`
 /// Raven transport: `FX_SetRefDefFromCGame( (refdef_t*)VMA(1) ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:674-676`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2397`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1152-1154`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:674-676`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2397`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1152-1154`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxSetRefdefArgs {
     refdef: *mut c_void,
@@ -26,10 +26,10 @@ impl CgFxSetRefdefArgs {
 
 /// `CG_FX_SET_REFDEF` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:228`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:674-676`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1152-1154`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1152-1154`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:228`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:674-676`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1152-1154`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1152-1154`
 pub struct CgFxSetRefdef;
 
 impl OutboundSysCall for CgFxSetRefdef {

@@ -66,7 +66,7 @@ impl GTracecapsuleArgs {
 /// `G_TRACECAPSULE` MP game imports syscall ABI token.
 ///
 /// Raven: ( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask );
-/// Source: `oracle/oracle/codemp/game/g_public.h:235`
+/// Source: `oracle/codemp/game/g_public.h:235`
 pub struct GTracecapsule;
 
 impl OutboundSysCall for GTracecapsule {

@@ -5,15 +5,15 @@ use mp_qshared::shared::qhandle_t;
 
 /// Raven `forceTicPos_t` — screen position/size of a force-power icon, plus its shader.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:1018-1026`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:1018-1026`
 #[repr(C)]
 pub struct forceTicPos_t {
-	pub x: i32,
-	pub y: i32,
-	pub width: i32,
-	pub height: i32,
-	pub file: *mut c_char,
-	pub tic: qhandle_t,
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    pub file: *mut c_char,
+    pub tic: qhandle_t,
 }
 
 #[cfg(target_pointer_width = "64")]

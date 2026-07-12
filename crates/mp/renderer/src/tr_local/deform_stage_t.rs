@@ -7,7 +7,7 @@ use super::wave_form_t::waveForm_t;
 
 /// Raven `deformStage_t` — vertex deformation stage.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:310-320`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:310-320`
 #[repr(C)]
 pub struct deformStage_t {
     /// vertex coordinate modification type

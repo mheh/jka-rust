@@ -8,7 +8,7 @@ use mp_qshared::shared::MAX_QPATH;
 ///
 /// Raven: struct size = (int)( &((mdxmSurfHierarch_t *)0)->childIndexes[
 /// mdxmSurfHierarch_t->numChildren] ).
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:187-195`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:187-195`
 #[repr(C)]
 pub struct mdxmSurfHierarchy_t {
     pub name: [c_char; MAX_QPATH as usize],

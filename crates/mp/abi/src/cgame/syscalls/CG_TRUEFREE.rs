@@ -11,9 +11,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall(CG_TRUEFREE, ptr);`
 /// Raven transport: `VM_Shifted_Free((void **)VMA(1)); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:762-764`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2436-2438`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1288-1290`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:762-764`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2436-2438`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1288-1290`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgTruefreeArgs {
     ptr: *mut *mut c_void,
@@ -27,10 +27,10 @@ impl CgTruefreeArgs {
 
 /// `CG_TRUEFREE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:251`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:762-764`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1288-1290`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1288-1290`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:251`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:762-764`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1288-1290`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1288-1290`
 pub struct CgTruefree;
 
 impl OutboundSysCall for CgTruefree {

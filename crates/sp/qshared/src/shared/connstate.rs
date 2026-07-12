@@ -2,7 +2,7 @@
 
 /// Raven `connstate_t` — client connection state.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2518-2528`
+/// Type definition source: `oracle/code/game/q_shared.h:2518-2528`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum connstate_t {

@@ -4,7 +4,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `srfDisplayList_t` — a compiled OpenGL display list surface.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:628-631`
+/// Type definition source: `oracle/code/renderer/tr_local.h:628-631`
 #[repr(C)]
 pub struct srfDisplayList_s {
     pub surfaceType: surfaceType_t,

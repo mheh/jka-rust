@@ -9,7 +9,7 @@ use crate::entrypoints::RawVmMain;
 /// `name`/`dllHandle`/`entryPoint` are mirrored across `ModuleSlot` + its
 /// `LoadedModule`).
 ///
-/// Source: `oracle/oracle/codemp/qcommon/vm_local.h:111-146`
+/// Source: `oracle/codemp/qcommon/vm_local.h:111-146`
 pub struct LoadedModule {
     /// `vm->dllHandle` (`win_main.cpp:855-863`); `pub(crate)` per LOAD-D12f.
     // Held only to keep the OS-mapped dylib alive (RAII); its `entry` fn ptr is

@@ -6,64 +6,64 @@ use sp_qshared::shared::vec3_t;
 
 /// Raven `weaponData_t` — per-weapon-type data.
 ///
-/// Type definition source: `oracle/oracle/code/game/weapons.h:81-139`
+/// Type definition source: `oracle/code/game/weapons.h:81-139`
 #[repr(C)]
 pub struct weaponData_t {
-	pub classname: [c_char; 32], // Spawning name
-	pub weaponMdl: [c_char; 64], // Weapon Model
-	pub firingSnd: [c_char; 64], // Sound made when fired
-	pub altFiringSnd: [c_char; 64], // Sound made when alt-fired
-	//	char	flashSnd[64];		// Sound made by flash
-	//	char	altFlashSnd[64];	// Sound made by an alt-flash
-	pub stopSnd: [c_char; 64], // Sound made when weapon stops firing
-	pub chargeSnd: [c_char; 64], // sound to start when the weapon initiates the charging sequence
-	pub altChargeSnd: [c_char; 64], // alt sound to start when the weapon initiates the charging sequence
-	pub selectSnd: [c_char; 64], // the sound to play when this weapon gets selected
+    pub classname: [c_char; 32],    // Spawning name
+    pub weaponMdl: [c_char; 64],    // Weapon Model
+    pub firingSnd: [c_char; 64],    // Sound made when fired
+    pub altFiringSnd: [c_char; 64], // Sound made when alt-fired
+    //	char	flashSnd[64];		// Sound made by flash
+    //	char	altFlashSnd[64];	// Sound made by an alt-flash
+    pub stopSnd: [c_char; 64],      // Sound made when weapon stops firing
+    pub chargeSnd: [c_char; 64], // sound to start when the weapon initiates the charging sequence
+    pub altChargeSnd: [c_char; 64], // alt sound to start when the weapon initiates the charging sequence
+    pub selectSnd: [c_char; 64],    // the sound to play when this weapon gets selected
 
-	// #ifdef _IMMERSION
-	pub firingFrc: [c_char; 64],
-	pub altFiringFrc: [c_char; 64],
-	pub stopFrc: [c_char; 64],
-	pub chargeFrc: [c_char; 64],
-	pub altChargeFrc: [c_char; 64],
-	pub selectFrc: [c_char; 64],
-	// #endif // _IMMERSION
-	pub ammoIndex: i32, // Index to proper ammo slot
-	pub ammoLow: i32,   // Count when ammo is low
+    // #ifdef _IMMERSION
+    pub firingFrc: [c_char; 64],
+    pub altFiringFrc: [c_char; 64],
+    pub stopFrc: [c_char; 64],
+    pub chargeFrc: [c_char; 64],
+    pub altChargeFrc: [c_char; 64],
+    pub selectFrc: [c_char; 64],
+    // #endif // _IMMERSION
+    pub ammoIndex: i32, // Index to proper ammo slot
+    pub ammoLow: i32,   // Count when ammo is low
 
-	pub energyPerShot: i32, // Amount of energy used per shot
-	pub fireTime: i32,      // Amount of time between firings
-	pub range: i32,         // Range of weapon
+    pub energyPerShot: i32, // Amount of energy used per shot
+    pub fireTime: i32,      // Amount of time between firings
+    pub range: i32,         // Range of weapon
 
-	pub altEnergyPerShot: i32, // Amount of energy used for alt-fire
-	pub altFireTime: i32,      // Amount of time between alt-firings
-	pub altRange: i32,         // Range of alt-fire
+    pub altEnergyPerShot: i32, // Amount of energy used for alt-fire
+    pub altFireTime: i32,      // Amount of time between alt-firings
+    pub altRange: i32,         // Range of alt-fire
 
-	pub weaponIcon: [c_char; 64], // Name of weapon icon file
-	pub numBarrels: i32,          // how many barrels should we expect for this weapon?
+    pub weaponIcon: [c_char; 64], // Name of weapon icon file
+    pub numBarrels: i32,          // how many barrels should we expect for this weapon?
 
-	pub missileMdl: [c_char; 64],       // Missile Model
-	pub missileSound: [c_char; 64],     // Missile flight sound
-	pub missileDlight: f32,             // what is says
-	pub missileDlightColor: vec3_t,     // ditto
+    pub missileMdl: [c_char; 64],   // Missile Model
+    pub missileSound: [c_char; 64], // Missile flight sound
+    pub missileDlight: f32,         // what is says
+    pub missileDlightColor: vec3_t, // ditto
 
-	pub alt_missileMdl: [c_char; 64],   // Missile Model
-	pub alt_missileSound: [c_char; 64], // Missile sound
-	pub alt_missileDlight: f32,         // what is says
-	pub alt_missileDlightColor: vec3_t, // ditto
+    pub alt_missileMdl: [c_char; 64],   // Missile Model
+    pub alt_missileSound: [c_char; 64], // Missile sound
+    pub alt_missileDlight: f32,         // what is says
+    pub alt_missileDlightColor: vec3_t, // ditto
 
-	pub missileHitSound: [c_char; 64],    // Missile impact sound
-	pub altmissileHitSound: [c_char; 64], // alt Missile impact sound
+    pub missileHitSound: [c_char; 64],    // Missile impact sound
+    pub altmissileHitSound: [c_char; 64], // alt Missile impact sound
 
-	// #ifndef _USRDLL
-	pub func: *mut c_void,
-	pub altfunc: *mut c_void,
+    // #ifndef _USRDLL
+    pub func: *mut c_void,
+    pub altfunc: *mut c_void,
 
-	pub mMuzzleEffect: [c_char; 64],
-	pub mMuzzleEffectID: i32,
-	pub mAltMuzzleEffect: [c_char; 64],
-	pub mAltMuzzleEffectID: i32,
-	// #endif
+    pub mMuzzleEffect: [c_char; 64],
+    pub mMuzzleEffectID: i32,
+    pub mAltMuzzleEffect: [c_char; 64],
+    pub mAltMuzzleEffectID: i32,
+    // #endif
 }
 
 #[cfg(target_pointer_width = "64")]

@@ -1,22 +1,24 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_S_CLEARLOOPINGSOUNDS`.
 ///
 /// Raven wrapper: `syscall(CG_S_CLEARLOOPINGSOUNDS);`
 /// Raven transport: `S_ClearLoopingSounds();`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:213-214`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:588-590`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:213-214`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:588-590`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSClearloopingsoundsArgs;
 
 /// `CG_S_CLEARLOOPINGSOUNDS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:93`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:213-214`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:588-590`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:588-590`
+/// Enum value source: `oracle/code/cgame/cg_public.h:93`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:213-214`
+/// Output source: `oracle/code/client/cl_cgame.cpp:588-590`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:588-590`
 pub struct CgSClearloopingsounds;
 
 impl OutboundSysCall for CgSClearloopingsounds {

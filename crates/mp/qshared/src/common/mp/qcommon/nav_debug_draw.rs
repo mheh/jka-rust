@@ -5,7 +5,7 @@ use core::ffi::c_int;
 // Two anonymous `enum { ... }` blocks (no typedef) used as raw `int` args to
 // `G_DrawEdge`/`G_DrawNode` (nav debug-draw helpers); ported as plain consts
 // per the typedef-less-anonymous-enum rule.
-// Type definition source: `oracle/oracle/codemp/game/g_public.h:608-623`
+// Type definition source: `oracle/codemp/game/g_public.h:608-623`
 
 /// Raven edge-debug-draw kind.
 pub const EDGE_NORMAL: c_int = 0;

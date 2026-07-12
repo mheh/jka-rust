@@ -15,7 +15,7 @@ use super::saved_game_just_loaded_e::SavedGameJustLoaded_e;
 /// size will be fixed when ge->Init() is called; the server can't just use pointer
 /// arithmetic on gentities, because the server's sizeof(struct gentity_s) doesn't
 /// equal gentitySize.
-/// Type definition source: `oracle/oracle/code/game/g_public.h:476-527`
+/// Type definition source: `oracle/code/game/g_public.h:476-527`
 ///
 /// ABI-string note (SEAM-D12 sweep, applied here 2026-07-03): the fn-pointer
 /// fields carry `extern "C-unwind"`, not plain `extern "C"` — these are
@@ -47,7 +47,8 @@ pub struct game_export_t {
     // ReadLevel is called after the default map information has been
     // loaded with SpawnEntities
     pub WriteLevel: Option<unsafe extern "C-unwind" fn(qbAutosave: qboolean)>,
-    pub ReadLevel: Option<unsafe extern "C-unwind" fn(qbAutosave: qboolean, qbLoadTransition: qboolean)>,
+    pub ReadLevel:
+        Option<unsafe extern "C-unwind" fn(qbAutosave: qboolean, qbLoadTransition: qboolean)>,
     pub GameAllowedToSaveHere: Option<unsafe extern "C-unwind" fn() -> qboolean>,
 
     // return NULL if the client is allowed to connect, otherwise return

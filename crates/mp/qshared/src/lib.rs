@@ -10,3 +10,8 @@
 
 pub mod common;
 pub mod shared;
+
+// `rmAutomapSymbol_t` relocated here from `mp_engine_client` (RMG-D4d/RMG-D2(b),
+// ruling 21) and surfaced at the crate root as `mp_qshared::RmAutomapSymbol` so
+// `mp_engine_rmg` names it directly with no `rmg → mp_engine_client` edge.
+pub use common::mp::rmg::RmAutomapSymbol;

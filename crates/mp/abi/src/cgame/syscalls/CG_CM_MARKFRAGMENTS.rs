@@ -11,7 +11,7 @@ use mp_qshared::shared::vec3_t;
 
 /// `markFragment_t` ABI record returned through `fragmentBuffer`.
 ///
-/// Raven source: `oracle/oracle/codemp/game/q_shared.h:1918-1922`
+/// Raven source: `oracle/codemp/game/q_shared.h:1918-1922`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct markFragment_t {
@@ -33,10 +33,10 @@ const _: () = assert!(core::mem::offset_of!(markFragment_t, numPoints) == 4);
 /// parameter position, so it is transported as a writable `float *` backing
 /// `maxPoints` packed `vec3_t` vertices.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:177-181`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2212-2215`
-/// Buffer semantics source: `oracle/oracle/codemp/renderer/tr_marks.cpp:189-223`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:805-806`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:177-181`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2212-2215`
+/// Buffer semantics source: `oracle/codemp/renderer/tr_marks.cpp:189-223`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:805-806`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmMarkfragmentsArgs {
     /// Number of input polygon points, read by Raven as raw `args[1]`.
@@ -122,13 +122,13 @@ impl CgCmMarkfragmentsArgs {
 /// (const float *)VMA(3), args[4], (float *)VMA(5), args[6],
 /// (markFragment_t *)VMA(7));`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:94`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:177-181`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2212-2215`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:177-181`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:805-806`
-/// Output source: `oracle/oracle/codemp/renderer/tr_public.h:83-84`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:805-806`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:94`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:177-181`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2212-2215`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:177-181`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:805-806`
+/// Output source: `oracle/codemp/renderer/tr_public.h:83-84`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:805-806`
 pub struct CgCmMarkfragments;
 
 impl OutboundSysCall for CgCmMarkfragments {

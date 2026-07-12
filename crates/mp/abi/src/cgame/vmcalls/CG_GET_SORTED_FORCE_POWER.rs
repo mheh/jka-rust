@@ -7,10 +7,10 @@ use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, Vm
 /// `CG_GET_SORTED_FORCE_POWER` MP cgame exports vmMain ABI token.
 ///
 /// Raven: forcePowerSorted[arg0]
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:437`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:246-247`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:246-247`
-/// Transport/switch source: `oracle/oracle/codemp/cgame/cg_main.c:246-247` (no engine call site found)
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:437`
+/// Args source: `oracle/codemp/cgame/cg_main.c:246-247`
+/// Output source: `oracle/codemp/cgame/cg_main.c:246-247`
+/// Transport/switch source: `oracle/codemp/cgame/cg_main.c:246-247` (no engine call site found)
 pub struct CgGetSortedForcePower;
 
 impl InboundVmCall for CgGetSortedForcePower {

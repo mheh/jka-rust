@@ -27,7 +27,7 @@ use crate::server::world_sector_s::{worldSector_t, AREA_NODES};
 /// table's `Server.world_sectors` row, grouped under Raven names (Savegame
 /// precedent: a Rust-side grouping colocated with its sole owner).
 ///
-/// Source: `oracle/oracle/code/server/sv_world.cpp:82-83`
+/// Source: `oracle/code/server/sv_world.cpp:82-83`
 #[allow(non_snake_case)]
 pub struct WorldSectors {
     pub sv_worldSectors: [worldSector_t; AREA_NODES],
@@ -40,22 +40,22 @@ pub struct WorldSectors {
 /// file (user ruling 2026-07-05: a Rust-side grouping colocated with its sole
 /// owner, not a ported Raven type).
 ///
-/// Source: `oracle/oracle/code/server/sv_ccmds.cpp:22` (`qbLoadTransition`);
-/// `oracle/oracle/code/server/server.h:316-317` (extern decls);
-/// `oracle/oracle/code/game/g_public.h:54-59` (`SavedGameJustLoaded_e`).
+/// Source: `oracle/code/server/sv_ccmds.cpp:22` (`qbLoadTransition`);
+/// `oracle/code/server/server.h:316-317` (extern decls);
+/// `oracle/code/game/g_public.h:54-59` (`SavedGameJustLoaded_e`).
 #[allow(non_snake_case)] // Raven field names preserved (porting-rules §D12 spirit).
 pub struct Savegame {
     /// Raven `qboolean qbLoadTransition = qfalse;` — set for cross-map load
     /// transitions (`sv_ccmds.cpp:288`), cleared after spawn (`:311`).
     ///
-    /// Source: `oracle/oracle/code/server/sv_ccmds.cpp:22`
+    /// Source: `oracle/code/server/sv_ccmds.cpp:22`
     pub qbLoadTransition: qboolean,
     /// Raven `SavedGameJustLoaded_e eSavedGameJustLoaded` — `eNO`/`eFULL`/
     /// `eAUTO`; consumed at client-enter-world (`sv_client.cpp:483`), reset to
     /// `eNO` (`sv_client.cpp:500`), fed to `ge->Init` (`sv_game.cpp:690`).
     ///
-    /// Source: `oracle/oracle/code/server/server.h:316`;
-    /// `oracle/oracle/code/game/g_public.h:54-59`
+    /// Source: `oracle/code/server/server.h:316`;
+    /// `oracle/code/game/g_public.h:54-59`
     pub eSavedGameJustLoaded: SavedGameJustLoaded_e,
 }
 
@@ -74,8 +74,8 @@ pub struct Savegame {
 /// (`codemp/server/sv_main.cpp:192` — no master-server block exists in SP's
 /// `sv_main.cpp`).
 ///
-/// Source: `oracle/oracle/code/server/sv_main.cpp:18-20`;
-/// `oracle/oracle/code/server/server.h:42-49` (state/`SS_DEAD`).
+/// Source: `oracle/code/server/sv_main.cpp:18-20`;
+/// `oracle/code/server/server.h:42-49` (state/`SS_DEAD`).
 pub struct Server {
     /// Raven SP `game_export_t *ge` (`sv_main.cpp:20`) — the engine-held game
     /// export handle (the SEAM-D2 table seam; state-ownership "SP seam
@@ -85,21 +85,21 @@ pub struct Server {
     /// Raven `sv` (`server_t`, "local server") — embeds the `SS_DEAD` liveness
     /// `state`, `svEntities`, `configstrings`, `models`.
     ///
-    /// Source: `oracle/oracle/code/server/sv_main.cpp:19`
+    /// Source: `oracle/code/server/sv_main.cpp:19`
     pub sv: server_t,
     /// Raven `svs` (`serverStatic_t`, "persistant server info", persists
     /// across maps) — heap `clients[]`, snapshot ring.
     ///
-    /// Source: `oracle/oracle/code/server/sv_main.cpp:18`
+    /// Source: `oracle/code/server/sv_main.cpp:18`
     pub svs: serverStatic_t,
     /// SP-only save-game transition state (master table `Server.savegame` row).
     ///
-    /// Source: `oracle/oracle/code/server/sv_ccmds.cpp:22`;
-    /// `oracle/oracle/code/server/server.h:316-317`
+    /// Source: `oracle/code/server/sv_ccmds.cpp:22`;
+    /// `oracle/code/server/server.h:316-317`
     pub savegame: Savegame,
     /// Raven `sv_worldSectors[AREA_NODES]` + `sv_numworldSectors`.
     ///
-    /// Source: `oracle/oracle/code/server/sv_world.cpp:82-83`
+    /// Source: `oracle/code/server/sv_world.cpp:82-83`
     pub world_sectors: WorldSectors,
 }
 
@@ -110,17 +110,17 @@ pub struct Server {
 /// then `ge->Init(...)` (`:691`). Signature is a skeleton placeholder — no doc
 /// freezes the SP engine-side surface yet (checkpoint-3 finding).
 ///
-/// Source: `oracle/oracle/code/server/sv_game.cpp:478`
+/// Source: `oracle/code/server/sv_game.cpp:478`
 pub fn sv_init_game_progs(server: &mut Server) {
     let _ = server;
-    todo!("Port SV_InitGameProgs — oracle/oracle/code/server/sv_game.cpp:478")
+    todo!("Port SV_InitGameProgs — oracle/code/server/sv_game.cpp:478")
 }
 
 /// Raven SP `SV_ShutdownGameProgs` (`sv_game.cpp:403`): `ge->Shutdown()`,
 /// clear the handle (our SP unloads no DLL — static attach, DEC-07).
 ///
-/// Source: `oracle/oracle/code/server/sv_game.cpp:403`
+/// Source: `oracle/code/server/sv_game.cpp:403`
 pub fn sv_shutdown_game_progs(server: &mut Server) {
     let _ = server;
-    todo!("Port SV_ShutdownGameProgs — oracle/oracle/code/server/sv_game.cpp:403")
+    todo!("Port SV_ShutdownGameProgs — oracle/code/server/sv_game.cpp:403")
 }

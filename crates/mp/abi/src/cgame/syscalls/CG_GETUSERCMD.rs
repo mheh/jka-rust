@@ -12,8 +12,8 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `qboolean trap_GetUserCmd(int cmdNumber, usercmd_t *ucmd)`.
 /// Raven transport: `return CL_GetUserCmd(args[1], (struct usercmd_s *)VMA(2));`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:490-491`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:971-972`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:490-491`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:971-972`
 #[derive(Debug)]
 pub struct CgGetusercmdArgs {
     /// Usercmd sequence number, read by Raven as `args[1]`.
@@ -46,10 +46,10 @@ impl CgGetusercmdArgs {
 /// Raven wrapper: `return syscall(CG_GETUSERCMD, cmdNumber, ucmd);`
 /// Raven transport: `return CL_GetUserCmd(args[1], (struct usercmd_s *)VMA(2));`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:186`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:490-491`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:490-491`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:971-972`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:186`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:490-491`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:490-491`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:971-972`
 pub struct CgGetusercmd;
 
 impl OutboundSysCall for CgGetusercmd {

@@ -1,13 +1,15 @@
 # Porting Rules
 
-Rules for converting Raven C/C++ (`oracle/oracle/**`) into idiomatic Rust under
-the crate graph in `docs/workspace-architecture.md`. Verified against the faithful
-port (`oracle/`) by differential testing (`--features oracle`).
+Rules for converting Raven C/C++ (`oracle/**`) into idiomatic Rust under
+the crate graph in `docs/workspace-architecture.md`. Verified against the oracle
+differentially: committed golden fixtures (`tools/jampgame-oracle`) and the A/B
+referee running the Rust and oracle game dylibs in lockstep.
 
 ## A. What "correct" means
 
 1. **Behavioral parity at the ABI seam, verified against oracle.** A port is done
-   when its observable behavior matches the oracle under `--features oracle`.
+   when its observable behavior matches the oracle under differential test
+   (golden fixtures / A/B referee).
    Internals are free; the seam is not.
 2. **No speculative behavior.** If Raven's behavior is unclear, port it faithfully
    first — even if ugly — get it green, *then* refactor behind the passing diff.
@@ -25,7 +27,7 @@ port (`oracle/`) by differential testing (`--features oracle`).
    `EntityId(u32)` into an owned arena; no aliasing raw pointers in safe code.
 6. **One owned instance per logical singleton.** Where Raven truly had one global
    (the engine), model it as one owned object reached through a single controlled
-   accessor — not scattered statics. (See `src/engine/PLAN.md`.)
+   accessor — not scattered statics. (See `docs/architecture/state-ownership.md`.)
 
 ## C. C -> Rust idiom translation
 
@@ -97,7 +99,7 @@ Every ported item keeps the current codebase style:
   /// `trajectory_t`.
   ///
   /// Raven: <original Raven comment, if any>.
-  /// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2648-2657`
+  /// Type definition source: `oracle/codemp/game/q_shared.h:2648-2657`
   pub struct Trajectory { /* ... */ }
   ```
 
@@ -113,9 +115,24 @@ Every ported item keeps the current codebase style:
   ```rust
   // Raven's `typedef char memtag_t` is 1 byte, not int-wide; `#[repr(i8)]` matches
   // that width.
-  // Source: `oracle/oracle/codemp/game/q_shared.h:3101-3107`
+  // Source: `oracle/codemp/game/q_shared.h:3101-3107`
   #[repr(i8)]
   ```
+
+## Import & path style
+
+Two conventions the closure sweep made explicit (user rules 2026-07-12):
+
+- **No function-body `use` declarations.** Imports live at the file top, never inside a
+  fn body. A symbol a function needs is `use`d once at the module head, not pulled in
+  locally.
+- **No inline fully-qualified crate paths in expressions.** Reference a symbol by its
+  short name (imported at file top), not by an inline `crate::a::b::c` /
+  `mp_qshared::x::y` path spelled out at the call site.
+
+Exempt: `#[cfg(test)]` modules and the `const` layout-assert blocks (the
+`size_of`/`offset_of!` static-asserts), where fully-qualified paths and local `use`s
+are idiomatic and stay.
 
 ## Unported-work markers
 
@@ -138,7 +155,7 @@ greppable.
 
   ```rust
   //TODO: Port gentity_t
-  // Source: oracle/oracle/codemp/game/g_local.h:137
+  // Source: oracle/codemp/game/g_local.h:137
   pub m_pVehicle: (),
   ```
 
@@ -147,7 +164,7 @@ greppable.
 
   ```rust
   fn G_Spawn() -> EntityId {
-      todo!("Port G_Spawn — oracle/oracle/codemp/game/g_utils.c:...")
+      todo!("Port G_Spawn — oracle/codemp/game/g_utils.c:...")
   }
   ```
 

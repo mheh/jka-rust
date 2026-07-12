@@ -2,7 +2,7 @@
 
 /// Raven `jumpState_t` — jump state enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/game/b_public.h:97-104`
+/// Type definition source: `oracle/code/game/b_public.h:97-104`
 #[repr(i32)]
 pub enum jumpState_t {
     JS_WAITING = 0,

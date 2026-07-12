@@ -2,7 +2,7 @@
 
 /// Raven `mdxmSurface_t` — per-surface geometry offsets within an `.mdxm`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:219-243`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:219-243`
 #[repr(C)]
 pub struct mdxmSurface_t {
     /// this one field at least should be kept, since the game-engine may switch-case (but currently=0 in carcass)

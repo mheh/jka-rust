@@ -15,11 +15,11 @@ use mp_qshared::shared::{qboolean, vec3_t};
 ///     (const Eorientations)args[6], (const Eorientations)args[7], (const Eorientations)args[8],
 ///     (qhandle_t *)VMA(9), args[10], args[11]);`.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:268`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:861-865`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2549-2551`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1369-1372`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1369-1372`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:268`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:861-865`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2549-2551`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1369-1372`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1369-1372`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CgG2AngleoverrideArgs {
     /// Ghoul2 handle, decoded by Raven as `*((CGhoul2Info_v *)args[1])`.
@@ -79,11 +79,11 @@ impl CgG2AngleoverrideArgs {
 
 /// `CG_G2_ANGLEOVERRIDE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:268`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:861-865`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2549-2551`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1369-1372`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1369-1372`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:268`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:861-865`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2549-2551`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1369-1372`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1369-1372`
 pub struct CgG2Angleoverride;
 
 impl OutboundSysCall for CgG2Angleoverride {

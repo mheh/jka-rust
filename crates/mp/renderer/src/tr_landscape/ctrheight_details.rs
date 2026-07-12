@@ -3,7 +3,7 @@ use mp_qshared::shared::qhandle_t;
 
 /// Raven `CTRHeightDetails` — per-landscape-tier shader handle for height-based detail texturing.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_landscape.h:37-47`
+/// Type definition source: `oracle/codemp/renderer/tr_landscape.h:37-47`
 #[repr(C)]
 pub struct CTRHeightDetails {
     mShader: qhandle_t,

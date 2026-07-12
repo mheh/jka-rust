@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use super::super::MpGameImport;
 use abi_transport::pass_float;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_START_FRAME` outbound game-to-engine syscall.
 ///
@@ -27,7 +29,7 @@ impl BotlibStartFrameArgs {
 
 /// `BOTLIB_START_FRAME` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:347`
+/// Source: `oracle/codemp/game/g_public.h:347`
 pub struct BotlibStartFrame;
 
 impl OutboundSysCall for BotlibStartFrame {

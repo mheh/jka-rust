@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use mp_qshared::shared::qboolean;
 
 /// Arguments for `UI_LAN_MARKSERVERVISIBLE`.
@@ -9,7 +11,7 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `syscall( UI_LAN_MARKSERVERVISIBLE, source, n, visible );`
 /// Raven transport: `LAN_MarkServerVisible( args[1], args[2], (qboolean)args[3] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:318-319`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:318-319`
 #[derive(Debug)]
 pub struct UiLanMarkservervisibleArgs {
     source: c_int,
@@ -40,10 +42,10 @@ impl UiLanMarkservervisibleArgs {
 /// Raven wrapper: `syscall( UI_LAN_MARKSERVERVISIBLE, source, n, visible );`
 /// Raven transport: `LAN_MarkServerVisible( args[1], args[2], (qboolean)args[3] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:98`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:318-319`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:974`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1099-1101`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:98`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:318-319`
+/// Output source: `oracle/codemp/ui/ui_local.h:974`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1099-1101`
 pub struct UiLanMarkservervisible;
 
 impl OutboundSysCall for UiLanMarkservervisible {

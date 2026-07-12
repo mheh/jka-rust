@@ -1,4 +1,4 @@
-//! Port of `oracle/oracle/codemp/game/w_force.c` (jampgame force-power logic).
+//! Port of `oracle/codemp/game/w_force.c` (jampgame force-power logic).
 //!
 //! Generated from `tools/closure-prototype/fnskel.py`; bodies filled per the
 //! jampgame mega-pass (settled fork rulings,
@@ -33,9 +33,7 @@ use mp_bg::local::force_power_needed::forcePowerNeeded;
 use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
-// Source: `oracle/oracle/codemp/game/q_shared.h`
-const qtrue: qboolean = 1;
-const qfalse: qboolean = 0;
+// Source: `oracle/codemp/game/q_shared.h`
 
 /// Per-file `g_entities` base-pointer helper for `EntityId` arena resolution
 /// (matches the `g_missile.rs`/`g_trigger.rs`/`NPC_combat.rs` precedent).
@@ -47,7 +45,7 @@ unsafe fn ent_base(ctx: GameContext<'_>) -> *const gentity_t {
 // Raven force-mastery-level anonymous enum (bg_public.h) → int-wide consts per
 // the enum-vs-alias rule (anonymous enum → `const`s). Only the two spellings the
 // ported bodies name are surfaced.
-// Source: `oracle/oracle/codemp/game/bg_public.h:383-392`
+// Source: `oracle/codemp/game/bg_public.h:383-392`
 pub const FORCE_MASTERY_UNINITIATED: c_int = 0;
 pub const FORCE_MASTERY_INITIATE: c_int = 1;
 pub const FORCE_MASTERY_PADAWAN: c_int = 2;
@@ -104,20 +102,10 @@ use mp_qshared::common::mp::qcommon::usercmd_button::*;
 /// Raven `M_PI` (`<math.h>`), used by the seeker-drone orbit math.
 const M_PI: f64 = std::f64::consts::PI;
 
-/// Raven `PITCH`/`YAW`/`ROLL` — Euler-angle component indices.
-/// Source: `oracle/oracle/codemp/game/q_shared.h`
-const PITCH: usize = 0;
-const YAW: usize = 1;
-const ROLL: usize = 2;
-
-/// Raven `PMF_FOLLOW`/`PMF_STUCK_TO_WALL` (`playerState_t::pm_flags` bits).
-/// Source: `oracle/oracle/codemp/game/bg_public.h:415,417`
-const PMF_FOLLOW: c_int = 4096;
-const PMF_STUCK_TO_WALL: c_int = 16384;
-
-/// Raven `SFL_TWO_HANDED` (`weaponData_t::weaponflags` bit) — uses both hands.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:691`
-pub const SFL_TWO_HANDED: c_int = 1 << 4;
+// `PITCH`/`YAW`/`ROLL` (`crate::q_math`), `PMF_FOLLOW`/`PMF_STUCK_TO_WALL`
+// (`mp_qshared::…::pm_flags`) and `SFL_TWO_HANDED` (`crate::saber::saber_flags`,
+// the canonical `SFL_*` home) all resolve via the crate prelude glob; the
+// shadowing local copies were removed by the placeholder-const sweep.
 
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_bg::public::entity_event::entity_event_t::{
@@ -126,12 +114,12 @@ use mp_bg::public::entity_event::entity_event_t::{
 
 /// Raven `mindTrickTime` per force-mastery level (ms).
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:139-145`
+/// Source: `oracle/codemp/game/w_force.c:139-145`
 pub const mindTrickTime: [c_int; 4] = [0 /*none*/, 5000, 10000, 15000];
 
 /// Raven `G_PreDefSound` — spawn a predefined-sound temp entity at `org`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:40-49`
+/// Source: `oracle/codemp/game/w_force.c:40-49`
 pub fn G_PreDefSound(ctx: GameContext<'_>, org: vec3_t, pdSound: c_int) -> *mut gentity_t {
     unsafe {
         let te = G_TempEntity(ctx, org, EV_PREDEFSOUND as c_int);
@@ -143,7 +131,7 @@ pub fn G_PreDefSound(ctx: GameContext<'_>, org: vec3_t, pdSound: c_int) -> *mut 
 
 /// Raven `WP_InitForcePowers`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:147-572`
+/// Source: `oracle/codemp/game/w_force.c:147-572`
 // MISSING-SYMBOL: `bgSiegeClasses` (siege-class force table) is referenced by
 // its faithful Raven name; not yet a real GameWorld/BgState field.
 pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
@@ -253,7 +241,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // Raven `char forcePowers[256]` — an IN/OUT C buffer: `BG_LegalizedForcePowers`
         // legalizes it in place below, and the parse loop that follows reads the
         // legalized contents back out of this same buffer, not a stale copy.
-        // Source: `oracle/oracle/codemp/game/w_force.c:155` (`char forcePowers[256];`)
+        // Source: `oracle/codemp/game/w_force.c:155` (`char forcePowers[256];`)
         let mut forcePowers: [c_char; 256] = [0; 256];
 
         if (*ent).s.eType == ET_NPC as c_int && (*ent).s.number >= MAX_CLIENTS as c_int {
@@ -348,7 +336,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
         readBuf[i_r] = 0;
         //THE RANK
-        // Source: oracle/oracle/codemp/game/w_force.c:316 — plain `atoi(readBuf)`.
+        // Source: oracle/codemp/game/w_force.c:316 — plain `atoi(readBuf)`.
         (*cl).ps.fd.forceRank = atoi_str(&String::from_utf8_lossy(&readBuf[..i_r]));
         i += 1;
 
@@ -360,7 +348,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
         readBuf[i_r] = 0;
         //THE SIDE
-        // Source: oracle/oracle/codemp/game/w_force.c:328 — plain `atoi(readBuf)`.
+        // Source: oracle/codemp/game/w_force.c:328 — plain `atoi(readBuf)`.
         (*cl).ps.fd.forceSide = atoi_str(&String::from_utf8_lossy(&readBuf[..i_r]));
         i += 1;
 
@@ -571,7 +559,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `WP_SpawnInitForcePowers` — reset per-spawn force state.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:574-691`
+/// Source: `oracle/codemp/game/w_force.c:574-691`
 // MISSING-SYMBOL: `bgSiegeClasses` (siege-class force table).
 pub fn WP_SpawnInitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
@@ -666,7 +654,7 @@ pub fn WP_SpawnInitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `ForcePowerUsableOn` — can `attacker` use `forcePower` on `other`?
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:697-772`
+/// Source: `oracle/codemp/game/w_force.c:697-772`
 pub fn ForcePowerUsableOn(
     ctx: GameContext<'_>,
     attacker: *mut gentity_t,
@@ -781,7 +769,7 @@ pub fn ForcePowerUsableOn(
 
 /// Raven `WP_ForcePowerAvailable` — is there enough force pool for `forcePower`?
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:774-801`
+/// Source: `oracle/codemp/game/w_force.c:774-801`
 // MISSING-SYMBOL: `forcePowerNeeded` (per-level force-cost table).
 pub fn WP_ForcePowerAvailable(
     ctx: GameContext<'_>,
@@ -821,7 +809,7 @@ pub fn WP_ForcePowerAvailable(
 
 /// Raven `WP_ForcePowerInUse`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:803-811`
+/// Source: `oracle/codemp/game/w_force.c:803-811`
 pub fn WP_ForcePowerInUse(self_: *mut gentity_t, forcePower: forcePowers_t) -> qboolean {
     unsafe {
         if (*((*self_).client as *mut gclient_t))
@@ -840,7 +828,7 @@ pub fn WP_ForcePowerInUse(self_: *mut gentity_t, forcePower: forcePowers_t) -> q
 
 /// Raven `WP_ForcePowerUsable` — full gate on activating `forcePower`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:813-938`
+/// Source: `oracle/codemp/game/w_force.c:813-938`
 pub fn WP_ForcePowerUsable(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -951,7 +939,7 @@ pub fn WP_ForcePowerUsable(
 /// Raven `WP_AbsorbConversion` — absorb an incoming force attack, return the
 /// remaining (post-absorb) power level, or `-1` when not absorbed.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:940-997`
+/// Source: `oracle/codemp/game/w_force.c:940-997`
 pub fn WP_AbsorbConversion(
     ctx: GameContext<'_>,
     attacked: *mut gentity_t,
@@ -1020,7 +1008,7 @@ pub fn WP_AbsorbConversion(
 
 /// Raven `WP_ForcePowerRegenerate` — regen the force pool on a regular interval.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:999-1019`
+/// Source: `oracle/codemp/game/w_force.c:999-1019`
 pub fn WP_ForcePowerRegenerate(self_: *mut gentity_t, overrideAmt: c_int) {
     unsafe {
         if (*self_).client.is_null() {
@@ -1045,7 +1033,7 @@ pub fn WP_ForcePowerRegenerate(self_: *mut gentity_t, overrideAmt: c_int) {
 
 /// Raven `WP_ForcePowerStart` — activate the given force power.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1021-1234`
+/// Source: `oracle/codemp/game/w_force.c:1021-1234`
 pub fn WP_ForcePowerStart(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -1232,7 +1220,7 @@ pub fn WP_ForcePowerStart(
 
 /// Raven `ForceHeal`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1236-1292`
+/// Source: `oracle/codemp/game/w_force.c:1236-1292`
 pub fn ForceHeal(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -1278,7 +1266,7 @@ pub fn ForceHeal(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `WP_AddToClientBitflags` — pack `entNum` into a temp-ent's tricked-index
 /// bitfields.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1294-1317`
+/// Source: `oracle/codemp/game/w_force.c:1294-1317`
 pub fn WP_AddToClientBitflags(ent: *mut gentity_t, entNum: c_int) {
     unsafe {
         if ent.is_null() {
@@ -1299,7 +1287,7 @@ pub fn WP_AddToClientBitflags(ent: *mut gentity_t, entNum: c_int) {
 
 /// Raven `ForceTeamHeal`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1319-1422`
+/// Source: `oracle/codemp/game/w_force.c:1319-1422`
 // MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
@@ -1412,7 +1400,7 @@ pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ForceTeamForceReplenish`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1424-1521`
+/// Source: `oracle/codemp/game/w_force.c:1424-1521`
 // MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
@@ -1514,7 +1502,7 @@ pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ForceGrip`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1523-1594`
+/// Source: `oracle/codemp/game/w_force.c:1523-1594`
 pub fn ForceGrip(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -1598,11 +1586,20 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
             if (*target).s.number < MAX_CLIENTS as c_int && (*tcl).ps.m_iVehicleNum != 0 {
                 //a player on a vehicle
-                // PORT-NOTE(vehicle-vtable): faithful Raven grabs
-                // `vehEnt->m_pVehicle->m_pVehicleInfo->Eject(...)` — the
-                // vehicle vtable dispatch is not in this packet's resolved call
-                // surface. Left as a no-op eject; the surrounding grip logic is
-                // otherwise faithful.
+                let vehEnt = &mut (*ctx.world).g_entities[(*tcl).ps.m_iVehicleNum as usize]
+                    as *mut gentity_t;
+                if (*vehEnt).inuse != qfalse
+                    && !(*vehEnt).client.is_null()
+                    && !(*vehEnt).m_pVehicle.is_null()
+                {
+                    let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+                    if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
+                        || (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_ANIMAL
+                    {
+                        //push the guy off
+                        crate::veh_dispatch::eject(ctx, pVeh, target as *mut bgEntity_t, qfalse);
+                    }
+                }
             }
             (*cl).ps.fd.forceGripEntityNum = (tr.entityNum) as i32;
             (*tcl).ps.fd.forceGripStarted = level_time as f32;
@@ -1619,7 +1616,7 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ForceSpeed`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1596-1629`
+/// Source: `oracle/codemp/game/w_force.c:1596-1629`
 pub fn ForceSpeed(ctx: GameContext<'_>, self_: *mut gentity_t, forceDuration: c_int) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -1666,7 +1663,7 @@ pub fn ForceSpeed(ctx: GameContext<'_>, self_: *mut gentity_t, forceDuration: c_
 
 /// Raven `ForceSeeing`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1631-1656`
+/// Source: `oracle/codemp/game/w_force.c:1631-1656`
 pub fn ForceSeeing(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -1704,7 +1701,7 @@ pub fn ForceSeeing(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ForceProtect`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1658-1692`
+/// Source: `oracle/codemp/game/w_force.c:1658-1692`
 pub fn ForceProtect(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -1748,7 +1745,7 @@ pub fn ForceProtect(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ForceAbsorb`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1694-1728`
+/// Source: `oracle/codemp/game/w_force.c:1694-1728`
 pub fn ForceAbsorb(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -1792,7 +1789,7 @@ pub fn ForceAbsorb(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ForceRage`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1730-1775`
+/// Source: `oracle/codemp/game/w_force.c:1730-1775`
 pub fn ForceRage(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -1851,7 +1848,7 @@ pub fn ForceRage(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ForceLightning`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1777-1810`
+/// Source: `oracle/codemp/game/w_force.c:1777-1810`
 pub fn ForceLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -1890,7 +1887,7 @@ pub fn ForceLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ForceLightningDamage` — apply a lightning tick to `traceEnt`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1812-1900`
+/// Source: `oracle/codemp/game/w_force.c:1812-1900`
 pub fn ForceLightningDamage(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -2005,7 +2002,7 @@ pub fn ForceLightningDamage(
 
 /// Raven `ForceShootLightning`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:1902-2020`
+/// Source: `oracle/codemp/game/w_force.c:1902-2020`
 pub fn ForceShootLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let scl = (*self_).client as *mut gclient_t;
@@ -2180,7 +2177,7 @@ pub fn ForceShootLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ForceDrain`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2022-2056`
+/// Source: `oracle/codemp/game/w_force.c:2022-2056`
 pub fn ForceDrain(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -2218,7 +2215,7 @@ pub fn ForceDrain(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `ForceDrainDamage`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2058-2182`
+/// Source: `oracle/codemp/game/w_force.c:2058-2182`
 pub fn ForceDrainDamage(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -2320,7 +2317,7 @@ pub fn ForceDrainDamage(
 
 /// Raven `ForceShootDrain`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2184-2315`
+/// Source: `oracle/codemp/game/w_force.c:2184-2315`
 pub fn ForceShootDrain(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
     unsafe {
         let scl = (*self_).client as *mut gclient_t;
@@ -2507,7 +2504,7 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
 
 /// Raven `ForceJumpCharge`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2317-2375`
+/// Source: `oracle/codemp/game/w_force.c:2317-2375`
 // MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceJumpCharge(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut usercmd_t) {
     unsafe {
@@ -2596,7 +2593,7 @@ pub fn ForceJumpCharge(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut u
 
 /// Raven `WP_GetVelocityForForceJump`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2377-2460`
+/// Source: `oracle/codemp/game/w_force.c:2377-2460`
 // `jumpVel` is a written-through out-param (`VectorMA(... jumpVel)`); the
 // out-param reshape turns the by-value `vec3_t` into `&mut vec3_t`.
 pub fn WP_GetVelocityForForceJump(
@@ -2680,7 +2677,7 @@ pub fn WP_GetVelocityForForceJump(
 
 /// Raven `ForceJump`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2462-2500`
+/// Source: `oracle/codemp/game/w_force.c:2462-2500`
 // MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceJump(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut usercmd_t) {
     unsafe {
@@ -2733,7 +2730,7 @@ pub fn ForceJump(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut usercmd
 
 /// Raven `WP_AddAsMindtricked` — pack `entNum` into a forcedata mindtrick mask.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2502-2525`
+/// Source: `oracle/codemp/game/w_force.c:2502-2525`
 pub fn WP_AddAsMindtricked(fd: *mut forcedata_t, entNum: c_int) {
     unsafe {
         if fd.is_null() {
@@ -2754,7 +2751,7 @@ pub fn WP_AddAsMindtricked(fd: *mut forcedata_t, entNum: c_int) {
 
 /// Raven `ForceTelepathyCheckDirectNPCTarget`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2527-2721`
+/// Source: `oracle/codemp/game/w_force.c:2527-2721`
 // MISSING-SYMBOL: `gNPC_t` — `gentity_t::NPC` is still a `*mut c_void`
 // placeholder (see `crates/mp/qshared/src/common/mp/gentity.rs:160-164`); the
 // `scriptFlags`/`charmedTime`/`confusionTime` field accesses below are
@@ -2967,7 +2964,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
 
 /// Raven `ForceTelepathy`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2723-2893`
+/// Source: `oracle/codemp/game/w_force.c:2723-2893`
 pub fn ForceTelepathy(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -3132,19 +3129,19 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `GEntity_UseFunc`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2895-2898`
+/// Source: `oracle/codemp/game/w_force.c:2895-2898`
 pub fn GEntity_UseFunc(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    GlobalUse(self_, other, activator);
+    GlobalUse(ctx, self_, other, activator);
 }
 
 /// Raven `CanCounterThrow`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2900-2968`
+/// Source: `oracle/codemp/game/w_force.c:2900-2968`
 pub fn CanCounterThrow(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -3223,7 +3220,7 @@ pub fn CanCounterThrow(
 
 /// Raven `G_InGetUpAnim`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:2970-3023`
+/// Source: `oracle/codemp/game/w_force.c:2970-3023`
 pub fn G_InGetUpAnim(ps: *mut playerState_t) -> qboolean {
     unsafe {
         let legs = (*ps).legsAnim;
@@ -3282,7 +3279,7 @@ pub fn G_InGetUpAnim(ps: *mut playerState_t) -> qboolean {
 
 /// Raven `G_LetGoOfWall`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:3025-3042`
+/// Source: `oracle/codemp/game/w_force.c:3025-3042`
 pub fn G_LetGoOfWall(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
@@ -3301,7 +3298,7 @@ pub fn G_LetGoOfWall(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `ForceThrow`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:3054-3820`
+/// Source: `oracle/codemp/game/w_force.c:3054-3820`
 // PORT-NOTE(unported-global-and-vehicle-vtable): reads the un-ported
 // `forcePowerNeeded` table, calls the vehicle vtable
 // (`vehEnt->m_pVehicle->m_pVehicleInfo->Eject`, not in the resolved call surface),
@@ -3892,11 +3889,28 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                                 && (*pcl).ps.m_iVehicleNum != 0
                                 && dirLen <= 128.0
                             {
-                                // PORT-NOTE(vehicle-vtable): faithful Raven grabs
-                                // `vehEnt->m_pVehicle->m_pVehicleInfo->Eject(...)`
-                                // — the vehicle vtable dispatch is not in
-                                // this packet's resolved call surface; left as a
-                                // no-op eject.
+                                //a player on a vehicle
+                                let vehEnt = &mut (*ctx.world).g_entities
+                                    [(*pcl).ps.m_iVehicleNum as usize]
+                                    as *mut gentity_t;
+                                if (*vehEnt).inuse != qfalse
+                                    && !(*vehEnt).client.is_null()
+                                    && !(*vehEnt).m_pVehicle.is_null()
+                                {
+                                    let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+                                    if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
+                                        || (*(*pVeh).m_pVehicleInfo).r#type
+                                            == vehicleType_t::VH_ANIMAL
+                                    {
+                                        //push the guy off
+                                        crate::veh_dispatch::eject(
+                                            ctx,
+                                            pVeh,
+                                            push_list[x] as *mut bgEntity_t,
+                                            qfalse,
+                                        );
+                                    }
+                                }
                             }
                         }
                     }
@@ -4110,7 +4124,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
 
 /// Raven `WP_ForcePowerStop`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:3822-3946`
+/// Source: `oracle/codemp/game/w_force.c:3822-3946`
 pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: forcePowers_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -4254,7 +4268,7 @@ pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower
 
 /// Raven `DoGripAction`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:3948-4162`
+/// Source: `oracle/codemp/game/w_force.c:3948-4162`
 // PORT-NOTE(unported-global-table): reads `forcePowerNeeded[level][power]`
 // (const table not yet ported; values absent from packet). Parked like
 // the other `forcePowerNeeded` consumers.
@@ -4524,7 +4538,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
 
 /// Raven `G_IsMindTricked` — is `client` in one of `fd`'s mindtrick masks?
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:4164-4206`
+/// Source: `oracle/codemp/game/w_force.c:4164-4206`
 pub fn G_IsMindTricked(fd: *mut forcedata_t, client: c_int) -> qboolean {
     unsafe {
         let checkIn;
@@ -4562,7 +4576,7 @@ pub fn G_IsMindTricked(fd: *mut forcedata_t, client: c_int) -> qboolean {
 
 /// Raven `RemoveTrickedEnt` — clear `client` from `fd`'s mindtrick masks.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:4208-4231`
+/// Source: `oracle/codemp/game/w_force.c:4208-4231`
 fn RemoveTrickedEnt(fd: *mut forcedata_t, client: c_int) {
     unsafe {
         if fd.is_null() {
@@ -4583,7 +4597,7 @@ fn RemoveTrickedEnt(fd: *mut forcedata_t, client: c_int) {
 
 /// Raven `WP_UpdateMindtrickEnts`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:4236-4280`
+/// Source: `oracle/codemp/game/w_force.c:4236-4280`
 fn WP_UpdateMindtrickEnts(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -4645,7 +4659,7 @@ fn WP_UpdateMindtrickEnts(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `WP_ForcePowerRun`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:4282-4506`
+/// Source: `oracle/codemp/game/w_force.c:4282-4506`
 fn WP_ForcePowerRun(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -4861,7 +4875,7 @@ fn WP_ForcePowerRun(
 
 /// Raven `WP_DoSpecificPower`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:4508-4671`
+/// Source: `oracle/codemp/game/w_force.c:4508-4671`
 pub fn WP_DoSpecificPower(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -5003,7 +5017,7 @@ pub fn WP_DoSpecificPower(
 
 /// Raven `FindGenericEnemyIndex`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:4673-4709`
+/// Source: `oracle/codemp/game/w_force.c:4673-4709`
 pub fn FindGenericEnemyIndex(ctx: GameContext<'_>, self_: *mut gentity_t) {
     //Find another client that would be considered a threat.
     unsafe {
@@ -5057,7 +5071,7 @@ pub fn FindGenericEnemyIndex(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `SeekerDroneUpdate`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:4711-4868`
+/// Source: `oracle/codemp/game/w_force.c:4711-4868`
 pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -5250,7 +5264,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `HolocronUpdate`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:4870-4956`
+/// Source: `oracle/codemp/game/w_force.c:4870-4956`
 pub fn HolocronUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
     //keep holocron status updated in holocron mode
     unsafe {
@@ -5334,7 +5348,7 @@ pub fn HolocronUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `JediMasterUpdate`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:4958-5011`
+/// Source: `oracle/codemp/game/w_force.c:4958-5011`
 pub fn JediMasterUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
     //keep jedi master status updated for JM gametype
     unsafe {
@@ -5388,7 +5402,7 @@ pub fn JediMasterUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `WP_HasForcePowers` — does `ps` know any non-trivial force power?
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:5013-5034`
+/// Source: `oracle/codemp/game/w_force.c:5013-5034`
 pub fn WP_HasForcePowers(ps: *const playerState_t) -> qboolean {
     unsafe {
         if !ps.is_null() {
@@ -5410,7 +5424,7 @@ pub fn WP_HasForcePowers(ps: *const playerState_t) -> qboolean {
 
 /// Raven `G_SpecialRollGetup`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:5037-5092`
+/// Source: `oracle/codemp/game/w_force.c:5037-5092`
 pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -5479,7 +5493,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
 
 /// Raven `WP_ForcePowersUpdate`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:5094-5671`
+/// Source: `oracle/codemp/game/w_force.c:5094-5671`
 // PORT-NOTE(unported-global-table): the siege force-regen branch reads
 // `bgSiegeClasses[...].classflags` (saga class data, not yet ported;
 // values absent from packet) and `forcePowerDarkLight` (currently a private
@@ -5979,8 +5993,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                                     + ((*ctx.world).cvars.g_forceRegenTime.integer as f64
                                         * (0.6
                                             + (0.3 * (*cl).sess.wins as f32 as f64
-                                                / (*ctx.world).cvars.g_duel_fraglimit.integer
-                                                    as f32
+                                                / (*ctx.world).cvars.g_duel_fraglimit.integer as f32
                                                     as f64)))
                                         as c_int;
                             } else {
@@ -6013,7 +6026,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
 
 /// Raven `Jedi_DodgeEvasion`.
 ///
-/// Source: `oracle/oracle/codemp/game/w_force.c:5673-5801`
+/// Source: `oracle/codemp/game/w_force.c:5673-5801`
 pub fn Jedi_DodgeEvasion(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,

@@ -4,7 +4,7 @@ use core::ffi::c_ushort;
 
 /// Raven `TargaHeader` — TGA image file header.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:74-80`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:74-80`
 #[repr(C)]
 pub struct TargaHeader {
     pub id_length: u8,

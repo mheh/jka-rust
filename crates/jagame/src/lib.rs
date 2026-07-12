@@ -128,7 +128,7 @@ pub unsafe extern "C-unwind" fn GetGameAPI(import: *const game_import_t) -> *con
         num_entities: 0,
     };
     //TODO: Port GI_Init + gameinfo_import_t wiring
-    // Source: oracle/oracle/code/game/g_main.cpp:906-914
+    // Source: oracle/code/game/g_main.cpp:906-914
 
     GLOBALS.0.get() as *const game_export_t
 }
@@ -176,30 +176,30 @@ unsafe extern "C-unwind" fn init(
         qbLoadTransition,
     );
     let _ = (&ENGINE, WORLD.0.get());
-    todo!("Port InitGame — oracle/oracle/code/game/g_main.cpp:696")
+    todo!("Port InitGame — oracle/code/game/g_main.cpp:696")
 }
 
 /// Raven `ShutdownGame` (`g_main.cpp:806`). Takes the world OUT of the cell
 /// after its delegation returns (module-unload lifetime; drop runs teardown).
 unsafe extern "C-unwind" fn shutdown() {
-    todo!("Port ShutdownGame — oracle/oracle/code/game/g_main.cpp:806")
+    todo!("Port ShutdownGame — oracle/code/game/g_main.cpp:806")
 }
 
 /// Raven `WriteLevel` (`g_savegame.cpp:1131`).
 unsafe extern "C-unwind" fn write_level(qbAutosave: qboolean) {
     let _ = qbAutosave;
-    todo!("Port WriteLevel — oracle/oracle/code/game/g_savegame.cpp:1131")
+    todo!("Port WriteLevel — oracle/code/game/g_savegame.cpp:1131")
 }
 
 /// Raven `ReadLevel` (`g_savegame.cpp:1162`).
 unsafe extern "C-unwind" fn read_level(qbAutosave: qboolean, qbLoadTransition: qboolean) {
     let _ = (qbAutosave, qbLoadTransition);
-    todo!("Port ReadLevel — oracle/oracle/code/game/g_savegame.cpp:1162")
+    todo!("Port ReadLevel — oracle/code/game/g_savegame.cpp:1162")
 }
 
 /// Raven `GameAllowedToSaveHere` (`g_savegame.cpp:1228`).
 unsafe extern "C-unwind" fn game_allowed_to_save_here() -> qboolean {
-    todo!("Port GameAllowedToSaveHere — oracle/oracle/code/game/g_savegame.cpp:1228")
+    todo!("Port GameAllowedToSaveHere — oracle/code/game/g_savegame.cpp:1228")
 }
 
 /// Raven `ClientConnect` (`g_client.cpp:505`).
@@ -209,7 +209,7 @@ unsafe extern "C-unwind" fn client_connect(
     eSavedGameJustLoaded: SavedGameJustLoaded_e,
 ) -> *mut c_char {
     let _ = (clientNum, firstTime, eSavedGameJustLoaded);
-    todo!("Port ClientConnect — oracle/oracle/code/game/g_client.cpp:505")
+    todo!("Port ClientConnect — oracle/code/game/g_client.cpp:505")
 }
 
 /// Raven `ClientBegin` (`g_client.cpp:569`).
@@ -219,52 +219,52 @@ unsafe extern "C-unwind" fn client_begin(
     eSavedGameJustLoaded: SavedGameJustLoaded_e,
 ) {
     let _ = (clientNum, cmd, eSavedGameJustLoaded);
-    todo!("Port ClientBegin — oracle/oracle/code/game/g_client.cpp:569")
+    todo!("Port ClientBegin — oracle/code/game/g_client.cpp:569")
 }
 
 /// Raven `ClientUserinfoChanged` (`g_client.cpp:416`).
 unsafe extern "C-unwind" fn client_userinfo_changed(clientNum: c_int) {
     let _ = clientNum;
-    todo!("Port ClientUserinfoChanged — oracle/oracle/code/game/g_client.cpp:416")
+    todo!("Port ClientUserinfoChanged — oracle/code/game/g_client.cpp:416")
 }
 
 /// Raven `ClientDisconnect` (`g_client.cpp:2449`).
 unsafe extern "C-unwind" fn client_disconnect(clientNum: c_int) {
     let _ = clientNum;
-    todo!("Port ClientDisconnect — oracle/oracle/code/game/g_client.cpp:2449")
+    todo!("Port ClientDisconnect — oracle/code/game/g_client.cpp:2449")
 }
 
 /// Raven `ClientCommand` (`g_cmds.cpp:1368`).
 unsafe extern "C-unwind" fn client_command(clientNum: c_int) {
     let _ = clientNum;
-    todo!("Port ClientCommand — oracle/oracle/code/game/g_cmds.cpp:1368")
+    todo!("Port ClientCommand — oracle/code/game/g_cmds.cpp:1368")
 }
 
 /// Raven `ClientThink` (`g_active.cpp:5615`).
 unsafe extern "C-unwind" fn client_think(clientNum: c_int, cmd: *mut usercmd_t) {
     let _ = (clientNum, cmd);
-    todo!("Port ClientThink — oracle/oracle/code/game/g_active.cpp:5615")
+    todo!("Port ClientThink — oracle/code/game/g_active.cpp:5615")
 }
 
 /// Raven `G_RunFrame` (`g_main.cpp:1895`).
 unsafe extern "C-unwind" fn run_frame(levelTime: c_int) {
     let _ = levelTime;
-    todo!("Port G_RunFrame — oracle/oracle/code/game/g_main.cpp:1895")
+    todo!("Port G_RunFrame — oracle/code/game/g_main.cpp:1895")
 }
 
 /// Raven `G_ConnectNavs` (`g_main.cpp:503`).
 unsafe extern "C-unwind" fn connect_navs(mapname: *const c_char, checkSum: c_int) {
     let _ = (mapname, checkSum);
-    todo!("Port G_ConnectNavs — oracle/oracle/code/game/g_main.cpp:503")
+    todo!("Port G_ConnectNavs — oracle/code/game/g_main.cpp:503")
 }
 
 /// Raven `ConsoleCommand` (`g_svcmds.cpp:1005`).
 unsafe extern "C-unwind" fn console_command() -> qboolean {
-    todo!("Port ConsoleCommand — oracle/oracle/code/game/g_svcmds.cpp:1005")
+    todo!("Port ConsoleCommand — oracle/code/game/g_svcmds.cpp:1005")
 }
 
 /// Raven `G_GameSpawnRMGEntity` (`g_main.cpp:857`).
 unsafe extern "C-unwind" fn game_spawn_rmg_entity(s: *mut c_char) {
     let _ = s;
-    todo!("Port G_GameSpawnRMGEntity — oracle/oracle/code/game/g_main.cpp:857")
+    todo!("Port G_GameSpawnRMGEntity — oracle/code/game/g_main.cpp:857")
 }

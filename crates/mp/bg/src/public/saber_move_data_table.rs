@@ -1,6 +1,6 @@
 //! MP `bg_saber.c` saber-move finite-state table.
 //!
-//! Source: `oracle/oracle/codemp/game/bg_saber.c:113-321`
+//! Source: `oracle/codemp/game/bg_saber.c:113-321`
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
@@ -18,7 +18,7 @@ use super::set_anim::{
 
 // Per-move animation-flag presets — combinations of the `SETANIM_FLAG_*` bits, used by
 // the `animSetFlags` column below.
-// Source: `oracle/oracle/codemp/game/bg_saber.c:113-117`
+// Source: `oracle/codemp/game/bg_saber.c:113-117`
 pub const AFLAG_IDLE: c_uint = SETANIM_FLAG_NORMAL as c_uint;
 pub const AFLAG_ACTIVE: c_uint =
     (SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS) as c_uint;
@@ -37,206 +37,1971 @@ pub const AFLAG_FINISH: c_uint = SETANIM_FLAG_HOLD as c_uint;
 /// A raw pointer field is not `Sync`, so this is a `const` (inlined per use), not a
 /// `static` (which would require `Sync`).
 ///
-/// Source: `oracle/oracle/codemp/game/bg_saber.c:120-321`
+/// Source: `oracle/codemp/game/bg_saber.c:120-321`
 pub const saberMoveData: [saberMoveData_t; LS_MOVE_MAX as usize] = [
     // name			anim(do all styles?)startQ	endQ	setanimflag		blend,	blocking	chain_idle		chain_attack	trailLen
-    saberMoveData_t { name: c"None".as_ptr() as *mut c_char, animToUse: BOTH_STAND1 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_IDLE, blendTime: 350, blocking: BLK_NO as c_int, chain_idle: LS_NONE, chain_attack: LS_NONE, trailLength: 0 }, // LS_NONE		= 0,
-
+    saberMoveData_t {
+        name: c"None".as_ptr() as *mut c_char,
+        animToUse: BOTH_STAND1 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_IDLE,
+        blendTime: 350,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_NONE,
+        chain_attack: LS_NONE,
+        trailLength: 0,
+    }, // LS_NONE		= 0,
     // General movements with saber
-    saberMoveData_t { name: c"Ready".as_ptr() as *mut c_char, animToUse: BOTH_STAND2 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_IDLE, blendTime: 350, blocking: BLK_WIDE as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 0 }, // LS_READY,
-    saberMoveData_t { name: c"Draw".as_ptr() as *mut c_char, animToUse: BOTH_STAND1TO2 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_FINISH, blendTime: 350, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 0 }, // LS_DRAW,
-    saberMoveData_t { name: c"Putaway".as_ptr() as *mut c_char, animToUse: BOTH_STAND2TO1 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_FINISH, blendTime: 350, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 0 }, // LS_PUTAWAY,
-
+    saberMoveData_t {
+        name: c"Ready".as_ptr() as *mut c_char,
+        animToUse: BOTH_STAND2 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_IDLE,
+        blendTime: 350,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 0,
+    }, // LS_READY,
+    saberMoveData_t {
+        name: c"Draw".as_ptr() as *mut c_char,
+        animToUse: BOTH_STAND1TO2 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_FINISH,
+        blendTime: 350,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 0,
+    }, // LS_DRAW,
+    saberMoveData_t {
+        name: c"Putaway".as_ptr() as *mut c_char,
+        animToUse: BOTH_STAND2TO1 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_FINISH,
+        blendTime: 350,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 0,
+    }, // LS_PUTAWAY,
     // Attacks
     //UL2LR
-    saberMoveData_t { name: c"TL2BR Att".as_ptr() as *mut c_char, animToUse: BOTH_A1_TL_BR as c_int, startQuad: Q_TL as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_R_TL2BR, trailLength: 200 }, // LS_A_TL2BR
+    saberMoveData_t {
+        name: c"TL2BR Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_A1_TL_BR as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_R_TL2BR,
+        trailLength: 200,
+    }, // LS_A_TL2BR
     //SLASH LEFT
-    saberMoveData_t { name: c"L2R Att".as_ptr() as *mut c_char, animToUse: BOTH_A1__L__R as c_int, startQuad: Q_L as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_R_L2R, chain_attack: LS_R_L2R, trailLength: 200 }, // LS_A_L2R
+    saberMoveData_t {
+        name: c"L2R Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_A1__L__R as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_R_L2R,
+        chain_attack: LS_R_L2R,
+        trailLength: 200,
+    }, // LS_A_L2R
     //LL2UR
-    saberMoveData_t { name: c"BL2TR Att".as_ptr() as *mut c_char, animToUse: BOTH_A1_BL_TR as c_int, startQuad: Q_BL as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_TIGHT as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_R_BL2TR, trailLength: 200 }, // LS_A_BL2TR
+    saberMoveData_t {
+        name: c"BL2TR Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_A1_BL_TR as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_R_BL2TR,
+        trailLength: 200,
+    }, // LS_A_BL2TR
     //LR2UL
-    saberMoveData_t { name: c"BR2TL Att".as_ptr() as *mut c_char, animToUse: BOTH_A1_BR_TL as c_int, startQuad: Q_BR as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_R_BR2TL, trailLength: 200 }, // LS_A_BR2TL
+    saberMoveData_t {
+        name: c"BR2TL Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_A1_BR_TL as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_R_BR2TL,
+        trailLength: 200,
+    }, // LS_A_BR2TL
     //SLASH RIGHT
-    saberMoveData_t { name: c"R2L Att".as_ptr() as *mut c_char, animToUse: BOTH_A1__R__L as c_int, startQuad: Q_R as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_R_R2L, chain_attack: LS_R_R2L, trailLength: 200 }, // LS_A_R2L
+    saberMoveData_t {
+        name: c"R2L Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_A1__R__L as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_R_R2L,
+        chain_attack: LS_R_R2L,
+        trailLength: 200,
+    }, // LS_A_R2L
     //UR2LL
-    saberMoveData_t { name: c"TR2BL Att".as_ptr() as *mut c_char, animToUse: BOTH_A1_TR_BL as c_int, startQuad: Q_TR as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_R_TR2BL, trailLength: 200 }, // LS_A_TR2BL
+    saberMoveData_t {
+        name: c"TR2BL Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_A1_TR_BL as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_R_TR2BL,
+        trailLength: 200,
+    }, // LS_A_TR2BL
     //SLASH DOWN
-    saberMoveData_t { name: c"T2B Att".as_ptr() as *mut c_char, animToUse: BOTH_A1_T__B_ as c_int, startQuad: Q_T as c_int, endQuad: Q_B as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_R_T2B, chain_attack: LS_R_T2B, trailLength: 200 }, // LS_A_T2B
+    saberMoveData_t {
+        name: c"T2B Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_A1_T__B_ as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_B as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_R_T2B,
+        chain_attack: LS_R_T2B,
+        trailLength: 200,
+    }, // LS_A_T2B
     //special attacks
-    saberMoveData_t { name: c"Back Stab".as_ptr() as *mut c_char, animToUse: BOTH_A2_STABBACK1 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_A_BACKSTAB
-    saberMoveData_t { name: c"Back Att".as_ptr() as *mut c_char, animToUse: BOTH_ATTACK_BACK as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_A_BACK
-    saberMoveData_t { name: c"CR Back Att".as_ptr() as *mut c_char, animToUse: BOTH_CROUCHATTACKBACK1 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_A_BACK_CR
-    saberMoveData_t { name: c"RollStab".as_ptr() as *mut c_char, animToUse: BOTH_ROLL_STAB as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_ROLL_STAB
-    saberMoveData_t { name: c"Lunge Att".as_ptr() as *mut c_char, animToUse: BOTH_LUNGE2_B__T_ as c_int, startQuad: Q_B as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_A_LUNGE
-    saberMoveData_t { name: c"Jump Att".as_ptr() as *mut c_char, animToUse: BOTH_FORCELEAP2_T__B_ as c_int, startQuad: Q_T as c_int, endQuad: Q_B as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_A_JUMP_T__B_
-    saberMoveData_t { name: c"Flip Stab".as_ptr() as *mut c_char, animToUse: BOTH_JUMPFLIPSTABDOWN as c_int, startQuad: Q_R as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_T1_T___R, trailLength: 200 }, // LS_A_FLIP_STAB
-    saberMoveData_t { name: c"Flip Slash".as_ptr() as *mut c_char, animToUse: BOTH_JUMPFLIPSLASHDOWN1 as c_int, startQuad: Q_L as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_T1__R_T_, trailLength: 200 }, // LS_A_FLIP_SLASH
-    saberMoveData_t { name: c"DualJump Atk".as_ptr() as *mut c_char, animToUse: BOTH_JUMPATTACK6 as c_int, startQuad: Q_R as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_T1_BL_TR, trailLength: 200 }, // LS_JUMPATTACK_DUAL
-
-    saberMoveData_t { name: c"DualJumpAtkL_A".as_ptr() as *mut c_char, animToUse: BOTH_ARIAL_LEFT as c_int, startQuad: Q_R as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_A_TL2BR, trailLength: 200 }, // LS_JUMPATTACK_ARIAL_LEFT
-    saberMoveData_t { name: c"DualJumpAtkR_A".as_ptr() as *mut c_char, animToUse: BOTH_ARIAL_RIGHT as c_int, startQuad: Q_R as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_A_TR2BL, trailLength: 200 }, // LS_JUMPATTACK_ARIAL_RIGHT
-
-    saberMoveData_t { name: c"DualJumpAtkL_A".as_ptr() as *mut c_char, animToUse: BOTH_CARTWHEEL_LEFT as c_int, startQuad: Q_R as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_T1_TL_BR, trailLength: 200 }, // LS_JUMPATTACK_CART_LEFT
-    saberMoveData_t { name: c"DualJumpAtkR_A".as_ptr() as *mut c_char, animToUse: BOTH_CARTWHEEL_RIGHT as c_int, startQuad: Q_R as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_T1_TR_BL, trailLength: 200 }, // LS_JUMPATTACK_CART_RIGHT
-
-    saberMoveData_t { name: c"DualJumpAtkLStaff".as_ptr() as *mut c_char, animToUse: BOTH_BUTTERFLY_FL1 as c_int, startQuad: Q_R as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_T1__L__R, trailLength: 200 }, // LS_JUMPATTACK_STAFF_LEFT
-    saberMoveData_t { name: c"DualJumpAtkRStaff".as_ptr() as *mut c_char, animToUse: BOTH_BUTTERFLY_FR1 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_T1__R__L, trailLength: 200 }, // LS_JUMPATTACK_STAFF_RIGHT
-
-    saberMoveData_t { name: c"ButterflyLeft".as_ptr() as *mut c_char, animToUse: BOTH_BUTTERFLY_LEFT as c_int, startQuad: Q_R as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_T1__L__R, trailLength: 200 }, // LS_BUTTERFLY_LEFT
-    saberMoveData_t { name: c"ButterflyRight".as_ptr() as *mut c_char, animToUse: BOTH_BUTTERFLY_RIGHT as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_T1__R__L, trailLength: 200 }, // LS_BUTTERFLY_RIGHT
-
-    saberMoveData_t { name: c"BkFlip Atk".as_ptr() as *mut c_char, animToUse: BOTH_JUMPATTACK7 as c_int, startQuad: Q_B as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_T1_T___R, trailLength: 200 }, // LS_A_BACKFLIP_ATK
-    saberMoveData_t { name: c"DualSpinAtk".as_ptr() as *mut c_char, animToUse: BOTH_SPINATTACK6 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_SPINATTACK_DUAL
-    saberMoveData_t { name: c"StfSpinAtk".as_ptr() as *mut c_char, animToUse: BOTH_SPINATTACK7 as c_int, startQuad: Q_L as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_SPINATTACK
-    saberMoveData_t { name: c"LngLeapAtk".as_ptr() as *mut c_char, animToUse: BOTH_FORCELONGLEAP_ATTACK as c_int, startQuad: Q_R as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_LEAP_ATTACK
-    saberMoveData_t { name: c"SwoopAtkR".as_ptr() as *mut c_char, animToUse: BOTH_VS_ATR_S as c_int, startQuad: Q_R as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_SWOOP_ATTACK_RIGHT
-    saberMoveData_t { name: c"SwoopAtkL".as_ptr() as *mut c_char, animToUse: BOTH_VS_ATL_S as c_int, startQuad: Q_L as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_SWOOP_ATTACK_LEFT
-    saberMoveData_t { name: c"TauntaunAtkR".as_ptr() as *mut c_char, animToUse: BOTH_VT_ATR_S as c_int, startQuad: Q_R as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_TAUNTAUN_ATTACK_RIGHT
-    saberMoveData_t { name: c"TauntaunAtkL".as_ptr() as *mut c_char, animToUse: BOTH_VT_ATL_S as c_int, startQuad: Q_L as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_TAUNTAUN_ATTACK_LEFT
-    saberMoveData_t { name: c"StfKickFwd".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_F as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_F
-    saberMoveData_t { name: c"StfKickBack".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_B as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_B
-    saberMoveData_t { name: c"StfKickRight".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_R as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_R
-    saberMoveData_t { name: c"StfKickLeft".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_L as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_L
-    saberMoveData_t { name: c"StfKickSpin".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_S as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_S
-    saberMoveData_t { name: c"StfKickBkFwd".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_BF as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_BF
-    saberMoveData_t { name: c"StfKickSplit".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_RL as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_RL
-    saberMoveData_t { name: c"StfKickFwdAir".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_F_AIR as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_F_AIR
-    saberMoveData_t { name: c"StfKickBackAir".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_B_AIR as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_B_AIR
-    saberMoveData_t { name: c"StfKickRightAir".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_R_AIR as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_R_AIR
-    saberMoveData_t { name: c"StfKickLeftAir".as_ptr() as *mut c_char, animToUse: BOTH_A7_KICK_L_AIR as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_KICK_L_AIR
-    saberMoveData_t { name: c"StabDown".as_ptr() as *mut c_char, animToUse: BOTH_STABDOWN as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_STABDOWN
-    saberMoveData_t { name: c"StabDownStf".as_ptr() as *mut c_char, animToUse: BOTH_STABDOWN_STAFF as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_STABDOWN_STAFF
-    saberMoveData_t { name: c"StabDownDual".as_ptr() as *mut c_char, animToUse: BOTH_STABDOWN_DUAL as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_S_R2L, trailLength: 200 }, // LS_STABDOWN_DUAL
-    saberMoveData_t { name: c"dualspinprot".as_ptr() as *mut c_char, animToUse: BOTH_A6_SABERPROTECT as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 500 }, // LS_DUAL_SPIN_PROTECT
-    saberMoveData_t { name: c"StfSoulCal".as_ptr() as *mut c_char, animToUse: BOTH_A7_SOULCAL as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 500 }, // LS_STAFF_SOULCAL
-    saberMoveData_t { name: c"specialfast".as_ptr() as *mut c_char, animToUse: BOTH_A1_SPECIAL as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 2000 }, // LS_A1_SPECIAL
-    saberMoveData_t { name: c"specialmed".as_ptr() as *mut c_char, animToUse: BOTH_A2_SPECIAL as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 2000 }, // LS_A2_SPECIAL
-    saberMoveData_t { name: c"specialstr".as_ptr() as *mut c_char, animToUse: BOTH_A3_SPECIAL as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 2000 }, // LS_A3_SPECIAL
-    saberMoveData_t { name: c"upsidedwnatk".as_ptr() as *mut c_char, animToUse: BOTH_FLIP_ATTACK7 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_UPSIDE_DOWN_ATTACK
-    saberMoveData_t { name: c"pullatkstab".as_ptr() as *mut c_char, animToUse: BOTH_PULL_IMPALE_STAB as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_PULL_ATTACK_STAB
-    saberMoveData_t { name: c"pullatkswing".as_ptr() as *mut c_char, animToUse: BOTH_PULL_IMPALE_SWING as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_PULL_ATTACK_SWING
-    saberMoveData_t { name: c"AloraSpinAtk".as_ptr() as *mut c_char, animToUse: BOTH_ALORA_SPIN_SLASH as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_SPINATTACK_ALORA
-    saberMoveData_t { name: c"Dual FB Atk".as_ptr() as *mut c_char, animToUse: BOTH_A6_FB as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_DUAL_FB
-    saberMoveData_t { name: c"Dual LR Atk".as_ptr() as *mut c_char, animToUse: BOTH_A6_LR as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_DUAL_LR
-    saberMoveData_t { name: c"StfHiltBash".as_ptr() as *mut c_char, animToUse: BOTH_A7_HILT as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_HILT_BASH
-
+    saberMoveData_t {
+        name: c"Back Stab".as_ptr() as *mut c_char,
+        animToUse: BOTH_A2_STABBACK1 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_A_BACKSTAB
+    saberMoveData_t {
+        name: c"Back Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_ATTACK_BACK as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_A_BACK
+    saberMoveData_t {
+        name: c"CR Back Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_CROUCHATTACKBACK1 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_A_BACK_CR
+    saberMoveData_t {
+        name: c"RollStab".as_ptr() as *mut c_char,
+        animToUse: BOTH_ROLL_STAB as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_ROLL_STAB
+    saberMoveData_t {
+        name: c"Lunge Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_LUNGE2_B__T_ as c_int,
+        startQuad: Q_B as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_A_LUNGE
+    saberMoveData_t {
+        name: c"Jump Att".as_ptr() as *mut c_char,
+        animToUse: BOTH_FORCELEAP2_T__B_ as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_B as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_A_JUMP_T__B_
+    saberMoveData_t {
+        name: c"Flip Stab".as_ptr() as *mut c_char,
+        animToUse: BOTH_JUMPFLIPSTABDOWN as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_T1_T___R,
+        trailLength: 200,
+    }, // LS_A_FLIP_STAB
+    saberMoveData_t {
+        name: c"Flip Slash".as_ptr() as *mut c_char,
+        animToUse: BOTH_JUMPFLIPSLASHDOWN1 as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_T1__R_T_,
+        trailLength: 200,
+    }, // LS_A_FLIP_SLASH
+    saberMoveData_t {
+        name: c"DualJump Atk".as_ptr() as *mut c_char,
+        animToUse: BOTH_JUMPATTACK6 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_T1_BL_TR,
+        trailLength: 200,
+    }, // LS_JUMPATTACK_DUAL
+    saberMoveData_t {
+        name: c"DualJumpAtkL_A".as_ptr() as *mut c_char,
+        animToUse: BOTH_ARIAL_LEFT as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_A_TL2BR,
+        trailLength: 200,
+    }, // LS_JUMPATTACK_ARIAL_LEFT
+    saberMoveData_t {
+        name: c"DualJumpAtkR_A".as_ptr() as *mut c_char,
+        animToUse: BOTH_ARIAL_RIGHT as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_A_TR2BL,
+        trailLength: 200,
+    }, // LS_JUMPATTACK_ARIAL_RIGHT
+    saberMoveData_t {
+        name: c"DualJumpAtkL_A".as_ptr() as *mut c_char,
+        animToUse: BOTH_CARTWHEEL_LEFT as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_T1_TL_BR,
+        trailLength: 200,
+    }, // LS_JUMPATTACK_CART_LEFT
+    saberMoveData_t {
+        name: c"DualJumpAtkR_A".as_ptr() as *mut c_char,
+        animToUse: BOTH_CARTWHEEL_RIGHT as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_T1_TR_BL,
+        trailLength: 200,
+    }, // LS_JUMPATTACK_CART_RIGHT
+    saberMoveData_t {
+        name: c"DualJumpAtkLStaff".as_ptr() as *mut c_char,
+        animToUse: BOTH_BUTTERFLY_FL1 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_T1__L__R,
+        trailLength: 200,
+    }, // LS_JUMPATTACK_STAFF_LEFT
+    saberMoveData_t {
+        name: c"DualJumpAtkRStaff".as_ptr() as *mut c_char,
+        animToUse: BOTH_BUTTERFLY_FR1 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_T1__R__L,
+        trailLength: 200,
+    }, // LS_JUMPATTACK_STAFF_RIGHT
+    saberMoveData_t {
+        name: c"ButterflyLeft".as_ptr() as *mut c_char,
+        animToUse: BOTH_BUTTERFLY_LEFT as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_T1__L__R,
+        trailLength: 200,
+    }, // LS_BUTTERFLY_LEFT
+    saberMoveData_t {
+        name: c"ButterflyRight".as_ptr() as *mut c_char,
+        animToUse: BOTH_BUTTERFLY_RIGHT as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_T1__R__L,
+        trailLength: 200,
+    }, // LS_BUTTERFLY_RIGHT
+    saberMoveData_t {
+        name: c"BkFlip Atk".as_ptr() as *mut c_char,
+        animToUse: BOTH_JUMPATTACK7 as c_int,
+        startQuad: Q_B as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_T1_T___R,
+        trailLength: 200,
+    }, // LS_A_BACKFLIP_ATK
+    saberMoveData_t {
+        name: c"DualSpinAtk".as_ptr() as *mut c_char,
+        animToUse: BOTH_SPINATTACK6 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_SPINATTACK_DUAL
+    saberMoveData_t {
+        name: c"StfSpinAtk".as_ptr() as *mut c_char,
+        animToUse: BOTH_SPINATTACK7 as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_SPINATTACK
+    saberMoveData_t {
+        name: c"LngLeapAtk".as_ptr() as *mut c_char,
+        animToUse: BOTH_FORCELONGLEAP_ATTACK as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_LEAP_ATTACK
+    saberMoveData_t {
+        name: c"SwoopAtkR".as_ptr() as *mut c_char,
+        animToUse: BOTH_VS_ATR_S as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_SWOOP_ATTACK_RIGHT
+    saberMoveData_t {
+        name: c"SwoopAtkL".as_ptr() as *mut c_char,
+        animToUse: BOTH_VS_ATL_S as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_SWOOP_ATTACK_LEFT
+    saberMoveData_t {
+        name: c"TauntaunAtkR".as_ptr() as *mut c_char,
+        animToUse: BOTH_VT_ATR_S as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_TAUNTAUN_ATTACK_RIGHT
+    saberMoveData_t {
+        name: c"TauntaunAtkL".as_ptr() as *mut c_char,
+        animToUse: BOTH_VT_ATL_S as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_TAUNTAUN_ATTACK_LEFT
+    saberMoveData_t {
+        name: c"StfKickFwd".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_F as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_F
+    saberMoveData_t {
+        name: c"StfKickBack".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_B as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_B
+    saberMoveData_t {
+        name: c"StfKickRight".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_R as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_R
+    saberMoveData_t {
+        name: c"StfKickLeft".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_L as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_L
+    saberMoveData_t {
+        name: c"StfKickSpin".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_S as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_S
+    saberMoveData_t {
+        name: c"StfKickBkFwd".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_BF as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_BF
+    saberMoveData_t {
+        name: c"StfKickSplit".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_RL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_RL
+    saberMoveData_t {
+        name: c"StfKickFwdAir".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_F_AIR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_F_AIR
+    saberMoveData_t {
+        name: c"StfKickBackAir".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_B_AIR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_B_AIR
+    saberMoveData_t {
+        name: c"StfKickRightAir".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_R_AIR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_R_AIR
+    saberMoveData_t {
+        name: c"StfKickLeftAir".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_KICK_L_AIR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_KICK_L_AIR
+    saberMoveData_t {
+        name: c"StabDown".as_ptr() as *mut c_char,
+        animToUse: BOTH_STABDOWN as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_STABDOWN
+    saberMoveData_t {
+        name: c"StabDownStf".as_ptr() as *mut c_char,
+        animToUse: BOTH_STABDOWN_STAFF as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_STABDOWN_STAFF
+    saberMoveData_t {
+        name: c"StabDownDual".as_ptr() as *mut c_char,
+        animToUse: BOTH_STABDOWN_DUAL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_S_R2L,
+        trailLength: 200,
+    }, // LS_STABDOWN_DUAL
+    saberMoveData_t {
+        name: c"dualspinprot".as_ptr() as *mut c_char,
+        animToUse: BOTH_A6_SABERPROTECT as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 500,
+    }, // LS_DUAL_SPIN_PROTECT
+    saberMoveData_t {
+        name: c"StfSoulCal".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_SOULCAL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 500,
+    }, // LS_STAFF_SOULCAL
+    saberMoveData_t {
+        name: c"specialfast".as_ptr() as *mut c_char,
+        animToUse: BOTH_A1_SPECIAL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 2000,
+    }, // LS_A1_SPECIAL
+    saberMoveData_t {
+        name: c"specialmed".as_ptr() as *mut c_char,
+        animToUse: BOTH_A2_SPECIAL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 2000,
+    }, // LS_A2_SPECIAL
+    saberMoveData_t {
+        name: c"specialstr".as_ptr() as *mut c_char,
+        animToUse: BOTH_A3_SPECIAL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 2000,
+    }, // LS_A3_SPECIAL
+    saberMoveData_t {
+        name: c"upsidedwnatk".as_ptr() as *mut c_char,
+        animToUse: BOTH_FLIP_ATTACK7 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_UPSIDE_DOWN_ATTACK
+    saberMoveData_t {
+        name: c"pullatkstab".as_ptr() as *mut c_char,
+        animToUse: BOTH_PULL_IMPALE_STAB as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_PULL_ATTACK_STAB
+    saberMoveData_t {
+        name: c"pullatkswing".as_ptr() as *mut c_char,
+        animToUse: BOTH_PULL_IMPALE_SWING as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_PULL_ATTACK_SWING
+    saberMoveData_t {
+        name: c"AloraSpinAtk".as_ptr() as *mut c_char,
+        animToUse: BOTH_ALORA_SPIN_SLASH as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_SPINATTACK_ALORA
+    saberMoveData_t {
+        name: c"Dual FB Atk".as_ptr() as *mut c_char,
+        animToUse: BOTH_A6_FB as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_DUAL_FB
+    saberMoveData_t {
+        name: c"Dual LR Atk".as_ptr() as *mut c_char,
+        animToUse: BOTH_A6_LR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_DUAL_LR
+    saberMoveData_t {
+        name: c"StfHiltBash".as_ptr() as *mut c_char,
+        animToUse: BOTH_A7_HILT as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_HILT_BASH
     //starts
-    saberMoveData_t { name: c"TL2BR St".as_ptr() as *mut c_char, animToUse: BOTH_S1_S1_TL as c_int, startQuad: Q_R as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_A_TL2BR, chain_attack: LS_A_TL2BR, trailLength: 200 }, // LS_S_TL2BR
-    saberMoveData_t { name: c"L2R St".as_ptr() as *mut c_char, animToUse: BOTH_S1_S1__L as c_int, startQuad: Q_R as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_A_L2R, chain_attack: LS_A_L2R, trailLength: 200 }, // LS_S_L2R
-    saberMoveData_t { name: c"BL2TR St".as_ptr() as *mut c_char, animToUse: BOTH_S1_S1_BL as c_int, startQuad: Q_R as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_A_BL2TR, chain_attack: LS_A_BL2TR, trailLength: 200 }, // LS_S_BL2TR
-    saberMoveData_t { name: c"BR2TL St".as_ptr() as *mut c_char, animToUse: BOTH_S1_S1_BR as c_int, startQuad: Q_R as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_A_BR2TL, chain_attack: LS_A_BR2TL, trailLength: 200 }, // LS_S_BR2TL
-    saberMoveData_t { name: c"R2L St".as_ptr() as *mut c_char, animToUse: BOTH_S1_S1__R as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_A_R2L, chain_attack: LS_A_R2L, trailLength: 200 }, // LS_S_R2L
-    saberMoveData_t { name: c"TR2BL St".as_ptr() as *mut c_char, animToUse: BOTH_S1_S1_TR as c_int, startQuad: Q_R as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_A_TR2BL, chain_attack: LS_A_TR2BL, trailLength: 200 }, // LS_S_TR2BL
-    saberMoveData_t { name: c"T2B St".as_ptr() as *mut c_char, animToUse: BOTH_S1_S1_T_ as c_int, startQuad: Q_R as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_A_T2B, chain_attack: LS_A_T2B, trailLength: 200 }, // LS_S_T2B
-
+    saberMoveData_t {
+        name: c"TL2BR St".as_ptr() as *mut c_char,
+        animToUse: BOTH_S1_S1_TL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_A_TL2BR,
+        chain_attack: LS_A_TL2BR,
+        trailLength: 200,
+    }, // LS_S_TL2BR
+    saberMoveData_t {
+        name: c"L2R St".as_ptr() as *mut c_char,
+        animToUse: BOTH_S1_S1__L as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_A_L2R,
+        chain_attack: LS_A_L2R,
+        trailLength: 200,
+    }, // LS_S_L2R
+    saberMoveData_t {
+        name: c"BL2TR St".as_ptr() as *mut c_char,
+        animToUse: BOTH_S1_S1_BL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_A_BL2TR,
+        chain_attack: LS_A_BL2TR,
+        trailLength: 200,
+    }, // LS_S_BL2TR
+    saberMoveData_t {
+        name: c"BR2TL St".as_ptr() as *mut c_char,
+        animToUse: BOTH_S1_S1_BR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_A_BR2TL,
+        chain_attack: LS_A_BR2TL,
+        trailLength: 200,
+    }, // LS_S_BR2TL
+    saberMoveData_t {
+        name: c"R2L St".as_ptr() as *mut c_char,
+        animToUse: BOTH_S1_S1__R as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_A_R2L,
+        chain_attack: LS_A_R2L,
+        trailLength: 200,
+    }, // LS_S_R2L
+    saberMoveData_t {
+        name: c"TR2BL St".as_ptr() as *mut c_char,
+        animToUse: BOTH_S1_S1_TR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_A_TR2BL,
+        chain_attack: LS_A_TR2BL,
+        trailLength: 200,
+    }, // LS_S_TR2BL
+    saberMoveData_t {
+        name: c"T2B St".as_ptr() as *mut c_char,
+        animToUse: BOTH_S1_S1_T_ as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_A_T2B,
+        chain_attack: LS_A_T2B,
+        trailLength: 200,
+    }, // LS_S_T2B
     //returns
-    saberMoveData_t { name: c"TL2BR Ret".as_ptr() as *mut c_char, animToUse: BOTH_R1_BR_S1 as c_int, startQuad: Q_BR as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_FINISH, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_R_TL2BR
-    saberMoveData_t { name: c"L2R Ret".as_ptr() as *mut c_char, animToUse: BOTH_R1__R_S1 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_FINISH, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_R_L2R
-    saberMoveData_t { name: c"BL2TR Ret".as_ptr() as *mut c_char, animToUse: BOTH_R1_TR_S1 as c_int, startQuad: Q_TR as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_FINISH, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_R_BL2TR
-    saberMoveData_t { name: c"BR2TL Ret".as_ptr() as *mut c_char, animToUse: BOTH_R1_TL_S1 as c_int, startQuad: Q_TL as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_FINISH, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_R_BR2TL
-    saberMoveData_t { name: c"R2L Ret".as_ptr() as *mut c_char, animToUse: BOTH_R1__L_S1 as c_int, startQuad: Q_L as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_FINISH, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_R_R2L
-    saberMoveData_t { name: c"TR2BL Ret".as_ptr() as *mut c_char, animToUse: BOTH_R1_BL_S1 as c_int, startQuad: Q_BL as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_FINISH, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_R_TR2BL
-    saberMoveData_t { name: c"T2B Ret".as_ptr() as *mut c_char, animToUse: BOTH_R1_B__S1 as c_int, startQuad: Q_B as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_FINISH, blendTime: 100, blocking: BLK_TIGHT as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 200 }, // LS_R_T2B
-
+    saberMoveData_t {
+        name: c"TL2BR Ret".as_ptr() as *mut c_char,
+        animToUse: BOTH_R1_BR_S1 as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_FINISH,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_R_TL2BR
+    saberMoveData_t {
+        name: c"L2R Ret".as_ptr() as *mut c_char,
+        animToUse: BOTH_R1__R_S1 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_FINISH,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_R_L2R
+    saberMoveData_t {
+        name: c"BL2TR Ret".as_ptr() as *mut c_char,
+        animToUse: BOTH_R1_TR_S1 as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_FINISH,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_R_BL2TR
+    saberMoveData_t {
+        name: c"BR2TL Ret".as_ptr() as *mut c_char,
+        animToUse: BOTH_R1_TL_S1 as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_FINISH,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_R_BR2TL
+    saberMoveData_t {
+        name: c"R2L Ret".as_ptr() as *mut c_char,
+        animToUse: BOTH_R1__L_S1 as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_FINISH,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_R_R2L
+    saberMoveData_t {
+        name: c"TR2BL Ret".as_ptr() as *mut c_char,
+        animToUse: BOTH_R1_BL_S1 as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_FINISH,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_R_TR2BL
+    saberMoveData_t {
+        name: c"T2B Ret".as_ptr() as *mut c_char,
+        animToUse: BOTH_R1_B__S1 as c_int,
+        startQuad: Q_B as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_FINISH,
+        blendTime: 100,
+        blocking: BLK_TIGHT as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 200,
+    }, // LS_R_T2B
     //Transitions
-    saberMoveData_t { name: c"BR2R Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BR__R as c_int, startQuad: Q_BR as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_L2R, chain_attack: LS_A_R2L, trailLength: 150 }, //# Fast arc bottom right to right
-    saberMoveData_t { name: c"BR2TR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BR_TR as c_int, startQuad: Q_BR as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_TR2BL, trailLength: 150 }, //# Fast arc bottom right to top right		(use: BOTH_T1_TR_BR)
-    saberMoveData_t { name: c"BR2T Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BR_T_ as c_int, startQuad: Q_BR as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_T2B, trailLength: 150 }, //# Fast arc bottom right to top			(use: BOTH_T1_T__BR)
-    saberMoveData_t { name: c"BR2TL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BR_TL as c_int, startQuad: Q_BR as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_A_TL2BR, trailLength: 150 }, //# Fast weak spin bottom right to top left
-    saberMoveData_t { name: c"BR2L Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BR__L as c_int, startQuad: Q_BR as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_R2L, chain_attack: LS_A_L2R, trailLength: 150 }, //# Fast weak spin bottom right to left
-    saberMoveData_t { name: c"BR2BL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BR_BL as c_int, startQuad: Q_BR as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_A_BL2TR, trailLength: 150 }, //# Fast weak spin bottom right to bottom left
-    saberMoveData_t { name: c"R2BR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__R_BR as c_int, startQuad: Q_R as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_A_BR2TL, trailLength: 150 }, //# Fast arc right to bottom right			(use: BOTH_T1_BR__R)
-    saberMoveData_t { name: c"R2TR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__R_TR as c_int, startQuad: Q_R as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_TR2BL, trailLength: 150 }, //# Fast arc right to top right
-    saberMoveData_t { name: c"R2T Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__R_T_ as c_int, startQuad: Q_R as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_T2B, trailLength: 150 }, //# Fast ar right to top				(use: BOTH_T1_T___R)
-    saberMoveData_t { name: c"R2TL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__R_TL as c_int, startQuad: Q_R as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_A_TL2BR, trailLength: 150 }, //# Fast arc right to top left
-    saberMoveData_t { name: c"R2L Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__R__L as c_int, startQuad: Q_R as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_R2L, chain_attack: LS_A_L2R, trailLength: 150 }, //# Fast weak spin right to left
-    saberMoveData_t { name: c"R2BL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__R_BL as c_int, startQuad: Q_R as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_A_BL2TR, trailLength: 150 }, //# Fast weak spin right to bottom left
-    saberMoveData_t { name: c"TR2BR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TR_BR as c_int, startQuad: Q_TR as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_A_BR2TL, trailLength: 150 }, //# Fast arc top right to bottom right
-    saberMoveData_t { name: c"TR2R Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TR__R as c_int, startQuad: Q_TR as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_L2R, chain_attack: LS_A_R2L, trailLength: 150 }, //# Fast arc top right to right			(use: BOTH_T1__R_TR)
-    saberMoveData_t { name: c"TR2T Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TR_T_ as c_int, startQuad: Q_TR as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_T2B, trailLength: 150 }, //# Fast arc top right to top				(use: BOTH_T1_T__TR)
-    saberMoveData_t { name: c"TR2TL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TR_TL as c_int, startQuad: Q_TR as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_A_TL2BR, trailLength: 150 }, //# Fast arc top right to top left
-    saberMoveData_t { name: c"TR2L Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TR__L as c_int, startQuad: Q_TR as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_R2L, chain_attack: LS_A_L2R, trailLength: 150 }, //# Fast arc top right to left
-    saberMoveData_t { name: c"TR2BL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TR_BL as c_int, startQuad: Q_TR as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_A_BL2TR, trailLength: 150 }, //# Fast weak spin top right to bottom left
-    saberMoveData_t { name: c"T2BR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_T__BR as c_int, startQuad: Q_T as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_A_BR2TL, trailLength: 150 }, //# Fast arc top to bottom right
-    saberMoveData_t { name: c"T2R Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_T___R as c_int, startQuad: Q_T as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_L2R, chain_attack: LS_A_R2L, trailLength: 150 }, //# Fast arc top to right
-    saberMoveData_t { name: c"T2TR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_T__TR as c_int, startQuad: Q_T as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_TR2BL, trailLength: 150 }, //# Fast arc top to top right
-    saberMoveData_t { name: c"T2TL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_T__TL as c_int, startQuad: Q_T as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_A_TL2BR, trailLength: 150 }, //# Fast arc top to top left
-    saberMoveData_t { name: c"T2L Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_T___L as c_int, startQuad: Q_T as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_R2L, chain_attack: LS_A_L2R, trailLength: 150 }, //# Fast arc top to left
-    saberMoveData_t { name: c"T2BL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_T__BL as c_int, startQuad: Q_T as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_A_BL2TR, trailLength: 150 }, //# Fast arc top to bottom left
-    saberMoveData_t { name: c"TL2BR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TL_BR as c_int, startQuad: Q_TL as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_A_BR2TL, trailLength: 150 }, //# Fast weak spin top left to bottom right
-    saberMoveData_t { name: c"TL2R Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TL__R as c_int, startQuad: Q_TL as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_L2R, chain_attack: LS_A_R2L, trailLength: 150 }, //# Fast arc top left to right			(use: BOTH_T1__R_TL)
-    saberMoveData_t { name: c"TL2TR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TL_TR as c_int, startQuad: Q_TL as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_TR2BL, trailLength: 150 }, //# Fast arc top left to top right			(use: BOTH_T1_TR_TL)
-    saberMoveData_t { name: c"TL2T Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TL_T_ as c_int, startQuad: Q_TL as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_T2B, trailLength: 150 }, //# Fast arc top left to top				(use: BOTH_T1_T__TL)
-    saberMoveData_t { name: c"TL2L Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TL__L as c_int, startQuad: Q_TL as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_R2L, chain_attack: LS_A_L2R, trailLength: 150 }, //# Fast arc top left to left				(use: BOTH_T1__L_TL)
-    saberMoveData_t { name: c"TL2BL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_TL_BL as c_int, startQuad: Q_TL as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_A_BL2TR, trailLength: 150 }, //# Fast arc top left to bottom left
-    saberMoveData_t { name: c"L2BR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__L_BR as c_int, startQuad: Q_L as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_A_BR2TL, trailLength: 150 }, //# Fast weak spin left to bottom right
-    saberMoveData_t { name: c"L2R Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__L__R as c_int, startQuad: Q_L as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_L2R, chain_attack: LS_A_R2L, trailLength: 150 }, //# Fast weak spin left to right
-    saberMoveData_t { name: c"L2TR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__L_TR as c_int, startQuad: Q_L as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_TR2BL, trailLength: 150 }, //# Fast arc left to top right			(use: BOTH_T1_TR__L)
-    saberMoveData_t { name: c"L2T Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__L_T_ as c_int, startQuad: Q_L as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_T2B, trailLength: 150 }, //# Fast arc left to top				(use: BOTH_T1_T___L)
-    saberMoveData_t { name: c"L2TL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__L_TL as c_int, startQuad: Q_L as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_A_TL2BR, trailLength: 150 }, //# Fast arc left to top left
-    saberMoveData_t { name: c"L2BL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1__L_BL as c_int, startQuad: Q_L as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_A_BL2TR, trailLength: 150 }, //# Fast arc left to bottom left			(use: BOTH_T1_BL__L)
-    saberMoveData_t { name: c"BL2BR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BL_BR as c_int, startQuad: Q_BL as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_A_BR2TL, trailLength: 150 }, //# Fast weak spin bottom left to bottom right
-    saberMoveData_t { name: c"BL2R Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BL__R as c_int, startQuad: Q_BL as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_L2R, chain_attack: LS_A_R2L, trailLength: 150 }, //# Fast weak spin bottom left to right
-    saberMoveData_t { name: c"BL2TR Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BL_TR as c_int, startQuad: Q_BL as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_TR2BL, trailLength: 150 }, //# Fast weak spin bottom left to top right
-    saberMoveData_t { name: c"BL2T Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BL_T_ as c_int, startQuad: Q_BL as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_T2B, trailLength: 150 }, //# Fast arc bottom left to top			(use: BOTH_T1_T__BL)
-    saberMoveData_t { name: c"BL2TL Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BL_TL as c_int, startQuad: Q_BL as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_A_TL2BR, trailLength: 150 }, //# Fast arc bottom left to top left		(use: BOTH_T1_TL_BL)
-    saberMoveData_t { name: c"BL2L Trans".as_ptr() as *mut c_char, animToUse: BOTH_T1_BL__L as c_int, startQuad: Q_BL as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_R2L, chain_attack: LS_A_L2R, trailLength: 150 }, //# Fast arc bottom left to left
-
+    saberMoveData_t {
+        name: c"BR2R Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BR__R as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_L2R,
+        chain_attack: LS_A_R2L,
+        trailLength: 150,
+    }, //# Fast arc bottom right to right
+    saberMoveData_t {
+        name: c"BR2TR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BR_TR as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_TR2BL,
+        trailLength: 150,
+    }, //# Fast arc bottom right to top right		(use: BOTH_T1_TR_BR)
+    saberMoveData_t {
+        name: c"BR2T Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BR_T_ as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_T2B,
+        trailLength: 150,
+    }, //# Fast arc bottom right to top			(use: BOTH_T1_T__BR)
+    saberMoveData_t {
+        name: c"BR2TL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BR_TL as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_A_TL2BR,
+        trailLength: 150,
+    }, //# Fast weak spin bottom right to top left
+    saberMoveData_t {
+        name: c"BR2L Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BR__L as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_R2L,
+        chain_attack: LS_A_L2R,
+        trailLength: 150,
+    }, //# Fast weak spin bottom right to left
+    saberMoveData_t {
+        name: c"BR2BL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BR_BL as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_A_BL2TR,
+        trailLength: 150,
+    }, //# Fast weak spin bottom right to bottom left
+    saberMoveData_t {
+        name: c"R2BR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__R_BR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_A_BR2TL,
+        trailLength: 150,
+    }, //# Fast arc right to bottom right			(use: BOTH_T1_BR__R)
+    saberMoveData_t {
+        name: c"R2TR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__R_TR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_TR2BL,
+        trailLength: 150,
+    }, //# Fast arc right to top right
+    saberMoveData_t {
+        name: c"R2T Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__R_T_ as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_T2B,
+        trailLength: 150,
+    }, //# Fast ar right to top				(use: BOTH_T1_T___R)
+    saberMoveData_t {
+        name: c"R2TL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__R_TL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_A_TL2BR,
+        trailLength: 150,
+    }, //# Fast arc right to top left
+    saberMoveData_t {
+        name: c"R2L Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__R__L as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_R2L,
+        chain_attack: LS_A_L2R,
+        trailLength: 150,
+    }, //# Fast weak spin right to left
+    saberMoveData_t {
+        name: c"R2BL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__R_BL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_A_BL2TR,
+        trailLength: 150,
+    }, //# Fast weak spin right to bottom left
+    saberMoveData_t {
+        name: c"TR2BR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TR_BR as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_A_BR2TL,
+        trailLength: 150,
+    }, //# Fast arc top right to bottom right
+    saberMoveData_t {
+        name: c"TR2R Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TR__R as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_L2R,
+        chain_attack: LS_A_R2L,
+        trailLength: 150,
+    }, //# Fast arc top right to right			(use: BOTH_T1__R_TR)
+    saberMoveData_t {
+        name: c"TR2T Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TR_T_ as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_T2B,
+        trailLength: 150,
+    }, //# Fast arc top right to top				(use: BOTH_T1_T__TR)
+    saberMoveData_t {
+        name: c"TR2TL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TR_TL as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_A_TL2BR,
+        trailLength: 150,
+    }, //# Fast arc top right to top left
+    saberMoveData_t {
+        name: c"TR2L Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TR__L as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_R2L,
+        chain_attack: LS_A_L2R,
+        trailLength: 150,
+    }, //# Fast arc top right to left
+    saberMoveData_t {
+        name: c"TR2BL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TR_BL as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_A_BL2TR,
+        trailLength: 150,
+    }, //# Fast weak spin top right to bottom left
+    saberMoveData_t {
+        name: c"T2BR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_T__BR as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_A_BR2TL,
+        trailLength: 150,
+    }, //# Fast arc top to bottom right
+    saberMoveData_t {
+        name: c"T2R Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_T___R as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_L2R,
+        chain_attack: LS_A_R2L,
+        trailLength: 150,
+    }, //# Fast arc top to right
+    saberMoveData_t {
+        name: c"T2TR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_T__TR as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_TR2BL,
+        trailLength: 150,
+    }, //# Fast arc top to top right
+    saberMoveData_t {
+        name: c"T2TL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_T__TL as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_A_TL2BR,
+        trailLength: 150,
+    }, //# Fast arc top to top left
+    saberMoveData_t {
+        name: c"T2L Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_T___L as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_R2L,
+        chain_attack: LS_A_L2R,
+        trailLength: 150,
+    }, //# Fast arc top to left
+    saberMoveData_t {
+        name: c"T2BL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_T__BL as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_A_BL2TR,
+        trailLength: 150,
+    }, //# Fast arc top to bottom left
+    saberMoveData_t {
+        name: c"TL2BR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TL_BR as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_A_BR2TL,
+        trailLength: 150,
+    }, //# Fast weak spin top left to bottom right
+    saberMoveData_t {
+        name: c"TL2R Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TL__R as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_L2R,
+        chain_attack: LS_A_R2L,
+        trailLength: 150,
+    }, //# Fast arc top left to right			(use: BOTH_T1__R_TL)
+    saberMoveData_t {
+        name: c"TL2TR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TL_TR as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_TR2BL,
+        trailLength: 150,
+    }, //# Fast arc top left to top right			(use: BOTH_T1_TR_TL)
+    saberMoveData_t {
+        name: c"TL2T Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TL_T_ as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_T2B,
+        trailLength: 150,
+    }, //# Fast arc top left to top				(use: BOTH_T1_T__TL)
+    saberMoveData_t {
+        name: c"TL2L Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TL__L as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_R2L,
+        chain_attack: LS_A_L2R,
+        trailLength: 150,
+    }, //# Fast arc top left to left				(use: BOTH_T1__L_TL)
+    saberMoveData_t {
+        name: c"TL2BL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_TL_BL as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_A_BL2TR,
+        trailLength: 150,
+    }, //# Fast arc top left to bottom left
+    saberMoveData_t {
+        name: c"L2BR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__L_BR as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_A_BR2TL,
+        trailLength: 150,
+    }, //# Fast weak spin left to bottom right
+    saberMoveData_t {
+        name: c"L2R Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__L__R as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_L2R,
+        chain_attack: LS_A_R2L,
+        trailLength: 150,
+    }, //# Fast weak spin left to right
+    saberMoveData_t {
+        name: c"L2TR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__L_TR as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_TR2BL,
+        trailLength: 150,
+    }, //# Fast arc left to top right			(use: BOTH_T1_TR__L)
+    saberMoveData_t {
+        name: c"L2T Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__L_T_ as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_T2B,
+        trailLength: 150,
+    }, //# Fast arc left to top				(use: BOTH_T1_T___L)
+    saberMoveData_t {
+        name: c"L2TL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__L_TL as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_A_TL2BR,
+        trailLength: 150,
+    }, //# Fast arc left to top left
+    saberMoveData_t {
+        name: c"L2BL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1__L_BL as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_A_BL2TR,
+        trailLength: 150,
+    }, //# Fast arc left to bottom left			(use: BOTH_T1_BL__L)
+    saberMoveData_t {
+        name: c"BL2BR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BL_BR as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_A_BR2TL,
+        trailLength: 150,
+    }, //# Fast weak spin bottom left to bottom right
+    saberMoveData_t {
+        name: c"BL2R Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BL__R as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_L2R,
+        chain_attack: LS_A_R2L,
+        trailLength: 150,
+    }, //# Fast weak spin bottom left to right
+    saberMoveData_t {
+        name: c"BL2TR Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BL_TR as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_TR2BL,
+        trailLength: 150,
+    }, //# Fast weak spin bottom left to top right
+    saberMoveData_t {
+        name: c"BL2T Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BL_T_ as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_T2B,
+        trailLength: 150,
+    }, //# Fast arc bottom left to top			(use: BOTH_T1_T__BL)
+    saberMoveData_t {
+        name: c"BL2TL Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BL_TL as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_A_TL2BR,
+        trailLength: 150,
+    }, //# Fast arc bottom left to top left		(use: BOTH_T1_TL_BL)
+    saberMoveData_t {
+        name: c"BL2L Trans".as_ptr() as *mut c_char,
+        animToUse: BOTH_T1_BL__L as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_R2L,
+        chain_attack: LS_A_L2R,
+        trailLength: 150,
+    }, //# Fast arc bottom left to left
     //Bounces
-    saberMoveData_t { name: c"Bounce BR".as_ptr() as *mut c_char, animToUse: BOTH_B1_BR___ as c_int, startQuad: Q_BR as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_T1_BR_TR, trailLength: 150 },
-    saberMoveData_t { name: c"Bounce R".as_ptr() as *mut c_char, animToUse: BOTH_B1__R___ as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_L2R, chain_attack: LS_T1__R__L, trailLength: 150 },
-    saberMoveData_t { name: c"Bounce TR".as_ptr() as *mut c_char, animToUse: BOTH_B1_TR___ as c_int, startQuad: Q_TR as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_T1_TR_TL, trailLength: 150 },
-    saberMoveData_t { name: c"Bounce T".as_ptr() as *mut c_char, animToUse: BOTH_B1_T____ as c_int, startQuad: Q_T as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_T1_T__BL, trailLength: 150 },
-    saberMoveData_t { name: c"Bounce TL".as_ptr() as *mut c_char, animToUse: BOTH_B1_TL___ as c_int, startQuad: Q_TL as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_T1_TL_TR, trailLength: 150 },
-    saberMoveData_t { name: c"Bounce L".as_ptr() as *mut c_char, animToUse: BOTH_B1__L___ as c_int, startQuad: Q_L as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_R2L, chain_attack: LS_T1__L__R, trailLength: 150 },
-    saberMoveData_t { name: c"Bounce BL".as_ptr() as *mut c_char, animToUse: BOTH_B1_BL___ as c_int, startQuad: Q_BL as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_T1_BL_TR, trailLength: 150 },
-
+    saberMoveData_t {
+        name: c"Bounce BR".as_ptr() as *mut c_char,
+        animToUse: BOTH_B1_BR___ as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_T1_BR_TR,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Bounce R".as_ptr() as *mut c_char,
+        animToUse: BOTH_B1__R___ as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_L2R,
+        chain_attack: LS_T1__R__L,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Bounce TR".as_ptr() as *mut c_char,
+        animToUse: BOTH_B1_TR___ as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_T1_TR_TL,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Bounce T".as_ptr() as *mut c_char,
+        animToUse: BOTH_B1_T____ as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_T1_T__BL,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Bounce TL".as_ptr() as *mut c_char,
+        animToUse: BOTH_B1_TL___ as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_T1_TL_TR,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Bounce L".as_ptr() as *mut c_char,
+        animToUse: BOTH_B1__L___ as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_R2L,
+        chain_attack: LS_T1__L__R,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Bounce BL".as_ptr() as *mut c_char,
+        animToUse: BOTH_B1_BL___ as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_T1_BL_TR,
+        trailLength: 150,
+    },
     //Deflected attacks (like bounces, but slide off enemy saber, not straight back)
-    saberMoveData_t { name: c"Deflect BR".as_ptr() as *mut c_char, animToUse: BOTH_D1_BR___ as c_int, startQuad: Q_BR as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_T1_BR_TR, trailLength: 150 },
-    saberMoveData_t { name: c"Deflect R".as_ptr() as *mut c_char, animToUse: BOTH_D1__R___ as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_L2R, chain_attack: LS_T1__R__L, trailLength: 150 },
-    saberMoveData_t { name: c"Deflect TR".as_ptr() as *mut c_char, animToUse: BOTH_D1_TR___ as c_int, startQuad: Q_TR as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_T1_TR_TL, trailLength: 150 },
-    saberMoveData_t { name: c"Deflect T".as_ptr() as *mut c_char, animToUse: BOTH_B1_T____ as c_int, startQuad: Q_T as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_T1_T__BL, trailLength: 150 },
-    saberMoveData_t { name: c"Deflect TL".as_ptr() as *mut c_char, animToUse: BOTH_D1_TL___ as c_int, startQuad: Q_TL as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_T1_TL_TR, trailLength: 150 },
-    saberMoveData_t { name: c"Deflect L".as_ptr() as *mut c_char, animToUse: BOTH_D1__L___ as c_int, startQuad: Q_L as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_R2L, chain_attack: LS_T1__L__R, trailLength: 150 },
-    saberMoveData_t { name: c"Deflect BL".as_ptr() as *mut c_char, animToUse: BOTH_D1_BL___ as c_int, startQuad: Q_BL as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_T1_BL_TR, trailLength: 150 },
-    saberMoveData_t { name: c"Deflect B".as_ptr() as *mut c_char, animToUse: BOTH_D1_B____ as c_int, startQuad: Q_B as c_int, endQuad: Q_B as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_T1_T__BL, trailLength: 150 },
-
+    saberMoveData_t {
+        name: c"Deflect BR".as_ptr() as *mut c_char,
+        animToUse: BOTH_D1_BR___ as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_T1_BR_TR,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Deflect R".as_ptr() as *mut c_char,
+        animToUse: BOTH_D1__R___ as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_L2R,
+        chain_attack: LS_T1__R__L,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Deflect TR".as_ptr() as *mut c_char,
+        animToUse: BOTH_D1_TR___ as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_T1_TR_TL,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Deflect T".as_ptr() as *mut c_char,
+        animToUse: BOTH_B1_T____ as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_T1_T__BL,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Deflect TL".as_ptr() as *mut c_char,
+        animToUse: BOTH_D1_TL___ as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_T1_TL_TR,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Deflect L".as_ptr() as *mut c_char,
+        animToUse: BOTH_D1__L___ as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_R2L,
+        chain_attack: LS_T1__L__R,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Deflect BL".as_ptr() as *mut c_char,
+        animToUse: BOTH_D1_BL___ as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_T1_BL_TR,
+        trailLength: 150,
+    },
+    saberMoveData_t {
+        name: c"Deflect B".as_ptr() as *mut c_char,
+        animToUse: BOTH_D1_B____ as c_int,
+        startQuad: Q_B as c_int,
+        endQuad: Q_B as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_T1_T__BL,
+        trailLength: 150,
+    },
     //Reflected attacks
-    saberMoveData_t { name: c"Reflected BR".as_ptr() as *mut c_char, animToUse: BOTH_V1_BR_S1 as c_int, startQuad: Q_BR as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, //	LS_V1_BR
-    saberMoveData_t { name: c"Reflected R".as_ptr() as *mut c_char, animToUse: BOTH_V1__R_S1 as c_int, startQuad: Q_R as c_int, endQuad: Q_R as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, //	LS_V1__R
-    saberMoveData_t { name: c"Reflected TR".as_ptr() as *mut c_char, animToUse: BOTH_V1_TR_S1 as c_int, startQuad: Q_TR as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, //	LS_V1_TR
-    saberMoveData_t { name: c"Reflected T".as_ptr() as *mut c_char, animToUse: BOTH_V1_T__S1 as c_int, startQuad: Q_T as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, //	LS_V1_T_
-    saberMoveData_t { name: c"Reflected TL".as_ptr() as *mut c_char, animToUse: BOTH_V1_TL_S1 as c_int, startQuad: Q_TL as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, //	LS_V1_TL
-    saberMoveData_t { name: c"Reflected L".as_ptr() as *mut c_char, animToUse: BOTH_V1__L_S1 as c_int, startQuad: Q_L as c_int, endQuad: Q_L as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, //	LS_V1__L
-    saberMoveData_t { name: c"Reflected BL".as_ptr() as *mut c_char, animToUse: BOTH_V1_BL_S1 as c_int, startQuad: Q_BL as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, //	LS_V1_BL
-    saberMoveData_t { name: c"Reflected B".as_ptr() as *mut c_char, animToUse: BOTH_V1_B__S1 as c_int, startQuad: Q_B as c_int, endQuad: Q_B as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 100, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, //	LS_V1_B_
-
+    saberMoveData_t {
+        name: c"Reflected BR".as_ptr() as *mut c_char,
+        animToUse: BOTH_V1_BR_S1 as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, //	LS_V1_BR
+    saberMoveData_t {
+        name: c"Reflected R".as_ptr() as *mut c_char,
+        animToUse: BOTH_V1__R_S1 as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_R as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, //	LS_V1__R
+    saberMoveData_t {
+        name: c"Reflected TR".as_ptr() as *mut c_char,
+        animToUse: BOTH_V1_TR_S1 as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, //	LS_V1_TR
+    saberMoveData_t {
+        name: c"Reflected T".as_ptr() as *mut c_char,
+        animToUse: BOTH_V1_T__S1 as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, //	LS_V1_T_
+    saberMoveData_t {
+        name: c"Reflected TL".as_ptr() as *mut c_char,
+        animToUse: BOTH_V1_TL_S1 as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, //	LS_V1_TL
+    saberMoveData_t {
+        name: c"Reflected L".as_ptr() as *mut c_char,
+        animToUse: BOTH_V1__L_S1 as c_int,
+        startQuad: Q_L as c_int,
+        endQuad: Q_L as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, //	LS_V1__L
+    saberMoveData_t {
+        name: c"Reflected BL".as_ptr() as *mut c_char,
+        animToUse: BOTH_V1_BL_S1 as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, //	LS_V1_BL
+    saberMoveData_t {
+        name: c"Reflected B".as_ptr() as *mut c_char,
+        animToUse: BOTH_V1_B__S1 as c_int,
+        startQuad: Q_B as c_int,
+        endQuad: Q_B as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 100,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, //	LS_V1_B_
     // Broken parries
-    saberMoveData_t { name: c"BParry Top".as_ptr() as *mut c_char, animToUse: BOTH_H1_S1_T_ as c_int, startQuad: Q_T as c_int, endQuad: Q_B as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, // LS_PARRY_UP,
-    saberMoveData_t { name: c"BParry UR".as_ptr() as *mut c_char, animToUse: BOTH_H1_S1_TR as c_int, startQuad: Q_TR as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, // LS_PARRY_UR,
-    saberMoveData_t { name: c"BParry UL".as_ptr() as *mut c_char, animToUse: BOTH_H1_S1_TL as c_int, startQuad: Q_TL as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, // LS_PARRY_UL,
-    saberMoveData_t { name: c"BParry LR".as_ptr() as *mut c_char, animToUse: BOTH_H1_S1_BL as c_int, startQuad: Q_BL as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, // LS_PARRY_LR,
-    saberMoveData_t { name: c"BParry Bot".as_ptr() as *mut c_char, animToUse: BOTH_H1_S1_B_ as c_int, startQuad: Q_B as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, // LS_PARRY_LL
-    saberMoveData_t { name: c"BParry LL".as_ptr() as *mut c_char, animToUse: BOTH_H1_S1_BR as c_int, startQuad: Q_BR as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_NO as c_int, chain_idle: LS_READY, chain_attack: LS_READY, trailLength: 150 }, // LS_PARRY_LL
-
+    saberMoveData_t {
+        name: c"BParry Top".as_ptr() as *mut c_char,
+        animToUse: BOTH_H1_S1_T_ as c_int,
+        startQuad: Q_T as c_int,
+        endQuad: Q_B as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, // LS_PARRY_UP,
+    saberMoveData_t {
+        name: c"BParry UR".as_ptr() as *mut c_char,
+        animToUse: BOTH_H1_S1_TR as c_int,
+        startQuad: Q_TR as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, // LS_PARRY_UR,
+    saberMoveData_t {
+        name: c"BParry UL".as_ptr() as *mut c_char,
+        animToUse: BOTH_H1_S1_TL as c_int,
+        startQuad: Q_TL as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, // LS_PARRY_UL,
+    saberMoveData_t {
+        name: c"BParry LR".as_ptr() as *mut c_char,
+        animToUse: BOTH_H1_S1_BL as c_int,
+        startQuad: Q_BL as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, // LS_PARRY_LR,
+    saberMoveData_t {
+        name: c"BParry Bot".as_ptr() as *mut c_char,
+        animToUse: BOTH_H1_S1_B_ as c_int,
+        startQuad: Q_B as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, // LS_PARRY_LL
+    saberMoveData_t {
+        name: c"BParry LL".as_ptr() as *mut c_char,
+        animToUse: BOTH_H1_S1_BR as c_int,
+        startQuad: Q_BR as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_NO as c_int,
+        chain_idle: LS_READY,
+        chain_attack: LS_READY,
+        trailLength: 150,
+    }, // LS_PARRY_LL
     // Knockaways
-    saberMoveData_t { name: c"Knock Top".as_ptr() as *mut c_char, animToUse: BOTH_K1_S1_T_ as c_int, startQuad: Q_R as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_T1_T__BR, trailLength: 150 }, // LS_PARRY_UP,
-    saberMoveData_t { name: c"Knock UR".as_ptr() as *mut c_char, animToUse: BOTH_K1_S1_TR as c_int, startQuad: Q_R as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_T1_TR__R, trailLength: 150 }, // LS_PARRY_UR,
-    saberMoveData_t { name: c"Knock UL".as_ptr() as *mut c_char, animToUse: BOTH_K1_S1_TL as c_int, startQuad: Q_R as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_T1_TL__L, trailLength: 150 }, // LS_PARRY_UL,
-    saberMoveData_t { name: c"Knock LR".as_ptr() as *mut c_char, animToUse: BOTH_K1_S1_BL as c_int, startQuad: Q_R as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_T1_BL_TL, trailLength: 150 }, // LS_PARRY_LR,
-    saberMoveData_t { name: c"Knock LL".as_ptr() as *mut c_char, animToUse: BOTH_K1_S1_BR as c_int, startQuad: Q_R as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_T1_BR_TR, trailLength: 150 }, // LS_PARRY_LL
-
+    saberMoveData_t {
+        name: c"Knock Top".as_ptr() as *mut c_char,
+        animToUse: BOTH_K1_S1_T_ as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_T1_T__BR,
+        trailLength: 150,
+    }, // LS_PARRY_UP,
+    saberMoveData_t {
+        name: c"Knock UR".as_ptr() as *mut c_char,
+        animToUse: BOTH_K1_S1_TR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_T1_TR__R,
+        trailLength: 150,
+    }, // LS_PARRY_UR,
+    saberMoveData_t {
+        name: c"Knock UL".as_ptr() as *mut c_char,
+        animToUse: BOTH_K1_S1_TL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_T1_TL__L,
+        trailLength: 150,
+    }, // LS_PARRY_UL,
+    saberMoveData_t {
+        name: c"Knock LR".as_ptr() as *mut c_char,
+        animToUse: BOTH_K1_S1_BL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_T1_BL_TL,
+        trailLength: 150,
+    }, // LS_PARRY_LR,
+    saberMoveData_t {
+        name: c"Knock LL".as_ptr() as *mut c_char,
+        animToUse: BOTH_K1_S1_BR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_T1_BR_TR,
+        trailLength: 150,
+    }, // LS_PARRY_LL
     // Parry
-    saberMoveData_t { name: c"Parry Top".as_ptr() as *mut c_char, animToUse: BOTH_P1_S1_T_ as c_int, startQuad: Q_R as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_T2B, trailLength: 150 }, // LS_PARRY_UP,
-    saberMoveData_t { name: c"Parry UR".as_ptr() as *mut c_char, animToUse: BOTH_P1_S1_TR as c_int, startQuad: Q_R as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_TR2BL, trailLength: 150 }, // LS_PARRY_UR,
-    saberMoveData_t { name: c"Parry UL".as_ptr() as *mut c_char, animToUse: BOTH_P1_S1_TL as c_int, startQuad: Q_R as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_A_TL2BR, trailLength: 150 }, // LS_PARRY_UL,
-    saberMoveData_t { name: c"Parry LR".as_ptr() as *mut c_char, animToUse: BOTH_P1_S1_BL as c_int, startQuad: Q_R as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_A_BR2TL, trailLength: 150 }, // LS_PARRY_LR,
-    saberMoveData_t { name: c"Parry LL".as_ptr() as *mut c_char, animToUse: BOTH_P1_S1_BR as c_int, startQuad: Q_R as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_A_BL2TR, trailLength: 150 }, // LS_PARRY_LL
-
+    saberMoveData_t {
+        name: c"Parry Top".as_ptr() as *mut c_char,
+        animToUse: BOTH_P1_S1_T_ as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_T2B,
+        trailLength: 150,
+    }, // LS_PARRY_UP,
+    saberMoveData_t {
+        name: c"Parry UR".as_ptr() as *mut c_char,
+        animToUse: BOTH_P1_S1_TR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_TR2BL,
+        trailLength: 150,
+    }, // LS_PARRY_UR,
+    saberMoveData_t {
+        name: c"Parry UL".as_ptr() as *mut c_char,
+        animToUse: BOTH_P1_S1_TL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_A_TL2BR,
+        trailLength: 150,
+    }, // LS_PARRY_UL,
+    saberMoveData_t {
+        name: c"Parry LR".as_ptr() as *mut c_char,
+        animToUse: BOTH_P1_S1_BL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_A_BR2TL,
+        trailLength: 150,
+    }, // LS_PARRY_LR,
+    saberMoveData_t {
+        name: c"Parry LL".as_ptr() as *mut c_char,
+        animToUse: BOTH_P1_S1_BR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_A_BL2TR,
+        trailLength: 150,
+    }, // LS_PARRY_LL
     // Reflecting a missile
-    saberMoveData_t { name: c"Reflect Top".as_ptr() as *mut c_char, animToUse: BOTH_P1_S1_T_ as c_int, startQuad: Q_R as c_int, endQuad: Q_T as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_T2B, trailLength: 300 }, // LS_PARRY_UP,
-    saberMoveData_t { name: c"Reflect UR".as_ptr() as *mut c_char, animToUse: BOTH_P1_S1_TL as c_int, startQuad: Q_R as c_int, endQuad: Q_TR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_BR2TL, chain_attack: LS_A_TL2BR, trailLength: 300 }, // LS_PARRY_UR,
-    saberMoveData_t { name: c"Reflect UL".as_ptr() as *mut c_char, animToUse: BOTH_P1_S1_TR as c_int, startQuad: Q_R as c_int, endQuad: Q_TL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_BL2TR, chain_attack: LS_A_TR2BL, trailLength: 300 }, // LS_PARRY_UL,
-    saberMoveData_t { name: c"Reflect LR".as_ptr() as *mut c_char, animToUse: BOTH_P1_S1_BR as c_int, startQuad: Q_R as c_int, endQuad: Q_BL as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_TR2BL, chain_attack: LS_A_BL2TR, trailLength: 300 }, // LS_PARRY_LR
-    saberMoveData_t { name: c"Reflect LL".as_ptr() as *mut c_char, animToUse: BOTH_P1_S1_BL as c_int, startQuad: Q_R as c_int, endQuad: Q_BR as c_int, animSetFlags: AFLAG_ACTIVE, blendTime: 50, blocking: BLK_WIDE as c_int, chain_idle: LS_R_TL2BR, chain_attack: LS_A_BR2TL, trailLength: 300 }, // LS_PARRY_LL,
+    saberMoveData_t {
+        name: c"Reflect Top".as_ptr() as *mut c_char,
+        animToUse: BOTH_P1_S1_T_ as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_T as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_T2B,
+        trailLength: 300,
+    }, // LS_PARRY_UP,
+    saberMoveData_t {
+        name: c"Reflect UR".as_ptr() as *mut c_char,
+        animToUse: BOTH_P1_S1_TL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_BR2TL,
+        chain_attack: LS_A_TL2BR,
+        trailLength: 300,
+    }, // LS_PARRY_UR,
+    saberMoveData_t {
+        name: c"Reflect UL".as_ptr() as *mut c_char,
+        animToUse: BOTH_P1_S1_TR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_TL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_BL2TR,
+        chain_attack: LS_A_TR2BL,
+        trailLength: 300,
+    }, // LS_PARRY_UL,
+    saberMoveData_t {
+        name: c"Reflect LR".as_ptr() as *mut c_char,
+        animToUse: BOTH_P1_S1_BR as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BL as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_TR2BL,
+        chain_attack: LS_A_BL2TR,
+        trailLength: 300,
+    }, // LS_PARRY_LR
+    saberMoveData_t {
+        name: c"Reflect LL".as_ptr() as *mut c_char,
+        animToUse: BOTH_P1_S1_BL as c_int,
+        startQuad: Q_R as c_int,
+        endQuad: Q_BR as c_int,
+        animSetFlags: AFLAG_ACTIVE,
+        blendTime: 50,
+        blocking: BLK_WIDE as c_int,
+        chain_idle: LS_R_TL2BR,
+        chain_attack: LS_A_BR2TL,
+        trailLength: 300,
+    }, // LS_PARRY_LL,
 ];

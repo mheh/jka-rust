@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_S_STARTLOCALSOUND`.
 ///
@@ -9,9 +11,9 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven's wrapper forwards the sound handle and channel number as two payload
 /// words, and the client switch reads them from `args[1]` and `args[2]`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:196-197`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2225`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:815-817`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:196-197`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2225`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:815-817`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgSStartlocalsoundArgs {
     /// Sound handle (`sfxHandle_t`, Raven typedefs this as `int`), read as
@@ -40,11 +42,11 @@ impl CgSStartlocalsoundArgs {
 /// Raven wrapper: `syscall( CG_S_STARTLOCALSOUND, sfx, channelNum );`
 /// Raven transport: `S_StartLocalSound( args[1], args[2] ); return 0;`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:98`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:196-197`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:196-197`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:815-817`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:815-817`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:98`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:196-197`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:196-197`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:815-817`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:815-817`
 pub struct CgSStartlocalsound;
 
 impl OutboundSysCall for CgSStartlocalsound {

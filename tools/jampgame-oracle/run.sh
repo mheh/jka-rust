@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build the jampgame q_math + bg_lib oracle dumpers from the UNMODIFIED Raven
 # sources and check (or, with --regen, regenerate) the golden dumps under
-# golden/.
+# crates/mp/game/tests/oracle/golden/.
 #
 # The oracle .c files and their real header chain (q_shared.h + teams.h +
 # bg_lib.h + surfaceflags.h + ../qcommon/{disablewarnings,tags}.h) are copied
@@ -12,7 +12,11 @@
 set -eu
 cd "$(dirname "$0")"
 
-ORACLE=../../oracle/oracle
+# Committed parity data (fixtures + goldens) lives inside the mp_game crate so
+# the crate is self-contained; this harness only generates/checks it.
+DATA=../../crates/mp/game/tests/oracle
+
+ORACLE=../../oracle
 G=$ORACLE/codemp/game
 Q=$ORACLE/codemp/qcommon
 
@@ -53,15 +57,16 @@ cat > build/codemp/game/shim.h <<'EOF'
 EOF
 
 # raven_rng.c: Raven's holdrand LCG (q_math.c:1432-1474) extracted verbatim,
-# with `unsigned long holdrand` normalized to `unsigned int` (the 32-bit i686
-# ship target the port models; on this LP64 host `unsigned long` is 64-bit and
-# `>>17` would diverge). Functions renamed r_* so they don't clash with the
-# 64-bit copies still living in q_math.c.
+# `unsigned long holdrand` kept at NATIVE width (ruling 2026-07-09, reversing
+# the earlier 32-bit normalization: the port's `c_ulong` model is
+# platform-faithful — 32-bit on the i686 ship, 64-bit on this LP64 host — so
+# the golden is generated at host width, matching the referee A/B oracle).
+# Functions renamed r_* so they don't clash with the copies still living in
+# q_math.c.
 {
 	echo '#include <assert.h>'
 	sed -n '1432,1474p' build/codemp/game/q_math.c \
-	  | sed -E -e 's/unsigned long[[:space:]]+holdrand/unsigned int holdrand/' \
-	           -e 's/[[:<:]]Rand_Init[[:>:]]/r_Rand_Init/g' \
+	  | sed -E -e 's/[[:<:]]Rand_Init[[:>:]]/r_Rand_Init/g' \
 	           -e 's/[[:<:]]Q_flrand[[:>:]]/r_Q_flrand/g' \
 	           -e 's/[[:<:]]Q_irand[[:>:]]/r_Q_irand/g' \
 	           -e 's/[[:<:]]flrand[[:>:]]/r_flrand/g' \
@@ -143,15 +148,15 @@ TRACECFLAGS="-w -std=gnu11 -D__linux__ -D_FORTIFY_SOURCE=0 -ffp-contract=off \
 # shellcheck disable=SC2086
 cc $TRACECFLAGS -o build/trace_dump main_trace.c -lm
 
-mkdir -p golden
+mkdir -p "$DATA/golden"
 status=0
 run_one() {
 	name=$1; bin=$2
 	if [ "${REGEN:-}" = "1" ]; then
-		"$bin" fixtures > "golden/$name.txt"
+		"$bin" "$DATA/fixtures" > "$DATA/golden/$name.txt"
 		echo "regenerated $name"
 	else
-		"$bin" fixtures | diff -u "golden/$name.txt" - || status=1
+		"$bin" "$DATA/fixtures" | diff -u "$DATA/golden/$name.txt" - || status=1
 	fi
 }
 
@@ -159,10 +164,10 @@ run_one() {
 run_file() {
 	name=$1; bin=$2; fix=$3
 	if [ "${REGEN:-}" = "1" ]; then
-		"$bin" "$fix" > "golden/$name.txt"
+		"$bin" "$fix" > "$DATA/golden/$name.txt"
 		echo "regenerated $name"
 	else
-		"$bin" "$fix" | diff -u "golden/$name.txt" - || status=1
+		"$bin" "$fix" | diff -u "$DATA/golden/$name.txt" - || status=1
 	fi
 }
 
@@ -173,13 +178,13 @@ PMOVE_SCENARIOS="idle walk-fwd strafe-turn jump-land fall-onto-box wall-step"
 run_pmove() {
 	out=$( for s in $PMOVE_SCENARIOS; do
 		echo "-- scenario $s --"
-		build/pmove_dump "fixtures/pmove/$s.txt" fixtures/pmove
+		build/pmove_dump "$DATA/fixtures/pmove/$s.txt" "$DATA/fixtures/pmove"
 	done )
 	if [ "${REGEN:-}" = "1" ]; then
-		printf '%s\n' "$out" > golden/pmove.txt
+		printf '%s\n' "$out" > "$DATA/golden/pmove.txt"
 		echo "regenerated pmove"
 	else
-		printf '%s\n' "$out" | diff -u golden/pmove.txt - || status=1
+		printf '%s\n' "$out" | diff -u "$DATA/golden/pmove.txt" - || status=1
 	fi
 }
 
@@ -187,7 +192,7 @@ if [ "${1:-}" = "--regen" ]; then REGEN=1; fi
 run_one qmath build/qmath_dump
 run_one bglib build/bglib_dump
 run_one saberload build/saberload_dump
-run_file pmove_trace build/trace_dump fixtures/pmove/trace.txt
+run_file pmove_trace build/trace_dump "$DATA/fixtures/pmove/trace.txt"
 run_pmove
 
 [ "$status" -eq 0 ] && echo "jampgame-oracle: OK"

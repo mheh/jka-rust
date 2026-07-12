@@ -1,0 +1,10 @@
+== SE_BuildFileList("strings") ==
+count=4
+results=|strings/english/menus.str;strings/english/objectives.str;strings/french/objectives.str;strings/german/objectives.str;|
+== SE_GetNumLanguages (dedup, english-first) ==
+numLanguages=3
+LANG 0 name=|english| dir=|strings/english|
+LANG 1 name=|french| dir=|strings/french|
+LANG 2 name=|german| dir=|strings/german|
+name oor=|| neg=||
+dir  oor=|| neg=||

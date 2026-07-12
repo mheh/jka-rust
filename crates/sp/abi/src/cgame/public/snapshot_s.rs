@@ -7,13 +7,13 @@ use sp_qshared::common::sp::renderer::refdef_t::MAX_MAP_AREA_BYTES;
 
 /// Raven `MAX_ENTITIES_IN_SNAPSHOT`.
 ///
-/// Source: `oracle/oracle/code/cgame/cg_public.h:14`
+/// Source: `oracle/code/cgame/cg_public.h:14`
 pub const MAX_ENTITIES_IN_SNAPSHOT: usize = 512;
 
 /// Raven `snapshot_t` (tag `snapshot_s`) — a complete snapshot of game state
 /// at a serverTime.
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_public.h:24-47`
+/// Type definition source: `oracle/code/cgame/cg_public.h:24-47`
 #[repr(C)]
 pub struct snapshot_t {
     /// SNAPFLAG_RATE_DELAYED, SNAPFLAG_DROPPED_COMMANDS

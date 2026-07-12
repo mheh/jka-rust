@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall(CG_G2_SETSURFACEONOFF, ghoul2, surfaceName, flags);`
 /// Raven transport: `return G2API_SetSurfaceOnOff(*((CGhoul2Info_v *)args[1]), (const char *)VMA(2), args[3]);`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:960-962`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2560`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1501-1502`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:960-962`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2560`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1501-1502`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SetsurfaceonoffArgs {
     ghoul2: *mut c_void,
@@ -33,10 +33,10 @@ impl CgG2SetsurfaceonoffArgs {
 
 /// `CG_G2_SETSURFACEONOFF` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:287`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:960-962`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1501-1502`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1501-1502`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:287`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:960-962`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1501-1502`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1501-1502`
 pub struct CgG2Setsurfaceonoff;
 
 impl OutboundSysCall for CgG2Setsurfaceonoff {

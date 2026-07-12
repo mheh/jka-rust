@@ -11,8 +11,8 @@ use sp_qshared::shared::qhandle_t;
 /// Raven wrapper: `return syscall( CG_R_REGISTERMODEL, name );`
 /// Raven transport: `return re.RegisterModel( (const char *) VMA(1) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:303-304`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:655-656`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:303-304`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:655-656`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRRegistermodelArgs {
     name: *const c_char,
@@ -26,10 +26,10 @@ impl CgRRegistermodelArgs {
 
 /// `CG_R_REGISTERMODEL` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:118`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:303-304`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:655-656`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:655-656`
+/// Enum value source: `oracle/code/cgame/cg_public.h:118`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:303-304`
+/// Output source: `oracle/code/client/cl_cgame.cpp:655-656`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:655-656`
 pub struct CgRRegistermodel;
 
 impl OutboundSysCall for CgRRegistermodel {

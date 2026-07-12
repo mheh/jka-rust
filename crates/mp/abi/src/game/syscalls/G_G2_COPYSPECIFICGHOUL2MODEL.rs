@@ -47,7 +47,7 @@ impl GG2Copyspecificghoul2ModelArgs {
 
 /// `G_G2_COPYSPECIFICGHOUL2MODEL` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:524`
+/// Source: `oracle/codemp/game/g_public.h:524`
 pub struct GG2Copyspecificghoul2Model;
 
 impl OutboundSysCall for GG2Copyspecificghoul2Model {

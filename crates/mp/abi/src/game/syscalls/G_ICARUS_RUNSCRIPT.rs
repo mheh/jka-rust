@@ -34,7 +34,7 @@ impl GIcarusRunscriptArgs {
 
 /// `G_ICARUS_RUNSCRIPT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:252`
+/// Source: `oracle/codemp/game/g_public.h:252`
 pub struct GIcarusRunscript;
 
 impl OutboundSysCall for GIcarusRunscript {

@@ -2,7 +2,7 @@
 
 /// Raven `genCmds_t` generic (button-driven) client commands.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2488-2521`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2488-2521`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum genCmds_t {

@@ -6,7 +6,7 @@ use super::sv_entity_s::svEntity_t;
 
 /// Raven `AREA_NODES`.
 ///
-/// Type definition source: `oracle/oracle/code/server/sv_world.cpp:80`
+/// Type definition source: `oracle/code/server/sv_world.cpp:80`
 pub const AREA_NODES: usize = 1024;
 
 /// Raven `worldSector_t`.
@@ -16,7 +16,7 @@ pub const AREA_NODES: usize = 1024;
 /// aligned bsp tree. Entities are kept in chains either at the final leafs, or
 /// at the first node that splits them, which prevents having to deal with
 /// multiple fragments of a single entity.
-/// Type definition source: `oracle/oracle/code/server/sv_world.cpp:72-77`
+/// Type definition source: `oracle/code/server/sv_world.cpp:72-77`
 #[repr(C)]
 pub struct worldSector_t {
     /// -1 = leaf node

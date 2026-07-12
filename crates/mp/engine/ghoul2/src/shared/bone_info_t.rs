@@ -6,7 +6,12 @@ use mp_qshared::shared::{mdxaBone_t, vec3_t};
 /// model instance.
 ///
 /// Raven: (none).
-/// Type definition source: `oracle/oracle/codemp/ghoul2/ghoul2_shared.h:63-168`
+/// Type definition source: `oracle/codemp/ghoul2/ghoul2_shared.h:63-168`
+///
+/// `Clone` matches Raven's trivial copy (POD in a `vector` copied by
+/// `CGhoul2Info::mBlist`'s copy during `DeepCopy`); the `basepose*` raw
+/// pointers copy shallowly, as the C++ default copy would.
+#[derive(Clone)]
 #[repr(C)]
 pub struct boneInfo_t {
     /// what bone are we overriding?

@@ -6,12 +6,12 @@ use super::surface_type_t::surfaceType_t;
 
 /// `VERTEXSIZE` — non-`_XBOX` build: `6 + (MAXLIGHTMAPS * 3)` = 18 floats per point.
 ///
-/// Source: `oracle/oracle/code/renderer/tr_local.h:684`
+/// Source: `oracle/code/renderer/tr_local.h:684`
 const VERTEXSIZE: usize = 18;
 
 /// Raven `srfSurfaceFace_t` — planar surface (Q3 "face"), variable-sized.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:727-740`
+/// Type definition source: `oracle/code/renderer/tr_local.h:727-740`
 #[repr(C)]
 pub struct srfSurfaceFace_t {
     pub surfaceType: surfaceType_t,

@@ -7,8 +7,8 @@ use abi_transport::generic::{
 
 /// Arguments for `CG_RAG_CALLBACK`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:256-257`
-/// Shared-buffer callback data source: `oracle/oracle/codemp/cgame/cg_main.c:507-566`
+/// Args source: `oracle/codemp/cgame/cg_main.c:256-257`
+/// Shared-buffer callback data source: `oracle/codemp/cgame/cg_main.c:507-566`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgRagCallbackArgs {
     call_type: c_int,
@@ -27,14 +27,14 @@ impl CgRagCallbackArgs {
 /// `CG_RAG_CALLBACK` MP cgame exports vmMain ABI token.
 ///
 /// Raven: handle ragdoll callbacks, for events and debugging -rww
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:412`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:256-257`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:256-257`
-/// Transport/call-site source: `oracle/oracle/codemp/ghoul2/G2_bones.cpp:2700`
-/// Transport/call-site source: `oracle/oracle/codemp/ghoul2/G2_bones.cpp:2899`
-/// Transport/call-site source: `oracle/oracle/codemp/ghoul2/G2_bones.cpp:2921`
-/// Transport/call-site source: `oracle/oracle/codemp/ghoul2/G2_bones.cpp:3064`
-/// Transport/call-site source: `oracle/oracle/codemp/ghoul2/G2_bones.cpp:3966`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:412`
+/// Args source: `oracle/codemp/cgame/cg_main.c:256-257`
+/// Output source: `oracle/codemp/cgame/cg_main.c:256-257`
+/// Transport/call-site source: `oracle/codemp/ghoul2/G2_bones.cpp:2700`
+/// Transport/call-site source: `oracle/codemp/ghoul2/G2_bones.cpp:2899`
+/// Transport/call-site source: `oracle/codemp/ghoul2/G2_bones.cpp:2921`
+/// Transport/call-site source: `oracle/codemp/ghoul2/G2_bones.cpp:3064`
+/// Transport/call-site source: `oracle/codemp/ghoul2/G2_bones.cpp:3966`
 pub struct CgRagCallback;
 
 impl InboundVmCall for CgRagCallback {

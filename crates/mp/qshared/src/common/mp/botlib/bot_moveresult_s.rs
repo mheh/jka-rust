@@ -4,18 +4,18 @@ use crate::shared::vec3_t;
 
 /// Raven `bot_moveresult_t` — result of a bot movement prediction/execution.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_ai_move.h:74-85`
+/// Type definition source: `oracle/codemp/game/be_ai_move.h:74-85`
 #[repr(C)]
 pub struct bot_moveresult_t {
-	pub failure: i32,             // true if movement failed all together
-	pub r#type: i32,              // failure or blocked type
-	pub blocked: i32,             // true if blocked by an entity
-	pub blockentity: i32,         // entity blocking the bot
-	pub traveltype: i32,          // last executed travel type
-	pub flags: i32,               // result flags
-	pub weapon: i32,              // weapon used for movement
-	pub movedir: vec3_t,          // movement direction
-	pub ideal_viewangles: vec3_t, // ideal viewangles for the movement
+    pub failure: i32,             // true if movement failed all together
+    pub r#type: i32,              // failure or blocked type
+    pub blocked: i32,             // true if blocked by an entity
+    pub blockentity: i32,         // entity blocking the bot
+    pub traveltype: i32,          // last executed travel type
+    pub flags: i32,               // result flags
+    pub weapon: i32,              // weapon used for movement
+    pub movedir: vec3_t,          // movement direction
+    pub ideal_viewangles: vec3_t, // ideal viewangles for the movement
 }
 
 /// The oracle tag is `bot_moveresult_s`; alias it so siblings referencing the

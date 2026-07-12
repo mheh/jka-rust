@@ -32,7 +32,7 @@ impl GIcarusGetvectorvariableArgs {
 
 /// `G_ICARUS_GETVECTORVARIABLE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:271`
+/// Source: `oracle/codemp/game/g_public.h:271`
 pub struct GIcarusGetvectorvariable;
 
 impl OutboundSysCall for GIcarusGetvectorvariable {

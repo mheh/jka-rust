@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_GETSERVERCOMMAND`.
 ///
@@ -9,8 +11,8 @@ use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall
 /// Raven's wrapper forwards the server command number as the only payload word,
 /// and the client switch reads it from `args[1]`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:482-483`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:967-968`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:482-483`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:967-968`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgGetservercommandArgs {
     /// Server command sequence number, read by Raven as `args[1]`.
@@ -34,10 +36,10 @@ impl CgGetservercommandArgs {
 /// Raven wrapper: `return syscall( CG_GETSERVERCOMMAND, serverCommandNumber );`
 /// Raven transport: `return CL_GetServerCommand( args[1] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:184`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:482-483`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:967-968`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:967-968`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:184`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:482-483`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:967-968`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:967-968`
 pub struct CgGetservercommand;
 
 impl OutboundSysCall for CgGetservercommand {

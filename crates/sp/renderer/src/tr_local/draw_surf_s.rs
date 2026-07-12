@@ -4,7 +4,7 @@ use super::surface_type_t::surfaceType_t;
 
 /// Raven `drawSurf_s` (typedef `drawSurf_t`).
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:608-611`
+/// Type definition source: `oracle/code/renderer/tr_local.h:608-611`
 #[repr(C)]
 pub struct drawSurf_t {
     /// bit combination for fast compares

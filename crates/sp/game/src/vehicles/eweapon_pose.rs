@@ -2,7 +2,7 @@
 
 /// Raven `EWeaponPose` — weapon pose state for vehicles.
 ///
-/// Type definition source: `oracle/oracle/code/game/G_Vehicles.h:18-24`
+/// Type definition source: `oracle/code/game/G_Vehicles.h:18-24`
 #[repr(i32)]
 pub enum EWeaponPose {
     WPOSE_NONE = 0,

@@ -25,12 +25,12 @@ pub type RawSyscall = *const c_void;
 
 /// `"dllEntry"` export: hands the module the engine syscall trampoline.
 ///
-/// Source: `oracle/oracle/codemp/game/g_syscalls.c:14-16`
+/// Source: `oracle/codemp/game/g_syscalls.c:14-16`
 pub type RawDllEntry = extern "C-unwind" fn(syscall: RawSyscall);
 
 /// `"vmMain"` export: command selector + twelve `int`-width argument words.
 ///
-/// Source: `oracle/oracle/codemp/game/g_main.c:515`
+/// Source: `oracle/codemp/game/g_main.c:515`
 pub type RawVmMain = extern "C-unwind" fn(
     command: AbiCommand,
     arg0: AbiWord,

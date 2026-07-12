@@ -148,7 +148,7 @@ def build_packet(cfile, fns, ctx):
     o.append("")
 
     # ------------------------------------------------------ (c) full source
-    o.append(f"## COMPLETE ORACLE SOURCE — `oracle/oracle/codemp/game/{cfile}`")
+    o.append(f"## COMPLETE ORACLE SOURCE — `oracle/codemp/game/{cfile}`")
     o.append("")
     o.append("```c")
     o.append(numbered_source(src_path))
@@ -203,7 +203,7 @@ def build_packet(cfile, fns, ctx):
             if fn is None:
                 o.append(f"// UNPORTED `{name}` ({cf}) — park per protocol:")
                 o.append(f"//TODO: Port {name}")
-                o.append(f"// Source: oracle/oracle/codemp/game/{cf}")
+                o.append(f"// Source: oracle/codemp/game/{cf}")
                 continue
             o.append(f"// {cf}:{fn['line']}  (skeleton: out/skel/{cf[:-2]}.rs)")
             o.append(one_line_signature(fn, ctx["ported"]) + ";")

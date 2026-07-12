@@ -64,7 +64,7 @@ impl GLocateGameDataArgs {
 /// Raven: playerState_t *clients, int sizeofGameClient );
 /// Raven: the game needs to let the server system know where and how big the gentities
 /// Raven: are, so it can look at them directly without going through an interface
-/// Source: `oracle/oracle/codemp/game/g_public.h:145`
+/// Source: `oracle/codemp/game/g_public.h:145`
 pub struct GLocateGameData;
 
 impl OutboundSysCall for GLocateGameData {

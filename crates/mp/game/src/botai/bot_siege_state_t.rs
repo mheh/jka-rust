@@ -2,7 +2,7 @@
 
 /// Raven `bot_siege_state_t` — Siege bot state enumeration.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/ai_main.h:92-98`
+/// Type definition source: `oracle/codemp/game/ai_main.h:92-98`
 #[repr(i32)]
 pub enum bot_siege_state_t {
     SIEGESTATE_NONE = 0,

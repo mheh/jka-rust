@@ -7,12 +7,12 @@ use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
 
 /// Raven `MAX_ENTITIES_IN_SNAPSHOT`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:13`
+/// Source: `oracle/codemp/cgame/cg_public.h:13`
 pub const MAX_ENTITIES_IN_SNAPSHOT: usize = 256;
 
 /// Raven `snapshot_t` — a complete snapshot of game state at a serverTime.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_public.h:20-36`
+/// Type definition source: `oracle/codemp/cgame/cg_public.h:20-36`
 #[repr(C)]
 pub struct snapshot_t {
     /// SNAPFLAG_RATE_DELAYED, etc

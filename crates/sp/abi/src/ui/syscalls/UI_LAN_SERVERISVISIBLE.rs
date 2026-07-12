@@ -1,18 +1,20 @@
 use core::ffi::c_int;
 
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `UI_LAN_SERVERISVISIBLE`.
 ///
 /// Raven wrapper: `return syscall( UI_LAN_SERVERISVISIBLE, source, n );`
 /// Raven transport: `return LAN_ServerIsVisible( args[1], args[2] );`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:236`
-/// Args source (SP fallback): `oracle/oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_SERVERISVISIBLE`.
-/// Args source (fallback): `oracle/oracle/codemp/ui/ui_local.h:975`
-/// Transport/switch source (fallback): `oracle/oracle/codemp/client/cl_ui.cpp:1103-1104`
-/// Output source fallback: `oracle/oracle/codemp/ui/ui_local.h:975`
+/// Enum source: `oracle/code/ui/ui_public.h:236`
+/// Args source (SP fallback): `oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_SERVERISVISIBLE`.
+/// Args source (fallback): `oracle/codemp/ui/ui_local.h:975`
+/// Transport/switch source (fallback): `oracle/codemp/client/cl_ui.cpp:1103-1104`
+/// Output source fallback: `oracle/codemp/ui/ui_local.h:975`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiLanServerisvisibleArgs {
     source: c_int,
@@ -35,7 +37,7 @@ impl UiLanServerisvisibleArgs {
 
 /// `UI_LAN_SERVERISVISIBLE` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:236`
+/// Source: `oracle/code/ui/ui_public.h:236`
 pub struct UiLanServerisvisible;
 
 impl OutboundSysCall for UiLanServerisvisible {

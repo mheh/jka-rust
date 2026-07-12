@@ -1,23 +1,25 @@
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_UI_MENUCLOSE_ALL`.
 ///
 /// Raven wrapper: `syscall(CG_UI_MENUCLOSE_ALL);`
 /// Raven transport: `Menus_CloseAll(); return 0;`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:608-610`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:883-885`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:883-885`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:608-610`
+/// Output source: `oracle/code/client/cl_cgame.cpp:883-885`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:883-885`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgUiMenucloseAllArgs;
 
 /// `CG_UI_MENUCLOSE_ALL` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:203`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:608-610`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:883-885`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:883-885`
+/// Enum value source: `oracle/code/cgame/cg_public.h:203`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:608-610`
+/// Output source: `oracle/code/client/cl_cgame.cpp:883-885`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:883-885`
 pub struct CgUiMenucloseAll;
 
 impl OutboundSysCall for CgUiMenucloseAll {

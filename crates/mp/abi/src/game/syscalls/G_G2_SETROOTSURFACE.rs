@@ -2,8 +2,8 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::shared::qboolean;
 use core::ffi::c_int;
+use mp_qshared::shared::qboolean;
 use std::ffi::CString;
 
 /// `G_G2_SETROOTSURFACE` outbound game-to-engine syscall.
@@ -36,7 +36,7 @@ impl GG2SetrootsurfaceArgs {
 
 /// `G_G2_SETROOTSURFACE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:533`
+/// Source: `oracle/codemp/game/g_public.h:533`
 pub struct GG2Setrootsurface;
 
 impl OutboundSysCall for GG2Setrootsurface {

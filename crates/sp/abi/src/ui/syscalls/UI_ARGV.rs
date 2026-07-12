@@ -7,10 +7,10 @@ use abi_transport::generic::{
 
 /// `UI_ARGV` SP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:163`
-/// Args source: `oracle/oracle/code/qcommon/qcommon.h:291`
-/// Output source: `oracle/oracle/code/qcommon/qcommon.h:291`
-/// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:219` (bound in `uiimport_t`, no dedicated case)
+/// Enum value source: `oracle/code/ui/ui_public.h:163`
+/// Args source: `oracle/code/qcommon/qcommon.h:291`
+/// Output source: `oracle/code/qcommon/qcommon.h:291`
+/// Transport/switch source: `oracle/code/client/cl_ui.cpp:219` (bound in `uiimport_t`, no dedicated case)
 pub struct UiArgv;
 
 #[derive(Debug)]

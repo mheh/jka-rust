@@ -2,7 +2,7 @@
 
 /// Raven `sharedEIKMoveState` IK bone move states.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:960-964`
+/// Type definition source: `oracle/codemp/game/q_shared.h:960-964`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum sharedEIKMoveState {

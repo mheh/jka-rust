@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_Jedi.c`.
+//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Jedi.c`.
 //!
 //! Pass-3 transcription: `ctx: GameContext` threads the ai_main globals
 //! (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) via `(*ctx.world)`, RNG
@@ -21,8 +21,10 @@ use crate::saber::evasion_type_t::evasionType_t;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::entity_event::entity_event_t;
 // Consts defined in sibling modules but not re-exported through the prelude glob;
-// imported here so call sites keep the bare Raven spelling.
-use crate::bg_slidemove::{SOLID_BMODEL, STEPSIZE};
+// imported here so call sites keep the bare Raven spelling. `SOLID_BMODEL`
+// (`q_shared.h:2642`) reaches this file via the prelude's
+// `mp_qshared::shared::surface_flags::*` glob.
+use crate::bg_slidemove::STEPSIZE;
 use crate::NPC_AI_Stormtrooper::MIN_ROCKET_DIST_SQUARED;
 // Explicit import to dedupe an E0659 glob ambiguity (known SFL_*/SVF_* debt);
 // canonical path per crate::saber::saber_flags.
@@ -33,14 +35,14 @@ use mp_qshared::shared::surface_flags::MASK_SHOT;
 
 /// Raven `G_StartMatrixEffect`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:16-19`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:16-19`
 pub fn G_StartMatrixEffect(ent: *mut gentity_t) {
     //perhaps write this at some point?
 }
 
 /// Raven `NPC_ShadowTrooper_Precache`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:103-108`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:103-108`
 pub fn NPC_ShadowTrooper_Precache(ctx: GameContext<'_>) {
     crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_FORCE));
     crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/cloak.wav".as_ptr());
@@ -49,7 +51,7 @@ pub fn NPC_ShadowTrooper_Precache(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_ClearTimers`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:110-135`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:110-135`
 pub fn Jedi_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
     crate::g_timer::TIMER_Set(ctx, ent, c"roamTime".as_ptr(), 0);
     crate::g_timer::TIMER_Set(ctx, ent, c"chatter".as_ptr(), 0);
@@ -78,7 +80,7 @@ pub fn Jedi_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
 /// Raven `Jedi_PlayBlockedPushSound`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:137-148`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:137-148`
 pub fn Jedi_PlayBlockedPushSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let level_time = (*ctx.world).level.time;
@@ -109,7 +111,7 @@ pub fn Jedi_PlayBlockedPushSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Jedi_PlayDeflectSound`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:150-161`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:150-161`
 pub fn Jedi_PlayDeflectSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         // Q_irand is drawn inside each emitting branch (as in Raven) so the LCG
@@ -140,7 +142,7 @@ pub fn Jedi_PlayDeflectSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `NPC_Jedi_PlayConfusionSound`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:163-180`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:163-180`
 pub fn NPC_Jedi_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).health > 0 {
@@ -172,7 +174,7 @@ pub fn NPC_Jedi_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) 
 
 /// Raven `Boba_Precache`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:182-189`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:182-189`
 pub fn Boba_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/boba/jeton.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/boba/jethover.wav".as_ptr());
@@ -183,7 +185,7 @@ pub fn Boba_Precache(ctx: GameContext<'_>) {
 
 /// Raven `Boba_ChangeWeapon`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:193-201`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:193-201`
 pub fn Boba_ChangeWeapon(ctx: GameContext<'_>, wp: c_int) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
@@ -201,7 +203,7 @@ pub fn Boba_ChangeWeapon(ctx: GameContext<'_>, wp: c_int) {
 
 /// Raven `WP_ResistForcePush`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:203-270`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:203-270`
 pub fn WP_ResistForcePush(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -298,7 +300,7 @@ pub fn WP_ResistForcePush(
 ///
 /// `pushDir` is read-only here (never written), so it stays by-value.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:272-343`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:272-343`
 pub fn Boba_StopKnockdown(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -372,7 +374,7 @@ pub fn Boba_StopKnockdown(
 
 /// Raven `Boba_FlyStart`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:345-365`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:345-365`
 pub fn Boba_FlyStart(ctx: GameContext<'_>, self_: *mut gentity_t) {
     //switch to seeker AI for a while
     unsafe {
@@ -406,7 +408,7 @@ pub fn Boba_FlyStart(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Boba_FlyStop`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:367-384`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:367-384`
 pub fn Boba_FlyStop(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let world = ctx.world;
@@ -440,7 +442,7 @@ pub fn Boba_FlyStop(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Boba_Flying`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:386-389`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:386-389`
 pub fn Boba_Flying(self_: *mut gentity_t) -> qboolean {
     unsafe {
         let client = (*self_).client as *mut gclient_t;
@@ -454,7 +456,7 @@ pub fn Boba_Flying(self_: *mut gentity_t) -> qboolean {
 
 /// Raven `Boba_FireFlameThrower`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:391-416`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:391-416`
 pub fn Boba_FireFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let world = ctx.world;
@@ -521,7 +523,7 @@ pub fn Boba_FireFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Boba_StartFlameThrower`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:419-469`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:419-469`
 pub fn Boba_StartFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let world = ctx.world;
@@ -574,7 +576,7 @@ pub fn Boba_StartFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Boba_DoFlameThrower`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:471-479`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:471-479`
 pub fn Boba_DoFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         crate::npc_c::NPC_SetAnim(
@@ -595,7 +597,7 @@ pub fn Boba_DoFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Boba_FireDecide`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:481-797`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:481-797`
 pub fn Boba_FireDecide(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -722,7 +724,8 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
                         hitAlly = qtrue; //us!
                     } else if enemyInFOV != qfalse {
                         //if enemy is FOV, go ahead and check for shooting
-                        let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy, Some(&mut impactPos));
+                        let hit =
+                            crate::NPC_combat::NPC_ShotEntity(ctx, enemy, Some(&mut impactPos));
                         let hitEnt = ge.add(hit as usize);
                         let hitEnt_client = (*hitEnt).client as *mut gclient_t;
 
@@ -945,7 +948,7 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_Cloak`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:799-816`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:799-816`
 pub fn Jedi_Cloak(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if !self_.is_null() {
@@ -972,7 +975,7 @@ pub fn Jedi_Cloak(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Jedi_Decloak`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:818-833`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:818-833`
 pub fn Jedi_Decloak(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if !self_.is_null() {
@@ -999,7 +1002,7 @@ pub fn Jedi_Decloak(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Jedi_CheckCloak`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:835-857`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:835-857`
 pub fn Jedi_CheckCloak(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -1029,7 +1032,7 @@ pub fn Jedi_CheckCloak(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_Aggression`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:863-898`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:863-898`
 pub fn Jedi_Aggression(self_: *mut gentity_t, change: c_int) {
     unsafe {
         let upper_threshold: c_int;
@@ -1065,7 +1068,7 @@ pub fn Jedi_Aggression(self_: *mut gentity_t, change: c_int) {
 
 /// Raven `Jedi_AggressionErosion`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:900-912`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:900-912`
 pub fn Jedi_AggressionErosion(ctx: GameContext<'_>, amt: c_int) {
     unsafe {
         let world = ctx.world;
@@ -1094,7 +1097,7 @@ pub fn Jedi_AggressionErosion(ctx: GameContext<'_>, amt: c_int) {
 
 /// Raven `NPC_Jedi_RateNewEnemy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:914-950`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:914-950`
 pub fn NPC_Jedi_RateNewEnemy(ctx: GameContext<'_>, self_: *mut gentity_t, enemy: *mut gentity_t) {
     let healthAggression: f32;
     let weaponAggression: f32;
@@ -1151,7 +1154,7 @@ pub fn NPC_Jedi_RateNewEnemy(ctx: GameContext<'_>, self_: *mut gentity_t, enemy:
 
 /// Raven `Jedi_Rage`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:952-964`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:952-964`
 pub fn Jedi_Rage(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -1175,7 +1178,7 @@ pub fn Jedi_Rage(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_RageStop`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:966-973`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:966-973`
 pub fn Jedi_RageStop(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if !(*self_).NPC.is_null() {
@@ -1188,7 +1191,7 @@ pub fn Jedi_RageStop(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Jedi_BattleTaunt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:980-1013`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:980-1013`
 pub fn Jedi_BattleTaunt(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -1221,7 +1224,8 @@ pub fn Jedi_BattleTaunt(ctx: GameContext<'_>) -> qboolean {
                 && (*enemy_client).NPC_class == CLASS_JEDI
             {
                 //a jedi fighting a jedi - training
-                if (*client).NPC_class == CLASS_JEDI && (*npc_info).rank as c_int == RANK_COMMANDER as c_int
+                if (*client).NPC_class == CLASS_JEDI
+                    && (*npc_info).rank as c_int == RANK_COMMANDER as c_int
                 {
                     //only trainer taunts
                     event = entity_event_t::EV_TAUNT1 as c_int;
@@ -1253,7 +1257,7 @@ pub fn Jedi_BattleTaunt(ctx: GameContext<'_>) -> qboolean {
 
 /// Raven `Jedi_ClearPathToSpot`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1020-1077`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1020-1077`
 pub fn Jedi_ClearPathToSpot(ctx: GameContext<'_>, dest: vec3_t, impactEntNum: c_int) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -1347,7 +1351,7 @@ pub fn Jedi_ClearPathToSpot(ctx: GameContext<'_>, dest: vec3_t, impactEntNum: c_
 
 /// Raven `NPC_MoveDirClear`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1079-1193`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1079-1193`
 pub fn NPC_MoveDirClear(
     ctx: GameContext<'_>,
     forwardmove: c_int,
@@ -1490,7 +1494,7 @@ pub fn NPC_MoveDirClear(
 
 /// Raven `Jedi_HoldPosition`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1200-1211`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1200-1211`
 pub fn Jedi_HoldPosition(ctx: GameContext<'_>) {
     unsafe {
         let npc_info = (*ctx.world).globals.NPCInfo;
@@ -1500,7 +1504,7 @@ pub fn Jedi_HoldPosition(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_Move`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1219-1251`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1219-1251`
 pub fn Jedi_Move(ctx: GameContext<'_>, goal: *mut gentity_t, retreat: qboolean) {
     unsafe {
         let world = ctx.world;
@@ -1547,7 +1551,7 @@ pub fn Jedi_Move(ctx: GameContext<'_>, goal: *mut gentity_t, retreat: qboolean) 
 
 /// Raven `Jedi_Hunt`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1253-1280`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1253-1280`
 pub fn Jedi_Hunt(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -1577,7 +1581,7 @@ pub fn Jedi_Hunt(ctx: GameContext<'_>) -> qboolean {
 
 /// Raven `Jedi_Retreat`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1300-1310`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1300-1310`
 pub fn Jedi_Retreat(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -1597,7 +1601,7 @@ pub fn Jedi_Retreat(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_Advance`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1312-1325`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1312-1325`
 pub fn Jedi_Advance(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -1617,7 +1621,7 @@ pub fn Jedi_Advance(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_AdjustSaberAnimLevel`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1327-1394`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1327-1394`
 pub fn Jedi_AdjustSaberAnimLevel(ctx: GameContext<'_>, self_: *mut gentity_t, newLevel: c_int) {
     unsafe {
         let world = ctx.world;
@@ -1636,12 +1640,16 @@ pub fn Jedi_AdjustSaberAnimLevel(ctx: GameContext<'_>, self_: *mut gentity_t, ne
             return;
         }
         if (*client).playerTeam == NPCTEAM_ENEMY as c_int {
-            if (*snpc).rank as c_int == RANK_CIVILIAN as c_int || (*snpc).rank as c_int == RANK_LT_JG as c_int {
+            if (*snpc).rank as c_int == RANK_CIVILIAN as c_int
+                || (*snpc).rank as c_int == RANK_LT_JG as c_int
+            {
                 //grunt and fencer always uses quick attacks
                 (*client).ps.fd.saberAnimLevel = FORCE_LEVEL_1;
                 return;
             }
-            if (*snpc).rank as c_int == RANK_CREWMAN as c_int || (*snpc).rank as c_int == RANK_ENSIGN as c_int {
+            if (*snpc).rank as c_int == RANK_CREWMAN as c_int
+                || (*snpc).rank as c_int == RANK_ENSIGN as c_int
+            {
                 //acrobat & force-users always use medium attacks
                 (*client).ps.fd.saberAnimLevel = FORCE_LEVEL_2;
                 return;
@@ -1680,7 +1688,7 @@ pub fn Jedi_AdjustSaberAnimLevel(ctx: GameContext<'_>, self_: *mut gentity_t, ne
 
 /// Raven `Jedi_CheckDecreaseSaberAnimLevel`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1396-1411`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1396-1411`
 pub fn Jedi_CheckDecreaseSaberAnimLevel(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -1718,7 +1726,7 @@ pub fn Jedi_CheckDecreaseSaberAnimLevel(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_CombatDistance`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1413-1874`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1413-1874`
 pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
     unsafe {
         let world = ctx.world;
@@ -2205,7 +2213,7 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
 
 /// Raven `Jedi_Strafe`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1876-1929`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1876-1929`
 pub fn Jedi_Strafe(
     ctx: GameContext<'_>,
     strafeTimeMin: c_int,
@@ -2298,7 +2306,7 @@ pub fn Jedi_Strafe(
 
 /// Raven `Jedi_CheckFlipEvasions`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1969-2303`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1969-2303`
 pub fn Jedi_CheckFlipEvasions(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -2382,7 +2390,8 @@ pub fn Jedi_CheckFlipEvasions(
                 return evasionType_t::EVASION_OTHER;
             }
         } else if (*client).NPC_class != CLASS_DESANN
-            && ((*snpc).rank as c_int == RANK_CREWMAN as c_int || (*snpc).rank as c_int >= RANK_LT as c_int)
+            && ((*snpc).rank as c_int == RANK_CREWMAN as c_int
+                || (*snpc).rank as c_int >= RANK_LT as c_int)
             && (*world).bg_state.rng.Q_irand(0, 1) != 0
             && crate::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim) == qfalse
             && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
@@ -2697,7 +2706,7 @@ pub fn Jedi_CheckFlipEvasions(
 
 /// Raven `Jedi_ReCalcParryTime`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:2305-2441`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:2305-2441`
 pub fn Jedi_ReCalcParryTime(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -2800,13 +2809,14 @@ pub fn Jedi_ReCalcParryTime(
 
 /// Raven `Jedi_QuickReactions`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:2443-2453`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:2443-2453`
 pub fn Jedi_QuickReactions(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
     unsafe {
         let world = ctx.world;
         let npc_info = (*world).globals.NPCInfo;
         let client = (*self_).client as *mut gclient_t;
-        if ((*client).NPC_class == CLASS_JEDI && (*npc_info).rank as c_int == RANK_COMMANDER as c_int)
+        if ((*client).NPC_class == CLASS_JEDI
+            && (*npc_info).rank as c_int == RANK_COMMANDER as c_int)
             || (*client).NPC_class == CLASS_TAVION
             || ((*client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] > FORCE_LEVEL_1
                 && (*world).cvars.g_spskill.integer > 1)
@@ -2821,7 +2831,7 @@ pub fn Jedi_QuickReactions(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
 
 /// Raven `Jedi_SaberBusy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:2455-2470`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:2455-2470`
 pub fn Jedi_SaberBusy(self_: *mut gentity_t) -> qboolean {
     unsafe {
         let client = (*self_).client as *mut gclient_t;
@@ -2843,7 +2853,7 @@ pub fn Jedi_SaberBusy(self_: *mut gentity_t) -> qboolean {
 
 /// Raven `Jedi_SaberBlockGo`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:2485-3139`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:2485-3139`
 pub fn Jedi_SaberBlockGo(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -2909,7 +2919,8 @@ pub fn Jedi_SaberBlockGo(
         {
             let snpc = (*self_).NPC as *mut gNPC_t;
             if !(*self_).NPC.is_null()
-                && ((*snpc).rank as c_int == RANK_CREWMAN as c_int || (*snpc).rank as c_int >= RANK_LT_JG as c_int)
+                && ((*snpc).rank as c_int == RANK_CREWMAN as c_int
+                    || (*snpc).rank as c_int >= RANK_LT_JG as c_int)
             {
                 if (*client).ps.groundEntityNum != ENTITYNUM_NONE
                     && ((*client).ps.pm_flags & PMF_DUCKED) == 0
@@ -3199,7 +3210,8 @@ pub fn Jedi_SaberBlockGo(
             } else {
                 //gotta jump!
                 if !(*self_).NPC.is_null()
-                    && ((*snpc).rank as c_int == RANK_CREWMAN as c_int || (*snpc).rank as c_int > RANK_LT_JG as c_int)
+                    && ((*snpc).rank as c_int == RANK_CREWMAN as c_int
+                        || (*snpc).rank as c_int > RANK_LT_JG as c_int)
                     && ((*world).bg_state.rng.Q_irand(0, 10) == 0
                         || ((*world).bg_state.rng.Q_irand(0, 2) == 0
                             && ((*cmd).forwardmove != 0 || (*cmd).rightmove != 0)))
@@ -3490,7 +3502,7 @@ pub fn Jedi_SaberBlockGo(
 
 /// Raven `Jedi_SaberBlock`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3143-3372`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:3143-3372`
 pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -3711,7 +3723,9 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
             }
         } else {
             let mut dodgeTime = (*client).ps.torsoTimer;
-            if (*npc_info).rank as c_int > RANK_LT_COMM as c_int && (*client).NPC_class != CLASS_DESANN {
+            if (*npc_info).rank as c_int > RANK_LT_COMM as c_int
+                && (*client).NPC_class != CLASS_DESANN
+            {
                 dodgeTime -= 200;
             }
             crate::g_timer::TIMER_Set(ctx, npc, c"parryReCalcTime".as_ptr(), dodgeTime);
@@ -3724,7 +3738,7 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
 
 /// Raven `Jedi_EvasionSaber`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3380-3666`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:3380-3666`
 pub fn Jedi_EvasionSaber(
     ctx: GameContext<'_>,
     enemy_movedir: vec3_t,
@@ -4041,7 +4055,7 @@ pub fn Jedi_EvasionSaber(
 
 /// Raven `Jedi_FindEnemyInCone`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3686-3761`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:3686-3761`
 pub fn Jedi_FindEnemyInCone(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -4167,7 +4181,7 @@ pub fn Jedi_FindEnemyInCone(
 
 /// Raven `Jedi_SetEnemyInfo`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3763-3796`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:3763-3796`
 pub fn Jedi_SetEnemyInfo(
     ctx: GameContext<'_>,
     enemy_dest: &mut vec3_t,
@@ -4227,7 +4241,7 @@ pub fn Jedi_SetEnemyInfo(
 
 /// Raven `Jedi_FaceEnemy`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3799-3874`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:3799-3874`
 pub fn Jedi_FaceEnemy(ctx: GameContext<'_>, doPitch: qboolean) {
     unsafe {
         let world = ctx.world;
@@ -4324,7 +4338,7 @@ pub fn Jedi_FaceEnemy(ctx: GameContext<'_>, doPitch: qboolean) {
 
 /// Raven `Jedi_DebounceDirectionChanges`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3876-4005`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:3876-4005`
 pub fn Jedi_DebounceDirectionChanges(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -4463,7 +4477,7 @@ pub fn Jedi_DebounceDirectionChanges(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_TimersApply`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4007-4065`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:4007-4065`
 pub fn Jedi_TimersApply(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -4520,7 +4534,7 @@ pub fn Jedi_TimersApply(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_CombatTimersUpdate`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4067-4273`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:4067-4273`
 pub fn Jedi_CombatTimersUpdate(ctx: GameContext<'_>, enemy_dist: c_int) {
     unsafe {
         let world = ctx.world;
@@ -4706,7 +4720,7 @@ pub fn Jedi_CombatTimersUpdate(ctx: GameContext<'_>, enemy_dist: c_int) {
 
 /// Raven `Jedi_CombatIdle`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4275-4337`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:4275-4337`
 pub fn Jedi_CombatIdle(ctx: GameContext<'_>, enemy_dist: c_int) {
     unsafe {
         let world = ctx.world;
@@ -4776,7 +4790,7 @@ pub fn Jedi_CombatIdle(ctx: GameContext<'_>, enemy_dist: c_int) {
 
 /// Raven `Jedi_AttackDecide`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4339-4467`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:4339-4467`
 pub fn Jedi_AttackDecide(ctx: GameContext<'_>, enemy_dist: c_int) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -4814,7 +4828,8 @@ pub fn Jedi_AttackDecide(ctx: GameContext<'_>, enemy_dist: c_int) -> qboolean {
                 chance = 20;
             } else if (*client).NPC_class == CLASS_TAVION {
                 chance = 10;
-            } else if (*client).NPC_class == CLASS_REBORN && (*npc_info).rank as c_int == RANK_LT_JG as c_int
+            } else if (*client).NPC_class == CLASS_REBORN
+                && (*npc_info).rank as c_int == RANK_LT_JG as c_int
             {
                 chance = 5;
             } else {
@@ -4838,8 +4853,10 @@ pub fn Jedi_AttackDecide(ctx: GameContext<'_>, enemy_dist: c_int) -> qboolean {
         }
 
         if (*client).NPC_class == CLASS_TAVION
-            || ((*client).NPC_class == CLASS_REBORN && (*npc_info).rank as c_int == RANK_LT_JG as c_int)
-            || ((*client).NPC_class == CLASS_JEDI && (*npc_info).rank as c_int == RANK_COMMANDER as c_int)
+            || ((*client).NPC_class == CLASS_REBORN
+                && (*npc_info).rank as c_int == RANK_LT_JG as c_int)
+            || ((*client).NPC_class == CLASS_JEDI
+                && (*npc_info).rank as c_int == RANK_COMMANDER as c_int)
         {
             if (crate::bg_panimate::PM_SaberInParry((*client).ps.saberMove) != qfalse
                 || crate::bg_panimate::PM_SaberInKnockaway((*client).ps.saberMove) != qfalse)
@@ -4915,7 +4932,7 @@ pub fn Jedi_AttackDecide(ctx: GameContext<'_>, enemy_dist: c_int) -> qboolean {
 
 /// Raven `Jedi_Jump`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4473-4717`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:4473-4717`
 pub fn Jedi_Jump(ctx: GameContext<'_>, dest: vec3_t, goalEntNum: c_int) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -5099,7 +5116,7 @@ pub fn Jedi_Jump(ctx: GameContext<'_>, dest: vec3_t, goalEntNum: c_int) -> qbool
 
 /// Raven `Jedi_TryJump`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4719-4865`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:4719-4865`
 pub fn Jedi_TryJump(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -5274,7 +5291,7 @@ pub fn Jedi_TryJump(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
 
 /// Raven `Jedi_Jumping`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4867-4914`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:4867-4914`
 pub fn Jedi_Jumping(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -5298,7 +5315,7 @@ pub fn Jedi_Jumping(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
 
 /// Raven `Jedi_CheckEnemyMovement`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4917-5036`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:4917-5036`
 pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
     unsafe {
         let world = ctx.world;
@@ -5328,7 +5345,9 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                     || (*enemy_client).ps.legsAnim == BOTH_JUMPFLIPSTABDOWN as c_int
                 {
                     //enemy is flipping over me
-                    if (*world).bg_state.rng.Q_irand(0, (*npc_info).rank as c_int) < RANK_LT as c_int {
+                    if (*world).bg_state.rng.Q_irand(0, (*npc_info).rank as c_int)
+                        < RANK_LT as c_int
+                    {
                         //be nice and stand still for him...
                         (*world).globals.ucmd.forwardmove = 0;
                         (*world).globals.ucmd.rightmove = 0;
@@ -5366,7 +5385,8 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                     if (*enemy_client).ps.groundEntityNum == ENTITYNUM_NONE {
                         //still in air
                         if enemy_dist < 256.0 {
-                            if (*world).bg_state.rng.Q_irand(0, (*npc_info).rank as c_int) < RANK_LT as c_int
+                            if (*world).bg_state.rng.Q_irand(0, (*npc_info).rank as c_int)
+                                < RANK_LT as c_int
                             {
                                 let mut enemyFwd: vec3_t = [0.0; 3];
                                 let mut dest: vec3_t = [0.0; 3];
@@ -5511,7 +5531,7 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
 
 /// Raven `Jedi_CheckJumps`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5038-5153`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5038-5153`
 pub fn Jedi_CheckJumps(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -5663,7 +5683,7 @@ pub fn Jedi_CheckJumps(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_Combat`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5155-5344`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5155-5344`
 pub fn Jedi_Combat(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -5863,7 +5883,7 @@ pub fn Jedi_Combat(ctx: GameContext<'_>) {
 
 /// Raven `NPC_Jedi_Pain`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5358-5444`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5358-5444`
 pub fn NPC_Jedi_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -5994,7 +6014,7 @@ pub fn NPC_Jedi_Pain(
 
 /// Raven `Jedi_CheckDanger`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5446-5463`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5446-5463`
 pub fn Jedi_CheckDanger(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -6041,7 +6061,7 @@ pub fn Jedi_CheckDanger(ctx: GameContext<'_>) -> qboolean {
 
 /// Raven `Jedi_CheckAmbushPlayer`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5465-5545`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5465-5545`
 pub fn Jedi_CheckAmbushPlayer(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -6143,7 +6163,7 @@ pub fn Jedi_CheckAmbushPlayer(ctx: GameContext<'_>) -> qboolean {
 
 /// Raven `Jedi_Ambush`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5547-5559`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5547-5559`
 pub fn Jedi_Ambush(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let world = ctx.world;
@@ -6175,7 +6195,7 @@ pub fn Jedi_Ambush(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Jedi_WaitingAmbush`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5561-5568`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5561-5568`
 pub fn Jedi_WaitingAmbush(self_: *mut gentity_t) -> qboolean {
     unsafe {
         let client = (*self_).client as *mut gclient_t;
@@ -6188,7 +6208,7 @@ pub fn Jedi_WaitingAmbush(self_: *mut gentity_t) -> qboolean {
 
 /// Raven `Jedi_Patrol`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5575-5728`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5575-5728`
 pub fn Jedi_Patrol(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -6401,7 +6421,7 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_CanPullBackSaber`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5730-5752`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5730-5752`
 pub fn Jedi_CanPullBackSaber(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
     unsafe {
         let world = ctx.world;
@@ -6431,7 +6451,7 @@ pub fn Jedi_CanPullBackSaber(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbo
 
 /// Raven `NPC_BSJedi_FollowLeader`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5758-5836`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5758-5836`
 pub fn NPC_BSJedi_FollowLeader(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -6531,7 +6551,7 @@ pub fn NPC_BSJedi_FollowLeader(ctx: GameContext<'_>) {
 
 /// Raven `Jedi_Attack`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5845-6166`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5845-6166`
 pub fn Jedi_Attack(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
@@ -6921,7 +6941,7 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
 
 /// Raven `NPC_BSJedi_Default`.
 ///
-/// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:6170-6220`
+/// Source: `oracle/codemp/game/NPC_AI_Jedi.c:6170-6220`
 pub fn NPC_BSJedi_Default(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;

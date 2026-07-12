@@ -10,7 +10,7 @@ use super::view_parms_t::viewParms_t;
 
 /// Raven `backEndState_t` — persistent state carried between backend renders.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_local.h:1091-1104`
+/// Type definition source: `oracle/code/renderer/tr_local.h:1091-1104`
 #[repr(C)]
 pub struct backEndState_t {
     pub refdef: trRefdef_t,

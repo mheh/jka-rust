@@ -1,7 +1,9 @@
 use super::super::MpGameImport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ROFF_PLAY` outbound game-to-engine syscall.
 ///
@@ -41,7 +43,7 @@ impl GRoffPlayArgs {
 /// `G_ROFF_PLAY` MP game imports syscall ABI token.
 ///
 /// Raven: qboolean	ROFF_Play(int entID, int roffID, qboolean doTranslation);
-/// Source: `oracle/oracle/codemp/game/g_public.h:244`
+/// Source: `oracle/codemp/game/g_public.h:244`
 pub struct GRoffPlay;
 
 impl OutboundSysCall for GRoffPlay {

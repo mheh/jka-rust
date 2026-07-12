@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( UI_PC_LOAD_SOURCE, filename );`
 /// Raven transport: `return botlib_export->PC_LoadSourceHandle( (const char *)VMA(1) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:366-367`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1159-1160`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:366-367`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1159-1160`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiPcLoadSourceArgs {
     filename: *const c_char,
@@ -32,11 +32,11 @@ impl UiPcLoadSourceArgs {
 /// Raven wrapper: `int trap_PC_LoadSource( const char *filename ) { return syscall( UI_PC_LOAD_SOURCE, filename ); }`
 /// Raven transport: `return botlib_export->PC_LoadSourceHandle( (const char *)VMA(1) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:85`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:82-90`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:366-367`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1159-1160`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1159-1160`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:85`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:82-90`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:366-367`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1159-1160`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1159-1160`
 pub struct UiPcLoadSource;
 
 impl OutboundSysCall for UiPcLoadSource {

@@ -3,7 +3,7 @@
 /// Raven `vehicleType_t` — vehicle type enumeration.
 ///
 /// Raven: Types of vehicles.
-/// Type definition source: `oracle/oracle/code/game/G_Vehicles.h:7-16`
+/// Type definition source: `oracle/code/game/G_Vehicles.h:7-16`
 #[repr(i32)]
 pub enum vehicleType_t {
     VH_NONE = 0,

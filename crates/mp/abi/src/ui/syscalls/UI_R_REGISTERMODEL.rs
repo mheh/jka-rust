@@ -12,9 +12,9 @@ use mp_qshared::shared::qhandle_t;
 /// Raven's client switch forwards the shader name through `VMA(1)` and returns
 /// the renderer handle word.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:103-104`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:103-104`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:932-933`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:103-104`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:103-104`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:932-933`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRRegistermodelArgs {
     pub name: *const c_char,
@@ -28,7 +28,7 @@ impl UiRRegistermodelArgs {
 
 /// `UI_R_REGISTERMODEL` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:36`
+/// Source: `oracle/codemp/ui/ui_public.h:36`
 pub struct UiRRegistermodel;
 
 impl OutboundSysCall for UiRRegistermodel {

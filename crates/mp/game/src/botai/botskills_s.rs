@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 /// Raven `botskills_t` — per-bot difficulty/skill tuning values.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/ai_main.h:137-145`
+/// Type definition source: `oracle/codemp/game/ai_main.h:137-145`
 #[repr(C)]
 pub struct botskills_t {
     pub reflex: c_int,

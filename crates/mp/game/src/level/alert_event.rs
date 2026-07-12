@@ -1,6 +1,6 @@
 //! MP `alertEvent_t` and its enums.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/g_local.h:778-805`
+//! Type definition source: `oracle/codemp/game/g_local.h:778-805`
 
 #![allow(non_camel_case_types)]
 
@@ -9,12 +9,12 @@ use core::ffi::c_int;
 use mp_qshared::common::mp::gentity::gentity_t;
 use mp_qshared::shared::vec3_t;
 
-/// Raven `MAX_ALERT_EVENTS`. Source: `oracle/oracle/codemp/game/g_local.h:777`
+/// Raven `MAX_ALERT_EVENTS`. Source: `oracle/codemp/game/g_local.h:777`
 pub const MAX_ALERT_EVENTS: usize = 32;
 
 /// Raven `alertEventType_e` (named `typedef enum`).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:778-783`
+/// Type definition source: `oracle/codemp/game/g_local.h:778-783`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum alertEventType_e {
@@ -24,7 +24,7 @@ pub enum alertEventType_e {
 
 /// Raven `alertEventLevel_e` (named `typedef enum`).
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:785-792`
+/// Type definition source: `oracle/codemp/game/g_local.h:785-792`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum alertEventLevel_e {
@@ -37,7 +37,7 @@ pub enum alertEventLevel_e {
 
 /// Raven `alertEvent_t`. Pointer-bearing (`owner`) => arch-dependent.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:794-805`
+/// Type definition source: `oracle/codemp/game/g_local.h:794-805`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct alertEvent_t {

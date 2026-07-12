@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_RMG_INIT, terrainID, terrainInfo);`
 /// Raven transport: `RM_CreateRandomModels(args[1], (const char *)VMA(2));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:115-118`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:494-513`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:115-118`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:494-513`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRmgInitArgs {
     terrain_id: c_int,
@@ -30,10 +30,10 @@ impl CgRmgInitArgs {
 /// `CG_RMG_INIT` SP cgame imports syscall ABI token.
 ///
 /// Raven: RMG BEGIN
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:78`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:115-118`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:494-513`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:494-513`
+/// Enum value source: `oracle/code/cgame/cg_public.h:78`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:115-118`
+/// Output source: `oracle/code/client/cl_cgame.cpp:494-513`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:494-513`
 pub struct CgRmgInit;
 
 impl OutboundSysCall for CgRmgInit {

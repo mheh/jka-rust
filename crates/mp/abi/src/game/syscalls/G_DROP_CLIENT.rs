@@ -31,7 +31,7 @@ impl GDropClientArgs {
 ///
 /// Raven: ( int clientNum, const char *reason );
 /// Raven: kick a client off the server with a message
-/// Source: `oracle/oracle/codemp/game/g_public.h:150`
+/// Source: `oracle/codemp/game/g_public.h:150`
 pub struct GDropClient;
 
 impl OutboundSysCall for GDropClient {

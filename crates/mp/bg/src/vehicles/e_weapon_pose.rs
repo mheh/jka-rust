@@ -2,7 +2,7 @@
 
 /// Raven `EWeaponPose` — weapon pose enumeration for vehicles.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:20-26`
+/// Type definition source: `oracle/codemp/game/bg_vehicles.h:20-26`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EWeaponPose {

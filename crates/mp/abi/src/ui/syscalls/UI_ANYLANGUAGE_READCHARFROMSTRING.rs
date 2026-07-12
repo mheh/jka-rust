@@ -11,9 +11,9 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `return syscall( UI_ANYLANGUAGE_READCHARFROMSTRING, psText, piAdvanceCount, pbIsTrailingPunctuation);`
 /// Raven transport: `return re.AnyLanguage_ReadCharFromString( (const char *)VMA(1), (int *) VMA(2), (qboolean *) VMA(3) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:146-148`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:999`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1154-1155`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:146-148`
+/// Args source: `oracle/codemp/ui/ui_local.h:999`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1154-1155`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiAnylanguageReadcharfromstringArgs {
     ps_text: *const c_char,
@@ -49,11 +49,11 @@ impl UiAnylanguageReadcharfromstringArgs {
 
 /// `UI_ANYLANGUAGE_READCHARFROMSTRING` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:82`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:146-148`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:999`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1154-1155`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1154-1155`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:82`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:146-148`
+/// Output source: `oracle/codemp/ui/ui_local.h:999`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1154-1155`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1154-1155`
 pub struct UiAnylanguageReadcharfromstring;
 
 impl OutboundSysCall for UiAnylanguageReadcharfromstring {

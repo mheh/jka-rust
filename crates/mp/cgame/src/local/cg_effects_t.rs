@@ -4,131 +4,131 @@ use mp_qshared::shared::fxHandle_t;
 
 /// Raven `cgEffects_t` — cached effect handles for cgame-side weapon/force/misc effects.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:1385-1509`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:1385-1509`
 #[repr(C)]
 pub struct cgEffects_t {
-	//concussion
-	pub concussionShotEffect: fxHandle_t,
-	pub concussionImpactEffect: fxHandle_t,
+    //concussion
+    pub concussionShotEffect: fxHandle_t,
+    pub concussionImpactEffect: fxHandle_t,
 
-	// BRYAR PISTOL
-	pub bryarShotEffect: fxHandle_t,
-	pub bryarPowerupShotEffect: fxHandle_t,
-	pub bryarWallImpactEffect: fxHandle_t,
-	pub bryarWallImpactEffect2: fxHandle_t,
-	pub bryarWallImpactEffect3: fxHandle_t,
-	pub bryarFleshImpactEffect: fxHandle_t,
-	pub bryarDroidImpactEffect: fxHandle_t,
+    // BRYAR PISTOL
+    pub bryarShotEffect: fxHandle_t,
+    pub bryarPowerupShotEffect: fxHandle_t,
+    pub bryarWallImpactEffect: fxHandle_t,
+    pub bryarWallImpactEffect2: fxHandle_t,
+    pub bryarWallImpactEffect3: fxHandle_t,
+    pub bryarFleshImpactEffect: fxHandle_t,
+    pub bryarDroidImpactEffect: fxHandle_t,
 
-	// BLASTER
-	pub blasterShotEffect: fxHandle_t,
-	pub blasterWallImpactEffect: fxHandle_t,
-	pub blasterFleshImpactEffect: fxHandle_t,
-	pub blasterDroidImpactEffect: fxHandle_t,
+    // BLASTER
+    pub blasterShotEffect: fxHandle_t,
+    pub blasterWallImpactEffect: fxHandle_t,
+    pub blasterFleshImpactEffect: fxHandle_t,
+    pub blasterDroidImpactEffect: fxHandle_t,
 
-	// DISRUPTOR
-	pub disruptorRingsEffect: fxHandle_t,
-	pub disruptorProjectileEffect: fxHandle_t,
-	pub disruptorWallImpactEffect: fxHandle_t,
-	pub disruptorFleshImpactEffect: fxHandle_t,
-	pub disruptorAltMissEffect: fxHandle_t,
-	pub disruptorAltHitEffect: fxHandle_t,
+    // DISRUPTOR
+    pub disruptorRingsEffect: fxHandle_t,
+    pub disruptorProjectileEffect: fxHandle_t,
+    pub disruptorWallImpactEffect: fxHandle_t,
+    pub disruptorFleshImpactEffect: fxHandle_t,
+    pub disruptorAltMissEffect: fxHandle_t,
+    pub disruptorAltHitEffect: fxHandle_t,
 
-	// BOWCASTER
-	pub bowcasterShotEffect: fxHandle_t,
-	pub bowcasterImpactEffect: fxHandle_t,
+    // BOWCASTER
+    pub bowcasterShotEffect: fxHandle_t,
+    pub bowcasterImpactEffect: fxHandle_t,
 
-	// REPEATER
-	pub repeaterProjectileEffect: fxHandle_t,
-	pub repeaterAltProjectileEffect: fxHandle_t,
-	pub repeaterWallImpactEffect: fxHandle_t,
-	pub repeaterFleshImpactEffect: fxHandle_t,
-	pub repeaterAltWallImpactEffect: fxHandle_t,
+    // REPEATER
+    pub repeaterProjectileEffect: fxHandle_t,
+    pub repeaterAltProjectileEffect: fxHandle_t,
+    pub repeaterWallImpactEffect: fxHandle_t,
+    pub repeaterFleshImpactEffect: fxHandle_t,
+    pub repeaterAltWallImpactEffect: fxHandle_t,
 
-	// DEMP2
-	pub demp2ProjectileEffect: fxHandle_t,
-	pub demp2WallImpactEffect: fxHandle_t,
-	pub demp2FleshImpactEffect: fxHandle_t,
+    // DEMP2
+    pub demp2ProjectileEffect: fxHandle_t,
+    pub demp2WallImpactEffect: fxHandle_t,
+    pub demp2FleshImpactEffect: fxHandle_t,
 
-	// FLECHETTE
-	pub flechetteShotEffect: fxHandle_t,
-	pub flechetteAltShotEffect: fxHandle_t,
-	pub flechetteWallImpactEffect: fxHandle_t,
-	pub flechetteFleshImpactEffect: fxHandle_t,
+    // FLECHETTE
+    pub flechetteShotEffect: fxHandle_t,
+    pub flechetteAltShotEffect: fxHandle_t,
+    pub flechetteWallImpactEffect: fxHandle_t,
+    pub flechetteFleshImpactEffect: fxHandle_t,
 
-	// ROCKET
-	pub rocketShotEffect: fxHandle_t,
-	pub rocketExplosionEffect: fxHandle_t,
+    // ROCKET
+    pub rocketShotEffect: fxHandle_t,
+    pub rocketExplosionEffect: fxHandle_t,
 
-	// THERMAL
-	pub thermalExplosionEffect: fxHandle_t,
-	pub thermalShockwaveEffect: fxHandle_t,
+    // THERMAL
+    pub thermalExplosionEffect: fxHandle_t,
+    pub thermalShockwaveEffect: fxHandle_t,
 
-	// TRIPMINE
-	pub tripmineLaserFX: fxHandle_t,
-	pub tripmineGlowFX: fxHandle_t,
+    // TRIPMINE
+    pub tripmineLaserFX: fxHandle_t,
+    pub tripmineGlowFX: fxHandle_t,
 
-	//FORCE
-	pub forceLightning: fxHandle_t,
-	pub forceLightningWide: fxHandle_t,
+    //FORCE
+    pub forceLightning: fxHandle_t,
+    pub forceLightningWide: fxHandle_t,
 
-	pub forceDrain: fxHandle_t,
-	pub forceDrainWide: fxHandle_t,
-	pub forceDrained: fxHandle_t,
+    pub forceDrain: fxHandle_t,
+    pub forceDrainWide: fxHandle_t,
+    pub forceDrained: fxHandle_t,
 
-	//TURRET
-	pub turretShotEffect: fxHandle_t,
+    //TURRET
+    pub turretShotEffect: fxHandle_t,
 
-	//Whatever
-	pub itemCone: fxHandle_t,
+    //Whatever
+    pub itemCone: fxHandle_t,
 
-	pub mSparks: fxHandle_t,
-	pub mSaberCut: fxHandle_t,
-	pub mTurretMuzzleFlash: fxHandle_t,
-	pub mSaberBlock: fxHandle_t,
-	pub mSaberBloodSparks: fxHandle_t,
-	pub mSaberBloodSparksSmall: fxHandle_t,
-	pub mSaberBloodSparksMid: fxHandle_t,
-	pub mSpawn: fxHandle_t,
-	pub mJediSpawn: fxHandle_t,
-	pub mBlasterDeflect: fxHandle_t,
-	pub mBlasterSmoke: fxHandle_t,
-	pub mForceConfustionOld: fxHandle_t,
-	pub mDisruptorDeathSmoke: fxHandle_t,
-	pub mSparkExplosion: fxHandle_t,
-	pub mTurretExplode: fxHandle_t,
-	pub mEmplacedExplode: fxHandle_t,
-	pub mEmplacedDeadSmoke: fxHandle_t,
-	pub mTripmineExplosion: fxHandle_t,
-	pub mDetpackExplosion: fxHandle_t,
-	pub mFlechetteAltBlow: fxHandle_t,
-	pub mStunBatonFleshImpact: fxHandle_t,
-	pub mAltDetonate: fxHandle_t,
-	pub mSparksExplodeNoSound: fxHandle_t,
-	pub mTripMineLaster: fxHandle_t,
-	pub mEmplacedMuzzleFlash: fxHandle_t,
-	pub mConcussionAltRing: fxHandle_t,
-	pub mHyperspaceStars: fxHandle_t,
-	pub mBlackSmoke: fxHandle_t,
-	pub mShipDestDestroyed: fxHandle_t,
-	pub mShipDestBurning: fxHandle_t,
-	pub mBobaJet: fxHandle_t,
+    pub mSparks: fxHandle_t,
+    pub mSaberCut: fxHandle_t,
+    pub mTurretMuzzleFlash: fxHandle_t,
+    pub mSaberBlock: fxHandle_t,
+    pub mSaberBloodSparks: fxHandle_t,
+    pub mSaberBloodSparksSmall: fxHandle_t,
+    pub mSaberBloodSparksMid: fxHandle_t,
+    pub mSpawn: fxHandle_t,
+    pub mJediSpawn: fxHandle_t,
+    pub mBlasterDeflect: fxHandle_t,
+    pub mBlasterSmoke: fxHandle_t,
+    pub mForceConfustionOld: fxHandle_t,
+    pub mDisruptorDeathSmoke: fxHandle_t,
+    pub mSparkExplosion: fxHandle_t,
+    pub mTurretExplode: fxHandle_t,
+    pub mEmplacedExplode: fxHandle_t,
+    pub mEmplacedDeadSmoke: fxHandle_t,
+    pub mTripmineExplosion: fxHandle_t,
+    pub mDetpackExplosion: fxHandle_t,
+    pub mFlechetteAltBlow: fxHandle_t,
+    pub mStunBatonFleshImpact: fxHandle_t,
+    pub mAltDetonate: fxHandle_t,
+    pub mSparksExplodeNoSound: fxHandle_t,
+    pub mTripMineLaster: fxHandle_t,
+    pub mEmplacedMuzzleFlash: fxHandle_t,
+    pub mConcussionAltRing: fxHandle_t,
+    pub mHyperspaceStars: fxHandle_t,
+    pub mBlackSmoke: fxHandle_t,
+    pub mShipDestDestroyed: fxHandle_t,
+    pub mShipDestBurning: fxHandle_t,
+    pub mBobaJet: fxHandle_t,
 
-	//footstep effects
-	pub footstepMud: fxHandle_t,
-	pub footstepSand: fxHandle_t,
-	pub footstepSnow: fxHandle_t,
-	pub footstepGravel: fxHandle_t,
-	//landing effects
-	pub landingMud: fxHandle_t,
-	pub landingSand: fxHandle_t,
-	pub landingDirt: fxHandle_t,
-	pub landingSnow: fxHandle_t,
-	pub landingGravel: fxHandle_t,
-	//splashes
-	pub waterSplash: fxHandle_t,
-	pub lavaSplash: fxHandle_t,
-	pub acidSplash: fxHandle_t,
+    //footstep effects
+    pub footstepMud: fxHandle_t,
+    pub footstepSand: fxHandle_t,
+    pub footstepSnow: fxHandle_t,
+    pub footstepGravel: fxHandle_t,
+    //landing effects
+    pub landingMud: fxHandle_t,
+    pub landingSand: fxHandle_t,
+    pub landingDirt: fxHandle_t,
+    pub landingSnow: fxHandle_t,
+    pub landingGravel: fxHandle_t,
+    //splashes
+    pub waterSplash: fxHandle_t,
+    pub lavaSplash: fxHandle_t,
+    pub acidSplash: fxHandle_t,
 }
 
 const _: () = assert!(core::mem::size_of::<cgEffects_t>() == 356);

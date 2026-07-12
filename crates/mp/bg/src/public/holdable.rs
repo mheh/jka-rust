@@ -1,6 +1,6 @@
 //! MP `bg_public.h` holdable item definitions.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:686-704`
+//! Type definition source: `oracle/codemp/game/bg_public.h:686-704`
 
 #![allow(non_camel_case_types)]
 
@@ -10,7 +10,7 @@ use core::ffi::c_int;
 ///
 /// Raven: NOTE: Names the holdables via an anonymous `enum { HI_NONE..HI_NUM_HOLDABLE }`,
 /// then `typedef int holdable_t` for storage.
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:704`
+/// Type definition source: `oracle/codemp/game/bg_public.h:704`
 pub type holdable_t = c_int;
 
 pub const HI_NONE: holdable_t = 0;

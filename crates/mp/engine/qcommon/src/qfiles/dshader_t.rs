@@ -6,12 +6,12 @@ use mp_qshared::shared::MAX_QPATH;
 
 /// Raven `dshader_t` — BSP shader reference.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/../qcommon/qfiles.h:447-451`
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:447-451`
 #[repr(C)]
 pub struct dshader_t {
-	pub shader: [c_char; MAX_QPATH],
-	pub surfaceFlags: i32,
-	pub contentFlags: i32,
+    pub shader: [c_char; MAX_QPATH],
+    pub surfaceFlags: i32,
+    pub contentFlags: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<dshader_t>() == 72);

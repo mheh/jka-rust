@@ -27,7 +27,7 @@ impl BotlibLoadMapArgs {
 
 /// `BOTLIB_LOAD_MAP` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:348`
+/// Source: `oracle/codemp/game/g_public.h:348`
 pub struct BotlibLoadMap;
 
 impl OutboundSysCall for BotlibLoadMap {

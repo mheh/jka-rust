@@ -2,24 +2,25 @@
 
 /// Raven `aas_areasettings_t` — per-area settings.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:119-129`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:119-129`
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct aas_areasettings_t {
-	//could also add all kind of statistic fields
-	/// contents of the area
-	pub contents: i32,
-	/// several area flags
-	pub areaflags: i32,
-	/// how a bot can be present in this area
-	pub presencetype: i32,
-	/// cluster the area belongs to, if negative it's a portal
-	pub cluster: i32,
-	/// number of the area in the cluster
-	pub clusterareanum: i32,
-	/// number of reachable areas from this one
-	pub numreachableareas: i32,
-	/// first reachable area in the reachable area index
-	pub firstreachablearea: i32,
+    //could also add all kind of statistic fields
+    /// contents of the area
+    pub contents: i32,
+    /// several area flags
+    pub areaflags: i32,
+    /// how a bot can be present in this area
+    pub presencetype: i32,
+    /// cluster the area belongs to, if negative it's a portal
+    pub cluster: i32,
+    /// number of the area in the cluster
+    pub clusterareanum: i32,
+    /// number of reachable areas from this one
+    pub numreachableareas: i32,
+    /// first reachable area in the reachable area index
+    pub firstreachablearea: i32,
 }
 
 pub type aas_areasettings_s = aas_areasettings_t;

@@ -39,7 +39,7 @@ impl BotlibAiSetChatNameArgs {
 
 /// `BOTLIB_AI_SET_CHAT_NAME` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:438`
+/// Source: `oracle/codemp/game/g_public.h:438`
 pub struct BotlibAiSetChatName;
 
 impl OutboundSysCall for BotlibAiSetChatName {

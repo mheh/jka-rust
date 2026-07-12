@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_EA_RESPAWN` outbound game-to-engine syscall.
 ///
@@ -24,7 +26,7 @@ impl BotlibEaRespawnArgs {
 
 /// `BOTLIB_EA_RESPAWN` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:393`
+/// Source: `oracle/codemp/game/g_public.h:393`
 pub struct BotlibEaRespawn;
 
 impl OutboundSysCall for BotlibEaRespawn {

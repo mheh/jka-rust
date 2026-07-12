@@ -7,10 +7,10 @@ use mp_qshared::shared::qboolean;
 /// Raven comment alignment for this enum block is shifted in this snapshot (`ui_public.h` around UI_INIT),
 /// so signature is validated from `ui_main.c` switch/function call paths.
 ///
-/// Source (enum): `oracle/oracle/codemp/ui/ui_public.h:219`
-/// Source (args): `oracle/oracle/codemp/ui/ui_main.c:550`
-/// Source (output): `oracle/oracle/codemp/ui/ui_main.c:589`
-/// Source (call site/transport): `oracle/oracle/codemp/client/cl_ui.cpp:1494`
+/// Source (enum): `oracle/codemp/ui/ui_public.h:219`
+/// Source (args): `oracle/codemp/ui/ui_main.c:550`
+/// Source (output): `oracle/codemp/ui/ui_main.c:589`
+/// Source (call site/transport): `oracle/codemp/client/cl_ui.cpp:1494`
 pub struct UiInit;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -47,7 +47,7 @@ impl GGetUserinfoArgs {
 /// Raven: userinfo strings are maintained by the server system, so they
 /// Raven: are persistant across level loads, while all other game visible
 /// Raven: data is completely reset
-/// Source: `oracle/oracle/codemp/game/g_public.h:166`
+/// Source: `oracle/codemp/game/g_public.h:166`
 pub struct GGetUserinfo;
 
 impl OutboundSysCall for GGetUserinfo {

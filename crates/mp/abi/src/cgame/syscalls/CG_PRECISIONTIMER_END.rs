@@ -13,9 +13,9 @@ use abi_transport::generic::{
 /// Raven transport: casts `args[1]` back to `timing_c *`, returns
 /// `timer->End()`, then deletes the timer.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:44-47`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2158`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:706-713`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:44-47`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2158`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:706-713`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgPrecisiontimerEndArgs {
     the_timer: *mut c_void,
@@ -29,11 +29,11 @@ impl CgPrecisiontimerEndArgs {
 
 /// `CG_PRECISIONTIMER_END` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:63`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:44-47`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:44-47`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:706-713`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:706-713`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:63`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:44-47`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:44-47`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:706-713`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:706-713`
 pub struct CgPrecisiontimerEnd;
 
 impl OutboundSysCall for CgPrecisiontimerEnd {

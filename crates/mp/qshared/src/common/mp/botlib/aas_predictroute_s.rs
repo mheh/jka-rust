@@ -4,23 +4,23 @@ use crate::shared::vec3_t;
 
 /// Raven `aas_predictroute_t` — result of AAS route prediction.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_aas.h:196-205`
+/// Type definition source: `oracle/codemp/game/be_aas.h:196-205`
 #[repr(C)]
 pub struct aas_predictroute_t {
-	/// position at the end of movement prediction
-	pub endpos: vec3_t,
-	/// area at end of movement prediction
-	pub endarea: i32,
-	/// event that made the prediction stop
-	pub stopevent: i32,
-	/// contents at the end of movement prediction
-	pub endcontents: i32,
-	/// end travel flags
-	pub endtravelflags: i32,
-	/// number of areas predicted ahead
-	pub numareas: i32,
-	/// time predicted ahead (in hundreth of a sec)
-	pub time: i32,
+    /// position at the end of movement prediction
+    pub endpos: vec3_t,
+    /// area at end of movement prediction
+    pub endarea: i32,
+    /// event that made the prediction stop
+    pub stopevent: i32,
+    /// contents at the end of movement prediction
+    pub endcontents: i32,
+    /// end travel flags
+    pub endtravelflags: i32,
+    /// number of areas predicted ahead
+    pub numareas: i32,
+    /// time predicted ahead (in hundreth of a sec)
+    pub time: i32,
 }
 
 pub type aas_predictroute_s = aas_predictroute_t;

@@ -39,7 +39,7 @@ impl GG2AddboltArgs {
 
 /// `G_G2_ADDBOLT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:517`
+/// Source: `oracle/codemp/game/g_public.h:517`
 pub struct GG2Addbolt;
 
 impl OutboundSysCall for GG2Addbolt {

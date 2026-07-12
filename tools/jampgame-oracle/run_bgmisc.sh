@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build the jampgame "bgmisc" oracle dumper from the UNMODIFIED Raven sources
-# and check (or, with --regen, regenerate) the golden dump golden/bgmisc.txt.
+# and check (or, with --regen, regenerate) the golden dump
+# crates/mp/game/tests/oracle/golden/bgmisc.txt.
 #
 # The dumper drives bg_misc.c + bg_weapons.c (the trajectory evaluators, the
 # bg_itemlist / weaponData / ammoData tables, the item lookups, item-grab
@@ -14,7 +15,11 @@
 set -eu
 cd "$(dirname "$0")"
 
-ORACLE=../../oracle/oracle
+# Committed parity data (fixtures + goldens) lives inside the mp_game crate so
+# the crate is self-contained; this harness only generates/checks it.
+DATA=../../crates/mp/game/tests/oracle
+
+ORACLE=../../oracle
 G=$ORACLE/codemp/game
 Q=$ORACLE/codemp/qcommon
 B=build-bgmisc
@@ -61,13 +66,13 @@ cc $CFLAGS -c main_bgmisc.c -o "$B/bg_main.o"
 # shellcheck disable=SC2086
 cc "$B/bg_main.o" $OBJS -lm -o "$B/bgmisc_dump"
 
-mkdir -p golden
+mkdir -p "$DATA/golden"
 status=0
 if [ "${1:-}" = "--regen" ]; then
-	"$B/bgmisc_dump" fixtures/bgmisc > golden/bgmisc.txt
+	"$B/bgmisc_dump" "$DATA/fixtures/bgmisc" > "$DATA/golden/bgmisc.txt"
 	echo "regenerated bgmisc"
 else
-	"$B/bgmisc_dump" fixtures/bgmisc | diff -u golden/bgmisc.txt - || status=1
+	"$B/bgmisc_dump" "$DATA/fixtures/bgmisc" | diff -u "$DATA/golden/bgmisc.txt" - || status=1
 fi
 
 [ "$status" -eq 0 ] && echo "jampgame-oracle bgmisc: OK"

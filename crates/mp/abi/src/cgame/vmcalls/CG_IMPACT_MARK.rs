@@ -8,13 +8,13 @@ use abi_transport::generic::InboundVmCall;
 /// Raven: float red, float green, float blue, float alpha, qboolean alphaFade, float radius, qboolean temporary);
 /// Raven: shared-buffer payload `TCGImpactMark` carries the mark shader, origin, dir, orientation/color/radius,
 /// Raven: and temporary/alpha-fade flags.
-/// Enum source: `oracle/oracle/codemp/cgame/cg_public.h:426-429`
-/// Shared-buffer source: `oracle/oracle/codemp/cgame/cg_public.h:467-479`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:303-305`, `oracle/oracle/codemp/cgame/cg_main.c:570-580`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:303-305`, `oracle/oracle/codemp/cgame/cg_main.c:578-579`
-/// Transport/switch source: `oracle/oracle/codemp/cgame/cg_main.c:303-305`
-/// Transport/call-site source: no `VM_Call( cgvm, CG_IMPACT_MARK )` site found in tracked Oracle sources; dispatch and payload usage is established in `oracle/oracle/codemp/cgame/cg_main.c`.
-/// Shared-buffer payload type source: `oracle/oracle/codemp/cgame/cg_public.h:467-479`
+/// Enum source: `oracle/codemp/cgame/cg_public.h:426-429`
+/// Shared-buffer source: `oracle/codemp/cgame/cg_public.h:467-479`
+/// Args source: `oracle/codemp/cgame/cg_main.c:303-305`, `oracle/codemp/cgame/cg_main.c:570-580`
+/// Output source: `oracle/codemp/cgame/cg_main.c:303-305`, `oracle/codemp/cgame/cg_main.c:578-579`
+/// Transport/switch source: `oracle/codemp/cgame/cg_main.c:303-305`
+/// Transport/call-site source: no `VM_Call( cgvm, CG_IMPACT_MARK )` site found in tracked Oracle sources; dispatch and payload usage is established in `oracle/codemp/cgame/cg_main.c`.
+/// Shared-buffer payload type source: `oracle/codemp/cgame/cg_public.h:467-479`
 pub struct CgImpactMark;
 
 impl InboundVmCall for CgImpactMark {

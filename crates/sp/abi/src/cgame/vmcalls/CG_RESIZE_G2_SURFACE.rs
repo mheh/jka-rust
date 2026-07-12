@@ -10,8 +10,8 @@ use abi_transport::generic::{
 ///
 /// Raven vmMain: `CG_ResizeG2Surface((surfaceInfo_v *)arg0, arg1);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:128`
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:201`
+/// Args source: `oracle/code/cgame/cg_main.cpp:128`
+/// Type definition source: `oracle/code/game/ghoul2_shared.h:201`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CgResizeG2SurfaceArgs {
     surface: *mut surfaceInfo_v,
@@ -35,10 +35,10 @@ impl CgResizeG2SurfaceArgs {
 /// `CG_RESIZE_G2_SURFACE` SP cgame exports vmMain ABI token.
 ///
 /// Raven: `void CG_ResizeG2Surface( surfaceInfo_v *surface, int newCount );`
-/// Enum value source: `oracle/oracle/code/client/vmachine.h:28`
-/// Args source: `oracle/oracle/code/cgame/cg_main.cpp:41`, `oracle/oracle/code/cgame/cg_main.cpp:128`
-/// Output source: `oracle/oracle/code/cgame/cg_main.cpp:128`
-/// VM_Main switch source: `oracle/oracle/code/cgame/cg_main.cpp:118-130`
+/// Enum value source: `oracle/code/client/vmachine.h:28`
+/// Args source: `oracle/code/cgame/cg_main.cpp:41`, `oracle/code/cgame/cg_main.cpp:128`
+/// Output source: `oracle/code/cgame/cg_main.cpp:128`
+/// VM_Main switch source: `oracle/code/cgame/cg_main.cpp:118-130`
 /// Raven: `surfaceInfo_v` is a vector type in `game/ghoul2_shared.h:201`.
 pub struct CgResizeG2Surface;
 

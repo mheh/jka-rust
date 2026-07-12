@@ -36,7 +36,7 @@ impl GDebugPolygonCreateArgs {
 
 /// `G_DEBUG_POLYGON_CREATE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:230`
+/// Source: `oracle/codemp/game/g_public.h:230`
 pub struct GDebugPolygonCreate;
 
 impl OutboundSysCall for GDebugPolygonCreate {

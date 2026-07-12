@@ -1,13 +1,13 @@
 //! MP `saberType_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/q_shared.h:601-631`
+//! Type definition source: `oracle/codemp/game/q_shared.h:601-631`
 
 #![allow(non_camel_case_types)]
 
 /// Raven `saberType_t` — none, single, staff, etc.
 ///
 /// `typedef enum` → int-wide discriminants.
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:601-631`
+/// Type definition source: `oracle/codemp/game/q_shared.h:601-631`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum saberType_t {

@@ -13,10 +13,10 @@ use sp_qshared::shared::qhandle_t;
 /// `cgi_R_LerpTag( orientation_t *tag, qhandle_t mod, int startFrame, int endFrame, float frac, const char *tagName )`
 /// Raven transport: `re.LerpTag( (orientation_t *) VMA(1), args[2], args[3], args[4], VMF(5), (const char *) VMA(6) );`
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:144`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:409-411`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:723-725`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:723-725`
+/// Enum value source: `oracle/code/cgame/cg_public.h:144`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:409-411`
+/// Output source: `oracle/code/client/cl_cgame.cpp:723-725`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:723-725`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRLerptagArgs {
     tag: *mut c_void,
@@ -73,10 +73,10 @@ impl CgRLerptagArgs {
 
 /// `CG_R_LERPTAG` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:144`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:409-411`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:723-725`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:723-725`
+/// Enum value source: `oracle/code/cgame/cg_public.h:144`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:409-411`
+/// Output source: `oracle/code/client/cl_cgame.cpp:723-725`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:723-725`
 pub struct CgRLerptag;
 
 impl OutboundSysCall for CgRLerptag {

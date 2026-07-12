@@ -1,6 +1,6 @@
 //! SP `playerState_t` copied from Raven `code/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/code/game/q_shared.h:2066-2361`
+//! Source: `oracle/code/game/q_shared.h:2066-2361`
 
 #![allow(non_camel_case_types, non_snake_case)]
 
@@ -12,37 +12,37 @@ use super::saber::{saberInfo_t, MAX_SABERS};
 
 /// Raven SP `MAX_STATS`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1582`
+/// Type definition source: `oracle/code/game/q_shared.h:1582`
 pub const MAX_STATS: usize = 16;
 /// Raven SP `MAX_PERSISTANT`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1586`
+/// Type definition source: `oracle/code/game/q_shared.h:1586`
 pub const MAX_PERSISTANT: usize = 16;
 /// Raven SP `MAX_POWERUPS`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1589`
+/// Type definition source: `oracle/code/game/q_shared.h:1589`
 pub const MAX_POWERUPS: usize = 16;
 /// Raven SP `MAX_AMMO`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1591`
+/// Type definition source: `oracle/code/game/q_shared.h:1591`
 pub const MAX_AMMO: usize = 10;
 /// Raven SP `MAX_INVENTORY`.
 ///
 /// Raven: See INV_MAX.
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1592`
+/// Type definition source: `oracle/code/game/q_shared.h:1592`
 pub const MAX_INVENTORY: usize = 15;
 /// Raven SP `MAX_SECURITY_KEYS`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1593`
+/// Type definition source: `oracle/code/game/q_shared.h:1593`
 pub const MAX_SECURITY_KEYS: usize = 5;
 /// Raven SP `MAX_SECURITY_KEY_MESSSAGE`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1594`
+/// Type definition source: `oracle/code/game/q_shared.h:1594`
 pub const MAX_SECURITY_KEY_MESSSAGE: usize = 24;
 /// Raven SP `MAX_PS_EVENTS`.
 ///
 /// Raven: this must be a power of 2 unless you change some &'s to %'s -ste
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1596`
+/// Type definition source: `oracle/code/game/q_shared.h:1596`
 pub const MAX_PS_EVENTS: usize = 2;
 
 /// Raven SP `playerState_t` — full client/server prediction state for a player.
@@ -57,7 +57,7 @@ pub const MAX_PS_EVENTS: usize = 2;
 /// C++ helper methods interspersed among the fields in Raven's source (e.g.
 /// `SaberStaff`, `SaberActivate`, `SaberDisarmBonus`) do not affect layout and
 /// are not ported; only the data fields are.
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2077-2361`
+/// Type definition source: `oracle/code/game/q_shared.h:2077-2361`
 // Note: no `PartialEq` derive — `saberInfo_t` (embedded via `saber`) holds raw
 // pointers and does not itself derive `PartialEq`.
 #[repr(C)]

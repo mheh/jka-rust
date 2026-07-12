@@ -12,9 +12,9 @@ use mp_qshared::shared::qhandle_t;
 /// Raven transport:
 /// `re.AddPolyToScene( args[1], args[2], (const polyVert_t *)VMA(3), 1 );`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:335-336`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2271`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:897-899`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:335-336`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2271`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:897-899`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRAddpolytosceneArgs {
     h_shader: qhandle_t,
@@ -34,10 +34,10 @@ impl CgRAddpolytosceneArgs {
 
 /// `CG_R_ADDPOLYTOSCENE` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:152`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:335-336`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:897-899`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:897-899`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:152`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:335-336`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:897-899`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:897-899`
 pub struct CgRAddpolytoscene;
 
 impl OutboundSysCall for CgRAddpolytoscene {

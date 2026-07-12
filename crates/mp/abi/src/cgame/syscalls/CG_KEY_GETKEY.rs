@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `int trap_Key_GetKey( const char *binding )`.
 /// Raven transport: `Key_GetKey( (const char *)VMA(1) )`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:537-538`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:996-997`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:537-538`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:996-997`
 #[derive(Debug)]
 pub struct CgKeyGetkeyArgs {
     binding: *const c_char,
@@ -37,10 +37,10 @@ impl CgKeyGetkeyArgs {
 /// Raven wrapper: `return syscall( CG_KEY_GETKEY, binding );`
 /// Raven transport: `return Key_GetKey( (const char *)VMA(1) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:197`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:537-538`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:996-997`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:996-997`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:197`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:537-538`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:996-997`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:996-997`
 pub struct CgKeyGetkey;
 
 impl OutboundSysCall for CgKeyGetkey {

@@ -38,7 +38,7 @@ impl BotlibAasIntForBspEpairKeyArgs {
 
 /// `BOTLIB_AAS_INT_FOR_BSP_EPAIR_KEY` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:373`
+/// Source: `oracle/codemp/game/g_public.h:373`
 pub struct BotlibAasIntForBspEpairKey;
 
 impl OutboundSysCall for BotlibAasIntForBspEpairKey {

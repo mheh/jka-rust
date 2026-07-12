@@ -1,6 +1,6 @@
 //! SP `usercmd_t` copied from Raven `code/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/code/game/q_shared.h:2406-2415`
+//! Source: `oracle/code/game/q_shared.h:2406-2415`
 
 #![allow(non_camel_case_types)]
 

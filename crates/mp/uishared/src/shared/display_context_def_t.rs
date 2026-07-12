@@ -13,7 +13,7 @@ use super::item_def_s::itemDef_t;
 /// Raven `displayContextDef_t` — the UI module's function-pointer table into
 /// the engine plus the display/frame state the engine keeps refreshed for it.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:400-477`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:400-477`
 #[repr(C)]
 pub struct displayContextDef_t {
     pub registerShaderNoMip: Option<unsafe extern "C" fn(p: *const c_char) -> qhandle_t>,
@@ -51,9 +51,8 @@ pub struct displayContextDef_t {
     pub textHeight:
         Option<unsafe extern "C" fn(text: *const c_char, scale: f32, iMenuFont: c_int) -> c_int>,
     pub registerModel: Option<unsafe extern "C" fn(p: *const c_char) -> qhandle_t>,
-    pub modelBounds: Option<
-        unsafe extern "C" fn(model: qhandle_t, min: *mut vec3_t, max: *mut vec3_t),
-    >,
+    pub modelBounds:
+        Option<unsafe extern "C" fn(model: qhandle_t, min: *mut vec3_t, max: *mut vec3_t)>,
     pub fillRect:
         Option<unsafe extern "C" fn(x: f32, y: f32, w: f32, h: f32, color: *const vec4_t)>,
     pub drawRect: Option<
@@ -66,9 +65,8 @@ pub struct displayContextDef_t {
     pub renderScene: Option<unsafe extern "C" fn(fd: *const refdef_t)>,
 
     pub RegisterFont: Option<unsafe extern "C" fn(fontName: *const c_char) -> qhandle_t>,
-    pub Font_StrLenPixels: Option<
-        unsafe extern "C" fn(text: *const c_char, iFontIndex: c_int, scale: f32) -> c_int,
-    >,
+    pub Font_StrLenPixels:
+        Option<unsafe extern "C" fn(text: *const c_char, iFontIndex: c_int, scale: f32) -> c_int>,
     pub Font_StrLenChars: Option<unsafe extern "C" fn(text: *const c_char) -> c_int>,
     pub Font_HeightPixels: Option<unsafe extern "C" fn(iFontIndex: c_int, scale: f32) -> c_int>,
     pub Font_DrawString: Option<
@@ -137,7 +135,12 @@ pub struct displayContextDef_t {
     pub getOverstrikeMode: Option<unsafe extern "C" fn() -> qboolean>,
     pub startLocalSound: Option<unsafe extern "C" fn(sfx: sfxHandle_t, channelNum: c_int)>,
     pub ownerDrawHandleKey: Option<
-        unsafe extern "C" fn(ownerDraw: c_int, flags: c_int, special: *mut f32, key: c_int) -> qboolean,
+        unsafe extern "C" fn(
+            ownerDraw: c_int,
+            flags: c_int,
+            special: *mut f32,
+            key: c_int,
+        ) -> qboolean,
     >,
     pub feederCount: Option<unsafe extern "C" fn(feederID: f32) -> c_int>,
     pub feederItemText: Option<
@@ -174,8 +177,7 @@ pub struct displayContextDef_t {
     pub playCinematic:
         Option<unsafe extern "C" fn(name: *const c_char, x: f32, y: f32, w: f32, h: f32) -> c_int>,
     pub stopCinematic: Option<unsafe extern "C" fn(handle: c_int)>,
-    pub drawCinematic:
-        Option<unsafe extern "C" fn(handle: c_int, x: f32, y: f32, w: f32, h: f32)>,
+    pub drawCinematic: Option<unsafe extern "C" fn(handle: c_int, x: f32, y: f32, w: f32, h: f32)>,
     pub runCinematicFrame: Option<unsafe extern "C" fn(handle: c_int)>,
 
     pub yscale: f32,

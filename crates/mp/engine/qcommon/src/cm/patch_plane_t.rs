@@ -2,7 +2,7 @@
 
 /// Raven `patchPlane_t` — a surface or edge plane used by patch collision.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_patch.h:45-48`
+/// Type definition source: `oracle/codemp/qcommon/cm_patch.h:45-48`
 #[repr(C)]
 pub struct patchPlane_t {
     pub plane: [f32; 4],

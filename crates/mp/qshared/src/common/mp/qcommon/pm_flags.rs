@@ -3,7 +3,7 @@
 //! Plain `#define` bit flags (not an enum), so §C8 makes them `const`s
 //! directly.
 //!
-//! Source: `oracle/oracle/codemp/game/bg_public.h:403-417`
+//! Source: `oracle/codemp/game/bg_public.h:403-417`
 
 use core::ffi::c_int;
 
@@ -25,5 +25,5 @@ pub const PMF_STUCK_TO_WALL: c_int = 16384; // grabbing a wall
 
 /// Raven `PMF_ALL_TIMES`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:419`
+/// Source: `oracle/codemp/game/bg_public.h:419`
 pub const PMF_ALL_TIMES: c_int = PMF_TIME_WATERJUMP | PMF_TIME_LAND | PMF_TIME_KNOCKBACK;

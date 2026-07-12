@@ -4,7 +4,7 @@ use core::ffi::c_int;
 
 /// Raven `cArea_t` — flood-fill state for a single collision-model area.
 ///
-/// Type definition source: `oracle/oracle/codemp/qcommon/cm_local.h:99-102`
+/// Type definition source: `oracle/codemp/qcommon/cm_local.h:99-102`
 #[repr(C)]
 pub struct cArea_t {
     pub floodnum: c_int,

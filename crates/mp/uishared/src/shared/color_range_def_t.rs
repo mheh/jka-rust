@@ -4,7 +4,7 @@ use mp_qshared::shared::vec4_t;
 
 /// Raven `colorRangeDef_t` — a color range definition.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_shared.h:148-152`
+/// Type definition source: `oracle/codemp/ui/ui_shared.h:148-152`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct colorRangeDef_t {

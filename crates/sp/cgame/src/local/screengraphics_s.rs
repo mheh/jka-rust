@@ -6,37 +6,37 @@ use sp_qshared::shared::qhandle_t;
 
 /// Raven `screengraphics_s` — a scripted screen HUD element (string or graphic).
 ///
-/// Type definition source: `oracle/oracle/code/cgame/cg_local.h:521-539`
+/// Type definition source: `oracle/code/cgame/cg_local.h:521-539`
 #[repr(C)]
 pub struct screengraphics_s {
-	/// STRING or GRAPHIC
-	pub r#type: i32,
-	/// When it changes
-	pub timer: f32,
-	/// X position
-	pub x: i32,
-	/// Y positon
-	pub y: i32,
-	/// Graphic width
-	pub width: i32,
-	/// Graphic height
-	pub height: i32,
-	/// File name of graphic/ text if STRING
-	pub file: *mut c_char,
-	/// Index to ingame_text[]
-	pub ingameEnum: i32,
-	/// Handle of graphic if GRAPHIC
-	pub graphic: qhandle_t,
-	pub min: i32,
-	pub max: i32,
-	/// Final value
-	pub target: i32,
-	pub inc: i32,
-	pub style: i32,
-	/// Normal color
-	pub color: i32,
-	/// To an address
-	pub pointer: *mut core::ffi::c_void,
+    /// STRING or GRAPHIC
+    pub r#type: i32,
+    /// When it changes
+    pub timer: f32,
+    /// X position
+    pub x: i32,
+    /// Y positon
+    pub y: i32,
+    /// Graphic width
+    pub width: i32,
+    /// Graphic height
+    pub height: i32,
+    /// File name of graphic/ text if STRING
+    pub file: *mut c_char,
+    /// Index to ingame_text[]
+    pub ingameEnum: i32,
+    /// Handle of graphic if GRAPHIC
+    pub graphic: qhandle_t,
+    pub min: i32,
+    pub max: i32,
+    /// Final value
+    pub target: i32,
+    pub inc: i32,
+    pub style: i32,
+    /// Normal color
+    pub color: i32,
+    /// To an address
+    pub pointer: *mut core::ffi::c_void,
 }
 
 const _: () = assert!(core::mem::size_of::<screengraphics_s>() == 72);

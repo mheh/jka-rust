@@ -20,7 +20,7 @@ use core::ffi::c_void;
 /// recover it without this crate naming that state. `extern "C-unwind"` per
 /// SEAM-D12.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/vm.cpp:471-472,506`
+/// Source: `oracle/codemp/qcommon/vm.cpp:471-472,506`
 pub type SlotSyscall = extern "C-unwind" fn(ctx: *mut c_void, args: *const isize) -> isize;
 
 /// One per hosted module slot: the injected engine ctx + dispatch target the
@@ -31,7 +31,7 @@ pub type SlotSyscall = extern "C-unwind" fn(ctx: *mut c_void, args: *const isize
 /// §D11 engine-side seam exemption, the twin of the module shell's
 /// `OnceLock<CEngine>` (SEAM-D1), one per slot (STATE-D2).
 ///
-/// Source: `oracle/oracle/codemp/qcommon/vm.cpp:471-472,506` (`VM_Create`
+/// Source: `oracle/codemp/qcommon/vm.cpp:471-472,506` (`VM_Create`
 /// receiving + storing `systemCalls`).
 pub struct EngineSlot {
     /// Opaque engine ctx handed back to `syscall` on every trampoline forward.

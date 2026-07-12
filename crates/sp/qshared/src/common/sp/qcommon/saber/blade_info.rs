@@ -1,6 +1,6 @@
 //! SP `bladeInfo_t` and `MAX_BLADES`.
 //!
-//! Type definition source: `oracle/oracle/code/game/q_shared.h:1634-1658`
+//! Type definition source: `oracle/code/game/q_shared.h:1634-1658`
 
 #![allow(non_camel_case_types)]
 
@@ -13,7 +13,7 @@ use super::saber_trail::saberTrail_t;
 ///
 /// Diverges from MP: SP lacks `desiredLength` and the `hitWallDebounceTime`/
 /// `storageTime`/`extendDebounce` timing ints MP added.
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:1634-1657`
+/// Type definition source: `oracle/code/game/q_shared.h:1634-1657`
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct bladeInfo_t {
@@ -33,5 +33,5 @@ const _: () = assert!(core::mem::size_of::<bladeInfo_t>() == 164);
 
 /// Raven SP `MAX_BLADES`.
 ///
-/// Source: `oracle/oracle/code/game/q_shared.h:1658`
+/// Source: `oracle/code/game/q_shared.h:1658`
 pub const MAX_BLADES: usize = 8;

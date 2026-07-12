@@ -1,13 +1,15 @@
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// `UI_CEIL` SP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/ui/ui_public.h:247`
-/// Output source (SP ambiguous): `oracle/oracle/code/ui/ui_public.h:247`
-/// Args/output fallback source (MP): `oracle/oracle/codemp/client/cl_ui.cpp:843-846`
-/// SP caveat: `oracle/oracle/code/client/cl_ui.cpp` has no SP switch case for this token.
+/// Enum value source: `oracle/code/ui/ui_public.h:247`
+/// Output source (SP ambiguous): `oracle/code/ui/ui_public.h:247`
+/// Args/output fallback source (MP): `oracle/codemp/client/cl_ui.cpp:843-846`
+/// SP caveat: `oracle/code/client/cl_ui.cpp` has no SP switch case for this token.
 /// TODO: SP transport evidence for float ABI is still missing; this follows MP float syscall pattern.
 pub struct UiCeil;
 

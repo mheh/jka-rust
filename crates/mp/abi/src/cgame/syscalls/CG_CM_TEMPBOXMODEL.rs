@@ -13,8 +13,8 @@ use mp_qshared::shared::vec3_t;
 /// reads both transport words with `VMA` as `const float *` before calling
 /// `CM_TempBoxModel(..., qfalse)`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:135-136`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:785-786`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:135-136`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:785-786`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmTempboxmodelArgs {
     mins: *const vec3_t,
@@ -40,11 +40,11 @@ impl CgCmTempboxmodelArgs {
 /// Raven wrapper: `return syscall( CG_CM_TEMPBOXMODEL, mins, maxs );`
 /// Raven transport: `return CM_TempBoxModel((const float *)VMA(1), (const float *)VMA(2), qfalse);`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:86`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:135-136`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:135-136`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:785-786`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:785-786`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:86`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:135-136`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:135-136`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:785-786`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:785-786`
 pub struct CgCmTempboxmodel;
 
 impl OutboundSysCall for CgCmTempboxmodel {

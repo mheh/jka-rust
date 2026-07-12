@@ -10,7 +10,7 @@
 //! impl — exactly the choice Raven's setters baked into the fn-ptr slots.
 //!
 //! The override map is the QAGAME (server) column of the Raven setters:
-//! - generic base: `oracle/oracle/codemp/game/g_vehicles.c:3290` (`G_SetSharedVehicleFunctions`)
+//! - generic base: `oracle/codemp/game/g_vehicles.c:3290` (`G_SetSharedVehicleFunctions`)
 //! - Fighter overrides Board+Eject: `FighterNPC.c:1948`
 //! - Walker overrides Board+RegisterAssets: `WalkerNPC.c:547`
 //! - Animal overrides DeathUpdate: `AnimalNPC.c:857`
@@ -35,7 +35,7 @@ unsafe fn veh_type(pVeh: *mut Vehicle_t) -> vehicleType_t {
 }
 
 /// `Board` — Fighter/Walker override, else generic base.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:630` (generic),
+/// Source: `oracle/codemp/game/g_vehicles.c:630` (generic),
 /// `FighterNPC.c:212`, `WalkerNPC.c:186`.
 pub fn board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean {
     match unsafe { veh_type(pVeh) } {
@@ -52,7 +52,7 @@ pub fn board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
 }
 
 /// `Eject` — Fighter override, else generic base.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1019` (generic), `FighterNPC.c:224`.
+/// Source: `oracle/codemp/game/g_vehicles.c:1019` (generic), `FighterNPC.c:224`.
 pub fn eject(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
@@ -66,13 +66,13 @@ pub fn eject(
 }
 
 /// `EjectAll` — generic base only (no game-tier override).
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1377`.
+/// Source: `oracle/codemp/game/g_vehicles.c:1377`.
 pub fn eject_all(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
     crate::g_vehicles::EjectAll(ctx, pVeh)
 }
 
 /// `DeathUpdate` — Animal override, else generic base.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1485` (generic), `AnimalNPC.c:...`.
+/// Source: `oracle/codemp/game/g_vehicles.c:1485` (generic), `AnimalNPC.c:...`.
 pub fn death_update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
         vehicleType_t::VH_ANIMAL => crate::AnimalNPC::DeathUpdate(ctx, pVeh),
@@ -81,7 +81,7 @@ pub fn death_update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 }
 
 /// `RegisterAssets` — Walker override, else generic base (empty).
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1619` (generic), `WalkerNPC.c:...`.
+/// Source: `oracle/codemp/game/g_vehicles.c:1619` (generic), `WalkerNPC.c:...`.
 pub fn register_assets(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
         vehicleType_t::VH_WALKER => crate::WalkerNPC::RegisterAssets(ctx, pVeh),
@@ -90,25 +90,25 @@ pub fn register_assets(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 }
 
 /// `Initialize` — generic base only.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:...` (`Initialize`).
+/// Source: `oracle/codemp/game/g_vehicles.c:...` (`Initialize`).
 pub fn initialize(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
     crate::g_vehicles::Initialize(ctx, pVeh)
 }
 
 /// `StartDeathDelay` — generic base only.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1451`.
+/// Source: `oracle/codemp/game/g_vehicles.c:1451`.
 pub fn start_death_delay(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, iDelayTimeOverride: c_int) {
     crate::g_vehicles::StartDeathDelay(ctx, pVeh, iDelayTimeOverride)
 }
 
 /// `Inhabited` — generic base only (`type`-independent).
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:...` (`Inhabited`).
+/// Source: `oracle/codemp/game/g_vehicles.c:...` (`Inhabited`).
 pub fn inhabited(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
     crate::g_vehicles::Inhabited(ctx, pVeh)
 }
 
 /// `ValidateBoard` — generic base only.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:...` (`ValidateBoard`).
+/// Source: `oracle/codemp/game/g_vehicles.c:...` (`ValidateBoard`).
 pub fn validate_board(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
@@ -118,26 +118,26 @@ pub fn validate_board(
 }
 
 /// `SetPilot` — generic base only.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3280`.
+/// Source: `oracle/codemp/game/g_vehicles.c:3280`.
 pub fn set_pilot(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pPilot: *mut bgEntity_t) {
     crate::g_vehicles::SetPilot(ctx, pVeh, pPilot)
 }
 
 /// `Ghost` — generic base only.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:...` (`Ghost`).
+/// Source: `oracle/codemp/game/g_vehicles.c:...` (`Ghost`).
 pub fn ghost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
     crate::g_vehicles::Ghost(ctx, pVeh, pEnt)
 }
 
 /// `UnGhost` — generic base only.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:1718` (`UnGhost`).
+/// Source: `oracle/codemp/game/g_vehicles.c:1718` (`UnGhost`).
 pub fn un_ghost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
     crate::g_vehicles::UnGhost(ctx, pVeh, pEnt)
 }
 
 /// `AnimateVehicle` — per-class only (the generic base leaves the slot null, so
 /// Raven's callers `if`-guard it; the `_` arm is that skip).
-/// Source: `oracle/oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c` (`AnimateVehicle`).
+/// Source: `oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c` (`AnimateVehicle`).
 pub fn animate_vehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
         vehicleType_t::VH_SPEEDER => crate::SpeederNPC::AnimateVehicle(ctx, pVeh),
@@ -149,7 +149,7 @@ pub fn animate_vehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 }
 
 /// `AnimateRiders` — per-class only (Walker leaves it null).
-/// Source: `oracle/oracle/codemp/game/{Fighter,Speeder,Animal}NPC.c` (`AnimateRiders`).
+/// Source: `oracle/codemp/game/{Fighter,Speeder,Animal}NPC.c` (`AnimateRiders`).
 pub fn animate_riders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
         vehicleType_t::VH_SPEEDER => crate::SpeederNPC::AnimateRiders(ctx, pVeh),
@@ -160,7 +160,7 @@ pub fn animate_riders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 }
 
 /// `ProcessMoveCommands` — per-class only.
-/// Source: `oracle/oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c`.
+/// Source: `oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c`.
 pub fn process_move_commands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
         vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessMoveCommands(ctx, pVeh),
@@ -172,7 +172,7 @@ pub fn process_move_commands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 }
 
 /// `ProcessOrientCommands` — per-class only.
-/// Source: `oracle/oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c`.
+/// Source: `oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c`.
 pub fn process_orient_commands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
         vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessOrientCommands(ctx, pVeh),
@@ -190,7 +190,7 @@ pub fn process_orient_commands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// type) keeps the base `Update` set by the shared setter. Each per-class override
 /// first runs its own body (e.g. `FighterNPC::Update` → `BG_FighterUpdate`) then
 /// chains the generic base.
-/// Source: `oracle/oracle/codemp/game/{Fighter,Speeder,Animal,Walker}NPC.c`
+/// Source: `oracle/codemp/game/{Fighter,Speeder,Animal,Walker}NPC.c`
 /// (per-class `Update` wiring), `g_vehicles.c:3306` (base).
 pub fn update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     match unsafe { veh_type(pVeh) } {
@@ -203,13 +203,13 @@ pub fn update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_
 
 /// `Animate` — generic base only (the `vehicleInfo_t.Animate` slot, distinct
 /// from the per-class `AnimateVehicle` slot dispatched by [`animate_vehicle`]).
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3298`.
+/// Source: `oracle/codemp/game/g_vehicles.c:3298`.
 pub fn animate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     crate::g_vehicles::Animate(ctx, pVeh)
 }
 
 /// `UpdateRider` — generic base only.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3307`.
+/// Source: `oracle/codemp/game/g_vehicles.c:3307`.
 pub fn update_rider(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
@@ -220,7 +220,7 @@ pub fn update_rider(
 }
 
 /// `AttachRiders` — generic base only.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3310`.
+/// Source: `oracle/codemp/game/g_vehicles.c:3310`.
 pub fn attach_riders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     crate::g_vehicles::AttachRiders(ctx, pVeh)
 }

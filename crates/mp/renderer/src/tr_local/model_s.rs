@@ -12,13 +12,13 @@ use crate::mdx_format::mdxa_header_t::mdxaHeader_t;
 use crate::mdx_format::mdxm_header_t::mdxmHeader_t;
 
 /// `MD3_MAX_LODS`.
-/// Source: `oracle/oracle/codemp/qcommon/qfiles.h:96`
+/// Source: `oracle/codemp/qcommon/qfiles.h:96`
 const MD3_MAX_LODS: usize = 3;
 
 /// Raven `model_s` (typedef `model_t`) — a loaded renderable model (brush,
 /// MD3 mesh, or Ghoul2 mesh/animation).
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:1117-1135`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:1117-1135`
 #[repr(C)]
 pub struct model_t {
     pub name: [c_char; MAX_QPATH as usize],

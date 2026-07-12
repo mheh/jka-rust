@@ -2,7 +2,7 @@
 
 /// Raven `targetModel_t` — target model parts for animation/rendering.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_shared.h:118-129`
+/// Type definition source: `oracle/code/game/g_shared.h:118-129`
 #[repr(i32)]
 pub enum targetModel_t {
     MODEL_LEGS = 0,

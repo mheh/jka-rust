@@ -8,7 +8,7 @@ use crate::shared::vec3_t;
 
 /// Raven `polyVert_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:71-75`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:71-75`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct polyVert_t {

@@ -32,7 +32,7 @@ impl GTestprintintArgs {
 
 /// `G_TESTPRINTINT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:289`
+/// Source: `oracle/codemp/game/g_public.h:289`
 pub struct GTestprintint;
 
 impl OutboundSysCall for GTestprintint {

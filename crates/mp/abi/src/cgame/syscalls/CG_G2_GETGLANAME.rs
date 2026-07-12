@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall(CG_G2_GETGLANAME, ghoul2, modelIndex, fillBuf);`
 /// Raven transport copies `G2API_GetGLAName` into the caller-provided buffer.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:885-887`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2552`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1406-1418`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:885-887`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2552`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1406-1418`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2GetglanameArgs {
     ghoul2: *mut c_void,
@@ -32,10 +32,10 @@ impl CgG2GetglanameArgs {
 
 /// `CG_G2_GETGLANAME` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:272`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:885-887`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1406-1418`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1406-1418`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:272`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:885-887`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1406-1418`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1406-1418`
 pub struct CgG2Getglaname;
 
 impl OutboundSysCall for CgG2Getglaname {

@@ -11,10 +11,10 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `qboolean trap_G2API_HasGhoul2ModelOnIndex(void *ghlInfo, int modelIndex)`.
 /// Raven transport: `return G2API_HasGhoul2ModelOnIndex((CGhoul2Info_v **)VMA(1), args[2]);`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:276`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:905-907`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1433-1435`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1433-1435`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:276`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:905-907`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1433-1435`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1433-1435`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2Hasghoul2modelonindexArgs {
     /// Raw Ghoul2 handle word, decoded by Raven as `(CGhoul2Info_v **)VMA(1)`.
@@ -38,10 +38,10 @@ impl CgG2Hasghoul2modelonindexArgs {
 /// `modelIndex` as raw `args[2]`; the engine switch returns `qboolean` as an
 /// int-compatible word.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:276`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:905-907`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1433-1435`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1433-1435`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:276`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:905-907`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1433-1435`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1433-1435`
 pub struct CgG2Hasghoul2modelonindex;
 
 impl OutboundSysCall for CgG2Hasghoul2modelonindex {

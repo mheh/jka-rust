@@ -40,7 +40,7 @@ impl GCvarVariableStringBufferArgs {
 /// `G_CVAR_VARIABLE_STRING_BUFFER` MP game imports syscall ABI token.
 ///
 /// Raven: ( const char *var_name, char *buffer, int bufsize );
-/// Source: `oracle/oracle/codemp/game/g_public.h:126`
+/// Source: `oracle/codemp/game/g_public.h:126`
 pub struct GCvarVariableStringBuffer;
 
 impl OutboundSysCall for GCvarVariableStringBuffer {

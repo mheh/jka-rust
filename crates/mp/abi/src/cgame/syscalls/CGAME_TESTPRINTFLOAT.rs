@@ -16,9 +16,9 @@ use abi_transport::pass_float;
 /// searched MP engine switch handles the shared `TRAP_TESTPRINTFLOAT` slot that
 /// corresponds to `CGAME_TESTPRINTFLOAT`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:517-518`
-/// Transport source: `oracle/oracle/codemp/qcommon/qcommon.h:296`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:680-681`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:517-518`
+/// Transport source: `oracle/codemp/qcommon/qcommon.h:296`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:680-681`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgameTestprintfloatArgs {
     string: *const c_char,
@@ -37,11 +37,11 @@ impl CgameTestprintfloatArgs {
 
 /// `CGAME_TESTPRINTFLOAT` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:144`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:517-518`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:680-681`
-/// Transport source: `oracle/oracle/codemp/qcommon/qcommon.h:296`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:680-681`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:144`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:517-518`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:680-681`
+/// Transport source: `oracle/codemp/qcommon/qcommon.h:296`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:680-681`
 pub struct CgameTestprintfloat;
 
 impl OutboundSysCall for CgameTestprintfloat {

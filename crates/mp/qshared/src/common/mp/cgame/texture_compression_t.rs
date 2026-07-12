@@ -4,7 +4,7 @@
 
 /// Raven `textureCompression_t` — GL texture-compression capability reported in `glconfig_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:293-297`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:293-297`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum textureCompression_t {

@@ -4,7 +4,7 @@
 ///
 /// Raven: this struct for pointing purposes, need to and with 0x00FFFFFF to
 /// be meaningful.
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:410-413`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:410-413`
 #[repr(C)]
 pub struct mdxaIndex_t {
     pub iIndex: i32,

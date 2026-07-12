@@ -59,7 +59,7 @@ impl BotlibAasTraceAreasArgs {
 
 /// `BOTLIB_AAS_TRACE_AREAS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:366`
+/// Source: `oracle/codemp/game/g_public.h:366`
 pub struct BotlibAasTraceAreas;
 
 impl OutboundSysCall for BotlibAasTraceAreas {

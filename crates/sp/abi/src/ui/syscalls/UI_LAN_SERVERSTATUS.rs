@@ -2,18 +2,20 @@ use core::ffi::{c_char, c_int};
 
 use super::super::SpUiImport;
 use abi_transport::generic::ptr_to_word;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `UI_LAN_SERVERSTATUS`.
 ///
 /// Raven wrapper: `return syscall( UI_LAN_SERVERSTATUS, serverAddress, serverStatus, maxLen );`
 /// Raven transport: `return LAN_GetServerStatus( (char *)VMA(1), (char *)VMA(2), args[3] );`
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:234`
-/// Args source (SP fallback): `oracle/oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_SERVERSTATUS`.
-/// Args source (fallback): `oracle/oracle/codemp/ui/ui_local.h:980`
-/// Transport/switch source (fallback): `oracle/oracle/codemp/client/cl_ui.cpp:1113-1114`
-/// Output source fallback: `oracle/oracle/codemp/ui/ui_local.h:980`
+/// Enum source: `oracle/code/ui/ui_public.h:234`
+/// Args source (SP fallback): `oracle/code/client/cl_ui.cpp` does not implement `UI_LAN_SERVERSTATUS`.
+/// Args source (fallback): `oracle/codemp/ui/ui_local.h:980`
+/// Transport/switch source (fallback): `oracle/codemp/client/cl_ui.cpp:1113-1114`
+/// Output source fallback: `oracle/codemp/ui/ui_local.h:980`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiLanServerstatusArgs {
     server_address: *const c_char,
@@ -49,7 +51,7 @@ impl UiLanServerstatusArgs {
 
 /// `UI_LAN_SERVERSTATUS` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:234`
+/// Source: `oracle/code/ui/ui_public.h:234`
 pub struct UiLanServerstatus;
 
 impl OutboundSysCall for UiLanServerstatus {

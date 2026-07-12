@@ -2,7 +2,7 @@
 
 /// Raven `cbufExec_t` command-buffer stuffing modes.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:405-410`
+/// Type definition source: `oracle/codemp/game/q_shared.h:405-410`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum cbufExec_t {

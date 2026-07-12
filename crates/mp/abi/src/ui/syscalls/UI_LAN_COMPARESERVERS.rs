@@ -1,14 +1,16 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `UI_LAN_COMPARESERVERS`.
 ///
 /// Raven wrapper: `return syscall( UI_LAN_COMPARESERVERS, source, sortKey, sortDir, s1, s2 );`
 /// Raven transport: `return LAN_CompareServers( args[1], args[2], args[3], args[4], args[5] );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:338-339`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:338-339`
 #[derive(Debug)]
 pub struct UiLanCompareserversArgs {
     source: c_int,
@@ -55,10 +57,10 @@ impl UiLanCompareserversArgs {
 /// Raven wrapper: `return syscall( UI_LAN_COMPARESERVERS, source, sortKey, sortDir, s1, s2 );`
 /// Raven transport: `return LAN_CompareServers( args[1], args[2], args[3], args[4], args[5] );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:114`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:338-339`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:981`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1116-1117`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:114`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:338-339`
+/// Output source: `oracle/codemp/ui/ui_local.h:981`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1116-1117`
 pub struct UiLanCompareservers;
 
 impl OutboundSysCall for UiLanCompareservers {

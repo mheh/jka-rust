@@ -10,8 +10,8 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_PRINT, fmt );`
 /// Raven transport: `Com_Printf( "%s", VMA(1) );`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:46-48`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:437-439`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:46-48`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:437-439`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgPrintArgs {
     message: *const c_char,
@@ -27,10 +27,10 @@ impl CgPrintArgs {
 
 /// `CG_PRINT` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:61`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:46-48`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:437-439`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:437-439`
+/// Enum value source: `oracle/code/cgame/cg_public.h:61`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:46-48`
+/// Output source: `oracle/code/client/cl_cgame.cpp:437-439`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:437-439`
 pub struct CgPrint;
 
 impl OutboundSysCall for CgPrint {

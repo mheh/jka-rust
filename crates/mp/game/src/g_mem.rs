@@ -1,4 +1,4 @@
-//! Port of `oracle/oracle/codemp/game/g_mem.c` — the game-tier bump allocator.
+//! Port of `oracle/codemp/game/g_mem.c` — the game-tier bump allocator.
 //!
 //! State-threading resolution (supersedes the mega-pass park): Raven's
 //! file-scope `static memoryPool`/`allocPoint` become `GameWorld` fields
@@ -15,10 +15,12 @@ use crate::prelude::*;
 /// supersedes the mega-pass state-threading park (the pool fields already
 /// existed on `GameWorld`; only the accessor was missing).
 ///
-/// Source: `oracle/oracle/codemp/game/g_mem.c:16-33`
+/// Source: `oracle/codemp/game/g_mem.c:16-33`
 pub fn G_Alloc(ctx: GameContext<'_>, size: c_int) -> *mut c_void {
     use crate::g_main::{G_Error, G_Printf};
 
+    // Raven `#define POOLSIZE (256 * 1024)` — `g_mem.c` file-local.
+    // Source: `oracle/codemp/game/g_mem.c:11`
     const POOLSIZE: c_int = 262144; // 256 * 1024
 
     unsafe {
@@ -52,7 +54,7 @@ pub fn G_Alloc(ctx: GameContext<'_>, size: c_int) -> *mut c_void {
 
 /// Raven `G_InitMemory`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_mem.c:35-37`
+/// Source: `oracle/codemp/game/g_mem.c:35-37`
 pub fn G_InitMemory(ctx: GameContext<'_>) {
     // Raven: allocPoint = 0;
     unsafe {
@@ -62,7 +64,7 @@ pub fn G_InitMemory(ctx: GameContext<'_>) {
 
 /// Raven `Svcmd_GameMem_f`.
 ///
-/// Source: `oracle/oracle/codemp/game/g_mem.c:39-41`
+/// Source: `oracle/codemp/game/g_mem.c:39-41`
 pub fn Svcmd_GameMem_f(ctx: GameContext<'_>) {
     use crate::g_main::G_Printf;
     // Raven: G_Printf( "Game memory status: %i out of %i bytes allocated\n", allocPoint, POOLSIZE );

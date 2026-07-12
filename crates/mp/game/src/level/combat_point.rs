@@ -1,6 +1,6 @@
 //! MP `combatPoint_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/g_local.h:762-773`
+//! Type definition source: `oracle/codemp/game/g_local.h:762-773`
 
 #![allow(non_camel_case_types)]
 
@@ -8,12 +8,12 @@ use core::ffi::c_int;
 
 use mp_qshared::shared::{qboolean, vec3_t};
 
-/// Raven `MAX_COMBAT_POINTS`. Source: `oracle/oracle/codemp/game/g_local.h:762`
+/// Raven `MAX_COMBAT_POINTS`. Source: `oracle/codemp/game/g_local.h:762`
 pub const MAX_COMBAT_POINTS: usize = 512;
 
 /// Raven `combatPoint_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:764-773`
+/// Type definition source: `oracle/codemp/game/g_local.h:764-773`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct combatPoint_t {

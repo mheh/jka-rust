@@ -41,7 +41,7 @@ impl BotlibEaGetInputArgs {
 
 /// `BOTLIB_EA_GET_INPUT` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:409`
+/// Source: `oracle/codemp/game/g_public.h:409`
 pub struct BotlibEaGetInput;
 
 impl OutboundSysCall for BotlibEaGetInput {

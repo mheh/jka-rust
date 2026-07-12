@@ -1,5 +1,5 @@
 // PORT-COMPLETE: g_svcmds.c 14/14
-//! Faithful port for `oracle/oracle/codemp/game/g_svcmds.c`.
+//! Faithful port for `oracle/codemp/game/g_svcmds.c`.
 //!
 //! Server-side console commands: IP filtering, entity listing, team forcing.
 //! IP filter state is owned by `GameWorld`; accessed via `ctx.world.globals`.
@@ -18,7 +18,7 @@ use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
 use mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs;
 
 // IP filter type: holds mask and compare value for IP filtering.
-// Source: oracle/oracle/codemp/game/g_svcmds.c:41-45
+// Source: oracle/codemp/game/g_svcmds.c:41-45
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct ipFilter_t {
@@ -33,7 +33,7 @@ pub const MAX_IPFILTERS: usize = 1024;
 ///
 /// Parse an IP address string into mask and compare values for IP filtering.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:62-102`
+/// Source: `oracle/codemp/game/g_svcmds.c:62-102`
 pub fn StringToFilter(ctx: GameContext<'_>, s: *mut c_char, f: *mut c_void) -> qboolean {
     let mut num = [0u8; 128];
     let mut i: c_int = 0;
@@ -101,7 +101,7 @@ pub fn StringToFilter(ctx: GameContext<'_>, s: *mut c_char, f: *mut c_void) -> q
 ///
 /// Rebuild the `g_banIPs` cvar from the active IP filters.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:109-127`
+/// Source: `oracle/codemp/game/g_svcmds.c:109-127`
 pub fn UpdateIPBans(ctx: GameContext<'_>) {
     let mut iplist = String::new();
     let world = unsafe { &mut *ctx.world };
@@ -128,7 +128,7 @@ pub fn UpdateIPBans(ctx: GameContext<'_>) {
 ///
 /// Check if a packet from the given address should be filtered.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:134-166`
+/// Source: `oracle/codemp/game/g_svcmds.c:134-166`
 pub fn G_FilterPacket(ctx: GameContext<'_>, from: *mut c_char) -> qboolean {
     let mut m = [0u8; 4];
     let mut i: c_int = 0;
@@ -182,7 +182,7 @@ pub fn G_FilterPacket(ctx: GameContext<'_>, from: *mut c_char) -> qboolean {
 ///
 /// Add an IP filter entry.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:173-194`
+/// Source: `oracle/codemp/game/g_svcmds.c:173-194`
 pub fn AddIP(ctx: GameContext<'_>, str: *mut c_char) {
     let world = unsafe { &mut *ctx.world };
 
@@ -220,7 +220,7 @@ pub fn AddIP(ctx: GameContext<'_>, str: *mut c_char) {
 ///
 /// Parse space-separated IP addresses from g_banIPs cvar and add them to filters.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:201-218`
+/// Source: `oracle/codemp/game/g_svcmds.c:201-218`
 pub fn G_ProcessIPBans(ctx: GameContext<'_>) {
     let world = unsafe { &*ctx.world };
     let ban_ips_str = unsafe { cstr_to_str(world.cvars.g_banIPs.string.as_ptr()) };
@@ -251,7 +251,7 @@ pub fn G_ProcessIPBans(ctx: GameContext<'_>) {
 ///
 /// Console command: addip <ip-mask>
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:226-239`
+/// Source: `oracle/codemp/game/g_svcmds.c:226-239`
 pub fn Svcmd_AddIP_f(ctx: GameContext<'_>) {
     let argc = trap::Argc(ctx.engine, GArgcArgs::new());
     if argc < 2 {
@@ -269,7 +269,7 @@ pub fn Svcmd_AddIP_f(ctx: GameContext<'_>) {
 ///
 /// Console command: sv removeip <ip-mask>
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:246-274`
+/// Source: `oracle/codemp/game/g_svcmds.c:246-274`
 pub fn Svcmd_RemoveIP_f(ctx: GameContext<'_>) {
     let argc = trap::Argc(ctx.engine, GArgcArgs::new());
     if argc < 2 {
@@ -316,7 +316,7 @@ pub fn Svcmd_RemoveIP_f(ctx: GameContext<'_>) {
 ///
 /// Console command: list currently banned IPs.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:276-297`
+/// Source: `oracle/codemp/game/g_svcmds.c:276-297`
 pub fn Svcmd_ListIPs_f(ctx: GameContext<'_>) {
     let world = unsafe { &*ctx.world };
 
@@ -347,7 +347,7 @@ pub fn Svcmd_ListIPs_f(ctx: GameContext<'_>) {
 ///
 /// Save IP filters to "banip.txt" file.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:299-331`
+/// Source: `oracle/codemp/game/g_svcmds.c:299-331`
 pub fn G_SaveBanIP(ctx: GameContext<'_>) {
     let world = unsafe { &*ctx.world };
     let mut fh: i32 = 0;
@@ -400,7 +400,7 @@ pub fn G_SaveBanIP(ctx: GameContext<'_>) {
 ///
 /// Load IP filters from "banip.txt" file.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:333-379`
+/// Source: `oracle/codemp/game/g_svcmds.c:333-379`
 pub fn G_LoadIPBans(ctx: GameContext<'_>) {
     let world = unsafe { &mut *ctx.world };
     let mut fh: i32 = 0;
@@ -458,7 +458,7 @@ pub fn G_LoadIPBans(ctx: GameContext<'_>) {
 ///
 /// Console command: list entities on the server.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:386-443`
+/// Source: `oracle/codemp/game/g_svcmds.c:386-443`
 pub fn Svcmd_EntityList_f(ctx: GameContext<'_>) {
     let world = unsafe { &*ctx.world };
 
@@ -511,7 +511,7 @@ pub fn Svcmd_EntityList_f(ctx: GameContext<'_>) {
 ///
 /// Look up a client by slot number or player name.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:445-480`
+/// Source: `oracle/codemp/game/g_svcmds.c:445-480`
 pub fn ClientForString(ctx: GameContext<'_>, s: *const c_char) -> *mut gclient_t {
     let world = unsafe { &*ctx.world };
 
@@ -567,7 +567,7 @@ pub fn ClientForString(ctx: GameContext<'_>, s: *const c_char) -> *mut gclient_t
 ///
 /// Console command: force a player to a team.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:489-503`
+/// Source: `oracle/codemp/game/g_svcmds.c:489-503`
 pub fn Svcmd_ForceTeam_f(ctx: GameContext<'_>) {
     let mut str = [0 as c_char; 128];
     let world = unsafe { &*ctx.world };
@@ -594,7 +594,7 @@ pub fn Svcmd_ForceTeam_f(ctx: GameContext<'_>) {
 ///
 /// Dispatcher for server console commands.
 ///
-/// Source: `oracle/oracle/codemp/game/g_svcmds.c:513-575`
+/// Source: `oracle/codemp/game/g_svcmds.c:513-575`
 pub fn ConsoleCommand(ctx: GameContext<'_>) -> qboolean {
     let world = unsafe { &*ctx.world };
     let mut cmd = [0 as c_char; 128];

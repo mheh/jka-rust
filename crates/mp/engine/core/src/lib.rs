@@ -6,6 +6,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 pub mod engine;
+pub mod game_version_consts;
 pub mod lifecycle;
 pub mod sv_init_game_progs;
 

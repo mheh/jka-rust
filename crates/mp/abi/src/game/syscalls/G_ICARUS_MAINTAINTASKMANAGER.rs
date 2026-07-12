@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use super::super::MpGameImport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_MAINTAINTASKMANAGER` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -23,7 +25,7 @@ impl GIcarusMaintaintaskmanagerArgs {
 
 /// `G_ICARUS_MAINTAINTASKMANAGER` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:258`
+/// Source: `oracle/codemp/game/g_public.h:258`
 pub struct GIcarusMaintaintaskmanager;
 
 impl OutboundSysCall for GIcarusMaintaintaskmanager {

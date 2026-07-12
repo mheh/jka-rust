@@ -1,6 +1,6 @@
 //! MP `qtime_t` copied from Raven `codemp/game/q_shared.h`.
 //!
-//! Source: `oracle/oracle/codemp/game/q_shared.h:3009-3021`
+//! Source: `oracle/codemp/game/q_shared.h:3009-3021`
 
 #![allow(non_camel_case_types)]
 

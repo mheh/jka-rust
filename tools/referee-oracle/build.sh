@@ -7,7 +7,7 @@
 # byte-diffed. Phase 1 (this script + tests/oracle_smoke.rs) only proves the
 # artifact builds and our mock-engine harness can drive its full lifecycle.
 #
-# The oracle tree (oracle/oracle/**) is NEVER edited. Every game/*.c is compiled
+# The oracle tree (oracle/**) is NEVER edited. Every game/*.c is compiled
 # straight from a throwaway COPY under build/src/ whose only change is a one-line
 # activation of Raven's OWN `#define qboolean int` (see the patch step below).
 #
@@ -18,7 +18,7 @@
 set -eu
 cd "$(dirname "$0")"
 
-ORACLE=../../oracle/oracle
+ORACLE=../../oracle
 G="$ORACLE/codemp/game"
 SHIM="$(pwd)/shim/oracle_shim.h"
 
@@ -84,7 +84,7 @@ esac
 # -fsigned-char: pins retail `char` semantics on platforms where it defaults
 #   unsigned (e.g. aarch64 Linux gcc); a no-op on Apple/x86 where char is
 #   already signed. Matches OpenJK (sets it for all GNU/Clang builds) and
-#   Raven's own legacy unix makefile (oracle/oracle/codemp/unix/makefile:78).
+#   Raven's own legacy unix makefile (oracle/codemp/unix/makefile:78).
 # FP regime (parity-defining): -fno-fast-math -ffp-contract=off matches what
 #   rustc/LLVM do for the Rust cdylib (IEEE, NO fused multiply-add). -O2 to match
 #   the release profile. See README.md.

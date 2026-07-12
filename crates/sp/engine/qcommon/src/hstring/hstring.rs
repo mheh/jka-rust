@@ -4,7 +4,7 @@
 /// characters themselves).
 ///
 /// Raven: no header comment.
-/// Type definition source: `oracle/oracle/code/qcommon/hstring.h:13-79`
+/// Type definition source: `oracle/code/qcommon/hstring.h:13-79`
 #[repr(C)]
 pub struct hstring {
     mId: i32,

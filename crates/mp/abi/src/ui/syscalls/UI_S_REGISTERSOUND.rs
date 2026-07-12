@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall( UI_S_REGISTERSOUND, sample );`
 /// Raven transport: `return S_RegisterSound( (const char *)VMA(1) );`
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:214-215`
-/// Args source: `oracle/oracle/codemp/ui/ui_local.h:950`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1000-1001`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:214-215`
+/// Args source: `oracle/codemp/ui/ui_local.h:950`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1000-1001`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiSRegistersoundArgs {
     sample: *const c_char,
@@ -26,11 +26,11 @@ impl UiSRegistersoundArgs {
 
 /// `UI_S_REGISTERSOUND` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:50`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:214-215`
-/// Output source: `oracle/oracle/codemp/ui/ui_local.h:950`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1000-1001`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1000-1001`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:50`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:214-215`
+/// Output source: `oracle/codemp/ui/ui_local.h:950`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1000-1001`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1000-1001`
 pub struct UiSRegistersound;
 
 impl OutboundSysCall for UiSRegistersound {

@@ -8,7 +8,7 @@ use sp_qshared::shared::vec3_t;
 /// Raven: constructor copies `effectorPos` into `effectorPosition` and binds the
 /// `const trace_t&` reference; not modeled at the ABI-layout level here (`tr` is
 /// a non-owning pointer to the referenced `trace_t`).
-/// Type definition source: `oracle/oracle/code/ghoul2/ghoul2_gore.h:69-80`
+/// Type definition source: `oracle/code/ghoul2/ghoul2_gore.h:69-80`
 #[repr(C)]
 pub struct SRagDollEffectorCollision {
     pub effectorPosition: vec3_t,

@@ -10,172 +10,172 @@ use mp_qshared::shared::{qboolean, qhandle_t, sfxHandle_t, vec3_t, MAX_QPATH};
 
 /// Raven `MAX_TEAMNAME`.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:12`
+/// Source: `oracle/codemp/game/q_shared.h:12`
 pub const MAX_TEAMNAME: usize = 32;
 
 /// Raven `MAX_CUSTOM_SOUNDS`.
 ///
 /// Raven: rww - Note that for now these must all be the same, because of the way I am
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:193`
+/// Source: `oracle/codemp/cgame/cg_local.h:193`
 pub const MAX_CUSTOM_SOUNDS: usize = 40;
 
 /// Raven `MAX_CUSTOM_COMBAT_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:187`
+/// Source: `oracle/codemp/cgame/cg_local.h:187`
 pub const MAX_CUSTOM_COMBAT_SOUNDS: usize = 40;
 
 /// Raven `MAX_CUSTOM_EXTRA_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:188`
+/// Source: `oracle/codemp/cgame/cg_local.h:188`
 pub const MAX_CUSTOM_EXTRA_SOUNDS: usize = 40;
 
 /// Raven `MAX_CUSTOM_JEDI_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:189`
+/// Source: `oracle/codemp/cgame/cg_local.h:189`
 pub const MAX_CUSTOM_JEDI_SOUNDS: usize = 40;
 
 /// Raven `MAX_CUSTOM_SIEGE_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/game/bg_public.h:140`
+/// Source: `oracle/codemp/game/bg_public.h:140`
 pub const MAX_CUSTOM_SIEGE_SOUNDS: usize = 30;
 
 /// Raven `MAX_CUSTOM_DUEL_SOUNDS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/cg_local.h:191`
+/// Source: `oracle/codemp/cgame/cg_local.h:191`
 pub const MAX_CUSTOM_DUEL_SOUNDS: usize = 40;
 
 /// Raven `clientInfo_t` — per-client rendering/gameplay info cached by cgame.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/cg_local.h:196-315`
+/// Type definition source: `oracle/codemp/cgame/cg_local.h:196-315`
 #[repr(C)]
 pub struct clientInfo_t {
-	pub infoValid: qboolean,
+    pub infoValid: qboolean,
 
-	pub colorOverride: [f32; 3],
+    pub colorOverride: [f32; 3],
 
-	pub saber: [saberInfo_t; MAX_SABERS],
-	//TODO: Port ghoul2Weapons element type (CGhoul2Info_v*)
-	// Source: oracle/oracle/codemp/cgame/cg_local.h:202
-	pub ghoul2Weapons: [*mut c_void; MAX_SABERS],
+    pub saber: [saberInfo_t; MAX_SABERS],
+    //TODO: Port ghoul2Weapons element type (CGhoul2Info_v*)
+    // Source: oracle/codemp/cgame/cg_local.h:202
+    pub ghoul2Weapons: [*mut c_void; MAX_SABERS],
 
-	pub saberName: [c_char; 64],
-	pub saber2Name: [c_char; 64],
+    pub saberName: [c_char; 64],
+    pub saber2Name: [c_char; 64],
 
-	pub name: [c_char; MAX_QPATH],
-	pub team: team_t,
+    pub name: [c_char; MAX_QPATH],
+    pub team: team_t,
 
-	pub duelTeam: i32,
+    pub duelTeam: i32,
 
-	/// 0 = not bot, 1-5 = bot
-	pub botSkill: i32,
+    /// 0 = not bot, 1-5 = bot
+    pub botSkill: i32,
 
-	pub frame: i32,
+    pub frame: i32,
 
-	pub color1: vec3_t,
-	pub color2: vec3_t,
+    pub color1: vec3_t,
+    pub color2: vec3_t,
 
-	pub icolor1: i32,
-	pub icolor2: i32,
+    pub icolor1: i32,
+    pub icolor2: i32,
 
-	/// updated by score servercmds
-	pub score: i32,
-	/// location index for team mode
-	pub location: i32,
-	/// you only get this info about your teammates
-	pub health: i32,
-	pub armor: i32,
-	pub curWeapon: i32,
+    /// updated by score servercmds
+    pub score: i32,
+    /// location index for team mode
+    pub location: i32,
+    /// you only get this info about your teammates
+    pub health: i32,
+    pub armor: i32,
+    pub curWeapon: i32,
 
-	pub handicap: i32,
-	/// in tourney mode
-	pub wins: i32,
-	pub losses: i32,
+    pub handicap: i32,
+    /// in tourney mode
+    pub wins: i32,
+    pub losses: i32,
 
-	/// task in teamplay (offence/defence)
-	pub teamTask: i32,
-	/// true when this is a team leader
-	pub teamLeader: qboolean,
+    /// task in teamplay (offence/defence)
+    pub teamTask: i32,
+    /// true when this is a team leader
+    pub teamLeader: qboolean,
 
-	/// so can display quad/flag status
-	pub powerups: i32,
+    /// so can display quad/flag status
+    pub powerups: i32,
 
-	pub medkitUsageTime: i32,
+    pub medkitUsageTime: i32,
 
-	pub breathPuffTime: i32,
+    pub breathPuffTime: i32,
 
-	// when clientinfo is changed, the loading of models/skins/sounds
-	// can be deferred until you are dead, to prevent hitches in
-	// gameplay
-	pub modelName: [c_char; MAX_QPATH],
-	pub skinName: [c_char; MAX_QPATH],
-	pub forcePowers: [c_char; MAX_QPATH],
+    // when clientinfo is changed, the loading of models/skins/sounds
+    // can be deferred until you are dead, to prevent hitches in
+    // gameplay
+    pub modelName: [c_char; MAX_QPATH],
+    pub skinName: [c_char; MAX_QPATH],
+    pub forcePowers: [c_char; MAX_QPATH],
 
-	pub teamName: [c_char; MAX_TEAMNAME],
+    pub teamName: [c_char; MAX_TEAMNAME],
 
-	pub corrTime: i32,
+    pub corrTime: i32,
 
-	pub lastHeadAngles: vec3_t,
-	pub lookTime: i32,
+    pub lastHeadAngles: vec3_t,
+    pub lookTime: i32,
 
-	pub brokenLimbs: i32,
+    pub brokenLimbs: i32,
 
-	pub deferred: qboolean,
+    pub deferred: qboolean,
 
-	/// true if using the new mission pack animations
-	pub newAnims: qboolean,
-	/// true if legs yaw is always the same as torso yaw
-	pub fixedlegs: qboolean,
-	/// true if torso never changes yaw
-	pub fixedtorso: qboolean,
+    /// true if using the new mission pack animations
+    pub newAnims: qboolean,
+    /// true if legs yaw is always the same as torso yaw
+    pub fixedlegs: qboolean,
+    /// true if torso never changes yaw
+    pub fixedtorso: qboolean,
 
-	/// move head in icon views
-	pub headOffset: vec3_t,
-	/// from model
-	pub gender: gender_t,
+    /// move head in icon views
+    pub headOffset: vec3_t,
+    /// from model
+    pub gender: gender_t,
 
-	pub legsModel: qhandle_t,
-	pub legsSkin: qhandle_t,
+    pub legsModel: qhandle_t,
+    pub legsSkin: qhandle_t,
 
-	pub torsoModel: qhandle_t,
-	pub torsoSkin: qhandle_t,
+    pub torsoModel: qhandle_t,
+    pub torsoSkin: qhandle_t,
 
-	//TODO: Port ghoul2Model (CGhoul2Info_v*)
-	// Source: oracle/oracle/codemp/cgame/cg_local.h:279
-	pub ghoul2Model: *mut c_void,
+    //TODO: Port ghoul2Model (CGhoul2Info_v*)
+    // Source: oracle/codemp/cgame/cg_local.h:279
+    pub ghoul2Model: *mut c_void,
 
-	pub modelIcon: qhandle_t,
+    pub modelIcon: qhandle_t,
 
-	pub bolt_rhand: qhandle_t,
-	pub bolt_lhand: qhandle_t,
+    pub bolt_rhand: qhandle_t,
+    pub bolt_lhand: qhandle_t,
 
-	pub bolt_head: qhandle_t,
+    pub bolt_head: qhandle_t,
 
-	pub bolt_motion: qhandle_t,
+    pub bolt_motion: qhandle_t,
 
-	pub bolt_llumbar: qhandle_t,
+    pub bolt_llumbar: qhandle_t,
 
-	pub siegeIndex: i32,
-	pub siegeDesiredTeam: i32,
+    pub siegeIndex: i32,
+    pub siegeDesiredTeam: i32,
 
-	pub sounds: [sfxHandle_t; MAX_CUSTOM_SOUNDS],
-	pub combatSounds: [sfxHandle_t; MAX_CUSTOM_COMBAT_SOUNDS],
-	pub extraSounds: [sfxHandle_t; MAX_CUSTOM_EXTRA_SOUNDS],
-	pub jediSounds: [sfxHandle_t; MAX_CUSTOM_JEDI_SOUNDS],
-	pub siegeSounds: [sfxHandle_t; MAX_CUSTOM_SIEGE_SOUNDS],
-	pub duelSounds: [sfxHandle_t; MAX_CUSTOM_DUEL_SOUNDS],
+    pub sounds: [sfxHandle_t; MAX_CUSTOM_SOUNDS],
+    pub combatSounds: [sfxHandle_t; MAX_CUSTOM_COMBAT_SOUNDS],
+    pub extraSounds: [sfxHandle_t; MAX_CUSTOM_EXTRA_SOUNDS],
+    pub jediSounds: [sfxHandle_t; MAX_CUSTOM_JEDI_SOUNDS],
+    pub siegeSounds: [sfxHandle_t; MAX_CUSTOM_SIEGE_SOUNDS],
+    pub duelSounds: [sfxHandle_t; MAX_CUSTOM_DUEL_SOUNDS],
 
-	pub legsAnim: i32,
-	pub torsoAnim: i32,
+    pub legsAnim: i32,
+    pub torsoAnim: i32,
 
-	/// time before next blink. If a minus value, we are in blink mode
-	pub facial_blink: f32,
-	/// time before next frown. If a minus value, we are in frown mode
-	pub facial_frown: f32,
-	/// time before next aux. If a minus value, we are in aux mode
-	pub facial_aux: f32,
+    /// time before next blink. If a minus value, we are in blink mode
+    pub facial_blink: f32,
+    /// time before next frown. If a minus value, we are in frown mode
+    pub facial_frown: f32,
+    /// time before next aux. If a minus value, we are in aux mode
+    pub facial_aux: f32,
 
-	/// do crazy amount of smoothing
-	pub superSmoothTime: i32,
+    /// do crazy amount of smoothing
+    pub superSmoothTime: i32,
 }
 
 #[cfg(target_pointer_width = "64")]

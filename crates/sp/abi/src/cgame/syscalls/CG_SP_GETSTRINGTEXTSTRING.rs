@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall( CG_SP_GETSTRINGTEXTSTRING, text, buffer, bufferLength );`
 /// Raven transport: `text = SE_GetString((const char *) VMA(1));`, then copies into `VMA(2)` with size `args[3]` and returns `strlen(text)`.
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:640`
-/// Args source: `oracle/oracle/code/cgame/cg_local.h:1206`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:995-1010`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:640`
+/// Args source: `oracle/code/cgame/cg_local.h:1206`
+/// Output source: `oracle/code/client/cl_cgame.cpp:995-1010`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgSpGetstringtextstringArgs {
     text: *const c_char,
@@ -44,10 +44,10 @@ impl CgSpGetstringtextstringArgs {
 
 /// `CG_SP_GETSTRINGTEXTSTRING` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:206`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:640`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:995-1010`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:995-1010`
+/// Enum value source: `oracle/code/cgame/cg_public.h:206`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:640`
+/// Output source: `oracle/code/client/cl_cgame.cpp:995-1010`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:995-1010`
 pub struct CgSpGetstringtextstring;
 
 impl OutboundSysCall for CgSpGetstringtextstring {

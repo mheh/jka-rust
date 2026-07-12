@@ -7,12 +7,12 @@ use sp_qshared::shared::{qboolean, vec3_t};
 /// `CM_MAX_GRID_SIZE`.
 ///
 /// Raven: max dimensions of a grid mesh in memory (collision-model variant).
-/// Source: `oracle/oracle/code/qcommon/cm_patch.h:104`
+/// Source: `oracle/code/qcommon/cm_patch.h:104`
 pub const CM_MAX_GRID_SIZE: usize = 129;
 
 /// Raven `cGrid_t`.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/cm_patch.h:104-110`
+/// Type definition source: `oracle/code/qcommon/cm_patch.h:104-110`
 #[repr(C)]
 pub struct cGrid_t {
     pub width: c_int,

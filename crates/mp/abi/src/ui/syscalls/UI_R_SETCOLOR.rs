@@ -11,9 +11,9 @@ use abi_transport::generic::{
 /// Raven's client switch forwards the color pointer through `VMA(1)`; `NULL`
 /// clears the current color.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:190-191`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:190-191`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:980-981`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:190-191`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:190-191`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:980-981`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRSetcolorArgs {
     pub rgba: *const f32,
@@ -27,7 +27,7 @@ impl UiRSetcolorArgs {
 
 /// `UI_R_SETCOLOR` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:45`
+/// Source: `oracle/codemp/ui/ui_public.h:45`
 pub struct UiRSetcolor;
 
 impl OutboundSysCall for UiRSetcolor {

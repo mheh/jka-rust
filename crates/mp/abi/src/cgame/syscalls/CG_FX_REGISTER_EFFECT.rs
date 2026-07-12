@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall( CG_FX_REGISTER_EFFECT, file);`
 /// Raven transport: `return FX_RegisterEffect((const char *)VMA(1));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:621-623`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2398`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1105-1106`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:621-623`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2398`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1105-1106`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxRegisterEffectArgs {
     file: *const c_char,
@@ -26,10 +26,10 @@ impl CgFxRegisterEffectArgs {
 
 /// `CG_FX_REGISTER_EFFECT` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:219`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:621-623`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1105-1106`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1105-1106`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:219`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:621-623`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1105-1106`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1105-1106`
 pub struct CgFxRegisterEffect;
 
 impl OutboundSysCall for CgFxRegisterEffect {

@@ -1,6 +1,6 @@
 //! MP `renderInfo_t`.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/g_local.h:460-532`
+//! Type definition source: `oracle/codemp/game/g_local.h:460-532`
 
 #![allow(non_camel_case_types)]
 
@@ -14,7 +14,7 @@ use crate::npc::lookMode_t;
 /// muzzle points, tag points, look target, bolt indices, `lastG2`.
 ///
 /// Pointer-bearing (`lastG2`) => arch-dependent; asserts pin the host-64-bit layout.
-/// Type definition source: `oracle/oracle/codemp/game/g_local.h:460-532`
+/// Type definition source: `oracle/codemp/game/g_local.h:460-532`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct renderInfo_t {

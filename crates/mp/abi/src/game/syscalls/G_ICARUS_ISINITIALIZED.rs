@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use super::super::MpGameImport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_ISINITIALIZED` outbound game-to-engine syscall.
 ///
@@ -25,7 +27,7 @@ impl GIcarusIsinitializedArgs {
 
 /// `G_ICARUS_ISINITIALIZED` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:257`
+/// Source: `oracle/codemp/game/g_public.h:257`
 pub struct GIcarusIsinitialized;
 
 impl OutboundSysCall for GIcarusIsinitialized {

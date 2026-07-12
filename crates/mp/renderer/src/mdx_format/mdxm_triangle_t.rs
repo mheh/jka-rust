@@ -2,7 +2,7 @@
 
 /// Raven `mdxmTriangle_t` — triangle vertex indexes.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:250-252`
+/// Type definition source: `oracle/codemp/renderer/../ghoul2/../renderer/mdx_format.h:250-252`
 #[repr(C)]
 pub struct mdxmTriangle_t {
     pub indexes: [i32; 3],

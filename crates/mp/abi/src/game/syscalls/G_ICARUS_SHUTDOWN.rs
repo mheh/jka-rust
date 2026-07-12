@@ -1,6 +1,8 @@
 use super::super::MpGameImport;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_SHUTDOWN` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,7 +16,7 @@ impl GIcarusShutdownArgs {
 
 /// `G_ICARUS_SHUTDOWN` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:264`
+/// Source: `oracle/codemp/game/g_public.h:264`
 pub struct GIcarusShutdown;
 
 impl OutboundSysCall for GIcarusShutdown {

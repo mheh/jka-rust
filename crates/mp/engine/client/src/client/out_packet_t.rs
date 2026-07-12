@@ -5,7 +5,7 @@
 /// Raven: `p_cmdNumber` = cl.cmdNumber when packet was sent; `p_serverTime` =
 /// usercmd->serverTime when packet was sent; `p_realtime` = cls.realtime when
 /// packet was sent.
-/// Type definition source: `oracle/oracle/codemp/client/client.h:58-62`
+/// Type definition source: `oracle/codemp/client/client.h:58-62`
 #[repr(C)]
 pub struct outPacket_t {
     pub p_cmdNumber: i32,

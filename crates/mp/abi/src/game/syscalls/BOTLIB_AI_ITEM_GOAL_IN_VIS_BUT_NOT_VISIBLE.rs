@@ -47,7 +47,7 @@ impl BotlibAiItemGoalInVisButNotVisibleArgs {
 
 /// `BOTLIB_AI_ITEM_GOAL_IN_VIS_BUT_NOT_VISIBLE` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:453`
+/// Source: `oracle/codemp/game/g_public.h:453`
 pub struct BotlibAiItemGoalInVisButNotVisible;
 
 impl OutboundSysCall for BotlibAiItemGoalInVisButNotVisible {

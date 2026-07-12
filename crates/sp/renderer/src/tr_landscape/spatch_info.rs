@@ -8,7 +8,7 @@ use super::ctrpatch::CTRPatch;
 /// Raven `SPatchInfo` (typedef'd as `TPatchInfo`) — a patch plus the triangle-half
 /// shader and part index to render for it.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_landscape.h:110-115`
+/// Type definition source: `oracle/code/renderer/tr_landscape.h:110-115`
 #[repr(C)]
 pub struct TPatchInfo {
     pub mPatch: *mut CTRPatch,

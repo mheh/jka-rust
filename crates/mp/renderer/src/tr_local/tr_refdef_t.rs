@@ -15,48 +15,48 @@ use super::tr_ref_entity_t::trRefEntity_t;
 
 /// Raven `trRefdef_t`.
 ///
-/// Type definition source: `oracle/oracle/codemp/renderer/tr_local.h:563-598`
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:563-598`
 #[repr(C)]
 pub struct trRefdef_t {
-	pub x: i32,
-	pub y: i32,
-	pub width: i32,
-	pub height: i32,
-	pub fov_x: f32,
-	pub fov_y: f32,
-	pub vieworg: vec3_t,
-	/// transformation matrix
-	pub viewaxis: [vec3_t; 3],
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    pub fov_x: f32,
+    pub fov_y: f32,
+    pub vieworg: vec3_t,
+    /// transformation matrix
+    pub viewaxis: [vec3_t; 3],
 
-	/// time in milliseconds for shader effects and other time dependent rendering issues
-	pub time: i32,
-	pub frametime: i32,
-	/// RDF_NOWORLDMODEL, etc
-	pub rdflags: i32,
+    /// time in milliseconds for shader effects and other time dependent rendering issues
+    pub time: i32,
+    pub frametime: i32,
+    /// RDF_NOWORLDMODEL, etc
+    pub rdflags: i32,
 
-	/// 1 bits will prevent the associated area from rendering at all
-	pub areamask: [u8; MAX_MAP_AREA_BYTES],
-	/// qtrue if areamask changed since last scene
-	pub areamaskModified: qboolean,
+    /// 1 bits will prevent the associated area from rendering at all
+    pub areamask: [u8; MAX_MAP_AREA_BYTES],
+    /// qtrue if areamask changed since last scene
+    pub areamaskModified: qboolean,
 
-	/// tr.refdef.time / 1000.0
-	pub floatTime: f32,
+    /// tr.refdef.time / 1000.0
+    pub floatTime: f32,
 
-	/// text messages for deform text shaders
-	pub text: [[c_char; MAX_RENDER_STRING_LENGTH]; MAX_RENDER_STRINGS],
+    /// text messages for deform text shaders
+    pub text: [[c_char; MAX_RENDER_STRING_LENGTH]; MAX_RENDER_STRINGS],
 
-	pub num_entities: i32,
-	pub entities: *mut trRefEntity_t,
-	pub miniEntities: *mut trMiniRefEntity_t,
+    pub num_entities: i32,
+    pub entities: *mut trRefEntity_t,
+    pub miniEntities: *mut trMiniRefEntity_t,
 
-	pub num_dlights: i32,
-	pub dlights: *mut dlight_t,
+    pub num_dlights: i32,
+    pub dlights: *mut dlight_t,
 
-	pub numPolys: i32,
-	pub polys: *mut srfPoly_t,
+    pub numPolys: i32,
+    pub polys: *mut srfPoly_t,
 
-	pub numDrawSurfs: i32,
-	pub drawSurfs: *mut drawSurf_t,
+    pub numDrawSurfs: i32,
+    pub drawSurfs: *mut drawSurf_t,
 }
 
 const _: () = assert!(core::mem::size_of::<trRefdef_t>() == 448);

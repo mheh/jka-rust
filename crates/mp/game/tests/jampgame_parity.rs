@@ -2,7 +2,7 @@
 //! the Raven oracle. Reproduces `tools/jampgame-oracle/`'s canonical bit-exact
 //! dumps by calling the PORTED functions (`mp_game::q_math`,
 //! `mp_game::bg_lib`, `mp_game::bg_channel::Rng`) and byte-compares to the
-//! committed goldens under `tools/jampgame-oracle/golden/`.
+//! committed goldens under `tests/oracle/golden/`.
 //!
 //! Single-threaded by construction: the oracle keeps its RNG in file statics
 //! (a fresh dumper process per family); the Rust side mirrors that with ONE
@@ -20,7 +20,7 @@ use mp_game::q_math::*;
 use mp_game::shared::cplane_t;
 
 fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tools/jampgame-oracle")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
 }
 
 fn compare(name: &str, got: &str) {
@@ -80,13 +80,22 @@ impl CBits for f64 {
 }
 
 fn v3(o: &mut String, v: &[f32; 3]) {
-    let _ = writeln!(o, "{:08x} {:08x} {:08x}", v[0].cbits(), v[1].cbits(), v[2].cbits());
+    let _ = writeln!(
+        o,
+        "{:08x} {:08x} {:08x}",
+        v[0].cbits(),
+        v[1].cbits(),
+        v[2].cbits()
+    );
 }
 fn v4(o: &mut String, v: &[f32; 4]) {
     let _ = writeln!(
         o,
         "{:08x} {:08x} {:08x} {:08x}",
-        v[0].cbits(), v[1].cbits(), v[2].cbits(), v[3].cbits()
+        v[0].cbits(),
+        v[1].cbits(),
+        v[2].cbits(),
+        v[3].cbits()
     );
 }
 fn dot_nz(v: &[f32; 3]) -> bool {
@@ -103,7 +112,11 @@ fn load_vectors() -> Vec<[f32; 3]> {
             .map(|h| u32::from_str_radix(h, 16).unwrap())
             .collect();
         if w.len() == 3 {
-            out.push([f32::from_bits(w[0]), f32::from_bits(w[1]), f32::from_bits(w[2])]);
+            out.push([
+                f32::from_bits(w[0]),
+                f32::from_bits(w[1]),
+                f32::from_bits(w[2]),
+            ]);
         }
     }
     out
@@ -159,7 +172,13 @@ fn dump_scalars(o: &mut String) {
     ];
     for x in ci {
         let ax = if x < 0 { -x } else { x };
-        let _ = writeln!(o, "cc {} cs {} log2 {}", ClampChar(x) as i32, ClampShort(x) as i32, Q_log2(ax));
+        let _ = writeln!(
+            o,
+            "cc {} cs {} log2 {}",
+            ClampChar(x) as i32,
+            ClampShort(x) as i32,
+            Q_log2(ax)
+        );
     }
     let cf: [u32; 10] = [
         0x3f800000, 0x40490fdb, 0x00000001, 0x80000000, 0x7f7fffff, 0x3dcccccd, 0xc0000000,
@@ -168,7 +187,12 @@ fn dump_scalars(o: &mut String) {
     for u in cf {
         let v = f32::from_bits(u);
         let a = if v < 0.0 { -v } else { v };
-        let _ = writeln!(o, "rsqrt {:08x} fabs {:08x}", Q_rsqrt(a).cbits(), Q_fabs(v).cbits());
+        let _ = writeln!(
+            o,
+            "rsqrt {:08x} fabs {:08x}",
+            Q_rsqrt(a).cbits(),
+            Q_fabs(v).cbits()
+        );
     }
     for y in 1..=6 {
         let _ = writeln!(o, "powf {:08x}", powf(1.5, y).cbits());
@@ -200,8 +224,17 @@ fn dump_scalars(o: &mut String) {
         [0x3e4ccccd, 0x3f19999a, 0x3f733333],
     ];
     for c in cc {
-        let (r, g, bl) = (f32::from_bits(c[0]), f32::from_bits(c[1]), f32::from_bits(c[2]));
-        let _ = writeln!(o, "cb3 {:08x} cb4 {:08x}", ColorBytes3(r, g, bl), ColorBytes4(r, g, bl, 0.5));
+        let (r, g, bl) = (
+            f32::from_bits(c[0]),
+            f32::from_bits(c[1]),
+            f32::from_bits(c[2]),
+        );
+        let _ = writeln!(
+            o,
+            "cb3 {:08x} cb4 {:08x}",
+            ColorBytes3(r, g, bl),
+            ColorBytes4(r, g, bl, 0.5)
+        );
         let inv = [r, g, bl];
         let mut out = [0.0; 3];
         let m = NormalizeColor(inv, &mut out);
@@ -221,7 +254,11 @@ fn dump_n2ll(o: &mut String) {
         [0xbf13cd36, 0x3f13cd36, 0],
     ];
     for nn in ns {
-        let mut n = [f32::from_bits(nn[0]), f32::from_bits(nn[1]), f32::from_bits(nn[2])];
+        let mut n = [
+            f32::from_bits(nn[0]),
+            f32::from_bits(nn[1]),
+            f32::from_bits(nn[2]),
+        ];
         VectorNormalize(&mut n);
         let mut bytes = [0u8; 2];
         NormalToLatLong(n, bytes.as_mut_ptr());
@@ -265,9 +302,15 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = writeln!(
                 o,
                 "av {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x}",
-                f[0].cbits(), f[1].cbits(), f[2].cbits(),
-                r[0].cbits(), r[1].cbits(), r[2].cbits(),
-                up[0].cbits(), up[1].cbits(), up[2].cbits()
+                f[0].cbits(),
+                f[1].cbits(),
+                f[2].cbits(),
+                r[0].cbits(),
+                r[1].cbits(),
+                r[2].cbits(),
+                up[0].cbits(),
+                up[1].cbits(),
+                up[2].cbits()
             );
         }
         {
@@ -288,9 +331,24 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = write!(o, "vn2 {:08x} ", len.cbits());
             v3(o, &t);
         }
-        let _ = writeln!(o, "vl {:08x} vls {:08x}", VectorLength(a).cbits(), VectorLengthSquared(a).cbits());
-        let _ = writeln!(o, "dist {:08x} dsq {:08x}", Distance(a, b).cbits(), DistanceSquared(a, b).cbits());
-        let _ = writeln!(o, "dh {:08x} dhs {:08x}", DistanceHorizontal(a, b).cbits(), DistanceHorizontalSquared(a, b).cbits());
+        let _ = writeln!(
+            o,
+            "vl {:08x} vls {:08x}",
+            VectorLength(a).cbits(),
+            VectorLengthSquared(a).cbits()
+        );
+        let _ = writeln!(
+            o,
+            "dist {:08x} dsq {:08x}",
+            Distance(a, b).cbits(),
+            DistanceSquared(a, b).cbits()
+        );
+        let _ = writeln!(
+            o,
+            "dh {:08x} dhs {:08x}",
+            DistanceHorizontal(a, b).cbits(),
+            DistanceHorizontalSquared(a, b).cbits()
+        );
         let _ = writeln!(o, "vcmp {} {}", VectorCompare(a, b), VectorCompare(a, a));
         {
             let mut t = [0.0; 3];
@@ -298,7 +356,12 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = write!(o, "cross ");
             v3(o, &t);
         }
-        let _ = writeln!(o, "dot {:08x} _dot {:08x}", _DotProduct(a, b).cbits(), _DotProduct(a, b).cbits());
+        let _ = writeln!(
+            o,
+            "dot {:08x} _dot {:08x}",
+            _DotProduct(a, b).cbits(),
+            _DotProduct(a, b).cbits()
+        );
         let _ = writeln!(o, "dpn {:08x}", DotProductNormalize(a, b).cbits());
         {
             let mut t = a;
@@ -351,8 +414,12 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = writeln!(
                 o,
                 "mnv {:08x} {:08x} {:08x} {:08x} {:08x} {:08x}",
-                t[0].cbits(), t[1].cbits(), t[2].cbits(),
-                u[0].cbits(), u[1].cbits(), u[2].cbits()
+                t[0].cbits(),
+                t[1].cbits(),
+                t[2].cbits(),
+                u[0].cbits(),
+                u[1].cbits(),
+                u[2].cbits()
             );
         }
         if dot_nz(&a) {
@@ -401,16 +468,26 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = write!(o, "gclose {} ", ok);
             v3(o, &res);
         }
-        let _ = writeln!(o, "gdist {:08x}", G_PointDistFromLineSegment(a, b, c).cbits());
+        let _ = writeln!(
+            o,
+            "gdist {:08x}",
+            G_PointDistFromLineSegment(a, b, c).cbits()
+        );
         {
             let mut axis: [[f32; 3]; 3] = [[0.0; 3]; 3];
             AnglesToAxis(a, axis.as_mut_ptr());
             let _ = writeln!(
                 o,
                 "a2a {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x}",
-                axis[0][0].cbits(), axis[0][1].cbits(), axis[0][2].cbits(),
-                axis[1][0].cbits(), axis[1][1].cbits(), axis[1][2].cbits(),
-                axis[2][0].cbits(), axis[2][1].cbits(), axis[2][2].cbits()
+                axis[0][0].cbits(),
+                axis[0][1].cbits(),
+                axis[0][2].cbits(),
+                axis[1][0].cbits(),
+                axis[1][1].cbits(),
+                axis[1][2].cbits(),
+                axis[2][0].cbits(),
+                axis[2][1].cbits(),
+                axis[2][2].cbits()
             );
             let mut t = [0.0; 3];
             VectorRotate(b, axis.as_mut_ptr(), &mut t);
@@ -421,19 +498,37 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = write!(o, "acopy ");
             v3(o, &cp[1]);
             RotateAroundDirection(axis.as_mut_ptr(), a[1]);
-            let _ = writeln!(o, "rad {:08x} {:08x} {:08x}", axis[1][0].cbits(), axis[1][1].cbits(), axis[1][2].cbits());
+            let _ = writeln!(
+                o,
+                "rad {:08x} {:08x} {:08x}",
+                axis[1][0].cbits(),
+                axis[1][1].cbits(),
+                axis[1][2].cbits()
+            );
         }
         {
             let mut ax: [[f32; 3]; 3] = [[0.0; 3]; 3];
             AxisClear(ax.as_mut_ptr());
-            let _ = writeln!(o, "aclear {:08x} {:08x} {:08x}", ax[0][0].cbits(), ax[1][1].cbits(), ax[2][2].cbits());
+            let _ = writeln!(
+                o,
+                "aclear {:08x} {:08x} {:08x}",
+                ax[0][0].cbits(),
+                ax[1][1].cbits(),
+                ax[2][2].cbits()
+            );
         }
         {
             let m1 = [[a[0], a[1], a[2]], [b[0], b[1], b[2]], [c[0], c[1], c[2]]];
             let m2 = [[c[0], b[1], a[2]], [a[0], c[1], b[2]], [b[0], a[1], c[2]]];
             let mut ou = [[0.0; 3]; 3];
             MatrixMultiply(&m1, &m2, &mut ou);
-            let _ = writeln!(o, "mm {:08x} {:08x} {:08x}", ou[0][0].cbits(), ou[1][1].cbits(), ou[2][2].cbits());
+            let _ = writeln!(
+                o,
+                "mm {:08x} {:08x} {:08x}",
+                ou[0][0].cbits(),
+                ou[1][1].cbits(),
+                ou[2][2].cbits()
+            );
         }
         {
             let (mut mn, mut mx) = ([0.0; 3], [0.0; 3]);
@@ -443,8 +538,12 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = writeln!(
                 o,
                 "bounds {:08x} {:08x} {:08x} {:08x} {:08x} {:08x}",
-                mn[0].cbits(), mn[1].cbits(), mn[2].cbits(),
-                mx[0].cbits(), mx[1].cbits(), mx[2].cbits()
+                mn[0].cbits(),
+                mn[1].cbits(),
+                mn[2].cbits(),
+                mx[0].cbits(),
+                mx[1].cbits(),
+                mx[2].cbits()
             );
         }
     }
@@ -525,22 +624,50 @@ fn dump_qsort(o: &mut String) {
     let mut arr: Vec<c_int> = text.lines().filter_map(|l| l.trim().parse().ok()).collect();
     let n = arr.len();
     let f = cmp_int as extern "C" fn(*const c_void, *const c_void) -> c_int;
-    qsort(arr.as_mut_ptr() as *mut c_void, n, core::mem::size_of::<c_int>(), f as usize as *mut c_void);
+    qsort(
+        arr.as_mut_ptr() as *mut c_void,
+        n,
+        core::mem::size_of::<c_int>(),
+        f as usize as *mut c_void,
+    );
     let _ = writeln!(o, "ints {}", n);
     for v in &arr {
         let _ = writeln!(o, "{}", v);
     }
 
     let mut kv: Vec<Kv> = [
-        (5, 0), (3, 1), (5, 2), (1, 3), (3, 4), (9, 5), (1, 6), (7, 7), (3, 8), (5, 9),
-        (0, 10), (8, 11), (2, 12), (8, 13), (4, 14), (6, 15), (3, 16), (9, 17), (1, 18), (5, 19),
+        (5, 0),
+        (3, 1),
+        (5, 2),
+        (1, 3),
+        (3, 4),
+        (9, 5),
+        (1, 6),
+        (7, 7),
+        (3, 8),
+        (5, 9),
+        (0, 10),
+        (8, 11),
+        (2, 12),
+        (8, 13),
+        (4, 14),
+        (6, 15),
+        (3, 16),
+        (9, 17),
+        (1, 18),
+        (5, 19),
     ]
     .iter()
     .map(|&(key, payload)| Kv { key, payload })
     .collect();
     let kn = kv.len();
     let fk = cmp_kv as extern "C" fn(*const c_void, *const c_void) -> c_int;
-    qsort(kv.as_mut_ptr() as *mut c_void, kn, core::mem::size_of::<Kv>(), fk as usize as *mut c_void);
+    qsort(
+        kv.as_mut_ptr() as *mut c_void,
+        kn,
+        core::mem::size_of::<Kv>(),
+        fk as usize as *mut c_void,
+    );
     let _ = writeln!(o, "kv {}", kn);
     for e in &kv {
         let _ = writeln!(o, "{} {}", e.key, e.payload);
@@ -592,23 +719,32 @@ fn bglib_parity() {
 
 // ============================ bg_saberLoad family ============================
 //
-// Reproduces `tools/jampgame-oracle/golden/saberload.txt` by driving the
+// Reproduces `tests/oracle/golden/saberload.txt` by driving the
 // PORTED `WP_SaberLoadParms` + `WP_SaberParseParms` over the same
 // `fixtures/sabers/*.sab`. A tiny `TestTraps` serves the fixtures dir through
 // the real `BgTraps` FS seam and mints deterministic skin handles; the
-// context-free sound-registration order is observed through the port's
-// `saber_snd_tape_*` seam. See `tools/jampgame-oracle/README.md`.
+// context-free sound registrations reach a configstring-servicing mock engine
+// through the real `g_strap` seam (real 1,2,3… indices), and their order is
+// observed through the port's `saber_snd_tape_*` seam. See
+// `tools/jampgame-oracle/README.md`.
 mod saberload {
     use super::{compare, oracle_dir, CBits};
     use core::ffi::{c_char, c_int, c_void};
     use std::cell::{Cell, RefCell};
+    use std::collections::BTreeMap;
+    use std::ffi::CStr;
     use std::fmt::Write as _;
     use std::path::PathBuf;
+    use std::sync::OnceLock;
 
+    use mp_abi::game::imports::MpGameImport;
+    use mp_engine_qcommon::vm::{arm_game_slot, game_syscall_trampoline};
+    use mp_engine_select::Engine;
     use mp_game::bg_channel::{BgState, BgTraps};
     use mp_game::bg_saberLoad::{
         saber_snd_tape_drain, saber_snd_tape_enable, WP_SaberLoadParms, WP_SaberParseParms,
     };
+    use mp_game::g_strap::init_strap_engine;
     use mp_game::prelude::*;
 
     // The saber names parsed, in order. Mirrors main_saberload.c's g_names.
@@ -620,6 +756,61 @@ mod saberload {
         "nonexistent_xyz",
         "",
     ];
+
+    // ---- strap-seam mock engine (configstrings) ----------------------------
+    // `BG_SoundIndex` -> `G_SoundIndex` is the real configstring registration
+    // (`G_FindConfigstringIndex` over `CS_SOUNDS`), reached ctx-free through the
+    // `g_strap` seam cell. Serve it with a real engine stand-in: the C-variadic
+    // inbound trampoline (`game_syscall_trampoline` armed via `arm_game_slot` —
+    // the jampgame smoke-test precedent, crates/jampgame/tests/common/mod.rs)
+    // dispatching to a configstring table that persists across all six parses,
+    // like a real engine's per-level table. Distinct names mint 1,2,3…; repeats
+    // dedup. The oracle dumper's G_SoundIndex stub mirrors these semantics.
+    thread_local! {
+        static CONFIGSTRINGS: RefCell<BTreeMap<isize, Vec<u8>>> =
+            const { RefCell::new(BTreeMap::new()) };
+    }
+
+    /// Fixed-arity dispatch target behind the trampoline: services
+    /// `G_GET_CONFIGSTRING`/`G_SET_CONFIGSTRING` only; any other import on the
+    /// saber-load path is a test bug and panics loudly.
+    extern "C-unwind" fn cs_syscall(_ctx: *mut c_void, args: *const isize) -> isize {
+        const GET: isize = MpGameImport::G_GET_CONFIGSTRING as isize;
+        const SET: isize = MpGameImport::G_SET_CONFIGSTRING as isize;
+        // SAFETY: `args` is the trampoline's 16-word frame (`args[0]` = import
+        // number, the rest the syscall's words in encode order).
+        unsafe {
+            match *args {
+                GET => {
+                    // ( int num, char *buffer, int bufferSize ) — the stored
+                    // string ("" when unset), NUL-terminated, truncated.
+                    let (num, buf, size) = (*args.add(1), *args.add(2) as *mut u8, *args.add(3));
+                    let s =
+                        CONFIGSTRINGS.with(|cs| cs.borrow().get(&num).cloned().unwrap_or_default());
+                    if !buf.is_null() && size > 0 {
+                        let n = s.len().min(size as usize - 1);
+                        core::ptr::copy_nonoverlapping(s.as_ptr(), buf, n);
+                        *buf.add(n) = 0;
+                    }
+                    0
+                }
+                SET => {
+                    // ( int num, const char *string )
+                    let (num, ptr) = (*args.add(1), *args.add(2) as *const c_char);
+                    let s = if ptr.is_null() {
+                        Vec::new()
+                    } else {
+                        CStr::from_ptr(ptr).to_bytes().to_vec()
+                    };
+                    CONFIGSTRINGS.with(|cs| {
+                        cs.borrow_mut().insert(num, s);
+                    });
+                    0
+                }
+                other => panic!("saberload mock engine: unmodeled syscall #{other}"),
+            }
+        }
+    }
 
     /// A fixtures-backed `BgTraps`: the FS calls read `<dir>/sabers/*`, and
     /// `r_register_skin` mints a per-saber counter with a name log. Every other
@@ -940,12 +1131,25 @@ mod saberload {
 
     // Read a fixed C-char array field as a displayable string (up to NUL).
     fn field_str(buf: &[c_char]) -> String {
-        let bytes: Vec<u8> = buf.iter().take_while(|&&c| c != 0).map(|&c| c as u8).collect();
+        let bytes: Vec<u8> = buf
+            .iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| c as u8)
+            .collect();
         String::from_utf8_lossy(&bytes).into_owned()
     }
 
     #[test]
     fn saberload_parity() {
+        // Arm the `g_strap` seam (the GAME_INIT stand-in) BEFORE any parse —
+        // `WP_SaberSetDefaults` registers sounds immediately. The `Engine` is a
+        // process-static because the seam cell keeps a raw pointer to it.
+        arm_game_slot(core::ptr::null_mut(), cs_syscall);
+        static ENGINE: OnceLock<Engine> = OnceLock::new();
+        init_strap_engine(
+            ENGINE.get_or_init(|| Engine::new(game_syscall_trampoline as *const c_void)),
+        );
+
         let dir = oracle_dir().join("fixtures");
         let traps = TestTraps::new(dir);
         let mut bg = BgState::new();
@@ -975,7 +1179,7 @@ mod saberload {
             };
 
             let _ = writeln!(o, "saber \"{name}\"");
-            pi(&mut o, "ret", if ret != QFALSE { 1 } else { 0 });
+            pi(&mut o, "ret", if ret != qfalse { 1 } else { 0 });
             qstr(&mut o, "name", &field_str(&saber.name));
             qstr(&mut o, "fullName", &field_str(&saber.fullName));
             pi(&mut o, "type", saber.r#type as c_int);

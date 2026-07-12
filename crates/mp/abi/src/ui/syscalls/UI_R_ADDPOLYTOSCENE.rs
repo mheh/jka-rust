@@ -12,9 +12,9 @@ use mp_qshared::shared::qhandle_t;
 /// Raven's client switch forwards the shader handle and vertex count as raw
 /// words and the vertex array through `VMA(3)`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:178-179`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:178-179`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:964-965`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:178-179`
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:178-179`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:964-965`
 #[derive(Debug, Clone, Copy)]
 pub struct UiRAddpolytosceneArgs {
     pub shader: qhandle_t,
@@ -34,7 +34,7 @@ impl UiRAddpolytosceneArgs {
 
 /// `UI_R_ADDPOLYTOSCENE` MP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:42`
+/// Source: `oracle/codemp/ui/ui_public.h:42`
 pub struct UiRAddpolytoscene;
 
 impl OutboundSysCall for UiRAddpolytoscene {

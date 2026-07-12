@@ -2,11 +2,11 @@
 
 /// Raven `md3XyzNormal_t` — MD3 model per-frame vertex position/normal.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/../qcommon/qfiles.h:163-166`
+/// Type definition source: `oracle/code/qcommon/../qcommon/qfiles.h:163-166`
 #[repr(C)]
 pub struct md3XyzNormal_t {
-	pub xyz: [i16; 3],
-	pub normal: i16,
+    pub xyz: [i16; 3],
+    pub normal: i16,
 }
 
 const _: () = assert!(core::mem::size_of::<md3XyzNormal_t>() == 8);

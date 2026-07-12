@@ -1,13 +1,15 @@
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_PC_REMOVE_ALL_GLOBAL_DEFINES`.
 ///
 /// Raven wrapper: `syscall ( CG_PC_REMOVE_ALL_GLOBAL_DEFINES );`
 /// Raven transport: `botlib_export->PC_RemoveAllGlobalDefines ( ); return 0;`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:566-568`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1011-1013`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:566-568`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1011-1013`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CgPcRemoveAllGlobalDefinesArgs;
 
@@ -19,10 +21,10 @@ impl CgPcRemoveAllGlobalDefinesArgs {
 
 /// `CG_PC_REMOVE_ALL_GLOBAL_DEFINES` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:205`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:566-568`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1011-1013`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1011-1013`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:205`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:566-568`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1011-1013`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1011-1013`
 pub struct CgPcRemoveAllGlobalDefines;
 
 impl OutboundSysCall for CgPcRemoveAllGlobalDefines {

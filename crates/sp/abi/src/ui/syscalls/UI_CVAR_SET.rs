@@ -7,12 +7,12 @@ use abi_transport::generic::{
 
 /// `UI_CVAR_SET` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:155`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp` is missing for this SP call;
-/// `oracle/oracle/codemp/ui/ui_syscalls.c:41-42` provides Raven's canonical wrapper form.
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:41-42` and
-/// `oracle/oracle/codemp/client/cl_ui.cpp:876-878`.
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:876-878`.
+/// Enum source: `oracle/code/ui/ui_public.h:155`
+/// Args source: `oracle/code/client/cl_ui.cpp` is missing for this SP call;
+/// `oracle/codemp/ui/ui_syscalls.c:41-42` provides Raven's canonical wrapper form.
+/// Output source: `oracle/codemp/ui/ui_syscalls.c:41-42` and
+/// `oracle/codemp/client/cl_ui.cpp:876-878`.
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:876-878`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCvarSetArgs {
     var_name: *const c_char,

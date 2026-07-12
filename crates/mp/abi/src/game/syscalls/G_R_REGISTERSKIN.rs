@@ -25,7 +25,7 @@ impl GRRegisterskinArgs {
 
 /// `G_R_REGISTERSKIN` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:506`
+/// Source: `oracle/codemp/game/g_public.h:506`
 pub struct GRRegisterskin;
 
 impl OutboundSysCall for GRRegisterskin {

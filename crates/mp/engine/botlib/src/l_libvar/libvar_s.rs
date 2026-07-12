@@ -6,16 +6,16 @@ use mp_qshared::shared::qboolean;
 
 /// Raven `libvar_s` — a bot library variable (cvar-like linked list node).
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/l_libvar.h:16-24`
+/// Type definition source: `oracle/codemp/botlib/l_libvar.h:16-24`
 #[repr(C)]
 pub struct libvar_t {
-	pub name: *mut c_char,
-	pub string: *mut c_char,
-	pub flags: i32,
-	/// set each time the cvar is changed
-	pub modified: qboolean,
-	pub value: f32,
-	pub next: *mut libvar_t,
+    pub name: *mut c_char,
+    pub string: *mut c_char,
+    pub flags: i32,
+    /// set each time the cvar is changed
+    pub modified: qboolean,
+    pub value: f32,
+    pub next: *mut libvar_t,
 }
 
 pub type libvar_s = libvar_t;

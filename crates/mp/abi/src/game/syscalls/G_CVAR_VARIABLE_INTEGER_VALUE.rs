@@ -28,7 +28,7 @@ impl GCvarVariableIntegerValueArgs {
 /// `G_CVAR_VARIABLE_INTEGER_VALUE` MP game imports syscall ABI token.
 ///
 /// Raven: ( const char *var_name );
-/// Source: `oracle/oracle/codemp/game/g_public.h:124`
+/// Source: `oracle/codemp/game/g_public.h:124`
 pub struct GCvarVariableIntegerValue;
 
 impl OutboundSysCall for GCvarVariableIntegerValue {

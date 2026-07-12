@@ -24,7 +24,7 @@ impl GIcarusVariabledeclaredArgs {
 
 /// `G_ICARUS_VARIABLEDECLARED` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:268`
+/// Source: `oracle/codemp/game/g_public.h:268`
 pub struct GIcarusVariabledeclared;
 
 impl OutboundSysCall for GIcarusVariabledeclared {

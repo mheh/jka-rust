@@ -1,6 +1,6 @@
 //! MP `team_t` and its team constants.
 //!
-//! Type definition source: `oracle/oracle/codemp/game/bg_public.h:1008-1017`
+//! Type definition source: `oracle/codemp/game/bg_public.h:1008-1017`
 
 #![allow(non_camel_case_types)]
 
@@ -10,7 +10,7 @@ use core::ffi::c_int;
 ///
 /// Raven names the teams via an anonymous `enum { TEAM_FREE..TEAM_NUM_TEAMS }`,
 /// then `typedef int team_t` for storage.
-/// Type definition source: `oracle/oracle/codemp/game/bg_public.h:1017`
+/// Type definition source: `oracle/codemp/game/bg_public.h:1017`
 pub type team_t = c_int;
 
 pub const TEAM_FREE: team_t = 0;

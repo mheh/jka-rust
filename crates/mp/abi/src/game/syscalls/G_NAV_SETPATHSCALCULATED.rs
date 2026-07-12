@@ -1,5 +1,7 @@
 use super::super::MpGameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use mp_qshared::shared::qboolean;
 
 /// `G_NAV_SETPATHSCALCULATED` outbound game-to-engine syscall.
@@ -21,7 +23,7 @@ impl GNavSetpathscalculatedArgs {
 /// `G_NAV_SETPATHSCALCULATED` MP game imports syscall ABI token.
 ///
 /// Raven: rww - END NPC NAV TRAPS
-/// Source: `oracle/oracle/codemp/game/g_public.h:339`
+/// Source: `oracle/codemp/game/g_public.h:339`
 pub struct GNavSetpathscalculated;
 
 impl OutboundSysCall for GNavSetpathscalculated {

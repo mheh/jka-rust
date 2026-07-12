@@ -7,7 +7,7 @@ use mp_uishared::shared::menu_def_t::MAX_MENUITEMS;
 
 /// Raven `menuframework_s` — base menu framework shared by all MP UI menus.
 ///
-/// Type definition source: `oracle/oracle/codemp/ui/ui_local.h:144-158`
+/// Type definition source: `oracle/codemp/ui/ui_local.h:144-158`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct menuframework_s {

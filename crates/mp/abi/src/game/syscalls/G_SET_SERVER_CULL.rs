@@ -1,7 +1,9 @@
 use super::super::MpGameImport;
 use abi_transport::pass_float;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_SET_SERVER_CULL` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -22,7 +24,7 @@ impl GSetServerCullArgs {
 /// `G_SET_SERVER_CULL` MP game imports syscall ABI token.
 ///
 /// Raven: server culling to reduce traffic on open maps -rww
-/// Source: `oracle/oracle/codemp/game/g_public.h:176`
+/// Source: `oracle/codemp/game/g_public.h:176`
 pub struct GSetServerCull;
 
 impl OutboundSysCall for GSetServerCull {

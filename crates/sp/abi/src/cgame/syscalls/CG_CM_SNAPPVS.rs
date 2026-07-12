@@ -11,8 +11,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `void cgi_CM_SnapPVS(vec3_t origin,byte *buffer)`.
 /// Raven transport: `CM_SnapPVS((float(*))VMA(1),(byte *) VMA(2));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:175-177`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:547-549`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:175-177`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:547-549`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgCmSnappvsArgs {
     origin: *const vec3_t,
@@ -35,10 +35,10 @@ impl CgCmSnappvsArgs {
 
 /// `CG_CM_SNAPPVS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:90`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:175-177`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:547-549`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:547-549`
+/// Enum value source: `oracle/code/cgame/cg_public.h:90`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:175-177`
+/// Output source: `oracle/code/client/cl_cgame.cpp:547-549`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:547-549`
 pub struct CgCmSnappvs;
 
 impl OutboundSysCall for CgCmSnappvs {

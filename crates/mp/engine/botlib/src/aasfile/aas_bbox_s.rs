@@ -4,13 +4,13 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `aas_bbox_t` — a bounding box used for a presence type.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:97-102`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:97-102`
 #[repr(C)]
 pub struct aas_bbox_t {
-	pub presencetype: i32,
-	pub flags: i32,
-	pub mins: vec3_t,
-	pub maxs: vec3_t,
+    pub presencetype: i32,
+    pub flags: i32,
+    pub mins: vec3_t,
+    pub maxs: vec3_t,
 }
 
 pub type aas_bbox_s = aas_bbox_t;

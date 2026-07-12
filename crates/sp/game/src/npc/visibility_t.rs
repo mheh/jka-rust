@@ -2,7 +2,7 @@
 
 /// Raven `visibility_t` — visibility enumeration.
 ///
-/// Type definition source: `oracle/oracle/code/game/b_public.h:88-88`
+/// Type definition source: `oracle/code/game/b_public.h:88-88`
 #[repr(i32)]
 pub enum visibility_t {
     VIS_UNKNOWN = 0,

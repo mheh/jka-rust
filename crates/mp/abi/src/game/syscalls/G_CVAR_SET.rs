@@ -30,7 +30,7 @@ impl GCvarSetArgs {
 /// `G_CVAR_SET` MP game imports syscall ABI token.
 ///
 /// Raven: ( const char *var_name, const char *value );
-/// Source: `oracle/oracle/codemp/game/g_public.h:123`
+/// Source: `oracle/codemp/game/g_public.h:123`
 pub struct GCvarSet;
 
 impl OutboundSysCall for GCvarSet {

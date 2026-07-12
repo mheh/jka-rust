@@ -4,16 +4,16 @@ use crate::shared::{qboolean, vec3_t};
 
 /// Raven `aas_trace_t` — result of an AAS trace.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/be_aas.h:68-77`
+/// Type definition source: `oracle/codemp/game/be_aas.h:68-77`
 #[repr(C)]
 pub struct aas_trace_t {
-	pub startsolid: qboolean, // if true, the initial point was in a solid area
-	pub fraction: f32,        // time completed, 1.0 = didn't hit anything
-	pub endpos: vec3_t,       // final position
-	pub ent: i32,             // entity blocking the trace
-	pub lastarea: i32,        // last area the trace was in (zero if none)
-	pub area: i32,            // area blocking the trace (zero if none)
-	pub planenum: i32,        // number of the plane that was hit
+    pub startsolid: qboolean, // if true, the initial point was in a solid area
+    pub fraction: f32,        // time completed, 1.0 = didn't hit anything
+    pub endpos: vec3_t,       // final position
+    pub ent: i32,             // entity blocking the trace
+    pub lastarea: i32,        // last area the trace was in (zero if none)
+    pub area: i32,            // area blocking the trace (zero if none)
+    pub planenum: i32,        // number of the plane that was hit
 }
 
 pub type aas_trace_s = aas_trace_t;

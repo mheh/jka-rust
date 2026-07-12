@@ -6,7 +6,7 @@ use super::poly_vert_t::polyVert_t;
 
 /// Raven `poly_s` — a dynamically-added polygon.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:76-80`
+/// Type definition source: `oracle/code/renderer/tr_types.h:76-80`
 #[repr(C)]
 pub struct poly_s {
     pub hShader: qhandle_t,
@@ -16,7 +16,7 @@ pub struct poly_s {
 
 /// Raven `poly_t` — `typedef struct poly_s poly_t`.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:76-80`
+/// Type definition source: `oracle/code/renderer/tr_types.h:76-80`
 pub type poly_t = poly_s;
 
 #[cfg(target_pointer_width = "64")]

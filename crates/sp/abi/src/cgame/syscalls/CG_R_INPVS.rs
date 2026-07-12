@@ -10,8 +10,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `return syscall( CG_R_INPVS, p1, p2 );`
 /// Raven transport: `return R_inPVS((float *) VMA(1), (float *) VMA(2));`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:370-372`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:693-694`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:370-372`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:693-694`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgRInpvsArgs {
     p1: *const vec3_t,
@@ -34,10 +34,10 @@ impl CgRInpvsArgs {
 
 /// `CG_R_INPVS` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:134`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:370-372`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:693-694`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:693-694`
+/// Enum value source: `oracle/code/cgame/cg_public.h:134`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:370-372`
+/// Output source: `oracle/code/client/cl_cgame.cpp:693-694`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:693-694`
 pub struct CgRInpvs;
 
 impl OutboundSysCall for CgRInpvs {

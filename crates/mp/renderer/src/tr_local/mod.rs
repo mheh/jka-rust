@@ -26,6 +26,7 @@ pub mod fog_t;
 pub mod front_end_counters_t;
 pub mod gen_func_t;
 pub mod gl_index_t;
+pub mod glext_consts;
 pub mod glstate_t;
 pub mod hit_mat_reg_t;
 pub mod image_s;

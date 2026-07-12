@@ -7,12 +7,12 @@ use abi_transport::generic::{
 
 /// `UI_CVAR_RESET` SP UI imports syscall ABI token.
 ///
-/// Enum source: `oracle/oracle/code/ui/ui_public.h:159`
-/// Args source: `oracle/oracle/code/client/cl_ui.cpp` has no SP transport case;
-/// `oracle/oracle/codemp/ui/ui_syscalls.c:59-60` provides the Raven wrapper signature.
+/// Enum source: `oracle/code/ui/ui_public.h:159`
+/// Args source: `oracle/code/client/cl_ui.cpp` has no SP transport case;
+/// `oracle/codemp/ui/ui_syscalls.c:59-60` provides the Raven wrapper signature.
 /// Output source: no SP `cl_ui.cpp` transport output is present for this token;
-/// `oracle/oracle/codemp/client/cl_ui.cpp:891-893`.
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:891-893` (fallback).
+/// `oracle/codemp/client/cl_ui.cpp:891-893`.
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:891-893` (fallback).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCvarResetArgs {
     name: *const c_char,

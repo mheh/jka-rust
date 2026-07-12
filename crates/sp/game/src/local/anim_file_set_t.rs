@@ -2,7 +2,7 @@
 
 //! SP `g_local.h` per-model animation config.
 //!
-//! Type definition source: `oracle/oracle/code/game/g_local.h:68-76`
+//! Type definition source: `oracle/code/game/g_local.h:68-76`
 
 use core::ffi::c_char;
 
@@ -13,19 +13,19 @@ use sp_qshared::shared::MAX_QPATH;
 
 /// Raven `MAX_ANIM_EVENTS`.
 ///
-/// Source: `oracle/oracle/code/game/bg_public.h:484`
+/// Source: `oracle/code/game/bg_public.h:484`
 pub const MAX_ANIM_EVENTS: usize = 300;
 
 /// Raven `MAX_ANIMATIONS` — sentinel of the `animNumber_t` enum.
 ///
-/// Source: `oracle/oracle/code/game/anims.h:1789`
+/// Source: `oracle/code/game/anims.h:1789`
 pub const MAX_ANIMATIONS: usize = 1543;
 
 const _: () = assert!(animNumber_t::MAX_ANIMATIONS as usize == MAX_ANIMATIONS);
 
 /// Raven `animFileSet_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/g_local.h:68-76`
+/// Type definition source: `oracle/code/game/g_local.h:68-76`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct animFileSet_t {

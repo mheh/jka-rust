@@ -14,8 +14,8 @@ use mp_qshared::shared::vec3_t;
 /// Raven's wrapper forwards the raw vector pointers and model handle; the client
 /// switch reads `p`, `origin`, and `angles` with `VMA` and `model` from `args[2]`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:145-147`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:791-792`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:145-147`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:791-792`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgCmTransformedpointcontentsArgs {
     point: *const vec3_t,
@@ -61,11 +61,11 @@ impl CgCmTransformedpointcontentsArgs {
 /// Raven wrapper: `return syscall( CG_CM_TRANSFORMEDPOINTCONTENTS, p, model, origin, angles );`
 /// Raven transport: `return CM_TransformedPointContents((const float *)VMA(1), args[2], (const float *)VMA(3), (const float *)VMA(4));`
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:89`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:145-147`
-/// Output source: `oracle/oracle/codemp/cgame/cg_syscalls.c:145-147`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:791-792`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:791-792`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:89`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:145-147`
+/// Output source: `oracle/codemp/cgame/cg_syscalls.c:145-147`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:791-792`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:791-792`
 pub struct CgCmTransformedpointcontents;
 
 impl OutboundSysCall for CgCmTransformedpointcontents {

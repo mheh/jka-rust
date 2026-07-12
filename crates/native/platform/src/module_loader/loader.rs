@@ -22,9 +22,9 @@ use crate::entrypoints::{RawSyscall, RawVmMain};
 /// porting-rules §20): debug builds print (`Com_Printf`) and return `None`;
 /// release builds (`cfg(not(debug_assertions))`) raise the in-loader
 /// receiverless `com_error(ERR_FATAL, "Sys_LoadDll(%s) failed dlsym(vmMain): …")`.
-/// Source: `oracle/oracle/codemp/unix/unix_main.c:431-436`.
+/// Source: `oracle/codemp/unix/unix_main.c:431-436`.
 ///
-/// Source: `oracle/oracle/codemp/win32/win_main.cpp:811-887`
+/// Source: `oracle/codemp/win32/win_main.cpp:811-887`
 pub fn sys_load_dll(
     policy: &ModuleSearchPolicy,
     name: &str,
@@ -33,7 +33,7 @@ pub fn sys_load_dll(
     use crate::entrypoints::RawDllEntry;
 
     //TODO: Port Sys_UnpackDLL — pure-server pk3 unpack pre-step, deferred (LOAD-D7)
-    // Source: oracle/oracle/codemp/win32/win_main.cpp:762-800,849-852
+    // Source: oracle/codemp/win32/win_main.cpp:762-800,849-852
 
     // Filename synthesis (win_main.cpp:826 / unix_main.c:346). A `None` suffix
     // is the LOAD-Q1 unresolved macOS arm — no filename can be synthesized.
@@ -73,7 +73,7 @@ pub fn sys_load_dll(
                 // (`cfg(not(debug_assertions))`) in-loader receiverless fatal
                 // dual of unix_main.c:431-436 is sanctioned-open:
                 //TODO: Port NDEBUG in-loader fatal (LOAD-Q13 mechanism)
-                // Source: oracle/oracle/codemp/unix/unix_main.c:431-436
+                // Source: oracle/codemp/unix/unix_main.c:431-436
                 eprintln!("Sys_LoadDll({name}) failed dlsym(vmMain/dllEntry)");
                 return None;
             }
@@ -87,7 +87,7 @@ pub fn sys_load_dll(
 /// Faithful to `Sys_UnloadDll` via `VM_Free` (`vm.cpp:605-610`): drop the
 /// library, clearing the slot. No global `currentVM`/`lastVM` clobber (LOAD-D5).
 ///
-/// Source: `oracle/oracle/codemp/qcommon/vm.cpp:605-610`
+/// Source: `oracle/codemp/qcommon/vm.cpp:605-610`
 pub fn unload_module(module: LoadedModule) {
     // Drop of the `libloading::Library` IS the Sys_UnloadDll/FreeLibrary
     // (vm.cpp:605-610); no global currentVM/lastVM clobber (LOAD-D5).

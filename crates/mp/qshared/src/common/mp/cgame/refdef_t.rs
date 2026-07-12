@@ -9,22 +9,22 @@ use native_types::byte;
 
 /// Raven `MAX_MAP_AREA_BYTES` — bit vector of area visibility.
 ///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:416`
+/// Source: `oracle/codemp/game/q_shared.h:416`
 pub const MAX_MAP_AREA_BYTES: usize = 32;
 
 /// Raven `MAX_RENDER_STRINGS`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/tr_types.h:254`
+/// Source: `oracle/codemp/cgame/tr_types.h:254`
 pub const MAX_RENDER_STRINGS: usize = 8;
 
 /// Raven `MAX_RENDER_STRING_LENGTH`.
 ///
-/// Source: `oracle/oracle/codemp/cgame/tr_types.h:255`
+/// Source: `oracle/codemp/cgame/tr_types.h:255`
 pub const MAX_RENDER_STRING_LENGTH: usize = 32;
 
 /// Raven `refdef_t` — the scene definition cgame/ui hand to the renderer each frame.
 ///
-/// Type definition source: `oracle/oracle/codemp/cgame/tr_types.h:257-275`
+/// Type definition source: `oracle/codemp/cgame/tr_types.h:257-275`
 #[repr(C)]
 pub struct refdef_t {
     pub x: i32,

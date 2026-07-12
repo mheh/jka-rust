@@ -3,7 +3,7 @@
 /// Raven `bSet_t` — AI behavior-set script enumeration.
 ///
 /// This should check to matching a behavior state name first, then look for a script.
-/// Type definition source: `oracle/oracle/code/game/bset.h:1-24`
+/// Type definition source: `oracle/code/game/bset.h:1-24`
 #[repr(i32)]
 pub enum bSet_t {
     /// Script to use when first spawned.

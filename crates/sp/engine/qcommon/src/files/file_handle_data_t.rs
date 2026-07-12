@@ -7,7 +7,7 @@ use super::qfile_us::qfile_ut;
 
 /// Raven `fileHandleData_t` — per-handle state for an open engine file.
 ///
-/// Type definition source: `oracle/oracle/code/qcommon/files.h:72-87`
+/// Type definition source: `oracle/code/qcommon/files.h:72-87`
 #[repr(C)]
 pub struct fileHandleData_t {
     pub handleFiles: qfile_ut,

@@ -10,10 +10,10 @@ use abi_transport::generic::{
 /// Raven wrapper: `syscall( CG_FX_ADDELECTRICITY, p );`
 /// Raven transport opens `addElectricityArgStruct_t` from `VMA(1)`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:715-718`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2416`
-/// Args struct source: `oracle/oracle/codemp/game/q_shared.h:2622-2639`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1230-1242`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:715-718`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2416`
+/// Args struct source: `oracle/codemp/game/q_shared.h:2622-2639`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1230-1242`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFxAddelectricityArgs {
     p: *mut c_void,
@@ -28,10 +28,10 @@ impl CgFxAddelectricityArgs {
 /// `CG_FX_ADDELECTRICITY` MP cgame imports syscall ABI token.
 ///
 /// Raven: additional funcs for adding custom incode stuff.
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:237`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:715-718`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1230-1242`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1230-1242`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:237`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:715-718`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1230-1242`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1230-1242`
 pub struct CgFxAddelectricity;
 
 impl OutboundSysCall for CgFxAddelectricity {

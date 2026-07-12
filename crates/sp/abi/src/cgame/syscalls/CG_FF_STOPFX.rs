@@ -1,15 +1,17 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for `CG_FF_STOPFX`.
 ///
 /// Raven wrapper: `syscall( CG_FF_STOPFX, iFX );`
 /// Raven transport: `FFFX_STOP((ffFX_e) args[1]);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:277-278`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:637-639`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:277-278`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:637-639`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgFfStopfxArgs {
     i_fx: c_int,
@@ -27,10 +29,10 @@ impl CgFfStopfxArgs {
 
 /// `CG_FF_STOPFX` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:110`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:277-278`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:637-639`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:637-639`
+/// Enum value source: `oracle/code/cgame/cg_public.h:110`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:277-278`
+/// Output source: `oracle/code/client/cl_cgame.cpp:637-639`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:637-639`
 pub struct CgFfStopfx;
 
 impl OutboundSysCall for CgFfStopfx {

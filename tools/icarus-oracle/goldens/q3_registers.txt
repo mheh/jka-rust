@@ -1,0 +1,20 @@
+== q3_registers ==
+-- declared : numVariables=3
+  F |health|=0.000
+  S |name|=|NULL|
+  V |spot|=|0.0 0.0 0.0|
+decl health=1 name=2 spot=3 ghost=0
+set ghost=0
+-- set : numVariables=3
+  F |health|=42.500
+  S |name|=|kyle|
+  V |spot|=|1.0 2.0 3.0|
+get health ok=1 val=42.500
+get name ok=1 val=|kyle|
+get spot ok=1 val=1.000 2.000 3.000
+get ghost ok=0
+-- freed name : numVariables=2
+  F |health|=42.500
+  V |spot|=|1.0 2.0 3.0|
+after flood numVariables=33 floats=32
+== end ==

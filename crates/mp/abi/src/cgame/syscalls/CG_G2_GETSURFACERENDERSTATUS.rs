@@ -10,9 +10,9 @@ use abi_transport::generic::{
 /// Raven wrapper: `return syscall(CG_G2_GETSURFACERENDERSTATUS, ghoul2, modelIndex, surfaceName);`
 /// Raven transport: `return G2API_GetSurfaceRenderStatus(&g2[args[2]], (const char *)VMA(3));`
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:976-978`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2563`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1513-1518`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:976-978`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2563`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1513-1518`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2GetsurfacerenderstatusArgs {
     ghoul2: *mut c_void,
@@ -32,10 +32,10 @@ impl CgG2GetsurfacerenderstatusArgs {
 
 /// `CG_G2_GETSURFACERENDERSTATUS` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:290`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:976-978`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1513-1518`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1513-1518`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:290`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:976-978`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:1513-1518`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:1513-1518`
 pub struct CgG2Getsurfacerenderstatus;
 
 impl OutboundSysCall for CgG2Getsurfacerenderstatus {

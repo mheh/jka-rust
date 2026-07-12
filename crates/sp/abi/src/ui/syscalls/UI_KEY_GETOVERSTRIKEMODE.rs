@@ -1,10 +1,12 @@
 use super::super::SpUiImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use core::ffi::c_int;
 
 /// `UI_KEY_GETOVERSTRIKEMODE` SP UI imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/code/ui/ui_public.h:189`
+/// Source: `oracle/code/ui/ui_public.h:189`
 pub struct UiKeyGetoverstrikemode;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -20,9 +22,9 @@ impl OutboundSysCall for UiKeyGetoverstrikemode {
     type Import = SpUiImport;
     /// Raven wrapper: `syscall( UI_KEY_GETOVERSTRIKEMODE );`
     ///
-    /// Args source: `oracle/oracle/code/ui/ui_syscalls.cpp:118-121`
-    /// Output source: `oracle/oracle/code/ui/ui_syscalls.cpp:118-121`
-    /// Transport/switch source: `oracle/oracle/code/ui/ui_syscalls.cpp:439` (commented path in `client/cl_ui.cpp`)
+    /// Args source: `oracle/code/ui/ui_syscalls.cpp:118-121`
+    /// Output source: `oracle/code/ui/ui_syscalls.cpp:118-121`
+    /// Transport/switch source: `oracle/code/ui/ui_syscalls.cpp:439` (commented path in `client/cl_ui.cpp`)
     type Args = UiKeyGetoverstrikemodeArgs;
     type Output = c_int;
 

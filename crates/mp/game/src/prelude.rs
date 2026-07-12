@@ -21,15 +21,8 @@ pub use core::ffi::{
 // Raven `byte` (`q_shared.h:349`, `typedef unsigned char byte`). `native_types`
 // defines it but is not re-exported for this name through `mp_qshared`; the
 // local alias matches the same `c_uchar` width.
-// Source: `oracle/oracle/codemp/game/q_shared.h:349`
+// Source: `oracle/codemp/game/q_shared.h:349`
 pub type byte = c_uchar;
-
-// Raven `qtrue`/`qfalse` bare spellings (`q_shared.h` `qboolean` enum values,
-// pass-3 symbol backfill). The canonical port lives as `QTRUE`/`QFALSE` in
-// `native_types`; skeleton bodies transcribe Raven's exact lowercase macro
-// names, so both spellings are provided.
-pub const qtrue: qboolean = QTRUE;
-pub const qfalse: qboolean = QFALSE;
 
 // Integration round-1 addendum: the fnskel packets transcribe Raven constant
 // spellings verbatim (per each file's own "integration-deferred" note) without
@@ -51,7 +44,7 @@ pub use mp_bg::public::saber_move_name::*;
 pub use mp_bg::public::set_anim::*;
 pub use mp_bg::public::team::*;
 pub use mp_bg::public::{bg_parryDebounce, JUMP_VELOCITY};
-pub use mp_bg::public::{CROUCH_VIEWHEIGHT, DEAD_VIEWHEIGHT, DEFAULT_VIEWHEIGHT};
+pub use mp_bg::public::{CROUCH_VIEWHEIGHT, DEAD_VIEWHEIGHT, DEFAULT_MAXS_2, DEFAULT_VIEWHEIGHT};
 pub use mp_bg::vehicles::e_weapon_pose::EWeaponPose;
 pub use mp_bg::vehicles::e_weapon_pose::EWeaponPose::*;
 pub use mp_bg::vehicles::veh_flags_t::vehFlags_t::*;
@@ -62,6 +55,7 @@ pub use mp_bg::vehicles::vehicle_type_t::vehicleType_t::*;
 pub use mp_bg::weapons::weaponData;
 pub use mp_bg::weapons::weapon_t::*;
 pub use mp_bg::weapons::WP_MuzzlePoint;
+pub use mp_qshared::common::mp::ghoul2::bone_flags::*;
 pub use mp_qshared::common::mp::qcommon::pm_flags::*;
 pub use mp_qshared::shared::force_powers::*;
 pub use mp_qshared::shared::limits::*;
@@ -93,6 +87,7 @@ pub use crate::g_target::Q3_SCRIPT_DIR;
 pub use crate::level::damage_flags::*;
 pub use crate::npc::ai_flags::*;
 pub use crate::npc::check_flags::*;
+pub use crate::npc::combat_point_flags::*;
 pub use crate::npc::script_flags::*;
 pub use crate::npc::squad_state::*;
 pub use crate::q_math::{
@@ -169,10 +164,10 @@ pub use mp_bg::local::pml_t::pml_t;
 // `use crate::prelude::*` glob resolves those call sites.
 pub use crate::trap;
 // Raven `trap_R_RegisterSkin` re-export with Raven name for pass-3 bodies
-// that transcribe the bare Raven spelling (oracle/oracle/codemp/game/g_syscalls.c:1179-1182)
+// that transcribe the bare Raven spelling (oracle/codemp/game/g_syscalls.c:1179-1182)
 pub use crate::trap::R_RegisterSkin as trap_R_RegisterSkin;
 // Raven `trap_G2API_*` re-exports with Raven names for pass-3 bodies that
-// transcribe the bare Raven spellings (oracle/oracle/codemp/game/g_syscalls.c)
+// transcribe the bare Raven spellings (oracle/codemp/game/g_syscalls.c)
 pub use crate::trap::G2API_AnimateG2Models as trap_G2API_AnimateG2Models;
 pub use crate::trap::G2API_CleanGhoul2Models as trap_G2API_CleanGhoul2Models;
 pub use crate::trap::G2API_GetBoltMatrix as trap_G2API_GetBoltMatrix;
@@ -191,7 +186,7 @@ pub use crate::trap::TrueMalloc as trap_TrueMalloc;
 // The entity fn-ID dispatch enums (`ent_fn_enums`), named bare in the
 // spawn/think/touch/… assignment sites.
 pub use crate::ent_fn_enums::{
-    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse,
+    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse, FnId,
 };
 
 pub use crate::ai::group_info::AIGroupInfo_t;
@@ -239,7 +234,16 @@ pub use mp_bg::weapons::ammo_t::ammo_t::*;
 pub use mp_bg::weapons::weapon_t::weapon_t;
 
 pub use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_t;
+pub use mp_qshared::common::mp::botlib::action::{
+    ACTION_ALT_ATTACK, ACTION_ATTACK, ACTION_CROUCH, ACTION_DELAYEDJUMP, ACTION_FORCEPOWER,
+    ACTION_GESTURE, ACTION_JUMP, ACTION_MOVEBACK, ACTION_MOVEDOWN, ACTION_MOVEFORWARD,
+    ACTION_MOVELEFT, ACTION_MOVERIGHT, ACTION_MOVEUP, ACTION_RESPAWN, ACTION_TALK, ACTION_USE,
+    ACTION_WALK,
+};
 pub use mp_qshared::common::mp::botlib::bot_input_s::bot_input_t;
+pub use mp_qshared::common::mp::botlib::print_type::{
+    PRT_ERROR, PRT_EXIT, PRT_FATAL, PRT_MESSAGE, PRT_WARNING,
+};
 pub use mp_qshared::common::mp::gentity::{
     gentity_t, material_t, moverState_t, MAT_CRATE1, MAT_CRATE2, MAT_DRK_STONE, MAT_ELECTRICAL,
     MAT_ELEC_METAL, MAT_GLASS, MAT_GLASS_METAL, MAT_GRATE1, MAT_GREY_STONE, MAT_LT_STONE,
@@ -252,7 +256,7 @@ pub use mp_qshared::common::mp::gentity::{
 // need to access server-side fields like spawnflags. For game-code bodies that have gentity_t
 // parameters cast through bgEntity_t, we re-export gentity_t under the bgEntity_t name to allow
 // those accesses (e.g. `(*bgEntity).spawnflags`).
-// Source: oracle/oracle/codemp/game/g_vehicles.c, FighterNPC.c, etc. (local macro)
+// Source: oracle/codemp/game/g_vehicles.c, FighterNPC.c, etc. (local macro)
 pub use mp_qshared::common::mp::gentity::gentity_t as bgEntity_t;
 pub use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 pub use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
@@ -285,18 +289,18 @@ pub use mp_qshared::shared::trajectory::{trType_t, trajectory_t};
 pub use mp_qshared::shared::wpobject::wpobject_t;
 pub use mp_qshared::shared::Eorientations::*;
 pub use mp_qshared::shared::{
-    fileHandle_t, mdxaBone_t, qboolean, qhandle_t, vec3_t, vec4_t, vec_t, Eorientations, MAX_QPATH,
-    QFALSE, QTRUE,
+    fileHandle_t, mdxaBone_t, qboolean, qfalse, qhandle_t, qtrue, vec3_t, vec4_t, vec_t,
+    Eorientations, MAX_QPATH,
 };
 
 // Pass-3 prep C1 (agenda B6/B10): batch re-export of game-crate-local fns
 // spelled bare in pass-2 porter bodies but never wired into the prelude.
 // Each resolves to a single `pub fn`/`const` definition (scripted).
 pub use crate::bg_lib::atof;
-pub use crate::cstr_util::atoi;
 pub use crate::bg_misc::{BG_EmplacedView, BG_FindItemForWeapon};
 pub use crate::bg_panimate::{BG_InKnockDownOnly, BG_InReboundHold, BG_InReboundJump};
 pub use crate::bg_pmove::BG_SabersOff;
+pub use crate::cstr_util::atoi;
 pub use crate::g_client::SpotWouldTelefrag2;
 pub use crate::g_combat::{G_CheckVehicleNPCTeamDamage, G_Damage, G_RadiusDamage};
 pub use crate::g_items::{RegisterItem, Touch_Item};
@@ -371,7 +375,6 @@ pub use crate::client::client_connected::*; // .claude/worktrees/agent-a43cc5320
 pub use crate::client::client_persistant::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/client/client_persistant.rs
 pub use crate::g_active::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_active.rs
 pub use crate::g_client::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_client.rs
-pub use crate::g_cmds::MAX_TOKEN_CHARS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_cmds.rs
 pub use crate::g_cmds::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_cmds.rs
 pub use crate::g_icarus_set_type::{setTable, setType_t, setType_t::*}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_icarus_set_type.rs
 pub use crate::g_items::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_items.rs
@@ -448,12 +451,11 @@ pub use mp_qshared::shared::wpobject::MAX_NEIGHBOR_SIZE; // .claude/worktrees/ag
 // two modules (same values) so the glob re-exports above are unambiguous, until
 // the duplicate-const consolidation sweep removes one copy of each.
 pub use crate::npc::squad_state::NUM_SQUAD_STATES;
-pub use crate::NPC_AI_Stormtrooper::CPF_DUCK;
 pub use mp_bg::public::configstring::{CS_CLIENT_JEDIMASTER, CS_ITEMS};
 pub use mp_qshared::common::mp::qcommon::task_id_t::taskID_t::NUM_TIDS;
 
 // Raven `G_ICARUS_TASKIDPENDING` args re-export under the misspelled
 // `GICARUSTaskIDPendingArgs` spelling that `NPC_sounds.rs` transcribes bare;
 // the canonical camelCase port is `GIcarusTaskidpendingArgs`.
-// Source: oracle/oracle/codemp/game/g_syscalls.c:329-332
+// Source: oracle/codemp/game/g_syscalls.c:329-332
 pub use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs as GICARUSTaskIDPendingArgs;

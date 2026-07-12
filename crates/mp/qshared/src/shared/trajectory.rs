@@ -4,8 +4,8 @@ use crate::shared::vec3_t;
 
 /// Raven `trType_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2426-2435`
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2648-2657`
+/// Type definition source: `oracle/code/game/q_shared.h:2426-2435`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2648-2657`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum trType_t {
@@ -22,8 +22,8 @@ pub enum trType_t {
 
 /// Raven `trajectory_t`.
 ///
-/// Type definition source: `oracle/oracle/code/game/q_shared.h:2437-2443`
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2659-2665`
+/// Type definition source: `oracle/code/game/q_shared.h:2437-2443`
+/// Type definition source: `oracle/codemp/game/q_shared.h:2659-2665`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct trajectory_t {

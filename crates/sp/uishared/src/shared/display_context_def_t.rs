@@ -23,7 +23,7 @@ use super::item_def_s::itemDef_s;
 /// `Font_*`, `Language_*`, `AnyLanguage_ReadCharFromString`) and cinematic
 /// playback hooks (`startBackgroundTrack`, `playCinematic`, `drawCinematic`,
 /// `runCinematicFrame`), and adds `cursorShow`.
-/// Type definition source: `oracle/oracle/code/ui/ui_shared.h:169-265`
+/// Type definition source: `oracle/code/ui/ui_shared.h:169-265`
 #[repr(C)]
 pub struct displayContextDef_t {
     pub addRefEntityToScene: Option<unsafe extern "C" fn(re: *const refEntity_t)>,
@@ -78,7 +78,12 @@ pub struct displayContextDef_t {
     pub modelBounds:
         Option<unsafe extern "C" fn(model: qhandle_t, min: *mut vec3_t, max: *mut vec3_t)>,
     pub ownerDrawHandleKey: Option<
-        unsafe extern "C" fn(ownerDraw: c_int, flags: c_int, special: *mut f32, key: c_int) -> qboolean,
+        unsafe extern "C" fn(
+            ownerDraw: c_int,
+            flags: c_int,
+            special: *mut f32,
+            key: c_int,
+        ) -> qboolean,
     >,
     pub ownerDrawItem: Option<
         unsafe extern "C" fn(
@@ -136,7 +141,7 @@ pub struct displayContextDef_t {
     // Raven: rww - ghoul2 stuff. Add whatever you need here, remember to set it in
     // _UI_Init or it will crash when you try to use it.
     //TODO: Port CGhoul2Info
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:240
+    // Source: oracle/code/game/ghoul2_shared.h:240
     pub g2_SetSkin: Option<
         unsafe extern "C" fn(
             ghlInfo: *mut c_void,
@@ -145,7 +150,7 @@ pub struct displayContextDef_t {
         ) -> qboolean,
     >,
     //TODO: Port CGhoul2Info
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:240
+    // Source: oracle/code/game/ghoul2_shared.h:240
     pub g2_SetBoneAnim: Option<
         unsafe extern "C" fn(
             ghlInfo: *mut c_void,
@@ -175,7 +180,7 @@ pub struct displayContextDef_t {
     >,
     pub g2_CleanGhoul2Models: Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v)>,
     //TODO: Port CGhoul2Info
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:240
+    // Source: oracle/code/game/ghoul2_shared.h:240
     pub g2_AddBolt:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, boneName: *const c_char) -> c_int>,
     pub g2_GetBoltMatrix: Option<
@@ -197,7 +202,7 @@ pub struct displayContextDef_t {
 
     // Raven: Utility functions that don't immediately redirect to ghoul2 functions
     //TODO: Port CGhoul2Info
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:240
+    // Source: oracle/code/game/ghoul2_shared.h:240
     pub g2hilev_SetAnim: Option<
         unsafe extern "C" fn(
             ghlInfo: *mut c_void,

@@ -2,9 +2,9 @@
 //! `Com_Error` (`g_main.rs`), mirroring Raven's own file-static syscall
 //! pointer at this same boundary.
 //!
-//! Source: `oracle/oracle/codemp/game/g_syscalls.c` (file-static
+//! Source: `oracle/codemp/game/g_syscalls.c` (file-static
 //! `trap_*` pointers filled by `dllEntry`); the ctx-free callers this
-//! stands in for are `oracle/oracle/codemp/game/g_main.c:1208-1228`.
+//! stands in for are `oracle/codemp/game/g_main.c:1208-1228`.
 //!
 //! Narrow SEAM-D1 extension (approved 2026-07-06): the shell registers these
 //! two fn pointers at `dllEntry` so `Com_Printf`/`Com_Error` can reach
@@ -47,7 +47,7 @@ pub(crate) fn com_error_sink() -> Option<fn(*const c_char)> {
 /// Builds the shell's `Com_Printf` sink fn body: routes `msg` through
 /// `trap_Printf` (`G_PRINT`) exactly as `G_Printf` does (`g_main.rs`).
 ///
-/// Source: `oracle/oracle/codemp/game/g_main.c:1219-1228`
+/// Source: `oracle/codemp/game/g_main.c:1219-1228`
 pub fn route_print(engine: &Engine, msg: *const c_char) {
     unsafe {
         let text = cstr_to_str(msg);
@@ -58,7 +58,7 @@ pub fn route_print(engine: &Engine, msg: *const c_char) {
 /// Builds the shell's `Com_Error` sink fn body: routes `msg` through
 /// `trap_Error` (`G_ERROR`) exactly as `G_Error` does (`g_main.rs`).
 ///
-/// Source: `oracle/oracle/codemp/game/g_main.c:1208-1217`
+/// Source: `oracle/codemp/game/g_main.c:1208-1217`
 pub fn route_error(engine: &Engine, msg: *const c_char) {
     unsafe {
         let text = cstr_to_str(msg);

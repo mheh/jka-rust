@@ -4,22 +4,22 @@ use mp_qshared::shared::vec3_t;
 
 /// Raven `aas_area_t` — an AAS area.
 ///
-/// Type definition source: `oracle/oracle/codemp/botlib/aasfile.h:188-197`
+/// Type definition source: `oracle/codemp/botlib/aasfile.h:188-197`
 #[repr(C)]
 pub struct aas_area_t {
-	/// number of this area
-	pub areanum: i32,
-	//3d definition
-	/// number of faces used for the boundary of the area
-	pub numfaces: i32,
-	/// first face in the face index used for the boundary of the area
-	pub firstface: i32,
-	/// mins of the area
-	pub mins: vec3_t,
-	/// maxs of the area
-	pub maxs: vec3_t,
-	/// 'center' of the area
-	pub center: vec3_t,
+    /// number of this area
+    pub areanum: i32,
+    //3d definition
+    /// number of faces used for the boundary of the area
+    pub numfaces: i32,
+    /// first face in the face index used for the boundary of the area
+    pub firstface: i32,
+    /// mins of the area
+    pub mins: vec3_t,
+    /// maxs of the area
+    pub maxs: vec3_t,
+    /// 'center' of the area
+    pub center: vec3_t,
 }
 
 pub type aas_area_s = aas_area_t;

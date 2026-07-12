@@ -11,8 +11,8 @@ use sp_qshared::shared::vec3_t;
 /// Raven wrapper: `syscall( CG_S_ADDLOCALSET, name, listener_origin, origin, entID, time );`
 /// Raven transport: `S_AddLocalSet((const char *) VMA(1), (float *) VMA(2), (float *) VMA(3), args[4], args[5]);`
 ///
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:201-202`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:570-571`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:201-202`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:570-571`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgSAddlocalsetArgs {
     name: *const c_char,
@@ -62,10 +62,10 @@ impl CgSAddlocalsetArgs {
 
 /// `CG_S_ADDLOCALSET` SP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:163`
-/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:201-202`
-/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:570-571`
-/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:570-571`
+/// Enum value source: `oracle/code/cgame/cg_public.h:163`
+/// Args source: `oracle/code/cgame/cg_syscalls.cpp:201-202`
+/// Output source: `oracle/code/client/cl_cgame.cpp:570-571`
+/// Transport/switch source: `oracle/code/client/cl_cgame.cpp:570-571`
 pub struct CgSAddlocalset;
 
 impl OutboundSysCall for CgSAddlocalset {

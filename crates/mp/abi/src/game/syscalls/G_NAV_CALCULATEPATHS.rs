@@ -1,7 +1,9 @@
 use super::super::MpGameImport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_CALCULATEPATHS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,7 +23,7 @@ impl GNavCalculatepathsArgs {
 
 /// `G_NAV_CALCULATEPATHS` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:303`
+/// Source: `oracle/codemp/game/g_public.h:303`
 pub struct GNavCalculatepaths;
 
 impl OutboundSysCall for GNavCalculatepaths {

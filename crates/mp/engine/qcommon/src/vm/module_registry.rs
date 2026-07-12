@@ -1,9 +1,12 @@
 //! `ModuleRegistry` — the `vmTable[MAX_VM]` slot registry (LOAD-D8).
 
+use crate::common::error::{com_error, ErrorLevel};
 use core::ffi::c_void;
 
 use native_platform::entrypoints::RawSyscall;
-use native_platform::module_loader::{ModuleSearchPolicy, RestartKind};
+use native_platform::module_loader::{
+    sys_load_dll, unload_module, ModuleSearchPolicy, RestartKind,
+};
 
 use super::engine_slot::SlotSyscall;
 use super::module_slot::ModuleSlot;
@@ -16,7 +19,7 @@ pub const MAX_VM: usize = 3;
 /// The `vmTable[MAX_VM]` replacement — per-slot only, no current-module global
 /// (LOAD-D5). Home crate mirrors `vm.cpp`'s subsystem.
 ///
-/// Source: `oracle/oracle/codemp/qcommon/vm.cpp:28-29`
+/// Source: `oracle/codemp/qcommon/vm.cpp:28-29`
 pub struct ModuleRegistry {
     slots: [Option<ModuleSlot>; MAX_VM],
 }
@@ -63,7 +66,7 @@ impl ModuleRegistry {
     /// `sv_game.cpp:1750-1752`). The slot-full/bad-parms `ERR_FATAL`s stay INSIDE
     /// via the receiverless `com_error` (LOAD-D11).
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:471-524`
+    /// Source: `oracle/codemp/qcommon/vm.cpp:471-524`
     pub fn load_module(
         &mut self,
         policy: &ModuleSearchPolicy,
@@ -72,8 +75,6 @@ impl ModuleRegistry {
         system_calls: SlotSyscall,
         ctx: *mut c_void,
     ) -> Option<SlotId> {
-        use crate::common::error::{com_error, ErrorLevel};
-
         // Bad-parms guard (vm.cpp:480-482); `name.is_empty()` only — the
         // `!module`/`!systemCalls` disjuncts are structurally unreachable
         // (round-5 resolution).
@@ -112,7 +113,7 @@ impl ModuleRegistry {
     /// `VM_Free` (`vm.cpp:605-610`): `unload_module` the slot's module, clearing
     /// it. No global `currentVM`/`lastVM` clobber (LOAD-D5).
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:605-610`
+    /// Source: `oracle/codemp/qcommon/vm.cpp:605-610`
     pub fn unload(&mut self, slot: SlotId) {
         if let Some(s) = self.slots[slot.0 as usize].take() {
             native_platform::module_loader::unload_module(s.module);
@@ -128,13 +129,8 @@ impl ModuleRegistry {
     ///
     /// PROVISIONAL SIGNATURE (checkpoint-7 finding): no frozen doc pins a
     /// `VM_Call` dual; minimal faithful shape pending its doc home.
-    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:787-819`
-    pub fn vm_call(
-        &self,
-        slot: &SlotId,
-        command: core::ffi::c_int,
-        args: [isize; 12],
-    ) -> isize {
+    /// Source: `oracle/codemp/qcommon/vm.cpp:787-819`
+    pub fn vm_call(&self, slot: &SlotId, command: core::ffi::c_int, args: [isize; 12]) -> isize {
         let s = self.slots[slot.0 as usize]
             .as_ref()
             .expect("vm_call on an empty slot");
@@ -153,7 +149,7 @@ impl ModuleRegistry {
     /// re-running `VM_Create` (`vm.cpp:399-409`) — the frozen signature is
     /// unchanged by resolution 2.
     ///
-    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:391-458`
+    /// Source: `oracle/codemp/qcommon/vm.cpp:391-458`
     pub fn restart(
         &mut self,
         slot: SlotId,
@@ -162,7 +158,31 @@ impl ModuleRegistry {
         name: &str,
         syscall: RawSyscall,
     ) {
-        let _ = (&self.slots, slot, kind, policy, name, syscall);
-        todo!("Port VM_Restart — oracle/oracle/codemp/qcommon/vm.cpp:391-458")
+        match kind {
+            // DLL's can't be restarted in place (vm.cpp:398): the native arm
+            // saves `systemCall`/`name` off the vm, `VM_Free`s it, then re-runs
+            // `VM_Create` (vm.cpp:399-409). The QVM in-place reload arm
+            // (vm.cpp:412-457) is out of scope (native-only). Here the slot's
+            // stored `EngineSlot` stands in for the saved `systemCall`, and the
+            // recreate lands back in the same slot (drop+recreate in place).
+            RestartKind::DropRecreate => {
+                let Some(old) = self.slots[slot.0 as usize].take() else {
+                    return;
+                };
+                // Save the injected engine seam before freeing (vm.cpp:403).
+                let engine = old.engine;
+                // VM_Free (vm.cpp:406): unload the old artifact.
+                unload_module(old.module);
+                // VM_Create (vm.cpp:408): reload, reinjecting the saved seam.
+                // None = artifact not found (mirrors `sys_load_dll`'s contract);
+                // the slot is left empty for the caller's fatal disposition.
+                self.slots[slot.0 as usize] =
+                    sys_load_dll(policy, name, syscall).map(|module| ModuleSlot {
+                        name: name.to_string(),
+                        module,
+                        engine,
+                    });
+            }
+        }
     }
 }

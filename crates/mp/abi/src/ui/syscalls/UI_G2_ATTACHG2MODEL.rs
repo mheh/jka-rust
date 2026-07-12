@@ -11,8 +11,8 @@ use mp_qshared::shared::qboolean;
 /// Raven wrapper: `qboolean trap_G2API_AttachG2Model(void *ghoul2From, int modelIndexFrom,
 /// void *ghoul2To, int toBoltIndex, int toModel)`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:661-663`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1421-1427`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:661-663`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1421-1427`
 #[derive(Debug)]
 pub struct UiG2Attachg2modelArgs {
     /// Source Ghoul2 pointer transported as raw `args[1]`.
@@ -63,11 +63,11 @@ impl UiG2Attachg2modelArgs {
 
 /// `UI_G2_ATTACHG2MODEL` MP UI imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:188`
-/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:188`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:661-663`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1421-1427`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1421-1427`
+/// Enum value source: `oracle/codemp/ui/ui_public.h:188`
+/// Enum comment source: `oracle/codemp/ui/ui_public.h:188`
+/// Args source: `oracle/codemp/ui/ui_syscalls.c:661-663`
+/// Output source: `oracle/codemp/client/cl_ui.cpp:1421-1427`
+/// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:1421-1427`
 pub struct UiG2Attachg2model;
 
 impl OutboundSysCall for UiG2Attachg2model {

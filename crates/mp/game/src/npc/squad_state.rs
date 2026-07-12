@@ -4,7 +4,7 @@
 //! `typedef` name at all), so per enum-vs-alias fidelity this becomes a plain
 //! `c_int` alias + consts rather than a named Rust enum.
 //!
-//! Source: `oracle/oracle/codemp/game/ai.h:18-26`
+//! Source: `oracle/codemp/game/ai.h:18-26`
 
 use core::ffi::c_int;
 

@@ -8,10 +8,10 @@ use abi_transport::generic::{
 /// `CG_EVENT_HANDLING` MP cgame exports vmMain ABI token.
 ///
 /// Raven: void (*CG_EventHandling)(int type);
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:389-390`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:216-218`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:216-218`
-/// Transport/call-site source: `oracle/oracle/codemp/client/cl_keys.cpp:1529`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:389-390`
+/// Args source: `oracle/codemp/cgame/cg_main.c:216-218`
+/// Output source: `oracle/codemp/cgame/cg_main.c:216-218`
+/// Transport/call-site source: `oracle/codemp/client/cl_keys.cpp:1529`
 pub struct CgEventHandling;
 
 impl InboundVmCall for CgEventHandling {

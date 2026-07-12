@@ -5,7 +5,7 @@ use core::ffi::c_int;
 
 /// Raven `markFragment_t` — returned by `CM_MarkFragments()`.
 ///
-/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:1919-1922`
+/// Type definition source: `oracle/codemp/game/q_shared.h:1919-1922`
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct markFragment_t {

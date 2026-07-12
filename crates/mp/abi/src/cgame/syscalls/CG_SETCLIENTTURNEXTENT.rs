@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
-use abi_transport::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use abi_transport::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use abi_transport::pass_float;
 
 /// Arguments for `CG_SETCLIENTTURNEXTENT`.
@@ -10,9 +12,9 @@ use abi_transport::pass_float;
 /// Raven transport: the MP client switch currently returns `0` without reading
 /// `args[1..=3]`.
 ///
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:503-505`
-/// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2352`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:980-981`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:503-505`
+/// Args source: `oracle/codemp/cgame/cg_local.h:2352`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:980-981`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgSetclientturnextentArgs {
     turn_add: f32,
@@ -32,10 +34,10 @@ impl CgSetclientturnextentArgs {
 
 /// `CG_SETCLIENTTURNEXTENT` MP cgame imports syscall ABI token.
 ///
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:189`
-/// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:503-505`
-/// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:980-981`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:980-981`
+/// Enum value source: `oracle/codemp/cgame/cg_public.h:189`
+/// Args source: `oracle/codemp/cgame/cg_syscalls.c:503-505`
+/// Output source: `oracle/codemp/client/cl_cgame.cpp:980-981`
+/// Transport/switch source: `oracle/codemp/client/cl_cgame.cpp:980-981`
 pub struct CgSetclientturnextent;
 
 impl OutboundSysCall for CgSetclientturnextent {

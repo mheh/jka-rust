@@ -30,7 +30,7 @@ impl BotlibEaSayTeamArgs {
 
 /// `BOTLIB_EA_SAY_TEAM` MP game imports syscall ABI token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:383`
+/// Source: `oracle/codemp/game/g_public.h:383`
 pub struct BotlibEaSayTeam;
 
 impl OutboundSysCall for BotlibEaSayTeam {
