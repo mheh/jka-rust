@@ -66,8 +66,9 @@ c_void-family modes). **jampgame transcription and integration are done**:
 `mp_game` compiles with 0 errors (integrate phase: ~5,800 → 0), `cargo build
 --workspace` green, merged to master 2026-07-05; `todo!()` stubs and open
 `TODO: Port` markers both at zero (2026-07-06). CI builds and publishes
-engine-named modules on master pushes (`.github/workflows/build.yml`, rolling
-`latest` release; 32-bit lanes allowed-failure pending an ILP32 assert pass).
+engine-named modules and the `jampded` server executable on master pushes
+(`.github/workflows/build.yml`, rolling `latest` release; all module lanes
+enforced since the jampgame ILP32 assert pass).
 The `dangerous_implicit_autorefs` lint is allowed crate-wide in `mp_game`
 (documented in its lib.rs) pending the safe-state migration.
 
@@ -78,11 +79,14 @@ headless renderer model/skin subset), and the native platform layer — is
 transcribed and integrated: `cargo check --workspace` is 0 errors, 343 tests
 pass (incl. §F oracle-parity goldens), and `qcommon`/`botlib`/`server` are closed
 with zero stubs, zero `TODO: Port` markers, and zero extern forward-decl blocks.
-Closure rulings are recorded in `docs/decisions.md` (DEC-13…DEC-22). Remaining:
-boot/lifecycle wiring (hook install + core lifecycle), the referee swap — oracle
-differential tests (single-threaded; the oracle has global state) replace clang
-layout as ground truth — then warning-zero, the safe-state migration, and the
-ILP32 layout-assert pass.
+Closure rulings are recorded in `docs/decisions.md` (DEC-13…DEC-22). Boot/
+lifecycle wiring is done (DEC-23 host seam; the server boots and hosted a live
+player 2026-07-12), and the engine-island ILP32 assert pass is done (cfg-32
+twin asserts, enforced i686 cross-check in CI; the i386 `jampded` lane stays
+allowed-failure until the vm_x86 QVM-JIT asm statics land). Remaining: the
+referee swap — oracle differential tests (single-threaded; the oracle has
+global state) replace clang layout as ground truth — then warning-zero and the
+safe-state migration.
 
 - **MP** (`jamp` engine) ships 3 loadable DLLs: `jampgame`, `cgame`, `ui`.
 - **SP** (`jasp` engine) ships **only** `jagame`; SP cgame/ui are statically
