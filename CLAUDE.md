@@ -82,10 +82,13 @@ with zero stubs, zero `TODO: Port` markers, and zero extern forward-decl blocks.
 Closure rulings are recorded in `docs/decisions.md` (DEC-13…DEC-22). Boot/
 lifecycle wiring is done (DEC-23 host seam; the server boots and hosted a live
 player 2026-07-12), and the engine-island ILP32 assert pass is done (cfg-32
-twin asserts, enforced i686 cross-check in CI; the i386 `jampded` lane stays
-allowed-failure until the vm_x86 QVM-JIT asm statics land). Remaining: the
-referee swap — oracle differential tests (single-threaded; the oracle has
-global state) replace clang layout as ground truth — then warning-zero and the
+twin asserts; the i686 cross-check and every CI lane are enforced). The §3c
+referee swap is done (2026-07-12): real-map referee scenarios boot the real
+engine island (FS/CM/sv_world) inside the in-repo A/B harness and route the
+spatial syscall arms to the real `SV_GameSystemCalls`; oracle-vs-oracle is
+byte-identical over mp/duel1, and the first oracle-vs-rust run surfaced a
+genuine module finding (spawn-pitch −17 vs −18, `apos.trBase`, syscall
+streams identical — open). Remaining: that finding's fix batch, then the
 safe-state migration.
 
 - **MP** (`jamp` engine) ships 3 loadable DLLs: `jampgame`, `cgame`, `ui`.
