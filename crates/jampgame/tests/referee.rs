@@ -924,6 +924,7 @@ fn reflog_roundtrip() {
         reflog::gen_melee_brawl(),
         reflog::gen_real_duel1_idle(),
         reflog::gen_real_duel1_walk(),
+        reflog::gen_real_duel1_combat(),
     ] {
         let text = reflog::to_text(&sc);
         let reparsed = reflog::parse(&text);
@@ -964,6 +965,7 @@ fn regenerate_logs() {
         reflog::gen_melee_brawl(),
         reflog::gen_real_duel1_idle(),
         reflog::gen_real_duel1_walk(),
+        reflog::gen_real_duel1_combat(),
     ] {
         let path = dir.join(format!("{}.reflog", sc.name));
         std::fs::write(&path, reflog::to_text(&sc)).unwrap();
@@ -1022,4 +1024,22 @@ fn referee_real_duel1_walk() {
         return;
     }
     run_referee("referee_real_duel1_walk", reflog::gen_real_duel1_walk());
+}
+
+/// Real-map (plan §3c) combat scenario on `mp/duel1`: 4 clients on their
+/// default weapon (saber) alternate walk phases and LCG-scheduled attack
+/// bursts, exercising real weapon fire, damage, death, and attack-triggered
+/// respawn onto real spawn points. Self-skips when assets are missing.
+#[test]
+#[ignore = "requires retail assets (JKA_REF_BASEPATH) + oracle dylib + cargo build; run with --ignored"]
+fn referee_real_duel1_combat() {
+    if !real_assets_present() {
+        eprintln!(
+            "[referee] SKIP referee_real_duel1_combat: real-map assets missing at {} \
+             (set JKA_REF_BASEPATH; its base/ must hold assets0.pk3)",
+            ref_basepath().display()
+        );
+        return;
+    }
+    run_referee("referee_real_duel1_combat", reflog::gen_real_duel1_combat());
 }

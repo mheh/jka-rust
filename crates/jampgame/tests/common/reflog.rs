@@ -25,6 +25,15 @@ use mp_qshared::common::mp::qcommon::usercmd_t;
 /// without saber `saberEntityNum` bookkeeping. Mirrors `mp_bg`'s `WP_MELEE = 2`.
 pub const WP_MELEE: u8 = 2;
 
+/// WP_SABER (`bg_weapons.h`) — the default weapon `ClientSpawn` assigns a
+/// force-user in FFA (the `FORCEPOWERS` userinfo tail grants `FP_SABER_OFFENSE`,
+/// so `g_client.c`'s "no jediVmerc" branch sets `stats[STAT_WEAPONS] |=
+/// (1<<WP_SABER)` and `ps.weapon = WP_SABER`). Sending this as the replay
+/// `usercmd_t.weapon` from frame 0 matches what the client already spawned
+/// with, so `PM_Weapon`'s `ps->weapon != cmd->weapon` check never fires a
+/// weapon-change — no forced switch, unlike [`WP_MELEE`] above.
+pub const WP_SABER: u8 = 3;
+
 /// One client's replay input for one frame — the `usercmd_t` fields the log
 /// carries (everything except the derived `serverTime`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -440,6 +449,99 @@ pub fn gen_real_duel1_walk() -> Scenario {
         map: "mp/duel1".into(),
         seed: 4002,
         clients: 2,
+        msec: 50,
+        starttime: 600,
+        frames,
+        userinfos,
+        cmds,
+    }
+}
+
+/// `real-duel1-combat.reflog` (referee swap, plan §3c): map `mp/duel1`, 4
+/// clients, 2000 frames, default weapon (`WP_SABER` — see its doc comment).
+/// Each client alternates between a WALK phase (forwardmove 127, slow yaw
+/// sweep, occasional jump/crouch) and an LCG-scheduled ATTACK burst (faster
+/// yaw turning — a static generator has no runtime opponent position to
+/// literally aim at, so a burst approximates "turning to engage" — plus
+/// `BUTTON_ATTACK` held for the burst's duration). Exercises real saber
+/// combat end to end: swings landing, damage, death, and — since
+/// `g_active.c`'s respawn check is `ucmd->buttons & BUTTON_ATTACK` — the next
+/// burst's attack press respawns a dead client onto a real spawn point.
+pub fn gen_real_duel1_combat() -> Scenario {
+    let models = [
+        "kyle/default",
+        "jan/default",
+        "luke/default",
+        "desann/default",
+    ];
+    let mut userinfos = BTreeMap::new();
+    for c in 0..4i32 {
+        userinfos.insert(c, userinfo_for(c, models[c as usize]));
+    }
+
+    const BUTTON_ATTACK: i32 = 1;
+    let frames = 2000;
+    let mut cmds = BTreeMap::new();
+    // Independent input streams per client, each seeded distinctly.
+    for client in 0..4i32 {
+        let mut rng = Lcg(0xC0BA_0000u32.wrapping_add((client as u32).wrapping_mul(0x9E37_79B9)));
+        let mut yaw: i32 = rng.range(0, 65535);
+        let mut in_burst = false;
+        // Frames left in the current phase; a WALK phase always starts first.
+        let mut phase_left = rng.range(80, 220);
+        for frame in 0..frames {
+            if phase_left <= 0 {
+                in_burst = !in_burst;
+                phase_left = if in_burst {
+                    rng.range(25, 70)
+                } else {
+                    rng.range(90, 240)
+                };
+            }
+            phase_left -= 1;
+
+            yaw = if in_burst {
+                // Faster turning while engaging.
+                (yaw + rng.range(-3500, 3500)).rem_euclid(65536)
+            } else {
+                // Slow sweep while walking, per the `gen_real_duel1_walk` pattern.
+                (yaw + rng.range(-700, 700)).rem_euclid(65536)
+            };
+
+            let mut buttons = 0;
+            let mut upmove: i8 = 0;
+            let (forwardmove, rightmove) = if in_burst {
+                buttons |= BUTTON_ATTACK;
+                (rng.range(-30, 100) as i8, rng.range(-80, 80) as i8)
+            } else {
+                if rng.chance(4) {
+                    upmove = 127; // occasional jump
+                } else if rng.chance(3) {
+                    upmove = -127; // occasional crouch
+                }
+                (127, 0)
+            };
+
+            cmds.insert(
+                (frame, client),
+                CmdInput {
+                    angles: [0, yaw, 0],
+                    buttons,
+                    forwardmove,
+                    rightmove,
+                    upmove,
+                    weapon: WP_SABER,
+                    forcesel: 0,
+                },
+            );
+        }
+    }
+
+    Scenario {
+        name: "real-duel1-combat".into(),
+        map: "mp/duel1".into(),
+        seed: 4003,
+        clients: 4,
         msec: 50,
         starttime: 600,
         frames,
