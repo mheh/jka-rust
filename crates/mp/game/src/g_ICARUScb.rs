@@ -387,12 +387,22 @@ pub fn moverCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).s.loopSound = 0;
         (*ent).s.loopIsSoundset = qfalse;
         // BMS_END: unported sound-slot const (missing_symbols).
-        G_PlayDoorSound(ctx, ent, BMS_END);
+        G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_END);
 
         if (*ent).moverState == MOVER_1TO2 {
-            MatchTeam(ctx, ent, MOVER_POS2 as c_int, (*ctx.world).level.time);
+            MatchTeam(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                MOVER_POS2 as c_int,
+                (*ctx.world).level.time,
+            );
         } else if (*ent).moverState == MOVER_2TO1 {
-            MatchTeam(ctx, ent, MOVER_POS1 as c_int, (*ctx.world).level.time);
+            MatchTeam(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                MOVER_POS1 as c_int,
+                (*ctx.world).level.time,
+            );
         }
 
         if (*ent).blocked.get() == Some(EntBlocked::Blocked_Mover) {
@@ -494,8 +504,8 @@ pub fn Q3_Lerp2Start(ctx: GameContext<'_>, entID: c_int, taskID: c_int, duration
             ctx.engine,
             GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
         );
-        G_PlayDoorLoopSound(ctx, ent);
-        G_PlayDoorSound(ctx, ent, BMS_START);
+        G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
+        G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -540,8 +550,8 @@ pub fn Q3_Lerp2End(ctx: GameContext<'_>, entID: c_int, taskID: c_int, duration: 
             ctx.engine,
             GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
         );
-        G_PlayDoorLoopSound(ctx, ent);
-        G_PlayDoorSound(ctx, ent, BMS_START);
+        G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
+        G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -597,11 +607,16 @@ pub fn Q3_Lerp2Pos(
         }
         (*ent).moverState = moverState;
 
-        InitMoverTrData(ent);
+        InitMoverTrData(&mut *ent);
 
         (*ent).s.pos.trDuration = duration as c_int;
 
-        MatchTeam(ctx, ent, moverState as c_int, (*ctx.world).level.time);
+        MatchTeam(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            moverState as c_int,
+            (*ctx.world).level.time,
+        );
 
         if let Some(angles) = angles {
             let mut ang = [0.0f32; 3];
@@ -637,8 +652,8 @@ pub fn Q3_Lerp2Pos(
             ctx.engine,
             GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
         );
-        G_PlayDoorLoopSound(ctx, ent);
-        G_PlayDoorSound(ctx, ent, BMS_START);
+        G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
+        G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -1705,11 +1720,16 @@ pub fn Q3_Lerp2Origin(
         }
         (*ent).moverState = moverState;
 
-        InitMoverTrData(ent);
+        InitMoverTrData(&mut *ent);
 
         (*ent).s.pos.trDuration = duration as c_int;
 
-        MatchTeam(ctx, ent, moverState as c_int, (*ctx.world).level.time);
+        MatchTeam(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            moverState as c_int,
+            (*ctx.world).level.time,
+        );
 
         (*ent).reached = Some(EntReached::moverCallback).into();
         if (*ent).damage != 0 {
@@ -1722,8 +1742,8 @@ pub fn Q3_Lerp2Origin(
             );
         }
 
-        G_PlayDoorLoopSound(ctx, ent);
-        G_PlayDoorSound(ctx, ent, BMS_START);
+        G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
+        G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -5061,9 +5081,9 @@ pub fn Q3_Set(
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetInactive(ctx, entID, qfalse);
                 } else if Q_stricmp(b"unlocked\0".as_ptr() as *const c_char, data) == 0 {
-                    UnLockDoors(&(*ctx.world).g_entities[entID as usize] as *const gentity_t);
+                    UnLockDoors(&mut (*ctx.world).g_entities[entID as usize]);
                 } else if Q_stricmp(b"locked\0".as_ptr() as *const c_char, data) == 0 {
-                    LockDoors(&(*ctx.world).g_entities[entID as usize] as *const gentity_t);
+                    LockDoors(&mut (*ctx.world).g_entities[entID as usize]);
                 }
             }
 

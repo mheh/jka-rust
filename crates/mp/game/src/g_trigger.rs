@@ -2465,7 +2465,7 @@ pub fn asteroid_field_think(ctx: GameContext<'_>, self_id: EntityId) {
                     G_SetAngles(new_asteroid, (*copy_asteroid).s.angles);
                     (*new_asteroid).classname = c"func_rotating".as_ptr() as *mut c_char;
 
-                    SP_func_rotating(ctx, new_asteroid);
+                    SP_func_rotating(ctx, ctx.entity_id_of(new_asteroid).unwrap());
 
                     (*new_asteroid).genericValue15 = (*copy_asteroid).genericValue15;
                     (*new_asteroid).s.iModelScale = (*copy_asteroid).s.iModelScale;

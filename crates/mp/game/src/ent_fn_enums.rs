@@ -146,7 +146,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::NPC_Spawn_Go => NPC_Spawn_Go(ctx, self_),
         EntThink::NPC_Think => NPC_Think(ctx, self_),
         EntThink::RespawnItem => RespawnItem(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::ReturnToPos1 => ReturnToPos1(ctx, self_),
+        EntThink::ReturnToPos1 => ReturnToPos1(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::SaberUpdateSelf => SaberUpdateSelf(ctx, self_),
         EntThink::ShieldGoSolid => ShieldGoSolid(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::ShieldThink => ShieldThink(ctx, ctx.entity_id_of(self_).unwrap()),
@@ -154,14 +154,18 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::SolidifyOwner => SolidifyOwner(ctx, self_),
         EntThink::SpecialItemThink => SpecialItemThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::Team_DroppedFlagThink => Team_DroppedFlagThink(ctx, self_),
-        EntThink::Think_BeginMoving => Think_BeginMoving(ctx, self_),
-        EntThink::Think_MatchTeam => Think_MatchTeam(ctx, self_),
-        EntThink::Think_SetupTrainTargets => Think_SetupTrainTargets(ctx, self_),
-        EntThink::Think_SpawnNewDoorTrigger => Think_SpawnNewDoorTrigger(ctx, self_),
+        EntThink::Think_BeginMoving => Think_BeginMoving(ctx, ctx.entity_id_of(self_).unwrap()),
+        EntThink::Think_MatchTeam => Think_MatchTeam(ctx, ctx.entity_id_of(self_).unwrap()),
+        EntThink::Think_SetupTrainTargets => {
+            Think_SetupTrainTargets(ctx, ctx.entity_id_of(self_).unwrap())
+        }
+        EntThink::Think_SpawnNewDoorTrigger => {
+            Think_SpawnNewDoorTrigger(ctx, ctx.entity_id_of(self_).unwrap())
+        }
         EntThink::Think_Strike => Think_Strike(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::Think_Target_Delay => Think_Target_Delay(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::TrapThink => TrapThink(ctx, self_),
-        EntThink::Use_BinaryMover_Go => Use_BinaryMover_Go(ctx, self_),
+        EntThink::Use_BinaryMover_Go => Use_BinaryMover_Go(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::WP_VehWeapSetSolidToOwner => WP_VehWeapSetSolidToOwner(ctx, self_),
         EntThink::WP_flechette_alt_blow => WP_flechette_alt_blow(ctx, self_),
         EntThink::anglerCallback => anglerCallback(ctx, self_),
@@ -174,10 +178,14 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::check_recharge => check_recharge(ctx, self_),
         EntThink::emplaced_gun_update => emplaced_gun_update(ctx, self_),
         EntThink::faller_think => faller_think(ctx, self_),
-        EntThink::funcBBrushDieGo => funcBBrushDieGo(ctx, self_),
+        EntThink::funcBBrushDieGo => funcBBrushDieGo(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::func_timer_think => func_timer_think(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::func_usable_think => func_usable_think(self_),
-        EntThink::func_wait_return_solid => func_wait_return_solid(ctx, self_),
+        EntThink::func_usable_think => {
+            func_usable_think(ctx.entity_mut(ctx.entity_id_of(self_).unwrap()))
+        }
+        EntThink::func_wait_return_solid => {
+            func_wait_return_solid(ctx, ctx.entity_id_of(self_).unwrap())
+        }
         EntThink::fx_runner_link => fx_runner_link(ctx, self_),
         EntThink::fx_runner_think => fx_runner_think(ctx, self_),
         EntThink::laserTrapExplode => laserTrapExplode(ctx, self_),
@@ -220,8 +228,10 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_reached(ctx: GameContext<'_>, id: EntReached, self_: *mut gentity_t) {
     match id {
-        EntReached::Reached_BinaryMover => Reached_BinaryMover(ctx, self_),
-        EntReached::Reached_Train => Reached_Train(ctx, self_),
+        EntReached::Reached_BinaryMover => {
+            Reached_BinaryMover(ctx, ctx.entity_id_of(self_).unwrap())
+        }
+        EntReached::Reached_Train => Reached_Train(ctx, ctx.entity_id_of(self_).unwrap()),
         EntReached::moveAndRotateCallback => moveAndRotateCallback(ctx, self_),
         EntReached::moverCallback => moverCallback(ctx, self_),
     }
@@ -237,7 +247,11 @@ pub fn dispatch_blocked(
     other: *mut gentity_t,
 ) {
     match id {
-        EntBlocked::Blocked_Door => Blocked_Door(ctx, self_, other),
+        EntBlocked::Blocked_Door => Blocked_Door(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+        ),
         EntBlocked::Blocked_Mover => Blocked_Mover(ctx, self_, other),
     }
 }
@@ -271,8 +285,18 @@ pub fn dispatch_touch(
             trace,
         ),
         EntTouch::SiegeItemTouch => SiegeItemTouch(ctx, self_, other, trace),
-        EntTouch::Touch_Button => Touch_Button(ctx, self_, other, trace),
-        EntTouch::Touch_DoorTrigger => Touch_DoorTrigger(ctx, self_, other, trace),
+        EntTouch::Touch_Button => Touch_Button(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
+        EntTouch::Touch_DoorTrigger => Touch_DoorTrigger(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::Touch_Item => Touch_Item(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -285,12 +309,26 @@ pub fn dispatch_touch(
             ctx.entity_id_of(other),
             trace,
         ),
-        EntTouch::Touch_Plat => Touch_Plat(ctx, self_, other, trace),
-        EntTouch::Touch_PlatCenterTrigger => Touch_PlatCenterTrigger(ctx, self_, other, trace),
+        EntTouch::Touch_Plat => Touch_Plat(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
+        EntTouch::Touch_PlatCenterTrigger => Touch_PlatCenterTrigger(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::WP_TouchVehMissile => WP_TouchVehMissile(ctx, self_, other, trace),
         EntTouch::charge_stick => charge_stick(ctx, self_, other, trace),
         EntTouch::faller_touch => faller_touch(ctx, self_, other, trace),
-        EntTouch::funcBBrushTouch => funcBBrushTouch(self_, other, trace),
+        EntTouch::funcBBrushTouch => funcBBrushTouch(
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::hurt_touch => hurt_touch(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -344,14 +382,24 @@ pub fn dispatch_use(
     activator: *mut gentity_t,
 ) {
     match id {
-        EntUse::GlassUse => GlassUse(ctx, self_, other, activator),
+        EntUse::GlassUse => GlassUse(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::NPC_Spawn => NPC_Spawn(ctx, self_, other, activator),
         EntUse::NPC_Use => NPC_Use(ctx, self_, other, activator),
         EntUse::NPC_VehicleSpawnUse => NPC_VehicleSpawnUse(ctx, self_, other, activator),
         EntUse::SiegeIconUse => SiegeIconUse(self_, other, activator),
         EntUse::SiegeItemUse => SiegeItemUse(ctx, self_, other, activator),
         EntUse::SiegePointUse => SiegePointUse(self_, other, activator),
-        EntUse::Use_BinaryMover => Use_BinaryMover(ctx, self_, other, activator),
+        EntUse::Use_BinaryMover => Use_BinaryMover(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::Use_Item => Use_Item(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -421,15 +469,30 @@ pub fn dispatch_use(
         EntUse::ammo_power_converter_use => ammo_power_converter_use(ctx, self_, other, activator),
         EntUse::decompTriggerUse => decompTriggerUse(ctx, self_, other, activator),
         EntUse::emplaced_gun_realuse => emplaced_gun_realuse(ctx, self_, other, activator),
-        EntUse::funcBBrushUse => funcBBrushUse(ctx, self_, other, activator),
-        EntUse::func_static_use => func_static_use(ctx, self_, other, activator),
+        EntUse::funcBBrushUse => funcBBrushUse(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::func_static_use => func_static_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::func_timer_use => func_timer_use(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
             ctx.entity_id_of(other),
             ctx.entity_id_of(activator),
         ),
-        EntUse::func_usable_use => func_usable_use(ctx, self_, other, activator),
+        EntUse::func_usable_use => func_usable_use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::fx_runner_use => fx_runner_use(ctx, self_, other, activator),
         EntUse::health_power_converter_use => {
             health_power_converter_use(ctx, self_, other, activator)
@@ -517,7 +580,12 @@ pub fn dispatch_use(
         ),
         EntUse::turretG2_base_use => turretG2_base_use(self_, other, activator),
         EntUse::turret_base_use => turret_base_use(self_, other, activator),
-        EntUse::use_wall => use_wall(ctx, self_, other, activator),
+        EntUse::use_wall => use_wall(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
     }
 }
 
@@ -539,7 +607,11 @@ pub fn dispatch_pain(
             ctx.entity_id_of(attacker),
             damage,
         ),
-        EntPain::GlassPain => GlassPain(self_, attacker, damage),
+        EntPain::GlassPain => GlassPain(
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
         EntPain::NPC_ATST_Pain => NPC_ATST_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_Droid_Pain => NPC_Droid_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_GM_Pain => NPC_GM_Pain(ctx, self_, attacker, damage),
@@ -567,8 +639,18 @@ pub fn dispatch_pain(
         EntPain::TurretG2Pain => TurretG2Pain(ctx, self_, attacker, damage),
         EntPain::TurretPain => TurretPain(ctx, self_, attacker, damage),
         EntPain::emplaced_gun_pain => emplaced_gun_pain(ctx, self_, attacker, damage),
-        EntPain::funcBBrushPain => funcBBrushPain(ctx, self_, attacker, damage),
-        EntPain::func_usable_pain => func_usable_pain(ctx, self_, attacker, damage),
+        EntPain::funcBBrushPain => funcBBrushPain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
+        EntPain::func_usable_pain => func_usable_pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
     }
 }
 
@@ -594,7 +676,14 @@ pub fn dispatch_die(
             damage,
             r#mod,
         ),
-        EntDie::GlassDie => GlassDie(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::GlassDie => GlassDie(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::RocketDie => RocketDie(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::ShieldDie => ShieldDie(
             ctx,
@@ -611,8 +700,22 @@ pub fn dispatch_die(
         EntDie::emplaced_gun_die => {
             emplaced_gun_die(ctx, self_, inflictor, attacker, damage, r#mod)
         }
-        EntDie::funcBBrushDie => funcBBrushDie(ctx, self_, inflictor, attacker, damage, r#mod),
-        EntDie::func_usable_die => func_usable_die(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::funcBBrushDie => funcBBrushDie(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
+        EntDie::func_usable_die => func_usable_die(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::laserTrapDelayedExplode => {
             laserTrapDelayedExplode(ctx, self_, inflictor, attacker, damage, r#mod)
         }
@@ -1246,19 +1349,19 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         EntSpawn::info_siege_decomplete => SP_info_siege_decomplete(ctx, ent),
         EntSpawn::target_siege_end => SP_target_siege_end(ctx, ent),
         EntSpawn::misc_siege_item => SP_misc_siege_item(ctx, ent),
-        EntSpawn::func_plat => SP_func_plat(ctx, ent),
-        EntSpawn::func_button => SP_func_button(ctx, ent),
-        EntSpawn::func_door => SP_func_door(ctx, ent),
-        EntSpawn::func_static => SP_func_static(ctx, ent),
-        EntSpawn::func_rotating => SP_func_rotating(ctx, ent),
-        EntSpawn::func_bobbing => SP_func_bobbing(ctx, ent),
-        EntSpawn::func_pendulum => SP_func_pendulum(ctx, ent),
-        EntSpawn::func_train => SP_func_train(ctx, ent),
+        EntSpawn::func_plat => SP_func_plat(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::func_button => SP_func_button(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::func_door => SP_func_door(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::func_static => SP_func_static(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::func_rotating => SP_func_rotating(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::func_bobbing => SP_func_bobbing(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::func_pendulum => SP_func_pendulum(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::func_train => SP_func_train(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::func_timer => SP_func_timer(ctx, ctx.entity_id_of(ent).unwrap()),
-        EntSpawn::func_breakable => SP_func_breakable(ctx, ent),
-        EntSpawn::func_glass => SP_func_glass(ctx, ent),
-        EntSpawn::func_usable => SP_func_usable(ctx, ent),
-        EntSpawn::func_wall => SP_func_wall(ctx, ent),
+        EntSpawn::func_breakable => SP_func_breakable(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::func_glass => SP_func_glass(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::func_usable => SP_func_usable(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::func_wall => SP_func_wall(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::trigger_lightningstrike => {
             SP_trigger_lightningstrike(ctx, ctx.entity_id_of(ent).unwrap())
         }
@@ -1312,7 +1415,7 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         EntSpawn::target_play_music => SP_target_play_music(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::target_push => SP_target_push(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::light => SP_light(ctx, ent),
-        EntSpawn::path_corner => SP_path_corner(ctx, ent),
+        EntSpawn::path_corner => SP_path_corner(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::misc_teleporter_dest => SP_misc_teleporter_dest(ent),
         EntSpawn::misc_model => SP_misc_model(ctx, ent),
         EntSpawn::misc_model_static => SP_misc_model_static(ctx, ent),

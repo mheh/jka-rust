@@ -2823,7 +2823,7 @@ pub fn maglock_link(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         // check the traceEnt, make sure it's a door and give it a lockCount and deactivate it
         // find the trigger for the door
-        let door_trigger = G_FindDoorTrigger(ctx, trace_ent);
+        let door_trigger = G_FindDoorTrigger(ctx, ctx.entity_id_of(trace_ent).unwrap());
         (*self_).activator = if !door_trigger.is_null() {
             Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), door_trigger))
         } else {

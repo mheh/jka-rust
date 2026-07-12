@@ -3692,7 +3692,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
             }
 
             if (*ent).s.eType == entityType_t::ET_MOVER as c_int {
-                G_RunMover(ctx, ent);
+                G_RunMover(ctx, ctx.entity_id_of(ent).unwrap());
                 i += 1;
                 continue;
             }

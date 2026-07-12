@@ -4109,7 +4109,12 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                 } else if cstr_to_str((*push_list[x]).classname).eq_ignore_ascii_case("func_button")
                 {
                     //pretend you pushed it
-                    Touch_Button(ctx, push_list[x], self_, std::ptr::null_mut());
+                    Touch_Button(
+                        ctx,
+                        ctx.entity_id_of(push_list[x]).unwrap(),
+                        ctx.entity_id_of(self_),
+                        std::ptr::null_mut(),
+                    );
                     continue;
                 }
             }
