@@ -22,13 +22,35 @@ One concrete bundle in `mp_engine_qcommon` (`common/engine_host_view.rs`):
 pub struct EngineHostView<'a> {
     pub common: &'a mut Common,
     pub cm: &'a mut CollisionWorld,
-    pub sv: cmd_pc::Server,              // existing opaque type-erased slots,
-    pub rm: cm_load::RenderModels,       // held by value (newtype *mut ())
-    pub rmg: cm_load::RmManager,
+    pub sv: opaque_slots::Server,        // existing opaque type-erased slots,
+    pub cl: opaque_slots::Client,        // held by value (newtype *mut ())
+    pub bot: opaque_slots::BotLib,
+    pub rm: opaque_slots::RenderModels,
+    pub rmg: opaque_slots::RmManager,
     pub g2: opaque_slots::Ghoul2System,
 }
 impl EngineHost for EngineHostView<'_> { … }
 ```
+
+W1 amendments (landed, contract-bearing):
+- The view ALSO carries `cl`/`bot` slots — the already-transcribed qcommon
+  `Com_Init`/`Com_Frame` bodies (discovered in `common_fns.rs`; the core
+  `lifecycle.rs` stubs are stale) thread them to the `CL_Init`/`SV_Init`
+  hooks, so they ride in the view rather than as sidecars. (`BotLib` and the
+  other §F sidecars named below stay explicit params — no `EngineHost`
+  method needs them.)
+- Slot-cast rule is PER-SLOT, not per-view: a cast copies the raw pointer
+  out (`slot.as_raw()`), so the view stays usable while the cast borrow
+  lives; sound iff nothing called meanwhile casts the SAME slot again.
+  Casts of different slots may nest (the existing opaque-slot contract,
+  stated precisely).
+- Hook-target fns get EXACTLY the hook field's signature; `hook_install.rs`
+  (server) and `hook_install.rs` (renderer) install them by path, plus the
+  accessor hooks (`SV_Trace`/`SV_GentityNum`/`SV_SharedMemory`/`SVS_Time`/
+  `SV_ShownetEntityClassname`/`VM_CallSlot`/`R_Model*`/`R_SkinSurfaces`).
+- Phase 2 shrinks: qcommon already holds the transcribed 42-step `Com_Init`
+  and `Com_Frame` bodies; the core `com_*` surface becomes thin delegation
+  (view construction + hook install + the qcommon calls), not a re-port.
 
 - A function that consumes host services takes `view: &mut EngineHostView<'_>`
   as its single world parameter — `view.common` for state, `view` forwarded to
