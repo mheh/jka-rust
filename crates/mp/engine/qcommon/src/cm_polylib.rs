@@ -38,14 +38,8 @@ use crate::cm::cm_polylib_consts::{
 use crate::cm::winding_t::winding_t;
 use crate::collision_world::CollisionWorld;
 use crate::common::com_error;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
-use mp_host_interface::engine_host::EngineHost;
-
-// PORT-NOTE(rm-types): see module doc.
-#[allow(dead_code)]
-use crate::cm_load::RenderModels;
-#[allow(dead_code)]
-struct RmManager;
 
 // PORT-NOTE(on-epsilon): the packet's rosetta row points `ON_EPSILON` at
 // `mp_engine_botlib`'s `be_aas_bspq3_cpp_consts` (0.005) — but `mp_engine_botlib`
@@ -256,21 +250,18 @@ pub fn RemoveColinearPoints(cm: &mut CollisionWorld, w: *mut winding_t) {
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:30-45`
 pub fn AllocWinding(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     points: c_int,
 ) -> *mut winding_t {
     // PORT-NOTE(missing-field): `c_active_windings`/`c_peak_windings`/
     // `c_winding_allocs`/`c_winding_points` (`cm_polylib.cpp:12-15`) have no
     // home fields yet; referenced as `common.c_active_windings` etc. per the
     // owning-file convention, reported as missing symbols.
-    common.c_winding_allocs += 1;
-    common.c_winding_points += points;
-    common.c_active_windings += 1;
-    if common.c_active_windings > common.c_peak_windings {
-        common.c_peak_windings = common.c_active_windings;
+    view.common.c_winding_allocs += 1;
+    view.common.c_winding_points += points;
+    view.common.c_active_windings += 1;
+    if view.common.c_active_windings > view.common.c_peak_windings {
+        view.common.c_peak_windings = view.common.c_active_windings;
     }
 
     let s = core::mem::size_of::<vec_t>() as c_int * 3 * points
@@ -279,10 +270,7 @@ pub fn AllocWinding(
     // z_memman unit; called with the exact resolved receivers and reported
     // as a missing symbol (cm_trace.rs/vm_x86.rs precedent).
     let w = Z_Malloc(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         s,
         memtag_t::TAG_BSP,
         mp_qshared::shared::qtrue,
@@ -402,10 +390,7 @@ pub fn CheckWinding(w: *mut winding_t) {
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:178-242`
 pub fn BaseWindingForPlane(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     normal: vec3_t,
     dist: vec_t,
 ) -> *mut winding_t {
@@ -449,7 +434,7 @@ pub fn BaseWindingForPlane(
     VectorScale(vright, MAX_MAP_BOUNDS as vec_t, &mut vright);
 
     // project a really big axis aligned box onto the plane
-    let w = AllocWinding(common, cm, rm, host, 4);
+    let w = AllocWinding(view, 4);
 
     unsafe {
         VectorSubtract(org, vright, &mut (*w).p[0]);
@@ -478,14 +463,11 @@ pub fn BaseWindingForPlane(
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:249-258`
 pub fn CopyWinding(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     w: *mut winding_t,
 ) -> *mut winding_t {
     unsafe {
-        let c = AllocWinding(common, cm, rm, host, (*w).numpoints);
+        let c = AllocWinding(view, (*w).numpoints);
         let size = core::mem::offset_of!(winding_t, p)
             + (*w).numpoints as usize * core::mem::size_of::<vec3_t>();
         Com_Memcpy(c as *mut (), w as *const (), size);
@@ -497,14 +479,11 @@ pub fn CopyWinding(
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:265-277`
 pub fn ReverseWinding(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     w: *mut winding_t,
 ) -> *mut winding_t {
     unsafe {
-        let c = AllocWinding(common, cm, rm, host, (*w).numpoints);
+        let c = AllocWinding(view, (*w).numpoints);
         for i in 0..(*w).numpoints {
             let src = (*w).p[((*w).numpoints - 1 - i) as usize];
             VectorCopy(src, &mut (*c).p[i as usize]);
@@ -518,10 +497,7 @@ pub fn ReverseWinding(
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:397-491`
 pub fn ChopWindingInPlace(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     inout: *mut *mut winding_t,
     normal: vec3_t,
     dist: vec_t,
@@ -563,7 +539,7 @@ pub fn ChopWindingInPlace(
         dists[(*in_).numpoints as usize] = dists[0];
 
         if counts[0] == 0 {
-            FreeWinding(common, cm, in_);
+            FreeWinding(view.common, view.cm, in_);
             *inout = core::ptr::null_mut();
             return;
         }
@@ -574,7 +550,7 @@ pub fn ChopWindingInPlace(
         let maxpts = (*in_).numpoints + 4; // cant use counts[0]+2 because
                                            // of fp grouping errors
 
-        let f = AllocWinding(common, cm, rm, host, maxpts);
+        let f = AllocWinding(view, maxpts);
 
         for i in 0..(*in_).numpoints {
             let p1 = (*in_).p[i as usize];
@@ -630,7 +606,7 @@ pub fn ChopWindingInPlace(
             );
         }
 
-        FreeWinding(common, cm, in_);
+        FreeWinding(view.common, view.cm, in_);
         *inout = f;
     }
 }
@@ -639,10 +615,7 @@ pub fn ChopWindingInPlace(
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:285-389`
 pub fn ClipWindingEpsilon(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     in_: *mut winding_t,
     normal: vec3_t,
     dist: vec_t,
@@ -684,19 +657,19 @@ pub fn ClipWindingEpsilon(
         *back = core::ptr::null_mut();
 
         if counts[0] == 0 {
-            *back = CopyWinding(common, cm, rm, host, in_);
+            *back = CopyWinding(view, in_);
             return;
         }
         if counts[1] == 0 {
-            *front = CopyWinding(common, cm, rm, host, in_);
+            *front = CopyWinding(view, in_);
             return;
         }
 
         let maxpts = (*in_).numpoints + 4; // cant use counts[0]+2 because
                                            // of fp grouping errors
 
-        let f = AllocWinding(common, cm, rm, host, maxpts);
-        let b = AllocWinding(common, cm, rm, host, maxpts);
+        let f = AllocWinding(view, maxpts);
+        let b = AllocWinding(view, maxpts);
         *front = f;
         *back = b;
 
@@ -771,17 +744,14 @@ pub fn ClipWindingEpsilon(
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:626-711`
 pub fn AddWindingToConvexHull(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     mut w: *mut winding_t,
     hull: *mut *mut winding_t,
     normal: vec3_t,
 ) {
     unsafe {
         if (*hull).is_null() {
-            *hull = CopyWinding(common, cm, rm, host, w);
+            *hull = CopyWinding(view, w);
             return;
         }
 
@@ -863,8 +833,8 @@ pub fn AddWindingToConvexHull(
             );
         }
 
-        FreeWinding(common, cm, *hull);
-        w = AllocWinding(common, cm, rm, host, num_hull_points as c_int);
+        FreeWinding(view.common, view.cm, *hull);
+        w = AllocWinding(view, num_hull_points as c_int);
         (*w).numpoints = num_hull_points as c_int;
         *hull = w;
         Com_Memcpy(
@@ -879,10 +849,7 @@ pub fn AddWindingToConvexHull(
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:502-511`
 pub fn ChopWinding(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     in_: *mut winding_t,
     normal: vec3_t,
     dist: vec_t,
@@ -891,11 +858,11 @@ pub fn ChopWinding(
     let mut b: *mut winding_t = core::ptr::null_mut();
 
     ClipWindingEpsilon(
-        common, cm, rm, host, in_, normal, dist, ON_EPSILON, &mut f, &mut b,
+        view, in_, normal, dist, ON_EPSILON, &mut f, &mut b,
     );
-    FreeWinding(common, cm, in_);
+    FreeWinding(view.common, view.cm, in_);
     if !b.is_null() {
-        FreeWinding(common, cm, b);
+        FreeWinding(view.common, view.cm, b);
     }
     f
 }

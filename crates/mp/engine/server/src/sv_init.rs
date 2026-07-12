@@ -25,15 +25,12 @@ use mp_qshared::shared::qboolean;
 // than stubbed (ZERO-PARK), following the sibling files' precedent exactly.
 use mp_engine_ghoul2::api_collision::g2api_set_time;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
-use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::{com_printf, Common};
-use mp_engine_qcommon::cm_load::RenderModels;
-use mp_engine_qcommon::cm_load::RmManager;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_host_interface::engine_host::EngineHost;
 
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
-use crate::server_host::{ghoul2_slot, server_slot};
 use crate::sv_renderer::{
     R_InitShaders, R_InitSkins, R_SVModelInit, RE_RegisterMedia_LevelLoadBegin,
 };
@@ -126,18 +123,15 @@ pub fn SV_CreateBaseline(sv: &mut Server) {
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:25-91`
 pub fn SV_SetConfigstring(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
     index: c_int,
     mut val: *const c_char,
 ) {
     let maxChunkSize: c_int = MAX_STRING_CHARS as c_int - 24;
 
     if index < 0 || index >= MAX_CONFIGSTRINGS as c_int {
-        host.error(
+        view.error(
             errorParm_t::ERR_DROP,
             &format!("SV_SetConfigstring: bad index {}\n", index),
         );
@@ -154,15 +148,15 @@ pub fn SV_SetConfigstring(
         }
 
         // change the string in sv
-        Z_Free(common, sv.sv.configstrings[index as usize] as *mut _);
-        sv.sv.configstrings[index as usize] = CopyString(common, cm, rm, host, val);
+        Z_Free(view.common, sv.sv.configstrings[index as usize] as *mut _);
+        sv.sv.configstrings[index as usize] = CopyString(view, val);
     }
 
     // send it to all the clients if we aren't spawning a new server
     if sv.sv.state == serverState_t::SS_GAME || sv.sv.restarting != 0 {
         // send the data to all relevant clients
         unsafe {
-            for i in 0..(*common.sv_maxclients).integer {
+            for i in 0..(*view.common.sv_maxclients).integer {
                 let client = sv.svs.clients.offset(i as isize);
                 if (*client).state < clientState_t::CS_PRIMED {
                     continue;
@@ -197,7 +191,7 @@ pub fn SV_SetConfigstring(
                         );
 
                         SV_SendServerCommand(
-                            common,
+                            view.common,
                             sv,
                             client,
                             &format!(
@@ -214,7 +208,7 @@ pub fn SV_SetConfigstring(
                 } else {
                     // standard cs, just send it
                     SV_SendServerCommand(
-                        common,
+                        view.common,
                         sv,
                         client,
                         &format!(
@@ -328,35 +322,22 @@ pub fn SV_ClearServer(common: &mut Common, sv: &mut Server) {
 /// Raven `SV_BoundMaxClients`.
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:234-245`
-pub fn SV_BoundMaxClients(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    minimum: c_int,
-) {
+pub fn SV_BoundMaxClients(view: &mut EngineHostView, sv: &mut Server, minimum: c_int) {
     // get the current maxclients value
-    Cvar_Get(common, cm, rm, host, c"sv_maxclients".as_ptr(), c"8".as_ptr(), 0);
+    Cvar_Get(view, c"sv_maxclients".as_ptr(), c"8".as_ptr(), 0);
 
     unsafe {
-        (*common.sv_maxclients).modified = qboolean::from(0);
+        (*view.common.sv_maxclients).modified = qboolean::from(0);
 
-        if (*common.sv_maxclients).integer < minimum {
+        if (*view.common.sv_maxclients).integer < minimum {
             Cvar_Set(
-                common,
-                cm,
-                rm,
-                host,
+                view,
                 c"sv_maxclients".as_ptr(),
                 va(c"%i".as_ptr(), &[FmtArg::Int(minimum)]),
             );
-        } else if (*common.sv_maxclients).integer > MAX_CLIENTS as c_int {
+        } else if (*view.common.sv_maxclients).integer > MAX_CLIENTS as c_int {
             Cvar_Set(
-                common,
-                cm,
-                rm,
-                host,
+                view,
                 c"sv_maxclients".as_ptr(),
                 va(c"%i".as_ptr(), &[FmtArg::Int(MAX_CLIENTS as c_int)]),
             );
@@ -367,31 +348,18 @@ pub fn SV_BoundMaxClients(
 /// Raven `SV_TouchCGame`.
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:396-412`
-pub fn SV_TouchCGame(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn SV_TouchCGame(view: &mut EngineHostView) {
     let mut f: fileHandle_t = 0;
-    let filename: String = if Cvar_VariableValue(common, cm, rm, host, c"vm_cgame".as_ptr()) != 0.0 {
+    let filename: String = if Cvar_VariableValue(view, c"vm_cgame".as_ptr()) != 0.0 {
         Com_sprintf_vm_qvm("cgame")
     } else {
         "cgamex86.dll".to_string()
     };
 
     let filename_c = CString::new(filename).unwrap_or_default();
-    FS_FOpenFileRead(
-        common,
-        cm,
-        rm,
-        host,
-        filename_c.as_ptr(),
-        &mut f,
-        qboolean::from(0),
-    );
+    FS_FOpenFileRead(view, filename_c.as_ptr(), &mut f, qboolean::from(0));
     if f != 0 {
-        FS_FCloseFile(common, f);
+        FS_FCloseFile(view.common, f);
     }
 }
 
@@ -407,11 +375,8 @@ fn Com_sprintf_vm_qvm(sub: &str) -> String {
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:123-160`
 pub fn SV_AddConfigstring(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
     name: *const c_char,
     start: c_int,
     max: c_int,
@@ -436,7 +401,7 @@ pub fn SV_AddConfigstring(
                 || *sv.sv.configstrings[(start + i) as usize] == 0
             {
                 // Didn't find it
-                SV_SetConfigstring(common, cm, sv, rm, host, start + i, name);
+                SV_SetConfigstring(view, sv, start + i, name);
                 break;
             } else if Q_stricmp(sv.sv.configstrings[(start + i) as usize], name) == 0 {
                 return i;
@@ -450,58 +415,43 @@ pub fn SV_AddConfigstring(
 /// Raven `SV_Startup`.
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:258-278`
-pub fn SV_Startup(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn SV_Startup(view: &mut EngineHostView, sv: &mut Server) {
     unsafe {
         if sv.svs.initialized != 0 {
-            host.error(errorParm_t::ERR_FATAL, "SV_Startup: svs.initialized");
+            view.error(errorParm_t::ERR_FATAL, "SV_Startup: svs.initialized");
         }
-        SV_BoundMaxClients(common, cm, sv, rm, host, 1);
+        SV_BoundMaxClients(view, sv, 1);
 
         sv.svs.clients = Z_Malloc(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             (core::mem::size_of::<crate::server::client_s::client_t>()
-                * (*common.sv_maxclients).integer as usize) as c_int,
+                * (*view.common.sv_maxclients).integer as usize) as c_int,
             memtag_t::TAG_CLIENTS,
             qboolean::from(1),
             0,
         ) as *mut _;
-        if (*common.com_dedicated).integer != 0 {
-            sv.svs.numSnapshotEntities = (*common.sv_maxclients).integer * mp_engine_qcommon::qcommon::net_limits::PACKET_BACKUP as c_int * 64;
-            Cvar_Set(common, cm, rm, host, c"r_ghoul2animsmooth".as_ptr(), c"0".as_ptr());
-            Cvar_Set(common, cm, rm, host, c"r_ghoul2unsqashaftersmooth".as_ptr(), c"0".as_ptr());
+        if (*view.common.com_dedicated).integer != 0 {
+            sv.svs.numSnapshotEntities = (*view.common.sv_maxclients).integer * mp_engine_qcommon::qcommon::net_limits::PACKET_BACKUP as c_int * 64;
+            Cvar_Set(view, c"r_ghoul2animsmooth".as_ptr(), c"0".as_ptr());
+            Cvar_Set(view, c"r_ghoul2unsqashaftersmooth".as_ptr(), c"0".as_ptr());
         } else {
             // we don't need nearly as many when playing locally
-            sv.svs.numSnapshotEntities = (*common.sv_maxclients).integer * 4 * 64;
+            sv.svs.numSnapshotEntities = (*view.common.sv_maxclients).integer * 4 * 64;
         }
         sv.svs.initialized = qboolean::from(1);
     }
 
-    Cvar_Set(common, cm, rm, host, c"sv_running".as_ptr(), c"1".as_ptr());
+    Cvar_Set(view, c"sv_running".as_ptr(), c"1".as_ptr());
 }
 
 /// Raven `SV_ChangeMaxClients`.
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:299-358`
-pub fn SV_ChangeMaxClients(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn SV_ChangeMaxClients(view: &mut EngineHostView, sv: &mut Server) {
     // get the highest client number in use
     let mut count: c_int = 0;
     unsafe {
-        for i in 0..(*common.sv_maxclients).integer {
+        for i in 0..(*view.common.sv_maxclients).integer {
             if (*sv.svs.clients.offset(i as isize)).state >= clientState_t::CS_CONNECTED
                 && i > count
             {
@@ -511,19 +461,16 @@ pub fn SV_ChangeMaxClients(
     }
     count += 1;
 
-    let oldMaxClients = unsafe { (*common.sv_maxclients).integer };
+    let oldMaxClients = unsafe { (*view.common.sv_maxclients).integer };
     // never go below the highest client number in use
-    SV_BoundMaxClients(common, cm, sv, rm, host, count);
+    SV_BoundMaxClients(view, sv, count);
     // if still the same
-    if unsafe { (*common.sv_maxclients).integer } == oldMaxClients {
+    if unsafe { (*view.common.sv_maxclients).integer } == oldMaxClients {
         return;
     }
 
     let oldClients = Hunk_AllocateTempMemory(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         ((count as usize) * core::mem::size_of::<crate::server::client_s::client_t>()) as c_int,
     ) as *mut crate::server::client_s::client_t;
     unsafe {
@@ -547,15 +494,12 @@ pub fn SV_ChangeMaxClients(
         }
 
         // free old clients arrays
-        Z_Free(common, sv.svs.clients as *mut _);
+        Z_Free(view.common, sv.svs.clients as *mut _);
 
         // allocate new clients
         sv.svs.clients = Z_Malloc(
-            common,
-            cm,
-            rm,
-            host,
-            (((*common.sv_maxclients).integer as usize)
+            view,
+            (((*view.common.sv_maxclients).integer as usize)
                 * core::mem::size_of::<crate::server::client_s::client_t>()) as c_int,
             memtag_t::TAG_CLIENTS,
             qboolean::from(1),
@@ -564,7 +508,7 @@ pub fn SV_ChangeMaxClients(
         Com_Memset(
             sv.svs.clients as *mut (),
             0,
-            ((*common.sv_maxclients).integer as usize)
+            ((*view.common.sv_maxclients).integer as usize)
                 * core::mem::size_of::<crate::server::client_s::client_t>(),
         );
 
@@ -582,15 +526,15 @@ pub fn SV_ChangeMaxClients(
     }
 
     // free the old clients on the hunk
-    Hunk_FreeTempMemory(common, oldClients as *mut _);
+    Hunk_FreeTempMemory(view.common, oldClients as *mut _);
 
     // allocate new snapshot entities
     unsafe {
-        if (*common.com_dedicated).integer != 0 {
-            sv.svs.numSnapshotEntities = (*common.sv_maxclients).integer * mp_engine_qcommon::qcommon::net_limits::PACKET_BACKUP as c_int * 64;
+        if (*view.common.com_dedicated).integer != 0 {
+            sv.svs.numSnapshotEntities = (*view.common.sv_maxclients).integer * mp_engine_qcommon::qcommon::net_limits::PACKET_BACKUP as c_int * 64;
         } else {
             // we don't need nearly as many when playing locally
-            sv.svs.numSnapshotEntities = (*common.sv_maxclients).integer * 4 * 64;
+            sv.svs.numSnapshotEntities = (*view.common.sv_maxclients).integer * 4 * 64;
         }
     }
 }
@@ -598,21 +542,15 @@ pub fn SV_ChangeMaxClients(
 /// Raven `SV_SendMapChange`.
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:414-431`
-pub fn SV_SendMapChange(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn SV_SendMapChange(view: &mut EngineHostView, sv: &mut Server) {
     if !sv.svs.clients.is_null() {
         unsafe {
-            for i in 0..(*common.sv_maxclients).integer {
+            for i in 0..(*view.common.sv_maxclients).integer {
                 let client = sv.svs.clients.offset(i as isize);
                 if (*client).state >= clientState_t::CS_CONNECTED
                     && (*client).netchan.remoteAddress.r#type != netadrtype_t::NA_BOT
                 {
-                    SV_SendClientMapChange(common, cm, sv, rm, host, client);
+                    SV_SendClientMapChange(view, sv, client);
                 }
             }
         }
@@ -623,13 +561,9 @@ pub fn SV_SendMapChange(
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:472-791`
 pub fn SV_SpawnServer(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
     g2: &mut Ghoul2System,
-    host: &mut dyn EngineHost,
     server: *mut c_char,
     killBots: qboolean,
     eForceReload: ForceReload_e,
@@ -639,17 +573,17 @@ pub fn SV_SpawnServer(
     let mut systemInfo = [0 as c_char; 16384];
     let mut p: *const c_char;
 
-    SV_SendMapChange(common, cm, sv, rm, host);
+    SV_SendMapChange(view, sv);
 
-    RE_RegisterMedia_LevelLoadBegin(rm, host, server, eForceReload);
+    RE_RegisterMedia_LevelLoadBegin(view, server, eForceReload);
 
     // shut down the existing game if it is running
-    SV_ShutdownGameProgs(common, sv);
+    SV_ShutdownGameProgs(view.common, sv);
 
-    com_printf(common, "------ Server Initialization ------\n");
+    com_printf(view.common, "------ Server Initialization ------\n");
     unsafe {
         com_printf(
-            common,
+            view.common,
             &format!(
                 "Server: {}\n",
                 core::ffi::CStr::from_ptr(server).to_string_lossy()
@@ -665,46 +599,41 @@ pub fn SV_SpawnServer(
         // `delete[] svs.snapshotEntities` — owned Vec/Box drop is the
         // idiomatic-eventual shape; faithful transcription keeps the free +
         // null-out here (§D9 manual-alloc precedent).
-        Z_Free(common, sv.svs.snapshotEntities as *mut _);
+        Z_Free(view.common, sv.svs.snapshotEntities as *mut _);
         sv.svs.snapshotEntities = core::ptr::null_mut();
     }
     /*
     Ghoul2 Insert End
     */
 
-    SV_SendMapChange(common, cm, sv, rm, host);
+    SV_SendMapChange(view, sv);
 
     // if not running a dedicated server CL_MapLoading will connect the client to the server
     // also print some status stuff
-    (common.hooks.CL_MapLoading.expect("CL_MapLoading hook"))();
+    let cl_map_loading = view.common.hooks.CL_MapLoading.expect("CL_MapLoading hook");
+    cl_map_loading(view);
 
-    CM_ClearMap(cm, rmg);
+    CM_ClearMap(view.cm, &mut view.rmg);
 
     // clear the whole hunk because we're (re)loading the server
-    Hunk_Clear(
-        common,
-        &mut server_slot(sv),
-        rm,
-        &mut ghoul2_slot(g2),
-        host,
-    );
+    Hunk_Clear(view);
 
-    R_InitSkins(rm, host);
-    R_InitShaders(rm, host, qboolean::from(1));
+    R_InitSkins(view);
+    R_InitShaders(view, qboolean::from(1));
 
     // init client structures and svs.numSnapshotEntities
-    if Cvar_VariableValue(common, cm, rm, host, c"sv_running".as_ptr()) == 0.0 {
-        SV_Startup(common, cm, sv, rm, host);
+    if Cvar_VariableValue(view, c"sv_running".as_ptr()) == 0.0 {
+        SV_Startup(view, sv);
     } else {
         // check for maxclients change
         unsafe {
-            if (*common.sv_maxclients).modified != 0 {
-                SV_ChangeMaxClients(common, cm, sv, rm, host);
+            if (*view.common.sv_maxclients).modified != 0 {
+                SV_ChangeMaxClients(view, sv);
             }
         }
     }
 
-    SV_SendMapChange(common, cm, sv, rm, host);
+    SV_SendMapChange(view, sv);
 
     /*
     Ghoul2 Insert Start
@@ -712,15 +641,15 @@ pub fn SV_SpawnServer(
     // clear out those shaders, images and Models as long as this
     // isnt a dedicated server.
     unsafe {
-        if (*common.com_dedicated).integer != 0 {
-            R_SVModelInit(rm, host);
+        if (*view.common.com_dedicated).integer != 0 {
+            R_SVModelInit(view);
         }
     }
 
-    SV_SendMapChange(common, cm, sv, rm, host);
+    SV_SendMapChange(view, sv);
 
     // clear pak references
-    FS_ClearPakReferences(common, 0);
+    FS_ClearPakReferences(view.common, 0);
 
     /*
     Ghoul2 Insert Start
@@ -733,10 +662,7 @@ pub fn SV_SpawnServer(
     // new is an internal allocator (§A1: internals are free), reproduced here
     // as the `Z_Malloc` the matching `delete[]`/`Z_Free` deallocation pairs to.
     sv.svs.snapshotEntities = Z_Malloc(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         core::mem::size_of::<entityState_t>() as c_int * sv.svs.numSnapshotEntities,
         memtag_t::TAG_GENERAL,
         qboolean::from(1),
@@ -760,12 +686,12 @@ pub fn SV_SpawnServer(
 
     // set nextmap to the same map, but it may be overriden
     // by the game startup or another console command
-    Cvar_Set(common, cm, rm, host, c"nextmap".as_ptr(), c"map_restart 0".as_ptr());
+    Cvar_Set(view, c"nextmap".as_ptr(), c"map_restart 0".as_ptr());
 
     // wipe the entire per-level structure
-    SV_ClearServer(common, sv);
+    SV_ClearServer(view.common, sv);
     for i in 0..MAX_CONFIGSTRINGS {
-        sv.sv.configstrings[i] = CopyString(common, cm, rm, host, c"".as_ptr());
+        sv.sv.configstrings[i] = CopyString(view, c"".as_ptr());
     }
 
     //rww - RAGDOLL_BEGIN
@@ -773,16 +699,17 @@ pub fn SV_SpawnServer(
     //rww - RAGDOLL_END
 
     // make sure we are not paused
-    Cvar_Set(common, cm, rm, host, c"cl_paused".as_ptr(), c"0".as_ptr());
+    Cvar_Set(view, c"cl_paused".as_ptr(), c"0".as_ptr());
 
     // get a new checksum feed and restart the file system
     //
     // `srand`/`rand` are the engine's own `QRand` LCG on `common` (ruling 21).
-    let seed_ms = Com_Milliseconds(common, cm, rm, host);
-    common.qrand.srand(seed_ms as u32);
-    sv.sv.checksumFeed = ((common.qrand.rand() as c_int) << 16 ^ common.qrand.rand() as c_int)
-        ^ Com_Milliseconds(common, cm, rm, host);
-    FS_Restart(common, cm, rm, host, sv.sv.checksumFeed);
+    let seed_ms = Com_Milliseconds(view);
+    view.common.qrand.srand(seed_ms as u32);
+    sv.sv.checksumFeed = ((view.common.qrand.rand() as c_int) << 16
+        ^ view.common.qrand.rand() as c_int)
+        ^ Com_Milliseconds(view);
+    FS_Restart(view, sv.sv.checksumFeed);
 
     unsafe {
         let map_va = CString::new(format!(
@@ -790,46 +717,31 @@ pub fn SV_SpawnServer(
             core::ffi::CStr::from_ptr(server).to_string_lossy()
         ))
         .unwrap_or_default();
-        CM_LoadMap(
-            common,
-            cm,
-            rm,
-            rmg,
-            host,
-            map_va.as_ptr(),
-            qboolean::from(0),
-            &mut checksum,
-        );
+        CM_LoadMap(view, map_va.as_ptr(), qboolean::from(0), &mut checksum);
     }
 
-    SV_SendMapChange(common, cm, sv, rm, host);
+    SV_SendMapChange(view, sv);
 
     // set serverinfo visible name
-    Cvar_Set(common, cm, rm, host, c"mapname".as_ptr(), server);
+    Cvar_Set(view, c"mapname".as_ptr(), server);
 
     Cvar_Set(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"sv_mapChecksum".as_ptr(),
         va(c"%i".as_ptr(), &[FmtArg::Int(checksum)]),
     );
 
     // serverid should be different each time
-    sv.sv.serverId = common.frame_time;
+    sv.sv.serverId = view.common.frame_time;
     sv.sv.restartedServerId = sv.sv.serverId;
     Cvar_Set(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"sv_serverid".as_ptr(),
         va(c"%i".as_ptr(), &[FmtArg::Int(sv.sv.serverId)]),
     );
 
     // clear physics interaction links
-    SV_ClearWorld(cm, sv);
+    SV_ClearWorld(view.cm, sv);
 
     // media configstring setting should be done during
     // the loading stage, so connected clients don't have
@@ -837,11 +749,11 @@ pub fn SV_SpawnServer(
     sv.sv.state = serverState_t::SS_LOADING;
 
     // load and spawn all other entities
-    SV_InitGameProgs(common, cm, sv, rm, host);
+    SV_InitGameProgs(view, sv);
 
     // don't allow a map_restart if game is modified
     unsafe {
-        (*common.sv_gametype).modified = qboolean::from(0);
+        (*view.common.sv_gametype).modified = qboolean::from(0);
     }
 
     // run a few frames to allow everything to settle
@@ -850,12 +762,12 @@ pub fn SV_SpawnServer(
         g2api_set_time(g2, sv.svs.time, 0);
         //rww - RAGDOLL_END
         VM_Call(
-            common,
+            view.common,
             sv.gvm,
             MpGameExport::GAME_RUN_FRAME as i32,
             &[sv.svs.time],
         );
-        SV_BotFrame(common, sv, sv.svs.time);
+        SV_BotFrame(view.common, sv, sv.svs.time);
         sv.svs.time += 100;
     }
     //rww - RAGDOLL_BEGIN
@@ -866,13 +778,13 @@ pub fn SV_SpawnServer(
     SV_CreateBaseline(sv);
 
     unsafe {
-        for i in 0..(*common.sv_maxclients).integer {
+        for i in 0..(*view.common.sv_maxclients).integer {
             // send the new gamestate to all connected clients
             let client = sv.svs.clients.offset(i as isize);
             if (*client).state >= clientState_t::CS_CONNECTED {
                 if (*client).netchan.remoteAddress.r#type == netadrtype_t::NA_BOT {
                     if killBots != 0 {
-                        SV_DropClient(common, sv, client, c"".as_ptr());
+                        SV_DropClient(view.common, sv, client, c"".as_ptr());
                         continue;
                     }
                     isBot = qboolean::from(1);
@@ -882,16 +794,16 @@ pub fn SV_SpawnServer(
 
                 // connect the client again
                 let connect_ret = VM_Call(
-                    common,
+                    view.common,
                     sv.gvm,
                     MpGameExport::GAME_CLIENT_CONNECT as i32,
                     &[i, 0, isBot as c_int],
                 );
-                let denied = VM_ExplicitArgPtr(common, sv.gvm, connect_ret) as *mut c_char;
+                let denied = VM_ExplicitArgPtr(view.common, sv.gvm, connect_ret) as *mut c_char;
                 if !denied.is_null() {
                     // this generally shouldn't happen, because the client
                     // was connected before the level change
-                    SV_DropClient(common, sv, client, denied);
+                    SV_DropClient(view.common, sv, client, denied);
                 } else if isBot == 0 {
                     // when we get the next packet from a connected client,
                     // the new gamestate will be sent
@@ -906,7 +818,7 @@ pub fn SV_SpawnServer(
                     (*client).nextSnapshotTime = sv.svs.time; // generate a snapshot immediately
 
                     VM_Call(
-                        common,
+                        view.common,
                         sv.gvm,
                         MpGameExport::GAME_CLIENT_BEGIN as i32,
                         &[i],
@@ -918,75 +830,65 @@ pub fn SV_SpawnServer(
 
     // run another frame to allow things to look at all the players
     VM_Call(
-        common,
+        view.common,
         sv.gvm,
         MpGameExport::GAME_RUN_FRAME as i32,
         &[sv.svs.time],
     );
-    SV_BotFrame(common, sv, sv.svs.time);
+    SV_BotFrame(view.common, sv, sv.svs.time);
     sv.svs.time += 100;
     //rww - RAGDOLL_BEGIN
     g2api_set_time(g2, sv.svs.time, 0);
     //rww - RAGDOLL_END
 
     unsafe {
-        if (*common.sv_pure).integer != 0 {
+        if (*view.common.sv_pure).integer != 0 {
             // the server sends these to the clients so they will only
             // load pk3s also loaded at the server
-            p = FS_LoadedPakChecksums(common);
-            Cvar_Set(common, cm, rm, host, c"sv_paks".as_ptr(), p);
+            p = FS_LoadedPakChecksums(view.common);
+            Cvar_Set(view, c"sv_paks".as_ptr(), p);
             if libc::strlen(p) == 0 {
-                com_printf(common, "WARNING: sv_pure set but no PK3 files loaded\n");
+                com_printf(view.common, "WARNING: sv_pure set but no PK3 files loaded\n");
             }
-            p = FS_LoadedPakNames(common);
-            Cvar_Set(common, cm, rm, host, c"sv_pakNames".as_ptr(), p);
+            p = FS_LoadedPakNames(view.common);
+            Cvar_Set(view, c"sv_pakNames".as_ptr(), p);
 
             // if a dedicated pure server we need to touch the cgame because it could be in a
             // seperate pk3 file and the client will need to load the latest cgame.qvm
-            if (*common.com_dedicated).integer != 0 {
-                SV_TouchCGame(common, cm, rm, host);
+            if (*view.common.com_dedicated).integer != 0 {
+                SV_TouchCGame(view);
             }
         } else {
-            Cvar_Set(common, cm, rm, host, c"sv_paks".as_ptr(), c"".as_ptr());
-            Cvar_Set(common, cm, rm, host, c"sv_pakNames".as_ptr(), c"".as_ptr());
+            Cvar_Set(view, c"sv_paks".as_ptr(), c"".as_ptr());
+            Cvar_Set(view, c"sv_pakNames".as_ptr(), c"".as_ptr());
         }
     }
     // the server sends these to the clients so they can figure
     // out which pk3s should be auto-downloaded
-    p = FS_ReferencedPakChecksums(common);
-    Cvar_Set(common, cm, rm, host, c"sv_referencedPaks".as_ptr(), p);
-    p = FS_ReferencedPakNames(common);
-    Cvar_Set(
-        common,
-        cm,
-        rm,
-        host,
-        c"sv_referencedPakNames".as_ptr(),
-        p,
-    );
+    p = FS_ReferencedPakChecksums(view.common);
+    Cvar_Set(view, c"sv_referencedPaks".as_ptr(), p);
+    p = FS_ReferencedPakNames(view.common);
+    Cvar_Set(view, c"sv_referencedPakNames".as_ptr(), p);
 
     // save systeminfo and serverinfo strings
     Q_strncpyz(
         systemInfo.as_mut_ptr(),
-        Cvar_InfoString_Big(common, mp_qshared::shared::cvar::CVAR_SYSTEMINFO),
+        Cvar_InfoString_Big(view.common, mp_qshared::shared::cvar::CVAR_SYSTEMINFO),
         systemInfo.len() as c_int,
     );
-    common.cvar_modifiedFlags &= !mp_qshared::shared::cvar::CVAR_SYSTEMINFO;
-    SV_SetConfigstring(common, cm, sv, rm, host, mp_bg::public::configstring::CS_SYSTEMINFO, {
+    view.common.cvar_modifiedFlags &= !mp_qshared::shared::cvar::CVAR_SYSTEMINFO;
+    SV_SetConfigstring(view, sv, mp_bg::public::configstring::CS_SYSTEMINFO, {
         systemInfo.as_ptr()
     });
 
-    let serverinfo = Cvar_InfoString(common, mp_qshared::shared::cvar::CVAR_SERVERINFO);
+    let serverinfo = Cvar_InfoString(view.common, mp_qshared::shared::cvar::CVAR_SERVERINFO);
     SV_SetConfigstring(
-        common,
-        cm,
+        view,
         sv,
-        rm,
-        host,
         mp_bg::public::configstring::CS_SERVERINFO,
         serverinfo,
     );
-    common.cvar_modifiedFlags &= !mp_qshared::shared::cvar::CVAR_SERVERINFO;
+    view.common.cvar_modifiedFlags &= !mp_qshared::shared::cvar::CVAR_SERVERINFO;
 
     // any media configstring setting now should issue a warning
     // and any configstring changes should be reliably transmitted
@@ -996,7 +898,7 @@ pub fn SV_SpawnServer(
     // send a heartbeat now so the master will get up to date info
     SV_Heartbeat_f(sv);
 
-    Hunk_SetMark(common);
+    Hunk_SetMark(view.common);
 
     /* MrE: 2000-09-13: now called in CL_DownloadsComplete
     // don't call when running dedicated
@@ -1010,87 +912,66 @@ pub fn SV_SpawnServer(
 /// Raven `SV_Init`.
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:803-886`
-pub fn SV_Init(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    bot: &mut BotLib,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
-    SV_AddOperatorCommands(common, cm, sv, rm, host);
+pub fn SV_Init(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast of
+    // this slot for the borrow's duration.
+    let sv = unsafe { &mut *(view.sv.as_raw() as *mut Server) };
+    // SAFETY: view-constructor slot, single-threaded, no other live cast of
+    // this slot for the borrow's duration.
+    let bot = unsafe { &mut *(view.bot.as_raw() as *mut BotLib) };
+
+    SV_AddOperatorCommands(view, sv);
 
     // serverinfo vars
-    Cvar_Get(common, cm, rm, host, c"dmflags".as_ptr(), c"0".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
-    Cvar_Get(common, cm, rm, host, c"fraglimit".as_ptr(), c"20".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
-    Cvar_Get(common, cm, rm, host, c"timelimit".as_ptr(), c"0".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
-    Cvar_Get(common, cm, rm, host, c"capturelimit".as_ptr(), c"0".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
+    Cvar_Get(view, c"dmflags".as_ptr(), c"0".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
+    Cvar_Get(view, c"fraglimit".as_ptr(), c"20".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
+    Cvar_Get(view, c"timelimit".as_ptr(), c"0".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
+    Cvar_Get(view, c"capturelimit".as_ptr(), c"0".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
 
     // Get these to establish them and to make sure they have a default before the menus decide to stomp them.
     Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"g_maxHolocronCarry".as_ptr(),
         c"3".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
-    Cvar_Get(common, cm, rm, host, c"g_privateDuel".as_ptr(), c"1".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
-    Cvar_Get(common, cm, rm, host, c"g_saberLocking".as_ptr(), c"1".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
-    Cvar_Get(common, cm, rm, host, c"g_maxForceRank".as_ptr(), c"6".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
+    Cvar_Get(view, c"g_privateDuel".as_ptr(), c"1".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
+    Cvar_Get(view, c"g_saberLocking".as_ptr(), c"1".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
+    Cvar_Get(view, c"g_maxForceRank".as_ptr(), c"6".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
     Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"duel_fraglimit".as_ptr(),
         c"10".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
     Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"g_forceBasedTeams".as_ptr(),
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
     Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"g_duelWeaponDisable".as_ptr(),
         c"1".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
 
-    common.sv_gametype = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_gametype = Cvar_Get(
+        view,
         c"g_gametype".as_ptr(),
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO | mp_qshared::shared::cvar::CVAR_LATCH,
     );
-    common.sv_needpass = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_needpass = Cvar_Get(
+        view,
         c"g_needpass".as_ptr(),
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO | mp_qshared::shared::cvar::CVAR_ROM,
     );
-    Cvar_Get(common, cm, rm, host, c"sv_keywords".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
+    Cvar_Get(view, c"sv_keywords".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_SERVERINFO);
     Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"protocol".as_ptr(),
         va(
             c"%i".as_ptr(),
@@ -1098,175 +979,130 @@ pub fn SV_Init(
         ),
         mp_qshared::shared::cvar::CVAR_SERVERINFO | mp_qshared::shared::cvar::CVAR_ROM,
     );
-    common.sv_mapname = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_mapname = Cvar_Get(
+        view,
         c"mapname".as_ptr(),
         c"nomap".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO | mp_qshared::shared::cvar::CVAR_ROM,
     );
-    common.sv_privateClients = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_privateClients = Cvar_Get(
+        view,
         c"sv_privateClients".as_ptr(),
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
-    common.sv_hostname = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_hostname = Cvar_Get(
+        view,
         c"sv_hostname".as_ptr(),
         c"*Jedi*".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE,
     );
-    common.sv_maxclients = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_maxclients = Cvar_Get(
+        view,
         c"sv_maxclients".as_ptr(),
         c"8".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO | mp_qshared::shared::cvar::CVAR_LATCH,
     );
-    common.sv_maxRate = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_maxRate = Cvar_Get(
+        view,
         c"sv_maxRate".as_ptr(),
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_ARCHIVE | mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
-    common.sv_minPing = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_minPing = Cvar_Get(
+        view,
         c"sv_minPing".as_ptr(),
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_ARCHIVE | mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
-    common.sv_maxPing = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_maxPing = Cvar_Get(
+        view,
         c"sv_maxPing".as_ptr(),
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_ARCHIVE | mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
-    common.sv_floodProtect = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_floodProtect = Cvar_Get(
+        view,
         c"sv_floodProtect".as_ptr(),
         c"1".as_ptr(),
         mp_qshared::shared::cvar::CVAR_ARCHIVE | mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
     // systeminfo
     Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"sv_cheats".as_ptr(),
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ROM,
     );
-    common.sv_serverid = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_serverid = Cvar_Get(
+        view,
         c"sv_serverid".as_ptr(),
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ROM,
     );
     // (retail branch kept; `DLL_ONLY`-guarded alternate branch is a dead
     // build config here — §20-class note, not transcribed)
-    common.sv_pure = Cvar_Get(common, cm, rm, host, c"sv_pure".as_ptr(), c"1".as_ptr(), mp_qshared::shared::cvar::CVAR_SYSTEMINFO);
+    view.common.sv_pure = Cvar_Get(view, c"sv_pure".as_ptr(), c"1".as_ptr(), mp_qshared::shared::cvar::CVAR_SYSTEMINFO);
     Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"sv_paks".as_ptr(),
         c"".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ROM,
     );
     Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"sv_pakNames".as_ptr(),
         c"".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ROM,
     );
     Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"sv_referencedPaks".as_ptr(),
         c"".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ROM,
     );
     Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"sv_referencedPakNames".as_ptr(),
         c"".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ROM,
     );
 
     // server vars
-    common.sv_rconPassword = Cvar_Get(common, cm, rm, host, c"rconPassword".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
-    common.sv_privatePassword = Cvar_Get(common, cm, rm, host, c"sv_privatePassword".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
-    common.sv_fps = Cvar_Get(common, cm, rm, host, c"sv_fps".as_ptr(), c"20".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
-    common.sv_timeout = Cvar_Get(common, cm, rm, host, c"sv_timeout".as_ptr(), c"200".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
-    common.sv_zombietime = Cvar_Get(common, cm, rm, host, c"sv_zombietime".as_ptr(), c"2".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
-    Cvar_Get(common, cm, rm, host, c"nextmap".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
+    view.common.sv_rconPassword = Cvar_Get(view, c"rconPassword".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
+    view.common.sv_privatePassword = Cvar_Get(view, c"sv_privatePassword".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
+    view.common.sv_fps = Cvar_Get(view, c"sv_fps".as_ptr(), c"20".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
+    view.common.sv_timeout = Cvar_Get(view, c"sv_timeout".as_ptr(), c"200".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
+    view.common.sv_zombietime = Cvar_Get(view, c"sv_zombietime".as_ptr(), c"2".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
+    Cvar_Get(view, c"nextmap".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_TEMP);
 
     // (Xbox master/download exclusion branch not taken; retail non-Xbox path kept)
-    common.sv_allowDownload = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+    view.common.sv_allowDownload = Cvar_Get(
+        view,
         c"sv_allowDownload".as_ptr(),
         c"0".as_ptr(),
         mp_qshared::shared::cvar::CVAR_SERVERINFO,
     );
     // `MASTER_SERVER_NAME` (`qcommon/protocol.rs`) as a c-string cvar default,
     // matching the inline-literal precedent of the sibling sv_masterN defaults.
-    common.sv_master[0] =
-        Cvar_Get(common, cm, rm, host, c"sv_master1".as_ptr(), c"masterjk3.ravensoft.com".as_ptr(), 0);
-    common.sv_master[1] = Cvar_Get(common, cm, rm, host, c"sv_master2".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
-    common.sv_master[2] = Cvar_Get(common, cm, rm, host, c"sv_master3".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
-    common.sv_master[3] = Cvar_Get(common, cm, rm, host, c"sv_master4".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
-    common.sv_master[4] = Cvar_Get(common, cm, rm, host, c"sv_master5".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
-    common.sv_reconnectlimit = Cvar_Get(common, cm, rm, host, c"sv_reconnectlimit".as_ptr(), c"3".as_ptr(), 0);
-    common.sv_showghoultraces = Cvar_Get(common, cm, rm, host, c"sv_showghoultraces".as_ptr(), c"0".as_ptr(), 0);
-    common.sv_showloss = Cvar_Get(common, cm, rm, host, c"sv_showloss".as_ptr(), c"0".as_ptr(), 0);
-    common.sv_padPackets = Cvar_Get(common, cm, rm, host, c"sv_padPackets".as_ptr(), c"0".as_ptr(), 0);
-    common.sv_killserver = Cvar_Get(common, cm, rm, host, c"sv_killserver".as_ptr(), c"0".as_ptr(), 0);
-    common.sv_mapChecksum = Cvar_Get(common, cm, rm, host, c"sv_mapChecksum".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ROM);
+    view.common.sv_master[0] =
+        Cvar_Get(view, c"sv_master1".as_ptr(), c"masterjk3.ravensoft.com".as_ptr(), 0);
+    view.common.sv_master[1] = Cvar_Get(view, c"sv_master2".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
+    view.common.sv_master[2] = Cvar_Get(view, c"sv_master3".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
+    view.common.sv_master[3] = Cvar_Get(view, c"sv_master4".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
+    view.common.sv_master[4] = Cvar_Get(view, c"sv_master5".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ARCHIVE);
+    view.common.sv_reconnectlimit = Cvar_Get(view, c"sv_reconnectlimit".as_ptr(), c"3".as_ptr(), 0);
+    view.common.sv_showghoultraces = Cvar_Get(view, c"sv_showghoultraces".as_ptr(), c"0".as_ptr(), 0);
+    view.common.sv_showloss = Cvar_Get(view, c"sv_showloss".as_ptr(), c"0".as_ptr(), 0);
+    view.common.sv_padPackets = Cvar_Get(view, c"sv_padPackets".as_ptr(), c"0".as_ptr(), 0);
+    view.common.sv_killserver = Cvar_Get(view, c"sv_killserver".as_ptr(), c"0".as_ptr(), 0);
+    view.common.sv_mapChecksum = Cvar_Get(view, c"sv_mapChecksum".as_ptr(), c"".as_ptr(), mp_qshared::shared::cvar::CVAR_ROM);
 
     // initialize bot cvars so they are listed and can be set before loading the botlib
-    SV_BotInitCvars(common, cm, rm, host);
+    SV_BotInitCvars(view);
 
     // init the botlib here because we need the pre-compiler in the UI
-    SV_BotInitBotLib(common, cm, sv, bot, rm, host);
+    SV_BotInitBotLib(view, sv, bot);
 
     // Raven allocates `G2VertSpaceServer = new CMiniHeap(...)` here for game-side
     // model vertex transforms (sv_init.cpp:468-469); `CMiniHeap` is deleted per
@@ -1280,30 +1116,23 @@ pub fn SV_Init(
 /// is going to totally exit after returning from this function.
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:900-918`
-pub fn SV_FinalMessage(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    message: &str,
-) {
+pub fn SV_FinalMessage(view: &mut EngineHostView, sv: &mut Server, message: &str) {
     // send it twice, ignoring rate
     for _j in 0..2 {
-        let maxclients = unsafe { (*common.sv_maxclients).integer };
+        let maxclients = unsafe { (*view.common.sv_maxclients).integer };
         for i in 0..maxclients {
             let cl = unsafe { sv.svs.clients.offset(i as isize) };
             if unsafe { (*cl).state } >= clientState_t::CS_CONNECTED {
                 // don't send a disconnect to a local client
                 if unsafe { (*cl).netchan.remoteAddress.r#type } != netadrtype_t::NA_LOOPBACK {
-                    SV_SendServerCommand(common, sv, cl, &format!("print \"{}\"", message));
-                    SV_SendServerCommand(common, sv, cl, "disconnect");
+                    SV_SendServerCommand(view.common, sv, cl, &format!("print \"{}\"", message));
+                    SV_SendServerCommand(view.common, sv, cl, "disconnect");
                 }
                 // force a snapshot to be sent
                 unsafe {
                     (*cl).nextSnapshotTime = -1;
                 }
-                SV_SendClientSnapshot(common, cm, sv, rm, host, cl);
+                SV_SendClientSnapshot(view, sv, cl);
             }
         }
     }
@@ -1313,47 +1142,45 @@ pub fn SV_FinalMessage(
 /// `Sys_Error`.
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:929-990`
-pub fn SV_Shutdown(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
-    finalmsg: &str,
-) {
-    if common.com_sv_running.is_null() || unsafe { (*common.com_sv_running).integer } == 0 {
+pub fn SV_Shutdown(view: &mut EngineHostView, finalmsg: &str) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast of
+    // this slot for the borrow's duration.
+    let sv = unsafe { &mut *(view.sv.as_raw() as *mut Server) };
+
+    if view.common.com_sv_running.is_null()
+        || unsafe { (*view.common.com_sv_running).integer } == 0
+    {
         return;
     }
 
-    if !sv.svs.clients.is_null() && common.com_errorEntered == qboolean::from(0) {
-        SV_FinalMessage(common, cm, sv, rm, host, finalmsg);
+    if !sv.svs.clients.is_null() && view.common.com_errorEntered == qboolean::from(0) {
+        SV_FinalMessage(view, sv, finalmsg);
     }
 
     SV_RemoveOperatorCommands();
     // `#ifndef _XBOX` — no master on Xbox; this build is never Xbox.
-    SV_MasterShutdown(common, cm, rm, host, sv);
-    SV_ShutdownGameProgs(common, sv);
+    SV_MasterShutdown(view, sv);
+    SV_ShutdownGameProgs(view.common, sv);
 
     // de allocate the snapshot entities
     if !sv.svs.snapshotEntities.is_null() {
-        Z_Free(common, sv.svs.snapshotEntities as *mut _);
+        Z_Free(view.common, sv.svs.snapshotEntities as *mut _);
         sv.svs.snapshotEntities = core::ptr::null_mut();
     }
 
     // free current level
-    SV_ClearServer(common, sv);
+    SV_ClearServer(view.common, sv);
     // jfm: add a clear here since it's commented out in clearServer. This
     // prevents crashing cmShaderTable on exit.
-    CM_ClearMap(cm, rmg);
+    CM_ClearMap(view.cm, &mut view.rmg);
 
     // free server static data
     if !sv.svs.clients.is_null() {
-        Z_Free(common, sv.svs.clients as *mut _);
+        Z_Free(view.common, sv.svs.clients as *mut _);
     }
     let svs_size = core::mem::size_of_val(&sv.svs);
     Com_Memset(&mut sv.svs as *mut _ as *mut (), 0, svs_size);
 
-    Cvar_Set(common, cm, rm, host, c"sv_running".as_ptr(), c"0".as_ptr());
-    Cvar_Set(common, cm, rm, host, c"ui_singlePlayerActive".as_ptr(), c"0".as_ptr());
+    Cvar_Set(view, c"sv_running".as_ptr(), c"0".as_ptr());
+    Cvar_Set(view, c"ui_singlePlayerActive".as_ptr(), c"0".as_ptr());
 }

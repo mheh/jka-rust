@@ -13,7 +13,6 @@
 
 use core::ffi::{c_char, c_int};
 
-use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::ha_pref;
@@ -23,20 +22,16 @@ use native_types::qboolean;
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:28`
 const ZONE_MAGIC: i32 = 0x21436587;
 
-use crate::collision_world::CollisionWorld;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
 use crate::vm_fns::VM_Clear;
 use crate::z_memman::zone_header_s::zoneHeader_t;
 use crate::z_memman::zone_tail_s::zoneTail_t;
 
-// `Ghoul2System`/`Server` are type-erased receiver slots (real types live in
-// the above-tier engine crates); `Ghoul2System` is re-exported at this
-// historical home, defined once in `common::opaque_slots`.
-#[allow(dead_code)]
-use crate::cm_load::RenderModels;
+// `Ghoul2System` is a type-erased receiver slot (the real type lives in the
+// above-tier engine crates); re-exported at this historical home, defined once
+// in `common::opaque_slots`.
 pub use crate::common::opaque_slots::Ghoul2System;
-#[allow(dead_code)]
-use crate::cmd_pc::Server;
 
 // Real `Com_Printf` imported (sweep: extern forward-declares eliminated).
 use crate::common::com_printf as Com_Printf;
@@ -206,10 +201,7 @@ pub fn Z_Validate(common: &Common) {
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:157-308`
 pub fn Z_Malloc(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     iSize: c_int,
     eTag: memtag_t,
     bZeroit: qboolean,
@@ -249,19 +241,18 @@ pub fn Z_Malloc(
 
             // ditch the BSP cache...
             //
-            if crate::cm_load::CM_DeleteCachedMap(common, cm, native_types::qfalse) != 0 {
+            if crate::cm_load::CM_DeleteCachedMap(view.common, view.cm, native_types::qfalse) != 0 {
                 continue; // we've just ditched a whole load of memory, so try again with the malloc
             }
 
             // ditch any sounds not used on this level...
             //
-            if (common
+            let snd_register_audio = view
+                .common
                 .hooks
                 .SND_RegisterAudio_LevelLoadEnd
-                .expect("SND_RegisterAudio_LevelLoadEnd hook"))(
-                host, native_types::qtrue
-            ) != 0
-            {
+                .expect("SND_RegisterAudio_LevelLoadEnd hook");
+            if snd_register_audio(view, native_types::qtrue) != 0 {
                 continue; // we've dropped at least one sound, so try again with the malloc
             }
 
@@ -270,11 +261,10 @@ pub fn Z_Malloc(
 
             // ditch the model-binaries cache...  (must be getting desperate here!)
             //
-            if (common.hooks.RE_RegisterModels_LevelLoadEnd.expect(
+            let re_register_models = view.common.hooks.RE_RegisterModels_LevelLoadEnd.expect(
                 "RE_RegisterModels_LevelLoadEnd hook — installed by the renderer-model subsystem",
-            ))(rm, host, native_types::qtrue)
-                != 0
-            {
+            );
+            if re_register_models(view, native_types::qtrue) != 0 {
                 continue;
             }
 
@@ -283,13 +273,16 @@ pub fn Z_Malloc(
             // to ensure we're not dumping any memory needed by the sound
             // currently being loaded if that was the case)...
             //
-            if common.gbInsideLoadSound == 0 {
-                let snd_free_oldest_sound =
-                    common.hooks.SND_FreeOldestSound.expect("SND_FreeOldestSound hook");
-                let mut iBytesFreed = snd_free_oldest_sound(host);
+            if view.common.gbInsideLoadSound == 0 {
+                let snd_free_oldest_sound = view
+                    .common
+                    .hooks
+                    .SND_FreeOldestSound
+                    .expect("SND_FreeOldestSound hook");
+                let mut iBytesFreed = snd_free_oldest_sound(view);
                 if iBytesFreed != 0 {
                     loop {
-                        let iTheseBytesFreed = snd_free_oldest_sound(host);
+                        let iTheseBytesFreed = snd_free_oldest_sound(view);
                         if iTheseBytesFreed == 0 {
                             break;
                         }
@@ -307,13 +300,13 @@ pub fn Z_Malloc(
             //
             // findlabel:  "recovermem"
             Com_Printf(
-                common,
+                view.common,
                 &format!(
                     "^1Z_Malloc(): Failed to alloc {} bytes (TAG_{}) !!!!!\n",
                     iSize, psTagStrings[eTag as usize]
                 ),
             );
-            Z_Details_f(common);
+            Z_Details_f(view.common);
             crate::common::error::com_error(
                 errorParm_t::ERR_FATAL,
                 format!(
@@ -329,12 +322,12 @@ pub fn Z_Malloc(
         (*pMemory).iMagic = ZONE_MAGIC;
         (*pMemory).eTag = eTag;
         (*pMemory).iSize = iSize;
-        (*pMemory).pNext = common.TheZone.Header.pNext;
-        common.TheZone.Header.pNext = pMemory;
+        (*pMemory).pNext = view.common.TheZone.Header.pNext;
+        view.common.TheZone.Header.pNext = pMemory;
         if !(*pMemory).pNext.is_null() {
             (*(*pMemory).pNext).pPrev = pMemory;
         }
-        (*pMemory).pPrev = &mut common.TheZone.Header as *mut zoneHeader_t;
+        (*pMemory).pPrev = &mut view.common.TheZone.Header as *mut zoneHeader_t;
         //
         // add tail...
         //
@@ -342,17 +335,17 @@ pub fn Z_Malloc(
 
         // Update stats...
         //
-        common.TheZone.Stats.iCurrent += iSize;
-        common.TheZone.Stats.iCount += 1;
-        common.TheZone.Stats.iSizesPerTag[eTag as usize] += iSize;
-        common.TheZone.Stats.iCountsPerTag[eTag as usize] += 1;
+        view.common.TheZone.Stats.iCurrent += iSize;
+        view.common.TheZone.Stats.iCount += 1;
+        view.common.TheZone.Stats.iSizesPerTag[eTag as usize] += iSize;
+        view.common.TheZone.Stats.iCountsPerTag[eTag as usize] += 1;
 
-        if common.TheZone.Stats.iCurrent > common.TheZone.Stats.iPeak {
-            common.TheZone.Stats.iPeak = common.TheZone.Stats.iCurrent;
+        if view.common.TheZone.Stats.iCurrent > view.common.TheZone.Stats.iPeak {
+            view.common.TheZone.Stats.iPeak = view.common.TheZone.Stats.iCurrent;
         }
     }
 
-    Z_Validate(common); // check for corruption
+    Z_Validate(view.common); // check for corruption
 
     unsafe { pMemory.add(1) as *mut () }
 }
@@ -397,23 +390,8 @@ pub fn Z_Free(common: &mut Common, pvAddress: *mut ()) {
 /// Raven `S_Malloc` — `TAG_SMALL` `Z_Malloc` shorthand.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:480-482`
-pub fn S_Malloc(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    iSize: c_int,
-) -> *mut () {
-    Z_Malloc(
-        common,
-        cm,
-        rm,
-        host,
-        iSize,
-        memtag_t::TAG_SMALL,
-        native_types::qfalse,
-        4,
-    )
+pub fn S_Malloc(view: &mut EngineHostView, iSize: c_int) -> *mut () {
+    Z_Malloc(view, iSize, memtag_t::TAG_SMALL, native_types::qfalse, 4)
 }
 
 /// Raven `CopyString` — duplicates a string into the zone, returning shared
@@ -422,13 +400,7 @@ pub fn S_Malloc(
 /// Raven NOTE: never write over the memory `CopyString` returns because memory
 /// from a memstatic_t might be returned.
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:607-622`
-pub fn CopyString(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    in_: *const c_char,
-) -> *mut c_char {
+pub fn CopyString(view: &mut EngineHostView, in_: *const c_char) -> *mut c_char {
     unsafe {
         if *in_ == 0 {
             return (&gEmptyString.0 as *const StaticMem_t as *const u8)
@@ -439,7 +411,7 @@ pub fn CopyString(
                 .add(core::mem::size_of::<zoneHeader_t>()) as *mut c_char;
         }
 
-        let out = S_Malloc(common, cm, rm, host, (libc::strlen(in_) + 1) as c_int) as *mut c_char;
+        let out = S_Malloc(view, (libc::strlen(in_) + 1) as c_int) as *mut c_char;
         libc::strcpy(out, in_);
         out
     }
@@ -615,40 +587,30 @@ pub fn Com_ShutdownZoneMemory(common: &mut Common) {
 /// Raven `Com_InitZoneMemory`.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:577-594`
-pub fn Com_InitZoneMemory(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn Com_InitZoneMemory(view: &mut EngineHostView) {
     // §19: Raven's `memset(&TheZone, 0, sizeof(TheZone))` zero-inits the
     // whole struct before setting the header magic. `zone_t` has no `Default`
     // impl, so the memset is transcribed directly via `zeroed()` rather than
     // relying on aggregate zero-init.
-    common.TheZone = unsafe { core::mem::zeroed() };
-    common.TheZone.Header.iMagic = ZONE_MAGIC;
+    view.common.TheZone = unsafe { core::mem::zeroed() };
+    view.common.TheZone.Header.iMagic = ZONE_MAGIC;
 
     //#ifdef _DEBUG
     //	com_validateZone = Cvar_Get("com_validateZone", "1", 0);
     //#else
-    common.com_validateZone = Cvar_Get(common, cm, rm, host, c"com_validateZone".as_ptr(), c"0".as_ptr(), 0);
+    view.common.com_validateZone =
+        Cvar_Get(view, c"com_validateZone".as_ptr(), c"0".as_ptr(), 0);
     //#endif
 
     Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"zone_stats".as_ptr(),
-        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Z_Stats_f(common)),
+        Some(|view| Z_Stats_f(view.common)),
     );
     Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"zone_details".as_ptr(),
-        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Z_Details_f(common)),
+        Some(|view| Z_Details_f(view.common)),
     );
 
     // #ifdef _DEBUG: zone_memrecovertest is a debug-only command; this is a
@@ -816,37 +778,21 @@ pub fn Com_TouchMemory(common: &mut Common) {
 /// Raven `Hunk_Alloc`.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:791-793`
-pub fn Hunk_Alloc(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    size: c_int,
-    preference: ha_pref,
-) -> *mut () {
+pub fn Hunk_Alloc(view: &mut EngineHostView, size: c_int, preference: ha_pref) -> *mut () {
     let _ = preference;
     // §E0382: `common` moves into the call as the first arg, so its
     // `hunk_tag` field must be read into a local before the call, not inline.
-    let hunk_tag = common.hunk_tag;
-    Z_Malloc(common, cm, rm, host, size, hunk_tag, native_types::qtrue, 4)
+    let hunk_tag = view.common.hunk_tag;
+    Z_Malloc(view, size, hunk_tag, native_types::qtrue, 4)
 }
 
 /// Raven `Hunk_AllocateTempMemory`.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:806-809`
-pub fn Hunk_AllocateTempMemory(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    size: c_int,
-) -> *mut () {
+pub fn Hunk_AllocateTempMemory(view: &mut EngineHostView, size: c_int) -> *mut () {
     // don't bother clearing, because we are going to load a file over it
     Z_Malloc(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         size,
         memtag_t::TAG_TEMP_HUNKALLOC,
         native_types::qfalse,
@@ -864,54 +810,42 @@ pub fn Hunk_FreeTempMemory(common: &mut Common, buf: *mut ()) {
 /// Raven `Hunk_Clear`.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:752-782`
-pub fn Hunk_Clear(
-    common: &mut Common,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    g2: &mut Ghoul2System,
-    host: &mut dyn EngineHost,
-) {
+pub fn Hunk_Clear(view: &mut EngineHostView) {
     // DEDICATED: this is the dedicated-server build (§20/§C10 precedent —
     // the engine-fork-discovery rulings treat DEDICATED as the live
     // configuration), so the `#ifndef DEDICATED` client blocks
     // (CL_ShutdownCGame/CL_ShutdownUI/CIN_CloseAllVideos) are dropped.
-    let sv_shutdown_game_progs = common
+    let sv_shutdown_game_progs = view
+        .common
         .hooks
         .SV_ShutdownGameProgs
         .expect("SV_ShutdownGameProgs hook — installed by mp_engine_server at boot");
-    sv_shutdown_game_progs(common, sv);
+    sv_shutdown_game_progs(view);
 
-    common.hunk_tag = memtag_t::TAG_HUNK_MARK1;
-    Z_TagFree(common, memtag_t::TAG_HUNK_MARK1);
-    Z_TagFree(common, memtag_t::TAG_HUNK_MARK2);
+    view.common.hunk_tag = memtag_t::TAG_HUNK_MARK1;
+    Z_TagFree(view.common, memtag_t::TAG_HUNK_MARK1);
+    Z_TagFree(view.common, memtag_t::TAG_HUNK_MARK2);
 
-    (common
+    let r_hunk_clear_crap = view
+        .common
         .hooks
         .R_HunkClearCrap
-        .expect("R_HunkClearCrap hook — installed by the renderer-model subsystem"))(
-        rm, host,
-    );
+        .expect("R_HunkClearCrap hook — installed by the renderer-model subsystem");
+    r_hunk_clear_crap(view);
 
     //	Com_Printf( "Hunk_Clear: reset the hunk ok\n" );
-    VM_Clear(common);
+    VM_Clear(view.common);
 
     // See if any ghoul2 stuff was leaked, at this point it should be all
     // cleaned up.
     // _FULL_G2_LEAK_CHECKING is not defined in this build; the leak-check
     // assert/report block is dropped per its own guard.
-    let _ = g2;
 }
 
 /// Raven `Com_InitHunkMemory`.
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:678-681`
-pub fn Com_InitHunkMemory(
-    common: &mut Common,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    g2: &mut Ghoul2System,
-    host: &mut dyn EngineHost,
-) {
-    common.hunk_tag = memtag_t::TAG_HUNK_MARK1;
-    Hunk_Clear(common, sv, rm, g2, host);
+pub fn Com_InitHunkMemory(view: &mut EngineHostView) {
+    view.common.hunk_tag = memtag_t::TAG_HUNK_MARK1;
+    Hunk_Clear(view);
 }

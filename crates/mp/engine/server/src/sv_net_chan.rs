@@ -5,8 +5,7 @@
 use core::ffi::c_int;
 
 use mp_engine_qcommon::net_chan::{Netchan_Transmit, Netchan_TransmitNextFragment};
-use mp_engine_qcommon::collision_world::CollisionWorld;
-use mp_engine_qcommon::cm_load::RenderModels;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::msg::{MSG_ReadLong, MSG_WriteByte};
 use mp_engine_qcommon::net_chan::Netchan_Process;
@@ -14,7 +13,6 @@ use mp_engine_qcommon::qcommon::huffman_consts::{SV_DECODE_START, SV_ENCODE_STAR
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_engine_qcommon::qcommon::net_limits::MAX_RELIABLE_COMMANDS;
 use mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e;
-use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 
@@ -124,16 +122,10 @@ fn SV_Netchan_Decode(common: &mut Common, client: *mut client_t, msg: *mut msg_t
 /// Raven `SV_Netchan_TransmitNextFragment`.
 ///
 /// Source: `oracle/codemp/server/sv_net_chan.cpp:126-128`
-pub fn SV_Netchan_TransmitNextFragment(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    chan: *mut netchan_t,
-) {
+pub fn SV_Netchan_TransmitNextFragment(view: &mut EngineHostView, chan: *mut netchan_t) {
     // Callee's canonical home is qcommon `net_chan`; not yet ported there
     // (honest missing symbol).
-    Netchan_TransmitNextFragment(common, cm, rm, host, chan);
+    Netchan_TransmitNextFragment(view, chan);
 }
 
 /// Raven `SV_Netchan_Transmit`. The trailing `svc_EOF`, `SV_Netchan_Encode`
@@ -141,24 +133,14 @@ pub fn SV_Netchan_TransmitNextFragment(
 /// commented-out `Huff_Compress`/checksum scaffolding is dead code, not ported.
 ///
 /// Source: `oracle/codemp/server/sv_net_chan.cpp:138-147`
-pub fn SV_Netchan_Transmit(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    client: *mut client_t,
-    msg: *mut msg_t,
-) {
+pub fn SV_Netchan_Transmit(view: &mut EngineHostView, client: *mut client_t, msg: *mut msg_t) {
     unsafe {
-        MSG_WriteByte(common, msg, svc_ops_e::svc_EOF as c_int);
-        SV_Netchan_Encode(common, client, msg);
+        MSG_WriteByte(view.common, msg, svc_ops_e::svc_EOF as c_int);
+        SV_Netchan_Encode(view.common, client, msg);
         // Callee's canonical home is qcommon `net_chan`; not yet ported there
         // (honest missing symbol).
         Netchan_Transmit(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             &mut (*client).netchan,
             (*msg).cursize,
             (*msg).data,

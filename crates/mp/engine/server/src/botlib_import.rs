@@ -24,14 +24,18 @@
 use core::cell::UnsafeCell;
 use core::ffi::{c_char, c_int, c_long, c_void, CStr};
 
-use mp_engine_qcommon::cm_load::{CM_EntityString, RenderModels};
+use mp_engine_qcommon::cm_load::CM_EntityString;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::{com_printf, Common};
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
+use mp_engine_qcommon::common::opaque_slots::{
+    BotLib as SlotBotLib, Client as SlotClient, Ghoul2System as SlotGhoul2,
+    RenderModels as SlotRenderModels, RmManager as SlotRmManager, Server as SlotServer,
+};
 use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_Write};
 use mp_engine_qcommon::files_pc::{FS_FOpenFileByMode, FS_Read2, FS_Seek};
 use mp_engine_qcommon::z_memman_pc::{Hunk_Alloc, Hunk_CheckMark, Z_Free, Z_Malloc, Z_MemSize};
-use mp_host_interface::engine_host::EngineHost;
 
 use mp_qshared::common::mp::botlib::botlib_import_s::botlib_import_t;
 use mp_qshared::common::mp::botlib::print_type::{
@@ -66,8 +70,32 @@ struct BotImportCtx {
     common: *mut Common,
     cm: *mut CollisionWorld,
     sv: *mut Server,
-    rm: *mut RenderModels,
-    host: *mut dyn EngineHost,
+    // Raw `rm` slot target captured from the arming view. The migrated
+    // qcommon services (`Z_Malloc`/`Hunk_Alloc`/`FS_FOpenFileByMode`/`FS_Seek`)
+    // now take an `EngineHostView`, which each thunk rebuilds via `ctx_view`
+    // (host-seam restructure, user 2026-07-11).
+    rm: *mut (),
+}
+
+/// Rebuild an `EngineHostView` over the armed islands for the migrated qcommon
+/// services. The `cl`/`bot`/`rmg`/`g2` slots are null: those calls never touch
+/// them (they threaded only `common`/`cm`/`rm`/`host` before the restructure),
+/// matching the null-slot view precedent (host-seam worker spec rule 10).
+///
+/// SAFETY: the slot was armed by `SV_BotInitBotLib` from the live view; module
+/// dispatch is single-threaded, so this read cannot race an arm or another
+/// callback, and the captured island pointers outlive every botlib callback.
+unsafe fn ctx_view(ctx: &BotImportCtx) -> EngineHostView<'static> {
+    EngineHostView {
+        common: &mut *ctx.common,
+        cm: &mut *ctx.cm,
+        sv: SlotServer::from_raw(ctx.sv as *mut ()),
+        cl: SlotClient::from_raw(core::ptr::null_mut()),
+        bot: SlotBotLib::from_raw(core::ptr::null_mut()),
+        rm: SlotRenderModels::from_raw(ctx.rm),
+        rmg: SlotRmManager::from_raw(core::ptr::null_mut()),
+        g2: SlotGhoul2::from_raw(core::ptr::null_mut()),
+    }
 }
 
 struct BotImportSlotCell(UnsafeCell<Option<BotImportCtx>>);
@@ -94,32 +122,18 @@ fn ctx() -> &'static BotImportCtx {
 
 /// Arm the botlib-import slot with the `Engine` islands `SV_BotInitBotLib` holds
 /// — the botlib-import twin of `arm_game_slot`. Captures raw pointers to
-/// long-lived `Engine` fields; the `&mut` borrows end when this returns.
-pub fn arm_botlib_slot(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
-    // SAFETY: single-threaded server init; the captured pointers alias
-    // long-lived `Engine` island fields that outlive every botlib callback, and
-    // no callback can race this arm. The `host` trait-object pointer's borrow
-    // lifetime is erased to `'static` for slot storage (the game slot's `ctx`
-    // precedent: injected engine state read back single-threaded at the seam).
-    let host: *mut dyn EngineHost = unsafe {
-        core::mem::transmute::<*mut dyn EngineHost, *mut (dyn EngineHost + 'static)>(
-            host as *mut dyn EngineHost,
-        )
-    };
+/// long-lived `Engine` fields (`common`/`cm` and the real `Server`, plus the
+/// view's `rm` slot target); the `&mut` borrows end when this returns.
+pub fn arm_botlib_slot(view: &mut EngineHostView, sv: &mut Server) {
     let ctx = BotImportCtx {
-        common: common as *mut Common,
-        cm: cm as *mut CollisionWorld,
+        common: &mut *view.common as *mut Common,
+        cm: &mut *view.cm as *mut CollisionWorld,
         sv: sv as *mut Server,
-        rm: rm as *mut RenderModels,
-        host,
+        rm: view.rm.as_raw(),
     };
-    // SAFETY: single-threaded arm; see the cell's `Sync` note.
+    // SAFETY: single-threaded arm; see the cell's `Sync` note. The captured
+    // pointers alias long-lived `Engine` island fields that outlive every
+    // botlib callback, and no callback can race this arm.
     unsafe {
         *BOTLIB_SLOT.0.get() = Some(ctx);
     }
@@ -176,17 +190,9 @@ extern "C" fn bot_import_bsp_entity_data() -> *mut c_char {
 /// Raven `BotImport_GetMemory` — `Z_Malloc(size, TAG_BOTLIB, qtrue)`
 /// (`sv_bot.cpp:438-443`).
 extern "C" fn bot_import_get_memory(size: c_int) -> *mut c_void {
-    let ctx = ctx();
-    Z_Malloc(
-        unsafe { &mut *ctx.common },
-        unsafe { &mut *ctx.cm },
-        unsafe { &mut *ctx.rm },
-        unsafe { &mut *ctx.host },
-        size,
-        memtag_t::TAG_BOTLIB,
-        qtrue,
-        0,
-    ) as *mut c_void
+    // SAFETY: single-threaded callback; the armed slot's islands are live.
+    let mut view = unsafe { ctx_view(ctx()) };
+    Z_Malloc(&mut view, size, memtag_t::TAG_BOTLIB, qtrue, 0) as *mut c_void
 }
 
 /// Raven `BotImport_FreeMemory` — `Z_Free(ptr)` (`sv_bot.cpp:450-452`).
@@ -204,21 +210,15 @@ extern "C" fn bot_import_available_memory() -> c_int {
 /// `Hunk_Alloc(size, h_high)` (`sv_bot.cpp:459-464`).
 extern "C" fn bot_import_hunk_alloc(size: c_int) -> *mut c_void {
     let ctx = ctx();
-    let common = unsafe { &mut *ctx.common };
-    if Hunk_CheckMark(common) == qtrue {
+    if Hunk_CheckMark(unsafe { &mut *ctx.common }) == qtrue {
         com_error(
             errorParm_t::ERR_DROP,
             "SV_Bot_HunkAlloc: Alloc with marks already set\n".to_string(),
         );
     }
-    Hunk_Alloc(
-        common,
-        unsafe { &mut *ctx.cm },
-        unsafe { &mut *ctx.rm },
-        unsafe { &mut *ctx.host },
-        size,
-        ha_pref::h_high,
-    ) as *mut c_void
+    // SAFETY: single-threaded callback; the armed slot's islands are live.
+    let mut view = unsafe { ctx_view(ctx) };
+    Hunk_Alloc(&mut view, size, ha_pref::h_high) as *mut c_void
 }
 
 /// Raven `FS_FOpenFileByMode` (installed as `FS_FOpenFile`, `sv_bot.cpp:707`).
@@ -227,16 +227,9 @@ extern "C" fn bot_import_fs_fopen_file(
     file: *mut fileHandle_t,
     mode: fsMode_t,
 ) -> c_int {
-    let ctx = ctx();
-    FS_FOpenFileByMode(
-        unsafe { &mut *ctx.common },
-        unsafe { &mut *ctx.cm },
-        unsafe { &mut *ctx.rm },
-        unsafe { &mut *ctx.host },
-        qpath,
-        file,
-        mode,
-    )
+    // SAFETY: single-threaded callback; the armed slot's islands are live.
+    let mut view = unsafe { ctx_view(ctx()) };
+    FS_FOpenFileByMode(&mut view, qpath, file, mode)
 }
 
 /// Raven `FS_Read2` (installed as `FS_Read`, `sv_bot.cpp:708`).
@@ -256,16 +249,9 @@ extern "C" fn bot_import_fs_fclose_file(f: fileHandle_t) {
 
 /// Raven `FS_Seek` (`sv_bot.cpp:711`).
 extern "C" fn bot_import_fs_seek(f: fileHandle_t, offset: c_long, origin: c_int) -> c_int {
-    let ctx = ctx();
-    FS_Seek(
-        unsafe { &mut *ctx.common },
-        unsafe { &mut *ctx.cm },
-        unsafe { &mut *ctx.rm },
-        unsafe { &mut *ctx.host },
-        f,
-        offset,
-        origin,
-    )
+    // SAFETY: single-threaded callback; the armed slot's islands are live.
+    let mut view = unsafe { ctx_view(ctx()) };
+    FS_Seek(&mut view, f, offset, origin)
 }
 
 /// Raven `BotImport_DebugLineCreate` (`sv_bot.cpp:525-528`).

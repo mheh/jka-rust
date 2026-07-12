@@ -20,9 +20,8 @@ use crate::qcommon::net_field_t::netField_t;
 use mp_host_interface::engine_host::EngineHost;
 use native_types::byte;
 
-use crate::cm_load::RenderModels;
-use crate::collision_world::CollisionWorld;
 use crate::common::Common;
+use crate::common::engine_host_view::EngineHostView;
 
 // Sweep: extern forward-declares eliminated. Real qshared/in-crate callees
 // imported; `strlen` from libc (rule 3).
@@ -742,10 +741,7 @@ fn psf_fields_mut(common: &mut Common, table: PsfTable) -> &mut [netField_t] {
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:46-68`
 pub fn MSG_Init(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     buf: *mut msg_t,
     data: *mut byte,
     length: c_int,
@@ -753,29 +749,29 @@ pub fn MSG_Init(
     // The delta-coder field tables are file-scope statics in Raven; here they
     // live on `Common` and are populated lazily so the override check below sees
     // them filled.
-    if common.entity_state_fields.is_empty() {
-        common.entity_state_fields = build_entity_state_fields();
+    if view.common.entity_state_fields.is_empty() {
+        view.common.entity_state_fields = build_entity_state_fields();
     }
-    if common.player_state_fields.is_empty() {
-        common.player_state_fields = build_player_state_fields();
+    if view.common.player_state_fields.is_empty() {
+        view.common.player_state_fields = build_player_state_fields();
     }
-    if common.pilot_player_state_fields.is_empty() {
-        common.pilot_player_state_fields = build_pilot_player_state_fields();
+    if view.common.pilot_player_state_fields.is_empty() {
+        view.common.pilot_player_state_fields = build_pilot_player_state_fields();
     }
-    if common.veh_player_state_fields.is_empty() {
-        common.veh_player_state_fields = build_veh_player_state_fields();
+    if view.common.veh_player_state_fields.is_empty() {
+        view.common.veh_player_state_fields = build_veh_player_state_fields();
     }
 
-    if !common.g_nOverrideChecked {
+    if !view.common.g_nOverrideChecked {
         // Check for netf overrides, then for psf overrides.
-        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qfalse);
-        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qtrue);
+        MSG_CheckNETFPSFOverrides(view, qfalse);
+        MSG_CheckNETFPSFOverrides(view, qtrue);
 
-        common.g_nOverrideChecked = true;
+        view.common.g_nOverrideChecked = true;
     }
 
-    if common.msg_init == qfalse {
-        MSG_initHuffman(common);
+    if view.common.msg_init == qfalse {
+        MSG_initHuffman(view.common);
     }
 
     unsafe {
@@ -792,37 +788,34 @@ pub fn MSG_Init(
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:70-92`
 pub fn MSG_InitOOB(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     buf: *mut msg_t,
     data: *mut byte,
     length: c_int,
 ) {
-    if common.entity_state_fields.is_empty() {
-        common.entity_state_fields = build_entity_state_fields();
+    if view.common.entity_state_fields.is_empty() {
+        view.common.entity_state_fields = build_entity_state_fields();
     }
-    if common.player_state_fields.is_empty() {
-        common.player_state_fields = build_player_state_fields();
+    if view.common.player_state_fields.is_empty() {
+        view.common.player_state_fields = build_player_state_fields();
     }
-    if common.pilot_player_state_fields.is_empty() {
-        common.pilot_player_state_fields = build_pilot_player_state_fields();
+    if view.common.pilot_player_state_fields.is_empty() {
+        view.common.pilot_player_state_fields = build_pilot_player_state_fields();
     }
-    if common.veh_player_state_fields.is_empty() {
-        common.veh_player_state_fields = build_veh_player_state_fields();
+    if view.common.veh_player_state_fields.is_empty() {
+        view.common.veh_player_state_fields = build_veh_player_state_fields();
     }
 
-    if !common.g_nOverrideChecked {
+    if !view.common.g_nOverrideChecked {
         // Check for netf overrides, then for psf overrides.
-        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qfalse);
-        MSG_CheckNETFPSFOverrides(common, cm, rm, host, qtrue);
+        MSG_CheckNETFPSFOverrides(view, qfalse);
+        MSG_CheckNETFPSFOverrides(view, qtrue);
 
-        common.g_nOverrideChecked = true;
+        view.common.g_nOverrideChecked = true;
     }
 
-    if common.msg_init == qfalse {
-        MSG_initHuffman(common);
+    if view.common.msg_init == qfalse {
+        MSG_initHuffman(view.common);
     }
 
     unsafe {
@@ -863,13 +856,7 @@ fn msg_override_cstr_str(cbuf: &[c_char]) -> String {
 /// re-applying the file's `name, bits` lines. Live only under `!_XBOX`.
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:2005-2197`
-pub fn MSG_CheckNETFPSFOverrides(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    psfOverrides: qboolean,
-) {
+pub fn MSG_CheckNETFPSFOverrides(view: &mut EngineHostView, psfOverrides: qboolean) {
     let mut overrideFile: [c_char; 4096] = [0; 4096];
     let mut entryName: [c_char; 4096] = [0; 4096];
     let mut bits: [c_char; 4096] = [0; 4096];
@@ -886,12 +873,12 @@ pub fn MSG_CheckNETFPSFOverrides(
     if psfOverrides != qfalse {
         //do PSF overrides instead of NETF
         fileName = "psf_overrides.txt";
-        bitStorage = &mut common.g_psfBitStorage;
-        numFields = common.player_state_fields.len() as c_int;
+        bitStorage = &mut view.common.g_psfBitStorage;
+        numFields = view.common.player_state_fields.len() as c_int;
     } else {
         fileName = "netf_overrides.txt";
-        bitStorage = &mut common.g_netfBitStorage;
-        numFields = common.entity_state_fields.len() as c_int;
+        bitStorage = &mut view.common.g_netfBitStorage;
+        numFields = view.common.entity_state_fields.len() as c_int;
     }
 
     if !unsafe { *bitStorage }.is_null() {
@@ -903,9 +890,9 @@ pub fn MSG_CheckNETFPSFOverrides(
             // a defaults list shorter than `numFields` would null-deref, matching C.
             unsafe {
                 if psfOverrides != qfalse {
-                    common.player_state_fields[i as usize].bits = (*restore).bits;
+                    view.common.player_state_fields[i as usize].bits = (*restore).bits;
                 } else {
-                    common.entity_state_fields[i as usize].bits = (*restore).bits;
+                    view.common.entity_state_fields[i as usize].bits = (*restore).bits;
                 }
                 i += 1;
                 restore = (*restore).next;
@@ -914,7 +901,7 @@ pub fn MSG_CheckNETFPSFOverrides(
     }
 
     let path = std::ffi::CString::new(format!("ext_data/MP/{}", fileName)).unwrap();
-    len = FS_FOpenFileRead(common, cm, rm, host, path.as_ptr(), &mut f, qfalse);
+    len = FS_FOpenFileRead(view, path.as_ptr(), &mut f, qfalse);
 
     if f == 0 {
         //silently exit since this file is not needed to proceed.
@@ -923,16 +910,16 @@ pub fn MSG_CheckNETFPSFOverrides(
 
     if len >= 4096 {
         com_printf(
-            common,
+            view.common,
             &format!("WARNING: {} is >= 4096 bytes and is being ignored\n", fileName),
         );
-        FS_FCloseFile(common, f);
+        FS_FCloseFile(view.common, f);
         return;
     }
 
     //Get contents of the file
-    FS_Read(common, overrideFile.as_mut_ptr() as *mut (), len, f);
-    FS_FCloseFile(common, f);
+    FS_Read(view.common, overrideFile.as_mut_ptr() as *mut (), len, f);
+    FS_FCloseFile(view.common, f);
 
     //because FS_Read does not do this for us.
     overrideFile[len as usize] = 0;
@@ -945,10 +932,7 @@ pub fn MSG_CheckNETFPSFOverrides(
         while i < numFields {
             //Alloc memory for this new ptr
             let node = Z_Malloc(
-                common,
-                cm,
-                rm,
-                host,
+                view,
                 core::mem::size_of::<bitStorage_t>() as c_int,
                 memtag_t::TAG_GENERAL,
                 qtrue,
@@ -959,9 +943,9 @@ pub fn MSG_CheckNETFPSFOverrides(
                 *bitStorage = node;
 
                 if psfOverrides != qfalse {
-                    (*node).bits = common.player_state_fields[i as usize].bits;
+                    (*node).bits = view.common.player_state_fields[i as usize].bits;
                 } else {
-                    (*node).bits = common.entity_state_fields[i as usize].bits;
+                    (*node).bits = view.common.entity_state_fields[i as usize].bits;
                 }
 
                 //Point to the ->next of the existing current ptr
@@ -1000,7 +984,7 @@ pub fn MSG_CheckNETFPSFOverrides(
 
             if overrideFile[i as usize] == 0 {
                 //just give up, this shouldn't happen
-                com_printf(common, &format!("WARNING: Parsing error for {}\n", fileName));
+                com_printf(view.common, &format!("WARNING: Parsing error for {}\n", fileName));
                 return;
             }
 
@@ -1037,18 +1021,18 @@ pub fn MSG_CheckNETFPSFOverrides(
                 while j < numFields {
                     if psfOverrides != qfalse {
                         //check psf fields
-                        if msg_override_cstr_eq(&entryName, common.player_state_fields[j as usize].name)
+                        if msg_override_cstr_eq(&entryName, view.common.player_state_fields[j as usize].name)
                         {
                             //found it, set the bits
-                            common.player_state_fields[j as usize].bits = ibits;
+                            view.common.player_state_fields[j as usize].bits = ibits;
                             break;
                         }
                     } else {
                         //otherwise check netf fields
-                        if msg_override_cstr_eq(&entryName, common.entity_state_fields[j as usize].name)
+                        if msg_override_cstr_eq(&entryName, view.common.entity_state_fields[j as usize].name)
                         {
                             //found it, set the bits
-                            common.entity_state_fields[j as usize].bits = ibits;
+                            view.common.entity_state_fields[j as usize].bits = ibits;
                             break;
                         }
                     }
@@ -1058,7 +1042,7 @@ pub fn MSG_CheckNETFPSFOverrides(
                 if j == numFields {
                     //failed to find the value
                     com_printf(
-                        common,
+                        view.common,
                         &format!(
                             "WARNING: Value '{}' from {} is not valid\n",
                             msg_override_cstr_str(&entryName),
@@ -1068,7 +1052,7 @@ pub fn MSG_CheckNETFPSFOverrides(
                 }
             } else {
                 //also should not happen
-                com_printf(common, &format!("WARNING: Parsing error for {}\n", fileName));
+                com_printf(view.common, &format!("WARNING: Parsing error for {}\n", fileName));
                 return;
             }
         }
@@ -2033,8 +2017,7 @@ pub fn MSG_WriteDeltaEntity(
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:1228-1383`
 pub fn MSG_ReadDeltaEntity(
-    common: &mut Common,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     msg: *mut msg_t,
     from: *mut entityState_t,
     to: *mut entityState_t,
@@ -2050,14 +2033,14 @@ pub fn MSG_ReadDeltaEntity(
         let startBit = (*msg).bit;
 
         // check for a remove
-        if MSG_ReadBits(common, msg, 1) == 1 {
+        if MSG_ReadBits(view.common, msg, 1) == 1 {
             crate::common_fns::Com_Memset(to as *mut (), 0, core::mem::size_of::<entityState_t>());
             (*to).number = mp_qshared::shared::limits::MAX_GENTITIES as c_int - 1;
             //TODO: Port cl_shownet
             // Source: oracle/codemp/qcommon/msg.cpp:12
-            if common.cl_shownet >= 2 || common.cl_shownet == -1 {
+            if view.common.cl_shownet >= 2 || view.common.cl_shownet == -1 {
                 crate::common::com_printf(
-                    common,
+                    view.common,
                     &format!("{:3}: #{:<3} remove\n", (*msg).readcount, number),
                 );
             }
@@ -2065,26 +2048,31 @@ pub fn MSG_ReadDeltaEntity(
         }
 
         // check for no delta
-        if MSG_ReadBits(common, msg, 1) == 0 {
+        if MSG_ReadBits(view.common, msg, 1) == 0 {
             *to = *from;
             (*to).number = number;
             return;
         }
 
-        let num_fields = common.entity_state_fields.len();
-        let lc = MSG_ReadByte(common, msg);
+        let num_fields = view.common.entity_state_fields.len();
+        let lc = MSG_ReadByte(view.common, msg);
 
         // shownet 2/3 will interleave with other printed info, -1 will
         // just print the delta records`
-        let print = if common.cl_shownet >= 2 || common.cl_shownet == -1 {
-            if let Some(classname) = host.sv_shownet_entity_classname(number) {
+        let print = if view.common.cl_shownet >= 2 || view.common.cl_shownet == -1 {
+            // Bind the host probe to an owned local first: the returned
+            // `Option<String>` holds no borrow of `view`, so `view.common` is
+            // free inside the branches (an `if let` scrutinee would otherwise
+            // extend the `&mut view` receiver borrow across the block).
+            let classname = view.sv_shownet_entity_classname(number);
+            if let Some(classname) = classname {
                 crate::common::com_printf(
-                    common,
+                    view.common,
                     &format!("{:3}: #{:<3} ({}) ", (*msg).readcount, number, classname),
                 );
             } else {
                 crate::common::com_printf(
-                    common,
+                    view.common,
                     &format!("{:3}: #{:<3} ", (*msg).readcount, number),
                 );
             }
@@ -2099,51 +2087,51 @@ pub fn MSG_ReadDeltaEntity(
             // Copy the field's data out (all `Copy`/`'static`) so no borrow of
             // `common.entity_state_fields` is held across the `MSG_Read*`/
             // `com_printf` calls below, which need `&mut common`.
-            let field_offset = common.entity_state_fields[i as usize].offset;
-            let field_bits = common.entity_state_fields[i as usize].bits;
-            let field_name = common.entity_state_fields[i as usize].name;
+            let field_offset = view.common.entity_state_fields[i as usize].offset;
+            let field_bits = view.common.entity_state_fields[i as usize].bits;
+            let field_name = view.common.entity_state_fields[i as usize].name;
             let fromF = (from as *const u8).add(field_offset as usize) as *const c_int;
             let toF = (to as *mut u8).add(field_offset as usize) as *mut c_int;
 
-            if MSG_ReadBits(common, msg, 1) == 0 {
+            if MSG_ReadBits(view.common, msg, 1) == 0 {
                 // no change
                 *toF = *fromF;
             } else if field_bits == 0 {
                 // float
-                if MSG_ReadBits(common, msg, 1) == 0 {
+                if MSG_ReadBits(view.common, msg, 1) == 0 {
                     *(toF as *mut f32) = 0.0f32;
-                } else if MSG_ReadBits(common, msg, 1) == 0 {
+                } else if MSG_ReadBits(view.common, msg, 1) == 0 {
                     // integral float
                     let mut trunc =
-                        MSG_ReadBits(common, msg, crate::qcommon::msg_consts::FLOAT_INT_BITS);
+                        MSG_ReadBits(view.common, msg, crate::qcommon::msg_consts::FLOAT_INT_BITS);
                     // bias to allow equal parts positive and negative
                     trunc -= crate::qcommon::msg_consts::FLOAT_INT_BIAS;
                     *(toF as *mut f32) = trunc as f32;
                     if print {
-                        crate::common::com_printf(common, &format!("{}:{} ", field_name, trunc));
+                        crate::common::com_printf(view.common, &format!("{}:{} ", field_name, trunc));
                     }
                 } else {
                     // full floating point value
-                    *toF = MSG_ReadBits(common, msg, 32);
+                    *toF = MSG_ReadBits(view.common, msg, 32);
                     if print {
                         crate::common::com_printf(
-                            common,
+                            view.common,
                             &format!("{}:{} ", field_name, *(toF as *mut f32)),
                         );
                     }
                 }
-            } else if MSG_ReadBits(common, msg, 1) == 0 {
+            } else if MSG_ReadBits(view.common, msg, 1) == 0 {
                 *toF = 0;
             } else {
                 // integer
-                *toF = MSG_ReadBits(common, msg, field_bits);
+                *toF = MSG_ReadBits(view.common, msg, field_bits);
                 if print {
-                    crate::common::com_printf(common, &format!("{}:{} ", field_name, *toF));
+                    crate::common::com_printf(view.common, &format!("{}:{} ", field_name, *toF));
                 }
             }
         }
         for i in lc..(num_fields as c_int) {
-            let field = &common.entity_state_fields[i as usize];
+            let field = &view.common.entity_state_fields[i as usize];
             let fromF = (from as *const u8).add(field.offset as usize) as *const c_int;
             let toF = (to as *mut u8).add(field.offset as usize) as *mut c_int;
             // no change
@@ -2152,7 +2140,7 @@ pub fn MSG_ReadDeltaEntity(
 
         if print {
             let endBit = (*msg).bit;
-            crate::common::com_printf(common, &format!(" ({} bits)\n", endBit - startBit));
+            crate::common::com_printf(view.common, &format!(" ({} bits)\n", endBit - startBit));
         }
     }
 }

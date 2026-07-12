@@ -22,7 +22,6 @@
 use core::ffi::c_int;
 use std::alloc::{alloc_zeroed, Layout};
 
-use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::errorParm_t;
@@ -44,9 +43,9 @@ use crate::cm::facet_t::facet_t;
 use crate::cm::patch_collide_s::{patchCollide_s, patchCollide_t};
 use crate::cm::patch_plane_t::patchPlane_t;
 use crate::cm::trace_work_s::traceWork_t;
-use crate::cm_load::RenderModels;
 use crate::cm_polylib::{BaseWindingForPlane, ChopWindingInPlace, CopyWinding, FreeWinding};
 use crate::collision_world::CollisionWorld;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::{com_error, com_printf, Common};
 use crate::common_fns::{Com_DPrintf, Com_Memcpy, Com_Memset};
 use crate::z_memman_pc::{Hunk_Alloc, Z_Free, Z_Malloc};
@@ -694,10 +693,7 @@ fn CM_SetBorderInward(
 ///
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:755-800`
 fn CM_ValidateFacet(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     facet: *mut facet_t,
 ) -> qboolean {
     unsafe {
@@ -705,30 +701,24 @@ fn CM_ValidateFacet(
             return qfalse;
         }
 
-        let mut plane = cm.planes[(*facet).surfacePlane as usize].plane;
+        let mut plane = view.cm.planes[(*facet).surfacePlane as usize].plane;
         let mut w = BaseWindingForPlane(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             [plane[0], plane[1], plane[2]],
             plane[3],
         );
         let mut j = 0;
         while j < (*facet).numBorders && !w.is_null() {
             if (*facet).borderPlanes[j as usize] == -1 {
-                FreeWinding(common, cm, w);
+                FreeWinding(view.common, view.cm, w);
                 return qfalse;
             }
-            plane = cm.planes[(*facet).borderPlanes[j as usize] as usize].plane;
+            plane = view.cm.planes[(*facet).borderPlanes[j as usize] as usize].plane;
             if (*facet).borderInward[j as usize] == 0 {
                 plane = [-plane[0], -plane[1], -plane[2], -plane[3]];
             }
             ChopWindingInPlace(
-                common,
-                cm,
-                rm,
-                host,
+                view,
                 &mut w,
                 [plane[0], plane[1], plane[2]],
                 plane[3],
@@ -758,7 +748,7 @@ fn CM_ValidateFacet(
                 }
             }
         }
-        FreeWinding(common, cm, w);
+        FreeWinding(view.common, view.cm, w);
 
         for j in 0..3usize {
             if maxs[j] - mins[j] > MAX_MAP_BOUNDS as f32 {
@@ -779,20 +769,14 @@ fn CM_ValidateFacet(
 ///
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:807-968`
 fn CM_AddFacetBevels(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     facet: *mut facet_t,
 ) {
     unsafe {
-        let mut plane = cm.planes[(*facet).surfacePlane as usize].plane;
+        let mut plane = view.cm.planes[(*facet).surfacePlane as usize].plane;
 
         let mut w = BaseWindingForPlane(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             [plane[0], plane[1], plane[2]],
             plane[3],
         );
@@ -802,17 +786,14 @@ fn CM_AddFacetBevels(
                 j += 1;
                 continue;
             }
-            plane = cm.planes[(*facet).borderPlanes[j as usize] as usize].plane;
+            plane = view.cm.planes[(*facet).borderPlanes[j as usize] as usize].plane;
 
             if (*facet).borderInward[j as usize] == 0 {
                 plane = [-plane[0], -plane[1], -plane[2], -plane[3]];
             }
 
             ChopWindingInPlace(
-                common,
-                cm,
-                rm,
-                host,
+                view,
                 &mut w,
                 [plane[0], plane[1], plane[2]],
                 plane[3],
@@ -854,7 +835,7 @@ fn CM_AddFacetBevels(
                 }
                 // if it's the surface plane
                 if CM_PlaneEqual(
-                    &cm.planes[(*facet).surfacePlane as usize],
+                    &view.cm.planes[(*facet).surfacePlane as usize],
                     &aplane,
                     &mut flipped,
                 ) != 0
@@ -867,7 +848,7 @@ fn CM_AddFacetBevels(
                 let mut i = 0;
                 while i < (*facet).numBorders {
                     if CM_PlaneEqual(
-                        &cm.planes[(*facet).borderPlanes[i as usize] as usize],
+                        &view.cm.planes[(*facet).borderPlanes[i as usize] as usize],
                         &aplane,
                         &mut flipped,
                     ) != 0
@@ -879,10 +860,10 @@ fn CM_AddFacetBevels(
 
                 if i == (*facet).numBorders {
                     if (*facet).numBorders > 4 + 6 + 16 {
-                        com_printf(common, "ERROR: too many bevels\n");
+                        com_printf(view.common, "ERROR: too many bevels\n");
                     }
                     (*facet).borderPlanes[(*facet).numBorders as usize] =
-                        CM_FindPlane2(cm, &aplane, &mut flipped);
+                        CM_FindPlane2(view.cm, &aplane, &mut flipped);
                     (*facet).borderNoAdjust[(*facet).numBorders as usize] = qfalse;
                     (*facet).borderInward[(*facet).numBorders as usize] = flipped;
                     (*facet).numBorders += 1;
@@ -954,7 +935,7 @@ fn CM_AddFacetBevels(
 
                     // if it's the surface plane
                     if CM_PlaneEqual(
-                        &cm.planes[(*facet).surfacePlane as usize],
+                        &view.cm.planes[(*facet).surfacePlane as usize],
                         &eplane,
                         &mut flipped,
                     ) != 0
@@ -966,7 +947,7 @@ fn CM_AddFacetBevels(
                     let mut i = 0;
                     while i < (*facet).numBorders {
                         if CM_PlaneEqual(
-                            &cm.planes[(*facet).borderPlanes[i as usize] as usize],
+                            &view.cm.planes[(*facet).borderPlanes[i as usize] as usize],
                             &eplane,
                             &mut flipped,
                         ) != 0
@@ -978,17 +959,17 @@ fn CM_AddFacetBevels(
 
                     if i == (*facet).numBorders {
                         if (*facet).numBorders > 4 + 6 + 16 {
-                            com_printf(common, "ERROR: too many bevels\n");
+                            com_printf(view.common, "ERROR: too many bevels\n");
                         }
                         (*facet).borderPlanes[(*facet).numBorders as usize] =
-                            CM_FindPlane2(cm, &eplane, &mut flipped);
+                            CM_FindPlane2(view.cm, &eplane, &mut flipped);
 
                         let mut kchk = 0;
                         while kchk < (*facet).numBorders {
                             if (*facet).borderPlanes[(*facet).numBorders as usize]
                                 == (*facet).borderPlanes[kchk as usize]
                             {
-                                com_printf(common, "WARNING: bevel plane already used\n");
+                                com_printf(view.common, "WARNING: bevel plane already used\n");
                             }
                             kchk += 1;
                         }
@@ -996,29 +977,26 @@ fn CM_AddFacetBevels(
                         (*facet).borderNoAdjust[(*facet).numBorders as usize] = qfalse;
                         (*facet).borderInward[(*facet).numBorders as usize] = flipped;
 
-                        let mut w2 = CopyWinding(common, cm, rm, host, w);
+                        let mut w2 = CopyWinding(view, w);
                         let mut newplane =
-                            cm.planes[(*facet).borderPlanes[(*facet).numBorders as usize] as usize]
+                            view.cm.planes[(*facet).borderPlanes[(*facet).numBorders as usize] as usize]
                                 .plane;
                         if (*facet).borderInward[(*facet).numBorders as usize] == 0 {
                             newplane = [-newplane[0], -newplane[1], -newplane[2], -newplane[3]];
                         }
                         ChopWindingInPlace(
-                            common,
-                            cm,
-                            rm,
-                            host,
+                            view,
                             &mut w2,
                             [newplane[0], newplane[1], newplane[2]],
                             newplane[3],
                             0.1,
                         );
                         if w2.is_null() {
-                            Com_DPrintf(common, "WARNING: CM_AddFacetBevels... invalid bevel\n");
+                            Com_DPrintf(view.common, "WARNING: CM_AddFacetBevels... invalid bevel\n");
                             dir += 2;
                             continue;
                         } else {
-                            FreeWinding(common, cm, w2);
+                            FreeWinding(view.common, view.cm, w2);
                         }
 
                         (*facet).numBorders += 1;
@@ -1030,7 +1008,7 @@ fn CM_AddFacetBevels(
             }
             j += 1;
         }
-        FreeWinding(common, cm, w);
+        FreeWinding(view.common, view.cm, w);
 
         // add opposite plane
         (*facet).borderPlanes[(*facet).numBorders as usize] = (*facet).surfacePlane;
@@ -1052,10 +1030,7 @@ const EN_LEFT: usize = 3;
 ///
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:983-1150`
 fn CM_PatchCollideFromGrid(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     grid: &cGrid_t,
     pf: *mut patchCollide_t,
 ) {
@@ -1073,17 +1048,14 @@ fn CM_PatchCollideFromGrid(
         let mut grid_planes = grid_planes;
 
         let facets = Z_Malloc(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             (MAX_FACETS * core::mem::size_of::<facet_t>()) as c_int,
             memtag_t::TAG_TEMP_WORKSPACE,
             qfalse,
             4,
         ) as *mut facet_t;
 
-        cm.numPlanes = 0;
+        view.cm.numPlanes = 0;
         let mut num_facets: c_int = 0;
 
         // find the planes for each triangle of the grid
@@ -1092,12 +1064,12 @@ fn CM_PatchCollideFromGrid(
                 let p1 = grid.points[i as usize][j as usize];
                 let p2 = grid.points[(i + 1) as usize][j as usize];
                 let p3 = grid.points[(i + 1) as usize][(j + 1) as usize];
-                grid_planes[i as usize][j as usize][0] = CM_FindPlane(cm, p1, p2, p3);
+                grid_planes[i as usize][j as usize][0] = CM_FindPlane(view.cm, p1, p2, p3);
 
                 let p1 = grid.points[(i + 1) as usize][(j + 1) as usize];
                 let p2 = grid.points[i as usize][(j + 1) as usize];
                 let p3 = grid.points[i as usize][j as usize];
-                grid_planes[i as usize][j as usize][1] = CM_FindPlane(cm, p1, p2, p3);
+                grid_planes[i as usize][j as usize][1] = CM_FindPlane(view.cm, p1, p2, p3);
             }
         }
 
@@ -1113,7 +1085,7 @@ fn CM_PatchCollideFromGrid(
                 no_adjust[EN_TOP] =
                     (borders[EN_TOP] == grid_planes[i as usize][j as usize][0]) as c_int;
                 if borders[EN_TOP] == -1 || no_adjust[EN_TOP] != 0 {
-                    borders[EN_TOP] = CM_EdgePlaneNum(common, cm, grid, &grid_planes, i, j, 0);
+                    borders[EN_TOP] = CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 0);
                 }
 
                 borders[EN_BOTTOM] = -1;
@@ -1125,7 +1097,7 @@ fn CM_PatchCollideFromGrid(
                 no_adjust[EN_BOTTOM] =
                     (borders[EN_BOTTOM] == grid_planes[i as usize][j as usize][1]) as c_int;
                 if borders[EN_BOTTOM] == -1 || no_adjust[EN_BOTTOM] != 0 {
-                    borders[EN_BOTTOM] = CM_EdgePlaneNum(common, cm, grid, &grid_planes, i, j, 2);
+                    borders[EN_BOTTOM] = CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 2);
                 }
 
                 borders[EN_LEFT] = -1;
@@ -1137,7 +1109,7 @@ fn CM_PatchCollideFromGrid(
                 no_adjust[EN_LEFT] =
                     (borders[EN_LEFT] == grid_planes[i as usize][j as usize][1]) as c_int;
                 if borders[EN_LEFT] == -1 || no_adjust[EN_LEFT] != 0 {
-                    borders[EN_LEFT] = CM_EdgePlaneNum(common, cm, grid, &grid_planes, i, j, 3);
+                    borders[EN_LEFT] = CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 3);
                 }
 
                 borders[EN_RIGHT] = -1;
@@ -1149,7 +1121,7 @@ fn CM_PatchCollideFromGrid(
                 no_adjust[EN_RIGHT] =
                     (borders[EN_RIGHT] == grid_planes[i as usize][j as usize][0]) as c_int;
                 if borders[EN_RIGHT] == -1 || no_adjust[EN_RIGHT] != 0 {
-                    borders[EN_RIGHT] = CM_EdgePlaneNum(common, cm, grid, &grid_planes, i, j, 1);
+                    borders[EN_RIGHT] = CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 1);
                 }
 
                 if num_facets == MAX_FACETS as c_int {
@@ -1173,9 +1145,9 @@ fn CM_PatchCollideFromGrid(
                     (*facet).borderNoAdjust[2] = no_adjust[EN_BOTTOM];
                     (*facet).borderPlanes[3] = borders[EN_LEFT];
                     (*facet).borderNoAdjust[3] = no_adjust[EN_LEFT];
-                    CM_SetBorderInward(common, cm, facet, grid, i, j, -1);
-                    if CM_ValidateFacet(common, cm, rm, host, facet) != qfalse {
-                        CM_AddFacetBevels(common, cm, rm, host, facet);
+                    CM_SetBorderInward(view.common, view.cm, facet, grid, i, j, -1);
+                    if CM_ValidateFacet(view, facet) != qfalse {
+                        CM_AddFacetBevels(view, facet);
                         num_facets += 1;
                     }
                 } else {
@@ -1191,12 +1163,12 @@ fn CM_PatchCollideFromGrid(
                         (*facet).borderPlanes[2] = borders[EN_BOTTOM];
                         if (*facet).borderPlanes[2] == -1 {
                             (*facet).borderPlanes[2] =
-                                CM_EdgePlaneNum(common, cm, grid, &grid_planes, i, j, 4);
+                                CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 4);
                         }
                     }
-                    CM_SetBorderInward(common, cm, facet, grid, i, j, 0);
-                    if CM_ValidateFacet(common, cm, rm, host, facet) != qfalse {
-                        CM_AddFacetBevels(common, cm, rm, host, facet);
+                    CM_SetBorderInward(view.common, view.cm, facet, grid, i, j, 0);
+                    if CM_ValidateFacet(view, facet) != qfalse {
+                        CM_AddFacetBevels(view, facet);
                         num_facets += 1;
                     }
 
@@ -1217,12 +1189,12 @@ fn CM_PatchCollideFromGrid(
                         (*facet).borderPlanes[2] = borders[EN_TOP];
                         if (*facet).borderPlanes[2] == -1 {
                             (*facet).borderPlanes[2] =
-                                CM_EdgePlaneNum(common, cm, grid, &grid_planes, i, j, 5);
+                                CM_EdgePlaneNum(view.common, view.cm, grid, &grid_planes, i, j, 5);
                         }
                     }
-                    CM_SetBorderInward(common, cm, facet, grid, i, j, 1);
-                    if CM_ValidateFacet(common, cm, rm, host, facet) != qfalse {
-                        CM_AddFacetBevels(common, cm, rm, host, facet);
+                    CM_SetBorderInward(view.common, view.cm, facet, grid, i, j, 1);
+                    if CM_ValidateFacet(view, facet) != qfalse {
+                        CM_AddFacetBevels(view, facet);
                         num_facets += 1;
                     }
                 }
@@ -1230,14 +1202,11 @@ fn CM_PatchCollideFromGrid(
         }
 
         // copy the results out
-        (*pf).numPlanes = cm.numPlanes;
+        (*pf).numPlanes = view.cm.numPlanes;
         (*pf).numFacets = num_facets;
         if num_facets != 0 {
             (*pf).facets = Hunk_Alloc(
-                common,
-                cm,
-                rm,
-                host,
+                view,
                 (num_facets as usize * core::mem::size_of::<facet_t>()) as c_int,
                 ha_pref::h_high,
             ) as *mut facet_t;
@@ -1250,20 +1219,17 @@ fn CM_PatchCollideFromGrid(
             (*pf).facets = core::ptr::null_mut();
         }
         (*pf).planes = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
-            (cm.numPlanes as usize * core::mem::size_of::<patchPlane_t>()) as c_int,
+            view,
+            (view.cm.numPlanes as usize * core::mem::size_of::<patchPlane_t>()) as c_int,
             ha_pref::h_high,
         ) as *mut patchPlane_t;
         Com_Memcpy(
             (*pf).planes as *mut (),
-            cm.planes.as_ptr() as *const (),
-            cm.numPlanes as usize * core::mem::size_of::<patchPlane_t>(),
+            view.cm.planes.as_ptr() as *const (),
+            view.cm.numPlanes as usize * core::mem::size_of::<patchPlane_t>(),
         );
 
-        Z_Free(common, facets as *mut ());
+        Z_Free(view.common, facets as *mut ());
         let _ = &mut grid_planes;
     }
 }
@@ -1274,10 +1240,7 @@ fn CM_PatchCollideFromGrid(
 ///
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:1163-1229`
 pub fn CM_GeneratePatchCollide(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     width: c_int,
     height: c_int,
     points: *mut vec3_t,
@@ -1334,10 +1297,7 @@ pub fn CM_GeneratePatchCollide(
         // the aproximate surface defined by these points will be
         // collided against
         let pf = Hunk_Alloc(
-            common,
-            cm,
-            rm,
-            host,
+            view,
             core::mem::size_of::<patchCollide_s>() as c_int,
             ha_pref::h_high,
         ) as *mut patchCollide_s;
@@ -1360,10 +1320,10 @@ pub fn CM_GeneratePatchCollide(
             }
         }
 
-        cm.c_totalPatchBlocks += (grid.width - 1) * (grid.height - 1);
+        view.cm.c_totalPatchBlocks += (grid.width - 1) * (grid.height - 1);
 
         // generate a bsp tree for the surface
-        CM_PatchCollideFromGrid(common, cm, rm, host, &grid, pf);
+        CM_PatchCollideFromGrid(view, &grid, pf);
 
         // expand by one unit for epsilon purposes
         (*pf).bounds[0][0] -= 1.0;
@@ -1537,17 +1497,13 @@ fn CM_CheckFacetPlane(
 ///
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:1392-1527`
 pub fn CM_TraceThroughPatchCollide(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
     pc: *const patchCollide_s,
 ) {
     // §20: only `cm` (for `cm_playerCurveClip`) is live in the ported trace
     // path; the dropped debug-capture removed the other receivers' uses.
-    let _ = (&mut *common, &mut *rm, &mut *host);
     unsafe {
         // I'm not sure if test is strictly correct.  Are all
         // bboxes axis aligned?  Do I care?  It seems to work
@@ -1559,7 +1515,7 @@ pub fn CM_TraceThroughPatchCollide(
         }
 
         if (*tw).isPoint != qfalse {
-            CM_TracePointThroughPatchCollide(cm, tw, trace, pc);
+            CM_TracePointThroughPatchCollide(view.cm, tw, trace, pc);
             return;
         }
 

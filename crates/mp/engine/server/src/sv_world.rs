@@ -13,8 +13,7 @@ use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
-use mp_engine_qcommon::cm_load::RenderModels;
-use mp_engine_qcommon::cm_load::RmManager;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::game::class_t::class_t;
@@ -561,12 +560,8 @@ const VEC3_ORIGIN: vec3_t = [0.0, 0.0, 0.0];
 /// Source: `oracle/codemp/server/sv_world.cpp:470-503`
 #[allow(clippy::too_many_arguments)]
 pub fn SV_ClipToEntity(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
+    view: &mut EngineHostView,
     sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
     trace: *mut trace_t,
     start: vec3_t,
     mins: vec3_t,
@@ -593,7 +588,7 @@ pub fn SV_ClipToEntity(
         }
 
         // might intersect, so do an exact clip
-        let clipHandle = SV_ClipHandleForEntity(cm, touch);
+        let clipHandle = SV_ClipHandleForEntity(view.cm, touch);
 
         let origin = (*touch).r.currentOrigin;
         let mut angles = (*touch).r.currentAngles;
@@ -603,11 +598,7 @@ pub fn SV_ClipToEntity(
         }
 
         mp_engine_qcommon::cm_trace::CM_TransformedBoxTrace(
-            common,
-            cm,
-            rm,
-            rmg,
-            host,
+            view,
             trace,
             start,
             end,
@@ -634,20 +625,11 @@ pub fn SV_ClipToEntity(
 /// (lines 643-687 of the cite) superseded by the live `#else` arm below it
 /// (line 688 on); only the live arm is transcribed, per C preprocessing.
 #[allow(clippy::too_many_arguments)]
-pub fn SV_ClipMoveToEntities(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    g2: &mut Ghoul2System,
-    mut host: &mut dyn EngineHost,
-    clip: *mut moveclip_t,
-) {
+pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *mut moveclip_t) {
     unsafe {
         let mut touchlist: [c_int; MAX_GENTITIES as usize] = [0; MAX_GENTITIES as usize];
         let num = SV_AreaEntities(
-            common,
+            view.common,
             sv,
             (*clip).boxmins,
             (*clip).boxmaxs,
@@ -726,7 +708,7 @@ pub fn SV_ClipMoveToEntities(
             }
 
             // might intersect, so do an exact clip
-            let clipHandle = SV_ClipHandleForEntity(cm, touch);
+            let clipHandle = SV_ClipHandleForEntity(view.cm, touch);
 
             let origin = (*touch).r.currentOrigin;
             let mut angles = (*touch).r.currentAngles;
@@ -746,11 +728,7 @@ pub fn SV_ClipMoveToEntities(
                 contents: 0,
             };
             mp_engine_qcommon::cm_trace::CM_TransformedBoxTrace(
-                common,
-                cm,
-                rm,
-                rmg,
-                host,
+                view,
                 &mut trace,
                 (*clip).start,
                 (*clip).end,
@@ -832,9 +810,9 @@ pub fn SV_ClipMoveToEntities(
                 // line with `#ifndef FINAL_BUILD`; FINAL_BUILD is undefined
                 // for this build per plan appendix, so the guard is always
                 // true and the print is unconditional here.
-                if host.cvar_integer("sv_showghoultraces") != 0 {
+                if view.cvar_integer("sv_showghoultraces") != 0 {
                     mp_engine_qcommon::common::common::com_printf(
-                        common,
+                        view.common,
                         &format!(
                             "Ghoul2 trace   lod={:1}   length={:6.0}   to {}\n",
                             (*clip).useLod,
@@ -852,8 +830,14 @@ pub fn SV_ClipMoveToEntities(
                 // *G2VertSpace` scratch arg both drop, per the ghoul2-server
                 // design); `(*touch).ghoul2` is the opaque `*mut CGhoul2Info_v`.
                 let ghoul2 = &mut *((*touch).ghoul2 as *mut CGhoul2Info_v);
-                let sv_time = host.sv_time();
-                let g2trace = if host.cvar_integer("com_optvehtrace") != 0
+                // SAFETY: view-constructor slot, single-threaded; this ghoul2
+                // cast aliases `view.g2`, but the g2api callees take it directly
+                // and never re-cast that slot for the borrow's duration (rule 7).
+                let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
+                // Real `&mut Server` is in scope — read `svs.time` directly
+                // rather than through the sv-touching `sv_time()` view method.
+                let sv_time = sv.svs.time;
+                let g2trace = if view.cvar_integer("com_optvehtrace") != 0
                     && (*touch).s.eType == mp_bg::public::entity_type::entityType_t::ET_NPC as c_int
                     && (*touch).s.NPC_class == class_t::CLASS_VEHICLE as c_int
                     && !(*touch).m_pVehicle.is_null()
@@ -861,7 +845,7 @@ pub fn SV_ClipMoveToEntities(
                     //for vehicles cache the transform data.
                     g2api_collision_detect_cache(
                         g2,
-                        &mut host,
+                        view,
                         ghoul2,
                         angles2,
                         (*touch).r.currentOrigin,
@@ -877,7 +861,7 @@ pub fn SV_ClipMoveToEntities(
                 } else {
                     g2api_collision_detect(
                         g2,
-                        &mut host,
+                        view,
                         ghoul2,
                         angles2,
                         (*touch).r.currentOrigin,
@@ -932,13 +916,7 @@ pub fn SV_ClipMoveToEntities(
 /// Source: `oracle/codemp/server/sv_world.cpp:803-862`
 #[allow(clippy::too_many_arguments)]
 pub fn SV_Trace(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    sv: &mut Server,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    g2: &mut Ghoul2System,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     results: *mut trace_t,
     start: vec3_t,
     mins: vec3_t,
@@ -969,11 +947,7 @@ pub fn SV_Trace(
 
         // clip to world
         mp_engine_qcommon::cm_trace::CM_BoxTrace(
-            common,
-            cm,
-            rm,
-            rmg,
-            host,
+            view,
             &mut clip.trace,
             start,
             end,
@@ -1020,7 +994,11 @@ pub fn SV_Trace(
         }
 
         // clip to other solid entities
-        SV_ClipMoveToEntities(common, cm, sv, rm, rmg, g2, host, &mut clip);
+        // SAFETY: view-constructor slot, single-threaded, no other live cast of
+        // this slot for the borrow's duration; `SV_ClipMoveToEntities` takes the
+        // cast `sv` directly and never re-casts `view.sv` (rule 7).
+        let sv = &mut *(view.sv.as_raw() as *mut Server);
+        SV_ClipMoveToEntities(view, sv, &mut clip);
 
         *results = clip.trace;
     }

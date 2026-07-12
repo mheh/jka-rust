@@ -15,15 +15,12 @@
 
 use core::ffi::{c_char, c_int, c_long, c_void};
 
-use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::qfalse;
 use native_types::fileHandle_t;
 
-use crate::cm_load::RenderModels;
-use crate::collision_world::CollisionWorld;
 use crate::common::{com_error, com_printf, Common, MASK_QUED_EVENTS, MAX_QUED_EVENTS};
 use crate::common::engine_host_view::EngineHostView;
 use crate::cvar_fns::{Cvar_Set, Cvar_VariableString};
@@ -191,15 +188,12 @@ pub fn Sys_StreamedRead(
 /// Raven's `int offset` param is widened to `c_long` to match the `FS_Seek` seam
 /// (the caller already holds a `c_long` offset).
 pub fn Sys_StreamSeek(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     f: fileHandle_t,
     offset: c_long,
     origin: c_int,
 ) {
-    FS_Seek(common, cm, rm, host, f, offset, origin);
+    FS_Seek(view, f, offset, origin);
 }
 
 /// Raven `Sys_QueEvent` (unix) — push one event onto the 256-entry
@@ -258,40 +252,36 @@ pub unsafe fn Sys_QueEvent(
 /// the headless module host, so they queue nothing and are elided.
 ///
 /// Source: `oracle/codemp/unix/unix_main.c:995-1051`
-pub fn Sys_GetEvent(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) -> sysEvent_t {
+pub fn Sys_GetEvent(view: &mut EngineHostView) -> sysEvent_t {
     // return if we have data
-    if common.sys_events.head > common.sys_events.tail {
-        common.sys_events.tail += 1;
-        return common.sys_events.que[((common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
+    if view.common.sys_events.head > view.common.sys_events.tail {
+        view.common.sys_events.tail += 1;
+        return view.common.sys_events.que
+            [((view.common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
     }
 
     // check for console commands
     if let Some(s) = native_platform::net::sys_console_input() {
         let bytes = s.as_bytes();
         let len = bytes.len() as c_int + 1;
-        let b = Z_Malloc(common, cm, rm, host, len, memtag_t::TAG_EVENT, qfalse, 4) as *mut u8;
+        let b = Z_Malloc(view, len, memtag_t::TAG_EVENT, qfalse, 4) as *mut u8;
         // strcpy( b, s ): copy the line and NUL-terminate.
         unsafe {
             core::ptr::copy_nonoverlapping(bytes.as_ptr(), b, bytes.len());
             *b.add(bytes.len()) = 0;
-            Sys_QueEvent(common, 0, sysEventType_t::SE_CONSOLE, 0, 0, len, b as *mut c_void);
+            Sys_QueEvent(view.common, 0, sysEventType_t::SE_CONSOLE, 0, 0, len, b as *mut c_void);
         }
     }
 
     // check for network packets
     let mut netmsg: msg_t = unsafe { core::mem::zeroed() };
-    let pkt = common.sys_packetReceived.as_mut_ptr();
-    MSG_Init(common, cm, rm, host, &mut netmsg, pkt, MAX_MSGLEN as c_int);
+    let pkt = view.common.sys_packetReceived.as_mut_ptr();
+    MSG_Init(view, &mut netmsg, pkt, MAX_MSGLEN as c_int);
     let mut adr: netadr_t = unsafe { core::mem::zeroed() };
-    if Sys_GetPacket(common, &mut adr, &mut netmsg) {
+    if Sys_GetPacket(view.common, &mut adr, &mut netmsg) {
         // copy out to a seperate buffer for qeueing
         let len = core::mem::size_of::<netadr_t>() as c_int + netmsg.cursize;
-        let buf = Z_Malloc(common, cm, rm, host, len, memtag_t::TAG_EVENT, qfalse, 4) as *mut netadr_t;
+        let buf = Z_Malloc(view, len, memtag_t::TAG_EVENT, qfalse, 4) as *mut netadr_t;
         unsafe {
             *buf = adr;
             core::ptr::copy_nonoverlapping(
@@ -299,19 +289,20 @@ pub fn Sys_GetEvent(
                 buf.add(1) as *mut u8,
                 netmsg.cursize as usize,
             );
-            Sys_QueEvent(common, 0, sysEventType_t::SE_PACKET, 0, 0, len, buf as *mut c_void);
+            Sys_QueEvent(view.common, 0, sysEventType_t::SE_PACKET, 0, 0, len, buf as *mut c_void);
         }
     }
 
     // return if we have data
-    if common.sys_events.head > common.sys_events.tail {
-        common.sys_events.tail += 1;
-        return common.sys_events.que[((common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
+    if view.common.sys_events.head > view.common.sys_events.tail {
+        view.common.sys_events.tail += 1;
+        return view.common.sys_events.que
+            [((view.common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
     }
 
     // create an empty event to return
     let mut ev: sysEvent_t = unsafe { core::mem::zeroed() };
-    ev.evTime = sys_milliseconds(common);
+    ev.evTime = sys_milliseconds(view.common);
     ev
 }
 

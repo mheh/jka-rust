@@ -47,15 +47,12 @@ use crate::cm::cmodel_s::cmodel_t;
 use crate::cm::leaf_list_s::leafList_t;
 use crate::cm::sphere_t::sphere_t;
 use crate::cm::trace_work_s::{traceWork_s, traceWork_t};
-use crate::cm_load::{
-    CM_ClipHandleToModel, CM_ModelBounds, CM_TempBoxModel, RenderModels, RmManager,
-};
+use crate::cm_load::{CM_ClipHandleToModel, CM_ModelBounds, CM_TempBoxModel};
 use crate::cm_patch_fns::{CM_PositionTestInPatchCollide, CM_TraceThroughPatchCollide};
 use crate::cm_test::{CM_BoxLeafnums_r, CM_StoreLeafs};
 use crate::collision_world::CollisionWorld;
-use crate::common::Common;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common_fns::Com_Memset;
-use mp_host_interface::engine_host::EngineHost;
 
 // PORT-NOTE(rm-types): `RmManager`/`RenderModels` are the state-receiver types
 // pinned by the engine-fork-discovery preamble's receiver order (rmg-terrain.md
@@ -701,9 +698,7 @@ pub fn CM_TraceThroughVerticalCylinder(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:703-798`
 pub fn CM_TraceThroughTerrain(
-    cm: &mut CollisionWorld,
-    _rmg: &mut RmManager,
-    _host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
     brush: *mut cbrush_t,
@@ -717,12 +712,12 @@ pub fn CM_TraceThroughTerrain(
         // block.
 
         // Check for absolutely no connection
-        if !CM_GenericBoxCollide((*tw).bounds, *cm.terrain_bounds()) {
+        if !CM_GenericBoxCollide((*tw).bounds, *view.cm.terrain_bounds()) {
             return;
         }
         // Now we know that at least some part of the trace needs to collide with the terrain
         // The regular brush collision is handled elsewhere, so advance the ray to an edge in the terrain brush
-        CM_TraceThroughBrush(cm, tw, trace, brush, true);
+        CM_TraceThroughBrush(view.cm, tw, trace, brush, true);
 
         // Remember the base entering and leaving fractions
         (*tw).baseEnterFrac = (*tw).enterFrac;
@@ -765,7 +760,7 @@ pub fn CM_TraceThroughTerrain(
 
             CM_CalcExtents(tBegin, (*tw).end, tw, (*tw).localBounds);
 
-            cm.terrain_patch_collide(
+            view.cm.terrain_patch_collide(
                 &mut *tw,
                 trace,
                 (*tw).start,
@@ -799,12 +794,12 @@ pub fn CM_TraceThroughTerrain(
 
         // Collide with any water
         if (*tw).contents & CONTENTS_WATER != 0 {
-            let fraction = cm.terrain_water_collide((*tw).start, (*tw).end, trace.fraction);
+            let fraction = view.cm.terrain_water_collide((*tw).start, (*tw).end, trace.fraction);
             if fraction < trace.fraction {
                 VectorSet(&mut trace.plane.normal, 0.0, 0.0, 1.0);
-                trace.contents = cm.terrain_water_contents();
+                trace.contents = view.cm.terrain_water_contents();
                 trace.fraction = fraction;
-                trace.surfaceFlags = cm.terrain_water_surface_flags();
+                trace.surfaceFlags = view.cm.terrain_water_surface_flags();
             }
         }
     }
@@ -814,9 +809,7 @@ pub fn CM_TraceThroughTerrain(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:262-333`
 pub fn CM_TestInLeaf(
-    cm: &mut CollisionWorld,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
     leaf: *mut cLeaf_t,
@@ -838,15 +831,15 @@ pub fn CM_TestInLeaf(
                 continue;
             }
 
-            if (*cm.cm_terrainPhysics).integer != 0
-                && !cm.cmg.landScape.is_null()
+            if (*view.cm.cm_terrainPhysics).integer != 0
+                && !view.cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
                 // Invalidate the checkcount for terrain as the terrain brush has to be processed
                 // many times.
                 (*b).checkcount -= 1;
 
-                CM_TraceThroughTerrain(cm, rmg, host, tw, trace, b);
+                CM_TraceThroughTerrain(view, tw, trace, b);
                 // If inside a terrain brush don't bother with regular brush collision
                 continue;
             }
@@ -857,7 +850,7 @@ pub fn CM_TestInLeaf(
         }
 
         // test against all patches
-        if (*cm.cm_noCurves).integer == 0 {
+        if (*view.cm.cm_noCurves).integer == 0 {
             for k in 0..(*leaf).numLeafSurfaces {
                 let patch: *mut cPatch_t = *(*local).surfaces.offset(
                     *(*local)
@@ -899,9 +892,7 @@ pub fn CM_TestInLeaf(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:448-483`
 pub fn CM_PositionTest(
-    cm: &mut CollisionWorld,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
 ) {
@@ -927,19 +918,19 @@ pub fn CM_PositionTest(
         ll.lastLeaf = 0;
         ll.overflowed = qfalse;
 
-        cm.cmg.checkcount += 1;
+        view.cm.cmg.checkcount += 1;
 
-        CM_BoxLeafnums_r(cm, &mut ll, 0);
+        CM_BoxLeafnums_r(view.cm, &mut ll, 0);
 
-        cm.cmg.checkcount += 1;
+        view.cm.cmg.checkcount += 1;
 
         // test the contents of the leafs
         for i in 0..ll.count {
             // Raw pointers (addr_of_mut) so `cm.cmg`/leaf don't alias the `cm`
             // receiver passed to the same call (CM_PointLeafnum precedent).
-            let leaf_ptr = cm.cmg.leafs.add(leafs[i as usize] as usize);
-            let cmg = core::ptr::addr_of_mut!(cm.cmg);
-            CM_TestInLeaf(cm, rmg, host, tw, trace, leaf_ptr, cmg);
+            let leaf_ptr = view.cm.cmg.leafs.add(leafs[i as usize] as usize);
+            let cmg = core::ptr::addr_of_mut!(view.cm.cmg);
+            CM_TestInLeaf(view, tw, trace, leaf_ptr, cmg);
             if trace.allsolid != 0 {
                 break;
             }
@@ -1038,9 +1029,7 @@ pub fn CM_TestCapsuleInCapsule(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:411-440`
 pub fn CM_TestBoundingBoxInCapsule(
-    cm: &mut CollisionWorld,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
     model: clipHandle_t,
@@ -1055,7 +1044,7 @@ pub fn CM_TestBoundingBoxInCapsule(
         // PORT-NOTE(shape-mismatch): `CM_ModelBounds`'s LAW signature (cm_load.rs)
         // takes `mins`/`maxs` by value (documented out-param non-propagation);
         // call bent to match — the fill does not write back here.
-        CM_ModelBounds(cm, model, mins, maxs);
+        CM_ModelBounds(view.cm, model, mins, maxs);
 
         // offset for capsule center
         for i in 0..3 {
@@ -1082,12 +1071,12 @@ pub fn CM_TestBoundingBoxInCapsule(
         );
 
         // replace the capsule with the bounding box
-        let h = CM_TempBoxModel(cm, (*tw).size[0], (*tw).size[1], qfalse);
+        let h = CM_TempBoxModel(view.cm, (*tw).size[0], (*tw).size[1], qfalse);
         // calculate collision
-        let cmod: *mut cmodel_t = CM_ClipHandleToModel(cm, h, core::ptr::null_mut());
-        let cmg = core::ptr::addr_of_mut!(cm.cmg);
+        let cmod: *mut cmodel_t = CM_ClipHandleToModel(view.cm, h, core::ptr::null_mut());
+        let cmg = core::ptr::addr_of_mut!(view.cm.cmg);
         let leaf = core::ptr::addr_of_mut!((*cmod).leaf);
-        CM_TestInLeaf(cm, rmg, host, tw, trace, leaf, cmg);
+        CM_TestInLeaf(view, tw, trace, leaf, cmg);
     }
 }
 
@@ -1095,20 +1084,17 @@ pub fn CM_TestBoundingBoxInCapsule(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:500-513`
 pub fn CM_TraceThroughPatch(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
     patch: *mut cPatch_t,
 ) {
     unsafe {
-        common.c_patch_traces += 1;
+        view.common.c_patch_traces += 1;
 
         let oldFrac = trace.fraction;
 
-        CM_TraceThroughPatchCollide(common, cm, rm, host, tw, trace, (*patch).pc);
+        CM_TraceThroughPatchCollide(view, tw, trace, (*patch).pc);
 
         if trace.fraction < oldFrac {
             trace.surfaceFlags = (*patch).surfaceFlags;
@@ -1206,11 +1192,7 @@ pub fn CM_TraceCapsuleThroughCapsule(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:976-1047`
 pub fn CM_TraceThroughLeaf(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
     local: *mut clipMap_t,
@@ -1233,17 +1215,17 @@ pub fn CM_TraceThroughLeaf(
                 continue;
             }
 
-            if (*cm.cm_terrainPhysics).integer != 0
-                && !cm.cmg.landScape.is_null()
+            if (*view.cm.cm_terrainPhysics).integer != 0
+                && !view.cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
                 // Invalidate the checkcount for terrain as the terrain brush has to be processed
                 // many times.
                 (*b).checkcount -= 1;
 
-                CM_TraceThroughTerrain(cm, rmg, host, tw, trace, b);
+                CM_TraceThroughTerrain(view, tw, trace, b);
             } else {
-                CM_TraceThroughBrush(cm, tw, trace, b, false);
+                CM_TraceThroughBrush(view.cm, tw, trace, b, false);
             }
 
             if trace.fraction == 0.0 {
@@ -1252,7 +1234,7 @@ pub fn CM_TraceThroughLeaf(
         }
 
         // trace line against all patches in the leaf
-        if (*cm.cm_noCurves).integer == 0 {
+        if (*view.cm.cm_noCurves).integer == 0 {
             for k in 0..(*leaf).numLeafSurfaces {
                 let patch: *mut cPatch_t = *(*local).surfaces.offset(
                     *(*local)
@@ -1272,7 +1254,7 @@ pub fn CM_TraceThroughLeaf(
                     continue;
                 }
 
-                CM_TraceThroughPatch(common, cm, rm, host, tw, trace, patch);
+                CM_TraceThroughPatch(view, tw, trace, patch);
                 if trace.fraction == 0.0 {
                     return;
                 }
@@ -1285,11 +1267,7 @@ pub fn CM_TraceThroughLeaf(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:1349-1419`
 pub fn CM_TraceToLeaf(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
     leaf: *mut cLeaf_t,
@@ -1312,27 +1290,27 @@ pub fn CM_TraceToLeaf(
                 continue;
             }
 
-            if (*cm.cm_terrainPhysics).integer != 0
-                && !cm.cmg.landScape.is_null()
+            if (*view.cm.cm_terrainPhysics).integer != 0
+                && !view.cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
                 // Invalidate the checkcount for terrain as the terrain brush has to be processed
                 // many times.
                 (*b).checkcount -= 1;
 
-                CM_TraceThroughTerrain(cm, rmg, host, tw, trace, b);
+                CM_TraceThroughTerrain(view, tw, trace, b);
                 // If inside a terrain brush don't bother with regular brush collision
                 continue;
             }
 
-            CM_TraceThroughBrush(cm, tw, trace, b, false);
+            CM_TraceThroughBrush(view.cm, tw, trace, b, false);
             if trace.fraction == 0.0 {
                 return;
             }
         }
 
         // trace line against all patches in the leaf
-        if (*cm.cm_noCurves).integer == 0 {
+        if (*view.cm.cm_noCurves).integer == 0 {
             for k in 0..(*leaf).numLeafSurfaces {
                 let patch: *mut cPatch_t = *(*local).surfaces.offset(
                     *(*local)
@@ -1352,7 +1330,7 @@ pub fn CM_TraceToLeaf(
                     continue;
                 }
 
-                CM_TraceThroughPatch(common, cm, rm, host, tw, trace, patch);
+                CM_TraceThroughPatch(view, tw, trace, patch);
                 if trace.fraction == 0.0 {
                     return;
                 }
@@ -1365,11 +1343,7 @@ pub fn CM_TraceToLeaf(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:1311-1340`
 pub fn CM_TraceBoundingBoxThroughCapsule(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
     model: clipHandle_t,
@@ -1384,7 +1358,7 @@ pub fn CM_TraceBoundingBoxThroughCapsule(
         // PORT-NOTE(shape-mismatch): `CM_ModelBounds`'s LAW signature (cm_load.rs)
         // takes `mins`/`maxs` by value (documented out-param non-propagation);
         // call bent to match — the fill does not write back here.
-        CM_ModelBounds(cm, model, mins, maxs);
+        CM_ModelBounds(view.cm, model, mins, maxs);
 
         // offset for capsule center
         for i in 0..3 {
@@ -1411,12 +1385,12 @@ pub fn CM_TraceBoundingBoxThroughCapsule(
         );
 
         // replace the capsule with the bounding box
-        let h = CM_TempBoxModel(cm, (*tw).size[0], (*tw).size[1], qfalse);
+        let h = CM_TempBoxModel(view.cm, (*tw).size[0], (*tw).size[1], qfalse);
         // calculate collision
-        let cmod: *mut cmodel_t = CM_ClipHandleToModel(cm, h, core::ptr::null_mut());
-        let cmg = core::ptr::addr_of_mut!(cm.cmg);
+        let cmod: *mut cmodel_t = CM_ClipHandleToModel(view.cm, h, core::ptr::null_mut());
+        let cmg = core::ptr::addr_of_mut!(view.cm.cmg);
         let leaf = core::ptr::addr_of_mut!((*cmod).leaf);
-        CM_TraceThroughLeaf(common, cm, rm, rmg, host, tw, trace, cmg, leaf);
+        CM_TraceThroughLeaf(view, tw, trace, cmg, leaf);
     }
 }
 
@@ -1424,11 +1398,7 @@ pub fn CM_TraceBoundingBoxThroughCapsule(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:1431-1548`
 pub fn CM_TraceThroughTree(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
     local: *mut clipMap_t,
@@ -1446,11 +1416,7 @@ pub fn CM_TraceThroughTree(
         // if < 0, we are in a leaf node
         if num < 0 {
             CM_TraceThroughLeaf(
-                common,
-                cm,
-                rm,
-                rmg,
-                host,
+                view,
                 tw,
                 trace,
                 local,
@@ -1486,11 +1452,7 @@ pub fn CM_TraceThroughTree(
         // see which sides we need to consider
         if t1 >= offset + 1.0 && t2 >= offset + 1.0 {
             CM_TraceThroughTree(
-                common,
-                cm,
-                rm,
-                rmg,
-                host,
+                view,
                 tw,
                 trace,
                 local,
@@ -1504,11 +1466,7 @@ pub fn CM_TraceThroughTree(
         }
         if t1 < -offset - 1.0 && t2 < -offset - 1.0 {
             CM_TraceThroughTree(
-                common,
-                cm,
-                rm,
-                rmg,
-                host,
+                view,
                 tw,
                 trace,
                 local,
@@ -1555,11 +1513,7 @@ pub fn CM_TraceThroughTree(
         mid[2] = p1[2] + frac * (p2[2] - p1[2]);
 
         CM_TraceThroughTree(
-            common,
-            cm,
-            rm,
-            rmg,
-            host,
+            view,
             tw,
             trace,
             local,
@@ -1585,11 +1539,7 @@ pub fn CM_TraceThroughTree(
         mid[2] = p1[2] + frac2 * (p2[2] - p1[2]);
 
         CM_TraceThroughTree(
-            common,
-            cm,
-            rm,
-            rmg,
-            host,
+            view,
             tw,
             trace,
             local,
@@ -1606,11 +1556,7 @@ pub fn CM_TraceThroughTree(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:1577-1829`
 pub fn CM_Trace(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     trace: *mut trace_t,
     start: vec3_t,
     end: vec3_t,
@@ -1627,11 +1573,11 @@ pub fn CM_Trace(
         let mut offset: vec3_t = [0.0; 3];
         let mut local: *mut clipMap_t = core::ptr::null_mut();
 
-        let cmod: *mut cmodel_t = CM_ClipHandleToModel(cm, model, &mut local);
+        let cmod: *mut cmodel_t = CM_ClipHandleToModel(view.cm, model, &mut local);
 
         (*local).checkcount += 1; // for multi-check avoidance
 
-        common.c_traces += 1; // for statistics, may be zeroed
+        view.common.c_traces += 1; // for statistics, may be zeroed
 
         // fill in a default trace
         Com_Memset(
@@ -1759,15 +1705,13 @@ pub fn CM_Trace(
             if model != 0 && (*cmod).firstNode == -1 {
                 if model == CAPSULE_MODEL_HANDLE as c_int {
                     if tw.sphere.r#use != qfalse {
-                        CM_TestCapsuleInCapsule(cm, &mut tw, &mut *trace, model);
+                        CM_TestCapsuleInCapsule(view.cm, &mut tw, &mut *trace, model);
                     } else {
-                        CM_TestBoundingBoxInCapsule(cm, rmg, host, &mut tw, &mut *trace, model);
+                        CM_TestBoundingBoxInCapsule(view, &mut tw, &mut *trace, model);
                     }
                 } else {
                     CM_TestInLeaf(
-                        cm,
-                        rmg,
-                        host,
+                        view,
                         &mut tw,
                         &mut *trace,
                         &mut (*cmod).leaf,
@@ -1775,14 +1719,10 @@ pub fn CM_Trace(
                     );
                 }
             } else if (*cmod).firstNode == -1 {
-                CM_PositionTest(cm, rmg, host, &mut tw, &mut *trace);
+                CM_PositionTest(view, &mut tw, &mut *trace);
             } else {
                 CM_TraceThroughTree(
-                    common,
-                    cm,
-                    rm,
-                    rmg,
-                    host,
+                    view,
                     &mut tw,
                     &mut *trace,
                     local,
@@ -1813,14 +1753,10 @@ pub fn CM_Trace(
             if model != 0 && (*cmod).firstNode == -1 {
                 if model == CAPSULE_MODEL_HANDLE as c_int {
                     if tw.sphere.r#use != qfalse {
-                        CM_TraceCapsuleThroughCapsule(cm, &mut tw, &mut *trace, model);
+                        CM_TraceCapsuleThroughCapsule(view.cm, &mut tw, &mut *trace, model);
                     } else {
                         CM_TraceBoundingBoxThroughCapsule(
-                            common,
-                            cm,
-                            rm,
-                            rmg,
-                            host,
+                            view,
                             &mut tw,
                             &mut *trace,
                             model,
@@ -1828,11 +1764,7 @@ pub fn CM_Trace(
                     }
                 } else {
                     CM_TraceThroughLeaf(
-                        common,
-                        cm,
-                        rm,
-                        rmg,
-                        host,
+                        view,
                         &mut tw,
                         &mut *trace,
                         local,
@@ -1841,11 +1773,7 @@ pub fn CM_Trace(
                 }
             } else {
                 CM_TraceThroughTree(
-                    common,
-                    cm,
-                    rm,
-                    rmg,
-                    host,
+                    view,
                     &mut tw,
                     &mut *trace,
                     local,
@@ -1882,11 +1810,7 @@ pub fn CM_Trace(
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:1836-1840`
 pub fn CM_BoxTrace(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     results: *mut trace_t,
     start: vec3_t,
     end: vec3_t,
@@ -1897,11 +1821,7 @@ pub fn CM_BoxTrace(
     capsule: c_int,
 ) {
     CM_Trace(
-        common,
-        cm,
-        rm,
-        rmg,
-        host,
+        view,
         results,
         start,
         end,
@@ -1925,11 +1845,7 @@ const VEC3_ORIGIN: vec3_t = [0.0, 0.0, 0.0];
 ///
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:1850-1937`
 pub fn CM_TransformedBoxTrace(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    rmg: &mut RmManager,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     trace: *mut trace_t,
     start: vec3_t,
     end: vec3_t,
@@ -2006,11 +1922,7 @@ pub fn CM_TransformedBoxTrace(
 
         // sweep the box through the model
         CM_Trace(
-            common,
-            cm,
-            rm,
-            rmg,
-            host,
+            view,
             trace,
             start_l,
             end_l,

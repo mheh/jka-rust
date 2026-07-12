@@ -17,7 +17,7 @@ use std::collections::BTreeSet;
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::error_parm::errorParm_t;
 
-use crate::common::Common;
+use crate::common::engine_host_view::EngineHostView;
 use super::interface::{se_build_file_list, se_free_file_data_after_load, se_load_file_data};
 use super::package::StringEdPackage;
 use super::{
@@ -382,8 +382,16 @@ pub fn se_get_language_dir(pkg: &StringEdPackage, lang_index: i32) -> String {
 /// [`se_init`].
 ///
 /// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:1156-1196`
-pub fn SE_Init(common: &mut Common, mut host: &mut dyn EngineHost) {
-    se_init(&mut common.stringed, &mut host);
+pub fn SE_Init(view: &mut EngineHostView) {
+    // Take/put-back (host-seam): `se_init` needs `&mut StringEdPackage` (owned by
+    // `view.common.stringed`) AND `&mut impl EngineHost` (the view itself); the
+    // two can't be borrowed from `view` at once, so the package is moved out,
+    // driven, and moved back. Error-path caveat (applies to every take/put-back
+    // wrapper in this file): a `com_error` panic inside leaves the field
+    // defaulted, but SE load failures are init-fatal in Raven too.
+    let mut pkg = std::mem::take(&mut view.common.stringed);
+    se_init(&mut pkg, &mut *view);
+    view.common.stringed = pkg;
 }
 
 /// Raven `SE_Init` — register the three cvars and load the current language.
@@ -426,8 +434,11 @@ pub fn se_init(pkg: &mut StringEdPackage, host: &mut impl EngineHost) {
 /// the seam.
 ///
 /// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:981-1007`
-pub fn SE_GetString(common: &mut Common, mut host: &mut dyn EngineHost, reference: &str) -> String {
-    common.stringed.get_string(reference, &mut host).to_owned()
+pub fn SE_GetString(view: &mut EngineHostView, reference: &str) -> String {
+    let mut pkg = std::mem::take(&mut view.common.stringed);
+    let result = pkg.get_string(reference, &mut *view).to_owned();
+    view.common.stringed = pkg;
+    result
 }
 
 /// Raven `SE_GetString(psPackageReference, psStringReference)` — the C-ABI-
@@ -436,16 +447,13 @@ pub fn SE_GetString(common: &mut Common, mut host: &mut dyn EngineHost, referenc
 /// `get_string`/`get_string2` pair.
 ///
 /// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:971-978`
-pub fn SE_GetString2(
-    common: &mut Common,
-    mut host: &mut dyn EngineHost,
-    package: &str,
-    string_ref: &str,
-) -> String {
-    common
-        .stringed
-        .get_string2(package, string_ref, &mut host)
-        .to_owned()
+pub fn SE_GetString2(view: &mut EngineHostView, package: &str, string_ref: &str) -> String {
+    let mut pkg = std::mem::take(&mut view.common.stringed);
+    let result = pkg
+        .get_string2(package, string_ref, &mut *view)
+        .to_owned();
+    view.common.stringed = pkg;
+    result
 }
 
 /// Raven `SE_ShutDown` — `Clear(SE_FALSE)`.

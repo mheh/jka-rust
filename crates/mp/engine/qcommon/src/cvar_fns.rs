@@ -7,7 +7,6 @@
 
 use core::ffi::{c_char, c_float, c_int, c_long, c_uint, CStr};
 
-use mp_host_interface::engine_host::EngineHost;
 use native_types::fileHandle_t;
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
@@ -23,10 +22,9 @@ use mp_qshared::shared::q_string::{
 };
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 
-use crate::cm_load::RenderModels;
 use crate::cmd::Cmd_AddCommand;
 use crate::cmd_common::{Cmd_Argc, Cmd_Argv};
-use crate::collision_world::CollisionWorld;
+use crate::common::engine_host_view::EngineHostView;
 use crate::common::error::com_error;
 use crate::common::{com_printf, Common};
 use crate::common_fns::Com_Filter;
@@ -126,14 +124,8 @@ pub fn Cvar_FindVar(common: &mut Common, var_name: *const c_char) -> *mut cvar_t
 /// Divergence: the sole in-engine caller (`vm_fns`) threads the full pinned
 /// receiver set, so this keeps all four though only `common` is used.
 /// Source: `oracle/codemp/qcommon/cvar.cpp:103-110`
-pub fn Cvar_VariableValue(
-    common: &mut Common,
-    _cm: &mut CollisionWorld,
-    _rm: &mut RenderModels,
-    _host: &mut dyn EngineHost,
-    var_name: *const c_char,
-) -> f32 {
-    let var = Cvar_FindVar(common, var_name);
+pub fn Cvar_VariableValue(view: &mut EngineHostView, var_name: *const c_char) -> f32 {
+    let var = Cvar_FindVar(view.common, var_name);
     if var.is_null() {
         return 0.0;
     }
@@ -205,10 +197,7 @@ pub fn Cvar_CommandCompletion(common: &mut Common, callback: fn(*const c_char)) 
 /// CVAR_ROM; the flags will be or'ed in if the variable exists.
 /// Source: `oracle/codemp/qcommon/cvar.cpp:188-280`
 pub fn Cvar_Get(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     var_name: *const c_char,
     var_value: *const c_char,
     flags: c_int,
@@ -222,7 +211,7 @@ pub fn Cvar_Get(
 
         if Cvar_ValidateString(var_name) == qfalse {
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "invalid cvar name string: {}\n",
                     CStr::from_ptr(var_name).to_string_lossy()
@@ -233,7 +222,7 @@ pub fn Cvar_Get(
 
         // `#if 0` backslash-value validation is compiled out in this build.
 
-        let var = Cvar_FindVar(common, var_name);
+        let var = Cvar_FindVar(view.common, var_name);
         if !var.is_null() {
             // if the C code is now specifying a variable that the user already
             // set a value for, take the new value as the reset value
@@ -242,23 +231,23 @@ pub fn Cvar_Get(
                 && *var_value != 0
             {
                 (*var).flags &= !CVAR_USER_CREATED;
-                Cvar_FreeString(common, (*var).resetString);
-                (*var).resetString = CopyString(common, cm, rm, host, var_value);
+                Cvar_FreeString(view.common, (*var).resetString);
+                (*var).resetString = CopyString(view, var_value);
 
                 // ZOID -- needs to be set so that cvars the game sets as
                 // SERVERINFO get sent to clients
-                common.cvar_modifiedFlags |= flags;
+                view.common.cvar_modifiedFlags |= flags;
             }
 
             (*var).flags |= flags;
             // only allow one non-empty reset string without a warning
             if *(*var).resetString == 0 {
                 // we don't have a reset string yet
-                Cvar_FreeString(common, (*var).resetString);
-                (*var).resetString = CopyString(common, cm, rm, host, var_value);
+                Cvar_FreeString(view.common, (*var).resetString);
+                (*var).resetString = CopyString(view, var_value);
             } else if *var_value != 0 && libc::strcmp((*var).resetString, var_value) != 0 {
                 crate::common_fns::Com_DPrintf(
-                    common,
+                    view.common,
                     &format!(
                         "Warning: cvar \"{}\" given initial values: \"{}\" and \"{}\"\n",
                         CStr::from_ptr(var_name).to_string_lossy(),
@@ -271,8 +260,8 @@ pub fn Cvar_Get(
             if !(*var).latchedString.is_null() {
                 let s = (*var).latchedString;
                 (*var).latchedString = core::ptr::null_mut(); // otherwise cvar_set2 would free it
-                Cvar_Set2(common, cm, rm, host, var_name, s, qtrue);
-                Cvar_FreeString(common, s);
+                Cvar_Set2(view, var_name, s, qtrue);
+                Cvar_FreeString(view.common, s);
             }
 
             // `#if 0` CVAR_ROM-override block is compiled out in this build.
@@ -282,28 +271,29 @@ pub fn Cvar_Get(
         //
         // allocate a new cvar
         //
-        if common.cvar_numIndexes >= MAX_CVARS as c_int {
+        if view.common.cvar_numIndexes >= MAX_CVARS as c_int {
             com_error(errorParm_t::ERR_FATAL, "MAX_CVARS".to_string());
         }
-        let var = &mut common.cvar_indexes[common.cvar_numIndexes as usize] as *mut cvar_t;
-        common.cvar_numIndexes += 1;
-        (*var).name = CopyString(common, cm, rm, host, var_name);
-        (*var).string = CopyString(common, cm, rm, host, var_value);
+        let var =
+            &mut view.common.cvar_indexes[view.common.cvar_numIndexes as usize] as *mut cvar_t;
+        view.common.cvar_numIndexes += 1;
+        (*var).name = CopyString(view, var_name);
+        (*var).string = CopyString(view, var_value);
         (*var).modified = qtrue;
         (*var).modificationCount = 1;
         (*var).value = libc::atof((*var).string) as c_float;
         (*var).integer = libc::atoi((*var).string);
-        (*var).resetString = CopyString(common, cm, rm, host, var_value);
+        (*var).resetString = CopyString(view, var_value);
 
         // link the variable in
-        (*var).next = common.cvar_vars;
-        common.cvar_vars = var;
+        (*var).next = view.common.cvar_vars;
+        view.common.cvar_vars = var;
 
         (*var).flags = flags;
 
         let hash = generateHashValue(var_name);
-        (*var).hashNext = common.cvar_hashTable[hash as usize];
-        common.cvar_hashTable[hash as usize] = var;
+        (*var).hashNext = view.common.cvar_hashTable[hash as usize];
+        view.common.cvar_hashTable[hash as usize] = var;
 
         var
     }
@@ -313,10 +303,7 @@ pub fn Cvar_Get(
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:287-395`
 pub fn Cvar_Set2(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     var_name: *const c_char,
     value: *const c_char,
     force: qboolean,
@@ -327,7 +314,7 @@ pub fn Cvar_Set2(
     unsafe {
         if Cvar_ValidateString(var_name) == qfalse {
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "invalid cvar name string: {}\n",
                     CStr::from_ptr(var_name).to_string_lossy()
@@ -338,23 +325,23 @@ pub fn Cvar_Set2(
 
         // `#if 0` value validation is compiled out in this build.
 
-        let var = Cvar_FindVar(common, var_name);
+        let var = Cvar_FindVar(view.common, var_name);
         if var.is_null() {
             if value.is_null() {
                 return core::ptr::null_mut();
             }
             // create it
             if force == qfalse {
-                return Cvar_Get(common, cm, rm, host, var_name, value, CVAR_USER_CREATED);
+                return Cvar_Get(view, var_name, value, CVAR_USER_CREATED);
             } else {
-                return Cvar_Get(common, cm, rm, host, var_name, value, 0);
+                return Cvar_Get(view, var_name, value, 0);
             }
         }
 
         // Dont display the update when its internal
         if ((*var).flags & CVAR_INTERNAL) == 0 {
             crate::common_fns::Com_DPrintf(
-                common,
+                view.common,
                 &format!(
                     "Cvar_Set2: {} {}\n",
                     CStr::from_ptr(var_name).to_string_lossy(),
@@ -372,12 +359,12 @@ pub fn Cvar_Set2(
         }
         // note what types of cvars have been modified (userinfo, archive,
         // serverinfo, systeminfo)
-        common.cvar_modifiedFlags |= (*var).flags;
+        view.common.cvar_modifiedFlags |= (*var).flags;
 
         if force == qfalse {
             if ((*var).flags & CVAR_ROM) != 0 {
                 com_printf(
-                    common,
+                    view.common,
                     &format!(
                         "{} is read only.\n",
                         CStr::from_ptr(var_name).to_string_lossy()
@@ -388,7 +375,7 @@ pub fn Cvar_Set2(
 
             if ((*var).flags & CVAR_INIT) != 0 {
                 com_printf(
-                    common,
+                    view.common,
                     &format!(
                         "{} is write protected.\n",
                         CStr::from_ptr(var_name).to_string_lossy()
@@ -402,27 +389,27 @@ pub fn Cvar_Set2(
                     if libc::strcmp(value, (*var).latchedString) == 0 {
                         return var;
                     }
-                    Cvar_FreeString(common, (*var).latchedString);
+                    Cvar_FreeString(view.common, (*var).latchedString);
                 } else if libc::strcmp(value, (*var).string) == 0 {
                     return var;
                 }
 
                 com_printf(
-                    common,
+                    view.common,
                     &format!(
                         "{} will be changed upon restarting.\n",
                         CStr::from_ptr(var_name).to_string_lossy()
                     ),
                 );
-                (*var).latchedString = CopyString(common, cm, rm, host, value);
+                (*var).latchedString = CopyString(view, value);
                 (*var).modified = qtrue;
                 (*var).modificationCount += 1;
                 return var;
             }
 
-            if ((*var).flags & CVAR_CHEAT) != 0 && (*common.cvar_cheats).integer == 0 {
+            if ((*var).flags & CVAR_CHEAT) != 0 && (*view.common.cvar_cheats).integer == 0 {
                 com_printf(
-                    common,
+                    view.common,
                     &format!(
                         "{} is cheat protected.\n",
                         CStr::from_ptr(var_name).to_string_lossy()
@@ -431,7 +418,7 @@ pub fn Cvar_Set2(
                 return var;
             }
         } else if !(*var).latchedString.is_null() {
-            Cvar_FreeString(common, (*var).latchedString);
+            Cvar_FreeString(view.common, (*var).latchedString);
             (*var).latchedString = core::ptr::null_mut();
         }
 
@@ -442,9 +429,9 @@ pub fn Cvar_Set2(
         (*var).modified = qtrue;
         (*var).modificationCount += 1;
 
-        Cvar_FreeString(common, (*var).string); // free the old value string
+        Cvar_FreeString(view.common, (*var).string); // free the old value string
 
-        (*var).string = CopyString(common, cm, rm, host, value);
+        (*var).string = CopyString(view, value);
         (*var).value = libc::atof((*var).string) as c_float;
         (*var).integer = libc::atoi((*var).string);
 
@@ -455,29 +442,15 @@ pub fn Cvar_Set2(
 /// Raven `Cvar_Set`.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:402-404`
-pub fn Cvar_Set(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    var_name: *const c_char,
-    value: *const c_char,
-) {
-    Cvar_Set2(common, cm, rm, host, var_name, value, qtrue);
+pub fn Cvar_Set(view: &mut EngineHostView, var_name: *const c_char, value: *const c_char) {
+    Cvar_Set2(view, var_name, value, qtrue);
 }
 
 /// Raven `Cvar_SetLatched`.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:411-413`
-pub fn Cvar_SetLatched(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    var_name: *const c_char,
-    value: *const c_char,
-) {
-    Cvar_Set2(common, cm, rm, host, var_name, value, qfalse);
+pub fn Cvar_SetLatched(view: &mut EngineHostView, var_name: *const c_char, value: *const c_char) {
+    Cvar_Set2(view, var_name, value, qfalse);
 }
 
 /// Raven `Cvar_SetValue`.
@@ -485,60 +458,42 @@ pub fn Cvar_SetLatched(
 /// The Raven `Com_sprintf` renders are ported via the CString/`format!`
 /// pre-render idiom (`Com_sprintf` has no landed qcommon home).
 /// Source: `oracle/codemp/qcommon/cvar.cpp:420-429`
-pub fn Cvar_SetValue(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    var_name: *const c_char,
-    value: f32,
-) {
+pub fn Cvar_SetValue(view: &mut EngineHostView, var_name: *const c_char, value: f32) {
     let val = if value == (value as c_int) as f32 {
         std::ffi::CString::new(format!("{}", value as c_int)).unwrap()
     } else {
         std::ffi::CString::new(format!("{value:.6}")).unwrap()
     };
-    Cvar_Set(common, cm, rm, host, var_name, val.as_ptr());
+    Cvar_Set(view, var_name, val.as_ptr());
 }
 
 /// Raven `Cvar_Reset`.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:437-439`
-pub fn Cvar_Reset(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-    var_name: *const c_char,
-) {
-    Cvar_Set2(common, cm, rm, host, var_name, core::ptr::null(), qfalse);
+pub fn Cvar_Reset(view: &mut EngineHostView, var_name: *const c_char) {
+    Cvar_Set2(view, var_name, core::ptr::null(), qfalse);
 }
 
 /// Raven `Cvar_SetCheatState`.
 ///
 /// Raven: any testing variables will be reset to the safe values.
 /// Source: `oracle/codemp/qcommon/cvar.cpp:449-467`
-pub fn Cvar_SetCheatState(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn Cvar_SetCheatState(view: &mut EngineHostView) {
     // set all default vars to the safe value
-    let mut var: *mut cvar_t = common.cvar_vars;
+    let mut var: *mut cvar_t = view.common.cvar_vars;
     unsafe {
         while !var.is_null() {
             if ((*var).flags & CVAR_CHEAT) != 0 {
                 // the CVAR_LATCHED|CVAR_CHEAT vars might escape the reset here
                 // because of a different var->latchedString
                 if !(*var).latchedString.is_null() {
-                    Cvar_FreeString(common, (*var).latchedString);
+                    Cvar_FreeString(view.common, (*var).latchedString);
                     (*var).latchedString = core::ptr::null_mut();
                 }
                 if libc::strcmp((*var).resetString, (*var).string) != 0 {
                     let name = (*var).name;
                     let reset = (*var).resetString;
-                    Cvar_Set(common, cm, rm, host, name, reset);
+                    Cvar_Set(view, name, reset);
                 }
             }
             var = (*var).next;
@@ -550,25 +505,20 @@ pub fn Cvar_SetCheatState(
 /// console.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:476-515`
-pub fn Cvar_Command(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) -> qboolean {
+pub fn Cvar_Command(view: &mut EngineHostView) -> qboolean {
     unsafe {
         // check variables
-        let arg0 = Cmd_Argv(common, 0);
-        let v = Cvar_FindVar(common, arg0);
+        let arg0 = Cmd_Argv(view.common, 0);
+        let v = Cvar_FindVar(view.common, arg0);
         if v.is_null() {
             return qfalse;
         }
 
         // perform a variable print or set
-        if Cmd_Argc(common) == 1 {
+        if Cmd_Argc(view.common) == 1 {
             // `S_COLOR_WHITE` = "^7" (oracle/codemp/game/q_shared.h:1167).
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "\"{}\" is:\"{}^7\" default:\"{}^7\"\n",
                     CStr::from_ptr((*v).name).to_string_lossy(),
@@ -578,7 +528,7 @@ pub fn Cvar_Command(
             );
             if !(*v).latchedString.is_null() {
                 com_printf(
-                    common,
+                    view.common,
                     &format!(
                         "latched: \"{}\"\n",
                         CStr::from_ptr((*v).latchedString).to_string_lossy()
@@ -589,15 +539,15 @@ pub fn Cvar_Command(
         }
 
         // JFM toggle test
-        let value = Cmd_Argv(common, 1);
+        let value = Cmd_Argv(view.common, 1);
         let name = (*v).name;
         if *value == b'!' as c_char {
             // toggle
             let nv = if (*v).value == 0.0 { 1 } else { 0 };
             let buff = std::ffi::CString::new(format!("{nv}")).unwrap();
-            Cvar_Set2(common, cm, rm, host, name, buff.as_ptr(), qfalse); // toggle the value
+            Cvar_Set2(view, name, buff.as_ptr(), qfalse); // toggle the value
         } else {
-            Cvar_Set2(common, cm, rm, host, name, value, qfalse); // set the value if forcing isn't required
+            Cvar_Set2(view, name, value, qfalse); // set the value if forcing isn't required
         }
 
         qtrue
@@ -607,39 +557,29 @@ pub fn Cvar_Command(
 /// Raven `Cvar_Toggle_f` — toggles a cvar for easy single key binding.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:525-537`
-pub fn Cvar_Toggle_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
-    if Cmd_Argc(common) != 2 {
-        com_printf(common, "usage: toggle <variable>\n");
+pub fn Cvar_Toggle_f(view: &mut EngineHostView) {
+    if Cmd_Argc(view.common) != 2 {
+        com_printf(view.common, "usage: toggle <variable>\n");
         return;
     }
 
-    let arg1 = Cmd_Argv(common, 1);
-    let mut v = Cvar_VariableValue(common, cm, rm, host, arg1) as c_int;
+    let arg1 = Cmd_Argv(view.common, 1);
+    let mut v = Cvar_VariableValue(view, arg1) as c_int;
     v = if v == 0 { 1 } else { 0 };
 
-    let arg1 = Cmd_Argv(common, 1);
+    let arg1 = Cmd_Argv(view.common, 1);
     let val = std::ffi::CString::new(format!("{v}")).unwrap();
-    Cvar_Set2(common, cm, rm, host, arg1, val.as_ptr(), qfalse);
+    Cvar_Set2(view, arg1, val.as_ptr(), qfalse);
 }
 
 /// Raven `Cvar_Set_f` — allows setting and defining of arbitrary cvars from
 /// console, even if they weren't declared in C code.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:547-571`
-pub fn Cvar_Set_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
-    let c = Cmd_Argc(common);
+pub fn Cvar_Set_f(view: &mut EngineHostView) {
+    let c = Cmd_Argc(view.common);
     if c < 3 {
-        com_printf(common, "usage: set <variable> <value>\n");
+        com_printf(view.common, "usage: set <variable> <value>\n");
         return;
     }
 
@@ -648,7 +588,7 @@ pub fn Cvar_Set_f(
     let mut l: c_int = 0;
     unsafe {
         for i in 2..c {
-            let arg = Cmd_Argv(common, i);
+            let arg = Cmd_Argv(view.common, i);
             let len = libc::strlen(arg.add(1)) as c_int;
             if l + len >= MAX_STRING_TOKENS as c_int - 2 {
                 break;
@@ -659,27 +599,22 @@ pub fn Cvar_Set_f(
             }
             l += len;
         }
-        let arg1 = Cmd_Argv(common, 1);
-        Cvar_Set2(common, cm, rm, host, arg1, combined.as_ptr(), qfalse);
+        let arg1 = Cmd_Argv(view.common, 1);
+        Cvar_Set2(view, arg1, combined.as_ptr(), qfalse);
     }
 }
 
 /// Raven `Cvar_SetU_f` — as `Cvar_Set`, but also flags it as userinfo.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:580-593`
-pub fn Cvar_SetU_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
-    if Cmd_Argc(common) != 3 {
-        com_printf(common, "usage: setu <variable> <value>\n");
+pub fn Cvar_SetU_f(view: &mut EngineHostView) {
+    if Cmd_Argc(view.common) != 3 {
+        com_printf(view.common, "usage: setu <variable> <value>\n");
         return;
     }
-    Cvar_Set_f(common, cm, rm, host);
-    let arg1 = Cmd_Argv(common, 1);
-    let v = Cvar_FindVar(common, arg1);
+    Cvar_Set_f(view);
+    let arg1 = Cmd_Argv(view.common, 1);
+    let v = Cvar_FindVar(view.common, arg1);
     if v.is_null() {
         return;
     }
@@ -691,19 +626,14 @@ pub fn Cvar_SetU_f(
 /// Raven `Cvar_SetS_f` — as `Cvar_Set`, but also flags it as serverinfo.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:602-615`
-pub fn Cvar_SetS_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
-    if Cmd_Argc(common) != 3 {
-        com_printf(common, "usage: sets <variable> <value>\n");
+pub fn Cvar_SetS_f(view: &mut EngineHostView) {
+    if Cmd_Argc(view.common) != 3 {
+        com_printf(view.common, "usage: sets <variable> <value>\n");
         return;
     }
-    Cvar_Set_f(common, cm, rm, host);
-    let arg1 = Cmd_Argv(common, 1);
-    let v = Cvar_FindVar(common, arg1);
+    Cvar_Set_f(view);
+    let arg1 = Cmd_Argv(view.common, 1);
+    let v = Cvar_FindVar(view.common, arg1);
     if v.is_null() {
         return;
     }
@@ -715,19 +645,14 @@ pub fn Cvar_SetS_f(
 /// Raven `Cvar_SetA_f` — as `Cvar_Set`, but also flags it as archived.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:624-637`
-pub fn Cvar_SetA_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
-    if Cmd_Argc(common) != 3 {
-        com_printf(common, "usage: seta <variable> <value>\n");
+pub fn Cvar_SetA_f(view: &mut EngineHostView) {
+    if Cmd_Argc(view.common) != 3 {
+        com_printf(view.common, "usage: seta <variable> <value>\n");
         return;
     }
-    Cvar_Set_f(common, cm, rm, host);
-    let arg1 = Cmd_Argv(common, 1);
-    let v = Cvar_FindVar(common, arg1);
+    Cvar_Set_f(view);
+    let arg1 = Cmd_Argv(view.common, 1);
+    let v = Cvar_FindVar(view.common, arg1);
     if v.is_null() {
         return;
     }
@@ -739,18 +664,13 @@ pub fn Cvar_SetA_f(
 /// Raven `Cvar_Reset_f`.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:644-650`
-pub fn Cvar_Reset_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
-    if Cmd_Argc(common) != 2 {
-        com_printf(common, "usage: reset <variable>\n");
+pub fn Cvar_Reset_f(view: &mut EngineHostView) {
+    if Cmd_Argc(view.common) != 2 {
+        com_printf(view.common, "usage: reset <variable>\n");
         return;
     }
-    let arg1 = Cmd_Argv(common, 1);
-    Cvar_Reset(common, cm, rm, host, arg1);
+    let arg1 = Cmd_Argv(view.common, 1);
+    Cvar_Reset(view, arg1);
 }
 
 /// Raven `Cvar_WriteVariables` — appends lines containing "set variable value"
@@ -839,13 +759,8 @@ pub fn Cvar_List_f(common: &mut Common) {
 /// Raven `Cvar_Restart_f` — resets all cvars to their hardcoded values.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:759-802`
-pub fn Cvar_Restart_f(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
-    let mut prev: *mut *mut cvar_t = &mut common.cvar_vars as *mut _;
+pub fn Cvar_Restart_f(view: &mut EngineHostView) {
+    let mut prev: *mut *mut cvar_t = &mut view.common.cvar_vars as *mut _;
     loop {
         unsafe {
             let var = *prev;
@@ -864,16 +779,16 @@ pub fn Cvar_Restart_f(
             if ((*var).flags & CVAR_USER_CREATED) != 0 {
                 *prev = (*var).next;
                 if !(*var).name.is_null() {
-                    Cvar_FreeString(common, (*var).name);
+                    Cvar_FreeString(view.common, (*var).name);
                 }
                 if !(*var).string.is_null() {
-                    Cvar_FreeString(common, (*var).string);
+                    Cvar_FreeString(view.common, (*var).string);
                 }
                 if !(*var).latchedString.is_null() {
-                    Cvar_FreeString(common, (*var).latchedString);
+                    Cvar_FreeString(view.common, (*var).latchedString);
                 }
                 if !(*var).resetString.is_null() {
-                    Cvar_FreeString(common, (*var).resetString);
+                    Cvar_FreeString(view.common, (*var).resetString);
                 }
                 // clear the var completely, since we can't remove the index
                 // from the list. Raven's `Com_Memset(var, 0, sizeof(var))`
@@ -889,7 +804,7 @@ pub fn Cvar_Restart_f(
 
             let name = (*var).name;
             let reset = (*var).resetString;
-            Cvar_Set(common, cm, rm, host, name, reset);
+            Cvar_Set(view, name, reset);
 
             prev = &mut (*var).next as *mut _;
         }
@@ -953,25 +868,22 @@ pub fn Cvar_InfoStringBuffer(common: &mut Common, bit: c_int, buff: *mut c_char,
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:889-899`
 pub fn Cvar_Register(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
+    view: &mut EngineHostView,
     vmCvar: *mut vmCvar_t,
     varName: *const c_char,
     defaultValue: *const c_char,
     flags: c_int,
 ) {
-    let cv = Cvar_Get(common, cm, rm, host, varName, defaultValue, flags);
+    let cv = Cvar_Get(view, varName, defaultValue, flags);
     if vmCvar.is_null() {
         return;
     }
     unsafe {
         (*vmCvar).handle =
-            (cv as *const cvar_t).offset_from(common.cvar_indexes.as_ptr()) as cvarHandle_t;
+            (cv as *const cvar_t).offset_from(view.common.cvar_indexes.as_ptr()) as cvarHandle_t;
         (*vmCvar).modificationCount = -1;
     }
-    Cvar_Update(common, vmCvar);
+    Cvar_Update(view.common, vmCvar);
 }
 
 /// Raven `Cvar_Update` — updates an interpreted module's version of a cvar.
@@ -1020,86 +932,26 @@ pub fn Cvar_Update(common: &mut Common, vmCvar: *mut vmCvar_t) {
 /// (the codebase pattern for state-threaded console commands); they are stored
 /// as raw pointers pending the dispatch-table reconciliation (ruling 5).
 /// Source: `oracle/codemp/qcommon/cvar.cpp:951-962`
-pub fn Cvar_Init(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn Cvar_Init(view: &mut EngineHostView) {
     let cheats = Cvar_Get(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"sv_cheats".as_ptr(),
         c"0".as_ptr(),
         CVAR_ROM | CVAR_SYSTEMINFO,
     );
-    common.cvar_cheats = cheats;
+    view.common.cvar_cheats = cheats;
 
+    Cmd_AddCommand(view, c"toggle".as_ptr(), Some(|view| Cvar_Toggle_f(view)));
+    Cmd_AddCommand(view, c"set".as_ptr(), Some(|view| Cvar_Set_f(view)));
+    Cmd_AddCommand(view, c"sets".as_ptr(), Some(|view| Cvar_SetS_f(view)));
+    Cmd_AddCommand(view, c"setu".as_ptr(), Some(|view| Cvar_SetU_f(view)));
+    Cmd_AddCommand(view, c"seta".as_ptr(), Some(|view| Cvar_SetA_f(view)));
+    Cmd_AddCommand(view, c"reset".as_ptr(), Some(|view| Cvar_Reset_f(view)));
+    Cmd_AddCommand(view, c"cvarlist".as_ptr(), Some(|view| Cvar_List_f(view.common)));
     Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        c"toggle".as_ptr(),
-        Some(|common, cm, _sv, rm, _rmg, _g2, host| Cvar_Toggle_f(common, cm, rm, host)),
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        c"set".as_ptr(),
-        Some(|common, cm, _sv, rm, _rmg, _g2, host| Cvar_Set_f(common, cm, rm, host)),
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        c"sets".as_ptr(),
-        Some(|common, cm, _sv, rm, _rmg, _g2, host| Cvar_SetS_f(common, cm, rm, host)),
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        c"setu".as_ptr(),
-        Some(|common, cm, _sv, rm, _rmg, _g2, host| Cvar_SetU_f(common, cm, rm, host)),
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        c"seta".as_ptr(),
-        Some(|common, cm, _sv, rm, _rmg, _g2, host| Cvar_SetA_f(common, cm, rm, host)),
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        c"reset".as_ptr(),
-        Some(|common, cm, _sv, rm, _rmg, _g2, host| Cvar_Reset_f(common, cm, rm, host)),
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
-        c"cvarlist".as_ptr(),
-        Some(|common, _cm, _sv, _rm, _rmg, _g2, _host| Cvar_List_f(common)),
-    );
-    Cmd_AddCommand(
-        common,
-        cm,
-        rm,
-        host,
+        view,
         c"cvar_restart".as_ptr(),
-        Some(|common, cm, _sv, rm, _rmg, _g2, host| Cvar_Restart_f(common, cm, rm, host)),
+        Some(|view| Cvar_Restart_f(view)),
     );
 }
 
@@ -1126,15 +978,10 @@ pub fn Cvar_Realloc(
 /// Raven `Cvar_Defrag` — turns many small allocation blocks into one big one.
 ///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:979-1018`
-pub fn Cvar_Defrag(
-    common: &mut Common,
-    cm: &mut CollisionWorld,
-    rm: &mut RenderModels,
-    host: &mut dyn EngineHost,
-) {
+pub fn Cvar_Defrag(view: &mut EngineHostView) {
     let mut totalMem: c_int = 0;
     unsafe {
-        let mut var: *mut cvar_t = common.cvar_vars;
+        let mut var: *mut cvar_t = view.common.cvar_vars;
         while !var.is_null() {
             if !(*var).name.is_null() {
                 totalMem += libc::strlen((*var).name) as c_int + 1;
@@ -1151,24 +998,23 @@ pub fn Cvar_Defrag(
             var = (*var).next;
         }
 
-        let mem = Z_Malloc(common, cm, rm, host, totalMem, memtag_t::TAG_SMALL, qfalse, 4)
-            as *mut c_char;
+        let mem = Z_Malloc(view, totalMem, memtag_t::TAG_SMALL, qfalse, 4) as *mut c_char;
         let nextMemPoolSize = totalMem;
         totalMem = 0;
 
-        let mut var: *mut cvar_t = common.cvar_vars;
+        let mut var: *mut cvar_t = view.common.cvar_vars;
         while !var.is_null() {
-            Cvar_Realloc(common, &mut (*var).name, mem, &mut totalMem);
-            Cvar_Realloc(common, &mut (*var).string, mem, &mut totalMem);
-            Cvar_Realloc(common, &mut (*var).resetString, mem, &mut totalMem);
-            Cvar_Realloc(common, &mut (*var).latchedString, mem, &mut totalMem);
+            Cvar_Realloc(view.common, &mut (*var).name, mem, &mut totalMem);
+            Cvar_Realloc(view.common, &mut (*var).string, mem, &mut totalMem);
+            Cvar_Realloc(view.common, &mut (*var).resetString, mem, &mut totalMem);
+            Cvar_Realloc(view.common, &mut (*var).latchedString, mem, &mut totalMem);
             var = (*var).next;
         }
 
-        if !common.cvar_lastMemPool.is_null() {
-            Z_Free(common, common.cvar_lastMemPool as *mut ());
+        if !view.common.cvar_lastMemPool.is_null() {
+            Z_Free(view.common, view.common.cvar_lastMemPool as *mut ());
         }
-        common.cvar_lastMemPool = mem;
-        common.cvar_memPoolSize = nextMemPoolSize;
+        view.common.cvar_lastMemPool = mem;
+        view.common.cvar_memPoolSize = nextMemPoolSize;
     }
 }
