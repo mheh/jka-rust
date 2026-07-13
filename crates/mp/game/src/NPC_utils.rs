@@ -1683,7 +1683,7 @@ pub fn NPC_CheckCharmed(ctx: GameContext<'_>) {
             //say something to let player know you've snapped out of it
             G_AddVoiceEvent(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 (*ctx.world).bg_state.rng.Q_irand(
                     entity_event_t::EV_CONFUSE1 as c_int,
                     entity_event_t::EV_CONFUSE3 as c_int,

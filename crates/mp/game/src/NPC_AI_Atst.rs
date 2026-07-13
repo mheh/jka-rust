@@ -336,7 +336,7 @@ pub fn ATST_Idle(ctx: GameContext<'_>) {
 
         NPC_SetAnim(
             ctx,
-            npc,
+            ctx.entity_id_of(npc).unwrap(),
             SETANIM_BOTH,
             BOTH_STAND1 as c_int,
             SETANIM_FLAG_NORMAL,

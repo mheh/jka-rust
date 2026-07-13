@@ -240,7 +240,7 @@ pub fn ImperialProbe_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboo
 
         NPC_SetAnim(
             ctx,
-            npc,
+            ctx.entity_id_of(npc).unwrap(),
             SETANIM_BOTH,
             BOTH_RUN1 as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -480,7 +480,7 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
 
         NPC_SetAnim(
             ctx,
-            npc,
+            ctx.entity_id_of(npc).unwrap(),
             SETANIM_BOTH,
             BOTH_RUN1 as c_int,
             SETANIM_FLAG_NORMAL,
@@ -573,7 +573,7 @@ pub fn NPC_Probe_Pain(
 
                     NPC_SetAnim(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_).unwrap(),
                         SETANIM_BOTH,
                         BOTH_PAIN1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -601,7 +601,7 @@ pub fn NPC_Probe_Pain(
             if world.bg_state.rng.random() < pain_chance {
                 NPC_SetAnim(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     SETANIM_BOTH,
                     BOTH_PAIN1 as c_int,
                     SETANIM_FLAG_OVERRIDE,
@@ -645,7 +645,7 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
         if (*npc).enemy.is_none() {
             NPC_SetAnim(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 SETANIM_BOTH,
                 BOTH_RUN1 as c_int,
                 SETANIM_FLAG_NORMAL,

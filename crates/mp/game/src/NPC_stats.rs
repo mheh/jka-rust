@@ -6,6 +6,12 @@
 //! `todo!()`; types resolve against already-ported crates, unresolved
 //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 //! RULES TABLE in fnskel.py.
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
+//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
+//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
+//! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_channel::GameBgTraps;
@@ -472,10 +478,12 @@ pub fn NPC_PrecacheWeapons(
 /// Raven `NPC_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:599-873`
-pub fn NPC_Precache(ctx: GameContext<'_>, spawner: *mut gentity_t) {
+pub fn NPC_Precache(ctx: GameContext<'_>, spawner: EntityId) {
     use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
 
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let spawner: *mut gentity_t = ctx.entity_mut(spawner);
         let mut player_team: team_t = NPCTEAM_FREE;
         let mut md3_model: qboolean = 0; // qfalse
         let mut custom_skin: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
@@ -750,16 +758,14 @@ pub fn NPC_Precache(ctx: GameContext<'_>, spawner: *mut gentity_t) {
 /// Raven `NPC_ParseParms`.
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:974-3233`
-pub fn NPC_ParseParms(
-    ctx: GameContext<'_>,
-    NPCName_in: *const c_char,
-    NPC: *mut gentity_t,
-) -> qboolean {
+pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: EntityId) -> qboolean {
     use crate::client::render_info::renderInfo_t;
     use crate::npc::g_npcstats_e::gNPCstats_t;
     use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
 
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let NPC: *mut gentity_t = ctx.entity_mut(NPC);
         let mut NPCName = NPCName_in;
 
         let mut sound: [c_char; MAX_QPATH] = [0; MAX_QPATH];
@@ -2085,7 +2091,7 @@ pub fn NPC_ParseParms(
                 set_type_back = 1;
             }
 
-            NPC_Precache(ctx, NPC); //this will just soundindex some values for sounds on the client,
+            NPC_Precache(ctx, ctx.entity_id_of(NPC).unwrap()); //this will just soundindex some values for sounds on the client,
 
             if set_type_back != 0 {
                 //don't want this being set if we aren't ready yet.

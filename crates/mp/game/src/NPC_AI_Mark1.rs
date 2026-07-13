@@ -166,7 +166,7 @@ pub fn Mark1_Idle(ctx: GameContext<'_>) {
         if !npc.is_null() {
             NPC_SetAnim(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 SETANIM_BOTH,
                 BOTH_SLEEP1 as c_int,
                 SETANIM_FLAG_NORMAL,
@@ -386,7 +386,7 @@ pub fn Mark1_die(
         if (*ctx.world).bg_state.rng.Q_irand(1, 10) > 5 {
             NPC_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 SETANIM_BOTH,
                 BOTH_DEATH2 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -394,7 +394,7 @@ pub fn Mark1_die(
         } else {
             NPC_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 SETANIM_BOTH,
                 BOTH_DEATH1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -466,7 +466,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
             if trap::G2API_GetSurfaceRenderStatus(ctx.engine, mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new((*self_).ghoul2, 0, c"l_arm".to_owned())) == 0 {
                 if (*ctx.world).bg_state.rng.Q_irand(1, 5) == 1 {
                     crate::npc_c::SaveNPCGlobals(ctx);
-                    crate::npc_c::SetNPCGlobals(ctx, self_);
+                    crate::npc_c::SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
                     Mark1Dead_FireBlaster(ctx);
                     crate::npc_c::RestoreNPCGlobals(ctx);
                 }
@@ -476,7 +476,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
             if trap::G2API_GetSurfaceRenderStatus(ctx.engine, mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new((*self_).ghoul2, 0, c"r_arm".to_owned())) == 0 {
                 if (*ctx.world).bg_state.rng.Q_irand(1, 10) == 1 {
                     crate::npc_c::SaveNPCGlobals(ctx);
-                    crate::npc_c::SetNPCGlobals(ctx, self_);
+                    crate::npc_c::SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
                     Mark1Dead_FireRocket(ctx);
                     crate::npc_c::RestoreNPCGlobals(ctx);
                 }
@@ -525,7 +525,7 @@ pub fn NPC_Mark1_Pain(
             if chance == 1 && damage > 5 {
                 NPC_SetAnim(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     SETANIM_BOTH,
                     BOTH_PAIN1 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -610,7 +610,7 @@ pub fn NPC_Mark1_Pain(
                         );
                         NPC_SetAnim(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_).unwrap(),
                             SETANIM_BOTH,
                             BOTH_PAIN1 as c_int,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -867,7 +867,7 @@ pub fn Mark1_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
                     Mark1_FireBlaster(ctx);
                     NPC_SetAnim(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc).unwrap(),
                         SETANIM_BOTH,
                         BOTH_ATTACK1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -1019,7 +1019,7 @@ pub fn Mark1_RocketAttack(ctx: GameContext<'_>, advance: qboolean) {
             );
             NPC_SetAnim(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 SETANIM_TORSO,
                 BOTH_ATTACK2 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,

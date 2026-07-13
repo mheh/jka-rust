@@ -7,6 +7,12 @@
 //! `todo!()`; types resolve against already-ported crates, unresolved
 //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 //! RULES TABLE in fnskel.py.
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
+//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
+//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
+//! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_timer::{TIMER_Done, TIMER_Set};
@@ -20,11 +26,13 @@ use crate::NPC_combat::G_ClearEnemy;
 /// Source: `oracle/codemp/game/NPC_sounds.c:23-64`
 pub fn G_AddVoiceEvent(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
+    self_: EntityId,
     event: c_int,
     speakDebounceTime: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         if (*self_).NPC.is_null() {
             return;
         }
@@ -78,8 +86,10 @@ pub fn G_AddVoiceEvent(
 /// Raven `NPC_PlayConfusionSound`.
 ///
 /// Source: `oracle/codemp/game/NPC_sounds.c:66-93`
-pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         if (*self_).health > 0 {
             if (*self_).enemy.is_some()
                 || TIMER_Done(
@@ -92,7 +102,7 @@ pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
                 G_AddVoiceEvent(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     (*ctx.world)
                         .bg_state
                         .rng
@@ -105,7 +115,12 @@ pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     > (*ctx.world).level.time
             {
                 (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
-                G_AddVoiceEvent(ctx, self_, EV_CONFUSE1 as c_int, 2000);
+                G_AddVoiceEvent(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    EV_CONFUSE1 as c_int,
+                    2000,
+                );
             }
         }
 

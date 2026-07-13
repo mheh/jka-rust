@@ -80,7 +80,7 @@ pub fn sentry_use(
         (*self_).flags &= !FL_SHIELDED;
         crate::npc_c::NPC_SetAnim(
             ctx,
-            self_,
+            ctx.entity_id_of(self_).unwrap(),
             SETANIM_BOTH,
             BOTH_POWERUP1 as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -120,7 +120,7 @@ pub fn NPC_Sentry_Pain(
             (*self_).flags |= FL_SHIELDED;
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 SETANIM_BOTH,
                 BOTH_FLY_SHIELDED as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -160,7 +160,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
                 (*NPCInfo).localState = LSTATE_ATTACKING;
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC).unwrap(),
                     SETANIM_BOTH,
                     BOTH_ATTACK1 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -181,7 +181,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
             );
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                NPC,
+                ctx.entity_id_of(NPC).unwrap(),
                 SETANIM_BOTH,
                 BOTH_POWERUP1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -392,7 +392,7 @@ pub fn Sentry_Idle(ctx: GameContext<'_>) {
         } else {
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                NPC,
+                ctx.entity_id_of(NPC).unwrap(),
                 SETANIM_BOTH,
                 BOTH_SLEEP1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -563,7 +563,7 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
                     (*NPC).flags |= FL_SHIELDED;
                     crate::npc_c::NPC_SetAnim(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         SETANIM_BOTH,
                         BOTH_FLY_SHIELDED as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,

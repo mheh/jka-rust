@@ -369,7 +369,7 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
             (*npc_ptr).flags &= !FL_SHIELDED;
             NPC_SetAnim(
                 ctx,
-                npc_ptr,
+                ctx.entity_id_of(npc_ptr).unwrap(),
                 SETANIM_BOTH,
                 BOTH_RUN1START as c_int,
                 SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
@@ -395,7 +395,7 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
                     (*npc_info_ptr).localState = LSTATE_RISINGUP;
                     NPC_SetAnim(
                         ctx,
-                        npc_ptr,
+                        ctx.entity_id_of(npc_ptr).unwrap(),
                         SETANIM_BOTH,
                         BOTH_RUN1STOP as c_int,
                         SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
@@ -424,7 +424,7 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
             (*npc_info_ptr).localState = LSTATE_RISINGUP;
             NPC_SetAnim(
                 ctx,
-                npc_ptr,
+                ctx.entity_id_of(npc_ptr).unwrap(),
                 SETANIM_BOTH,
                 BOTH_RUN1STOP as c_int,
                 SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
@@ -442,7 +442,7 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
         if (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN {
             NPC_SetAnim(
                 ctx,
-                npc_ptr,
+                ctx.entity_id_of(npc_ptr).unwrap(),
                 SETANIM_BOTH,
                 BOTH_RUN1STOP as c_int,
                 SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,

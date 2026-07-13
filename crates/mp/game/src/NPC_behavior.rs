@@ -821,7 +821,7 @@ pub fn NPC_BSJump(ctx: GameContext<'_>) {
                 if yawError < MIN_ANGLE_ERROR {
                     NPC_SetAnim(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         SETANIM_LEGS,
                         BOTH_CROUCH1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -911,7 +911,7 @@ pub fn NPC_BSJump(ctx: GameContext<'_>) {
                     (*npc_client).ps.velocity = [0.0; 3];
                     NPC_SetAnim(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         SETANIM_BOTH,
                         BOTH_LAND1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -922,7 +922,7 @@ pub fn NPC_BSJump(ctx: GameContext<'_>) {
                 } else {
                     NPC_SetAnim(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         SETANIM_BOTH,
                         BOTH_INAIR1 as c_int,
                         SETANIM_FLAG_OVERRIDE,
@@ -1050,7 +1050,7 @@ pub fn NPC_BSSearch(ctx: GameContext<'_>) {
                 if world.bg_state.rng.Q_irand(0, 1) == 0 {
                     NPC_SetAnim(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         SETANIM_BOTH,
                         BOTH_GUARD_LOOKAROUND1 as c_int,
                         SETANIM_FLAG_NORMAL,
@@ -1058,7 +1058,7 @@ pub fn NPC_BSSearch(ctx: GameContext<'_>) {
                 } else {
                     NPC_SetAnim(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         SETANIM_BOTH,
                         BOTH_GUARD_IDLE1 as c_int,
                         SETANIM_FLAG_NORMAL,
@@ -1274,7 +1274,7 @@ pub fn NPC_BSWander(ctx: GameContext<'_>) {
                 if world.bg_state.rng.Q_irand(0, 1) == 0 {
                     NPC_SetAnim(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         SETANIM_BOTH,
                         BOTH_GUARD_LOOKAROUND1 as c_int,
                         SETANIM_FLAG_NORMAL,
@@ -1282,7 +1282,7 @@ pub fn NPC_BSWander(ctx: GameContext<'_>) {
                 } else {
                     NPC_SetAnim(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         SETANIM_BOTH,
                         BOTH_GUARD_IDLE1 as c_int,
                         SETANIM_FLAG_NORMAL,
@@ -1392,7 +1392,7 @@ pub fn NPC_Surrender(ctx: GameContext<'_>) {
             (*NPCInfo).blockedSpeechDebounceTime = 0;
             G_AddVoiceEvent(
                 ctx,
-                NPC,
+                ctx.entity_id_of(NPC).unwrap(),
                 world
                     .bg_state
                     .rng
@@ -1745,7 +1745,7 @@ pub fn G_StartFlee(
             return;
         }
         SaveNPCGlobals(ctx);
-        SetNPCGlobals(ctx, self_);
+        SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
 
         NPC_StartFlee(
             ctx,

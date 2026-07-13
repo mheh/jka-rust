@@ -378,7 +378,7 @@ pub fn NPC_ChoosePainAnimation(
                     if pain_anim != -1 {
                         crate::npc_c::NPC_SetAnim(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_).unwrap(),
                             parts,
                             pain_anim,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -389,7 +389,7 @@ pub fn NPC_ChoosePainAnimation(
                 if voiceEvent != -1 {
                     crate::NPC_sounds::G_AddVoiceEvent(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_).unwrap(),
                         voiceEvent,
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
@@ -401,7 +401,7 @@ pub fn NPC_ChoosePainAnimation(
                 // (the BOTH_PAIN* anim numbers are unrelated).
                 crate::NPC_sounds::G_AddVoiceEvent(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     (*ctx.world).bg_state.rng.Q_irand(
                         entity_event_t::EV_CHOKE1 as c_int,
                         entity_event_t::EV_CHOKE3 as c_int,
@@ -610,7 +610,7 @@ pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId
         }
 
         SaveNPCGlobals(ctx);
-        SetNPCGlobals(ctx, self_);
+        SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
 
         // Do extra bits
         let npc_info_ptr = (*ctx.world).globals.NPCInfo;
@@ -684,7 +684,7 @@ pub fn NPC_Touch(
         }
 
         SaveNPCGlobals(ctx);
-        SetNPCGlobals(ctx, self_);
+        SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
 
         // I am dead and carrying a key
         if !(*self_).message.is_null() && (*self_).health <= 0 {
@@ -1069,7 +1069,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
                 (*npc).scriptFlags &= !SCF_NO_COMBAT_TALK;
             }
 
-            crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, event, 3000);
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), event, 3000);
 
             if add_flag && !npc.is_null() {
                 (*npc).scriptFlags |= SCF_NO_COMBAT_TALK;
@@ -1159,7 +1159,7 @@ pub fn NPC_Use(
         }
 
         SaveNPCGlobals(ctx);
-        SetNPCGlobals(ctx, self_);
+        SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
 
         let npc = (*self_).NPC as *mut gNPC_t;
         if !client.is_null() && !npc.is_null() {

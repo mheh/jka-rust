@@ -115,7 +115,7 @@ pub fn Rancor_CheckRoar(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean
             (*((*self_).client as *mut gclient_t)).ps.eFlags2 |= EF2_ALERTED;
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 SETANIM_BOTH,
                 BOTH_STAND1TO2 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -362,7 +362,7 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
                             .forceHandExtendTime = 0;
                         crate::npc_c::NPC_SetAnim(
                             ctx,
-                            radiusEnt,
+                            ctx.entity_id_of(radiusEnt).unwrap(),
                             SETANIM_BOTH,
                             BOTH_SWIM_IDLE1 as c_int,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -587,7 +587,7 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
                         if hitLoc == G2_MODELPART_HEAD as c_int {
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                radiusEnt,
+                                ctx.entity_id_of(radiusEnt).unwrap(),
                                 SETANIM_BOTH,
                                 BOTH_DEATH17 as c_int,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -595,7 +595,7 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
                         } else if hitLoc == G2_MODELPART_WAIST as c_int {
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                radiusEnt,
+                                ctx.entity_id_of(radiusEnt).unwrap(),
                                 SETANIM_BOTH,
                                 BOTH_DEATHBACKWARD2 as c_int,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -646,7 +646,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                     //quick bite
                     crate::npc_c::NPC_SetAnim(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc).unwrap(),
                         SETANIM_BOTH,
                         BOTH_ATTACK1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -661,7 +661,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                     //full eat
                     crate::npc_c::NPC_SetAnim(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc).unwrap(),
                         SETANIM_BOTH,
                         BOTH_ATTACK3 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -684,7 +684,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                         );
                         crate::npc_c::NPC_SetAnim(
                             ctx,
-                            activator,
+                            ctx.entity_id_of(activator).unwrap(),
                             SETANIM_TORSO,
                             BOTH_FALLDEATH1 as c_int,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -716,7 +716,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
 
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     SETANIM_BOTH,
                     BOTH_MELEE2 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -726,7 +726,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                 //smash
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     SETANIM_BOTH,
                     BOTH_MELEE1 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -736,7 +736,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                 //try to grab
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     SETANIM_BOTH,
                     BOTH_ATTACK2 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -823,7 +823,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                             (*activator_client).ps.forceHandExtendTime = 0;
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                activator,
+                                ctx.entity_id_of(activator).unwrap(),
                                 SETANIM_BOTH,
                                 BOTH_SWIM_IDLE1 as c_int,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -881,7 +881,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                             (*activator_client).ps.forceHandExtendTime = 0;
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                activator,
+                                ctx.entity_id_of(activator).unwrap(),
                                 SETANIM_BOTH,
                                 BOTH_SWIM_IDLE1 as c_int,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -971,7 +971,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                             (*activator_client).ps.forceHandExtendTime = 0;
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                activator,
+                                ctx.entity_id_of(activator).unwrap(),
                                 SETANIM_BOTH,
                                 BOTH_SWIM_IDLE1 as c_int,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -1228,7 +1228,7 @@ pub fn NPC_Rancor_Pain(
                             if (*self_).count == 1 {
                                 crate::npc_c::NPC_SetAnim(
                                     ctx,
-                                    self_,
+                                    ctx.entity_id_of(self_).unwrap(),
                                     SETANIM_BOTH,
                                     BOTH_PAIN2 as c_int,
                                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -1236,7 +1236,7 @@ pub fn NPC_Rancor_Pain(
                             } else {
                                 crate::npc_c::NPC_SetAnim(
                                     ctx,
-                                    self_,
+                                    ctx.entity_id_of(self_).unwrap(),
                                     SETANIM_BOTH,
                                     BOTH_PAIN1 as c_int,
                                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,

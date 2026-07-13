@@ -112,7 +112,7 @@ pub fn R2D2_TurnAnims(ctx: GameContext<'_>) {
                 if anim != BOTH_TURN_LEFT1 as c_int {
                     NPC_SetAnim(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc).unwrap(),
                         SETANIM_BOTH,
                         BOTH_TURN_LEFT1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -122,7 +122,7 @@ pub fn R2D2_TurnAnims(ctx: GameContext<'_>) {
                 if anim != BOTH_TURN_RIGHT1 as c_int {
                     NPC_SetAnim(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc).unwrap(),
                         SETANIM_BOTH,
                         BOTH_TURN_RIGHT1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -132,7 +132,7 @@ pub fn R2D2_TurnAnims(ctx: GameContext<'_>) {
         } else {
             NPC_SetAnim(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 SETANIM_BOTH,
                 BOTH_RUN1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -460,7 +460,7 @@ pub fn NPC_Droid_Pain(
                     if anim == BOTH_STAND2 as c_int {
                         NPC_SetAnim(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_).unwrap(),
                             SETANIM_BOTH,
                             BOTH_PAIN1 as c_int,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -468,7 +468,7 @@ pub fn NPC_Droid_Pain(
                     } else {
                         NPC_SetAnim(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_).unwrap(),
                             SETANIM_BOTH,
                             BOTH_PAIN2 as c_int,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -542,7 +542,7 @@ pub fn NPC_Droid_Pain(
                     if anim == BOTH_STAND2 as c_int {
                         NPC_SetAnim(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_).unwrap(),
                             SETANIM_BOTH,
                             BOTH_PAIN1 as c_int,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -550,7 +550,7 @@ pub fn NPC_Droid_Pain(
                     } else {
                         NPC_SetAnim(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_).unwrap(),
                             SETANIM_BOTH,
                             BOTH_PAIN2 as c_int,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,

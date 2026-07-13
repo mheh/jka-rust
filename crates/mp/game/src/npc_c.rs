@@ -8,6 +8,12 @@
 //! cvars) or an engine trap (`trap_*`) cannot be threaded against the staged
 //! raw-pointer signatures (no `GameWorld`/engine handle) and are parked;
 //! see PORT-NOTE markers, matching the g_utils.c precedent.
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
+//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
+//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
+//! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -44,7 +50,7 @@ use crate::NPC_stats::NPC_LoadParms;
 /// Raven `CorpsePhysics`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:46-103`
-pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn CorpsePhysics(ctx: GameContext<'_>, self_: EntityId) {
     // `EF_DISINTEGRATION` (entity_effects) and `CONTENTS_TRIGGER` (surface_flags)
     // resolve to their canonical workspace consts through the prelude glob.
     // `ALERT_CLEAR_TIME` — single-owner header, deliberately kept local (not
@@ -53,6 +59,8 @@ pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
     const ALERT_CLEAR_TIME: c_int = 200;
 
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let world = &mut *ctx.world;
         world.globals.ucmd = usercmd_t::default();
         crate::g_active::ClientThink(
@@ -72,7 +80,7 @@ pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
         {
             //on the ground
             //FIXME: check 4 corners
-            pitch_roll_for_slope(ctx, self_, None);
+            pitch_roll_for_slope(ctx, ctx.entity_id_of(self_).unwrap(), None);
         }
 
         if world.globals.eventClearTime == world.level.time + ALERT_CLEAR_TIME {
@@ -125,7 +133,7 @@ pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `NPC_RemoveBody`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:115-223`
-pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: EntityId) {
     // `EF_DISINTEGRATION` (entity_effects) resolves via the prelude glob.
     // Raven `g_local.h:37`: `#define FRAMETIME 100` — single-owner header,
     // deliberately kept local (not consolidated).
@@ -135,7 +143,9 @@ pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: *mut gentity_t) {
     use mp_bg::public::entity_effects::EF2_HELD_BY_MONSTER;
 
     unsafe {
-        CorpsePhysics(ctx, self_);
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        CorpsePhysics(ctx, ctx.entity_id_of(self_).unwrap());
 
         let world = &mut *ctx.world;
         (*self_).nextthink = world.level.time + FRAMETIME;
@@ -277,10 +287,9 @@ pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven: team no longer indicates species/race, so this switches on
 /// `NPC_class` instead (comment preserved from source).
 /// Source: `oracle/codemp/game/NPC.c:233-312`
-pub fn BodyRemovalPadTime(ent: *mut gentity_t) -> c_int {
-    if ent.is_null() {
-        return 0;
-    }
+pub fn BodyRemovalPadTime(ent: &gentity_t) -> c_int {
+    // Ctx-free leaf takes `&gentity_t`; the `ent.is_null()` guard is vacuous
+    // behind a reference (dropped); the `client` null guard is preserved.
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         if client.is_null() {
@@ -339,11 +348,13 @@ pub fn NPC_RemoveBodyEffect(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC.c:395-470`
 pub fn pitch_roll_for_slope(
     ctx: GameContext<'_>,
-    forwhom: *mut gentity_t,
+    forwhom: EntityId,
     pass_slope: Option<&mut vec3_t>,
 ) {
     // `PITCH`/`ROLL` resolve to the canonical `crate::q_math` consts via the prelude.
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let forwhom: *mut gentity_t = ctx.entity_mut(forwhom);
         // if we don't have a slope, get one
         let slope: vec3_t = match pass_slope {
             None => {
@@ -573,7 +584,7 @@ pub fn DeadThink(ctx: GameContext<'_>) {
 
         // Raven's commented-out `!NPCInfo->timeOfDeath` branch is dead code
         // upstream (`/* ... */`); only the live `else` block runs.
-        if world.level.time >= (*npc_info).timeOfDeath + BodyRemovalPadTime(npc_ent) {
+        if world.level.time >= (*npc_info).timeOfDeath + BodyRemovalPadTime(&*npc_ent) {
             //death anim done (or were given a specific amount of time to wait before removal), wait the requisite amount of time them remove
             if ((*client).ps.eFlags & EF_NODRAW) != 0 {
                 if trap::ICARUS_IsRunning(
@@ -632,7 +643,7 @@ pub fn DeadThink(ctx: GameContext<'_>) {
             }
         }
 
-        CorpsePhysics(ctx, npc_ent);
+        CorpsePhysics(ctx, ctx.entity_id_of(npc_ent).unwrap());
     }
 }
 
@@ -642,8 +653,10 @@ pub fn DeadThink(ctx: GameContext<'_>) {
 /// Raven `SetNPCGlobals`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:617-623`
-pub fn SetNPCGlobals(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SetNPCGlobals(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let world = &mut *ctx.world;
         world.globals.NPC = ent;
         world.globals.NPCInfo = (*ent).NPC as *mut gNPC_t;
@@ -844,7 +857,12 @@ pub fn NPC_HandleAIFlags(ctx: GameContext<'_>) {
                 entity_event_t::EV_VICTORY3 as c_int,
             );
             let debounce = (*ctx.world).bg_state.rng.Q_irand(2000, 4000);
-            crate::NPC_sounds::G_AddVoiceEvent(ctx, npc_ent, ev, debounce);
+            crate::NPC_sounds::G_AddVoiceEvent(
+                ctx,
+                ctx.entity_id_of(npc_ent).unwrap(),
+                ev,
+                debounce,
+            );
             (*npc_info).greetingDebounceTime = 0;
         }
 
@@ -1438,7 +1456,10 @@ pub fn NPC_RunBehavior(ctx: GameContext<'_>, team: c_int, bState: c_int) {
 /// Raven `NPC_ExecuteBState`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1576-1762`
-pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: `self_` is unused by the body (it drives off the `NPC` global set
+    // by the preceding `SetNPCGlobals`); signature is `EntityId`, no re-derive.
+    let _ = self_;
     use mp_bg::public::anim_number::animNumber_t;
     use mp_bg::public::weaponstate::weaponstate_t::{WEAPON_IDLE, WEAPON_READY};
     use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_ATTACK};
@@ -1537,7 +1558,7 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 //One-handed
                 NPC_SetAnim(
                     ctx,
-                    npc_ent,
+                    ctx.entity_id_of(npc_ent).unwrap(),
                     SETANIM_TORSO,
                     animNumber_t::TORSO_WEAPONREADY1 as c_int,
                     SETANIM_FLAG_NORMAL,
@@ -1546,7 +1567,7 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 //Sniper pose
                 NPC_SetAnim(
                     ctx,
-                    npc_ent,
+                    ctx.entity_id_of(npc_ent).unwrap(),
                     SETANIM_TORSO,
                     animNumber_t::TORSO_WEAPONREADY3 as c_int,
                     SETANIM_FLAG_NORMAL,
@@ -1560,7 +1581,7 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 //we look ready for action, using one of the first 2 weapon, let's rest our weapon on our shoulder
                 NPC_SetAnim(
                     ctx,
-                    npc_ent,
+                    ctx.entity_id_of(npc_ent).unwrap(),
                     SETANIM_TORSO,
                     animNumber_t::TORSO_WEAPONIDLE3 as c_int,
                     SETANIM_FLAG_NORMAL,
@@ -1647,8 +1668,10 @@ pub fn NPC_CheckInSolid(ctx: GameContext<'_>) {
 /// Raven `G_DroidSounds`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1787-1814`
-pub fn G_DroidSounds(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn G_DroidSounds(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let client = (*self_).client as *mut gclient_t;
         if client.is_null() {
             return;
@@ -1708,7 +1731,7 @@ pub fn G_DroidSounds(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `NPC_Think`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1826-1979`
-pub fn NPC_Think(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn NPC_Think(ctx: GameContext<'_>, self_: EntityId) {
     // `PMF_FOLLOW` (pm_flags) resolves to its canonical const via the prelude glob.
     // `FRAMETIME` (`g_local.h:37` = 100) — single-owner header, deliberately
     // kept local (not consolidated).
@@ -1716,10 +1739,12 @@ pub fn NPC_Think(ctx: GameContext<'_>, self_: *mut gentity_t) {
     use mp_bg::vehicles::vehicle_s::Vehicle_t;
 
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let world = &mut *ctx.world;
         (*self_).nextthink = world.level.time + FRAMETIME;
 
-        SetNPCGlobals(ctx, self_);
+        SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
 
         world.globals.ucmd = usercmd_t::default();
 
@@ -1804,7 +1829,7 @@ pub fn NPC_Think(ctx: GameContext<'_>, self_: *mut gentity_t) {
             }
         } else if (*self_).s.m_iVehicleNum != 0 {
             //droid in a vehicle?
-            G_DroidSounds(ctx, self_);
+            G_DroidSounds(ctx, ctx.entity_id_of(self_).unwrap());
         }
 
         if (*npc).nextBStateThink <= world.level.time && (*self_).s.m_iVehicleNum == 0 {
@@ -1830,7 +1855,7 @@ pub fn NPC_Think(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 || (*self_).m_pVehicle.is_null()
             {
                 //ok, let's not do this at all for vehicles.
-                NPC_ExecuteBState(ctx, self_);
+                NPC_ExecuteBState(ctx, ctx.entity_id_of(self_).unwrap());
             }
         } else {
             (*client).ps.moveDir = oldMoveDir;
@@ -1879,14 +1904,14 @@ pub fn NPC_InitGame(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC.c:2058-2110`
 pub fn NPC_SetAnim(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     setAnimParts: c_int,
     anim: c_int,
     setAnimFlags: c_int,
 ) {
     G_SetAnim(
         ctx,
-        ctx.entity_id_of(ent).unwrap(),
+        ent,
         core::ptr::null_mut(),
         setAnimParts,
         anim,

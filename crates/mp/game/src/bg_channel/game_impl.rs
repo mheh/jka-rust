@@ -699,7 +699,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 engine: self.engine,
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            crate::npc_c::NPC_SetAnim(ctx, ent, type_, anim, priority);
+            crate::npc_c::NPC_SetAnim(ctx, ctx.entity_id_of(ent).unwrap(), type_, anim, priority);
         }
     }
     fn wp_get_vehicle_cam_pos(

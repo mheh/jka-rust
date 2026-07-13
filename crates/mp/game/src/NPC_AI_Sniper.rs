@@ -102,7 +102,7 @@ pub fn NPC_Sniper_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t
         if (*self_).health > 0 {
             G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -158,7 +158,7 @@ pub fn NPC_Sniper_Pain(
             // FIXME: better way to know I was pushed (Raven comment).
             G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng

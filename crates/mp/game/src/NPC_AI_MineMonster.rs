@@ -221,7 +221,7 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
                 TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), dur);
                 NPC_SetAnim(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     SETANIM_BOTH,
                     BOTH_ATTACK4 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -237,7 +237,7 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
                     TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), 850);
                     NPC_SetAnim(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc).unwrap(),
                         SETANIM_BOTH,
                         BOTH_ATTACK3 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -252,7 +252,7 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
                     TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), 850);
                     NPC_SetAnim(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc).unwrap(),
                         SETANIM_BOTH,
                         BOTH_ATTACK1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -268,7 +268,7 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
                 TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), 1250);
                 NPC_SetAnim(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     SETANIM_BOTH,
                     BOTH_ATTACK2 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -414,7 +414,7 @@ pub fn NPC_MineMonster_Pain(
 
             NPC_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 SETANIM_BOTH,
                 BOTH_PAIN1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,

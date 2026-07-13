@@ -528,7 +528,7 @@ pub fn G_SetEnemy(ctx: GameContext<'_>, self_: EntityId, enemy: Option<EntityId>
 
                 if event != 0 {
                     //yell
-                    G_AddVoiceEvent(ctx, self_, event, 2000);
+                    G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), event, 2000);
                 }
             }
 
@@ -606,7 +606,7 @@ pub fn G_SetEnemy(ctx: GameContext<'_>, self_: EntityId, enemy: Option<EntityId>
         //Otherwise, just picking up another enemy
 
         if event != 0 {
-            G_AddVoiceEvent(ctx, self_, event, 2000);
+            G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), event, 2000);
         }
 
         //Take the enemy

@@ -1096,7 +1096,7 @@ pub fn G_VehicleAttachDroidUnit(ctx: GameContext<'_>, vehEnt: EntityId) {
             if !(*droidEnt).NPC.is_null() {
                 NPC_SetAnim(
                     ctx,
-                    droidEnt,
+                    ctx.entity_id_of(droidEnt).unwrap(),
                     SETANIM_BOTH as c_int,
                     BOTH_STAND2 as c_int,
                     (SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD) as c_int,

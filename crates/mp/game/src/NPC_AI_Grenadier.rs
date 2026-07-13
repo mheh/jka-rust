@@ -135,7 +135,7 @@ pub fn NPC_Grenadier_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentit
         if (*self_).health > 0 {
             G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -201,7 +201,7 @@ pub fn NPC_Grenadier_Pain(
             // FIXME: better way to know I was pushed (Raven comment).
             G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng

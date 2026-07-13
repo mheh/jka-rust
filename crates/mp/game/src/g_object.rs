@@ -235,7 +235,7 @@ pub fn G_RunObject(ctx: GameContext<'_>, id: EntityId) {
             }
         } else {
             ent.s.apos.trType = TR_STATIONARY;
-            crate::npc_c::pitch_roll_for_slope(ctx, &mut *ent, Some(&mut tr.plane.normal));
+            crate::npc_c::pitch_roll_for_slope(ctx, id, Some(&mut tr.plane.normal));
             // ent->r.currentAngles[0] = 0;//FIXME: match to slope
             // ent->r.currentAngles[2] = 0;//FIXME: match to slope
             crate::q_math::_VectorCopy(ent.r.currentAngles, &mut ent.s.apos.trBase);
@@ -246,7 +246,7 @@ pub fn G_RunObject(ctx: GameContext<'_>, id: EntityId) {
         }
     } else if ent.s.weapon != WP_SABER {
         ent.s.apos.trType = TR_STATIONARY;
-        crate::npc_c::pitch_roll_for_slope(ctx, &mut *ent, Some(&mut tr.plane.normal));
+        crate::npc_c::pitch_roll_for_slope(ctx, id, Some(&mut tr.plane.normal));
         // ent->r.currentAngles[0] = 0;//FIXME: match to slope
         // ent->r.currentAngles[2] = 0;//FIXME: match to slope
         crate::q_math::_VectorCopy(ent.r.currentAngles, &mut ent.s.apos.trBase);

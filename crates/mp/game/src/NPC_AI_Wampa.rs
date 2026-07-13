@@ -142,7 +142,7 @@ pub fn Wampa_CheckRoar(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean 
             (*self_).wait = level_time + (*ctx.world).bg_state.rng.Q_irand(5000, 20000) as f32;
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 SETANIM_BOTH,
                 (*ctx.world).bg_state.rng.Q_irand(
                     crate::prelude::BOTH_GESTURE1 as c_int,
@@ -394,7 +394,7 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
                         if hitLoc == crate::prelude::G2_MODELPART_HEAD as c_int {
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                radiusEnt,
+                                ctx.entity_id_of(radiusEnt).unwrap(),
                                 SETANIM_BOTH,
                                 crate::prelude::BOTH_DEATH17 as c_int,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -402,7 +402,7 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
                         } else if hitLoc == crate::prelude::G2_MODELPART_WAIST as c_int {
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                radiusEnt,
+                                ctx.entity_id_of(radiusEnt).unwrap(),
                                 SETANIM_BOTH,
                                 crate::prelude::BOTH_DEATHBACKWARD2 as c_int,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -457,7 +457,7 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                 // double slash
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     SETANIM_BOTH,
                     crate::prelude::BOTH_ATTACK1 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -480,7 +480,7 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                 );
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     SETANIM_BOTH,
                     crate::prelude::BOTH_ATTACK2 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -499,7 +499,7 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                 // backhand
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     SETANIM_BOTH,
                     crate::prelude::BOTH_ATTACK3 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -812,7 +812,7 @@ pub fn NPC_Wampa_Pain(
                         if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_).unwrap(),
                                 SETANIM_BOTH,
                                 crate::prelude::BOTH_PAIN2 as c_int,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -820,7 +820,7 @@ pub fn NPC_Wampa_Pain(
                         } else {
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_).unwrap(),
                                 SETANIM_BOTH,
                                 crate::prelude::BOTH_PAIN1 as c_int,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,

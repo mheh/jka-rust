@@ -44,7 +44,7 @@ pub fn NPC_Remote_Pain(
     damage: c_int,
 ) {
     crate::npc_c::SaveNPCGlobals(ctx);
-    crate::npc_c::SetNPCGlobals(ctx, self_);
+    crate::npc_c::SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
     Remote_Strafe(ctx);
     crate::npc_c::RestoreNPCGlobals(ctx);
     crate::NPC_reactions::NPC_Pain(

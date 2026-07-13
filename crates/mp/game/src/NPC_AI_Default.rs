@@ -596,7 +596,7 @@ pub fn NPC_BSDefault(ctx: GameContext<'_>) {
         if client.ps.torsoAnim as i32 != TORSO_SURRENDER_START as i32 {
             NPC_SetAnim(
                 ctx,
-                (*world).globals.NPC,
+                ctx.entity_id_of((*world).globals.NPC).unwrap(),
                 SETANIM_TORSO as i32,
                 TORSO_SURRENDER_START as i32,
                 SETANIM_FLAG_HOLD as i32,

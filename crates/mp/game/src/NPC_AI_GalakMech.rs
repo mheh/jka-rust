@@ -561,7 +561,7 @@ pub fn NPC_GM_Pain(
                     }
                     crate::NPC_sounds::G_AddVoiceEvent(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_).unwrap(),
                         speech,
                         (*ctx.world).bg_state.rng.Q_irand(3000, 5000),
                     );
@@ -1003,7 +1003,7 @@ pub fn GM_StartGloat(ctx: GameContext<'_>) {
 
         crate::npc_c::NPC_SetAnim(
             ctx,
-            npc_ent,
+            ctx.entity_id_of(npc_ent).unwrap(),
             SETANIM_BOTH,
             animNumber_t::BOTH_STAND2TO1 as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -1070,7 +1070,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     let laserAnim: c_int = BOTH_ATTACK2 as c_int;
                     crate::npc_c::NPC_SetAnim(
                         ctx,
-                        npc_ent,
+                        ctx.entity_id_of(npc_ent).unwrap(),
                         SETANIM_BOTH,
                         laserAnim,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -1228,7 +1228,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     let swingAnim: c_int = BOTH_ATTACK1 as c_int;
                     crate::npc_c::NPC_SetAnim(
                         ctx,
-                        npc_ent,
+                        ctx.entity_id_of(npc_ent).unwrap(),
                         SETANIM_BOTH,
                         swingAnim,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -1405,7 +1405,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     if speech != -1 {
                         crate::NPC_sounds::G_AddVoiceEvent(
                             ctx,
-                            npc_ent,
+                            ctx.entity_id_of(npc_ent).unwrap(),
                             speech,
                             (*ctx.world).bg_state.rng.Q_irand(3000, 5000),
                         );
@@ -1729,7 +1729,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 if (*enemy_ent).health < 50 && (*npc_info).movementSpeech == 2 {
                     crate::NPC_sounds::G_AddVoiceEvent(
                         ctx,
-                        npc_ent,
+                        ctx.entity_id_of(npc_ent).unwrap(),
                         entity_event_t::EV_ANGER2 as c_int,
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
@@ -1737,7 +1737,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 } else if (*enemy_ent).health < 75 && (*npc_info).movementSpeech == 1 {
                     crate::NPC_sounds::G_AddVoiceEvent(
                         ctx,
-                        npc_ent,
+                        ctx.entity_id_of(npc_ent).unwrap(),
                         entity_event_t::EV_ANGER1 as c_int,
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
@@ -1745,7 +1745,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 } else if (*enemy_ent).health < 100 && (*npc_info).movementSpeech == 0 {
                     crate::NPC_sounds::G_AddVoiceEvent(
                         ctx,
-                        npc_ent,
+                        ctx.entity_id_of(npc_ent).unwrap(),
                         entity_event_t::EV_ANGER3 as c_int,
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );

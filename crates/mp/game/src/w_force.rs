@@ -3066,7 +3066,10 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                         (*npc).confusionTime = (*ctx.world).level.time
                             + mindTrickTime
                                 [(*cl).ps.fd.forcePowerLevel[FP_TELEPATHY as usize] as usize]; //confused for about 10 seconds
-                        crate::NPC_sounds::NPC_PlayConfusionSound(ctx, traceEnt);
+                        crate::NPC_sounds::NPC_PlayConfusionSound(
+                            ctx,
+                            ctx.entity_id_of(traceEnt).unwrap(),
+                        );
                         if (*traceEnt).enemy.is_some() {
                             G_ClearEnemy(ctx, ctx.entity_id_of(traceEnt).unwrap());
                         }

@@ -212,7 +212,7 @@ pub fn G_VehicleSpawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
         // save this because self gets removed in next func
         let yaw = (*self_).s.angles[YAW];
 
-        let vehEnt = NPC_Spawn_Do(ctx, self_);
+        let vehEnt = NPC_Spawn_Do(ctx, ctx.entity_id_of(self_).unwrap());
         if vehEnt.is_null() {
             return; // return NULL;
         }
@@ -1731,7 +1731,7 @@ pub fn AttachRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 if !(*droid).NPC.is_null() {
                     crate::npc_c::NPC_SetAnim(
                         ctx,
-                        droid,
+                        ctx.entity_id_of(droid).unwrap(),
                         SETANIM_BOTH,
                         animNumber_t::BOTH_STAND2 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,

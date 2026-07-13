@@ -92,7 +92,7 @@ pub fn Jedi_PlayBlockedPushSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if (*self_).s.number == 0 {
             crate::NPC_sounds::G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 entity_event_t::EV_PUSHFAIL as c_int,
                 3000,
             );
@@ -104,7 +104,7 @@ pub fn Jedi_PlayBlockedPushSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
             {
                 crate::NPC_sounds::G_AddVoiceEvent(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     entity_event_t::EV_PUSHFAIL as c_int,
                     3000,
                 );
@@ -127,7 +127,7 @@ pub fn Jedi_PlayDeflectSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 entity_event_t::EV_DEFLECT1 as c_int,
                 entity_event_t::EV_DEFLECT3 as c_int,
             );
-            crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 3000);
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), ev, 3000);
         } else {
             let npc = (*self_).NPC as *mut gNPC_t;
             if (*self_).health > 0
@@ -138,7 +138,7 @@ pub fn Jedi_PlayDeflectSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     entity_event_t::EV_DEFLECT1 as c_int,
                     entity_event_t::EV_DEFLECT3 as c_int,
                 );
-                crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 3000);
+                crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), ev, 3000);
                 (*npc).blockedSpeechDebounceTime = level_time + 3000;
             }
         }
@@ -159,19 +159,19 @@ pub fn NPC_Jedi_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) 
                     entity_event_t::EV_CONFUSE1 as c_int,
                     entity_event_t::EV_CONFUSE3 as c_int,
                 );
-                crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
+                crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), ev, 2000);
             } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                 let ev = (*ctx.world).bg_state.rng.Q_irand(
                     entity_event_t::EV_TAUNT1 as c_int,
                     entity_event_t::EV_TAUNT3 as c_int,
                 );
-                crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
+                crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), ev, 2000);
             } else {
                 let ev = (*ctx.world).bg_state.rng.Q_irand(
                     entity_event_t::EV_GLOAT1 as c_int,
                     entity_event_t::EV_GLOAT3 as c_int,
                 );
-                crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
+                crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), ev, 2000);
             }
         }
     }
@@ -255,7 +255,7 @@ pub fn WP_ResistForcePush(
         }
         crate::npc_c::NPC_SetAnim(
             ctx,
-            self_,
+            ctx.entity_id_of(self_).unwrap(),
             parts,
             animNumber_t::BOTH_RESISTPUSH as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -628,7 +628,7 @@ pub fn Boba_DoFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         crate::npc_c::NPC_SetAnim(
             ctx,
-            self_,
+            ctx.entity_id_of(self_).unwrap(),
             SETANIM_TORSO,
             animNumber_t::BOTH_FORCELIGHTNING_HOLD as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -1303,7 +1303,12 @@ pub fn Jedi_BattleTaunt(ctx: GameContext<'_>) -> qboolean {
                 );
             }
             if event != -1 {
-                crate::NPC_sounds::G_AddVoiceEvent(ctx, npc, event, 3000);
+                crate::NPC_sounds::G_AddVoiceEvent(
+                    ctx,
+                    ctx.entity_id_of(npc).unwrap(),
+                    event,
+                    3000,
+                );
                 (*npc_info).blockedSpeechDebounceTime = (*world).level.time + 6000;
                 (*world).globals.jediSpeechDebounceTime[(*client).playerTeam as usize] =
                     (*world).level.time + 6000;
@@ -2063,7 +2068,7 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                     if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy)) != qfalse {
                         crate::NPC_sounds::G_AddVoiceEvent(
                             ctx,
-                            npc,
+                            ctx.entity_id_of(npc).unwrap(),
                             (*world).bg_state.rng.Q_irand(
                                 entity_event_t::EV_JCHASE1 as c_int,
                                 entity_event_t::EV_JCHASE3 as c_int,
@@ -2136,7 +2141,7 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                 {
                     crate::NPC_sounds::G_AddVoiceEvent(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc).unwrap(),
                         (*world).bg_state.rng.Q_irand(
                             entity_event_t::EV_TAUNT1 as c_int,
                             entity_event_t::EV_TAUNT3 as c_int,
@@ -2279,7 +2284,7 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                             {
                                 crate::NPC_sounds::G_AddVoiceEvent(
                                     ctx,
-                                    npc,
+                                    ctx.entity_id_of(npc).unwrap(),
                                     (*world).bg_state.rng.Q_irand(
                                         entity_event_t::EV_TAUNT1 as c_int,
                                         entity_event_t::EV_TAUNT3 as c_int,
@@ -2583,7 +2588,7 @@ pub fn Jedi_CheckFlipEvasions(
                 }
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     parts,
                     anim,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -2682,7 +2687,7 @@ pub fn Jedi_CheckFlipEvasions(
 
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     parts,
                     anim,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -2783,7 +2788,7 @@ pub fn Jedi_CheckFlipEvasions(
                                     };
                                     crate::npc_c::NPC_SetAnim(
                                         ctx,
-                                        self_,
+                                        ctx.entity_id_of(self_).unwrap(),
                                         parts2,
                                         anim,
                                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -2876,7 +2881,7 @@ pub fn Jedi_CheckFlipEvasions(
                             };
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_).unwrap(),
                                 parts2,
                                 anim,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -3543,7 +3548,7 @@ pub fn Jedi_SaberBlockGo(
                                 evasionType = evasionType_t::EVASION_CARTWHEEL;
                                 crate::npc_c::NPC_SetAnim(
                                     ctx,
-                                    self_,
+                                    ctx.entity_id_of(self_).unwrap(),
                                     SETANIM_BOTH,
                                     butterflyAnim,
                                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -3700,7 +3705,7 @@ pub fn Jedi_SaberBlockGo(
             evasionType = evasionType_t::EVASION_DODGE;
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 SETANIM_BOTH,
                 dodgeAnim,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -5015,7 +5020,7 @@ pub fn Jedi_CombatTimersUpdate(ctx: GameContext<'_>, enemy_dist: c_int) {
                     {
                         crate::NPC_sounds::G_AddVoiceEvent(
                             ctx,
-                            npc,
+                            ctx.entity_id_of(npc).unwrap(),
                             (*world).bg_state.rng.Q_irand(
                                 entity_event_t::EV_GLOAT1 as c_int,
                                 entity_event_t::EV_GLOAT3 as c_int,
@@ -5591,7 +5596,7 @@ pub fn Jedi_TryJump(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
                                         }
                                         crate::npc_c::NPC_SetAnim(
                                             ctx,
-                                            npc,
+                                            ctx.entity_id_of(npc).unwrap(),
                                             SETANIM_BOTH,
                                             jumpAnim,
                                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -6164,7 +6169,7 @@ pub fn Jedi_Combat(ctx: GameContext<'_>) {
                     {
                         crate::NPC_sounds::G_AddVoiceEvent(
                             ctx,
-                            npc,
+                            ctx.entity_id_of(npc).unwrap(),
                             (*world).bg_state.rng.Q_irand(
                                 entity_event_t::EV_JLOST1 as c_int,
                                 entity_event_t::EV_JLOST3 as c_int,
@@ -6392,7 +6397,7 @@ pub fn NPC_Jedi_Pain(
             //FIXME: better way to know I was pushed
             crate::NPC_sounds::G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*world).bg_state.rng.Q_irand(
                     entity_event_t::EV_PUSHED1 as c_int,
                     entity_event_t::EV_PUSHED3 as c_int,
@@ -6408,7 +6413,7 @@ pub fn NPC_Jedi_Pain(
         if (*client).ps.legsAnim == BOTH_CEILING_CLING as c_int {
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 SETANIM_LEGS,
                 BOTH_CEILING_DROP as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -6417,7 +6422,7 @@ pub fn NPC_Jedi_Pain(
         if (*client).ps.torsoAnim == BOTH_CEILING_CLING as c_int {
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 SETANIM_TORSO,
                 BOTH_CEILING_DROP as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -6612,7 +6617,7 @@ pub fn Jedi_Ambush(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*client).noclip = qfalse;
         crate::npc_c::NPC_SetAnim(
             ctx,
-            self_,
+            ctx.entity_id_of(self_).unwrap(),
             SETANIM_BOTH,
             BOTH_CEILING_DROP as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -6624,7 +6629,7 @@ pub fn Jedi_Ambush(ctx: GameContext<'_>, self_: *mut gentity_t) {
         Jedi_Decloak(ctx, self_);
         crate::NPC_sounds::G_AddVoiceEvent(
             ctx,
-            self_,
+            ctx.entity_id_of(self_).unwrap(),
             (*world).bg_state.rng.Q_irand(
                 entity_event_t::EV_ANGER1 as c_int,
                 entity_event_t::EV_ANGER3 as c_int,
@@ -6665,7 +6670,7 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                 //hiding on the ceiling
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     SETANIM_BOTH,
                     BOTH_CEILING_CLING as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -6806,7 +6811,7 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                                         if (*npc_info).investigateCount == 0 {
                                             crate::NPC_sounds::G_AddVoiceEvent(
                                                 ctx,
-                                                npc,
+                                                ctx.entity_id_of(npc).unwrap(),
                                                 (*world).bg_state.rng.Q_irand(
                                                     entity_event_t::EV_JDETECTED1 as c_int,
                                                     entity_event_t::EV_JDETECTED3 as c_int,
@@ -7188,7 +7193,7 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
                         (*npc_info).walkDebounceTime = -2;
                         crate::NPC_sounds::G_AddVoiceEvent(
                             ctx,
-                            npc,
+                            ctx.entity_id_of(npc).unwrap(),
                             (*world).bg_state.rng.Q_irand(
                                 entity_event_t::EV_VICTORY1 as c_int,
                                 entity_event_t::EV_VICTORY3 as c_int,
@@ -7226,7 +7231,7 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
                             //turned off saber (in hand), gloat
                             crate::NPC_sounds::G_AddVoiceEvent(
                                 ctx,
-                                npc,
+                                ctx.entity_id_of(npc).unwrap(),
                                 (*world).bg_state.rng.Q_irand(
                                     entity_event_t::EV_VICTORY1 as c_int,
                                     entity_event_t::EV_VICTORY3 as c_int,
@@ -7400,7 +7405,7 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
             {
                 crate::NPC_sounds::G_AddVoiceEvent(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     (*world).bg_state.rng.Q_irand(
                         entity_event_t::EV_COMBAT1 as c_int,
                         entity_event_t::EV_COMBAT3 as c_int,

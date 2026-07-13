@@ -5084,7 +5084,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
         } else if cmd_s.eq_ignore_ascii_case("NPC")
             && CheatsOk(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse
         {
-            crate::NPC_spawn::Cmd_NPC_f(ctx, ent);
+            crate::NPC_spawn::Cmd_NPC_f(ctx, ctx.entity_id_of(ent).unwrap());
         } else if cmd_s.eq_ignore_ascii_case("kill") {
             Cmd_Kill_f(ctx, ctx.entity_id_of(ent).unwrap());
         } else if cmd_s.eq_ignore_ascii_case("teamtask") {

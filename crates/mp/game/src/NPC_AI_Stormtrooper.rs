@@ -317,7 +317,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
         match speechType {
             SPEECH_CHASE => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -326,7 +326,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_CONFUSED => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -335,7 +335,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_COVER => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -344,7 +344,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_DETECTED => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -353,7 +353,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_GIVEUP => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -362,17 +362,22 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_LOOK => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
                     .Q_irand(EV_LOOK1 as c_int, EV_LOOK2 as c_int),
                 2000,
             ),
-            SPEECH_LOST => G_AddVoiceEvent(ctx, self_, EV_LOST1 as c_int, 2000),
+            SPEECH_LOST => G_AddVoiceEvent(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                EV_LOST1 as c_int,
+                2000,
+            ),
             SPEECH_OUTFLANK => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -381,7 +386,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_ESCAPING => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -390,7 +395,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_SIGHT => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -399,7 +404,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_SOUND => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -408,7 +413,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_SUSPICIOUS => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -417,7 +422,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_YELL => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -426,7 +431,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
             ),
             SPEECH_PUSHED => G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -540,7 +545,7 @@ pub fn NPC_ST_Pain(
             // FIXME: better way to know I was pushed (Raven comment).
             G_AddVoiceEvent(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 (*ctx.world)
                     .bg_state
                     .rng
@@ -1639,7 +1644,7 @@ pub fn NPC_BSST_Patrol(ctx: GameContext<'_>) {
                         // No longer overrides scripted anims
                         NPC_SetAnim(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC).unwrap(),
                             SETANIM_TORSO,
                             BOTH_STAND4 as c_int,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -1656,7 +1661,7 @@ pub fn NPC_BSST_Patrol(ctx: GameContext<'_>) {
                 {
                     NPC_SetAnim(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         SETANIM_BOTH,
                         BOTH_STAND4 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -2409,7 +2414,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
             for i in 0..(*group).numGroup {
                 let member = &mut world.g_entities[(*group).member[i as usize].number as usize]
                     as *mut gentity_t;
-                SetNPCGlobals(ctx, member);
+                SetNPCGlobals(ctx, ctx.entity_id_of(member).unwrap());
                 if trap::ICARUS_TaskIDPending(
                     ctx.engine,
                     GIcarusTaskidpendingArgs::new(NPC, TID_MOVE_NAV as c_int),
@@ -2531,7 +2536,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                 // don't include guys that aren't angry
                 continue;
             }
-            SetNPCGlobals(ctx, member);
+            SetNPCGlobals(ctx, ctx.entity_id_of(member).unwrap());
             // re-fetch NPC/NPCInfo after SetNPCGlobals swaps the ambient pointers
             let NPC = world.globals.NPC as *mut gentity_t;
             let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;

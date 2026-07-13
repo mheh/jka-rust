@@ -1562,7 +1562,7 @@ pub fn ItemUse_Seeker(ctx: GameContext<'_>, ent: EntityId) {
             // actualy spawn a remote NPC
             let remote = NPC_SpawnType(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent),
                 c"remote".as_ptr() as *mut c_char,
                 core::ptr::null_mut(),
                 qfalse,

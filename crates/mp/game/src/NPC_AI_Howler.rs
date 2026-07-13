@@ -192,7 +192,7 @@ pub fn Howler_Attack(ctx: GameContext<'_>) {
             );
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 SETANIM_BOTH,
                 BOTH_ATTACK1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -292,7 +292,7 @@ pub fn NPC_Howler_Pain(
 
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_).unwrap(),
                 SETANIM_BOTH,
                 BOTH_PAIN1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
