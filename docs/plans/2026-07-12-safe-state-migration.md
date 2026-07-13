@@ -127,6 +127,20 @@ before each commit. One commit per shard keeps the chain referee-bisectable.
   Stage-1-end cleanup `36786079` (stale STAGING headers swept, final
   param sweep: only seam/arena-base/double-pointer raws remain by
   design). **Stage 1 is complete.**
+- **Stage 2a — DONE** (`aafdb713`): world borrow flipped (&mut GameWorld,
+  non-Copy ctx, &mut self dispatch, ~2,000 sigs threaded), autoref lint
+  DENIED (278 explicit forms), world() accessor deleted; deref bodies ride
+  the `world_raw()` bridge (~4,680 uses, 60 files) pending 2b. Gates: 346
+  tests + six referee scenarios byte-identical + i686.
+- **Stage 2b wave cut** (by bridge-use weight, 2-wide worktree agents,
+  mutually-exclusive files, referee-gated commit per shard):
+  V1 w_saber ∥ g_weapon+g_mover · V2 g_combat+g_client ∥ g_saga+g_active ·
+  V3 g_items+w_force+g_misc ∥ NPC_AI_GalakMech+NPC_AI_Stormtrooper+
+  NPC_reactions+NPC_combat · V4 g_nav+g_trigger+g_ICARUScb+ai_main ∥
+  g_main+NPC_utils+g_cmds+g_utils · V5–V6 the remaining ~40 small files,
+  split by weight at cut time. Worker pattern: dissolve `world_raw()`/
+  `__hN` temps into real borrows per the g_object.rs pilot re-acquire
+  pattern; behavior/evaluation order preserved; referee arbitrates.
 - **Stage-1 precedents established** (binding on later shards): returns stay
   raw; signature-only re-derives for saturated bodies with in-code Stage-2
   debt marks; unused handler `other`/`activator` params are `Option<EntityId>`;
