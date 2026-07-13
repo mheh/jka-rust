@@ -1,5 +1,15 @@
 # Handoff — jka-rust live 30-bot server bug-hunt (2026-07-13)
 
+**RESOLVED same day — do not pick up:** both open threads below closed,
+pushed, and player-verified. Thread 1 (EV_SABER_HIT) was the ghoul2
+identity-world-matrix debt (misc.rs gap note #6): collision positions came
+back model-local, so effects spawned near the world origin — fixed by
+threading the real matrix into `g2_trace_models` (`2312f204`). Thread 2
+landed as a full row-identical regeneration of the three playerState tables
+(`926cccb5`). A transient client "invalid entityState field count (141 vs
+132)" during verification was stale-instance churn, not the new tables
+(A/B-confirmed: old- and new-table servers both connect clean).
+
 Fresh-agent pickup doc. Yesterday's session ran the first-ever bots-enabled live
 boots of the Rust MP dedicated server and shook out a chain of engine/module
 bugs the referee structurally cannot see. Two investigations are mid-flight.
