@@ -3902,7 +3902,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         if (*client).ps.cloakFuel <= 0 {
                             // turn it off
                             (*client).ps.cloakFuel = 0;
-                            Jedi_Decloak(ctx, ent);
+                            Jedi_Decloak(ctx, ctx.entity_id_of(ent));
                         }
                         (*client).cloakDebReduce = world.level.time + 200;
                     }

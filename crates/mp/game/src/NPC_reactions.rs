@@ -1181,8 +1181,8 @@ pub fn NPC_Use(
                         crate::veh_dispatch::board(ctx, pVeh, other as *mut bgEntity_t);
                     }
                 }
-            } else if crate::NPC_AI_Jedi::Jedi_WaitingAmbush(self_) != 0 {
-                crate::NPC_AI_Jedi::Jedi_Ambush(ctx, self_);
+            } else if crate::NPC_AI_Jedi::Jedi_WaitingAmbush(&*self_) != 0 {
+                crate::NPC_AI_Jedi::Jedi_Ambush(ctx, ctx.entity_id_of(self_).unwrap());
             }
 
             // Run any use instructions

@@ -1782,10 +1782,10 @@ pub fn ItemUse_UseCloak(ctx: GameContext<'_>, ent: EntityId) {
 
         if (*((*ent).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] != 0 {
             // decloak
-            Jedi_Decloak(ctx, ent);
+            Jedi_Decloak(ctx, ctx.entity_id_of(ent));
         } else {
             // cloak
-            Jedi_Cloak(ctx, ent);
+            Jedi_Cloak(ctx, ctx.entity_id_of(ent));
         }
 
         (*((*ent).client as *mut gclient_t)).cloakToggleTime =

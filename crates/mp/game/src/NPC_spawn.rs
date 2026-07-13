@@ -185,7 +185,7 @@ pub fn NPC_SetMiscDefaultData(ctx: GameContext<'_>, ent: EntityId) {
         if (*((*ent).client as *mut gclient_t)).ps.weapon == WP_SABER {
             crate::w_saber::WP_SaberInitBladeData(ctx, ctx.entity_id_of(ent).unwrap());
             (*((*ent).client as *mut gclient_t)).ps.saberHolstered = 2;
-            crate::NPC_AI_Jedi::Jedi_ClearTimers(ctx, ent);
+            crate::NPC_AI_Jedi::Jedi_ClearTimers(ctx, ctx.entity_id_of(ent).unwrap());
         }
         if (*((*ent).client as *mut gclient_t)).ps.fd.forcePowersKnown != 0 {
             crate::w_force::WP_InitForcePowers(ctx, ctx.entity_id_of(ent));
@@ -211,7 +211,10 @@ pub fn NPC_SetMiscDefaultData(ctx: GameContext<'_>, ent: EntityId) {
                 } else {
                     match (*((*ent).client as *mut gclient_t)).ps.weapon {
                         WP_THERMAL | WP_BLASTER => {
-                            crate::NPC_AI_Stormtrooper::ST_ClearTimers(ctx, ent);
+                            crate::NPC_AI_Stormtrooper::ST_ClearTimers(
+                                ctx,
+                                ctx.entity_id_of(ent).unwrap(),
+                            );
                             if (*((*ent).NPC as *mut gNPC_t)).rank >= RANK_LT
                                 || (*((*ent).client as *mut gclient_t)).ps.weapon == WP_THERMAL
                             {
@@ -237,7 +240,7 @@ pub fn NPC_SetMiscDefaultData(ctx: GameContext<'_>, ent: EntityId) {
             NPCTEAM_ENEMY => {
                 (*((*ent).NPC as *mut gNPC_t)).defaultBehavior = BS_DEFAULT;
                 if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SHADOWTROOPER {
-                    crate::NPC_AI_Jedi::Jedi_Cloak(ctx, ent);
+                    crate::NPC_AI_Jedi::Jedi_Cloak(ctx, ctx.entity_id_of(ent));
                 }
                 if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_TAVION
                     || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_REBORN
@@ -260,7 +263,10 @@ pub fn NPC_SetMiscDefaultData(ctx: GameContext<'_>, ent: EntityId) {
                     (*((*ent).client as *mut gclient_t)).ps.eFlags2 |= EF2_FLYING;
                 } else {
                     if (*((*ent).client as *mut gclient_t)).ps.weapon == WP_BLASTER {
-                        crate::NPC_AI_Stormtrooper::ST_ClearTimers(ctx, ent);
+                        crate::NPC_AI_Stormtrooper::ST_ClearTimers(
+                            ctx,
+                            ctx.entity_id_of(ent).unwrap(),
+                        );
                     }
                     let galak_mech = cstr("galak_mech");
                     if crate::q_shared::Q_stricmp((*ent).NPC_type, galak_mech.as_ptr()) == 0 {

@@ -810,7 +810,12 @@ pub fn dispatch_pain(
         EntPain::NPC_Droid_Pain => NPC_Droid_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_GM_Pain => NPC_GM_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_Howler_Pain => NPC_Howler_Pain(ctx, self_, attacker, damage),
-        EntPain::NPC_Jedi_Pain => NPC_Jedi_Pain(ctx, self_, attacker, damage),
+        EntPain::NPC_Jedi_Pain => NPC_Jedi_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
         EntPain::NPC_Mark1_Pain => NPC_Mark1_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_Mark2_Pain => NPC_Mark2_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_MineMonster_Pain => NPC_MineMonster_Pain(ctx, self_, attacker, damage),
@@ -825,7 +830,12 @@ pub fn dispatch_pain(
         EntPain::NPC_Remote_Pain => NPC_Remote_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_Seeker_Pain => NPC_Seeker_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_Sentry_Pain => NPC_Sentry_Pain(ctx, self_, attacker, damage),
-        EntPain::NPC_ST_Pain => NPC_ST_Pain(ctx, self_, attacker, damage),
+        EntPain::NPC_ST_Pain => NPC_ST_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
         EntPain::NPC_Wampa_Pain => NPC_Wampa_Pain(ctx, self_, attacker, damage),
         EntPain::ShieldPain => ShieldPain(
             ctx,

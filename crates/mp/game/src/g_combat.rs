@@ -2226,7 +2226,8 @@ pub fn player_die(
 
         if !(*self_).NPC.is_null() {
             let npc = (*self_).NPC as *mut gNPC_t;
-            if !(*self_).client.is_null() && crate::NPC_AI_Jedi::Jedi_WaitingAmbush(self_) != qfalse
+            if !(*self_).client.is_null()
+                && crate::NPC_AI_Jedi::Jedi_WaitingAmbush(&*self_) != qfalse
             {
                 // ambushing trooper
                 (*cl).noclip = qfalse;
@@ -2243,7 +2244,7 @@ pub fn player_die(
                 (*npc).tempGoal = None;
             }
             if false {
-                crate::NPC_AI_Jedi::Boba_FlyStop(ctx, self_);
+                crate::NPC_AI_Jedi::Boba_FlyStop(ctx, ctx.entity_id_of(self_).unwrap());
             }
             if (*self_).s.NPC_class == class_t::CLASS_RANCOR as c_int {
                 crate::NPC_AI_Rancor::Rancor_DropVictim(ctx, self_);

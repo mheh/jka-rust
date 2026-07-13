@@ -486,7 +486,11 @@ pub fn G_SetEnemy(ctx: GameContext<'_>, self_: EntityId, enemy: Option<EntityId>
 
         if !client.is_null() && (*client).ps.weapon == WP_SABER {
             //when get new enemy, set a base aggression based on what that enemy is using, how far they are, etc.
-            NPC_Jedi_RateNewEnemy(ctx, self_, enemy);
+            NPC_Jedi_RateNewEnemy(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(enemy),
+            );
         }
 
         //NOTE: this is not necessarily true!

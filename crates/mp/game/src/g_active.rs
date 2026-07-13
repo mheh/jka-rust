@@ -3676,10 +3676,10 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                 {
                     if (*client).ps.powerups[PW_CLOAKED as usize] != 0 {
                         // decloak
-                        Jedi_Decloak(ctx, ent);
+                        Jedi_Decloak(ctx, ctx.entity_id_of(ent));
                     } else {
                         // cloak
-                        Jedi_Cloak(ctx, ent);
+                        Jedi_Cloak(ctx, ctx.entity_id_of(ent));
                     }
                 }
             } else if gc == GENCMD_SABERATTACKCYCLE as c_int {

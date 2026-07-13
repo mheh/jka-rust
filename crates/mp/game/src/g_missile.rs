@@ -1060,7 +1060,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 } else if !(*other).client.is_null()
                     && (*((*other).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] != 0
                 {
-                    Jedi_Decloak(ctx, other);
+                    Jedi_Decloak(ctx, ctx.entity_id_of(other));
                     if (*ent).methodOfDeath == MOD_DEMP2_ALT as c_int {
                         (*((*other).client as *mut gclient_t)).cloakToggleTime = Q3_INFINITE;
                     } else {

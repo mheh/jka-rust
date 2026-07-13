@@ -6934,8 +6934,8 @@ pub fn WP_SaberStartMissileBlockCheck(ctx: GameContext<'_>, self_: EntityId, ucm
         if !incoming.is_null() {
             if !(*self_).NPC.is_null() {
                 let npc = (*self_).NPC as *mut gNPC_t;
-                if Jedi_WaitingAmbush(self_) != 0 {
-                    Jedi_Ambush(ctx, self_);
+                if Jedi_WaitingAmbush(&*self_) != 0 {
+                    Jedi_Ambush(ctx, ctx.entity_id_of(self_).unwrap());
                 }
                 if (*sc).NPC_class == CLASS_BOBAFETT
                     && (*sc).ps.eFlags2 & EF2_FLYING != 0
@@ -6962,11 +6962,11 @@ pub fn WP_SaberStartMissileBlockCheck(ctx: GameContext<'_>, self_: EntityId, ucm
                     }
                 } else if Jedi_SaberBlockGo(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     &mut (*npc).last_ucmd as *mut usercmd_t,
                     vec3_origin,
                     vec3_origin,
-                    incoming,
+                    ctx.entity_id_of(incoming),
                     0.0f32,
                 ) != evasionType_t::EVASION_NONE
                 {

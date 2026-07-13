@@ -1627,7 +1627,7 @@ pub fn DEMP2_AltRadiusDamage(ctx: GameContext<'_>, ent: EntityId) {
                     }
                     if (*((*gent).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] != 0 {
                         // disable cloak temporarily
-                        Jedi_Decloak(ctx, gent);
+                        Jedi_Decloak(ctx, ctx.entity_id_of(gent));
                         (*((*gent).client as *mut gclient_t)).cloakToggleTime =
                             (*ctx.world).level.time
                                 + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);

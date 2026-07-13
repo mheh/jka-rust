@@ -1319,7 +1319,7 @@ pub fn NPC_RunBehavior(ctx: GameContext<'_>, team: c_int, bState: c_int) {
             NPC_BehaviorSet_Seeker(ctx, bState);
         } else if (*client).NPC_class == class_t::CLASS_BOBAFETT {
             //bounty hunter
-            if crate::NPC_AI_Jedi::Boba_Flying(npc_ent) != 0 {
+            if crate::NPC_AI_Jedi::Boba_Flying(&*npc_ent) != 0 {
                 NPC_BehaviorSet_Seeker(ctx, bState);
             } else {
                 NPC_BehaviorSet_Jedi(ctx, bState);

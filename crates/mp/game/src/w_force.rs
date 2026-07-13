@@ -2098,7 +2098,7 @@ pub fn ForceLightningDamage(
                         }
                         if (*tcl).ps.powerups[PW_CLOAKED as usize] != 0 {
                             //disable cloak temporarily
-                            Jedi_Decloak(ctx, traceEnt);
+                            Jedi_Decloak(ctx, ctx.entity_id_of(traceEnt));
                             (*tcl).cloakToggleTime =
                                 level_time + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);
                         }
@@ -3075,7 +3075,10 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                         }
                     }
                 } else {
-                    crate::NPC_AI_Jedi::NPC_Jedi_PlayConfusionSound(ctx, traceEnt);
+                    crate::NPC_AI_Jedi::NPC_Jedi_PlayConfusionSound(
+                        ctx,
+                        ctx.entity_id_of(traceEnt).unwrap(),
+                    );
                 }
                 WP_ForcePowerStart(
                     ctx,

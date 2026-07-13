@@ -783,7 +783,7 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 //officers do not panic
                 noflee = true;
             } else {
-                ST_AggressionAdjust(member, -1);
+                ST_AggressionAdjust(&*member, -1);
                 (*memberNpc).currentAim -= (*ctx.world).bg_state.rng.Q_irand(0, 10);
             }
         }
@@ -813,8 +813,8 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         //those close to enemy run away!
                         ST_StartFlee(
                             ctx,
-                            member,
-                            (*group).enemy,
+                            ctx.entity_id_of(member),
+                            ctx.entity_id_of((*group).enemy),
                             (*member).r.currentOrigin,
                             alertEventLevel_e::AEL_DANGER_GREAT as c_int,
                             3000,
@@ -826,8 +826,8 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         //those close to me run away!
                         ST_StartFlee(
                             ctx,
-                            member,
-                            (*group).enemy,
+                            ctx.entity_id_of(member),
+                            ctx.entity_id_of((*group).enemy),
                             (*member).r.currentOrigin,
                             alertEventLevel_e::AEL_DANGER_GREAT as c_int,
                             3000,
@@ -844,15 +844,15 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
                             //lower rank they are, higher rank I am, more likely they are to flee
                             ST_StartFlee(
                                 ctx,
-                                member,
-                                (*group).enemy,
+                                ctx.entity_id_of(member),
+                                ctx.entity_id_of((*group).enemy),
                                 (*member).r.currentOrigin,
                                 alertEventLevel_e::AEL_DANGER_GREAT as c_int,
                                 3000,
                                 5000,
                             );
                         } else {
-                            ST_MarkToCover(ctx, member);
+                            ST_MarkToCover(ctx, ctx.entity_id_of(member));
                         }
                     }
                     (*memberNpc).currentAim -= (*ctx.world).bg_state.rng.Q_irand(1, 15);
