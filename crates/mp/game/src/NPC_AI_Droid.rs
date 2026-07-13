@@ -64,7 +64,12 @@ pub fn R2D2_PartsMove(ctx: GameContext<'_>) {
             (*npc).pos1[1] = (*ctx.world).bg_state.rng.Q_irand(-20, 20) as f32;
             (*npc).pos1[2] = (*ctx.world).bg_state.rng.Q_irand(-20, 20) as f32;
 
-            NPC_SetBoneAngles(ctx, npc, b"f_eye\0".as_ptr() as *mut c_char, (*npc).pos1);
+            NPC_SetBoneAngles(
+                ctx,
+                ctx.entity_id_of(npc).unwrap(),
+                b"f_eye\0".as_ptr() as *mut c_char,
+                (*npc).pos1,
+            );
 
             TIMER_Set(
                 ctx,
@@ -410,7 +415,7 @@ pub fn NPC_Droid_Pain(
 
         if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_R5D2 {
             // CLASS_R5D2
-            pain_chance = NPC_GetPainChance(ctx, self_, damage);
+            pain_chance = NPC_GetPainChance(ctx, ctx.entity_id_of(self_).unwrap(), damage);
 
             if mod_ == MOD_DEMP2 as c_int
                 || mod_ == MOD_DEMP2_ALT as c_int
@@ -431,7 +436,7 @@ pub fn NPC_Droid_Pain(
                                     c"head".to_owned(),
                                 ),
                             ) == 0) {
-                            NPC_SetSurfaceOnOff(ctx, self_, b"head\0".as_ptr() as *const c_char, TURN_OFF);
+                            NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), b"head\0".as_ptr() as *const c_char, TURN_OFF);
 
                             if (*((*self_).client as *mut gclient_t)).ps.m_iVehicleNum != 0 {
                                 let mut up = [0.0f32; 3];
@@ -492,7 +497,7 @@ pub fn NPC_Droid_Pain(
             (*((*self_).NPC as *mut gNPC_t)).scriptFlags &= !SCF_LOOK_FOR_ENEMIES;
         } else if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_R2D2 {
             // CLASS_R2D2
-            pain_chance = NPC_GetPainChance(ctx, self_, damage);
+            pain_chance = NPC_GetPainChance(ctx, ctx.entity_id_of(self_).unwrap(), damage);
 
             if mod_ == MOD_DEMP2 as c_int
                 || mod_ == MOD_DEMP2_ALT as c_int
@@ -513,7 +518,7 @@ pub fn NPC_Droid_Pain(
                                     c"head".to_owned(),
                                 ),
                             ) == 0) {
-                            NPC_SetSurfaceOnOff(ctx, self_, b"head\0".as_ptr() as *const c_char, TURN_OFF);
+                            NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), b"head\0".as_ptr() as *const c_char, TURN_OFF);
 
                             if (*((*self_).client as *mut gclient_t)).ps.m_iVehicleNum != 0 {
                                 let mut up = [0.0f32; 3];
@@ -583,7 +588,12 @@ pub fn NPC_Droid_Pain(
             (*((*self_).client as *mut gclient_t)).ps.velocity[2] -= 127.0;
         }
 
-        NPC_Pain(ctx, self_, attacker, damage);
+        NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
     }
 }
 

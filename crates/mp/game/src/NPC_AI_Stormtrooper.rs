@@ -482,8 +482,8 @@ pub fn ST_StartFlee(
         }
         G_StartFlee(
             ctx,
-            self_,
-            enemy,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(enemy),
             dangerPoint,
             dangerLevel,
             minTime,
@@ -529,7 +529,12 @@ pub fn NPC_ST_Pain(
             2000,
         );
 
-        NPC_Pain(ctx, self_, attacker, damage);
+        NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
 
         if damage == 0 && (*self_).health > 0 {
             // FIXME: better way to know I was pushed (Raven comment).
@@ -723,7 +728,7 @@ pub fn NPC_ST_SleepShuffle(ctx: GameContext<'_>) {
         let NPC = world.globals.NPC as *mut gentity_t;
 
         // Play an awake script if we have one
-        if G_ActivateBehavior(ctx, NPC, bSet_t::BSET_AWAKE as c_int) != 0 {
+        if G_ActivateBehavior(ctx, ctx.entity_id_of(NPC), bSet_t::BSET_AWAKE as c_int) != 0 {
             return;
         }
 
@@ -776,7 +781,11 @@ pub fn NPC_BSST_Sleep(ctx: GameContext<'_>) {
                 // rwwFIXMEFIXME: Care about all clients not just 0 (Raven comment).
                 if world.g_entities[0].health > 0 {
                     let target = &mut world.g_entities[0] as *mut gentity_t;
-                    G_SetEnemy(ctx, NPC, target);
+                    G_SetEnemy(
+                        ctx,
+                        ctx.entity_id_of(NPC).unwrap(),
+                        ctx.entity_id_of(target),
+                    );
                     return;
                 }
             }
@@ -831,7 +840,11 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
             && ((*NPCInfo).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0
             && target_dist < (minDist * minDist)
         {
-            G_SetEnemy(ctx, NPC, target);
+            G_SetEnemy(
+                ctx,
+                ctx.entity_id_of(NPC).unwrap(),
+                ctx.entity_id_of(target),
+            );
             (*NPCInfo).enemyLastSeenTime = world.level.time;
             TIMER_Set(
                 ctx,
@@ -857,8 +870,8 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
         // Check FOV first
         if InFOV(
             ctx,
-            target,
-            NPC,
+            ctx.entity_id_of(target),
+            ctx.entity_id_of(NPC).unwrap(),
             (*NPCInfo).stats.hfov,
             (*NPCInfo).stats.vfov,
         ) == qfalse
@@ -867,13 +880,17 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
         }
 
         // clearLOS = ( target->client->ps.leanofs ) ? NPC_ClearLOS5( ... ) : NPC_ClearLOS4( target );
-        let clearLOS = NPC_ClearLOS4(ctx, target);
+        let clearLOS = NPC_ClearLOS4(ctx, ctx.entity_id_of(target));
 
         // Now check for clear line of vision
         if clearLOS != qfalse {
             if (*tclient).NPC_class == CLASS_ATST {
                 // can't miss 'em!
-                G_SetEnemy(ctx, NPC, target);
+                G_SetEnemy(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    ctx.entity_id_of(target),
+                );
                 TIMER_Set(
                     ctx,
                     ctx.entity_id_of(NPC),
@@ -924,7 +941,11 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
 
             // Too close?
             if dist_rating < DISTANCE_THRESHOLD {
-                G_SetEnemy(ctx, NPC, target);
+                G_SetEnemy(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    ctx.entity_id_of(target),
+                );
                 TIMER_Set(
                     ctx,
                     ctx.entity_id_of(NPC),
@@ -1011,7 +1032,11 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
                 };
 
             if target_rating > realize && ((*NPCInfo).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
-                G_SetEnemy(ctx, NPC, target);
+                G_SetEnemy(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    ctx.entity_id_of(target),
+                );
                 (*NPCInfo).enemyLastSeenTime = world.level.time;
                 TIMER_Set(
                     ctx,
@@ -1037,7 +1062,13 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
                     );
                     // TODO: Play a sound along the lines of, "Huh? What was that?" (Raven comment).
                     ST_Speech(ctx, NPC, SPEECH_SIGHT, 0.0);
-                    NPC_TempLookTarget(ctx, NPC, (*target).s.number, lookTime, lookTime);
+                    NPC_TempLookTarget(
+                        ctx,
+                        ctx.entity_id_of(NPC).unwrap(),
+                        (*target).s.number,
+                        lookTime,
+                        lookTime,
+                    );
                     // FIXME: set desired yaw and pitch towards this guy? (Raven comment).
                 } else if TIMER_Get(ctx, ctx.entity_id_of(NPC), c"enemyLastVisible".as_ptr())
                     <= world.level.time + 500
@@ -1053,7 +1084,11 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
                             c"interrogating".as_ptr(),
                             interrogateTime,
                         );
-                        G_SetEnemy(ctx, NPC, target);
+                        G_SetEnemy(
+                            ctx,
+                            ctx.entity_id_of(NPC).unwrap(),
+                            ctx.entity_id_of(target),
+                        );
                         (*NPCInfo).enemyLastSeenTime = world.level.time;
                         TIMER_Set(
                             ctx,
@@ -1068,7 +1103,11 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
                             interrogateTime,
                         );
                     } else {
-                        G_SetEnemy(ctx, NPC, target);
+                        G_SetEnemy(
+                            ctx,
+                            ctx.entity_id_of(NPC).unwrap(),
+                            ctx.entity_id_of(target),
+                        );
                         (*NPCInfo).enemyLastSeenTime = world.level.time;
                         // FIXME: ambush guys (like those popping out of water)
                         // shouldn't delay... (Raven comment).
@@ -1116,7 +1155,7 @@ pub fn NPC_CheckPlayerTeamStealth(ctx: GameContext<'_>) -> qboolean {
 
             if !enemy.is_null()
                 && !(*enemy).client.is_null()
-                && NPC_ValidEnemy(ctx, enemy) != qfalse
+                && NPC_ValidEnemy(ctx, ctx.entity_id_of(enemy)) != qfalse
                 && (*((*enemy).client as *mut gclient_t)).playerTeam
                     == (*((*NPC).client as *mut gclient_t)).enemyTeam
             {
@@ -1161,7 +1200,7 @@ pub fn NPC_ST_InvestigateEvent(
                 }
                 // FIXME: what if can't actually see enemy... (Raven comment).
                 // ST_Speech( NPC, SPEECH_CHARGE, 0 ); (Raven, commented out).
-                G_SetEnemy(ctx, NPC, owner);
+                G_SetEnemy(ctx, ctx.entity_id_of(NPC).unwrap(), ctx.entity_id_of(owner));
                 (*NPCInfo).enemyLastSeenTime = world.level.time;
                 TIMER_Set(
                     ctx,
@@ -1375,7 +1414,7 @@ pub fn ST_OffsetLook(ctx: GameContext<'_>, offset: f32, out: &mut vec3_t) {
         out[2] = (*NPC).r.currentOrigin[2] + 64.0 * forward[2];
 
         let mut temp: vec3_t = [0.0; 3];
-        CalcEntitySpot(ctx, NPC, SPOT_HEAD, &mut temp);
+        CalcEntitySpot(ctx, ctx.entity_id_of(NPC), SPOT_HEAD, &mut temp);
         out[2] = temp[2];
     }
 }
@@ -1628,7 +1667,7 @@ pub fn NPC_BSST_Patrol(ctx: GameContext<'_>) {
             }
             // FIXME: this is a disgusting hack... (Raven comment).
             if (*client).ps.weapon != WP_NONE {
-                ChangeWeapon(ctx, NPC, WP_NONE);
+                ChangeWeapon(ctx, ctx.entity_id_of(NPC), WP_NONE);
                 (*client).ps.weapon = WP_NONE;
                 (*client).ps.weaponstate = WEAPON_READY as c_int;
                 /*
@@ -1939,7 +1978,7 @@ pub fn ST_CheckFireState(ctx: GameContext<'_>) {
                     let mut tooClose = qfalse;
                     let mut tooFar = qfalse;
 
-                    CalcEntitySpot(ctx, NPC, SPOT_HEAD, &mut muzzle);
+                    CalcEntitySpot(ctx, ctx.entity_id_of(NPC), SPOT_HEAD, &mut muzzle);
                     if VectorCompare(world.globals.impactPos, vec3_origin) != qfalse {
                         // never checked ShotEntity this frame, so must do a trace...
                         let mut forward: vec3_t = [0.0; 3];
@@ -2384,7 +2423,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                     continue;
                 }
                 // Lost enemy for three minutes? go into search mode?
-                G_ClearEnemy(ctx, NPC);
+                G_ClearEnemy(ctx, ctx.entity_id_of(NPC).unwrap());
                 (*NPC).waypoint =
                     NAV_FindClosestWaypointForEnt(ctx, NPC, (*(*group).enemy).waypoint);
                 if (*NPC).waypoint == WAYPOINT_NONE {
@@ -2560,13 +2599,13 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                 (*(*group).enemy).r.currentOrigin,
                                 (*NPC).r.currentOrigin,
                             ) < 65536.0
-                                && NPC_ClearLOS4(ctx, enemyEnt) != qfalse)
+                                && NPC_ClearLOS4(ctx, ctx.entity_id_of(enemyEnt)) != qfalse)
                         {
                             // done hiding or enemy near and can see us — er, start
                             // another flee I guess?
                             NPC_StartFlee(
                                 ctx,
-                                enemyEnt,
+                                ctx.entity_id_of(enemyEnt),
                                 (*enemyEnt).r.currentOrigin,
                                 AEL_DANGER_GREAT as c_int,
                                 5000,
@@ -3246,7 +3285,7 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
         }
 
         // can we see our target?
-        if NPC_ClearLOS4(ctx, enemy) != qfalse {
+        if NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy)) != qfalse {
             AI_GroupUpdateEnemyLastSeen(ctx, (*NPCInfo).group, (*enemy).r.currentOrigin);
             (*NPCInfo).enemyLastSeenTime = world.level.time;
             world.globals.enemyLOS = qtrue;
@@ -3265,7 +3304,7 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
                 } else if world.globals.enemyInFOV != qfalse {
                     // if enemy is FOV, go ahead and check for shooting
                     let mut impactPos = world.globals.impactPos;
-                    let hit = NPC_ShotEntity(ctx, enemy, Some(&mut impactPos));
+                    let hit = NPC_ShotEntity(ctx, ctx.entity_id_of(enemy), Some(&mut impactPos));
                     world.globals.impactPos = impactPos;
                     let hitEnt = &mut world.g_entities[hit as usize] as *mut gentity_t;
                     let hitClient = (*hitEnt).client as *mut gclient_t;

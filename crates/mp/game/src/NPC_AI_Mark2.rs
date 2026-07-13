@@ -119,7 +119,12 @@ pub fn NPC_Mark2_Pain(
     unsafe {
         let hit_loc = (*ctx.world).globals.gPainHitLoc;
 
-        NPC_Pain(ctx, self_, attacker, damage);
+        NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
 
         for i in 0..3 {
             if hit_loc == HL_GENERIC1 + i
@@ -138,7 +143,12 @@ pub fn NPC_Mark2_Pain(
                     if new_bolt != -1 {
                         NPC_Mark2_Part_Explode(ctx, self_, new_bolt);
                     }
-                    NPC_SetSurfaceOnOff(ctx, self_, surface_name.as_ptr(), TURN_OFF);
+                    NPC_SetSurfaceOnOff(
+                        ctx,
+                        ctx.entity_id_of(self_).unwrap(),
+                        surface_name.as_ptr(),
+                        TURN_OFF,
+                    );
                     break;
                 }
             }
@@ -236,7 +246,7 @@ pub fn Mark2_FireBlaster(ctx: GameContext<'_>, advance: qboolean) {
             };
             CalcEntitySpot(
                 ctx,
-                enemy_ptr,
+                ctx.entity_id_of(enemy_ptr),
                 crate::npc::spot_t::spot_t::SPOT_HEAD,
                 &mut enemy_org1,
             );
@@ -352,7 +362,7 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
         } else {
             core::ptr::null_mut()
         };
-        let visible = NPC_ClearLOS4(ctx, enemy_ptr);
+        let visible = NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ptr));
         let advance = (distance > MIN_DISTANCE_SQR as i64) as qboolean;
 
         if (*npc_info_ptr).localState == LSTATE_RISINGUP {

@@ -47,7 +47,12 @@ pub fn NPC_Remote_Pain(
     crate::npc_c::SetNPCGlobals(ctx, self_);
     Remote_Strafe(ctx);
     crate::npc_c::RestoreNPCGlobals(ctx);
-    crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
+    crate::NPC_reactions::NPC_Pain(
+        ctx,
+        ctx.entity_id_of(self_).unwrap(),
+        ctx.entity_id_of(attacker),
+        damage,
+    );
 }
 
 /// Raven `Remote_MaintainHeight`.
@@ -329,7 +334,12 @@ pub fn Remote_Fire(ctx: GameContext<'_>) {
             Some(enemy_id) => &(*ctx.world).g_entities[enemy_id.0 as usize] as *const gentity_t,
             None => core::ptr::null(),
         };
-        crate::NPC_utils::CalcEntitySpot(ctx, enemy_ent, SPOT_HEAD, &mut enemy_org1);
+        crate::NPC_utils::CalcEntitySpot(
+            ctx,
+            ctx.entity_id_of(enemy_ent),
+            SPOT_HEAD,
+            &mut enemy_org1,
+        );
     }
 
     crate::q_math::_VectorCopy(unsafe { (*npc).r.currentOrigin }, &mut muzzle1);
@@ -437,7 +447,7 @@ pub fn Remote_Attack(ctx: GameContext<'_>) {
                 (*npc).r.currentOrigin,
                 (*enemy_ent).r.currentOrigin,
             ) as c_int as f32;
-            visible = if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy_ent) != 0 {
+            visible = if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ent)) != 0 {
                 qtrue
             } else {
                 qfalse

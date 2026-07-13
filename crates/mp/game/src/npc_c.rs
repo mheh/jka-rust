@@ -80,10 +80,7 @@ pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
             if !client.is_null() && ((*client).ps.eFlags & EF_NODRAW) == 0 {
                 crate::NPC_senses::AddSightEvent(
                     ctx,
-                    match (*self_).enemy {
-                        Some(id) => &mut world.g_entities[id.index()] as *mut gentity_t,
-                        None => core::ptr::null_mut(),
-                    },
+                    (*self_).enemy,
                     (*self_).r.currentOrigin,
                     384.0,
                     alertEventLevel_e::AEL_DISCOVERED,
@@ -887,7 +884,11 @@ pub fn NPC_CheckAttackScript(ctx: GameContext<'_>) {
         if (world.globals.ucmd.buttons & BUTTON_ATTACK) == 0 {
             return;
         }
-        crate::NPC_utils::G_ActivateBehavior(ctx, world.globals.NPC, bSet_t::BSET_ATTACK as c_int);
+        crate::NPC_utils::G_ActivateBehavior(
+            ctx,
+            ctx.entity_id_of(world.globals.NPC),
+            bSet_t::BSET_ATTACK as c_int,
+        );
     }
 }
 
@@ -1371,7 +1372,7 @@ pub fn NPC_RunBehavior(ctx: GameContext<'_>, team: c_int, bState: c_int) {
                         if bState != bState_t::BS_FLEE as c_int {
                             // Guaranteed `Some` — covered by the `enemy.is_none()` guard above.
                             let enemy = &mut world.g_entities[(*npc_ent).enemy.unwrap().index()] as *mut gentity_t;
-                            crate::NPC_behavior::NPC_StartFlee(ctx, enemy, (*enemy).r.currentOrigin, alertEventLevel_e::AEL_DANGER_GREAT as c_int, 5000, 10000);
+                            crate::NPC_behavior::NPC_StartFlee(ctx, ctx.entity_id_of(enemy), (*enemy).r.currentOrigin, alertEventLevel_e::AEL_DANGER_GREAT as c_int, 5000, 10000);
                         } else {
                             crate::NPC_behavior::NPC_BSFlee(ctx);
                         }
@@ -1453,7 +1454,11 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: *mut gentity_t) {
         //FIXME: these next three bits could be a function call, some sort of setup/cleanup func
         //Lookmode must be reset every think cycle
         if (*npc_ent).delayScriptTime != 0 && (*npc_ent).delayScriptTime <= world.level.time {
-            crate::NPC_utils::G_ActivateBehavior(ctx, npc_ent, bSet_t::BSET_DELAYED as c_int);
+            crate::NPC_utils::G_ActivateBehavior(
+                ctx,
+                ctx.entity_id_of(npc_ent),
+                bSet_t::BSET_DELAYED as c_int,
+            );
             (*npc_ent).delayScriptTime = 0;
         }
 
@@ -1478,20 +1483,22 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: *mut gentity_t) {
             let enemy = &mut world.g_entities[enemy_id.index()] as *mut gentity_t;
             if (*enemy).inuse == 0 {
                 //just in case bState doesn't catch this
-                crate::NPC_combat::G_ClearEnemy(ctx, npc_ent);
+                crate::NPC_combat::G_ClearEnemy(ctx, ctx.entity_id_of(npc_ent).unwrap());
             }
         }
 
         if (*client).ps.saberLockTime != 0 && (*client).ps.saberLockEnemy != ENTITYNUM_NONE {
             crate::NPC_utils::NPC_SetLookTarget(
-                npc_ent,
+                ctx.entity_mut(ctx.entity_id_of(npc_ent).unwrap()),
                 (*client).ps.saberLockEnemy,
                 world.level.time + 1000,
             );
-        } else if crate::NPC_utils::NPC_CheckLookTarget(ctx, npc_ent) == 0 {
+        } else if crate::NPC_utils::NPC_CheckLookTarget(ctx, ctx.entity_id_of(npc_ent).unwrap())
+            == 0
+        {
             if let Some(enemy_id) = (*npc_ent).enemy {
                 crate::NPC_utils::NPC_SetLookTarget(
-                    npc_ent,
+                    ctx.entity_mut(ctx.entity_id_of(npc_ent).unwrap()),
                     world.g_entities[enemy_id.index()].s.number,
                     0,
                 );

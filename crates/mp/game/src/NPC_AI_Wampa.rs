@@ -761,7 +761,11 @@ pub fn NPC_Wampa_Pain(
             {
                 // if my enemy is dead (or attacked by player) and I'm not still holding/eating someone, turn on the attacker
                 // FIXME: if can't nav to my enemy, take this guy if I can nav to him
-                crate::NPC_combat::G_SetEnemy(ctx, self_, attacker);
+                crate::NPC_combat::G_SetEnemy(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    ctx.entity_id_of(attacker),
+                );
                 crate::g_timer::TIMER_Set(
                     ctx,
                     ctx.entity_id_of(self_),
@@ -943,7 +947,9 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                         Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                         None => core::ptr::null_mut(),
                     };
-                    if crate::NPC_combat::ValidEnemy(ctx, enemy_for_valid) == qfalse {
+                    if crate::NPC_combat::ValidEnemy(ctx, ctx.entity_id_of(enemy_for_valid))
+                        == qfalse
+                    {
                         crate::g_timer::TIMER_Remove(
                             ctx,
                             ctx.entity_id_of(npc),
@@ -1003,7 +1009,11 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                         {
                             // picked up a new enemy!
                             (*npc).lastEnemy = (*npc).enemy;
-                            crate::NPC_combat::G_SetEnemy(ctx, npc, newEnemy);
+                            crate::NPC_combat::G_SetEnemy(
+                                ctx,
+                                ctx.entity_id_of(npc).unwrap(),
+                                ctx.entity_id_of(newEnemy),
+                            );
                             // hold this one for at least 5-15 seconds
                             crate::g_timer::TIMER_Set(
                                 ctx,

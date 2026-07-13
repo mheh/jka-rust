@@ -439,7 +439,7 @@ pub fn Rancor_Smash(ctx: GameContext<'_>) {
 
         crate::NPC_senses::AddSoundEvent(
             ctx,
-            npc,
+            ctx.entity_id_of(npc),
             (*npc).r.currentOrigin,
             512.0,
             AEL_DANGER,
@@ -764,7 +764,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                     Rancor_Smash(ctx);
                     crate::NPC_utils::G_GetBoltPosition(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         (*((*npc).client as *mut gclient_t)).renderInfo.handLBolt,
                         Some(&mut shakePos),
                         0,
@@ -1045,7 +1045,10 @@ pub fn Rancor_Combat(ctx: GameContext<'_>) {
         // If we cannot see our target or we have somewhere to go, then do that
         if crate::NPC_utils::NPC_ClearLOS4(
             ctx,
-            crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy),
+            ctx.entity_id_of(crate::ent_id::resolve(
+                (*ctx.world).g_entities.as_mut_ptr(),
+                (*npc).enemy,
+            )),
         ) == qfalse
         {
             //|| UpdateGoal( ))
@@ -1166,7 +1169,11 @@ pub fn NPC_Rancor_Pain(
                 {
                     //if my enemy is dead (or attacked by player) and I'm not still holding/eating someone, turn on the attacker
                     //FIXME: if can't nav to my enemy, take this guy if I can nav to him
-                    crate::NPC_combat::G_SetEnemy(ctx, self_, attacker);
+                    crate::NPC_combat::G_SetEnemy(
+                        ctx,
+                        ctx.entity_id_of(self_).unwrap(),
+                        ctx.entity_id_of(attacker),
+                    );
                     crate::g_timer::TIMER_Set(
                         ctx,
                         ctx.entity_id_of(self_),
@@ -1346,7 +1353,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
 
         crate::NPC_senses::AddSightEvent(
             ctx,
-            npc,
+            ctx.entity_id_of(npc),
             (*npc).r.currentOrigin,
             1024.0,
             AEL_DANGER_GREAT,
@@ -1385,7 +1392,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             //do nothing but roar first time we see an enemy
             crate::NPC_senses::AddSoundEvent(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 (*npc).r.currentOrigin,
                 1024.0,
                 AEL_DANGER_GREAT,
@@ -1427,7 +1434,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             } else {
                 crate::NPC_senses::AddSoundEvent(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     (*npc).r.currentOrigin,
                     512.0,
                     AEL_DANGER_GREAT,
@@ -1456,7 +1463,10 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             } else if (*npc).count == 0 {
                 if crate::NPC_combat::ValidEnemy(
                     ctx,
-                    crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy),
+                    ctx.entity_id_of(crate::ent_id::resolve(
+                        (*ctx.world).g_entities.as_mut_ptr(),
+                        (*npc).enemy,
+                    )),
                 ) == qfalse
                 {
                     crate::g_timer::TIMER_Remove(
@@ -1495,7 +1505,11 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
                     {
                         //picked up a new enemy!
                         (*npc).lastEnemy = (*npc).enemy;
-                        crate::NPC_combat::G_SetEnemy(ctx, npc, newEnemy);
+                        crate::NPC_combat::G_SetEnemy(
+                            ctx,
+                            ctx.entity_id_of(npc).unwrap(),
+                            ctx.entity_id_of(newEnemy),
+                        );
                         //hold this one for at least 5-15 seconds
                         crate::g_timer::TIMER_Set(
                             ctx,
@@ -1538,7 +1552,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
                 );
                 crate::NPC_senses::AddSoundEvent(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     (*npc).r.currentOrigin,
                     384.0,
                     AEL_DANGER,

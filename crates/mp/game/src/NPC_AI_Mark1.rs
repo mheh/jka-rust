@@ -447,7 +447,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     NPC_Mark1_Part_Explode(ctx, self_, newBolt);
                     crate::NPC_utils::NPC_SetSurfaceOnOff(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_).unwrap(),
                         cstr(&format!("torso_tube{}", random_num)).as_ptr(),
                         TURN_OFF,
                     );
@@ -502,7 +502,12 @@ pub fn NPC_Mark1_Pain(
             return;
         }
 
-        crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
+        crate::NPC_reactions::NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
 
         crate::g_utils::G_Sound(
             ctx,
@@ -544,7 +549,12 @@ pub fn NPC_Mark1_Pain(
                     NPC_Mark1_Part_Explode(ctx, self_, newBolt);
                 }
 
-                crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"l_arm".as_ptr(), TURN_OFF);
+                crate::NPC_utils::NPC_SetSurfaceOnOff(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    c"l_arm".as_ptr(),
+                    TURN_OFF,
+                );
             }
         }
         // Hit in the right arm?
@@ -564,7 +574,12 @@ pub fn NPC_Mark1_Pain(
                     NPC_Mark1_Part_Explode(ctx, self_, newBolt);
                 }
 
-                crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"r_arm".as_ptr(), TURN_OFF);
+                crate::NPC_utils::NPC_SetSurfaceOnOff(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    c"r_arm".as_ptr(),
+                    TURN_OFF,
+                );
             }
         }
         // Check ammo pods
@@ -589,7 +604,7 @@ pub fn NPC_Mark1_Pain(
                         }
                         crate::NPC_utils::NPC_SetSurfaceOnOff(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_).unwrap(),
                             cstr(&format!("torso_tube{}", (i + 1) as c_int)).as_ptr(),
                             TURN_OFF,
                         );
@@ -740,7 +755,10 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
         if (*npc).health != 0 {
             crate::NPC_utils::CalcEntitySpot(
                 ctx,
-                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy),
+                ctx.entity_id_of(crate::ent_id::resolve(
+                    (*ctx.world).g_entities.as_mut_ptr(),
+                    (*npc).enemy,
+                )),
                 spot_t::SPOT_HEAD,
                 &mut enemy_org1,
             );
@@ -922,7 +940,10 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
 
         crate::NPC_utils::CalcEntitySpot(
             ctx,
-            crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy),
+            ctx.entity_id_of(crate::ent_id::resolve(
+                (*ctx.world).g_entities.as_mut_ptr(),
+                (*npc).enemy,
+            )),
             spot_t::SPOT_HEAD,
             &mut enemy_org1,
         );
@@ -1056,7 +1077,10 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
         };
         let visible = crate::NPC_utils::NPC_ClearLOS4(
             ctx,
-            crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy),
+            ctx.entity_id_of(crate::ent_id::resolve(
+                (*ctx.world).g_entities.as_mut_ptr(),
+                (*npc).enemy,
+            )),
         );
         let advance = if distance > MIN_DISTANCE_SQR {
             qtrue

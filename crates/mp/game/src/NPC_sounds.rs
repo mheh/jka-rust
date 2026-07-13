@@ -117,7 +117,7 @@ pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
         );
         (*((*self_).NPC as *mut gNPC_t)).tempBehavior = BS_DEFAULT;
 
-        G_ClearEnemy(ctx, self_);
+        G_ClearEnemy(ctx, ctx.entity_id_of(self_).unwrap());
 
         (*((*self_).NPC as *mut gNPC_t)).investigateCount = 0;
     }

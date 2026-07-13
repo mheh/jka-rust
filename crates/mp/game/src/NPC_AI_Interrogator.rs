@@ -118,7 +118,7 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
 
             crate::NPC_utils::NPC_SetBoneAngles(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 c"left_arm".as_ptr() as *mut c_char,
                 (*npc).pos1,
             );
@@ -160,7 +160,7 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
 
             crate::NPC_utils::NPC_SetBoneAngles(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 c"right_arm".as_ptr() as *mut c_char,
                 (*npc).pos2,
             );
@@ -169,7 +169,12 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
         // Claw
         (*npc).pos3[1] += (*ctx.world).bg_state.rng.Q_irand(10, 30) as f32;
         (*npc).pos3[1] = crate::q_math::AngleNormalize360((*npc).pos3[1]);
-        crate::NPC_utils::NPC_SetBoneAngles(ctx, npc, c"claw".as_ptr() as *mut c_char, (*npc).pos3);
+        crate::NPC_utils::NPC_SetBoneAngles(
+            ctx,
+            ctx.entity_id_of(npc).unwrap(),
+            c"claw".as_ptr() as *mut c_char,
+            (*npc).pos3,
+        );
     }
 }
 
@@ -550,16 +555,7 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
             },
         )) as c_int;
 
-        let visible = crate::NPC_utils::NPC_ClearLOS4(
-            ctx,
-            match (*npc).enemy {
-                Some(id) => {
-                    let base = (*ctx.world).g_entities.as_mut_ptr();
-                    base.add(id.index())
-                }
-                None => core::ptr::null_mut(),
-            },
-        );
+        let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, (*npc).enemy);
 
         let mut advance = if distance > MIN_DISTANCE * MIN_DISTANCE {
             1

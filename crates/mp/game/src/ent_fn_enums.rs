@@ -128,7 +128,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         }
         EntThink::DeadSaberThink => DeadSaberThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::DetPackBlow => DetPackBlow(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::Disappear => Disappear(self_),
+        EntThink::Disappear => Disappear(ctx.entity_mut(ctx.entity_id_of(self_).unwrap())),
         EntThink::DownedSaberThink => DownedSaberThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::EWebThink => EWebThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::FinishSpawningItem => FinishSpawningItem(ctx, ctx.entity_id_of(self_).unwrap()),
@@ -295,7 +295,12 @@ pub fn dispatch_touch(
             ctx.entity_id_of(other),
             trace,
         ),
-        EntTouch::NPC_Touch => NPC_Touch(ctx, self_, other, trace),
+        EntTouch::NPC_Touch => NPC_Touch(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::JMSaberTouch => JMSaberTouch(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -468,7 +473,12 @@ pub fn dispatch_use(
             ctx.entity_id_of(activator),
         ),
         EntUse::NPC_Spawn => NPC_Spawn(ctx, self_, other, activator),
-        EntUse::NPC_Use => NPC_Use(ctx, self_, other, activator),
+        EntUse::NPC_Use => NPC_Use(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::NPC_VehicleSpawnUse => NPC_VehicleSpawnUse(ctx, self_, other, activator),
         EntUse::SiegeIconUse => SiegeIconUse(
             ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
@@ -786,7 +796,12 @@ pub fn dispatch_pain(
         EntPain::NPC_Mark1_Pain => NPC_Mark1_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_Mark2_Pain => NPC_Mark2_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_MineMonster_Pain => NPC_MineMonster_Pain(ctx, self_, attacker, damage),
-        EntPain::NPC_Pain => NPC_Pain(ctx, self_, attacker, damage),
+        EntPain::NPC_Pain => NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
         EntPain::NPC_Probe_Pain => NPC_Probe_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_Rancor_Pain => NPC_Rancor_Pain(ctx, self_, attacker, damage),
         EntPain::NPC_Remote_Pain => NPC_Remote_Pain(ctx, self_, attacker, damage),
@@ -1654,7 +1669,7 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         EntSpawn::target_scriptrunner => {
             SP_target_scriptrunner(ctx, ctx.entity_id_of(ent).unwrap())
         }
-        EntSpawn::target_interest => SP_target_interest(ctx, ent),
+        EntSpawn::target_interest => SP_target_interest(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::target_activate => {
             SP_target_activate(ctx.entity_mut(ctx.entity_id_of(ent).unwrap()))
         }
@@ -1786,7 +1801,7 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         EntSpawn::CreateSpaceDust => SP_CreateSpaceDust(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::CreateRain => SP_CreateRain(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::CreateSnow => SP_CreateSnow(ctx, ctx.entity_id_of(ent).unwrap()),
-        EntSpawn::point_combat => SP_point_combat(ctx, ent),
+        EntSpawn::point_combat => SP_point_combat(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::misc_holocron => SP_misc_holocron(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::shooter_blaster => SP_shooter_blaster(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::team_CTF_redplayer => {

@@ -72,7 +72,11 @@ pub fn TurretPain(
         }
 
         if (*self_).enemy.is_none() {
-            G_SetEnemy(ctx, self_, attacker);
+            G_SetEnemy(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(attacker),
+            );
         }
     }
 }
@@ -689,7 +693,11 @@ pub fn turret_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
         }
 
         if found != 0 {
-            G_SetEnemy(ctx, self_, bestTarget);
+            G_SetEnemy(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(bestTarget),
+            );
             if VALIDSTRING((*self_).target2) {
                 G_UseTargets2(
                     ctx,

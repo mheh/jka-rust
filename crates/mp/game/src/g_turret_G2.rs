@@ -297,7 +297,11 @@ pub fn TurretG2Pain(
         }
         if (*self_).enemy.is_none() {
             // react to being hit
-            G_SetEnemy(ctx, self_, attacker);
+            G_SetEnemy(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(attacker),
+            );
         }
         // self->s.health = self->health;
         // mmm..yes..bad.
@@ -1016,7 +1020,11 @@ pub fn turretG2_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbo
         }
 
         if found != 0 {
-            G_SetEnemy(ctx, self_, bestTarget);
+            G_SetEnemy(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(bestTarget),
+            );
             if VALIDSTRING((*self_).target2 as *const c_char) {
                 G_UseTargets2(
                     ctx,

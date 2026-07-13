@@ -759,7 +759,7 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
             && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"flameTime".as_ptr())
                 != qfalse
         {
-            if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy) != qfalse {
+            if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy)) != qfalse {
                 (*npc_info).enemyLastSeenTime = (*world).level.time;
                 enemyLOS = qtrue;
 
@@ -776,8 +776,11 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
                         hitAlly = qtrue; //us!
                     } else if enemyInFOV != qfalse {
                         //if enemy is FOV, go ahead and check for shooting
-                        let hit =
-                            crate::NPC_combat::NPC_ShotEntity(ctx, enemy, Some(&mut impactPos));
+                        let hit = crate::NPC_combat::NPC_ShotEntity(
+                            ctx,
+                            ctx.entity_id_of(enemy),
+                            Some(&mut impactPos),
+                        );
                         let hitEnt = ge.add(hit as usize);
                         let hitEnt_client = (*hitEnt).client as *mut gclient_t;
 
@@ -852,7 +855,12 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
                             let mut distThreshold: f32;
                             let mut dist: f32;
 
-                            crate::NPC_utils::CalcEntitySpot(ctx, npc, SPOT_HEAD, &mut muzzle);
+                            crate::NPC_utils::CalcEntitySpot(
+                                ctx,
+                                ctx.entity_id_of(npc),
+                                SPOT_HEAD,
+                                &mut muzzle,
+                            );
                             if crate::q_math::VectorCompare(impactPos, vec3_origin) != qfalse {
                                 //never checked ShotEntity this frame, so must do a trace...
                                 let mut tr: trace_t = core::mem::zeroed();
@@ -2052,7 +2060,7 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                     && (*world).globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
                         < (*world).level.time
                 {
-                    if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy) != qfalse {
+                    if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy)) != qfalse {
                         crate::NPC_sounds::G_AddVoiceEvent(
                             ctx,
                             npc,
@@ -4554,8 +4562,8 @@ pub fn Jedi_FaceEnemy(ctx: GameContext<'_>, doPitch: qboolean) {
             (*npc_info).desiredYaw = (*client).ps.viewangles[YAW as usize];
             return;
         }
-        crate::NPC_utils::CalcEntitySpot(ctx, npc, SPOT_HEAD, &mut eyes);
-        crate::NPC_utils::CalcEntitySpot(ctx, enemy, SPOT_HEAD, &mut enemy_eyes);
+        crate::NPC_utils::CalcEntitySpot(ctx, ctx.entity_id_of(npc), SPOT_HEAD, &mut eyes);
+        crate::NPC_utils::CalcEntitySpot(ctx, ctx.entity_id_of(enemy), SPOT_HEAD, &mut enemy_eyes);
 
         if (*client).NPC_class == CLASS_BOBAFETT
             && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"flameTime".as_ptr())
@@ -5669,7 +5677,7 @@ pub fn Jedi_Jumping(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
                     0,
                 );
             } else {
-                crate::NPC_utils::NPC_FaceEntity(ctx, goal, qtrue);
+                crate::NPC_utils::NPC_FaceEntity(ctx, ctx.entity_id_of(goal), qtrue);
                 return qtrue;
             }
         }
@@ -5816,7 +5824,7 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                                 );
                                 if crate::q_math::VectorNormalize(&mut dir) > 32.0 {
                                     crate::NPC_move::G_UcmdMoveForDir(
-                                        npc,
+                                        ctx.entity_mut(ctx.entity_id_of(npc).unwrap()),
                                         &mut (*world).globals.ucmd,
                                         dir,
                                     );
@@ -5896,7 +5904,7 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                                 );
                                 if crate::q_math::VectorNormalize(&mut dir) > 64.0 {
                                     crate::NPC_move::G_UcmdMoveForDir(
-                                        npc,
+                                        ctx.entity_mut(ctx.entity_id_of(npc).unwrap()),
                                         &mut (*world).globals.ucmd,
                                         dir,
                                     );
@@ -6125,7 +6133,7 @@ pub fn Jedi_Combat(ctx: GameContext<'_>) {
             //not gripping
             if Jedi_ClearPathToSpot(ctx, enemy_dest, (*enemy).s.number) == qfalse {
                 //hunt him down
-                if (crate::NPC_utils::NPC_ClearLOS4(ctx, enemy) != qfalse
+                if (crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy)) != qfalse
                     || (*npc_info).enemyLastSeenTime > (*world).level.time - 500)
                     && crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue) != qfalse
                 {
@@ -6152,7 +6160,7 @@ pub fn Jedi_Combat(ctx: GameContext<'_>) {
                         && (*npc_info).blockedSpeechDebounceTime < (*world).level.time
                         && (*world).globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
                             < (*world).level.time
-                        && crate::NPC_utils::NPC_ClearLOS4(ctx, enemy) == qfalse
+                        && crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy)) == qfalse
                     {
                         crate::NPC_sounds::G_AddVoiceEvent(
                             ctx,
@@ -6373,7 +6381,12 @@ pub fn NPC_Jedi_Pain(
 
         crate::w_force::WP_ForcePowerStop(ctx, ctx.entity_id_of(self_).unwrap(), FP_GRIP);
 
-        crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
+        crate::NPC_reactions::NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
 
         if damage == 0 && (*self_).health > 0 {
             //FIXME: better way to know I was pushed
@@ -6446,7 +6459,11 @@ pub fn Jedi_CheckDanger(ctx: GameContext<'_>) -> qboolean {
                 //no owner
                 return qfalse;
             }
-            crate::NPC_combat::G_SetEnemy(ctx, npc, owner);
+            crate::NPC_combat::G_SetEnemy(
+                ctx,
+                ctx.entity_id_of(npc).unwrap(),
+                ctx.entity_id_of(owner),
+            );
             (*npc_info).enemyLastSeenTime = (*world).level.time;
             crate::g_timer::TIMER_Set(
                 ctx,
@@ -6482,13 +6499,14 @@ pub fn Jedi_CheckAmbushPlayer(ctx: GameContext<'_>) -> qboolean {
                 continue;
             }
 
-            if crate::NPC_utils::NPC_ValidEnemy(ctx, player) == qfalse {
+            if crate::NPC_utils::NPC_ValidEnemy(ctx, ctx.entity_id_of(player)) == qfalse {
                 i += 1;
                 continue;
             }
 
             if (*client).ps.powerups[PW_CLOAKED as usize] != 0
-                || crate::NPC_utils::NPC_SomeoneLookingAtMe(ctx, npc) == qfalse
+                || crate::NPC_utils::NPC_SomeoneLookingAtMe(ctx, ctx.entity_id_of(npc).unwrap())
+                    == qfalse
             {
                 //if I'm not cloaked and the player's crosshair is on me, I will wake up
                 if crate::trap::InPVS(
@@ -6504,7 +6522,11 @@ pub fn Jedi_CheckAmbushPlayer(ctx: GameContext<'_>) -> qboolean {
                     continue;
                 } else {
                     if (*client).ps.powerups[PW_CLOAKED as usize] == 0 {
-                        crate::NPC_utils::NPC_SetLookTarget(npc, 0, 0);
+                        crate::NPC_utils::NPC_SetLookTarget(
+                            ctx.entity_mut(ctx.entity_id_of(npc).unwrap()),
+                            0,
+                            0,
+                        );
                     }
                 }
                 zDiff = (*npc).r.currentOrigin[2] - (*player).r.currentOrigin[2];
@@ -6527,26 +6549,44 @@ pub fn Jedi_CheckAmbushPlayer(ctx: GameContext<'_>) -> qboolean {
                     }
                     //Check FOV first
                     if (*client).ps.powerups[PW_CLOAKED as usize] != 0 {
-                        if crate::NPC_senses::InFOV(ctx, player, npc, 30, 90) == qfalse {
+                        if crate::NPC_senses::InFOV(
+                            ctx,
+                            ctx.entity_id_of(player),
+                            ctx.entity_id_of(npc).unwrap(),
+                            30,
+                            90,
+                        ) == qfalse
+                        {
                             i += 1;
                             continue;
                         }
                     } else {
-                        if crate::NPC_senses::InFOV(ctx, player, npc, 45, 90) == qfalse {
+                        if crate::NPC_senses::InFOV(
+                            ctx,
+                            ctx.entity_id_of(player),
+                            ctx.entity_id_of(npc).unwrap(),
+                            45,
+                            90,
+                        ) == qfalse
+                        {
                             i += 1;
                             continue;
                         }
                     }
                 }
 
-                if crate::NPC_utils::NPC_ClearLOS4(ctx, player) == qfalse {
+                if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(player)) == qfalse {
                     i += 1;
                     continue;
                 }
             }
 
             //Got him, return true;
-            crate::NPC_combat::G_SetEnemy(ctx, npc, player);
+            crate::NPC_combat::G_SetEnemy(
+                ctx,
+                ctx.entity_id_of(npc).unwrap(),
+                ctx.entity_id_of(player),
+            );
             (*npc_info).enemyLastSeenTime = (*world).level.time;
             crate::g_timer::TIMER_Set(
                 ctx,
@@ -6650,7 +6690,7 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                     let enemy_dist: f32;
                     if !enemy.is_null()
                         && !(*enemy).client.is_null()
-                        && crate::NPC_utils::NPC_ValidEnemy(ctx, enemy) != qfalse
+                        && crate::NPC_utils::NPC_ValidEnemy(ctx, ctx.entity_id_of(enemy)) != qfalse
                         && (*enemy_c).playerTeam == (*client).enemyTeam
                     {
                         if crate::trap::InPVS(
@@ -6673,7 +6713,11 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                                     || ((*npc_info).investigateCount >= 3
                                         && (*client).ps.saberHolstered == 0)
                                 {
-                                    crate::NPC_combat::G_SetEnemy(ctx, npc, enemy);
+                                    crate::NPC_combat::G_SetEnemy(
+                                        ctx,
+                                        ctx.entity_id_of(npc).unwrap(),
+                                        ctx.entity_id_of(enemy),
+                                    );
                                     (*npc_info).stats.aggression = 3;
                                     break;
                                 } else if (*enemy_c).ps.saberInFlight != qfalse
@@ -6699,7 +6743,11 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                                         //it's heading towards me
                                         if saberDist < 200.0 {
                                             //incoming!
-                                            crate::NPC_combat::G_SetEnemy(ctx, npc, enemy);
+                                            crate::NPC_combat::G_SetEnemy(
+                                                ctx,
+                                                ctx.entity_id_of(npc).unwrap(),
+                                                ctx.entity_id_of(enemy),
+                                            );
                                             (*npc_info).stats.aggression = 3;
                                             break;
                                         }
@@ -6719,11 +6767,17 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                     } else {
                         //have one to consider
                         let best_c = (*best_enemy).client as *mut gclient_t;
-                        if crate::NPC_utils::NPC_ClearLOS4(ctx, best_enemy) != qfalse {
+                        if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(best_enemy))
+                            != qfalse
+                        {
                             //we have a clear LOS to him
                             if (*best_enemy).s.number != 0 {
                                 //just attack
-                                crate::NPC_combat::G_SetEnemy(ctx, npc, best_enemy);
+                                crate::NPC_combat::G_SetEnemy(
+                                    ctx,
+                                    ctx.entity_id_of(npc).unwrap(),
+                                    ctx.entity_id_of(best_enemy),
+                                );
                                 (*npc_info).stats.aggression = 3;
                             } else if (*client).NPC_class != CLASS_BOBAFETT {
                                 //the player, toy with him
@@ -6773,7 +6827,11 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                                     || (*npc_info).investigateCount >= 2
                                 {
                                     //stage three: keep facing him
-                                    crate::NPC_utils::NPC_FaceEntity(ctx, best_enemy, qtrue);
+                                    crate::NPC_utils::NPC_FaceEntity(
+                                        ctx,
+                                        ctx.entity_id_of(best_enemy),
+                                        qtrue,
+                                    );
                                     if best_enemy_dist < (330.0 * 330.0) {
                                         //stage four: turn on the saber
                                         if (*client).ps.saberInFlight == qfalse {
@@ -6793,12 +6851,16 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                                         c"watchTime".as_ptr(),
                                     ) != qfalse
                                     {
-                                        crate::NPC_utils::NPC_FaceEntity(ctx, best_enemy, qtrue);
+                                        crate::NPC_utils::NPC_FaceEntity(
+                                            ctx,
+                                            ctx.entity_id_of(best_enemy),
+                                            qtrue,
+                                        );
                                     }
                                 } else {
                                     //stage one: look at him.
                                     crate::NPC_utils::NPC_SetLookTarget(
-                                        npc,
+                                        ctx.entity_mut(ctx.entity_id_of(npc).unwrap()),
                                         (*best_enemy).s.number,
                                         0,
                                     );
@@ -6812,7 +6874,9 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                         ) != qfalse
                         {
                             //haven't seen him in a bit, clear the lookTarget
-                            crate::NPC_utils::NPC_ClearLookTarget(npc);
+                            crate::NPC_utils::NPC_ClearLookTarget(
+                                ctx.entity_mut(ctx.entity_id_of(npc).unwrap()),
+                            );
                         }
                     }
                 }
@@ -6903,7 +6967,11 @@ pub fn NPC_BSJedi_FollowLeader(ctx: GameContext<'_>) {
                                 //can't nav to it, try jumping to it
                                 let goal: *mut gentity_t =
                                     ge.add((*npc_info).goalEntity.unwrap().0 as usize);
-                                crate::NPC_utils::NPC_FaceEntity(ctx, goal, qtrue);
+                                crate::NPC_utils::NPC_FaceEntity(
+                                    ctx,
+                                    ctx.entity_id_of(goal),
+                                    qtrue,
+                                );
                                 Jedi_TryJump(ctx, goal);
                             }
                             crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
@@ -6932,8 +7000,9 @@ pub fn NPC_BSJedi_FollowLeader(ctx: GameContext<'_>) {
             ) == qfalse
             {
                 //can't get straight to him
-                if crate::NPC_utils::NPC_ClearLOS4(ctx, goal) != qfalse
-                    && crate::NPC_utils::NPC_FaceEntity(ctx, goal, qtrue) != qfalse
+                if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(goal)) != qfalse
+                    && crate::NPC_utils::NPC_FaceEntity(ctx, ctx.entity_id_of(goal), qtrue)
+                        != qfalse
                 {
                     //no line of sight
                     if Jedi_TryJump(ctx, goal) != qfalse {
@@ -7228,13 +7297,18 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
                         None => core::ptr::null_mut(),
                     };
                     if !activator.is_null()
-                        && crate::NPC_utils::NPC_ValidEnemy(ctx, activator) != qfalse
+                        && crate::NPC_utils::NPC_ValidEnemy(ctx, ctx.entity_id_of(activator))
+                            != qfalse
                     {
                         let turretOwner = activator;
-                        crate::NPC_combat::G_ClearEnemy(ctx, npc);
-                        crate::NPC_combat::G_SetEnemy(ctx, npc, turretOwner);
+                        crate::NPC_combat::G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
+                        crate::NPC_combat::G_SetEnemy(
+                            ctx,
+                            ctx.entity_id_of(npc).unwrap(),
+                            ctx.entity_id_of(turretOwner),
+                        );
                     } else {
-                        crate::NPC_combat::G_ClearEnemy(ctx, npc);
+                        crate::NPC_combat::G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
                     }
                 }
             }
@@ -7460,7 +7534,11 @@ pub fn NPC_BSJedi_Default(ctx: GameContext<'_>) {
                 if !newEnemy.is_null() && newEnemy != sav_enemy_ptr {
                     //picked up a new enemy!
                     (*npc).lastEnemy = (*npc).enemy;
-                    crate::NPC_combat::G_SetEnemy(ctx, npc, newEnemy);
+                    crate::NPC_combat::G_SetEnemy(
+                        ctx,
+                        ctx.entity_id_of(npc).unwrap(),
+                        ctx.entity_id_of(newEnemy),
+                    );
                 }
                 (*npc_info).enemyCheckDebounceTime =
                     (*world).level.time + (*world).bg_state.rng.Q_irand(1000, 3000);

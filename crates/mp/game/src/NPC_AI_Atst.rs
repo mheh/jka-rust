@@ -105,7 +105,12 @@ pub fn NPC_ATST_Pain(
     unsafe {
         // SAFETY: self_, attacker accessed through game context.
         G_ATSTCheckPain(ctx, self_, attacker, damage);
-        NPC_Pain(ctx, self_, attacker, damage);
+        NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
     }
 }
 
@@ -211,7 +216,10 @@ pub fn ATST_Attack(ctx: GameContext<'_>) {
         } else {
             DIST_MELEE
         };
-        visible = NPC_ClearLOS4(ctx, enemy as *const gentity_t as *mut gentity_t);
+        visible = NPC_ClearLOS4(
+            ctx,
+            ctx.entity_id_of(enemy as *const gentity_t as *mut gentity_t),
+        );
         advance = if distance > MIN_DISTANCE_SQR {
             qtrue
         } else {

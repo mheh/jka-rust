@@ -2270,7 +2270,12 @@ pub fn G_FlyVehicleDestroySurface(
 
         while numSurfs > 0 {
             numSurfs -= 1;
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, veh, surfName[numSurfs as usize], TURN_OFF);
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(veh).unwrap(),
+                surfName[numSurfs as usize],
+                TURN_OFF,
+            );
         }
 
         let vp = (*veh).m_pVehicle as *mut Vehicle_t;

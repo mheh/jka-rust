@@ -6,6 +6,12 @@
 //! `todo!()`; types resolve against already-ported crates, unresolved
 //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 //! RULES TABLE in fnskel.py.
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
+//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
+//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
+//! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_panimate::PM_InKnockDown;
@@ -16,10 +22,22 @@ use crate::q_math::{_VectorCopy, vectoangles, AngleNormalize360, AngleVectors, V
 use crate::trap;
 use std::ffi::c_int;
 
+/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
+/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 /// Raven `NPC_ClearPathToGoal`.
 ///
 /// Source: `oracle/codemp/game/NPC_move.c:27-70`
-pub fn NPC_ClearPathToGoal(ctx: GameContext<'_>, dir: vec3_t, goal: *mut gentity_t) -> qboolean {
+pub fn NPC_ClearPathToGoal(ctx: GameContext<'_>, dir: vec3_t, goal: Option<EntityId>) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
     unsafe {
         let mut trace: trace_t = core::mem::zeroed();
         let npc = (*ctx.world).globals.NPC;
@@ -216,7 +234,11 @@ pub fn NPC_GetMoveDirection(
         // Attempt a straight move to goal
         if let Some(goal_id) = npc_info.goalEntity {
             let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
-            if NPC_ClearPathToGoal(ctx, world.globals.frameNavInfo.0.direction, goal_ptr) == qfalse
+            if NPC_ClearPathToGoal(
+                ctx,
+                world.globals.frameNavInfo.0.direction,
+                ctx.entity_id_of(goal_ptr),
+            ) == qfalse
             {
                 // See if we're just stuck
                 if NAV_MoveToGoal(
@@ -320,8 +342,11 @@ pub fn NPC_GetMoveDirectionAltRoute(
         if let Some(goal_id) = npc_info.goalEntity {
             let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
             if tryStraight == qfalse
-                || NPC_ClearPathToGoal(ctx, world.globals.frameNavInfo.0.direction, goal_ptr)
-                    == qfalse
+                || NPC_ClearPathToGoal(
+                    ctx,
+                    world.globals.frameNavInfo.0.direction,
+                    ctx.entity_id_of(goal_ptr),
+                ) == qfalse
             {
                 // blocked — Can't get straight to goal, use macro nav
                 if NAVNEW_MoveToGoal(ctx, npc, &mut world.globals.frameNavInfo.0) == WAYPOINT_NONE {
@@ -394,7 +419,9 @@ pub fn NPC_GetMoveDirectionAltRoute(
 /// the ucmd conversion.
 ///
 /// Source: `oracle/codemp/game/NPC_move.c:324-370`
-pub fn G_UcmdMoveForDir(self_: *mut gentity_t, cmd: *mut usercmd_t, dir: vec3_t) {
+pub fn G_UcmdMoveForDir(self_: &mut gentity_t, cmd: *mut usercmd_t, dir: vec3_t) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = self_;
     unsafe {
         let mut forward = [0.0f32; 3];
         let mut right = [0.0f32; 3];
@@ -484,7 +511,7 @@ pub fn NPC_MoveToGoal(ctx: GameContext<'_>, tryStraight: qboolean) -> qboolean {
         // If in combat move, then move directly towards our goal
         if NPC_CheckCombatMove(ctx) == qtrue {
             // keep current facing
-            G_UcmdMoveForDir(npc, ucmd, dir);
+            G_UcmdMoveForDir(ctx.entity_mut(ctx.entity_id_of(npc).unwrap()), ucmd, dir);
         } else {
             // face our goal
             npc_info.desiredPitch = 0.0f32;

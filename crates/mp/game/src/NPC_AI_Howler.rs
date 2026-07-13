@@ -93,8 +93,8 @@ pub fn Howler_Patrol(ctx: GameContext<'_>) {
         if crate::q_math::VectorLengthSquared(dif) < 256.0 * 256.0 {
             crate::NPC_combat::G_SetEnemy(
                 ctx,
-                npc,
-                &mut (*ctx.world).g_entities[0] as *mut gentity_t,
+                ctx.entity_id_of(npc).unwrap(),
+                EntityId::from_num(0),
             );
         }
 
@@ -228,7 +228,7 @@ pub fn Howler_Combat(ctx: GameContext<'_>) {
 
         // If we cannot see our target or we have somewhere to go, then do that
         let enemy_ptr = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
-        if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy_ptr) == qfalse
+        if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ptr)) == qfalse
             || !crate::NPC_goal::UpdateGoal(ctx).is_null()
         {
             (*npc_info).combatMove = qtrue;

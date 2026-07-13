@@ -325,7 +325,7 @@ impl Dispatch<GameNavClearlos> for GameContext<'_> {
         let ent =
             unsafe { &mut (*self.world).g_entities[args.entity_num() as usize] as *mut gentity_t };
         let end = unsafe { *(args.end() as *const vec3_t) };
-        crate::NPC_utils::NPC_ClearLOS2(*self, ent, end)
+        crate::NPC_utils::NPC_ClearLOS2(*self, self.entity_id_of(ent), end)
     }
 }
 

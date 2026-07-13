@@ -11,6 +11,12 @@
 //! `VectorNormalize` (whose resolved signatures take `vec3_t` out-params
 //! by value, so they cannot write results back — see `g_combat.rs`'s
 //! established `vec3-outparam-seam` park reason).
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
+//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
+//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
+//! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_public_consts::SVF_GLASS_BRUSH;
@@ -32,6 +38,16 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::shared::{
     CONTENTS_OPAQUE, ENTITYNUM_NONE, ENTITYNUM_WORLD, MASK_OPAQUE, MAX_GENTITIES,
 };
+
+/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
+/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
 
 /// Vector comparison helper — returns 1 if vectors are equal, 0 otherwise.
 fn vector_compare(v1: vec3_t, v2: vec3_t) -> bool {
@@ -70,7 +86,7 @@ pub fn G_ClearLineOfSight(
 
     let hit = unsafe { &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t };
 
-    if EntIsGlass(hit) != 0 {
+    if EntIsGlass(ctx.entity(ctx.entity_id_of(hit).unwrap())) != 0 {
         let mut newpoint1 = tr.endpos;
         trap::Trace(
             ctx.engine,
@@ -99,15 +115,22 @@ pub fn G_ClearLineOfSight(
 /// check. This function does not look at PVS or FOV, or take any AI related
 /// factors (for example, the NPC's reaction time) into account.
 /// Source: `oracle/codemp/game/NPC_senses.c:47-80`
-pub fn CanSee(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CanSee(ctx: GameContext<'_>, ent: Option<EntityId>) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { ent_ptr(ctx, ent) };
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
     let mut eyes = [0.0; 3];
     let mut spot = [0.0; 3];
 
     let npc = unsafe { (&mut *ctx.world).globals.NPC };
-    CalcEntitySpot(ctx, npc, spot_t::SPOT_HEAD_LEAN, &mut eyes);
+    CalcEntitySpot(
+        ctx,
+        ctx.entity_id_of(npc),
+        spot_t::SPOT_HEAD_LEAN,
+        &mut eyes,
+    );
 
-    CalcEntitySpot(ctx, ent, spot_t::SPOT_ORIGIN, &mut spot);
+    CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_ORIGIN, &mut spot);
     trap::Trace(
         ctx.engine,
         GTraceArgs::new(
@@ -120,12 +143,18 @@ pub fn CanSee(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
             MASK_OPAQUE,
         ),
     );
-    ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_OPAQUE);
+    ShotThroughGlass(
+        ctx,
+        &mut tr as *mut trace_t,
+        ctx.entity_id_of(ent),
+        spot,
+        MASK_OPAQUE,
+    );
     if tr.fraction == 1.0 {
         return 1;
     }
 
-    CalcEntitySpot(ctx, ent, spot_t::SPOT_HEAD, &mut spot);
+    CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_HEAD, &mut spot);
     trap::Trace(
         ctx.engine,
         GTraceArgs::new(
@@ -138,12 +167,18 @@ pub fn CanSee(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
             MASK_OPAQUE,
         ),
     );
-    ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_OPAQUE);
+    ShotThroughGlass(
+        ctx,
+        &mut tr as *mut trace_t,
+        ctx.entity_id_of(ent),
+        spot,
+        MASK_OPAQUE,
+    );
     if tr.fraction == 1.0 {
         return 1;
     }
 
-    CalcEntitySpot(ctx, ent, spot_t::SPOT_LEGS, &mut spot);
+    CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_LEGS, &mut spot);
     trap::Trace(
         ctx.engine,
         GTraceArgs::new(
@@ -156,7 +191,13 @@ pub fn CanSee(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
             MASK_OPAQUE,
         ),
     );
-    ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_OPAQUE);
+    ShotThroughGlass(
+        ctx,
+        &mut tr as *mut trace_t,
+        ctx.entity_id_of(ent),
+        spot,
+        MASK_OPAQUE,
+    );
     if tr.fraction == 1.0 {
         return 1;
     }
@@ -227,10 +268,12 @@ pub fn InFOV3(
 pub fn InFOV2(
     ctx: GameContext<'_>,
     origin: vec3_t,
-    from: *mut gentity_t,
+    from: EntityId,
     hFOV: c_int,
     vFOV: c_int,
 ) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let from: *mut gentity_t = ctx.entity_mut(from);
     let mut fromAngles = [0.0; 3];
     let mut eyes = [0.0; 3];
 
@@ -243,7 +286,7 @@ pub fn InFOV2(
         _VectorCopy(unsafe { (*from).s.angles }, &mut fromAngles);
     }
 
-    CalcEntitySpot(ctx, from, spot_t::SPOT_HEAD, &mut eyes);
+    CalcEntitySpot(ctx, ctx.entity_id_of(from), spot_t::SPOT_HEAD, &mut eyes);
 
     InFOV3(origin, eyes, fromAngles, hFOV, vFOV)
 }
@@ -254,11 +297,14 @@ pub fn InFOV2(
 /// Source: `oracle/codemp/game/NPC_senses.c:149-208`
 pub fn InFOV(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    from: *mut gentity_t,
+    ent: Option<EntityId>,
+    from: EntityId,
     hFOV: c_int,
     vFOV: c_int,
 ) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { ent_ptr(ctx, ent) };
+    let from: *mut gentity_t = ctx.entity_mut(from);
     let mut eyes = [0.0; 3];
     let mut spot = [0.0; 3];
     let mut deltaVector = [0.0; 3];
@@ -287,9 +333,14 @@ pub fn InFOV(
         _VectorCopy(unsafe { (*from).s.angles }, &mut fromAngles);
     }
 
-    CalcEntitySpot(ctx, from, spot_t::SPOT_HEAD_LEAN, &mut eyes);
+    CalcEntitySpot(
+        ctx,
+        ctx.entity_id_of(from),
+        spot_t::SPOT_HEAD_LEAN,
+        &mut eyes,
+    );
 
-    CalcEntitySpot(ctx, ent, spot_t::SPOT_ORIGIN, &mut spot);
+    CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_ORIGIN, &mut spot);
     _VectorSubtract(spot, eyes, &mut deltaVector);
 
     vectoangles(deltaVector, &mut angles);
@@ -299,7 +350,7 @@ pub fn InFOV(
         return 1;
     }
 
-    CalcEntitySpot(ctx, ent, spot_t::SPOT_HEAD, &mut spot);
+    CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_HEAD, &mut spot);
     _VectorSubtract(spot, eyes, &mut deltaVector);
     vectoangles(deltaVector, &mut angles);
     deltaAngles[0] = AngleDelta(fromAngles[0], angles[0]);
@@ -308,7 +359,7 @@ pub fn InFOV(
         return 1;
     }
 
-    CalcEntitySpot(ctx, ent, spot_t::SPOT_LEGS, &mut spot);
+    CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_LEGS, &mut spot);
     _VectorSubtract(spot, eyes, &mut deltaVector);
     vectoangles(deltaVector, &mut angles);
     deltaAngles[0] = AngleDelta(fromAngles[0], angles[0]);
@@ -326,7 +377,9 @@ pub fn InFOV(
 /// account lighting, movement, turning, crouch/stand up, other anims, hide
 /// brushes, etc.
 /// Source: `oracle/codemp/game/NPC_senses.c:210-251`
-pub fn InVisrange(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn InVisrange(ctx: GameContext<'_>, ent: Option<EntityId>) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { ent_ptr(ctx, ent) };
     let mut eyes = [0.0; 3];
     let mut spot = [0.0; 3];
     let mut deltaVector = [0.0; 3];
@@ -334,8 +387,13 @@ pub fn InVisrange(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     let npc = unsafe { (&mut *ctx.world).globals.NPC };
     let npcinfo = unsafe { (&mut *ctx.world).globals.NPCInfo };
 
-    CalcEntitySpot(ctx, npc, spot_t::SPOT_HEAD_LEAN, &mut eyes);
-    CalcEntitySpot(ctx, ent, spot_t::SPOT_ORIGIN, &mut spot);
+    CalcEntitySpot(
+        ctx,
+        ctx.entity_id_of(npc),
+        spot_t::SPOT_HEAD_LEAN,
+        &mut eyes,
+    );
+    CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_ORIGIN, &mut spot);
     _VectorSubtract(spot, eyes, &mut deltaVector);
 
     let visrange = unsafe { (*npcinfo).stats.visrange * (*npcinfo).stats.visrange };
@@ -352,9 +410,11 @@ pub fn InVisrange(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_senses.c:257-325`
 pub fn NPC_CheckVisibility(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: Option<EntityId>,
     flags: c_int,
 ) -> visibility_t {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { ent_ptr(ctx, ent) };
     // Visibility check flags: `crate::npc::check_flags` (`b_local.h:165-169`).
     // flags should never be 0
     if flags == 0 {
@@ -383,14 +443,14 @@ pub fn NPC_CheckVisibility(
 
     // check within visrange
     if (flags & CHECK_VISRANGE) != 0 {
-        if InVisrange(ctx, ent) == 0 {
+        if InVisrange(ctx, ctx.entity_id_of(ent)) == 0 {
             return visibility_t::VIS_PVS;
         }
     }
 
     // check 360 degree visibility
     if (flags & CHECK_360) != 0 {
-        if CanSee(ctx, ent) == 0 {
+        if CanSee(ctx, ctx.entity_id_of(ent)) == 0 {
             return visibility_t::VIS_PVS;
         }
     }
@@ -400,9 +460,13 @@ pub fn NPC_CheckVisibility(
 
     // check FOV
     if (flags & CHECK_FOV) != 0 {
-        if InFOV(ctx, ent, npc, unsafe { (*npcinfo).stats.hfov }, unsafe {
-            (*npcinfo).stats.vfov
-        }) == 0
+        if InFOV(
+            ctx,
+            ctx.entity_id_of(ent),
+            ctx.entity_id_of(npc).unwrap(),
+            unsafe { (*npcinfo).stats.hfov },
+            unsafe { (*npcinfo).stats.vfov },
+        ) == 0
         {
             return visibility_t::VIS_360;
         }
@@ -414,7 +478,12 @@ pub fn NPC_CheckVisibility(
 
     // check shootability
     if (flags & CHECK_SHOOT) != 0 {
-        if CanShoot(ctx, ent, npc) == 0 {
+        if CanShoot(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            ctx.entity_id_of(npc).unwrap(),
+        ) == 0
+        {
             return visibility_t::VIS_FOV;
         }
     }
@@ -428,12 +497,14 @@ pub fn NPC_CheckVisibility(
 /// Source: `oracle/codemp/game/NPC_senses.c:332-386`
 pub fn G_CheckSoundEvents(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
+    self_: EntityId,
     maxHearDist: f32,
     ignoreAlert: c_int,
     mustHaveOwner: qboolean,
     minAlertLevel: c_int,
 ) -> c_int {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     let mut bestEvent = -1;
     let mut bestAlert = -1;
     let mut bestTime = -1;
@@ -475,7 +546,12 @@ pub fn G_CheckSoundEvents(
 
         if world.level.alertEvents[i].addLight != 0.0 {
             // a quiet sound, must have LOS to hear it
-            if G_ClearLOS5(ctx, self_, world.level.alertEvents[i].position) == 0 {
+            if G_ClearLOS5(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                world.level.alertEvents[i].position,
+            ) == 0
+            {
                 // no LOS, didn't hear it
                 continue;
             }
@@ -514,7 +590,7 @@ pub fn G_GetLightLevel(pos: vec3_t, fromDir: vec3_t) -> f32 {
 /// Source: `oracle/codemp/game/NPC_senses.c:408-468`
 pub fn G_CheckSightEvents(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
+    self_: EntityId,
     hFOV: c_int,
     vFOV: c_int,
     maxSeeDist: f32,
@@ -522,6 +598,8 @@ pub fn G_CheckSightEvents(
     mustHaveOwner: qboolean,
     minAlertLevel: c_int,
 ) -> c_int {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     let mut bestEvent = -1;
     let mut bestAlert = -1;
     let mut bestTime = -1;
@@ -563,11 +641,23 @@ pub fn G_CheckSightEvents(
         }
 
         // Must be visible
-        if InFOV2(ctx, world.level.alertEvents[i].position, self_, hFOV, vFOV) == 0 {
+        if InFOV2(
+            ctx,
+            world.level.alertEvents[i].position,
+            ctx.entity_id_of(self_).unwrap(),
+            hFOV,
+            vFOV,
+        ) == 0
+        {
             continue;
         }
 
-        if G_ClearLOS5(ctx, self_, world.level.alertEvents[i].position) == 0 {
+        if G_ClearLOS5(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            world.level.alertEvents[i].position,
+        ) == 0
+        {
             continue;
         }
 
@@ -592,7 +682,7 @@ pub fn G_CheckSightEvents(
 /// Source: `oracle/codemp/game/NPC_senses.c:478-530`
 pub fn G_CheckAlertEvents(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
+    self_: EntityId,
     checkSight: qboolean,
     checkSound: qboolean,
     maxSeeDist: f32,
@@ -601,6 +691,8 @@ pub fn G_CheckAlertEvents(
     mustHaveOwner: qboolean,
     minAlertLevel: c_int,
 ) -> c_int {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     let mut bestSoundEvent = -1;
     let mut bestSightEvent = -1;
     let mut bestSoundAlert = -1;
@@ -616,7 +708,7 @@ pub fn G_CheckAlertEvents(
     // get sound event
     bestSoundEvent = G_CheckSoundEvents(
         ctx,
-        self_,
+        ctx.entity_id_of(self_).unwrap(),
         maxHearDist,
         ignoreAlert,
         mustHaveOwner,
@@ -631,7 +723,7 @@ pub fn G_CheckAlertEvents(
     if unsafe { !(*self_).NPC.is_null() } {
         bestSightEvent = G_CheckSightEvents(
             ctx,
-            self_,
+            ctx.entity_id_of(self_).unwrap(),
             unsafe { (*((*self_).NPC as *mut gNPC_t)).stats.hfov },
             unsafe { (*((*self_).NPC as *mut gNPC_t)).stats.vfov },
             maxSeeDist,
@@ -642,7 +734,7 @@ pub fn G_CheckAlertEvents(
     } else {
         bestSightEvent = G_CheckSightEvents(
             ctx,
-            self_,
+            ctx.entity_id_of(self_).unwrap(),
             80,
             80,
             maxSeeDist,
@@ -663,7 +755,12 @@ pub fn G_CheckAlertEvents(
         let mut eyePoint = [0.0; 3];
         let mut sightDir = [0.0; 3];
         // get eye point
-        CalcEntitySpot(ctx, self_, spot_t::SPOT_HEAD_LEAN, &mut eyePoint);
+        CalcEntitySpot(
+            ctx,
+            ctx.entity_id_of(self_),
+            spot_t::SPOT_HEAD_LEAN,
+            &mut eyePoint,
+        );
         _VectorSubtract(
             world.level.alertEvents[bestSightEvent as usize].position,
             eyePoint,
@@ -698,7 +795,7 @@ pub fn NPC_CheckAlertEvents(
 
     G_CheckAlertEvents(
         ctx,
-        npc,
+        ctx.entity_id_of(npc).unwrap(),
         checkSight,
         checkSound,
         unsafe { (*npcinfo).stats.visrange },
@@ -713,11 +810,9 @@ pub fn NPC_CheckAlertEvents(
 ///
 /// Raven: FIXME: more bStates need to call this?
 /// Source: `oracle/codemp/game/NPC_senses.c:537-567`
-pub fn G_CheckForDanger(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    alertEvent: c_int,
-) -> qboolean {
+pub fn G_CheckForDanger(ctx: GameContext<'_>, self_: EntityId, alertEvent: c_int) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     if alertEvent == -1 {
         return 0;
     }
@@ -752,7 +847,7 @@ pub fn G_CheckForDanger(
                 } else {
                     NPC_StartFlee(
                         ctx,
-                        world.level.alertEvents[alertEvent as usize].owner,
+                        ctx.entity_id_of(world.level.alertEvents[alertEvent as usize].owner),
                         world.level.alertEvents[alertEvent as usize].position,
                         world.level.alertEvents[alertEvent as usize].level as c_int,
                         3000,
@@ -774,7 +869,7 @@ pub fn G_CheckForDanger(
 /// Source: `oracle/codemp/game/NPC_senses.c:568-571`
 pub fn NPC_CheckForDanger(ctx: GameContext<'_>, alertEvent: c_int) -> qboolean {
     let npc = unsafe { (&mut *ctx.world).globals.NPC };
-    G_CheckForDanger(ctx, npc, alertEvent)
+    G_CheckForDanger(ctx, ctx.entity_id_of(npc).unwrap(), alertEvent)
 }
 
 /// Raven `AddSoundEvent`.
@@ -782,12 +877,14 @@ pub fn NPC_CheckForDanger(ctx: GameContext<'_>, alertEvent: c_int) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_senses.c:579-615`
 pub fn AddSoundEvent(
     ctx: GameContext<'_>,
-    owner: *mut gentity_t,
+    owner: Option<EntityId>,
     position: vec3_t,
     radius: f32,
     alertLevel: alertEventLevel_e,
     needLOS: qboolean,
 ) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let owner: *mut gentity_t = unsafe { ent_ptr(ctx, owner) };
     let world = unsafe { (&mut *ctx.world) };
 
     // FIXME: Handle this in another manner?
@@ -831,12 +928,14 @@ pub fn AddSoundEvent(
 /// Source: `oracle/codemp/game/NPC_senses.c:623-652`
 pub fn AddSightEvent(
     ctx: GameContext<'_>,
-    owner: *mut gentity_t,
+    owner: Option<EntityId>,
     position: vec3_t,
     radius: f32,
     alertLevel: alertEventLevel_e,
     addLight: f32,
 ) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let owner: *mut gentity_t = unsafe { ent_ptr(ctx, owner) };
     let world = unsafe { (&mut *ctx.world) };
 
     // FIXME: Handle this in another manner?
@@ -969,12 +1068,9 @@ pub fn RemoveOldestAlert(ctx: GameContext<'_>) -> qboolean {
 ///
 /// Raven: Position to position.
 /// Source: `oracle/codemp/game/NPC_senses.c:739-764`
-pub fn G_ClearLOS(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    start: vec3_t,
-    end: vec3_t,
-) -> qboolean {
+pub fn G_ClearLOS(ctx: GameContext<'_>, self_: EntityId, start: vec3_t, end: vec3_t) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
     let mut trace_count = 0;
 
@@ -1033,15 +1129,23 @@ pub fn G_ClearLOS(
 /// Source: `oracle/codemp/game/NPC_senses.c:767-774`
 pub fn G_ClearLOS2(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    ent: *mut gentity_t,
+    self_: EntityId,
+    ent: Option<EntityId>,
     end: vec3_t,
 ) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let ent: *mut gentity_t = unsafe { ent_ptr(ctx, ent) };
     let mut eyes = [0.0; 3];
 
-    CalcEntitySpot(ctx, ent, spot_t::SPOT_HEAD_LEAN, &mut eyes);
+    CalcEntitySpot(
+        ctx,
+        ctx.entity_id_of(ent),
+        spot_t::SPOT_HEAD_LEAN,
+        &mut eyes,
+    );
 
-    G_ClearLOS(ctx, self_, eyes, end)
+    G_ClearLOS(ctx, ctx.entity_id_of(self_).unwrap(), eyes, end)
 }
 
 /// Raven `G_ClearLOS3`.
@@ -1050,23 +1154,31 @@ pub fn G_ClearLOS2(
 /// Source: `oracle/codemp/game/NPC_senses.c:777-794`
 pub fn G_ClearLOS3(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
+    self_: EntityId,
     start: vec3_t,
-    ent: *mut gentity_t,
+    ent: Option<EntityId>,
 ) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let ent: *mut gentity_t = unsafe { ent_ptr(ctx, ent) };
     let mut spot = [0.0; 3];
 
     // Look for the chest first
-    CalcEntitySpot(ctx, ent, spot_t::SPOT_ORIGIN, &mut spot);
+    CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_ORIGIN, &mut spot);
 
-    if G_ClearLOS(ctx, self_, start, spot) != 0 {
+    if G_ClearLOS(ctx, ctx.entity_id_of(self_).unwrap(), start, spot) != 0 {
         return 1;
     }
 
     // Look for the head next
-    CalcEntitySpot(ctx, ent, spot_t::SPOT_HEAD_LEAN, &mut spot);
+    CalcEntitySpot(
+        ctx,
+        ctx.entity_id_of(ent),
+        spot_t::SPOT_HEAD_LEAN,
+        &mut spot,
+    );
 
-    if G_ClearLOS(ctx, self_, start, spot) != 0 {
+    if G_ClearLOS(ctx, ctx.entity_id_of(self_).unwrap(), start, spot) != 0 {
         return 1;
     }
 
@@ -1077,26 +1189,46 @@ pub fn G_ClearLOS3(
 ///
 /// Raven: NPC's eyes to entity.
 /// Source: `oracle/codemp/game/NPC_senses.c:797-805`
-pub fn G_ClearLOS4(ctx: GameContext<'_>, self_: *mut gentity_t, ent: *mut gentity_t) -> qboolean {
+pub fn G_ClearLOS4(ctx: GameContext<'_>, self_: EntityId, ent: Option<EntityId>) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let ent: *mut gentity_t = unsafe { ent_ptr(ctx, ent) };
     let mut eyes = [0.0; 3];
 
     // Calculate my position
-    CalcEntitySpot(ctx, self_, spot_t::SPOT_HEAD_LEAN, &mut eyes);
+    CalcEntitySpot(
+        ctx,
+        ctx.entity_id_of(self_),
+        spot_t::SPOT_HEAD_LEAN,
+        &mut eyes,
+    );
 
-    G_ClearLOS3(ctx, self_, eyes, ent)
+    G_ClearLOS3(
+        ctx,
+        ctx.entity_id_of(self_).unwrap(),
+        eyes,
+        ctx.entity_id_of(ent),
+    )
 }
 
 /// Raven `G_ClearLOS5`.
 ///
 /// Raven: NPC's eyes to position.
 /// Source: `oracle/codemp/game/NPC_senses.c:808-816`
-pub fn G_ClearLOS5(ctx: GameContext<'_>, self_: *mut gentity_t, end: vec3_t) -> qboolean {
+pub fn G_ClearLOS5(ctx: GameContext<'_>, self_: EntityId, end: vec3_t) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     let mut eyes = [0.0; 3];
 
     // Calculate the my position
-    CalcEntitySpot(ctx, self_, spot_t::SPOT_HEAD_LEAN, &mut eyes);
+    CalcEntitySpot(
+        ctx,
+        ctx.entity_id_of(self_),
+        spot_t::SPOT_HEAD_LEAN,
+        &mut eyes,
+    );
 
-    G_ClearLOS(ctx, self_, eyes, end)
+    G_ClearLOS(ctx, ctx.entity_id_of(self_).unwrap(), eyes, end)
 }
 
 /// Raven `NPC_GetHFOVPercentage`.
@@ -1142,7 +1274,9 @@ pub fn NPC_GetVFOVPercentage(spot: vec3_t, from: vec3_t, facing: vec3_t, vFOV: f
 /// Raven `G_FindLocalInterestPoint`.
 ///
 /// Source: `oracle/codemp/game/NPC_senses.c:871-907`
-pub fn G_FindLocalInterestPoint(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
+pub fn G_FindLocalInterestPoint(ctx: GameContext<'_>, self_: EntityId) -> c_int {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     pub const MAX_INTEREST_DIST: f32 = 256.0 * 256.0; // 65536.0
 
     let mut best_point = ENTITYNUM_NONE;
@@ -1152,7 +1286,12 @@ pub fn G_FindLocalInterestPoint(ctx: GameContext<'_>, self_: *mut gentity_t) -> 
 
     let world = unsafe { (&mut *ctx.world) };
 
-    CalcEntitySpot(ctx, self_, spot_t::SPOT_HEAD_LEAN, &mut eyes);
+    CalcEntitySpot(
+        ctx,
+        ctx.entity_id_of(self_),
+        spot_t::SPOT_HEAD_LEAN,
+        &mut eyes,
+    );
     for i in 0..world.level.numInterestPoints as usize {
         // Don't ignore portals?  If through a portal, need to look at portal!
         if trap::InPVS(
@@ -1213,7 +1352,9 @@ pub fn G_FindLocalInterestPoint(ctx: GameContext<'_>, self_: *mut gentity_t) -> 
 /// point that a squadmate will look at if standing still. `target` fires
 /// when someone looks at this thing. FIXME: rename point_interest.
 /// Source: `oracle/codemp/game/NPC_senses.c:915-934`
-pub fn SP_target_interest(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_target_interest(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     let world = unsafe { (&mut *ctx.world) };
 
     if world.level.numInterestPoints >= MAX_INTEREST_POINTS as c_int {

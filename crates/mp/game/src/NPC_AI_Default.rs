@@ -32,7 +32,7 @@ pub fn NPC_LostEnemyDecideChase(ctx: GameContext<'_>) {
         _ => {}
     }
 
-    G_ClearEnemy(ctx, (*world).globals.NPC);
+    G_ClearEnemy(ctx, ctx.entity_id_of((*world).globals.NPC).unwrap());
 }
 
 /// Raven `NPC_StandIdle`.
@@ -152,14 +152,18 @@ pub fn NPC_BSStandGuard(ctx: GameContext<'_>) {
             if client.enemyTeam != 0 {
                 let new_enemy = NPC_PickEnemy(
                     ctx,
-                    (*world).globals.NPC,
+                    ctx.entity_id_of((*world).globals.NPC),
                     client.enemyTeam as c_int,
                     (npc.cantHitEnemyCounter < 10) as qboolean,
                     (client.enemyTeam as c_int == NPCTEAM_PLAYER) as qboolean,
                     qtrue,
                 );
                 if !new_enemy.is_null() {
-                    G_SetEnemy(ctx, (*world).globals.NPC, new_enemy);
+                    G_SetEnemy(
+                        ctx,
+                        ctx.entity_id_of((*world).globals.NPC).unwrap(),
+                        ctx.entity_id_of(new_enemy),
+                    );
                 }
             }
         }
@@ -200,11 +204,21 @@ pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
 
     if let Some(enemy_id) = npc.enemy {
         let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
-        o_evis = NPC_CheckVisibility(ctx, enemy as *const _ as *mut _, CHECK_FOV | CHECK_SHOOT);
+        o_evis = NPC_CheckVisibility(
+            ctx,
+            ctx.entity_id_of(enemy as *const _ as *mut _),
+            CHECK_FOV | CHECK_SHOOT,
+        );
         (*world).globals.enemyVisibility = o_evis;
 
         if o_evis as i32 > VIS_PVS as i32 {
-            if NPC_EnemyTooFar(ctx, enemy as *const _ as *mut _, 0.0, qtrue) == 0 {
+            if NPC_EnemyTooFar(
+                ctx,
+                ctx.entity_id_of(enemy as *const _ as *mut _),
+                0.0,
+                qtrue,
+            ) == 0
+            {
                 NPC_CheckCanAttack(ctx, 1.0, qfalse);
                 turned = true;
             }
@@ -230,11 +244,14 @@ pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
                 && ((enemy_dist as f64 * 1.5) * (enemy_dist as f64 * 1.5)
                     >= NPC_MaxDistSquaredForWeapon(ctx) as f64
                     || o_evis != VIS_SHOOT
-                    || enemy_dist > IdealDistance(ctx, (*world).globals.NPC) * 3.0)
+                    || enemy_dist
+                        > IdealDistance(ctx, ctx.entity_id_of((*world).globals.NPC).unwrap()) * 3.0)
             {
                 npc_info.goalEntity = npc.enemy;
                 NPC_MoveToGoal(ctx, qtrue);
-            } else if enemy_dist < IdealDistance(ctx, (*world).globals.NPC) {
+            } else if enemy_dist
+                < IdealDistance(ctx, ctx.entity_id_of((*world).globals.NPC).unwrap())
+            {
                 npc_info.goalEntity = npc.enemy;
                 npc_info.goalRadius = 12;
                 NPC_MoveToGoal(ctx, qtrue);
@@ -438,10 +455,20 @@ pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
         }
     }
 
-    CalcEntitySpot(ctx, (*world).globals.NPC, SPOT_WEAPON, &mut muzzle);
+    CalcEntitySpot(
+        ctx,
+        ctx.entity_id_of((*world).globals.NPC),
+        SPOT_WEAPON,
+        &mut muzzle,
+    );
     if let Some(enemy_id) = npc.enemy {
         let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
-        CalcEntitySpot(ctx, enemy as *const _ as *mut _, SPOT_HEAD, &mut org);
+        CalcEntitySpot(
+            ctx,
+            ctx.entity_id_of(enemy as *const _ as *mut _),
+            SPOT_HEAD,
+            &mut org,
+        );
 
         if !unsafe { &*enemy }.client.is_null() {
             org[2] -= 12.0;
@@ -601,7 +628,11 @@ pub fn NPC_BSDefault(ctx: GameContext<'_>) {
                             if unsafe { &*(alert_owner.client as *mut gclient_t) }.playerTeam
                                 == client.enemyTeam
                             {
-                                G_SetEnemy(ctx, (*world).globals.NPC, alert_entry.owner);
+                                G_SetEnemy(
+                                    ctx,
+                                    ctx.entity_id_of((*world).globals.NPC).unwrap(),
+                                    ctx.entity_id_of(alert_entry.owner),
+                                );
                             }
                         }
                     }
@@ -677,7 +708,8 @@ pub fn NPC_BSDefault(ctx: GameContext<'_>) {
             }
 
             if (npc_info.scriptFlags & SCF_FORCED_MARCH) != 0 {
-                if NPC_SomeoneLookingAtMe(ctx, (*world).globals.NPC) == 0 {
+                if NPC_SomeoneLookingAtMe(ctx, ctx.entity_id_of((*world).globals.NPC).unwrap()) == 0
+                {
                     move_ = false;
                 }
             }

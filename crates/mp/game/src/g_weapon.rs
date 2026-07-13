@@ -6125,7 +6125,11 @@ pub fn emplaced_gun_pain(
             // death effect.. for now taken care of on cgame
         } else {
             // if we have a pain behavior set then use it I guess
-            crate::NPC_utils::G_ActivateBehavior(ctx, self_, bSet_t::BSET_PAIN as c_int);
+            crate::NPC_utils::G_ActivateBehavior(
+                ctx,
+                ctx.entity_id_of(self_),
+                bSet_t::BSET_PAIN as c_int,
+            );
         }
     }
 }

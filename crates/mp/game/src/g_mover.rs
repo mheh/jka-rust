@@ -1216,7 +1216,7 @@ pub fn Use_BinaryMover(
             return;
         }
 
-        G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(ent), bSet_t::BSET_USE as c_int);
 
         (*ent).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), other);
         (*ent).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
@@ -2523,7 +2523,7 @@ pub fn func_static_use(
     let activator: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
     unsafe {
-        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
 
         if (*self_).spawnflags & 4 /* SWITCH_SHADER */ != 0 {
             (*self_).s.frame = if (*self_).s.frame != 0 { 0 } else { 1 }; // toggle frame
@@ -3082,7 +3082,7 @@ pub fn funcBBrushUse(
     let activator: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
     unsafe {
-        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
         if (*self_).spawnflags & 64 != 0 {
             // Using it doesn't break it, makes it use it's targets
             if !(*self_).target.is_null() && *(*self_).target != 0 {
@@ -3142,7 +3142,7 @@ pub fn funcBBrushPain(
             }
         }
 
-        G_ActivateBehavior(ctx, self_, bSet_t::BSET_PAIN as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_PAIN as c_int);
 
         if (*self_).material == MAT_DRK_STONE
             || (*self_).material == MAT_LT_STONE
@@ -3714,7 +3714,7 @@ pub fn func_usable_use(
         unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
     unsafe {
         // Toggle on and off
-        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
         if (*self_).s.eFlags & EF_SHADER_ANIM != 0 {
             // animate shader when used
             (*self_).s.frame += 1; // inc frame
@@ -3893,7 +3893,7 @@ pub fn use_wall(
     // raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(ent), bSet_t::BSET_USE as c_int);
 
         // not there so make it there
         if (*ent).r.contents & CONTENTS_SOLID == 0 {

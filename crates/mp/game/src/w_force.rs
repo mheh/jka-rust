@@ -2996,7 +2996,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
             let tcl = (*traceEnt).client as *mut gclient_t;
             let mut over_ride: c_int = 0;
 
-            if G_ActivateBehavior(ctx, traceEnt, (BSET_MINDTRICK) as i32) != 0 {
+            if G_ActivateBehavior(ctx, ctx.entity_id_of(traceEnt), (BSET_MINDTRICK) as i32) != 0 {
                 //activated a script on him
                 //FIXME: do the visual sparkles effect on their heads, still?
                 WP_ForcePowerStart(ctx, ctx.entity_id_of(self_).unwrap(), FP_TELEPATHY, 0);
@@ -3020,7 +3020,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                             let (newPlayerTeam, newEnemyTeam);
 
                             if (*traceEnt).enemy.is_some() {
-                                G_ClearEnemy(ctx, traceEnt);
+                                G_ClearEnemy(ctx, ctx.entity_id_of(traceEnt).unwrap());
                             }
                             if !(*traceEnt).NPC.is_null() {
                                 //traceEnt->NPC->tempBehavior = BS_FOLLOW_LEADER;
@@ -3068,7 +3068,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                                 [(*cl).ps.fd.forcePowerLevel[FP_TELEPATHY as usize] as usize]; //confused for about 10 seconds
                         crate::NPC_sounds::NPC_PlayConfusionSound(ctx, traceEnt);
                         if (*traceEnt).enemy.is_some() {
-                            G_ClearEnemy(ctx, traceEnt);
+                            G_ClearEnemy(ctx, ctx.entity_id_of(traceEnt).unwrap());
                         }
                     }
                 } else {
@@ -3087,7 +3087,12 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                     && !(*traceEnt).NPC.is_null()
                     && (*npc).scriptFlags & SCF_NO_RESPONSE == 0
                 {
-                    crate::NPC_reactions::NPC_UseResponse(ctx, traceEnt, self_, qfalse);
+                    crate::NPC_reactions::NPC_UseResponse(
+                        ctx,
+                        ctx.entity_id_of(traceEnt).unwrap(),
+                        ctx.entity_id_of(self_),
+                        qfalse,
+                    );
                     WP_ForcePowerStart(ctx, ctx.entity_id_of(self_).unwrap(), FP_TELEPATHY, 1);
                 }
             } //NOTE: no effect on TEAM_NEUTRAL?
@@ -3117,8 +3122,22 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                     (*tr).plane.normal,
                 );
                 //FIXME: these events don't seem to always be picked up...?
-                AddSoundEvent(ctx, self_, (*tr).endpos, 512.0, AEL_SUSPICIOUS, qtrue); //, qtrue );
-                AddSightEvent(ctx, self_, (*tr).endpos, 512.0, AEL_SUSPICIOUS, 50.0);
+                AddSoundEvent(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    (*tr).endpos,
+                    512.0,
+                    AEL_SUSPICIOUS,
+                    qtrue,
+                ); //, qtrue );
+                AddSightEvent(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    (*tr).endpos,
+                    512.0,
+                    AEL_SUSPICIOUS,
+                    50.0,
+                );
                 WP_ForcePowerStart(ctx, ctx.entity_id_of(self_).unwrap(), FP_TELEPATHY, 0);
                 *tookPower = qtrue;
             }

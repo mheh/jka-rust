@@ -1007,7 +1007,11 @@ pub fn pas_find_enemies(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
                             + ((*ctx.world).bg_state.rng.random() * 200.0) as c_int;
                     }
 
-                    G_SetEnemy(ctx, self_, target);
+                    G_SetEnemy(
+                        ctx,
+                        ctx.entity_id_of(self_).unwrap(),
+                        ctx.entity_id_of(target),
+                    );
                     bestDist = enemyDist;
                     found = qtrue;
                 }

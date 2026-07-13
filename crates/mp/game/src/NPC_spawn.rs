@@ -751,7 +751,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*((*ent).NPC as *mut gNPC_t)).currentAmmo =
             (*client).ps.ammo[weaponData[(*client).ps.weapon as usize].ammoIndex as usize];
         (*client).ps.weaponstate = (WEAPON_IDLE) as i32;
-        ChangeWeapon(ctx, ent, (*client).ps.weapon);
+        ChangeWeapon(ctx, ctx.entity_id_of(ent), (*client).ps.weapon);
 
         crate::q_math::_VectorCopy(spawn_origin, &mut (*client).ps.origin);
 
@@ -849,14 +849,16 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
             crate::g_utils::G_ScaleNetHealth(&mut *(ent));
         }
 
-        ChangeWeapon(ctx, ent, (*client).ps.weapon);
+        ChangeWeapon(ctx, ctx.entity_id_of(ent), (*client).ps.weapon);
 
         if (*ent).spawnflags & SFB_STARTINSOLID == 0 {
             crate::g_utils::G_CheckInSolid(ctx, ctx.entity_id_of(ent).unwrap(), qtrue);
         }
         (*((*ent).NPC as *mut gNPC_t)).lastClearOrigin = [0.0; 3];
 
-        if crate::NPC_utils::G_ActivateBehavior(ctx, ent, (BSET_SPAWN) as i32) != 0 {
+        if crate::NPC_utils::G_ActivateBehavior(ctx, ctx.entity_id_of(ent), (BSET_SPAWN) as i32)
+            != 0
+        {
             trap::ICARUS_MaintainTaskManager(ctx.engine, mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*ent).s.number));
         }
 
@@ -1470,8 +1472,20 @@ pub fn NPC_ShySpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
             return;
         }
 
-        if crate::NPC_senses::InFOV(ctx, ent, player0, 80, 64) != 0 {
-            if crate::NPC_utils::NPC_ClearLOS2(ctx, player0, (*ent).r.currentOrigin) != 0 {
+        if crate::NPC_senses::InFOV(
+            ctx,
+            ctx.entity_id_of(ent),
+            ctx.entity_id_of(player0).unwrap(),
+            80,
+            64,
+        ) != 0
+        {
+            if crate::NPC_utils::NPC_ClearLOS2(
+                ctx,
+                ctx.entity_id_of(player0),
+                (*ent).r.currentOrigin,
+            ) != 0
+            {
                 return;
             }
         }

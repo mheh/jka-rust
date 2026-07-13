@@ -992,7 +992,7 @@ pub fn G_G2NPCAngles(
                 // body pitch
                 crate::NPC_utils::NPC_SetBoneAngles(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent).unwrap(),
                     thoracic_bone.as_ptr() as *mut c_char,
                     lookAngles,
                 );
@@ -1058,7 +1058,7 @@ pub fn G_G2NPCAngles(
 
             crate::NPC_utils::NPC_SetBoneAngles(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent).unwrap(),
                 cranium_bone.as_ptr() as *mut c_char,
                 lookAngles,
             );
@@ -6895,7 +6895,11 @@ pub fn WP_SaberStartMissileBlockCheck(ctx: GameContext<'_>, self_: EntityId, ucm
                         if (*owner).health >= 0
                             && ((*owner).client.is_null() || (*owc).playerTeam != (*sc).playerTeam)
                         {
-                            G_SetEnemy(ctx, self_, owner);
+                            G_SetEnemy(
+                                ctx,
+                                ctx.entity_id_of(self_).unwrap(),
+                                ctx.entity_id_of(owner),
+                            );
                         }
                     }
                 }
@@ -9549,7 +9553,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                     //actually trace to a bolt
                     G_GetBoltPosition(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent),
                         (*client).renderInfo.handRBolt,
                         Some(&mut kickEnd),
                         0,
@@ -9576,7 +9580,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                         //actually trace to a bolt
                         G_GetBoltPosition(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             (*client).renderInfo.footRBolt,
                             Some(&mut kickEnd),
                             0,
@@ -9601,7 +9605,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                         //actually trace to a bolt
                         G_GetBoltPosition(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             (*client).renderInfo.footRBolt,
                             Some(&mut kickEnd),
                             0,
@@ -9627,7 +9631,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                         //actually trace to a bolt
                         G_GetBoltPosition(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             (*client).renderInfo.footRBolt,
                             Some(&mut kickEnd),
                             0,
@@ -9653,7 +9657,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                         //actually trace to a bolt
                         G_GetBoltPosition(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             (*client).renderInfo.footRBolt,
                             Some(&mut kickEnd),
                             0,
@@ -9680,7 +9684,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                         //actually trace to a bolt
                         G_GetBoltPosition(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             (*client).renderInfo.footRBolt,
                             Some(&mut kickEnd),
                             0,
@@ -9706,7 +9710,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                         //actually trace to a bolt
                         G_GetBoltPosition(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             (*client).renderInfo.footLBolt,
                             Some(&mut kickEnd),
                             0,
@@ -9732,7 +9736,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                         doKick = 1;
                         G_GetBoltPosition(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             (*client).renderInfo.footRBolt,
                             Some(&mut kickEnd),
                             0,
@@ -9808,7 +9812,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                         doKick = 1;
                         G_GetBoltPosition(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             (*client).renderInfo.footRBolt,
                             Some(&mut kickEnd),
                             0,
@@ -9852,7 +9856,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                         //actually trace to a bolt
                         G_GetBoltPosition(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             (*client).renderInfo.footRBolt,
                             Some(&mut kickEnd),
                             0,
@@ -9879,7 +9883,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: EntityId) {
                         //actually trace to a bolt
                         G_GetBoltPosition(
                             ctx,
-                            ent,
+                            ctx.entity_id_of(ent),
                             (*client).renderInfo.footLBolt,
                             Some(&mut kickEnd),
                             0,

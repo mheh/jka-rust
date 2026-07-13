@@ -226,7 +226,7 @@ pub fn misc_dlight_use(
     let activator: *mut gentity_t = unsafe { resolve(base, activator) };
 
     unsafe {
-        G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(ent), bSet_t::BSET_USE as c_int);
         (*ent).alt_fire = if (*ent).alt_fire != qfalse {
             qfalse
         } else {

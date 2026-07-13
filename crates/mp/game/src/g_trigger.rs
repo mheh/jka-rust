@@ -137,7 +137,7 @@ pub fn multi_trigger_run(ctx: GameContext<'_>, ent: EntityId) {
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
         (*ent).think = FnId::NONE;
 
-        G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(ent), bSet_t::BSET_USE as c_int);
 
         if !(*ent).soundSet.is_null() && *(*ent).soundSet != 0 {
             trap::SetConfigstring(
@@ -1363,7 +1363,7 @@ pub fn Use_target_push(
             return;
         }
 
-        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
 
         (*client).ps.velocity = (*self_).s.origin2;
 
@@ -1516,7 +1516,7 @@ pub fn hurt_use(
             (*self_).activator = None;
         }
 
-        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
 
         if (*self_).r.linked != 0 {
             trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(self_));
@@ -2253,7 +2253,7 @@ pub fn func_timer_use(
         let activator = ent_resolve_opt(ctx, activator);
         (*self_).activator = ent_id_opt(ent_base(ctx), activator);
 
-        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
 
         // if on, turn it off
         if (*self_).nextthink != 0 {

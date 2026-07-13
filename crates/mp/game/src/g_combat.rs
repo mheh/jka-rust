@@ -1483,13 +1483,16 @@ pub fn G_AlertTeam(
                     // out of sound range
                     if crate::NPC_senses::InFOV(
                         ctx,
-                        victim,
-                        check,
+                        ctx.entity_id_of(victim),
+                        ctx.entity_id_of(check).unwrap(),
                         (*npc).stats.hfov as c_int,
                         (*npc).stats.vfov as c_int,
                     ) == qfalse
-                        || crate::NPC_utils::NPC_ClearLOS2(ctx, check, (*victim).r.currentOrigin)
-                            == qfalse
+                        || crate::NPC_utils::NPC_ClearLOS2(
+                            ctx,
+                            ctx.entity_id_of(check),
+                            (*victim).r.currentOrigin,
+                        ) == qfalse
                     {
                         // out of FOV or no LOS
                         continue;
@@ -1497,7 +1500,11 @@ pub fn G_AlertTeam(
                 }
 
                 // FIXME: This can have a nasty cascading effect if setup wrong...
-                crate::NPC_combat::G_SetEnemy(ctx, check, attacker);
+                crate::NPC_combat::G_SetEnemy(
+                    ctx,
+                    ctx.entity_id_of(check).unwrap(),
+                    ctx.entity_id_of(attacker),
+                );
             }
         }
     }
@@ -1727,7 +1734,8 @@ pub fn G_CheckVictoryScript(ctx: GameContext<'_>, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        if G_ActivateBehavior(ctx, self_, bSet_t::BSET_VICTORY as c_int) != qfalse {
+        if G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_VICTORY as c_int) != qfalse
+        {
             return;
         }
 
@@ -2887,14 +2895,16 @@ pub fn player_die(
             (*((*self_).NPC as *mut gNPC_t)).nextBStateThink = (*ctx.world).level.time;
         }
 
-        if G_ActivateBehavior(ctx, self_, bSet_t::BSET_DEATH as c_int) != qfalse {
+        if G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_DEATH as c_int) != qfalse {
             //deathScript = qtrue;
         }
 
         if !(*self_).NPC.is_null()
             && ((*((*self_).NPC as *mut gNPC_t)).scriptFlags & SCF_FFDEATH) != 0
         {
-            if G_ActivateBehavior(ctx, self_, bSet_t::BSET_FFDEATH as c_int) != qfalse {
+            if G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_FFDEATH as c_int)
+                != qfalse
+            {
                 //deathScript = qtrue;
             }
             crate::g_utils::G_UseTargets2(
@@ -6027,7 +6037,7 @@ pub fn G_Damage(
                         ctx, die_fn, targ, inflictor, attacker, take, r#mod,
                     );
                 }
-                G_ActivateBehavior(ctx, targ, bSet_t::BSET_DEATH as c_int);
+                G_ActivateBehavior(ctx, ctx.entity_id_of(targ), bSet_t::BSET_DEATH as c_int);
                 return;
             } else {
                 if (*ctx.world).cvars.g_debugMelee.integer != 0 {

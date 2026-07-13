@@ -90,7 +90,12 @@ pub fn NPC_Seeker_Pain(
         crate::npc_c::SetNPCGlobals(ctx, self_);
         Seeker_Strafe(ctx);
         crate::npc_c::RestoreNPCGlobals(ctx);
-        crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
+        crate::NPC_reactions::NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
     }
 }
 
@@ -443,7 +448,10 @@ pub fn Seeker_Fire(ctx: GameContext<'_>) {
 
         crate::NPC_utils::CalcEntitySpot(
             ctx,
-            crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*NPC).enemy),
+            ctx.entity_id_of(crate::ent_id::resolve(
+                (*ctx.world).g_entities.as_mut_ptr(),
+                (*NPC).enemy,
+            )),
             spot_t::SPOT_HEAD,
             &mut enemy_org,
         );
@@ -551,7 +559,10 @@ pub fn Seeker_Attack(ctx: GameContext<'_>) {
         );
         let visible = crate::NPC_utils::NPC_ClearLOS4(
             ctx,
-            crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*NPC).enemy),
+            ctx.entity_id_of(crate::ent_id::resolve(
+                (*ctx.world).g_entities.as_mut_ptr(),
+                (*NPC).enemy,
+            )),
         );
         let mut advance = if distance > MIN_DISTANCE_SQR as f32 {
             qtrue
@@ -627,7 +638,7 @@ pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
             }
 
             // try to find the closest visible one
-            if crate::NPC_utils::NPC_ClearLOS4(ctx, ent) == 0 {
+            if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(ent)) == 0 {
                 continue;
             }
 

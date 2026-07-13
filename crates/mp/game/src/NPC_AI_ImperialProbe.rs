@@ -356,7 +356,12 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
             } else {
                 core::ptr::null_mut()
             };
-            CalcEntitySpot(ctx, enemy_ptr, SPOT_CHEST, &mut enemy_org1);
+            CalcEntitySpot(
+                ctx,
+                ctx.entity_id_of(enemy_ptr),
+                SPOT_CHEST,
+                &mut enemy_org1,
+            );
             enemy_org1[0] += world.bg_state.rng.Q_irand(0, 10) as f32;
             enemy_org1[1] += world.bg_state.rng.Q_irand(0, 10) as f32;
             _VectorSubtract(enemy_org1, muzzle1, &mut delta1);
@@ -493,7 +498,10 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
             },
         ) as c_int;
         let visible = if let Some(enemy_id) = (*npc).enemy {
-            NPC_ClearLOS4(ctx, &mut world.g_entities[enemy_id.0 as usize])
+            NPC_ClearLOS4(
+                ctx,
+                ctx.entity_id_of(&mut world.g_entities[enemy_id.0 as usize]),
+            )
         } else {
             0
         };
@@ -588,7 +596,7 @@ pub fn NPC_Probe_Pain(
                 (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_DROP;
             }
         } else {
-            let pain_chance = NPC_GetPainChance(ctx, self_, damage);
+            let pain_chance = NPC_GetPainChance(ctx, ctx.entity_id_of(self_).unwrap(), damage);
 
             if world.bg_state.rng.random() < pain_chance {
                 NPC_SetAnim(
@@ -601,7 +609,12 @@ pub fn NPC_Probe_Pain(
             }
         }
 
-        NPC_Pain(ctx, self_, attacker, damage);
+        NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
     }
 }
 

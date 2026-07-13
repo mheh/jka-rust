@@ -103,7 +103,7 @@ pub fn MineMonster_Patrol(ctx: GameContext<'_>) {
         );
 
         if VectorLengthSquared(dif) < 65536.0 {
-            G_SetEnemy(ctx, npc, &mut (*ctx.world).g_entities[0] as *mut gentity_t);
+            G_SetEnemy(ctx, ctx.entity_id_of(npc).unwrap(), EntityId::from_num(0));
         }
 
         if NPC_CheckEnemyExt(ctx, qtrue) == 0 {
@@ -327,7 +327,7 @@ pub fn MineMonster_Combat(ctx: GameContext<'_>) {
 
         let can_see = if let Some(enemy_id) = (*npc).enemy {
             let enemy_ptr = &mut (*ctx.world).g_entities[enemy_id.0 as usize] as *mut gentity_t;
-            NPC_ClearLOS4(ctx, enemy_ptr) != 0
+            NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ptr)) != 0
         } else {
             false
         };

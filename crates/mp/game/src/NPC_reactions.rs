@@ -25,6 +25,12 @@
 //! and `NPC_Respond`'s droid-class `va(fmt, …)` sound-path calls are ported
 //! faithfully via `format!()` (they format one `int`, so the string is
 //! byte-identical to Raven's).
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
+//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
+//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
+//! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -46,10 +52,22 @@ use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 
+/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
+/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 /// Raven `NPC_CheckAttacker`.
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:42-131`
-pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: *mut gentity_t, r#mod: c_int) {
+pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: Option<EntityId>, r#mod: c_int) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let other: *mut gentity_t = unsafe { ent_ptr(ctx, other) };
     unsafe {
         // `FL_NOTARGET` (crate::entity::flags) and `WP_SABER` (mp_bg weapon_t,
         // c_int const == 3) come from the prelude. `mod` is a plain c_int, so
@@ -78,7 +96,7 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: *mut gentity_t, r#mod: c_i
 
         // If we haven't taken a target, just get mad
         if (*npc).enemy.is_none() {
-            G_SetEnemy(ctx, npc, other);
+            G_SetEnemy(ctx, ctx.entity_id_of(npc).unwrap(), ctx.entity_id_of(other));
             return;
         }
 
@@ -87,8 +105,8 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: *mut gentity_t, r#mod: c_i
             let base = (*ctx.world).g_entities.as_mut_ptr();
             let enemy_ptr = base.add(enemy_id.0 as usize);
             if (*enemy_ptr).health <= 0 {
-                G_ClearEnemy(ctx, npc);
-                G_SetEnemy(ctx, npc, other);
+                G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
+                G_SetEnemy(ctx, ctx.entity_id_of(npc).unwrap(), ctx.entity_id_of(other));
                 return;
             }
         }
@@ -105,8 +123,8 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: *mut gentity_t, r#mod: c_i
             // I'm a jedi
             if r#mod == MOD_SABER {
                 // Always switch to this enemy if I'm a jedi and hit by another saber
-                G_ClearEnemy(ctx, npc);
-                G_SetEnemy(ctx, npc, other);
+                G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
+                G_SetEnemy(ctx, ctx.entity_id_of(npc).unwrap(), ctx.entity_id_of(other));
                 return;
             }
         }
@@ -124,7 +142,7 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: *mut gentity_t, r#mod: c_i
             // Randomly pick up the target. Raven `random()` is already in [0,1);
             // `Rng::random` matches it, so no extra /32768 normalization.
             if (*ctx.world).bg_state.rng.random() > luck_threshold {
-                G_ClearEnemy(ctx, other);
+                G_ClearEnemy(ctx, ctx.entity_id_of(other).unwrap());
                 (*other).enemy = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), npc));
             }
 
@@ -136,7 +154,9 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: *mut gentity_t, r#mod: c_i
 /// Raven `NPC_SetPainEvent`.
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:133-149`
-pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
         // Raven: `!self->NPC || !(self->NPC->aiFlags&NPCAI_DIE_ON_IMPACT)`.
@@ -161,7 +181,9 @@ pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `NPC_GetPainChance`.
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:157-196`
-pub fn NPC_GetPainChance(ctx: GameContext<'_>, self_: *mut gentity_t, damage: c_int) -> f32 {
+pub fn NPC_GetPainChance(ctx: GameContext<'_>, self_: EntityId, damage: c_int) -> f32 {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).enemy.is_none() {
             //surprised, always take pain
@@ -203,14 +225,17 @@ pub fn NPC_GetPainChance(ctx: GameContext<'_>, self_: *mut gentity_t, damage: c_
 /// Source: `oracle/codemp/game/NPC_reactions.c:207-356`
 pub fn NPC_ChoosePainAnimation(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     point: vec3_t,
     damage: c_int,
     r#mod: c_int,
     hitLoc: c_int,
     voiceEvent: c_int,
 ) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { ent_ptr(ctx, other) };
     unsafe {
         // Pain-anim numbers are `animNumber_t` variants; keep local c_int
         // aliases because `pain_anim` and `BG_PickAnim` operate in c_int.
@@ -280,7 +305,7 @@ pub fn NPC_ChoosePainAnimation(
             } else if !client.is_null() && (*client).NPC_class == CLASS_PROTOCOL {
                 pain_chance = 1.0f32;
             } else {
-                pain_chance = NPC_GetPainChance(ctx, self_, damage);
+                pain_chance = NPC_GetPainChance(ctx, ctx.entity_id_of(self_).unwrap(), damage);
             }
 
             if !client.is_null() && (*client).NPC_class == CLASS_DESANN {
@@ -369,7 +394,7 @@ pub fn NPC_ChoosePainAnimation(
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
                 } else {
-                    NPC_SetPainEvent(ctx, self_);
+                    NPC_SetPainEvent(ctx, ctx.entity_id_of(self_).unwrap());
                 }
             } else {
                 // Being force-gripped. Oracle: `Q_irand(EV_CHOKE1, EV_CHOKE3)`
@@ -412,12 +437,10 @@ pub fn NPC_ChoosePainAnimation(
 /// Raven `NPC_Pain`.
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:363-529`
-pub fn NPC_Pain(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
-    damage: c_int,
-) {
+pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId>, damage: c_int) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t = unsafe { ent_ptr(ctx, attacker) };
     unsafe {
         // `otherTeam` is npcteam_t (== c_int); keep TEAM_FREE (== 0) local.
         const TEAM_FREE: c_int = 0;
@@ -484,10 +507,10 @@ pub fn NPC_Pain(
                         // Run any pain instructions
                         if (*self_).health
                             <= ((*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] / 3)
-                            && G_ActivateBehavior(ctx, self_, BSET_FLEE) != 0
+                            && G_ActivateBehavior(ctx, ctx.entity_id_of(self_), BSET_FLEE) != 0
                         {
                         } else {
-                            G_ActivateBehavior(ctx, self_, BSET_PAIN);
+                            G_ActivateBehavior(ctx, ctx.entity_id_of(self_), BSET_PAIN);
                         }
                     }
 
@@ -495,11 +518,25 @@ pub fn NPC_Pain(
                         // Set our proper pain animation
                         if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                             NPC_ChoosePainAnimation(
-                                ctx, self_, other, point, damage, r#mod, hit_loc, EV_FFWARN,
+                                ctx,
+                                ctx.entity_id_of(self_).unwrap(),
+                                ctx.entity_id_of(other),
+                                point,
+                                damage,
+                                r#mod,
+                                hit_loc,
+                                EV_FFWARN,
                             );
                         } else {
                             NPC_ChoosePainAnimation(
-                                ctx, self_, other, point, damage, r#mod, hit_loc, -1,
+                                ctx,
+                                ctx.entity_id_of(self_).unwrap(),
+                                ctx.entity_id_of(other),
+                                point,
+                                damage,
+                                r#mod,
+                                hit_loc,
+                                -1,
                             );
                         }
                     }
@@ -516,16 +553,30 @@ pub fn NPC_Pain(
                         if damage != -1 {
                             if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                                 NPC_ChoosePainAnimation(
-                                    ctx, self_, other, point, damage, r#mod, hit_loc, EV_FFWARN,
+                                    ctx,
+                                    ctx.entity_id_of(self_).unwrap(),
+                                    ctx.entity_id_of(other),
+                                    point,
+                                    damage,
+                                    r#mod,
+                                    hit_loc,
+                                    EV_FFWARN,
                                 );
                             } else {
                                 NPC_ChoosePainAnimation(
-                                    ctx, self_, other, point, damage, r#mod, hit_loc, -1,
+                                    ctx,
+                                    ctx.entity_id_of(self_).unwrap(),
+                                    ctx.entity_id_of(other),
+                                    point,
+                                    damage,
+                                    r#mod,
+                                    hit_loc,
+                                    -1,
                                 );
                             }
                         }
                         return;
-                    } else if G_ActivateBehavior(ctx, self_, BSET_FFIRE) != 0 {
+                    } else if G_ActivateBehavior(ctx, ctx.entity_id_of(self_), BSET_FFIRE) != 0 {
                         // We have a specific script to run
                         return;
                     } else {
@@ -538,7 +589,11 @@ pub fn NPC_Pain(
                         (*npc).behaviorState = bState_t::BS_DEFAULT;
                         (*other).flags &= !FL_NOTARGET;
                         (*self_).r.svFlags &= !SVF_ICARUS_FREEZE;
-                        G_SetEnemy(ctx, self_, other);
+                        G_SetEnemy(
+                            ctx,
+                            ctx.entity_id_of(self_).unwrap(),
+                            ctx.entity_id_of(other),
+                        );
                         (*npc).scriptFlags &= !(SCF_DONT_FIRE
                             | SCF_CROUCHED
                             | SCF_WALKING
@@ -564,8 +619,8 @@ pub fn NPC_Pain(
             if damage != -1 {
                 NPC_ChoosePainAnimation(
                     ctx,
-                    self_,
-                    other,
+                    ctx.entity_id_of(self_).unwrap(),
+                    ctx.entity_id_of(other),
                     point,
                     damage,
                     r#mod,
@@ -579,17 +634,17 @@ pub fn NPC_Pain(
             if (*npc_ptr).enemy != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other))
                 && npc_ptr != other
             {
-                NPC_CheckAttacker(ctx, other, r#mod);
+                NPC_CheckAttacker(ctx, ctx.entity_id_of(other), r#mod);
             }
         }
 
         // Attempt to run any pain instructions
         if !client.is_null() && !npc.is_null() {
             if (*self_).health <= ((*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] / 3)
-                && G_ActivateBehavior(ctx, self_, BSET_FLEE) != 0
+                && G_ActivateBehavior(ctx, ctx.entity_id_of(self_), BSET_FLEE) != 0
             {
             } else {
-                G_ActivateBehavior(ctx, self_, BSET_PAIN);
+                G_ActivateBehavior(ctx, ctx.entity_id_of(self_), BSET_PAIN);
             }
         }
 
@@ -612,10 +667,13 @@ pub fn NPC_Pain(
 /// Source: `oracle/codemp/game/NPC_reactions.c:537-653`
 pub fn NPC_Touch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { ent_ptr(ctx, other) };
     unsafe {
         // MAX_CLIENTS_I32 (mp_qshared limits, == 32) and NPCAI_TOUCHED_GOAL
         // (crate::npc::ai_flags, == 0x8) resolve through the prelude.
@@ -674,7 +732,11 @@ pub fn NPC_Touch(
                             if (*npc_ptr).enemy
                                 != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other))
                             {
-                                G_SetEnemy(ctx, npc_ptr, other);
+                                G_SetEnemy(
+                                    ctx,
+                                    ctx.entity_id_of(npc_ptr).unwrap(),
+                                    ctx.entity_id_of(other),
+                                );
                             }
                         }
                     }
@@ -712,11 +774,13 @@ pub fn NPC_Touch(
 /// Source: `oracle/codemp/game/NPC_reactions.c:661-688`
 pub fn NPC_TempLookTarget(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
+    self_: EntityId,
     lookEntNum: c_int,
     mut minLookTime: c_int,
     mut maxLookTime: c_int,
 ) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let client = (*self_).client as *mut gclient_t;
         if client.is_null() {
@@ -739,12 +803,12 @@ pub fn NPC_TempLookTarget(
             maxLookTime = 1000;
         }
 
-        if NPC_CheckLookTarget(ctx, self_) == 0 {
+        if NPC_CheckLookTarget(ctx, ctx.entity_id_of(self_).unwrap()) == 0 {
             //Not already looking at something else
             //Look at him for 1 to 3 seconds
             let level_time = (*ctx.world).level.time;
             NPC_SetLookTarget(
-                self_,
+                ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
                 lookEntNum,
                 level_time + (*ctx.world).bg_state.rng.Q_irand(minLookTime, maxLookTime),
             );
@@ -755,7 +819,9 @@ pub fn NPC_TempLookTarget(
 /// Raven `NPC_Respond`.
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:690-942`
-pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) {
+pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         // The `CLASS_*` `class_t` variants resolve through the prelude; the
         // match below is on `NPC_class` (already `class_t`) directly rather than
@@ -793,7 +859,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
 
         if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
             // Set looktarget to them for a second or two
-            NPC_TempLookTarget(ctx, self_, userNum, 1000, 3000);
+            NPC_TempLookTarget(ctx, ctx.entity_id_of(self_).unwrap(), userNum, 1000, 3000);
         }
 
         // Some last-minute hacked in responses
@@ -1017,10 +1083,13 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
 /// Source: `oracle/codemp/game/NPC_reactions.c:950-999`
 pub fn NPC_UseResponse(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    user: *mut gentity_t,
+    self_: EntityId,
+    user: Option<EntityId>,
     useWhenDone: qboolean,
 ) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let user: *mut gentity_t = unsafe { ent_ptr(ctx, user) };
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
         let client = (*self_).client as *mut gclient_t;
@@ -1031,7 +1100,7 @@ pub fn NPC_UseResponse(
         if (*user).s.number != 0 {
             //not used by the player
             if useWhenDone != 0 {
-                G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+                G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
             }
             return;
         }
@@ -1043,7 +1112,7 @@ pub fn NPC_UseResponse(
         {
             //only those on the same team react
             if useWhenDone != 0 {
-                G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+                G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
             }
             return;
         }
@@ -1054,9 +1123,9 @@ pub fn NPC_UseResponse(
         }
 
         if useWhenDone != 0 {
-            G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+            G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
         } else {
-            NPC_Respond(ctx, self_, (*user).s.number);
+            NPC_Respond(ctx, ctx.entity_id_of(self_).unwrap(), (*user).s.number);
         }
     }
 }
@@ -1066,10 +1135,14 @@ pub fn NPC_UseResponse(
 /// Source: `oracle/codemp/game/NPC_reactions.c:1008-1093`
 pub fn NPC_Use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { ent_ptr(ctx, other) };
+    let activator: *mut gentity_t = unsafe { ent_ptr(ctx, activator) };
     unsafe {
         // `pm_type` is a c_int field and `BSET_USE` indexes `behaviorSet`
         // (c_int/usize), so alias both from their canonical enums.
@@ -1124,7 +1197,12 @@ pub fn NPC_Use(
             }
 
             if !(*self_).behaviorSet[BSET_USE as usize].is_null() {
-                NPC_UseResponse(ctx, self_, other, 1);
+                NPC_UseResponse(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    ctx.entity_id_of(other),
+                    1,
+                );
             } else if !npc.is_null()
                 && (*self_).enemy.is_none()
                 && !activator.is_null()
@@ -1133,7 +1211,12 @@ pub fn NPC_Use(
             {
                 // I don't have an enemy and I was used by the player
                 // (oracle gates on !(scriptFlags & SCF_NO_RESPONSE))
-                NPC_UseResponse(ctx, self_, other, 0);
+                NPC_UseResponse(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    ctx.entity_id_of(other),
+                    0,
+                );
             }
         }
 

@@ -266,7 +266,12 @@ pub fn VEH_TurretAim(
             yawAngles[1] = 0.0;
             yawAngles[2] = 0.0;
             yawAngles[(*turretStats).yawAxis as usize] = newAngles[YAW];
-            NPC_SetBoneAngles(ctx, parent, (*turretStats).yawBone, yawAngles);
+            NPC_SetBoneAngles(
+                ctx,
+                ctx.entity_id_of(parent).unwrap(),
+                (*turretStats).yawBone,
+                yawAngles,
+            );
         }
         // set pitch
         if (*turretStats).pitchBone != core::ptr::null_mut() {
@@ -275,7 +280,12 @@ pub fn VEH_TurretAim(
             pitchAngles[1] = 0.0;
             pitchAngles[2] = 0.0;
             pitchAngles[(*turretStats).pitchAxis as usize] = newAngles[PITCH];
-            NPC_SetBoneAngles(ctx, parent, (*turretStats).pitchBone, pitchAngles);
+            NPC_SetBoneAngles(
+                ctx,
+                ctx.entity_id_of(parent).unwrap(),
+                (*turretStats).pitchBone,
+                pitchAngles,
+            );
         }
         // force muzzle to recalc next check
         (*pVeh).m_iMuzzleTime[curMuzzle as usize] = 0;

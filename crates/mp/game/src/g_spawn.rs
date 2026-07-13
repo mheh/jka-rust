@@ -867,7 +867,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
             if !(*ent).classname.is_null() && *(*ent).classname != 0 {
                 if Q_strncmp(c"NPC_".as_ptr(), (*ent).classname, 4) != 0 {
                     // Not an NPC_spawner (rww - probably don't even care for MP, but whatever)
-                    G_ActivateBehavior(ctx, ent, BSET_SPAWN);
+                    G_ActivateBehavior(ctx, ctx.entity_id_of(ent), BSET_SPAWN);
                 }
             }
         }

@@ -71,7 +71,11 @@ pub fn sentry_use(
     activator: *mut gentity_t,
 ) {
     unsafe {
-        crate::NPC_utils::G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        crate::NPC_utils::G_ActivateBehavior(
+            ctx,
+            ctx.entity_id_of(self_),
+            bSet_t::BSET_USE as c_int,
+        );
 
         (*self_).flags &= !FL_SHIELDED;
         crate::npc_c::NPC_SetAnim(
@@ -98,7 +102,12 @@ pub fn NPC_Sentry_Pain(
         let world = &mut *ctx.world;
         let mod_ = world.globals.gPainMOD;
 
-        crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
+        crate::NPC_reactions::NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
 
         if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
             (*((*self_).NPC as *mut gNPC_t)).burstCount = 0;
@@ -645,8 +654,10 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
                 (*NPC).r.currentOrigin,
                 enemy.r.currentOrigin,
             ) as c_int as f32;
-            visible =
-                crate::NPC_utils::NPC_ClearLOS4(ctx, enemy as *const gentity_t as *mut gentity_t);
+            visible = crate::NPC_utils::NPC_ClearLOS4(
+                ctx,
+                ctx.entity_id_of(enemy as *const gentity_t as *mut gentity_t),
+            );
             advance = if distance > MIN_DISTANCE_SQR {
                 qtrue
             } else {

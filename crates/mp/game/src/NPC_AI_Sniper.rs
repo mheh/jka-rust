@@ -147,7 +147,12 @@ pub fn NPC_Sniper_Pain(
         TIMER_Set(ctx, ctx.entity_id_of(self_), c"duck".as_ptr(), -1);
         TIMER_Set(ctx, ctx.entity_id_of(self_), c"stand".as_ptr(), 2000);
 
-        NPC_Pain(ctx, self_, attacker, damage);
+        NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
 
         if damage == 0 && (*self_).health > 0 {
             // FIXME: better way to know I was pushed (Raven comment).
@@ -854,10 +859,12 @@ pub fn Sniper_UpdateEnemyPos(ctx: GameContext<'_>) {
                 let mut spot = [0.0f32; 3];
                 CalcEntitySpot(
                     ctx,
-                    (*NPC)
-                        .enemy
-                        .map(|id| &world.g_entities[id.index()] as *const gentity_t)
-                        .unwrap_or(core::ptr::null()),
+                    ctx.entity_id_of(
+                        (*NPC)
+                            .enemy
+                            .map(|id| &world.g_entities[id.index()] as *const gentity_t)
+                            .unwrap_or(core::ptr::null()),
+                    ),
                     spot_t::SPOT_HEAD_LEAN,
                     &mut spot,
                 );
@@ -984,10 +991,12 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
         // can we see our target?
         if NPC_ClearLOS4(
             ctx,
-            (*NPC)
-                .enemy
-                .map(|id| &mut world.g_entities[id.index()] as *mut gentity_t)
-                .unwrap_or(core::ptr::null_mut()),
+            ctx.entity_id_of(
+                (*NPC)
+                    .enemy
+                    .map(|id| &mut world.g_entities[id.index()] as *mut gentity_t)
+                    .unwrap_or(core::ptr::null_mut()),
+            ),
         ) != 0
         {
             let maxShootDist;

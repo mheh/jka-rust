@@ -1835,7 +1835,7 @@ pub fn Q3_SetEnemy(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
             || Q_stricmp(b"NULL\0".as_ptr() as *const c_char, name) == 0
         {
             if !(*ent).NPC.is_null() {
-                G_ClearEnemy(ctx, ent);
+                G_ClearEnemy(ctx, ctx.entity_id_of(ent).unwrap());
             } else {
                 (*ent).enemy = None;
             }
@@ -1856,7 +1856,7 @@ pub fn Q3_SetEnemy(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
                 return;
             }
 
-            G_SetEnemy(ctx, ent, enemy);
+            G_SetEnemy(ctx, ctx.entity_id_of(ent).unwrap(), ctx.entity_id_of(enemy));
             if !(*ent).NPC.is_null() {
                 (*ent).cantHitEnemyCounter = 0;
             }
@@ -2651,7 +2651,7 @@ pub fn Q3_SetWeapon(ctx: GameContext<'_>, entID: c_int, wp_name: *const c_char) 
         let wp = GetIDForString(WPTable.as_ptr() as *mut stringID_table_t, wp_name);
 
         (*((*ent).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 1 << wp;
-        ChangeWeapon(ctx, ent, wp);
+        ChangeWeapon(ctx, ctx.entity_id_of(ent), wp);
     }
 }
 

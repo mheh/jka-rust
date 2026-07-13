@@ -1131,7 +1131,11 @@ pub fn AI_CheckEnemyCollision(
             let entClient = (*ent).client as *mut gclient_t;
             if !blockerClient.is_null() && (*blockerClient).playerTeam == (*entClient).enemyTeam {
                 if takeEnemy != 0 {
-                    G_SetEnemy(ctx, ent, info.blocker);
+                    G_SetEnemy(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        ctx.entity_id_of(info.blocker),
+                    );
                 }
 
                 return 1;

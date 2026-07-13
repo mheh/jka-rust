@@ -36,6 +36,12 @@
 //! `va-varargs`, same fork as `g_client.rs`/`w_force.rs`). `G_GetBoltPosition`
 //! is parked on a cross-crate-visibility gap: `BG_GiveMeVectorFromMatrix`
 //! (`NPC_AI_Mark2.rs`) is a private fn in its owning file.
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
+//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
+//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
+//! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_lib::atof;
@@ -66,6 +72,16 @@ use mp_abi::game::syscalls::G_ICARUS_RUNSCRIPT::GIcarusRunscriptArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+
+/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
+/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
 
 // Raven `#define VALID_ATTACK_CONE 2.0f` (this file's own macro).
 // Source: `oracle/codemp/game/NPC_utils.c:11`
@@ -143,11 +159,13 @@ use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 /// Source: `oracle/codemp/game/NPC_utils.c:20-168`
 pub fn CalcEntitySpot(
     ctx: GameContext<'_>,
-    ent: *const gentity_t,
+    ent: Option<EntityId>,
     spot: spot_t,
     point: &mut vec3_t,
 ) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *const gentity_t = ent_ptr(ctx, ent);
         if ent.is_null() {
             return;
         }
@@ -708,8 +726,10 @@ pub fn SetTeamNumbers(ctx: GameContext<'_>) {
 /// Raven `G_ActivateBehavior`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:851-894`
-pub fn G_ActivateBehavior(ctx: GameContext<'_>, self_: *mut gentity_t, bset: c_int) -> qboolean {
+pub fn G_ActivateBehavior(ctx: GameContext<'_>, self_: Option<EntityId>, bset: c_int) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ent_ptr(ctx, self_);
         if self_.is_null() {
             return qfalse;
         }
@@ -754,13 +774,10 @@ pub fn G_ActivateBehavior(ctx: GameContext<'_>, self_: *mut gentity_t, bset: c_i
 /// `_XBOX` branches).
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:906-995`
-pub fn NPC_SetBoneAngles(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    bone: *mut c_char,
-    angles: vec3_t,
-) {
+pub fn NPC_SetBoneAngles(ctx: GameContext<'_>, ent: EntityId, bone: *mut c_char, angles: vec3_t) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let boneIndex = G_BoneIndex(ctx, bone as *const c_char);
 
         // Walk the 4 fixed bone-index/bone-angle slot pairs looking for
@@ -865,11 +882,13 @@ pub fn NPC_SetBoneAngles(
 /// Source: `oracle/codemp/game/NPC_utils.c:1001-1039`
 pub fn NPC_SetSurfaceOnOff(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     surfaceName: *const c_char,
     surfaceFlags: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let mut i: c_int = 0;
         let mut foundIt = qfalse;
 
@@ -919,8 +938,10 @@ pub fn NPC_SetSurfaceOnOff(
 /// general direction.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1042-1067`
-pub fn NPC_SomeoneLookingAtMe(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn NPC_SomeoneLookingAtMe(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let mut i: usize = 0;
         while i < MAX_CLIENTS {
             let pEnt = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
@@ -942,7 +963,7 @@ pub fn NPC_SomeoneLookingAtMe(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
                     ),
                 ) != 0
                 //I'm in a 30 fov or so cone from this player.. that's enough I guess.
-                && InFOV(ctx, ent, pEnt, 30, 30) != 0
+                && InFOV(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(pEnt).unwrap(), 30, 30) != 0
             {
                 return qtrue;
             }
@@ -958,42 +979,77 @@ pub fn NPC_SomeoneLookingAtMe(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1069-1072`
 pub fn NPC_ClearLOS(ctx: GameContext<'_>, start: vec3_t, end: vec3_t) -> qboolean {
-    unsafe { G_ClearLOS(ctx, (*ctx.world).globals.NPC, start, end) }
+    unsafe {
+        G_ClearLOS(
+            ctx,
+            ctx.entity_id_of((*ctx.world).globals.NPC).unwrap(),
+            start,
+            end,
+        )
+    }
 }
 
 /// Raven `NPC_ClearLOS5`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1073-1076`
 pub fn NPC_ClearLOS5(ctx: GameContext<'_>, end: vec3_t) -> qboolean {
-    unsafe { G_ClearLOS5(ctx, (*ctx.world).globals.NPC, end) }
+    unsafe {
+        G_ClearLOS5(
+            ctx,
+            ctx.entity_id_of((*ctx.world).globals.NPC).unwrap(),
+            end,
+        )
+    }
 }
 
 /// Raven `NPC_ClearLOS4`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1077-1080`
-pub fn NPC_ClearLOS4(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
-    unsafe { G_ClearLOS4(ctx, (*ctx.world).globals.NPC, ent) }
+pub fn NPC_ClearLOS4(ctx: GameContext<'_>, ent: Option<EntityId>) -> qboolean {
+    unsafe {
+        G_ClearLOS4(
+            ctx,
+            ctx.entity_id_of((*ctx.world).globals.NPC).unwrap(),
+            ent,
+        )
+    }
 }
 
 /// Raven `NPC_ClearLOS3`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1081-1084`
-pub fn NPC_ClearLOS3(ctx: GameContext<'_>, start: vec3_t, ent: *mut gentity_t) -> qboolean {
-    unsafe { G_ClearLOS3(ctx, (*ctx.world).globals.NPC, start, ent) }
+pub fn NPC_ClearLOS3(ctx: GameContext<'_>, start: vec3_t, ent: Option<EntityId>) -> qboolean {
+    unsafe {
+        G_ClearLOS3(
+            ctx,
+            ctx.entity_id_of((*ctx.world).globals.NPC).unwrap(),
+            start,
+            ent,
+        )
+    }
 }
 
 /// Raven `NPC_ClearLOS2`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1085-1088`
-pub fn NPC_ClearLOS2(ctx: GameContext<'_>, ent: *mut gentity_t, end: vec3_t) -> qboolean {
-    unsafe { G_ClearLOS2(ctx, (*ctx.world).globals.NPC, ent, end) }
+pub fn NPC_ClearLOS2(ctx: GameContext<'_>, ent: Option<EntityId>, end: vec3_t) -> qboolean {
+    unsafe {
+        G_ClearLOS2(
+            ctx,
+            ctx.entity_id_of((*ctx.world).globals.NPC).unwrap(),
+            ent,
+            end,
+        )
+    }
 }
 
 /// Raven `NPC_ValidEnemy`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1096-1187`
-pub fn NPC_ValidEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn NPC_ValidEnemy(ctx: GameContext<'_>, ent: Option<EntityId>) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ent_ptr(ctx, ent);
         let npc = (*ctx.world).globals.NPC;
         let mut ent_team: c_int = TEAM_FREE as c_int;
 
@@ -1097,8 +1153,10 @@ pub fn NPC_ValidEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 /// Raven `NPC_TargetVisible`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1195-1210`
-pub fn NPC_TargetVisible(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn NPC_TargetVisible(ctx: GameContext<'_>, ent: Option<EntityId>) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ent_ptr(ctx, ent);
         let npc = (*ctx.world).globals.NPC;
         let npc_info = (*ctx.world).globals.NPCInfo;
 
@@ -1112,8 +1170,8 @@ pub fn NPC_TargetVisible(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean 
         //Check our FOV
         if InFOV(
             ctx,
-            ent,
-            npc,
+            ctx.entity_id_of(ent),
+            ctx.entity_id_of(npc).unwrap(),
             (*npc_info).stats.hfov,
             (*npc_info).stats.vfov,
         ) == qfalse
@@ -1122,7 +1180,7 @@ pub fn NPC_TargetVisible(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean 
         }
 
         //Check for sight
-        if NPC_ClearLOS4(ctx, ent) == qfalse {
+        if NPC_ClearLOS4(ctx, ctx.entity_id_of(ent)) == qfalse {
             return qfalse;
         }
 
@@ -1133,8 +1191,10 @@ pub fn NPC_TargetVisible(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean 
 /// Raven `NPC_FindNearestEnemy`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1246-1294`
-pub fn NPC_FindNearestEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int {
+pub fn NPC_FindNearestEnemy(ctx: GameContext<'_>, ent: EntityId) -> c_int {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let npc_info = (*ctx.world).globals.NPCInfo;
 
         let mut nearest_ent_id: c_int = -1;
@@ -1172,13 +1232,13 @@ pub fn NPC_FindNearestEnemy(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int 
             }
 
             //Must be valid
-            if NPC_ValidEnemy(ctx, rad_ent) == qfalse {
+            if NPC_ValidEnemy(ctx, ctx.entity_id_of(rad_ent)) == qfalse {
                 i += 1;
                 continue;
             }
 
             //Must be visible
-            if NPC_TargetVisible(ctx, rad_ent) == qfalse {
+            if NPC_TargetVisible(ctx, ctx.entity_id_of(rad_ent)) == qfalse {
                 i += 1;
                 continue;
             }
@@ -1209,7 +1269,7 @@ pub fn NPC_PickEnemyExt(ctx: GameContext<'_>, checkAlerts: qboolean) -> *mut gen
         let npc = (*ctx.world).globals.NPC;
 
         //If we've asked for the closest enemy
-        let ent_id = NPC_FindNearestEnemy(ctx, npc);
+        let ent_id = NPC_FindNearestEnemy(ctx, ctx.entity_id_of(npc).unwrap());
 
         //If we have a valid enemy, use it
         if ent_id >= 0 {
@@ -1262,7 +1322,7 @@ pub fn NPC_PickEnemyExt(ctx: GameContext<'_>, checkAlerts: qboolean) -> *mut gen
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1356-1359`
 pub fn NPC_FindPlayer(ctx: GameContext<'_>) -> qboolean {
-    unsafe { NPC_TargetVisible(ctx, &mut (*ctx.world).g_entities[0] as *mut gentity_t) }
+    unsafe { NPC_TargetVisible(ctx, EntityId::from_num(0)) }
 }
 
 /// Raven `NPC_CheckPlayerDistance`.
@@ -1292,7 +1352,7 @@ pub fn NPC_FindEnemy(ctx: GameContext<'_>, checkAlerts: qboolean) -> qboolean {
         //if( NPC->svFlags & SVF_IGNORE_ENEMIES )
         if false {
             //rwwFIXMEFIXME: support for flag
-            G_ClearEnemy(ctx, npc);
+            G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
             return qfalse;
         }
 
@@ -1325,15 +1385,19 @@ pub fn NPC_FindEnemy(ctx: GameContext<'_>, checkAlerts: qboolean) -> qboolean {
             Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
-        if NPC_ValidEnemy(ctx, npc_enemy) != qfalse {
+        if NPC_ValidEnemy(ctx, ctx.entity_id_of(npc_enemy)) != qfalse {
             return qtrue;
         }
 
         let newenemy = NPC_PickEnemyExt(ctx, checkAlerts);
 
         //if we found one, take it as the enemy
-        if NPC_ValidEnemy(ctx, newenemy) != qfalse {
-            G_SetEnemy(ctx, npc, newenemy);
+        if NPC_ValidEnemy(ctx, ctx.entity_id_of(newenemy)) != qfalse {
+            G_SetEnemy(
+                ctx,
+                ctx.entity_id_of(npc).unwrap(),
+                ctx.entity_id_of(newenemy),
+            );
             return qtrue;
         }
 
@@ -1369,7 +1433,7 @@ pub fn NPC_FacePosition(ctx: GameContext<'_>, position: vec3_t, doPitch: qboolea
         {
             CalcEntitySpot(
                 ctx,
-                npc as *const gentity_t,
+                ctx.entity_id_of(npc as *const gentity_t),
                 spot_t::SPOT_ORIGIN,
                 &mut muzzle,
             );
@@ -1377,14 +1441,14 @@ pub fn NPC_FacePosition(ctx: GameContext<'_>, position: vec3_t, doPitch: qboolea
         } else if !npc_client.is_null() && (*npc_client).NPC_class == CLASS_GALAKMECH {
             CalcEntitySpot(
                 ctx,
-                npc as *const gentity_t,
+                ctx.entity_id_of(npc as *const gentity_t),
                 spot_t::SPOT_WEAPON,
                 &mut muzzle,
             );
         } else {
             CalcEntitySpot(
                 ctx,
-                npc as *const gentity_t,
+                ctx.entity_id_of(npc as *const gentity_t),
                 spot_t::SPOT_HEAD_LEAN,
                 &mut muzzle,
             ); //SPOT_HEAD
@@ -1448,14 +1512,9 @@ pub fn NPC_FacePosition(ctx: GameContext<'_>, position: vec3_t, doPitch: qboolea
 /// Raven `NPC_FaceEntity`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1555-1563`
-pub fn NPC_FaceEntity(ctx: GameContext<'_>, ent: *mut gentity_t, doPitch: qboolean) -> qboolean {
+pub fn NPC_FaceEntity(ctx: GameContext<'_>, ent: Option<EntityId>, doPitch: qboolean) -> qboolean {
     let mut entPos: vec3_t = [0.0; 3];
-    CalcEntitySpot(
-        ctx,
-        ent as *const gentity_t,
-        spot_t::SPOT_HEAD_LEAN,
-        &mut entPos,
-    );
+    CalcEntitySpot(ctx, ent, spot_t::SPOT_HEAD_LEAN, &mut entPos);
     NPC_FacePosition(ctx, entPos, doPitch)
 }
 
@@ -1476,7 +1535,7 @@ pub fn NPC_FaceEnemy(ctx: GameContext<'_>, doPitch: qboolean) -> qboolean {
         };
         let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
 
-        NPC_FaceEntity(ctx, enemy, doPitch)
+        NPC_FaceEntity(ctx, ctx.entity_id_of(enemy), doPitch)
     }
 }
 
@@ -1503,7 +1562,7 @@ pub fn NPC_CheckCanAttackExt(ctx: GameContext<'_>) -> qboolean {
             Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
-        if NPC_ClearShot(ctx, npc_enemy) == qfalse {
+        if NPC_ClearShot(ctx, ctx.entity_id_of(npc_enemy)) == qfalse {
             return qfalse;
         }
 
@@ -1514,8 +1573,10 @@ pub fn NPC_CheckCanAttackExt(ctx: GameContext<'_>) -> qboolean {
 /// Raven `NPC_ClearLookTarget`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1611-1625`
-pub fn NPC_ClearLookTarget(self_: *mut gentity_t) {
+pub fn NPC_ClearLookTarget(self_: &mut gentity_t) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = self_;
         if (*self_).client.is_null() {
             return;
         }
@@ -1535,8 +1596,10 @@ pub fn NPC_ClearLookTarget(self_: *mut gentity_t) {
 /// Raven `NPC_SetLookTarget`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1632-1646`
-pub fn NPC_SetLookTarget(self_: *mut gentity_t, entNum: c_int, clearTime: c_int) {
+pub fn NPC_SetLookTarget(self_: &mut gentity_t, entNum: c_int, clearTime: c_int) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = self_;
         if (*self_).client.is_null() {
             return;
         }
@@ -1556,8 +1619,10 @@ pub fn NPC_SetLookTarget(self_: *mut gentity_t, entNum: c_int, clearTime: c_int)
 /// Raven `NPC_CheckLookTarget`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1653-1679`
-pub fn NPC_CheckLookTarget(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
+pub fn NPC_CheckLookTarget(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         if !(*self_).client.is_null() {
             let client = (*self_).client as *mut gclient_t;
             let lookTarget = (*client).renderInfo.lookTarget;
@@ -1567,12 +1632,12 @@ pub fn NPC_CheckLookTarget(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
                 let target = &mut (*ctx.world).g_entities[lookTarget as usize] as *mut gentity_t;
                 if (target.is_null()) || (*target).inuse == qfalse {
                     //lookTarget not inuse or not valid anymore
-                    NPC_ClearLookTarget(self_);
+                    NPC_ClearLookTarget(ctx.entity_mut(ctx.entity_id_of(self_).unwrap()));
                 } else if (*client).renderInfo.lookTargetClearTime != 0
                     && (*client).renderInfo.lookTargetClearTime < (*ctx.world).level.time
                 {
                     //Time to clear lookTarget
-                    NPC_ClearLookTarget(self_);
+                    NPC_ClearLookTarget(ctx.entity_mut(ctx.entity_id_of(self_).unwrap()));
                 } else if !(*target).client.is_null()
                     && !(*self_).enemy.is_none()
                     && (*self_).enemy.map(|id| id.index()) != Some(lookTarget as usize)
@@ -1580,7 +1645,7 @@ pub fn NPC_CheckLookTarget(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
                     //should always look at current enemy if engaged in
                     //battle... FIXME: this could override certain scripted
                     //lookTargets...???
-                    NPC_ClearLookTarget(self_);
+                    NPC_ClearLookTarget(ctx.entity_mut(ctx.entity_id_of(self_).unwrap()));
                 } else {
                     return qtrue;
                 }
@@ -1613,7 +1678,7 @@ pub fn NPC_CheckCharmed(ctx: GameContext<'_>) {
             if (*npc_info).tempBehavior == bState_t::BS_FOLLOW_LEADER {
                 (*npc_info).tempBehavior = bState_t::BS_DEFAULT;
             }
-            G_ClearEnemy(ctx, npc);
+            G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
             (*npc_info).charmedTime = 0;
             //say something to let player know you've snapped out of it
             G_AddVoiceEvent(
@@ -1637,12 +1702,14 @@ pub fn NPC_CheckCharmed(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC_utils.c:1707-1740`
 pub fn G_GetBoltPosition(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
+    self_: Option<EntityId>,
     boltIndex: c_int,
     pos: Option<&mut vec3_t>,
     modelIndex: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ent_ptr(ctx, self_);
         if self_.is_null() || (*self_).inuse == qfalse {
             return;
         }
@@ -1691,10 +1758,12 @@ pub fn G_GetBoltPosition(
 /// Source: `oracle/codemp/game/NPC_utils.c:1742-1754`
 pub fn NPC_EntRangeFromBolt(
     ctx: GameContext<'_>,
-    targEnt: *mut gentity_t,
+    targEnt: Option<EntityId>,
     boltIndex: c_int,
 ) -> f32 {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let targEnt: *mut gentity_t = ent_ptr(ctx, targEnt);
         let npc = (*ctx.world).globals.NPC;
 
         if targEnt.is_null() {
@@ -1702,7 +1771,7 @@ pub fn NPC_EntRangeFromBolt(
         }
 
         let mut org: vec3_t = [0.0; 3];
-        G_GetBoltPosition(ctx, npc, boltIndex, Some(&mut org), 0);
+        G_GetBoltPosition(ctx, ctx.entity_id_of(npc), boltIndex, Some(&mut org), 0);
 
         Distance((*targEnt).r.currentOrigin, org)
     }
@@ -1717,7 +1786,7 @@ pub fn NPC_EnemyRangeFromBolt(ctx: GameContext<'_>, boltIndex: c_int) -> f32 {
             Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
-        NPC_EntRangeFromBolt(ctx, enemy, boltIndex)
+        NPC_EntRangeFromBolt(ctx, ctx.entity_id_of(enemy), boltIndex)
     }
 }
 
@@ -1741,7 +1810,7 @@ pub fn NPC_GetEntsNearBolt(
         //get my handRBolt's position
         let mut org: vec3_t = [0.0; 3];
 
-        G_GetBoltPosition(ctx, npc, boltIndex, Some(&mut org), 0);
+        G_GetBoltPosition(ctx, ctx.entity_id_of(npc), boltIndex, Some(&mut org), 0);
 
         *boltOrg = org;
 

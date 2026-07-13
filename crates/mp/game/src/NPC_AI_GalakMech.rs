@@ -142,20 +142,80 @@ pub fn NPC_GalakMech_Init(ctx: GameContext<'_>, ent: *mut gentity_t) {
             crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"noRapid".as_ptr(), 0);
             crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"talkDebounce".as_ptr(), 0);
 
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_shield".as_ptr(), TURN_ON);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_galakface".as_ptr(), TURN_OFF);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_galakhead".as_ptr(), TURN_OFF);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_eyes_mouth".as_ptr(), TURN_OFF);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_collar".as_ptr(), TURN_OFF);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_galaktorso".as_ptr(), TURN_OFF);
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_shield".as_ptr(),
+                TURN_ON,
+            );
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_galakface".as_ptr(),
+                TURN_OFF,
+            );
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_galakhead".as_ptr(),
+                TURN_OFF,
+            );
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_eyes_mouth".as_ptr(),
+                TURN_OFF,
+            );
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_collar".as_ptr(),
+                TURN_OFF,
+            );
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_galaktorso".as_ptr(),
+                TURN_OFF,
+            );
         } else {
             // NPC_SetSurfaceOnOff( ent, "helmet", TURN_OFF );
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_shield".as_ptr(), TURN_OFF);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_galakface".as_ptr(), TURN_ON);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_galakhead".as_ptr(), TURN_ON);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_eyes_mouth".as_ptr(), TURN_ON);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_collar".as_ptr(), TURN_ON);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_galaktorso".as_ptr(), TURN_ON);
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_shield".as_ptr(),
+                TURN_OFF,
+            );
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_galakface".as_ptr(),
+                TURN_ON,
+            );
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_galakhead".as_ptr(),
+                TURN_ON,
+            );
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_eyes_mouth".as_ptr(),
+                TURN_ON,
+            );
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_collar".as_ptr(),
+                TURN_ON,
+            );
+            crate::NPC_utils::NPC_SetSurfaceOnOff(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"torso_galaktorso".as_ptr(),
+                TURN_ON,
+            );
         }
     }
 }
@@ -254,7 +314,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 ),
                             );
                             GM_CreateExplosion(ctx, self_, newBolt, 1);
-                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"r_hand".as_ptr(), TURN_OFF);
+                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), c"r_hand".as_ptr(), TURN_OFF);
                         } else if trap::G2API_GetSurfaceRenderStatus(
                             ctx.engine,
                             mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
@@ -273,7 +333,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                     std::ffi::CString::new("*r_arm_elbow").unwrap(),
                                 ),
                             );
-                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"r_arm_middle".as_ptr(), TURN_OFF);
+                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), c"r_arm_middle".as_ptr(), TURN_OFF);
                         }
                     }
                     2 => {
@@ -297,7 +357,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 ),
                             );
                             GM_CreateExplosion(ctx, self_, newBolt, 0);
-                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"l_hand".as_ptr(), TURN_OFF);
+                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), c"l_hand".as_ptr(), TURN_OFF);
                         } else if trap::G2API_GetSurfaceRenderStatus(
                             ctx.engine,
                             mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
@@ -316,7 +376,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                     std::ffi::CString::new("*l_arm_cap_l_hand").unwrap(),
                                 ),
                             );
-                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"l_arm_wrist".as_ptr(), TURN_OFF);
+                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), c"l_arm_wrist".as_ptr(), TURN_OFF);
                         } else if trap::G2API_GetSurfaceRenderStatus(
                             ctx.engine,
                             mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
@@ -335,7 +395,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                     std::ffi::CString::new("*l_arm_cap_l_hand").unwrap(),
                                 ),
                             );
-                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"l_arm_middle".as_ptr(), TURN_OFF);
+                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), c"l_arm_middle".as_ptr(), TURN_OFF);
                         } else if trap::G2API_GetSurfaceRenderStatus(
                             ctx.engine,
                             mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
@@ -354,7 +414,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                     std::ffi::CString::new("*l_arm_elbow").unwrap(),
                                 ),
                             );
-                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"l_arm_augment".as_ptr(), TURN_OFF);
+                            crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), c"l_arm_augment".as_ptr(), TURN_OFF);
                         }
                     }
                     3 | 4 => {
@@ -508,10 +568,15 @@ pub fn NPC_GM_Pain(
                     (*self_).delay = level_time + (*ctx.world).bg_state.rng.Q_irand(5000, 7000);
                 }
             } else {
-                crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
+                crate::NPC_reactions::NPC_Pain(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    ctx.entity_id_of(attacker),
+                    damage,
+                );
             }
         } else if hitLoc == HL_GENERIC1 {
-            crate::NPC_reactions::NPC_SetPainEvent(ctx, self_);
+            crate::NPC_reactions::NPC_SetPainEvent(ctx, ctx.entity_id_of(self_).unwrap());
             // self->s.powerups |= ( 1 << PW_SHOCKED );
             // self->client->ps.powerups[PW_SHOCKED] = level.time + (*ctx.world).bg_state.rng.Q_irand( 500, 2500 );
             (*(*self_).client.cast::<gclient_t>()).ps.electrifyTime =
@@ -771,7 +836,12 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
                     let mut distThreshold: f32;
                     let mut dist: f32;
 
-                    crate::NPC_utils::CalcEntitySpot(ctx, npc_ent, SPOT_HEAD, &mut muzzle);
+                    crate::NPC_utils::CalcEntitySpot(
+                        ctx,
+                        ctx.entity_id_of(npc_ent),
+                        SPOT_HEAD,
+                        &mut muzzle,
+                    );
                     if VectorCompare(IMPACT_POS_4, vec3_origin) != 0 {
                         // never checked ShotEntity this frame, so must do a trace...
                         let mut tr: trace_t = core::mem::zeroed();
@@ -900,11 +970,36 @@ pub fn GM_StartGloat(ctx: GameContext<'_>) {
     unsafe {
         let npc_ent = (*ctx.world).globals.NPC;
         (*npc_ent).wait = 0.0;
-        crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_galakface".as_ptr(), TURN_ON);
-        crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_galakhead".as_ptr(), TURN_ON);
-        crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_eyes_mouth".as_ptr(), TURN_ON);
-        crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_collar".as_ptr(), TURN_ON);
-        crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_galaktorso".as_ptr(), TURN_ON);
+        crate::NPC_utils::NPC_SetSurfaceOnOff(
+            ctx,
+            ctx.entity_id_of(npc_ent).unwrap(),
+            c"torso_galakface".as_ptr(),
+            TURN_ON,
+        );
+        crate::NPC_utils::NPC_SetSurfaceOnOff(
+            ctx,
+            ctx.entity_id_of(npc_ent).unwrap(),
+            c"torso_galakhead".as_ptr(),
+            TURN_ON,
+        );
+        crate::NPC_utils::NPC_SetSurfaceOnOff(
+            ctx,
+            ctx.entity_id_of(npc_ent).unwrap(),
+            c"torso_eyes_mouth".as_ptr(),
+            TURN_ON,
+        );
+        crate::NPC_utils::NPC_SetSurfaceOnOff(
+            ctx,
+            ctx.entity_id_of(npc_ent).unwrap(),
+            c"torso_collar".as_ptr(),
+            TURN_ON,
+        );
+        crate::NPC_utils::NPC_SetSurfaceOnOff(
+            ctx,
+            ctx.entity_id_of(npc_ent).unwrap(),
+            c"torso_galaktorso".as_ptr(),
+            TURN_ON,
+        );
 
         crate::npc_c::NPC_SetAnim(
             ctx,
@@ -1222,7 +1317,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         }
 
         // can we see our target?
-        if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy_ent) != 0 {
+        if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ent)) != 0 {
             (*npc_info).enemyLastSeenTime = level_time; // used here for aim debouncing, not always a clear LOS
             (*ctx.world).globals.enemyLOS4 = qtrue;
 
@@ -1242,8 +1337,11 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     // out, let NPC_ShotEntity write through the local, then store back so the
                     // later reads see the same value C's file-static vec3_t would hold.
                     let mut impactPos4 = IMPACT_POS_4;
-                    let hit =
-                        crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, Some(&mut impactPos4));
+                    let hit = crate::NPC_combat::NPC_ShotEntity(
+                        ctx,
+                        ctx.entity_id_of(enemy_ent),
+                        Some(&mut impactPos4),
+                    );
                     *(&raw mut IMPACT_POS_4) = impactPos4;
                     let hit_ent = g_entities_base.add(hit as usize);
                     if hit == (*enemy_ent).s.number as c_int
@@ -1326,7 +1424,11 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             // `impactPos4` is a file static shared with GM_CheckFireState; copy it out, let
             // NPC_ShotEntity write through the local, then store back (matches C's file-static).
             let mut impactPos4 = IMPACT_POS_4;
-            let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, Some(&mut impactPos4));
+            let hit = crate::NPC_combat::NPC_ShotEntity(
+                ctx,
+                ctx.entity_id_of(enemy_ent),
+                Some(&mut impactPos4),
+            );
             *(&raw mut IMPACT_POS_4) = impactPos4;
             let hit_ent = g_entities_base.add(hit as usize);
             if hit == (*enemy_ent).s.number as c_int
@@ -1385,7 +1487,12 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             let mins = [-REPEATER_ALT_SIZE, -REPEATER_ALT_SIZE, -REPEATER_ALT_SIZE];
             let maxs = [REPEATER_ALT_SIZE, REPEATER_ALT_SIZE, REPEATER_ALT_SIZE];
 
-            crate::NPC_utils::CalcEntitySpot(ctx, npc_ent, SPOT_WEAPON, &mut muzzle);
+            crate::NPC_utils::CalcEntitySpot(
+                ctx,
+                ctx.entity_id_of(npc_ent),
+                SPOT_WEAPON,
+                &mut muzzle,
+            );
 
             _VectorCopy((*enemy_ent).r.currentOrigin, &mut target);
 
@@ -1669,7 +1776,7 @@ pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
                 // start regenerating the armor
                 crate::NPC_utils::NPC_SetSurfaceOnOff(
                     ctx,
-                    npc_ent,
+                    ctx.entity_id_of(npc_ent).unwrap(),
                     c"torso_shield".as_ptr(),
                     TURN_OFF,
                 );
@@ -1716,7 +1823,7 @@ pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
                                                      // NPC->fx_time = level.time;
                     crate::NPC_utils::NPC_SetSurfaceOnOff(
                         ctx,
-                        npc_ent,
+                        ctx.entity_id_of(npc_ent).unwrap(),
                         c"torso_shield".as_ptr(),
                         TURN_ON,
                     );

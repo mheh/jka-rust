@@ -124,7 +124,7 @@ pub fn NPC_Blocked(ctx: GameContext<'_>, self_: *mut gentity_t, blocker: *mut ge
         // Attempt to run any blocked scripts
         // PORT-NOTE(missing-const): BSET_BLOCKED (bset_t enum value) not
         // resolved anywhere in the crate graph; written as cited.
-        if G_ActivateBehavior(ctx, self_, BSET_BLOCKED as c_int) != 0 {
+        if G_ActivateBehavior(ctx, ctx.entity_id_of(self_), BSET_BLOCKED as c_int) != 0 {
             return;
         }
 
@@ -133,7 +133,11 @@ pub fn NPC_Blocked(ctx: GameContext<'_>, self_: *mut gentity_t, blocker: *mut ge
             let blocker_client = (*blocker).client as *mut gclient_t;
             let self_client = (*self_).client as *mut gclient_t;
             if (*blocker_client).playerTeam == (*self_client).enemyTeam {
-                G_SetEnemy(ctx, self_, blocker);
+                G_SetEnemy(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    ctx.entity_id_of(blocker),
+                );
                 return;
             }
         }
@@ -929,7 +933,7 @@ pub fn NAV_ResolveBlock(
 
         // For now, just complain about it
         NPC_Blocked(ctx, self_, blocker);
-        NPC_FaceEntity(ctx, blocker, qtrue);
+        NPC_FaceEntity(ctx, ctx.entity_id_of(blocker), qtrue);
 
         qfalse
     }
@@ -1137,7 +1141,7 @@ pub fn NAV_ResolveEntityCollision(
         // See if we can get around the blocker at all (only for player!)
         if (*blocker).s.number == 0 && NAV_StackedCanyon(ctx, self_, blocker, pathDir) != 0 {
             NPC_Blocked(ctx, self_, blocker);
-            NPC_FaceEntity(ctx, blocker, qtrue);
+            NPC_FaceEntity(ctx, ctx.entity_id_of(blocker), qtrue);
             return qfalse;
         }
 
@@ -1188,7 +1192,7 @@ pub fn NAV_TestForBlocked(
 
             if distance <= MIN_STOP_DIST as f32 {
                 NPC_Blocked(ctx, self_, blocker);
-                NPC_FaceEntity(ctx, blocker, qtrue);
+                NPC_FaceEntity(ctx, ctx.entity_id_of(blocker), qtrue);
                 return qtrue;
             }
         }

@@ -159,7 +159,7 @@ pub fn NPC_Grenadier_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentit
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).squadState = SQUAD_IDLE;
         (*npc).tempBehavior = bState_t::BS_DEFAULT;
-        G_ClearEnemy(ctx, self_); // FIXME: or just self->enemy = NULL;? (Raven comment).
+        G_ClearEnemy(ctx, ctx.entity_id_of(self_).unwrap()); // FIXME: or just self->enemy = NULL;? (Raven comment).
         (*npc).investigateCount = 0;
     }
 }
@@ -190,7 +190,12 @@ pub fn NPC_Grenadier_Pain(
             2000,
         );
 
-        NPC_Pain(ctx, self_, attacker, damage);
+        NPC_Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        );
 
         if damage == 0 && (*self_).health > 0 {
             // FIXME: better way to know I was pushed (Raven comment).
@@ -378,8 +383,10 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
                                 // an enemy
                                 G_SetEnemy(
                                     ctx,
-                                    npc_ptr,
-                                    world.level.alertEvents[alertEvent as usize].owner,
+                                    ctx.entity_id_of(npc_ptr).unwrap(),
+                                    ctx.entity_id_of(
+                                        world.level.alertEvents[alertEvent as usize].owner,
+                                    ),
                                 );
                                 TIMER_Set(
                                     ctx,
@@ -767,7 +774,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
         }
 
         // can we see our target?
-        if NPC_ClearLOS4(ctx, enemy_ent) != qfalse {
+        if NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ent)) != qfalse {
             (*npc_info_ptr).enemyLastSeenTime = world.level.time;
             world.globals.enemyLOS3 = qtrue;
 
@@ -798,7 +805,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
             {
                 // in front of me
                 // can we shoot our target?
-                let hit = NPC_ShotEntity(ctx, enemy_ent, None);
+                let hit = NPC_ShotEntity(ctx, ctx.entity_id_of(enemy_ent), None);
                 let hit_ent = &world.g_entities[hit as usize];
                 if hit == (*enemy_ent).s.number
                     || (!hit_ent.client.is_null()

@@ -7,9 +7,25 @@
 //! `NPCInfo`, `level`) or engine traps (`trap_ICARUS_TaskIDComplete`)
 //! without a `GameWorld`/engine handle on the staged raw-pointer skeleton
 //! are parked; only the pure-logic bounds-overlap checker is ported.
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
+//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
+//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
+//! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+
+/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
+/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -17,7 +33,9 @@ use crate::prelude::*;
 /// Raven `SetGoal`.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:10-24`
-pub fn SetGoal(ctx: GameContext<'_>, goal: *mut gentity_t, rating: f32) {
+pub fn SetGoal(ctx: GameContext<'_>, goal: Option<EntityId>, rating: f32) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
     unsafe {
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
         npc_info.goalEntity = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), goal);
@@ -28,7 +46,9 @@ pub fn SetGoal(ctx: GameContext<'_>, goal: *mut gentity_t, rating: f32) {
 /// Raven `NPC_SetGoal`.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:31-58`
-pub fn NPC_SetGoal(ctx: GameContext<'_>, goal: *mut gentity_t, rating: f32) {
+pub fn NPC_SetGoal(ctx: GameContext<'_>, goal: Option<EntityId>, rating: f32) {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
     unsafe {
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
         let entity_base = (*ctx.world).g_entities.as_mut_ptr();
@@ -50,7 +70,7 @@ pub fn NPC_SetGoal(ctx: GameContext<'_>, goal: *mut gentity_t, rating: f32) {
             npc_info.lastGoalEntity = npc_info.goalEntity;
         }
 
-        SetGoal(ctx, goal, rating);
+        SetGoal(ctx, ctx.entity_id_of(goal), rating);
     }
 }
 
@@ -62,7 +82,7 @@ pub fn NPC_ClearGoal(ctx: GameContext<'_>) {
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
 
         if npc_info.lastGoalEntity.is_none() {
-            SetGoal(ctx, core::ptr::null_mut(), 0.0);
+            SetGoal(ctx, ctx.entity_id_of(core::ptr::null_mut()), 0.0);
             return;
         }
 
@@ -74,12 +94,12 @@ pub fn NPC_ClearGoal(ctx: GameContext<'_>) {
             let goal = entity_base.add(goal_id.0 as usize);
 
             if (*goal).inuse != 0 && ((*goal).s.eFlags & EF_NODRAW) == 0 {
-                SetGoal(ctx, goal, 0.0);
+                SetGoal(ctx, ctx.entity_id_of(goal), 0.0);
                 return;
             }
         }
 
-        SetGoal(ctx, core::ptr::null_mut(), 0.0);
+        SetGoal(ctx, ctx.entity_id_of(core::ptr::null_mut()), 0.0);
     }
 }
 
@@ -147,7 +167,9 @@ pub fn NPC_ReachedGoal(ctx: GameContext<'_>) {
 /// logic is commented out; only the final nav-system check is active.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:136-231`
-pub fn ReachedGoal(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
+pub fn ReachedGoal(ctx: GameContext<'_>, goal: Option<EntityId>) -> qboolean {
+    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+    let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
     unsafe {
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
 
@@ -194,7 +216,7 @@ pub fn UpdateGoal(ctx: GameContext<'_>) -> *mut gentity_t {
             return core::ptr::null_mut();
         }
 
-        if ReachedGoal(ctx, goal) != 0 {
+        if ReachedGoal(ctx, ctx.entity_id_of(goal)) != 0 {
             NPC_ReachedGoal(ctx);
             return core::ptr::null_mut();
         }
