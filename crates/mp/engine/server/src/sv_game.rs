@@ -21,7 +21,7 @@ use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::pc_token_t;
 use mp_qshared::shared::q_math::{
-    AngleVectors, MatrixMultiply, PerpendicularVector, Sys_SnapVector,
+    vec3_origin, AngleVectors, MatrixMultiply, PerpendicularVector, Sys_SnapVector,
 };
 use mp_qshared::shared::surface_flags::CONTENTS_LIGHTSABER;
 use mp_qshared::shared::wpobject::wpobject_t;
@@ -475,7 +475,7 @@ pub fn SV_InitGameVM(view: &mut EngineHostView, sv: &mut Server, restart: qboole
         view.common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_INIT as c_int,
-        &[sv.svs.time, ms, restart as c_int],
+        &[sv.svs.time as isize, ms as isize, restart as isize],
     );
 
     let max_clients = unsafe { (*view.common.sv_maxclients).integer };
@@ -540,7 +540,7 @@ pub fn SV_RestartGameProgs(view: &mut EngineHostView, sv: &mut Server) {
         view.common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_SHUTDOWN as c_int,
-        &[qtrue as c_int],
+        &[qtrue as isize],
     );
 
     // do a restart instead of a free
@@ -681,6 +681,21 @@ unsafe fn vma(common: &Common, args: *mut isize, n: isize) -> *mut c_void {
 #[inline]
 unsafe fn vmf(args: *mut isize, n: isize) -> f32 {
     f32::from_bits(*args.offset(n) as u32)
+}
+
+/// Nullable `vec3_t` arg word for the trace arms. Raven's `SV_Trace` accepts
+/// NULL `mins`/`maxs` and substitutes `vec3_origin` (`sv_world.cpp:816-822`);
+/// our `SV_Trace` takes them by value, so the substitution lives at this seam,
+/// where the game module's `trap_Trace(…, NULL, NULL, …)` (bot AI) still
+/// delivers a null word.
+#[inline]
+unsafe fn vma_vec3_or_origin(common: &Common, args: *mut isize, n: isize) -> vec3_t {
+    let p = vma(common, args, n) as *const vec3_t;
+    if p.is_null() {
+        vec3_origin
+    } else {
+        *p
+    }
 }
 
 /// Checked `(taskID_t)args[2]` conversion for the three `G_ICARUS_TASKID*` arms.
@@ -990,8 +1005,8 @@ pub fn SV_GameSystemCalls(
                 view,
                 vma(view.common, args, 1) as *mut mp_qshared::common::mp::trace_t::trace_t,
                 *(vma(view.common, args, 2) as *const vec3_t),
-                *(vma(view.common, args, 3) as *const vec3_t),
-                *(vma(view.common, args, 4) as *const vec3_t),
+                vma_vec3_or_origin(view.common, args, 3),
+                vma_vec3_or_origin(view.common, args, 4),
                 *(vma(view.common, args, 5) as *const vec3_t),
                 *args.offset(6) as c_int,
                 *args.offset(7) as c_int,
@@ -1005,8 +1020,8 @@ pub fn SV_GameSystemCalls(
                 view,
                 vma(view.common, args, 1) as *mut mp_qshared::common::mp::trace_t::trace_t,
                 *(vma(view.common, args, 2) as *const vec3_t),
-                *(vma(view.common, args, 3) as *const vec3_t),
-                *(vma(view.common, args, 4) as *const vec3_t),
+                vma_vec3_or_origin(view.common, args, 3),
+                vma_vec3_or_origin(view.common, args, 4),
                 *(vma(view.common, args, 5) as *const vec3_t),
                 *args.offset(6) as c_int,
                 *args.offset(7) as c_int,
@@ -1020,8 +1035,8 @@ pub fn SV_GameSystemCalls(
                 view,
                 vma(view.common, args, 1) as *mut mp_qshared::common::mp::trace_t::trace_t,
                 *(vma(view.common, args, 2) as *const vec3_t),
-                *(vma(view.common, args, 3) as *const vec3_t),
-                *(vma(view.common, args, 4) as *const vec3_t),
+                vma_vec3_or_origin(view.common, args, 3),
+                vma_vec3_or_origin(view.common, args, 4),
                 *(vma(view.common, args, 5) as *const vec3_t),
                 *args.offset(6) as c_int,
                 *args.offset(7) as c_int,
@@ -3692,7 +3707,7 @@ pub fn SV_ShutdownGameProgs_body(common: &mut Common, sv: &mut Server) {
         common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_SHUTDOWN as c_int,
-        &[qfalse as c_int],
+        &[qfalse as isize],
     );
     mp_engine_qcommon::vm_fns::VM_Free(common, sv.gvm);
     sv.gvm = core::ptr::null_mut();

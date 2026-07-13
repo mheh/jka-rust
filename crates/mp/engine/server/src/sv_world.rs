@@ -930,13 +930,11 @@ pub fn SV_Trace(
     traceFlags: c_int,
     useLod: c_int,
 ) {
-    // PORT-NOTE(nullable-vec3): Raven's `!mins`/`!maxs` guard tests a
-    // possibly-NULL `const vec3_t` pointer; the resolved signature takes
-    // `mins`/`maxs` by value (`vec3_t` is `[f32; 3]`, never null in the
-    // by-value seam), so the null-substitution branch is unreachable here —
-    // no divergent behavior since callers can no longer pass NULL.
-    let mins = mins;
-    let maxs = maxs;
+    // PORT-NOTE(nullable-vec3): Raven's `!mins`/`!maxs` → vec3_origin guard
+    // tests possibly-NULL `const vec3_t` pointers; the resolved signature takes
+    // `mins`/`maxs` by value, so the substitution moved to the G_TRACE/
+    // G_G2TRACE/G_TRACECAPSULE syscall arms (`sv_game.rs vma_vec3_or_origin`),
+    // where the game module's NULL word still arrives (bot-AI trap_Trace).
 
     unsafe {
         let mut clip: moveclip_t = core::mem::zeroed();

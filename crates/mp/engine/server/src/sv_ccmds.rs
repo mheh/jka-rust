@@ -976,7 +976,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
             view.common,
             sv.gvm,
             mp_abi::game::exports::MpGameExport::GAME_RUN_FRAME as c_int,
-            &[sv.svs.time],
+            &[sv.svs.time as isize],
         );
         sv.svs.time += 100;
     }
@@ -1007,7 +1007,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
             view.common,
             sv.gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_CONNECT as c_int,
-            &[i, qfalse as c_int, isBot as c_int],
+            &[i as isize, qfalse as isize, isBot as isize],
         );
         let denied = VM_ExplicitArgPtr(view.common, sv.gvm, connect_ret) as *mut c_char;
         if !denied.is_null() {
@@ -1038,7 +1038,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
         view.common,
         sv.gvm,
         mp_abi::game::exports::MpGameExport::GAME_RUN_FRAME as c_int,
-        &[sv.svs.time],
+        &[sv.svs.time as isize],
     );
     sv.svs.time += 100;
 }

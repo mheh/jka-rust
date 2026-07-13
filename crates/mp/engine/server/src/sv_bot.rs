@@ -367,7 +367,7 @@ pub fn SV_BotWaypointReception(sv: &mut Server, wpnum: c_int, wps: *mut *mut wpo
     let mut i: c_int = 0;
     while i < sv.bot.gWPNum {
         let wp = unsafe { *wps.offset(i as isize) };
-        sv.bot.gWPArray[i as usize] = BotVMShift(sv.gvm, wp as usize as c_int) as *mut wpobject_t;
+        sv.bot.gWPArray[i as usize] = BotVMShift(sv.gvm, wp as isize) as *mut wpobject_t;
         i += 1;
     }
 }
@@ -542,7 +542,7 @@ pub fn SV_BotFrame(common: &mut Common, sv: &mut Server, time: c_int) {
         common,
         sv.gvm,
         MpGameExport::BOTAI_START_FRAME as c_int,
-        &[time],
+        &[time as isize],
     );
 }
 

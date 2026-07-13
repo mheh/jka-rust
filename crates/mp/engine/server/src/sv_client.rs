@@ -285,7 +285,7 @@ pub fn SV_ClientEnterWorld(
             common,
             sv.gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_BEGIN as c_int,
-            &[client_num],
+            &[client_num as isize],
         );
     }
 }
@@ -416,7 +416,7 @@ pub fn SV_UpdateUserinfo_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut 
             view.common,
             sv.gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_USERINFO_CHANGED as c_int,
-            &[client_num],
+            &[client_num as isize],
         );
     }
 }
@@ -502,7 +502,7 @@ pub fn SV_ExecuteClientCommand(
                 view.common,
                 sv.gvm,
                 mp_abi::game::exports::MpGameExport::GAME_CLIENT_COMMAND as c_int,
-                &[client_num],
+                &[client_num as isize],
             );
         }
     }
@@ -531,7 +531,7 @@ pub fn SV_ClientThink(
             common,
             sv.gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_THINK as c_int,
-            &[client_num],
+            &[client_num as isize],
         );
     }
 }
@@ -902,7 +902,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                         view.common,
                         sv.gvm,
                         mp_abi::game::exports::MpGameExport::GAME_CLIENT_DISCONNECT as c_int,
-                        &[cl_num],
+                        &[cl_num as isize],
                     );
                     found = true;
                     break;
@@ -1023,7 +1023,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             view.common,
             sv.gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_CONNECT as c_int,
-            &[client_num, qtrue as c_int, qfalse as c_int], // firstTime = qtrue
+            &[client_num as isize, qtrue as isize, qfalse as isize], // firstTime = qtrue
         );
         if denied != 0 {
             // we can't just use VM_ArgPtr, because that is only valid inside a VM_Call
@@ -1869,7 +1869,7 @@ pub fn SV_DropClient(
             common,
             sv.gvm,
             mp_abi::game::exports::MpGameExport::GAME_CLIENT_DISCONNECT as c_int,
-            &[drop_index as c_int],
+            &[drop_index as isize],
         );
 
         // add the disconnect command

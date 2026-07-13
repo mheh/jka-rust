@@ -765,7 +765,7 @@ pub fn SV_SpawnServer(
             view.common,
             sv.gvm,
             MpGameExport::GAME_RUN_FRAME as i32,
-            &[sv.svs.time],
+            &[sv.svs.time as isize],
         );
         SV_BotFrame(view.common, sv, sv.svs.time);
         sv.svs.time += 100;
@@ -797,7 +797,7 @@ pub fn SV_SpawnServer(
                     view.common,
                     sv.gvm,
                     MpGameExport::GAME_CLIENT_CONNECT as i32,
-                    &[i, 0, isBot as c_int],
+                    &[i as isize, 0, isBot as isize],
                 );
                 let denied = VM_ExplicitArgPtr(view.common, sv.gvm, connect_ret) as *mut c_char;
                 if !denied.is_null() {
@@ -821,7 +821,7 @@ pub fn SV_SpawnServer(
                         view.common,
                         sv.gvm,
                         MpGameExport::GAME_CLIENT_BEGIN as i32,
-                        &[i],
+                        &[i as isize],
                     );
                 }
             }
@@ -833,7 +833,7 @@ pub fn SV_SpawnServer(
         view.common,
         sv.gvm,
         MpGameExport::GAME_RUN_FRAME as i32,
-        &[sv.svs.time],
+        &[sv.svs.time as isize],
     );
     SV_BotFrame(view.common, sv, sv.svs.time);
     sv.svs.time += 100;

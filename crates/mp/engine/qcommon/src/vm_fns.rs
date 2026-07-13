@@ -231,8 +231,12 @@ pub fn VM_ArgPtrWord(common: &Common, value: isize) -> *mut () {
 /// `BotVMShift`.
 ///
 /// Raven: `gvm` — "always using the game vm here."
+///
+/// Raven's `int ptr` is 32-bit-era; on LP64 the native-dll arm carries a full
+/// pointer word (game waypoint addresses), so `isize`.
+///
 /// Source: `oracle/codemp/qcommon/vm.cpp:657-677`
-pub fn BotVMShift(gvm: *mut vm_t, ptr: c_int) -> *mut () {
+pub fn BotVMShift(gvm: *mut vm_t, ptr: isize) -> *mut () {
     if ptr == 0 {
         return core::ptr::null_mut();
     }
@@ -241,17 +245,20 @@ pub fn BotVMShift(gvm: *mut vm_t, ptr: c_int) -> *mut () {
     }
     unsafe {
         if !(*gvm).entryPoint.is_none() {
-            ((*gvm).dataBase as isize + ptr as isize) as *mut ()
+            ((*gvm).dataBase as isize + ptr) as *mut ()
         } else {
-            ((*gvm).dataBase as isize + (ptr & (*gvm).dataMask) as isize) as *mut ()
+            ((*gvm).dataBase as isize + (ptr & (*gvm).dataMask as isize)) as *mut ()
         }
     }
 }
 
 /// `VM_ExplicitArgPtr`.
 ///
+/// Raven's `int intValue` is 32-bit-era; on LP64 the native-dll arm carries a
+/// full pointer word (the `GAME_CLIENT_CONNECT` denied string), so `isize`.
+///
 /// Source: `oracle/codemp/qcommon/vm.cpp:742-758`
-pub fn VM_ExplicitArgPtr(common: &mut Common, vm: *mut vm_t, intValue: c_int) -> *mut () {
+pub fn VM_ExplicitArgPtr(common: &mut Common, vm: *mut vm_t, intValue: isize) -> *mut () {
     if intValue == 0 {
         return core::ptr::null_mut();
     }
@@ -261,9 +268,9 @@ pub fn VM_ExplicitArgPtr(common: &mut Common, vm: *mut vm_t, intValue: c_int) ->
     }
     unsafe {
         if !(*vm).entryPoint.is_none() {
-            ((*vm).dataBase as isize + intValue as isize) as *mut ()
+            ((*vm).dataBase as isize + intValue) as *mut ()
         } else {
-            ((*vm).dataBase as isize + (intValue & (*vm).dataMask) as isize) as *mut ()
+            ((*vm).dataBase as isize + (intValue & (*vm).dataMask as isize)) as *mut ()
         }
     }
 }
@@ -860,8 +867,12 @@ pub fn VM_Create(
 /// of the native-dll build (MP ships native modules), so a non-native `vm` is a
 /// fatal misconfiguration here.
 ///
+/// Raven's `int` arg/return words are a 32-bit-era assumption; on LP64 they
+/// truncate pointer-carrying words (`GAME_NAV_*` vec3 args, the
+/// `GAME_CLIENT_CONNECT` denied-string return), so the words are `isize` here.
+///
 /// Source: `oracle/codemp/qcommon/vm.cpp:787-819`
-pub fn VM_Call(common: &mut Common, vm: *mut vm_t, callnum: c_int, args: &[c_int]) -> c_int {
+pub fn VM_Call(common: &mut Common, vm: *mut vm_t, callnum: c_int, args: &[isize]) -> isize {
     if vm.is_null() {
         crate::common::com_error(errorParm_t::ERR_FATAL, "VM_Call with NULL vm".to_string());
     }
@@ -881,15 +892,15 @@ pub fn VM_Call(common: &mut Common, vm: *mut vm_t, callnum: c_int, args: &[c_int
         // if we have a dll loaded, call it directly (native arm, vm.cpp:806-816)
         let r = if let Some(entry) = (*vm).entryPoint {
             // Fixed-arity RawVmMain (the widened vmMain dual): command stays
-            // c_int, the 12 arg words widen to AbiWord — matching the module
+            // c_int, the 12 arg words are AbiWord-width — matching the module
             // export register-for-register.
             let mut a = [0 as isize; 12];
             for (i, v) in args.iter().take(12).enumerate() {
-                a[i] = *v as isize;
+                a[i] = *v;
             }
             entry(
                 callnum, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11],
-            ) as c_int
+            )
         } else {
             // The QVM `VM_CallCompiled`/`VM_CallInterpreted` arms are dead
             // surface in the native-dll build (§20): no bytecode VM is ever

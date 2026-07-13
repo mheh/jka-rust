@@ -1115,7 +1115,7 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
                 view.common,
                 sv.gvm,
                 MpGameExport::GAME_RUN_FRAME as c_int,
-                &[sv.svs.time],
+                &[sv.svs.time as isize],
             );
         }
         //rww - RAGDOLL_BEGIN
