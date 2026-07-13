@@ -498,11 +498,9 @@ pub fn SV_ClearWorld(cm: &mut CollisionWorld, sv: &mut Server) {
 
     // get world map bounds
     let h = mp_engine_qcommon::cm_load::CM_InlineModel(cm, 0);
-    let mins: vec3_t = [0.0; 3];
-    let maxs: vec3_t = [0.0; 3];
-    // CM_ModelBounds now takes mins/maxs by value (shape-mismatch out-param
-    // documented at its definition, cm_load.rs); reconciled call, no write-back.
-    mp_engine_qcommon::cm_load::CM_ModelBounds(cm, h, mins, maxs);
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
+    mp_engine_qcommon::cm_load::CM_ModelBounds(cm, h, &mut mins, &mut maxs);
     SV_CreateworldSector(sv, 0, mins, maxs);
 }
 

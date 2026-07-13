@@ -946,8 +946,8 @@ pub fn CM_TestCapsuleInCapsule(
     model: clipHandle_t,
 ) {
     unsafe {
-        let mins: vec3_t = [0.0; 3];
-        let maxs: vec3_t = [0.0; 3];
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
         let mut top: vec3_t = [0.0; 3];
         let mut bottom: vec3_t = [0.0; 3];
         let mut p1: vec3_t = [0.0; 3];
@@ -956,10 +956,7 @@ pub fn CM_TestCapsuleInCapsule(
         let mut offset: vec3_t = [0.0; 3];
         let mut symetricSize: vec3pair_t = [[0.0; 3]; 2];
 
-        // PORT-NOTE(shape-mismatch): `CM_ModelBounds`'s LAW signature (cm_load.rs)
-        // takes `mins`/`maxs` by value (documented out-param non-propagation);
-        // call bent to match — the fill does not write back here.
-        CM_ModelBounds(cm, model, mins, maxs);
+        CM_ModelBounds(cm, model, &mut mins, &mut maxs);
 
         VectorAdd((*tw).start, (*tw).sphere.offset, &mut top);
         VectorSubtract((*tw).start, (*tw).sphere.offset, &mut bottom);
@@ -1033,16 +1030,13 @@ pub fn CM_TestBoundingBoxInCapsule(
     model: clipHandle_t,
 ) {
     unsafe {
-        let mins: vec3_t = [0.0; 3];
-        let maxs: vec3_t = [0.0; 3];
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
         let mut offset: vec3_t = [0.0; 3];
         let mut size: vec3pair_t = [[0.0; 3]; 2];
 
         // mins maxs of the capsule
-        // PORT-NOTE(shape-mismatch): `CM_ModelBounds`'s LAW signature (cm_load.rs)
-        // takes `mins`/`maxs` by value (documented out-param non-propagation);
-        // call bent to match — the fill does not write back here.
-        CM_ModelBounds(view.cm, model, mins, maxs);
+        CM_ModelBounds(view.cm, model, &mut mins, &mut maxs);
 
         // offset for capsule center
         for i in 0..3 {
@@ -1111,8 +1105,8 @@ pub fn CM_TraceCapsuleThroughCapsule(
     model: clipHandle_t,
 ) {
     unsafe {
-        let mins: vec3_t = [0.0; 3];
-        let maxs: vec3_t = [0.0; 3];
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
         let mut top: vec3_t = [0.0; 3];
         let mut bottom: vec3_t = [0.0; 3];
         let mut starttop: vec3_t = [0.0; 3];
@@ -1122,10 +1116,7 @@ pub fn CM_TraceCapsuleThroughCapsule(
         let mut offset: vec3_t = [0.0; 3];
         let mut symetricSize: vec3pair_t = [[0.0; 3]; 2];
 
-        // PORT-NOTE(shape-mismatch): `CM_ModelBounds`'s LAW signature (cm_load.rs)
-        // takes `mins`/`maxs` by value (documented out-param non-propagation);
-        // call bent to match — the fill does not write back here.
-        CM_ModelBounds(cm, model, mins, maxs);
+        CM_ModelBounds(cm, model, &mut mins, &mut maxs);
         // test trace bounds vs. capsule bounds
         if (*tw).bounds[0][0] > maxs[0] + RADIUS_EPSILON
             || (*tw).bounds[0][1] > maxs[1] + RADIUS_EPSILON
@@ -1347,16 +1338,13 @@ pub fn CM_TraceBoundingBoxThroughCapsule(
     model: clipHandle_t,
 ) {
     unsafe {
-        let mins: vec3_t = [0.0; 3];
-        let maxs: vec3_t = [0.0; 3];
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
         let mut offset: vec3_t = [0.0; 3];
         let mut size: vec3pair_t = [[0.0; 3]; 2];
 
         // mins maxs of the capsule
-        // PORT-NOTE(shape-mismatch): `CM_ModelBounds`'s LAW signature (cm_load.rs)
-        // takes `mins`/`maxs` by value (documented out-param non-propagation);
-        // call bent to match — the fill does not write back here.
-        CM_ModelBounds(view.cm, model, mins, maxs);
+        CM_ModelBounds(view.cm, model, &mut mins, &mut maxs);
 
         // offset for capsule center
         for i in 0..3 {

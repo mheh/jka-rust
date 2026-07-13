@@ -996,19 +996,23 @@ pub fn CMod_LoadVisibility(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut
     }
 }
 
-/// Raven `CM_ModelBounds`.
+/// Raven `CM_ModelBounds` — real out-params: the mechanically-resolved
+/// by-value shape silently dropped the bounds, zeroing every brush entity's
+/// `r.mins`/`r.maxs` and the world-sector tree (found live: dead
+/// `trigger_hurt` volumes, 2026-07-13).
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:1020-1026`
-pub fn CM_ModelBounds(cm: &mut CollisionWorld, model: clipHandle_t, mins: vec3_t, maxs: vec3_t) {
+pub fn CM_ModelBounds(
+    cm: &mut CollisionWorld,
+    model: clipHandle_t,
+    mins: &mut vec3_t,
+    maxs: &mut vec3_t,
+) {
     unsafe {
         let cmod = CM_ClipHandleToModel(cm, model, core::ptr::null_mut());
-        let _mins = (*cmod).mins;
-        let _maxs = (*cmod).maxs;
+        *mins = (*cmod).mins;
+        *maxs = (*cmod).maxs;
     }
-    // PORT-NOTE(shape-mismatch): `mins`/`maxs` are plain `vec3_t` (by value)
-    // per the mechanically-resolved out-param convention (see
-    // `CM_GetWorldBounds`); the write does not propagate to the caller in
-    // this shape (reported in shape_mismatches).
 }
 
 /// Raven `CM_ModelContents_Actual`.
