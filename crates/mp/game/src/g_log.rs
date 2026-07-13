@@ -171,6 +171,12 @@ pub fn G_LogWeaponPowerup(ctx: GameContext<'_>, client: c_int, powerupid: c_int)
     if client >= MAX_CLIENTS as c_int {
         return;
     }
+    // Divergence (§19): Raven sizes this array `[HI_NUM_HOLDABLE]` but the
+    // caller passes PW_* ids (`g_items.c:2035`) — the late PW values are an
+    // OOB write into adjacent statics (stats-dump-only effect); skip instead.
+    if powerupid as usize >= HI_NUM_HOLDABLE as usize {
+        return;
+    }
     unsafe {
         let g = &mut (*ctx.world).globals;
         g.G_WeaponLogPowerups[client as usize][powerupid as usize] += 1;
