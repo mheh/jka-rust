@@ -3924,7 +3924,7 @@ pub fn Cmd_SetViewpos_f(ctx: GameContext<'_>, ent: EntityId) {
         );
         angles[YAW as usize] = crate::bg_lib::atof(buffer.as_ptr()) as f32;
 
-        crate::g_misc::TeleportPlayer(ctx, ent, origin, angles);
+        crate::g_misc::TeleportPlayer(ctx, ctx.entity_id_of(ent).unwrap(), origin, angles);
     }
 }
 

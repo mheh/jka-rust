@@ -12,6 +12,7 @@
 use crate::prelude::*;
 
 use crate::ent_fn_enums::{EntDie, EntThink, EntTouch, EntUse};
+use crate::ent_id::resolve;
 use crate::g_client::SetClientViewAngle;
 use crate::g_combat::AddScore;
 use crate::g_exphysics::G_RunExPhys;
@@ -94,10 +95,10 @@ impl Default for shooterClient_t {
 /// Used as a positional target for calculations in the utilities
 /// (spotlights, etc), but removed during gameplay.
 /// Source: `oracle/codemp/game/g_misc.c:25-27`
-pub fn SP_info_camp(self_: *mut gentity_t) {
-    unsafe {
-        G_SetOrigin(&mut *(self_), (*self_).s.origin);
-    }
+pub fn SP_info_camp(self_: &mut gentity_t) {
+    // STAGE-1: ctx-free leaf borrows &mut gentity_t (Stage-1 rule 2).
+    let origin = self_.s.origin;
+    G_SetOrigin(self_, origin);
 }
 
 /// Raven `SP_info_null`.
@@ -105,8 +106,8 @@ pub fn SP_info_camp(self_: *mut gentity_t) {
 /// Used as a positional target for calculations in the utilities
 /// (spotlights, etc), but removed during gameplay.
 /// Source: `oracle/codemp/game/g_misc.c:33-35`
-pub fn SP_info_null(ctx: GameContext<'_>, self_: *mut gentity_t) {
-    G_FreeEntity(ctx, ctx.entity_id_of(self_));
+pub fn SP_info_null(ctx: GameContext<'_>, self_: EntityId) {
+    G_FreeEntity(ctx, Some(self_));
 }
 
 /// Raven `SP_info_notnull`.
@@ -114,16 +115,19 @@ pub fn SP_info_null(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Used as a positional target for in-game calculation, like jumppad
 /// targets. `target_position` does the same thing.
 /// Source: `oracle/codemp/game/g_misc.c:42-44`
-pub fn SP_info_notnull(self_: *mut gentity_t) {
-    unsafe {
-        G_SetOrigin(&mut *(self_), (*self_).s.origin);
-    }
+pub fn SP_info_notnull(self_: &mut gentity_t) {
+    // STAGE-1: ctx-free leaf borrows &mut gentity_t (Stage-1 rule 2).
+    let origin = self_.s.origin;
+    G_SetOrigin(self_, origin);
 }
 
 /// Raven `misc_lightstyle_set`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:86-132`
-pub fn misc_lightstyle_set(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn misc_lightstyle_set(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_abi::game::syscalls::G_GET_CONFIGSTRING::GGetConfigstringArgs;
     use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
     unsafe {
@@ -211,10 +215,16 @@ pub fn misc_lightstyle_set(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:134-140`
 pub fn misc_dlight_use(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId ent + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     unsafe {
         G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
         (*ent).alt_fire = if (*ent).alt_fire != qfalse {
@@ -222,14 +232,17 @@ pub fn misc_dlight_use(
         } else {
             qtrue
         };
-        misc_lightstyle_set(ctx, ent);
+        misc_lightstyle_set(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }
 
 /// Raven `SP_light`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:142-166`
-pub fn SP_light(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_light(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+
     unsafe {
         if (*self_).targetname.is_null() {
             // if i don't have a light style switch, then i go away
@@ -268,19 +281,17 @@ pub fn SP_light(ctx: GameContext<'_>, self_: *mut gentity_t) {
             // turn myself on now
             (*self_).alt_fire = qtrue;
         }
-        misc_lightstyle_set(ctx, self_);
+        misc_lightstyle_set(ctx, ctx.entity_id_of(self_).unwrap());
     }
 }
 
 /// Raven `TeleportPlayer`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:177-231`
-pub fn TeleportPlayer(
-    ctx: GameContext<'_>,
-    player: *mut gentity_t,
-    origin: vec3_t,
-    angles: vec3_t,
-) {
+pub fn TeleportPlayer(ctx: GameContext<'_>, player: EntityId, origin: vec3_t, angles: vec3_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let player: *mut gentity_t = ctx.entity_mut(player);
+
     use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
     use mp_bg::public::team::TEAM_SPECTATOR;
     unsafe {
@@ -361,21 +372,27 @@ pub fn TeleportPlayer(
 /// Point teleporters at these. Now that we don't have teleport destination
 /// pads, this is just an info_notnull.
 /// Source: `oracle/codemp/game/g_misc.c:239-240`
-pub fn SP_misc_teleporter_dest(ent: *mut gentity_t) {}
+pub fn SP_misc_teleporter_dest(ent: &mut gentity_t) {}
 
 /// Raven `SP_misc_model`.
 ///
 /// The live (non-`#if 0`) path just frees the entity — map triangle
 /// generation was compiled out.
 /// Source: `oracle/codemp/game/g_misc.c:249-262`
-pub fn SP_misc_model(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_model(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 
 /// Raven `SP_misc_model_static`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:277-280`
-pub fn SP_misc_model_static(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_model_static(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 
@@ -383,14 +400,20 @@ pub fn SP_misc_model_static(ctx: GameContext<'_>, ent: *mut gentity_t) {
 ///
 /// The live (non-`#if 0`) path just frees the entity.
 /// Source: `oracle/codemp/game/g_misc.c:285-301`
-pub fn SP_misc_G2model(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_G2model(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 
 /// Raven `locateCamera`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:305-349`
-pub fn locateCamera(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn locateCamera(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         let owner = G_PickTarget(ctx, (*ent).target);
         if owner.is_null() {
@@ -440,7 +463,10 @@ pub fn locateCamera(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_misc_portal_surface`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:355-369`
-pub fn SP_misc_portal_surface(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_portal_surface(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         (*ent).r.mins = [0.0, 0.0, 0.0];
         (*ent).r.maxs = [0.0, 0.0, 0.0];
@@ -462,7 +488,10 @@ pub fn SP_misc_portal_surface(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_misc_portal_camera`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:375-385`
-pub fn SP_misc_portal_camera(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_portal_camera(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         (*ent).r.mins = [0.0, 0.0, 0.0];
         (*ent).r.maxs = [0.0, 0.0, 0.0];
@@ -480,7 +509,10 @@ pub fn SP_misc_portal_camera(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_misc_bsp`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:390-462`
-pub fn SP_misc_bsp(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_bsp(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_abi::game::syscalls::G_SET_ACTIVE_SUBBSP::GSetActiveSubbspArgs;
     use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
     use mp_qshared::shared::MAX_QPATH;
@@ -579,7 +611,10 @@ pub fn SP_misc_bsp(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_terrain`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:484-631`
-pub fn SP_terrain(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_terrain(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_abi::game::syscalls::G_CM_REGISTER_TERRAIN::GCmRegisterTerrainArgs;
     use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
     use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
@@ -785,7 +820,10 @@ pub fn SP_terrain(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `G_PortalifyEntities`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:638-667`
-pub fn G_PortalifyEntities(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn G_PortalifyEntities(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD};
     unsafe {
         let mut i: usize = 0;
@@ -836,14 +874,20 @@ pub fn G_PortalifyEntities(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_misc_skyportal_orient`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:675-678`
-pub fn SP_misc_skyportal_orient(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_skyportal_orient(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 
 /// Raven `SP_misc_skyportal`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:694-715`
-pub fn SP_misc_skyportal(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_skyportal(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
     unsafe {
         let mut fov: *mut c_char = core::ptr::null_mut();
@@ -899,16 +943,18 @@ pub fn SP_misc_skyportal(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `HolocronRespawn`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:760-763`
-pub fn HolocronRespawn(self_: *mut gentity_t) {
-    unsafe {
-        (*self_).s.modelindex = (*self_).count - 128;
-    }
+pub fn HolocronRespawn(self_: &mut gentity_t) {
+    // STAGE-1: ctx-free leaf borrows &mut gentity_t (Stage-1 rule 2).
+    self_.s.modelindex = self_.count - 128;
 }
 
 /// Raven `HolocronPopOut`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:765-784`
-pub fn HolocronPopOut(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn HolocronPopOut(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+
     unsafe {
         if (*ctx.world).bg_state.rng.Q_irand(1, 10) < 5 {
             (*self_).s.pos.trDelta[0] = 150.0 + (*ctx.world).bg_state.rng.Q_irand(1, 100) as f32;
@@ -932,10 +978,15 @@ pub fn HolocronPopOut(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:786-905`
 pub fn HolocronTouch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> other; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
     unsafe {
         let mut i: c_int = 0;
@@ -1063,7 +1114,10 @@ pub fn HolocronTouch(
 /// Raven `HolocronThink`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:907-991`
-pub fn HolocronThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn HolocronThink(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         let base = (*ctx.world).g_entities.as_mut_ptr();
 
@@ -1089,7 +1143,7 @@ pub fn HolocronThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if let Some(e) = (*ent).enemy {
                 let enemy_ptr = base.add(e.index());
                 if !(*enemy_ptr).client.is_null() {
-                    HolocronRespawn(ent);
+                    HolocronRespawn(&mut *ent);
                     crate::q_math::_VectorCopy(
                         (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
                         &mut (*ent).s.pos.trBase,
@@ -1103,7 +1157,7 @@ pub fn HolocronThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         &mut (*ent).r.currentOrigin,
                     );
                     // copy to person carrying's origin before popping out of them
-                    HolocronPopOut(ctx, ent);
+                    HolocronPopOut(ctx, ctx.entity_id_of(ent).unwrap());
                     (*((*enemy_ptr).client as *mut gclient_t))
                         .ps
                         .holocronsCarried[(*ent).count as usize] = 0.0;
@@ -1136,7 +1190,7 @@ pub fn HolocronThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         .ps
                         .holocronCantTouchTime = ((*ctx.world).level.time + 5000) as f32;
 
-                    HolocronRespawn(ent);
+                    HolocronRespawn(&mut *ent);
                     crate::q_math::_VectorCopy(
                         (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
                         &mut (*ent).s.pos.trBase,
@@ -1150,7 +1204,7 @@ pub fn HolocronThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         &mut (*ent).r.currentOrigin,
                     );
                     // copy to person carrying's origin before popping out of them
-                    HolocronPopOut(ctx, ent);
+                    HolocronPopOut(ctx, ctx.entity_id_of(ent).unwrap());
                     (*ent).enemy = None;
 
                     justthink(ent, ctx);
@@ -1168,7 +1222,7 @@ pub fn HolocronThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                             .holocronsCarried[(*ent).count as usize] = 0.0;
                     }
                     (*ent).enemy = None;
-                    HolocronRespawn(ent);
+                    HolocronRespawn(&mut *ent);
                     crate::q_math::_VectorCopy((*ent).s.origin2, &mut (*ent).s.pos.trBase);
                     crate::q_math::_VectorCopy((*ent).s.origin2, &mut (*ent).s.origin);
                     crate::q_math::_VectorCopy((*ent).s.origin2, &mut (*ent).r.currentOrigin);
@@ -1205,7 +1259,10 @@ pub fn HolocronThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_misc_holocron`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:993-1097`
-pub fn SP_misc_holocron(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_holocron(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_bg::public::gametype::GT_HOLOCRON;
     unsafe {
         let mut dest: vec3_t;
@@ -1323,10 +1380,16 @@ pub fn SP_misc_holocron(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:1107-1139`
 pub fn Use_Shooter(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId ent + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     unsafe {
         let mut dir: vec3_t;
         let mut up: vec3_t = [0.0, 0.0, 0.0];
@@ -1382,7 +1445,10 @@ pub fn Use_Shooter(
 /// Raven `InitShooter_Finish`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1142-1146`
-pub fn InitShooter_Finish(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn InitShooter_Finish(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         (*ent).enemy = ent_id_opt(
             (*ctx.world).g_entities.as_mut_ptr(),
@@ -1396,7 +1462,10 @@ pub fn InitShooter_Finish(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `InitShooter`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1148-1166`
-pub fn InitShooter(ctx: GameContext<'_>, ent: *mut gentity_t, weapon: c_int) {
+pub fn InitShooter(ctx: GameContext<'_>, ent: EntityId, weapon: c_int) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         (*ent).use_ = Some(EntUse::Use_Shooter).into();
         (*ent).s.weapon = weapon;
@@ -1423,15 +1492,25 @@ pub fn InitShooter(ctx: GameContext<'_>, ent: *mut gentity_t, weapon: c_int) {
 /// Raven `SP_shooter_blaster`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1172-1174`
-pub fn SP_shooter_blaster(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    InitShooter(ctx, ent, mp_bg::weapons::weapon_t::WP_BLASTER);
+pub fn SP_shooter_blaster(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
+    InitShooter(
+        ctx,
+        ctx.entity_id_of(ent).unwrap(),
+        mp_bg::weapons::weapon_t::WP_BLASTER,
+    );
 }
 
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `check_recharge`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1176-1206`
-pub fn check_recharge(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn check_recharge(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_USE;
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
     unsafe {
@@ -1481,7 +1560,10 @@ pub fn check_recharge(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:1213-1223`
 // PORT-NOTE(unported-const): `STATION_RECHARGE_TIME` (`g_local.h`) has no
 // ported home anywhere in the crate graph; referenced verbatim.
-pub fn EnergyShieldStationSettings(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn EnergyShieldStationSettings(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         G_SpawnInt(
             ctx,
@@ -1508,10 +1590,16 @@ pub fn EnergyShieldStationSettings(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:1230-1328`
 pub fn shield_power_converter_use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     use mp_bg::public::gametype::GT_SIEGE;
     use mp_bg::public::stat_index::statIndex_t::{STAT_ARMOR, STAT_MAX_HEALTH};
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
@@ -1627,10 +1715,16 @@ pub fn shield_power_converter_use(
 /// Source: `oracle/codemp/game/g_misc.c:1331-1505`
 pub fn ammo_generic_power_converter_use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     use mp_bg::public::gametype::GT_SIEGE;
     use mp_bg::weapons::ammo_t::ammo_t::{AMMO_BLASTER, AMMO_MAX, AMMO_ROCKETS};
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
@@ -1746,7 +1840,10 @@ pub fn ammo_generic_power_converter_use(
 /// Raven `SP_misc_ammo_floor_unit`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1515-1592`
-pub fn SP_misc_ammo_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_ammo_floor_unit(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_bg::public::gametype::GT_SIEGE;
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
     unsafe {
@@ -1812,7 +1909,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).r.contents = CONTENTS_SOLID;
         (*ent).clipmask = MASK_SOLID;
 
-        EnergyShieldStationSettings(ctx, ent);
+        EnergyShieldStationSettings(ctx, ctx.entity_id_of(ent).unwrap());
 
         (*ent).genericValue4 = (*ent).count; // initial value
         (*ent).think = Some(EntThink::check_recharge).into();
@@ -1856,7 +1953,10 @@ pub fn SP_misc_ammo_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_misc_shield_floor_unit`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1602-1687`
-pub fn SP_misc_shield_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_shield_floor_unit(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_bg::public::gametype::{GT_CTF, GT_CTY, GT_SIEGE};
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
     unsafe {
@@ -1930,7 +2030,7 @@ pub fn SP_misc_shield_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).r.contents = CONTENTS_SOLID;
         (*ent).clipmask = MASK_SOLID;
 
-        EnergyShieldStationSettings(ctx, ent);
+        EnergyShieldStationSettings(ctx, ctx.entity_id_of(ent).unwrap());
 
         (*ent).genericValue4 = (*ent).count;
         (*ent).think = Some(EntThink::check_recharge).into();
@@ -1973,7 +2073,10 @@ pub fn SP_misc_shield_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_misc_model_shield_power_converter`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1697-1735`
-pub fn SP_misc_model_shield_power_converter(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_model_shield_power_converter(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
     unsafe {
         if (*ent).health == 0 {
@@ -1990,7 +2093,7 @@ pub fn SP_misc_model_shield_power_converter(ctx: GameContext<'_>, ent: *mut gent
         (*ent).r.contents = CONTENTS_SOLID;
         (*ent).clipmask = MASK_SOLID;
 
-        EnergyShieldStationSettings(ctx, ent);
+        EnergyShieldStationSettings(ctx, ctx.entity_id_of(ent).unwrap());
 
         (*ent).genericValue4 = (*ent).count;
         (*ent).think = Some(EntThink::check_recharge).into();
@@ -2022,7 +2125,10 @@ pub fn SP_misc_model_shield_power_converter(ctx: GameContext<'_>, ent: *mut gent
 // PORT-NOTE(seam-threading): faithful skeleton signature carries no
 // `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one —
 // how is state threaded in?
-pub fn EnergyAmmoStationSettings(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn EnergyAmmoStationSettings(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         G_SpawnInt(
             ctx,
@@ -2038,10 +2144,16 @@ pub fn EnergyAmmoStationSettings(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:1753-1853`
 pub fn ammo_power_converter_use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     use mp_bg::weapons::ammo_t::ammo_t::{AMMO_BLASTER, AMMO_MAX};
     unsafe {
         let mut add: c_int = 0;
@@ -2099,7 +2211,10 @@ pub fn ammo_power_converter_use(
 /// Raven `SP_misc_model_ammo_power_converter`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1864-1904`
-pub fn SP_misc_model_ammo_power_converter(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_model_ammo_power_converter(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
     unsafe {
         if (*ent).health == 0 {
@@ -2124,7 +2239,7 @@ pub fn SP_misc_model_ammo_power_converter(ctx: GameContext<'_>, ent: *mut gentit
         );
         (*ent).use_ = Some(EntUse::ammo_power_converter_use).into();
 
-        EnergyAmmoStationSettings(ctx, ent);
+        EnergyAmmoStationSettings(ctx, ctx.entity_id_of(ent).unwrap());
 
         (*ent).genericValue4 = (*ent).count;
         (*ent).think = Some(EntThink::check_recharge).into();
@@ -2153,7 +2268,10 @@ pub fn SP_misc_model_ammo_power_converter(ctx: GameContext<'_>, ent: *mut gentit
 // PORT-NOTE(seam-threading): faithful skeleton signature carries no
 // `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one —
 // how is state threaded in?
-pub fn EnergyHealthStationSettings(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn EnergyHealthStationSettings(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         G_SpawnInt(
             ctx,
@@ -2170,10 +2288,16 @@ pub fn EnergyHealthStationSettings(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:1921-1972`
 pub fn health_power_converter_use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     use mp_bg::public::stat_index::statIndex_t::STAT_MAX_HEALTH;
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
     unsafe {
@@ -2217,7 +2341,10 @@ pub fn health_power_converter_use(
 /// Raven `SP_misc_model_health_power_converter`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1982-2027`
-pub fn SP_misc_model_health_power_converter(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_model_health_power_converter(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_bg::public::gametype::GT_SIEGE;
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
     unsafe {
@@ -2237,7 +2364,7 @@ pub fn SP_misc_model_health_power_converter(ctx: GameContext<'_>, ent: *mut gent
 
         (*ent).use_ = Some(EntUse::health_power_converter_use).into();
 
-        EnergyHealthStationSettings(ctx, ent);
+        EnergyHealthStationSettings(ctx, ctx.entity_id_of(ent).unwrap());
 
         (*ent).genericValue4 = (*ent).count;
         (*ent).think = Some(EntThink::check_recharge).into();
@@ -2270,7 +2397,10 @@ pub fn SP_misc_model_health_power_converter(ctx: GameContext<'_>, ent: *mut gent
 /// Raven `fx_runner_think`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2266-2310`
-pub fn fx_runner_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn fx_runner_think(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         crate::bg_misc::BG_EvaluateTrajectory(
             &(*ent).s.pos as *const trajectory_t,
@@ -2340,10 +2470,16 @@ pub fn fx_runner_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:2313-2384`
 pub fn fx_runner_use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     unsafe {
         if (*self_).s.isPortalEnt != 0 {
             // rww - mark it as broadcast upon first use if it's within the area of a skyportal
@@ -2356,7 +2492,7 @@ pub fn fx_runner_use(
             //	make sure we aren't thinking at all.
             let save_state = (*self_).s.modelindex2 + 1;
 
-            fx_runner_think(ctx, self_);
+            fx_runner_think(ctx, ctx.entity_id_of(self_).unwrap());
             (*self_).nextthink = -1;
             // one shot indicator
             (*self_).s.modelindex2 = save_state;
@@ -2390,7 +2526,7 @@ pub fn fx_runner_use(
             if (*self_).nextthink == -1 {
                 // NOTE: we fire the effect immediately on use, the fx_runner_think func will set
                 //	up the nextthink time.
-                fx_runner_think(ctx, self_);
+                fx_runner_think(ctx, ctx.entity_id_of(self_).unwrap());
 
                 if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
                     (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
@@ -2427,7 +2563,10 @@ pub fn fx_runner_use(
 /// Raven `fx_runner_link`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2387-2453`
-pub fn fx_runner_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn fx_runner_link(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         let mut dir: vec3_t;
 
@@ -2508,7 +2647,10 @@ pub fn fx_runner_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_fx_runner`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2456-2501`
-pub fn SP_fx_runner(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_fx_runner(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         let mut fx_file: *mut c_char = core::ptr::null_mut();
 
@@ -2584,7 +2726,10 @@ pub fn SP_fx_runner(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_CreateSpaceDust`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2509-2513`
-pub fn SP_CreateSpaceDust(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_CreateSpaceDust(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         G_EffectIndex(cstr(&format!("*spacedust {}", (*ent).count)).as_ptr());
         //G_EffectIndex("*constantwind ( 10 -10 0 )");
@@ -2594,7 +2739,10 @@ pub fn SP_CreateSpaceDust(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_CreateSnow`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2522-2527`
-pub fn SP_CreateSnow(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_CreateSnow(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     G_EffectIndex(b"*snow\0".as_ptr() as *const c_char);
     G_EffectIndex(b"*fog\0".as_ptr() as *const c_char);
     G_EffectIndex(b"*constantwind (100 100 -100)\0".as_ptr() as *const c_char);
@@ -2603,7 +2751,10 @@ pub fn SP_CreateSnow(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_CreateRain`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2535-2538`
-pub fn SP_CreateRain(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_CreateRain(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         G_EffectIndex(cstr(&format!("*rain init {}", (*ent).count)).as_ptr());
     }
@@ -2614,10 +2765,16 @@ pub fn SP_CreateRain(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:2543-2553`
 pub fn Use_Target_Screenshake(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId ent + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     unsafe {
         let bGlobal: qboolean = if (*ent).genericValue6 != 0 {
             qtrue
@@ -2642,7 +2799,10 @@ pub fn Use_Target_Screenshake(
 /// Raven `SP_target_screenshake`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2555-2565`
-pub fn SP_target_screenshake(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_target_screenshake(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         G_SpawnFloat(
             ctx,
@@ -2674,10 +2834,16 @@ pub fn SP_target_screenshake(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:2569-2597`
 pub fn Use_Target_Escapetrig(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId ent + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     use mp_bg::public::team::TEAM_SPECTATOR;
     unsafe {
         if (*ent).genericValue6 == 0 {
@@ -2724,7 +2890,10 @@ pub fn Use_Target_Escapetrig(
 /// Raven `SP_target_escapetrig`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2599-2613`
-pub fn SP_target_escapetrig(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_target_escapetrig(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_bg::public::gametype::GT_SINGLE_PLAYER;
     unsafe {
         if (*ctx.world).cvars.g_gametype.integer != GT_SINGLE_PLAYER {
@@ -2757,12 +2926,18 @@ pub fn SP_target_escapetrig(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:2623-2640`
 pub fn maglock_die(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     r#mod: c_int,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> inflictor/attacker; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let inflictor: *mut gentity_t = unsafe { resolve(base, inflictor) };
+    let attacker: *mut gentity_t = unsafe { resolve(base, attacker) };
+
     use crate::entity::flags::FL_INACTIVE;
     unsafe {
         if let Some(door_id) = (*self_).activator {
@@ -2781,7 +2956,10 @@ pub fn maglock_die(
 /// Raven `SP_misc_maglock`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2645-2658`
-pub fn SP_misc_maglock(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_misc_maglock(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+
     unsafe {
         // NOTE: May have to make these only work on doors that are either untargeted
         //		or are targeted by a trigger, not doors fired off by scripts, counters
@@ -2802,7 +2980,10 @@ pub fn SP_misc_maglock(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `maglock_link`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2659-2728`
-pub fn maglock_link(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn maglock_link(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+
     use crate::q_math::vectoangles;
     use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
     use mp_qshared::shared::limits::ENTITYNUM_WORLD;
@@ -2898,10 +3079,15 @@ pub fn maglock_link(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:2730-2756`
 pub fn faller_touch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> other; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+
     use mp_qshared::shared::sound_channel::{CHAN_AUTO, CHAN_VOICE};
     unsafe {
         if (*self_).epVelocity[2] < -100.0 && (*self_).genericValue7 < (*ctx.world).level.time {
@@ -2939,7 +3125,10 @@ pub fn faller_touch(
 /// Raven `faller_think`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2758-2787`
-pub fn faller_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn faller_think(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use mp_qshared::shared::sound_channel::CHAN_VOICE;
     unsafe {
         let gravity: f32 = 3.0;
@@ -2990,10 +3179,16 @@ pub fn faller_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:2789-2828`
 pub fn misc_faller_create(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId ent + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     unsafe {
         let faller = G_Spawn(ctx);
 
@@ -3039,9 +3234,17 @@ pub fn misc_faller_create(
 /// Raven `misc_faller_think`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2830-2834`
-pub fn misc_faller_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn misc_faller_think(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
-        misc_faller_create(ctx, ent, ent, ent);
+        misc_faller_create(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            ctx.entity_id_of(ent),
+            ctx.entity_id_of(ent),
+        );
         (*ent).nextthink = (*ctx.world).level.time
             + (*ent).genericValue1
             + (*ctx.world).bg_state.rng.Q_irand(0, (*ent).genericValue2);
@@ -3053,7 +3256,10 @@ pub fn misc_faller_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_misc_faller`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2844-2865`
-pub fn SP_misc_faller(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_faller(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         G_ModelIndex(c"models/players/stormtrooper/model.glm".as_ptr());
         G_SoundIndex(c"sound/chars/stofficer1/misc/pain25".as_ptr());
@@ -3421,7 +3627,10 @@ pub fn TAG_GetFlags(ctx: GameContext<'_>, owner: *const c_char, name: *const c_c
 /// Raven `ref_link`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3267-3298`
-pub fn ref_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ref_link(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     use crate::q_math::vectoangles;
     unsafe {
         if !(*ent).target.is_null() {
@@ -3474,14 +3683,17 @@ pub fn ref_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_reference_tag`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3300-3312`
-pub fn SP_reference_tag(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_reference_tag(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         if !(*ent).target.is_null() {
             // Init cannot occur until all entities have been spawned
             (*ent).think = Some(EntThink::ref_link).into();
             (*ent).nextthink = (*ctx.world).level.time + START_TIME_LINK_ENTS;
         } else {
-            ref_link(ctx, ent);
+            ref_link(ctx, ctx.entity_id_of(ent).unwrap());
         }
     }
 }
@@ -3537,7 +3749,10 @@ pub fn G_FreeClientForShooter(ctx: GameContext<'_>, cl: *mut gclient_t) {
 /// Raven `misc_weapon_shooter_fire`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3391-3399`
-pub fn misc_weapon_shooter_fire(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn misc_weapon_shooter_fire(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+
     use crate::g_weapon::FireWeapon;
     unsafe {
         FireWeapon(
@@ -3557,10 +3772,16 @@ pub fn misc_weapon_shooter_fire(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_misc.c:3401-3415`
 pub fn misc_weapon_shooter_use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> other/activator; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
+
     unsafe {
         if (*self_).think.get() == Some(EntThink::misc_weapon_shooter_fire) {
             // repeating fire, stop
@@ -3573,14 +3794,17 @@ pub fn misc_weapon_shooter_use(
             return;
         }
         // otherwise, fire
-        misc_weapon_shooter_fire(ctx, self_);
+        misc_weapon_shooter_fire(ctx, ctx.entity_id_of(self_).unwrap());
     }
 }
 
 /// Raven `misc_weapon_shooter_aim`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3417-3438`
-pub fn misc_weapon_shooter_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn misc_weapon_shooter_aim(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+
     use crate::q_math::vectoangles;
     unsafe {
         // update my aim
@@ -3619,7 +3843,10 @@ pub fn misc_weapon_shooter_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `SP_misc_weapon_shooter`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3444-3486`
-pub fn SP_misc_weapon_shooter(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SP_misc_weapon_shooter(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+
     unsafe {
         // alloc a client just for the weapon code to use
         (*self_).client = G_ClientForShooter(ctx) as *mut c_void;
@@ -3674,7 +3901,10 @@ pub fn SP_misc_weapon_shooter(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `SP_misc_weather_zone`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3491-3494`
-pub fn SP_misc_weather_zone(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_weather_zone(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     G_FreeEntity(ctx, ctx.entity_id_of(ent));
 }
 

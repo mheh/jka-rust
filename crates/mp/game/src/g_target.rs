@@ -687,7 +687,7 @@ pub fn target_teleporter_use(
     }
 
     let (dest_origin, dest_angles) = unsafe { ((*dest).s.origin, (*dest).s.angles) };
-    TeleportPlayer(ctx, ctx.entity_mut(activator), dest_origin, dest_angles);
+    TeleportPlayer(ctx, activator, dest_origin, dest_angles);
 }
 
 /// Raven `SP_target_teleporter`.

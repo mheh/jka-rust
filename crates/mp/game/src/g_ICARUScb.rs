@@ -35,6 +35,7 @@ const VTYPE_STRING: c_int = 2;
 const VTYPE_VECTOR: c_int = 3;
 
 use crate::ent_fn_enums::{EntBlocked, EntReached, EntThink};
+use crate::ent_id::resolve;
 use crate::g_client::SetClientViewAngle;
 use crate::g_combat::{player_die, G_Damage};
 use crate::g_misc::{TAG_GetAngles, TAG_GetOrigin, TAG_GetOrigin2, TAG_GetRadius};
@@ -142,7 +143,10 @@ pub fn G_DebugPrint(
 /// Raven `Q3_GetAnimLower`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:331-344`
-pub fn Q3_GetAnimLower(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut c_char {
+pub fn Q3_GetAnimLower(ctx: GameContext<'_>, ent: EntityId) -> *mut c_char {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         if (*ent).client.is_null() {
             G_DebugPrint(
@@ -163,7 +167,10 @@ pub fn Q3_GetAnimLower(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut c_char
 /// Raven `Q3_GetAnimUpper`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:351-364`
-pub fn Q3_GetAnimUpper(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut c_char {
+pub fn Q3_GetAnimUpper(ctx: GameContext<'_>, ent: EntityId) -> *mut c_char {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         if (*ent).client.is_null() {
             G_DebugPrint(
@@ -184,10 +191,13 @@ pub fn Q3_GetAnimUpper(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut c_char
 /// Raven `Q3_GetAnimBoth`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:371-398`
-pub fn Q3_GetAnimBoth(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut c_char {
+pub fn Q3_GetAnimBoth(ctx: GameContext<'_>, ent: EntityId) -> *mut c_char {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
-        let lower_name = Q3_GetAnimLower(ctx, ent);
-        let upper_name = Q3_GetAnimUpper(ctx, ent);
+        let lower_name = Q3_GetAnimLower(ctx, ctx.entity_id_of(ent).unwrap());
+        let upper_name = Q3_GetAnimUpper(ctx, ctx.entity_id_of(ent).unwrap());
 
         if lower_name.is_null() || *lower_name == 0 {
             G_DebugPrint(
@@ -341,7 +351,10 @@ pub fn Q3_Play(
 ///
 /// Utility function.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:569-591`
-pub fn anglerCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn anglerCallback(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         trap::ICARUS_TaskIDComplete(
             ctx.engine,
@@ -377,7 +390,10 @@ pub fn anglerCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
 ///
 /// Utility function.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:603-633`
-pub fn moverCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn moverCallback(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     unsafe {
         trap::ICARUS_TaskIDComplete(
             ctx.engine,
@@ -414,7 +430,12 @@ pub fn moverCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `Blocked_Mover`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:635-658`
-pub fn Blocked_Mover(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) {
+pub fn Blocked_Mover(ctx: GameContext<'_>, ent: EntityId, other: Option<EntityId>) {
+    // STAGE-1: EntityId ent + Option<EntityId> other; raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+
     unsafe {
         // remove anything other than a client -- no longer the case
 
@@ -458,11 +479,14 @@ pub fn Blocked_Mover(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gent
 ///
 /// Utility function.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:667-673`
-pub fn moveAndRotateCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn moveAndRotateCallback(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+
     //stop turning
-    anglerCallback(ctx, ent);
+    anglerCallback(ctx, ctx.entity_id_of(ent).unwrap());
     //stop moving
-    moverCallback(ctx, ent);
+    moverCallback(ctx, ctx.entity_id_of(ent).unwrap());
 }
 
 /// Raven `Q3_Lerp2Start`.
@@ -825,7 +849,10 @@ pub fn Q3_Kill(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
 /// Raven `Q3_RemoveEnt`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1062-1116`
-pub fn Q3_RemoveEnt(ctx: GameContext<'_>, victim: *mut gentity_t) {
+pub fn Q3_RemoveEnt(ctx: GameContext<'_>, victim: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let victim: *mut gentity_t = ctx.entity_mut(victim);
+
     unsafe {
         if !(*victim).client.is_null() {
             if (*victim).s.eType != ET_NPC as c_int {
@@ -862,7 +889,7 @@ pub fn Q3_Remove(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"self\0".as_ptr() as *const c_char, name) == 0 {
-            Q3_RemoveEnt(ctx, ent);
+            Q3_RemoveEnt(ctx, ctx.entity_id_of(ent).unwrap());
         } else if Q_stricmp(b"enemy\0".as_ptr() as *const c_char, name) == 0 {
             let victim = (*ent).enemy;
             if victim.is_none() {
@@ -874,7 +901,7 @@ pub fn Q3_Remove(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
                 return;
             }
             let victim = &mut (*ctx.world).g_entities[victim.unwrap().0 as usize] as *mut gentity_t;
-            Q3_RemoveEnt(ctx, victim);
+            Q3_RemoveEnt(ctx, ctx.entity_id_of(victim).unwrap());
         } else {
             let mut victim = G_Find(
                 ctx,
@@ -891,7 +918,7 @@ pub fn Q3_Remove(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
                 return;
             }
             while !victim.is_null() {
-                Q3_RemoveEnt(ctx, victim);
+                Q3_RemoveEnt(ctx, ctx.entity_id_of(victim).unwrap());
                 victim = G_Find(
                     ctx,
                     ctx.entity_id_of(victim),
@@ -1296,7 +1323,7 @@ pub fn Q3_GetString(
 
         match toGet {
             _ if toGet == SET_ANIM_BOTH as i32 => {
-                *value = Q3_GetAnimBoth(ctx, ent);
+                *value = Q3_GetAnimBoth(ctx, ctx.entity_id_of(ent).unwrap());
                 if value.is_null() || (*value).is_null() {
                     return 0;
                 }
@@ -1529,7 +1556,10 @@ pub fn Q3_GetString(
 /// Raven `MoveOwner`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1865-1886`
-pub fn MoveOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn MoveOwner(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+
     unsafe {
         let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
@@ -3495,7 +3525,10 @@ pub fn Q3_SetNoAvoid(ctx: GameContext<'_>, entID: c_int, noAvoid: qboolean) {
 /// Raven `SolidifyOwner`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4271-4295`
-pub fn SolidifyOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn SolidifyOwner(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+
     unsafe {
         let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 

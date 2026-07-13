@@ -1458,7 +1458,12 @@ pub fn trigger_teleporter_touch(
             return;
         }
 
-        TeleportPlayer(ctx, other, (*dest).s.origin, (*dest).s.angles);
+        TeleportPlayer(
+            ctx,
+            ctx.entity_id_of(other).unwrap(),
+            (*dest).s.origin,
+            (*dest).s.angles,
+        );
     }
 }
 
@@ -2093,7 +2098,12 @@ pub fn hyperspace_touch(
                     ];
                     // now put them in the offset position, facing the angles
                     // that position wants them to be facing
-                    TeleportPlayer(ctx, other, new_org, (*ent).s.angles);
+                    TeleportPlayer(
+                        ctx,
+                        ctx.entity_id_of(other).unwrap(),
+                        new_org,
+                        (*ent).s.angles,
+                    );
                     if !(*other).m_pVehicle.is_null()
                         && !(*((*other).m_pVehicle as *mut Vehicle_t))
                             .m_pPilot
@@ -2102,7 +2112,11 @@ pub fn hyperspace_touch(
                         // teleport the pilot, too
                         TeleportPlayer(
                             ctx,
-                            (*((*other).m_pVehicle as *mut Vehicle_t)).m_pPilot as *mut gentity_t,
+                            ctx.entity_id_of(
+                                (*((*other).m_pVehicle as *mut Vehicle_t)).m_pPilot
+                                    as *mut gentity_t,
+                            )
+                            .unwrap(),
                             new_org,
                             (*ent).s.angles,
                         );

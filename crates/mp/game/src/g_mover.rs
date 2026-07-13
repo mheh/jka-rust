@@ -1440,7 +1440,7 @@ pub fn Touch_DoorTriggerSpectator(
             && tr.fraction == 1.0f32
             && tr.entityNum as c_int == ENTITYNUM_NONE
         {
-            TeleportPlayer(ctx, other, origin, angles);
+            TeleportPlayer(ctx, ctx.entity_id_of(other).unwrap(), origin, angles);
         }
     }
 }
