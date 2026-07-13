@@ -289,6 +289,10 @@ pub fn SV_SetActiveSubBSP(cm: &mut CollisionWorld, sv: &mut Server, index: c_int
 /// Raven: "Return an entity with the memory shifted around to allow
 /// reading/modifying VM memory".
 ///
+/// Raven's `(int)` casts on the pointer fields are 32-bit-era; on LP64 they
+/// truncate module string pointers (SP-map ICARUS ents), so the words stay
+/// `isize` into `VM_ArgPtr`.
+///
 /// The file-static `gLocalModifier` (ruling 3: genuine cross-frame state)
 /// threads as a `Server` field (`sv.g_local_modifier`); PORT-NOTE(field): that
 /// field does not exist on `Server` yet — escalated (missing_symbols).
@@ -308,22 +312,25 @@ pub fn ConvertedEntity(
             sv.g_local_modifier.taskID[i] = (*ent).taskID[i];
         }
         sv.g_local_modifier.parms =
-            mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).parms as c_int) as *mut parms_t;
+            mp_engine_qcommon::vm_fns::VM_ArgPtrWord(common, (*ent).parms as isize) as *mut parms_t;
         for i in 0..NUM_BSETS as usize {
             sv.g_local_modifier.behaviorSet[i] =
-                mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).behaviorSet[i] as c_int)
+                mp_engine_qcommon::vm_fns::VM_ArgPtrWord(common, (*ent).behaviorSet[i] as isize)
                     as *mut c_char;
         }
         sv.g_local_modifier.script_targetname =
-            mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).script_targetname as c_int)
+            mp_engine_qcommon::vm_fns::VM_ArgPtrWord(common, (*ent).script_targetname as isize)
                 as *mut c_char;
         sv.g_local_modifier.delayScriptTime = (*ent).delayScriptTime;
         sv.g_local_modifier.fullName =
-            mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).fullName as c_int) as *mut c_char;
+            mp_engine_qcommon::vm_fns::VM_ArgPtrWord(common, (*ent).fullName as isize)
+                as *mut c_char;
         sv.g_local_modifier.targetname =
-            mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).targetname as c_int) as *mut c_char;
+            mp_engine_qcommon::vm_fns::VM_ArgPtrWord(common, (*ent).targetname as isize)
+                as *mut c_char;
         sv.g_local_modifier.classname =
-            mp_engine_qcommon::vm_fns::VM_ArgPtr(common, (*ent).classname as c_int) as *mut c_char;
+            mp_engine_qcommon::vm_fns::VM_ArgPtrWord(common, (*ent).classname as isize)
+                as *mut c_char;
 
         sv.g_local_modifier.ghoul2 = (*ent).ghoul2;
 
@@ -608,8 +615,8 @@ pub fn SV_SetBrushModel(
         }
 
         let name_str = core::ffi::CStr::from_ptr(name).to_string_lossy();
-        let mins = [0.0f32; 3];
-        let maxs = [0.0f32; 3];
+        let mut mins = [0.0f32; 3];
+        let mut maxs = [0.0f32; 3];
 
         if *name == b'*' as c_char {
             (*ent).s.modelindex = atoi(name.offset(1));
@@ -620,7 +627,7 @@ pub fn SV_SetBrushModel(
 
             let h = mp_engine_qcommon::cm_load::CM_InlineModel(view.cm, (*ent).s.modelindex);
 
-            mp_engine_qcommon::cm_load::CM_ModelBounds(view.cm, h, mins, maxs);
+            mp_engine_qcommon::cm_load::CM_ModelBounds(view.cm, h, &mut mins, &mut maxs);
 
             (*ent).r.mins = mins;
             (*ent).r.maxs = maxs;
@@ -643,7 +650,12 @@ pub fn SV_SetBrushModel(
                 bsp_name.as_ptr() as *const c_char,
                 qfalse,
             );
-            mp_engine_qcommon::cm_load::CM_ModelBounds(view.cm, (*ent).s.modelindex, mins, maxs);
+            mp_engine_qcommon::cm_load::CM_ModelBounds(
+                view.cm,
+                (*ent).s.modelindex,
+                &mut mins,
+                &mut maxs,
+            );
 
             (*ent).r.mins = mins;
             (*ent).r.maxs = maxs;
