@@ -1398,7 +1398,16 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
                     ClassTable.as_ptr() as *mut stringID_table_t,
                     value,
                 );
-                (*client_ptr).NPC_class = core::mem::transmute::<c_int, class_t>(class_id);
+                // Divergence (§19): Raven stores GetIDForString's -1 miss (SP-only
+                // class names) straight into the enum; `class_t` can't hold -1, and
+                // no MP code compares against CLASS_NONE, so a miss clamps to it.
+                // `s.NPC_class` below keeps the raw -1 exactly as Raven.
+                (*client_ptr).NPC_class =
+                    if class_id >= 0 && class_id < class_t::CLASS_NUM_CLASSES as c_int {
+                        core::mem::transmute::<c_int, class_t>(class_id)
+                    } else {
+                        class_t::CLASS_NONE
+                    };
                 (*NPC).s.NPC_class = class_id; //we actually only need this value now, but at the moment I don't feel like changing the 200+ references to client->NPC_class.
 
                 // No md3's for vehicles.
