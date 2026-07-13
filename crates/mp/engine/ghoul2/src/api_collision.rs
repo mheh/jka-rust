@@ -189,7 +189,7 @@ pub fn g2api_collision_detect(
     );
 
     // pre generate the world matrix - used to transform the incoming ray
-    let (_world_matrix, world_matrix_inv) = crate::misc::g2_generate_world_matrix(angles, position);
+    let (world_matrix, world_matrix_inv) = crate::misc::g2_generate_world_matrix(angles, position);
 
     // Raven's `G2VertSpace->ResetHeap()` has no Rust-side effect here
     // (module-doc gap note #2 / `misc.rs` module-doc #4: `CMiniHeap` dropped
@@ -220,6 +220,7 @@ pub fn g2api_collision_detect(
         None,
         None,
         false,
+        &world_matrix,
     );
 
     // now sort the resulting array of collision records so they are distance ordered
@@ -306,7 +307,7 @@ pub fn g2api_collision_detect_cache(
     }
 
     // pre generate the world matrix - used to transform the incoming ray
-    let (_world_matrix, world_matrix_inv) = crate::misc::g2_generate_world_matrix(angles, position);
+    let (world_matrix, world_matrix_inv) = crate::misc::g2_generate_world_matrix(angles, position);
 
     // model is built. Lets check to see if any triangles are actually hit.
     // first up, translate the ray to model space
@@ -332,6 +333,7 @@ pub fn g2api_collision_detect_cache(
         None,
         None,
         false,
+        &world_matrix,
     );
 
     // now sort the resulting array of collision records so they are distance ordered

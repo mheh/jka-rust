@@ -453,8 +453,10 @@ fn angles_to_axis(angles: vec3_t) -> [vec3_t; 3] {
     [forward, axis1, up]
 }
 
-/// The identity `mdxaBone_t` (module-doc gap note #6's fallback for the
-/// missing world matrix).
+/// The identity `mdxaBone_t` (test fixture; formerly gap note #6's stand-in
+/// for the missing world matrix, retired when the real matrix was threaded
+/// through `g2_trace_models`).
+#[cfg(test)]
 fn identity_mdxa_bone() -> mdxaBone_t {
     mdxaBone_t {
         matrix: [
@@ -1354,8 +1356,12 @@ pub(crate) fn g2_segment_triangle_test(
 /// ([`g2_decide_trace_lod`]), resets the surface-override lookup, builds a
 /// [`CTraceSurface`], and recurses via [`g2_trace_surfaces`].
 ///
-/// Module-doc gap note #6: uses the identity matrix in place of the real
-/// `worldMatrix` (no signature path receives it). Module-doc gap note #5: the
+/// `world_matrix` is threaded in from the `g2api_collision_detect*` callers
+/// (Raven reads the file-global `worldMatrix` that `G2_GenerateWorldMatrix`
+/// filled) so collision positions/normals come back in WORLD space — the
+/// former identity-matrix stand-in (module-doc gap note #6) returned
+/// model-local coordinates, found live as saber-hit effects spawning at the
+/// world origin (2026-07-13). Module-doc gap note #5: the
 /// second `if (!collRecMap && firstModelOnly) break;` (`G2_misc.cpp:1604`) is
 /// dead here too — `coll_rec_map` is never null through this signature —
 /// dropped (§C10). `shader`/`skin`/`cust_shader` locals feed only the dead
@@ -1380,9 +1386,8 @@ pub fn g2_trace_models(
     shader: Option<qhandle_t>,
     mut gore: Option<&mut SSkinGoreData>,
     skip_if_lod_not_match: bool,
+    world_matrix: &mdxaBone_t,
 ) {
-    let world_matrix = identity_mdxa_bone();
-
     let count = ghoul2.size(g2);
     for i in 0..count {
         // Raven's `goreModelIndex=i;` trace-scoped scratch has no reader in
@@ -1444,7 +1449,7 @@ pub fn g2_trace_models(
             gore.as_mut().map(|r| &mut **r),
         );
 
-        g2_trace_surfaces(host, &mut ts, &world_matrix);
+        g2_trace_surfaces(host, &mut ts, world_matrix);
 
         if ts.hit_one {
             break;
