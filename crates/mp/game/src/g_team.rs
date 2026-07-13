@@ -1379,7 +1379,7 @@ pub fn SelectRandomTeamSpawnPoint(
                 break;
             }
 
-            if SpotWouldTelefrag(ctx, spot) != 0 {
+            if SpotWouldTelefrag(ctx, ctx.entity_id_of(spot).unwrap()) != 0 {
                 continue;
             }
 

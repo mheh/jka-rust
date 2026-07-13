@@ -2074,7 +2074,7 @@ pub fn NPC_ParseParms(
             }
             crate::g_client::SetupGameGhoul2Model(
                 ctx,
-                NPC,
+                ctx.entity_id_of(NPC).unwrap(),
                 playerModel.as_mut_ptr(),
                 customSkin.as_mut_ptr(),
             );

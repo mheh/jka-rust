@@ -2122,7 +2122,7 @@ pub fn player_die(
 
         (*cl).ps.emplacedIndex = 0;
 
-        crate::g_client::G_BreakArm(ctx, self_, 0); // unbreak anything we have broken
+        crate::g_client::G_BreakArm(ctx, ctx.entity_id_of(self_).unwrap(), 0); // unbreak anything we have broken
         (*cl).ps.saberEntityNum = (*cl).saberStoredIndex; // in case we died while our saber was knocked away.
 
         (*cl).bodyGrabIndex = ENTITYNUM_NONE;
@@ -2563,7 +2563,11 @@ pub fn player_die(
                 if (*ctx.world).cvars.g_gametype.integer == GT_JEDIMASTER {
                     if !(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse {
                         // killed ourself so return the saber to the original position
-                        crate::g_client::ThrowSaberToAttacker(ctx, self_, core::ptr::null_mut());
+                        crate::g_client::ThrowSaberToAttacker(
+                            ctx,
+                            ctx.entity_id_of(self_).unwrap(),
+                            None,
+                        );
                         (*cl).ps.isJediMaster = qfalse;
                     }
                 }
@@ -2580,7 +2584,11 @@ pub fn player_die(
                         );
 
                         if !(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse {
-                            crate::g_client::ThrowSaberToAttacker(ctx, self_, attacker);
+                            crate::g_client::ThrowSaberToAttacker(
+                                ctx,
+                                ctx.entity_id_of(self_).unwrap(),
+                                ctx.entity_id_of(attacker),
+                            );
                             (*cl).ps.isJediMaster = qfalse;
                         }
                     } else {
@@ -2631,7 +2639,7 @@ pub fn player_die(
         } else {
             if !(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse {
                 // killed ourself so return the saber to the original position
-                crate::g_client::ThrowSaberToAttacker(ctx, self_, core::ptr::null_mut());
+                crate::g_client::ThrowSaberToAttacker(ctx, ctx.entity_id_of(self_).unwrap(), None);
                 (*cl).ps.isJediMaster = qfalse;
             }
 
@@ -2810,7 +2818,11 @@ pub fn player_die(
                         && G_HeavyMelee(ctx, ctx.entity_id_of(attacker)) != qfalse)
                 {
                     // saber or heavy melee (claws)
-                    crate::g_client::G_UpdateClientAnims(ctx, self_, 1.0);
+                    crate::g_client::G_UpdateClientAnims(
+                        ctx,
+                        ctx.entity_id_of(self_).unwrap(),
+                        1.0,
+                    );
                     G_CheckForDismemberment(
                         ctx,
                         ctx.entity_id_of(self_).unwrap(),
@@ -5908,12 +5920,20 @@ pub fn G_Damage(
                             + (*targ).locationDamage[HL_HAND_RT as usize]
                             >= 80
                         {
-                            crate::g_client::G_BreakArm(ctx, targ, (BROKENLIMB_RARM) as i32);
+                            crate::g_client::G_BreakArm(
+                                ctx,
+                                ctx.entity_id_of(targ).unwrap(),
+                                (BROKENLIMB_RARM) as i32,
+                            );
                         } else if (*targ).locationDamage[HL_ARM_LT as usize]
                             + (*targ).locationDamage[HL_HAND_LT as usize]
                             >= 80
                         {
-                            crate::g_client::G_BreakArm(ctx, targ, (BROKENLIMB_LARM) as i32);
+                            crate::g_client::G_BreakArm(
+                                ctx,
+                                ctx.entity_id_of(targ).unwrap(),
+                                (BROKENLIMB_LARM) as i32,
+                            );
                         }
                     }
                 }

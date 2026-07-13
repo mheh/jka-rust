@@ -761,7 +761,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         crate::q_math::_VectorCopy(spawn_origin, &mut (*ent).s.origin);
 
-        SetClientViewAngle(ent, spawn_angles);
+        SetClientViewAngle(&mut *ent, spawn_angles);
         (*client).renderInfo.lookTarget = ENTITYNUM_NONE;
 
         if (*ent).spawnflags & 64 == 0 {
@@ -1259,7 +1259,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t
                     .add(2),
             ];
             crate::g_utils::G_SetAngles(&mut *(newent), orient);
-            SetClientViewAngle(newent, orient);
+            SetClientViewAngle(&mut *newent, orient);
 
             (*newent).fly_sound_debounce_time = (*ent).fly_sound_debounce_time;
             (*newent).damage = (*ent).damage;

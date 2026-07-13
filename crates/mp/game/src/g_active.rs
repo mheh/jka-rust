@@ -1892,7 +1892,7 @@ pub fn G_HeldByMonster(ctx: GameContext<'_>, ent: Option<EntityId>, ucmd: *mut *
                 }
                 (*cl).ps.velocity = [0.0; 3];
                 G_SetOrigin(&mut *(ent), (*cl).ps.origin);
-                SetClientViewAngle(ent, (*cl).ps.viewangles);
+                SetClientViewAngle(&mut *ent, (*cl).ps.viewangles);
                 G_SetAngles(&mut *(ent), (*cl).ps.viewangles);
                 trap::LinkEntity(
                     ctx.engine,
@@ -2949,7 +2949,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     crate::q_math::_VectorSubtract((*thClient).ps.origin, (*client).ps.origin, &mut entDir);
                     crate::q_math::_VectorCopy((*client).ps.viewangles, &mut otherAngles);
                     otherAngles[YAW] = vectoyaw(entDir);
-                    SetClientViewAngle(ent, otherAngles);
+                    SetClientViewAngle(&mut *ent, otherAngles);
 
                     crate::q_math::_VectorCopy((*thClient).ps.viewangles, &mut tAngles);
                     tAngles[PITCH] = 0.0;
@@ -3225,7 +3225,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     &mut lockDir,
                 );
                 vectoangles(lockDir, &mut lockAng);
-                SetClientViewAngle(ent, lockAng);
+                SetClientViewAngle(&mut *ent, lockAng);
             }
 
             if (*client).ps.saberLockHitCheckTime < (*ctx.world).level.time {
@@ -3892,13 +3892,13 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                 if forceRes > 0
                     && ((*ctx.world).level.time - (*client).respawnTime) > forceRes * 1000
                 {
-                    respawn(ctx, ent);
+                    respawn(ctx, ctx.entity_id_of(ent).unwrap());
                     return;
                 }
 
                 // pressing attack or use is the normal respawn method
                 if (*ucmd).buttons & (BUTTON_ATTACK | BUTTON_USE_HOLDABLE) != 0 {
-                    respawn(ctx, ent);
+                    respawn(ctx, ctx.entity_id_of(ent).unwrap());
                 }
             } else if (*ctx.world).globals.gDoSlowMoDuel != qfalse {
                 (*client).respawnTime = (*ctx.world).level.time + 1000;

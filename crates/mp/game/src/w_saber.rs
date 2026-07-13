@@ -1735,11 +1735,11 @@ pub fn WP_SabersCheckLock2(
         );
         _VectorCopy((*ac).ps.viewangles, &mut attAngles);
         attAngles[YAW as usize] = crate::bg_misc::vectoyaw(defDir);
-        SetClientViewAngle(attacker, attAngles);
+        SetClientViewAngle(&mut *attacker, attAngles);
         defAngles[PITCH as usize] = attAngles[PITCH as usize] * -1.0;
         defAngles[YAW as usize] = AngleNormalize180(attAngles[YAW as usize] + 180.0);
         defAngles[ROLL as usize] = 0.0;
-        SetClientViewAngle(defender, defAngles);
+        SetClientViewAngle(&mut *defender, defAngles);
 
         // MATCH POSITIONS — diff is the total error in dist
         diff = VectorNormalize(&mut defDir) - idealDist;
@@ -9747,7 +9747,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                     }
                 } else {
                     vectoangles(grapAng, &mut grapAng);
-                    SetClientViewAngle(self_, grapAng);
+                    SetClientViewAngle(&mut *self_, grapAng);
 
                     if (*client).grappleState >= 20 {
                         // grapplee
@@ -10996,7 +10996,7 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
             return;
         }
 
-        G_UpdateClientAnims(ctx, self_, animSpeedScale);
+        G_UpdateClientAnims(ctx, ctx.entity_id_of(self_).unwrap(), animSpeedScale);
     }
 }
 

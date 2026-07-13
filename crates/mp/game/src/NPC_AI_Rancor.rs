@@ -209,7 +209,10 @@ pub fn Rancor_DropVictim(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 (*activator_client).ps.hasLookTarget = qfalse;
                 (*activator_client).ps.lookTarget = ENTITYNUM_NONE;
                 (*activator_client).ps.viewangles[ROLL] = 0.0;
-                crate::g_client::SetClientViewAngle(activator, (*activator_client).ps.viewangles);
+                crate::g_client::SetClientViewAngle(
+                    &mut *activator,
+                    (*activator_client).ps.viewangles,
+                );
                 (*activator).r.currentAngles[PITCH] = 0.0;
                 (*activator).r.currentAngles[ROLL] = 0.0;
                 crate::g_utils::G_SetAngles(&mut *(activator), (*activator).r.currentAngles);

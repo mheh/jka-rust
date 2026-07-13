@@ -327,7 +327,7 @@ pub fn TeleportPlayer(
         (*((*player).client as *mut gclient_t)).ps.eFlags ^= EF_TELEPORT_BIT;
 
         // set angles
-        SetClientViewAngle(player, angles);
+        SetClientViewAngle(&mut *player, angles);
 
         // kill anything at the destination
         if (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR {
@@ -3603,7 +3603,10 @@ pub fn misc_weapon_shooter_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     (*self_).pos1,
                     &mut (*((*self_).client as *mut gclient_t)).ps.viewangles,
                 );
-                SetClientViewAngle(self_, (*((*self_).client as *mut gclient_t)).ps.viewangles);
+                SetClientViewAngle(
+                    &mut *self_,
+                    (*((*self_).client as *mut gclient_t)).ps.viewangles,
+                );
                 //FIXME: don't keep doing this unless target is a moving target?
                 (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
             } else {

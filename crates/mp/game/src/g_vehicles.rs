@@ -563,7 +563,7 @@ pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
         let mut vPlayerDir: vec3_t = [0.0; 3];
         _VectorCopy(*((*pVeh).m_vOrientation as *const vec3_t), &mut vPlayerDir);
         vPlayerDir[ROLL] = 0.0;
-        crate::g_client::SetClientViewAngle(ent, vPlayerDir);
+        crate::g_client::SetClientViewAngle(&mut *ent, vPlayerDir);
 
         qtrue
     }
@@ -1056,10 +1056,10 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
                 &mut (*pVeh).m_vPrevOrientation,
             );
             crate::veh_dispatch::process_orient_commands(ctx, pVeh);
-            SetClientViewAngle(parent, *((*pVeh).m_vOrientation as *const vec3_t));
+            SetClientViewAngle(&mut *parent, *((*pVeh).m_vOrientation as *const vec3_t));
             if !(*pVeh).m_pPilot.is_null() {
                 SetClientViewAngle(
-                    (*pVeh).m_pPilot as *mut gentity_t,
+                    &mut *((*pVeh).m_pPilot as *mut gentity_t),
                     *((*pVeh).m_vOrientation as *const vec3_t),
                 );
             }
@@ -1319,7 +1319,7 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
 
         // Process the orient commands.
         crate::veh_dispatch::process_orient_commands(ctx, pVeh);
-        SetClientViewAngle(parent, *((*pVeh).m_vOrientation as *const vec3_t));
+        SetClientViewAngle(&mut *parent, *((*pVeh).m_vOrientation as *const vec3_t));
         if !(*pVeh).m_pPilot.is_null() {
             // MP
             let pilotPS = (*(*pVeh).m_pPilot).playerState;
@@ -1330,7 +1330,7 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
                 newVAngle[PITCH] = (*pilotPS).viewangles[PITCH];
                 newVAngle[YAW] = (*pilotPS).viewangles[YAW];
                 newVAngle[ROLL] = *(*pVeh).m_vOrientation.add(ROLL as usize);
-                SetClientViewAngle((*pVeh).m_pPilot as *mut gentity_t, newVAngle);
+                SetClientViewAngle(&mut *((*pVeh).m_pPilot as *mut gentity_t), newVAngle);
             }
         }
 
@@ -1725,7 +1725,7 @@ pub fn AttachRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 
                 crate::g_utils::G_SetOrigin(&mut *(droid), (*dcl).ps.origin);
                 crate::g_utils::G_SetAngles(&mut *(droid), (*dcl).ps.viewangles);
-                crate::g_client::SetClientViewAngle(droid, (*dcl).ps.viewangles);
+                crate::g_client::SetClientViewAngle(&mut *droid, (*dcl).ps.viewangles);
                 trap::LinkEntity(ctx.engine, GLinkentityArgs::new(droid));
 
                 if !(*droid).NPC.is_null() {
@@ -2662,7 +2662,7 @@ pub fn Eject(
         (*ec).ps.viewangles[PITCH as usize] = 0.0;
         (*ec).ps.viewangles[ROLL as usize] = 0.0;
         (*ec).ps.viewangles[YAW as usize] = *(*pVeh).m_vOrientation.add(YAW as usize);
-        crate::g_client::SetClientViewAngle(ent, (*ec).ps.viewangles);
+        crate::g_client::SetClientViewAngle(&mut *ent, (*ec).ps.viewangles);
 
         if (*ec).solidHack != 0 {
             (*ec).solidHack = 0;

@@ -1572,7 +1572,7 @@ pub fn hurt_touch(
             && (*other).health < 1
         {
             (*((*other).client as *mut gclient_t)).ps.fallingToDeath = 0;
-            respawn(ctx, other);
+            respawn(ctx, ctx.entity_id_of(other).unwrap());
             return;
         }
 

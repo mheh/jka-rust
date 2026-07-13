@@ -1279,7 +1279,7 @@ pub fn SiegeRespawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*client).sess.sessionTeam != (*client).sess.siegeDesiredTeam {
             SetTeamQuick(ctx, ent, (*client).sess.siegeDesiredTeam, qtrue);
         } else {
-            ClientSpawn(ctx, ent);
+            ClientSpawn(ctx, ctx.entity_id_of(ent).unwrap());
             // add a teleportation effect
             let tent = G_TempEntity(
                 ctx,

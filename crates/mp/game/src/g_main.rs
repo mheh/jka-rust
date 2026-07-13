@@ -1181,7 +1181,7 @@ pub fn G_ResetDuelists(ctx: GameContext<'_>) {
                 ctx.engine,
                 mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent),
             );
-            ClientSpawn(ctx, ent);
+            ClientSpawn(ctx, ctx.entity_id_of(ent).unwrap());
 
             // add a teleportation effect
             let origin = (*((*ent).client as *mut crate::client::gclient_t))
@@ -1645,7 +1645,7 @@ pub fn BeginIntermission(ctx: GameContext<'_>) {
                         != TEAM_SPECTATOR
                 {
                     // don't respawn spectators in powerduel or it will mess the line order all up
-                    respawn(ctx, client);
+                    respawn(ctx, ctx.entity_id_of(client).unwrap());
                 }
             }
             MoveClientToIntermission(ctx, ctx.entity_id_of(client).unwrap());
@@ -3533,7 +3533,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         .sessionTeam
                         != TEAM_SPECTATOR
                 {
-                    respawn(ctx, cl_ent);
+                    respawn(ctx, ctx.entity_id_of(cl_ent).unwrap());
                     (*((*cl_ent).client as *mut crate::client::gclient_t)).tempSpectate = 0;
                 }
                 i += 1;

@@ -120,7 +120,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
     match id {
         EntThink::AimAtTarget => AimAtTarget(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::BodyRid => BodyRid(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::BodySink => BodySink(ctx, self_),
+        EntThink::BodySink => BodySink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::CreateShield => CreateShield(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::DEMP2_AltDetonate => DEMP2_AltDetonate(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::DEMP2_AltRadiusDamage => {
@@ -139,7 +139,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::G_VehicleSpawn => G_VehicleSpawn(ctx, self_),
         EntThink::HolocronThink => HolocronThink(ctx, self_),
         EntThink::InitShooter_Finish => InitShooter_Finish(ctx, self_),
-        EntThink::JMSaberThink => JMSaberThink(ctx, self_),
+        EntThink::JMSaberThink => JMSaberThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::LimbThink => LimbThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::MoveOwner => MoveOwner(ctx, self_),
         EntThink::NPC_Begin => NPC_Begin(ctx, self_),
@@ -279,7 +279,12 @@ pub fn dispatch_touch(
     match id {
         EntTouch::HolocronTouch => HolocronTouch(ctx, self_, other, trace),
         EntTouch::NPC_Touch => NPC_Touch(ctx, self_, other, trace),
-        EntTouch::JMSaberTouch => JMSaberTouch(ctx, self_, other, trace),
+        EntTouch::JMSaberTouch => JMSaberTouch(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::LimbTouch => LimbTouch(
             ctx.entity_id_of(self_).unwrap(),
             ctx.entity_id_of(other),
@@ -426,7 +431,11 @@ pub fn dispatch_use(
         EntUse::NPC_VehicleSpawnUse => NPC_VehicleSpawnUse(ctx, self_, other, activator),
         EntUse::SiegeIconUse => SiegeIconUse(self_, other, activator),
         EntUse::SiegeItemUse => SiegeItemUse(ctx, self_, other, activator),
-        EntUse::SiegePointUse => SiegePointUse(self_, other, activator),
+        EntUse::SiegePointUse => SiegePointUse(
+            ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::Use_BinaryMover => Use_BinaryMover(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -1414,19 +1423,37 @@ pub fn spawn_for_classname(classname: &str) -> Option<EntSpawn> {
 /// Source: `oracle/codemp/game/g_spawn.c:435-673`
 pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
     match id {
-        EntSpawn::info_player_start => SP_info_player_start(ctx, ent),
-        EntSpawn::info_player_duel => SP_info_player_duel(ctx, ent),
-        EntSpawn::info_player_duel1 => SP_info_player_duel1(ctx, ent),
-        EntSpawn::info_player_duel2 => SP_info_player_duel2(ctx, ent),
-        EntSpawn::info_player_deathmatch => SP_info_player_deathmatch(ctx, ent),
-        EntSpawn::info_player_siegeteam1 => SP_info_player_siegeteam1(ctx, ent),
-        EntSpawn::info_player_siegeteam2 => SP_info_player_siegeteam2(ctx, ent),
-        EntSpawn::info_player_intermission => SP_info_player_intermission(ent),
-        EntSpawn::info_player_intermission_red => SP_info_player_intermission_red(ent),
-        EntSpawn::info_player_intermission_blue => SP_info_player_intermission_blue(ent),
-        EntSpawn::info_jedimaster_start => SP_info_jedimaster_start(ctx, ent),
-        EntSpawn::info_player_start_red => SP_info_player_start_red(ctx, ent),
-        EntSpawn::info_player_start_blue => SP_info_player_start_blue(ctx, ent),
+        EntSpawn::info_player_start => SP_info_player_start(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::info_player_duel => SP_info_player_duel(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::info_player_duel1 => SP_info_player_duel1(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::info_player_duel2 => SP_info_player_duel2(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::info_player_deathmatch => {
+            SP_info_player_deathmatch(ctx, ctx.entity_id_of(ent).unwrap())
+        }
+        EntSpawn::info_player_siegeteam1 => {
+            SP_info_player_siegeteam1(ctx, ctx.entity_id_of(ent).unwrap())
+        }
+        EntSpawn::info_player_siegeteam2 => {
+            SP_info_player_siegeteam2(ctx, ctx.entity_id_of(ent).unwrap())
+        }
+        EntSpawn::info_player_intermission => {
+            SP_info_player_intermission(ctx.entity(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::info_player_intermission_red => {
+            SP_info_player_intermission_red(ctx.entity(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::info_player_intermission_blue => {
+            SP_info_player_intermission_blue(ctx.entity(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::info_jedimaster_start => {
+            SP_info_jedimaster_start(ctx, ctx.entity_id_of(ent).unwrap())
+        }
+        EntSpawn::info_player_start_red => {
+            SP_info_player_start_red(ctx, ctx.entity_id_of(ent).unwrap())
+        }
+        EntSpawn::info_player_start_blue => {
+            SP_info_player_start_blue(ctx, ctx.entity_id_of(ent).unwrap())
+        }
         EntSpawn::info_null => SP_info_null(ctx, ent),
         EntSpawn::info_notnull => SP_info_notnull(ent),
         EntSpawn::info_camp => SP_info_camp(ent),

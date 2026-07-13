@@ -32,6 +32,20 @@
 //! resolved `va` drops the C varargs); and the large ghoul2/bg-entangled
 //! `Client*`/body-queue functions. `random()` (`q_shared.h:1591`) is reached
 //! via `(*ctx.world).bg_state.rng.random()` (ruling 15).
+//!
+//! Safe-state migration **Stage 1**. Entity params crossing this file's ABI
+//! seam are `EntityId`/`Option<EntityId>` handles (§B5) instead of raw
+//! `gentity_t*`, and `gclient_t*` params become their owning entity's
+//! `EntityId`; ctx-free leaves borrow `&mut gentity_t`. The pilot is
+//! `crate::g_object`. These bodies are saturated with still-raw seam derefs
+//! (gclient/`ps` walks, ghoul2/vehicle chases, spawn-point loops), so per the
+//! landed-shard "mega-fn" precedent they convert at the **signature only**: each
+//! fn re-derives its raw pointer(s) at the top of the body
+//! (`let ent: *mut gentity_t = ctx.entity_mut(id);`) and leaves the
+//! referee-verified body verbatim. The remaining raw bodies are Stage-2 debt.
+//! Behavior is byte-identical — a mechanical reshape, referee-verified.
+//! Unconverted callers bridge their raw pointer at the boundary with
+//! `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ai_main::BotAIShutdownClient;
@@ -133,7 +147,9 @@ fn fofs_classname() -> c_int {
 /// Raven `SP_info_player_duel`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:27-39`
-pub fn SP_info_player_duel(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_player_duel(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut i: c_int = 0;
         crate::g_spawn::G_SpawnInt(
@@ -160,7 +176,9 @@ pub fn SP_info_player_duel(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_info_player_duel1`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:47-59`
-pub fn SP_info_player_duel1(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_player_duel1(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut i: c_int = 0;
         crate::g_spawn::G_SpawnInt(
@@ -187,7 +205,9 @@ pub fn SP_info_player_duel1(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_info_player_duel2`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:67-79`
-pub fn SP_info_player_duel2(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_player_duel2(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut i: c_int = 0;
         crate::g_spawn::G_SpawnInt(
@@ -214,7 +234,9 @@ pub fn SP_info_player_duel2(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_info_player_deathmatch`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:88-99`
-pub fn SP_info_player_deathmatch(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_player_deathmatch(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut i: c_int = 0;
         crate::g_spawn::G_SpawnInt(
@@ -241,31 +263,36 @@ pub fn SP_info_player_deathmatch(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SP_info_player_start` — equivalent to `info_player_deathmatch`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:105-108`
-pub fn SP_info_player_start(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_player_start(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         (*ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
-        SP_info_player_deathmatch(ctx, ent);
+        SP_info_player_deathmatch(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }
 
 /// Raven `SP_info_player_start_red` — Red Team DM start.
 ///
 /// Source: `oracle/codemp/game/g_client.c:121-123`
-pub fn SP_info_player_start_red(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_player_start_red(ctx: GameContext<'_>, ent: EntityId) {
     SP_info_player_deathmatch(ctx, ent);
 }
 
 /// Raven `SP_info_player_start_blue` — Blue Team DM start.
 ///
 /// Source: `oracle/codemp/game/g_client.c:136-138`
-pub fn SP_info_player_start_blue(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_player_start_blue(ctx: GameContext<'_>, ent: EntityId) {
     SP_info_player_deathmatch(ctx, ent);
 }
 
 /// Raven `SiegePointUse` — toggle the siege spawn point on/off.
 ///
 /// Source: `oracle/codemp/game/g_client.c:140-151`
-pub fn SiegePointUse(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn SiegePointUse(self_: &mut gentity_t, other: Option<EntityId>, activator: Option<EntityId>) {
+    // STAGE-1: ctx-free gentity leaf borrows &mut gentity_t; `other`/`activator`
+    // are unused handler params kept as Option<EntityId>; raw re-derived (Stage-2 debt).
+    let self_: *mut gentity_t = self_;
     unsafe {
         // Toggle the point on/off
         if (*self_).genericValue1 != 0 {
@@ -284,13 +311,15 @@ pub fn SiegePointUse(self_: *mut gentity_t, other: *mut gentity_t, activator: *m
 // enum) and the target is a plain `pub fn` — cannot assign faithfully until the
 // fn-ID enum dispatch (ruling 2) is wired into the struct layout. Also reads
 // `g_gametype`.
-pub fn SP_info_player_siegeteam1(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_player_siegeteam1(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut soff: c_int = 0;
         if (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
             // turn into a DM spawn if not in siege game mode
             (*ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
-            SP_info_player_deathmatch(ctx, ent);
+            SP_info_player_deathmatch(ctx, ctx.entity_id_of(ent).unwrap());
             return;
         }
 
@@ -318,13 +347,15 @@ pub fn SP_info_player_siegeteam1(ctx: GameContext<'_>, ent: *mut gentity_t) {
 // PORT-NOTE(fn-ptr-store-shape-mismatch): stores `ent->use = SiegePointUse`
 // into the still-raw `gentity_t.use_` fn pointer (see siegeteam1). Also reads
 // `g_gametype`.
-pub fn SP_info_player_siegeteam2(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_player_siegeteam2(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut soff: c_int = 0;
         if (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
             // turn into a DM spawn if not in siege game mode
             (*ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
-            SP_info_player_deathmatch(ctx, ent);
+            SP_info_player_deathmatch(ctx, ctx.entity_id_of(ent).unwrap());
             return;
         }
 
@@ -350,17 +381,17 @@ pub fn SP_info_player_siegeteam2(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// spawn; the point is only read by the intermission code).
 ///
 /// Source: `oracle/codemp/game/g_client.c:230-232`
-pub fn SP_info_player_intermission(ent: *mut gentity_t) {}
+pub fn SP_info_player_intermission(ent: &gentity_t) {}
 
 /// Raven `SP_info_player_intermission_red`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:241-243`
-pub fn SP_info_player_intermission_red(ent: *mut gentity_t) {}
+pub fn SP_info_player_intermission_red(ent: &gentity_t) {}
 
 /// Raven `SP_info_player_intermission_blue`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:252-254`
-pub fn SP_info_player_intermission_blue(ent: *mut gentity_t) {}
+pub fn SP_info_player_intermission_blue(ent: &gentity_t) {}
 
 /// Raven `ThrowSaberToAttacker` — drop the Jedi-Master saber toward the killer.
 ///
@@ -369,7 +400,12 @@ pub fn SP_info_player_intermission_blue(ent: *mut gentity_t) {}
 // The `#ifdef _DEBUG` `Com_Printf` diagnostics are release-build no-ops and are
 // omitted (§20 dead-surface). `gJMSaberEnt` is the resolved `Option<*mut
 // gentity_t>` global (see game_globals.rs).
-pub fn ThrowSaberToAttacker(ctx: GameContext<'_>, self_: *mut gentity_t, attacker: *mut gentity_t) {
+pub fn ThrowSaberToAttacker(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId>) {
+    // STAGE-1: EntityId self_ + Option<EntityId> attacker (body null-checks
+    // attacker); raw re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t =
+        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), attacker) };
     unsafe {
         let base = (*ctx.world).g_entities.as_ptr();
         let client = (*self_).client as *mut gclient_t;
@@ -473,7 +509,9 @@ pub fn ThrowSaberToAttacker(ctx: GameContext<'_>, self_: *mut gentity_t, attacke
 // (`ent_fn_enums::EntThink::JMSaberThink`); this is its body. `pos2` is a
 // `vec3_t`, so the `pos2[0/1]` flag/timer reads/writes are `f32` exactly as C's
 // float-slot arithmetic.
-pub fn JMSaberThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn JMSaberThink(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         (*ctx.world).globals.gJMSaberEnt = Some(ent);
 
@@ -520,10 +558,15 @@ pub fn JMSaberThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 // `extern "C" fn`, not the `EntTouch` enum).
 pub fn JMSaberTouch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> other (body null-checks other);
+    // raw re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t =
+        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), other) };
     unsafe {
         if other.is_null() || (*other).client.is_null() || (*other).health < 1 {
             return;
@@ -622,7 +665,9 @@ pub fn JMSaberTouch(
 // PORT-NOTE(fn-ptr-store-shape-mismatch): stores `ent->touch = JMSaberTouch`
 // and `ent->think = JMSaberThink` into the still-raw `gentity_t` fn pointers,
 // writes `gJMSaberEnt`, reads `g_gametype`/`level`, calls `trap_LinkEntity`.
-pub fn SP_info_jedimaster_start(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_jedimaster_start(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         if (*ctx.world).cvars.g_gametype.integer != GT_JEDIMASTER {
             (*ctx.world).globals.gJMSaberEnt = None;
@@ -670,7 +715,9 @@ pub fn SP_info_jedimaster_start(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// client?
 ///
 /// Source: `oracle/codemp/game/g_client.c:532-552`
-pub fn SpotWouldTelefrag(ctx: GameContext<'_>, spot: *mut gentity_t) -> qboolean {
+pub fn SpotWouldTelefrag(ctx: GameContext<'_>, spot: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let spot: *mut gentity_t = ctx.entity_mut(spot);
     unsafe {
         let mut touch: [c_int; MAX_GENTITIES] = [0; MAX_GENTITIES];
         let mut mins: vec3_t = [0.0; 3];
@@ -708,7 +755,10 @@ pub fn SpotWouldTelefrag(ctx: GameContext<'_>, spot: *mut gentity_t) -> qboolean
 /// Raven `SpotWouldTelefrag2` — would `mover` moved to `dest` overlap a solid?
 ///
 /// Source: `oracle/codemp/game/g_client.c:554-580`
-pub fn SpotWouldTelefrag2(ctx: GameContext<'_>, mover: *mut gentity_t, dest: vec3_t) -> qboolean {
+pub fn SpotWouldTelefrag2(ctx: GameContext<'_>, mover: EntityId, dest: vec3_t) -> qboolean {
+    // STAGE-1: EntityId param (Raven unconditionally derefs `mover`), raw body
+    // re-derived verbatim (Stage-2 debt).
+    let mover: *mut gentity_t = ctx.entity_mut(mover);
     unsafe {
         let mut touch: [c_int; MAX_GENTITIES] = [0; MAX_GENTITIES];
         let mut mins: vec3_t = [0.0; 3];
@@ -800,7 +850,7 @@ pub fn SelectRandomDeathmatchSpawnPoint(ctx: GameContext<'_>) -> *mut gentity_t 
             if spot.is_null() {
                 break;
             }
-            if SpotWouldTelefrag(ctx, spot) != 0 {
+            if SpotWouldTelefrag(ctx, ctx.entity_id_of(spot).unwrap()) != 0 {
                 continue;
             }
             spots[count as usize] = spot;
@@ -862,7 +912,7 @@ pub fn SelectRandomFurthestSpawnPoint(
                 if spot.is_null() {
                     break;
                 }
-                if SpotWouldTelefrag(ctx, spot) != 0 {
+                if SpotWouldTelefrag(ctx, ctx.entity_id_of(spot).unwrap()) != 0 {
                     continue;
                 }
                 let mut delta: vec3_t = [0.0; 3];
@@ -913,7 +963,7 @@ pub fn SelectRandomFurthestSpawnPoint(
                 if spot.is_null() {
                     break;
                 }
-                if SpotWouldTelefrag(ctx, spot) != 0 {
+                if SpotWouldTelefrag(ctx, ctx.entity_id_of(spot).unwrap()) != 0 {
                     continue;
                 }
                 let mut delta: vec3_t = [0.0; 3];
@@ -1021,7 +1071,7 @@ pub fn SelectDuelSpawnPoint(
                 if spot.is_null() {
                     break;
                 }
-                if SpotWouldTelefrag(ctx, spot) != 0 {
+                if SpotWouldTelefrag(ctx, ctx.entity_id_of(spot).unwrap()) != 0 {
                     continue;
                 }
                 let mut delta: vec3_t = [0.0; 3];
@@ -1143,7 +1193,7 @@ pub fn SelectInitialSpawnPoint(
             }
         }
 
-        if spot.is_null() || SpotWouldTelefrag(ctx, spot) != 0 {
+        if spot.is_null() || SpotWouldTelefrag(ctx, ctx.entity_id_of(spot).unwrap()) != 0 {
             return SelectSpawnPoint(ctx, vec3_origin, origin, angles, team);
         }
 
@@ -1193,7 +1243,9 @@ pub fn InitBodyQue(ctx: GameContext<'_>) {
 /// Raven `BodySink` — after death, sink the body into the ground and remove.
 ///
 /// Source: `oracle/codemp/game/g_client.c:973-986`
-pub fn BodySink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn BodySink(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         if (*ctx.world).level.time - (*ent).timestamp > BODY_SINK_TIME + 2500 {
             // the body ques are never actually freed, they are just unlinked
@@ -1215,7 +1267,9 @@ pub fn BodySink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 // `die = body_die` (still-raw fn pointers), reads `g_entities`, writes `level`,
 // calls `trap_LinkEntity`/`trap_UnlinkEntity`/`trap_PointContents`/
 // `trap_SendServerCommand`.
-pub fn CopyToBodyQue(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CopyToBodyQue(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         if (*ctx.world).level.intermissiontime != 0 {
             return qfalse;
@@ -1356,7 +1410,9 @@ pub fn CopyToBodyQue(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 /// Source: `oracle/codemp/game/g_client.c:1130-1159`
 // PORT-NOTE(traps-plus-body-queue): calls `CopyToBodyQue` (parked), reads
 // `level`, sends `va(...)`-formatted server commands via `trap_SendServerCommand`.
-pub fn MaintainBodyQueue(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn MaintainBodyQueue(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // do whatever should be done taking ragdoll and dismemberment states into account.
         let mut do_rcg = qfalse;
@@ -1371,7 +1427,7 @@ pub fn MaintainBodyQueue(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*((*ent).client as *mut gclient_t)).noCorpse == qfalse
             && (*((*ent).client as *mut gclient_t)).ps.fallingToDeath == qfalse
         {
-            if CopyToBodyQue(ctx, ent) == qfalse {
+            if CopyToBodyQue(ctx, ctx.entity_id_of(ent).unwrap()) == qfalse {
                 do_rcg = qtrue;
             }
         } else {
@@ -1392,9 +1448,11 @@ pub fn MaintainBodyQueue(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `respawn` — respawn a client (or queue the body).
 ///
 /// Source: `oracle/codemp/game/g_client.c:1167-1228`
-pub fn respawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn respawn(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        MaintainBodyQueue(ctx, ent);
+        MaintainBodyQueue(ctx, ctx.entity_id_of(ent).unwrap());
 
         let client = (*ent).client as *mut gclient_t;
 
@@ -1409,7 +1467,7 @@ pub fn respawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*client).pers.teamState.state =
                 crate::client::player_team_state::playerTeamStateState_t::TEAM_BEGIN;
             (*client).sess.spectatorTime = (*ctx.world).level.time;
-            ClientSpawn(ctx, ent);
+            ClientSpawn(ctx, ctx.entity_id_of(ent).unwrap());
             (*client).iAmALoser = qtrue;
             return;
         }
@@ -1449,7 +1507,7 @@ pub fn respawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
             crate::g_saga::SiegeRespawn(ctx, ent);
         } else {
-            ClientSpawn(ctx, ent);
+            ClientSpawn(ctx, ctx.entity_id_of(ent).unwrap());
 
             // add a teleportation effect
             let tent = crate::g_utils::G_TempEntity(
@@ -1643,7 +1701,7 @@ pub fn ClientCleanName(
 // `trap_G2API_*` (AddBolt/CleanGhoul2Models/CopySpecificGhoul2Model/
 // InitGhoul2Model/SetBoltInfo/SetSkin); the ghoul2 handle threading + Args
 // constructors are not resolved in this packet.
-pub fn G_SaberModelSetup(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn G_SaberModelSetup(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
     use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs;
     use mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs;
     use mp_abi::game::syscalls::G_G2_COPYSPECIFICGHOUL2MODEL::GG2Copyspecificghoul2ModelArgs;
@@ -1651,6 +1709,8 @@ pub fn G_SaberModelSetup(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean 
     use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetboltinfoArgs;
     use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs;
 
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut i: usize = 0;
         let mut fallback_for_saber = qtrue;
@@ -2079,7 +2139,12 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
         );
         let userinfo = cstr_to_str(userinfo_buf.as_ptr());
         let modelname = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("model").as_ptr());
-        SetupGameGhoul2Model(ctx, ent, modelname, core::ptr::null_mut());
+        SetupGameGhoul2Model(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            modelname,
+            core::ptr::null_mut(),
+        );
 
         if !(*ent).ghoul2.is_null() && !(*ent).client.is_null() {
             (*((*ent).client as *mut gclient_t)).renderInfo.lastG2 = core::ptr::null_mut();
@@ -2187,7 +2252,7 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
             }
 
             // locate ent at a spawn point
-            ClientSpawn(ctx, ent);
+            ClientSpawn(ctx, ctx.entity_id_of(ent).unwrap());
         }
 
         if (*client).sess.sessionTeam != TEAM_SPECTATOR {
@@ -2242,7 +2307,9 @@ pub fn AllForceDisabled(force: c_int) -> qboolean {
 // PORT-NOTE(va-varargs-plus-rng): builds a sound name with `va(...)` +
 // `Q_irand(1,3)` (the resolved `va` drops the C varargs, and `Q_irand` is part
 // of the threaded-RNG surface, fork ruling 3).
-pub fn G_BreakArm(ctx: GameContext<'_>, ent: *mut gentity_t, arm: c_int) {
+pub fn G_BreakArm(ctx: GameContext<'_>, ent: EntityId, arm: c_int) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut anim: c_int = -1;
 
@@ -2329,9 +2396,11 @@ pub fn G_BreakArm(ctx: GameContext<'_>, ent: *mut gentity_t, arm: c_int) {
 // PORT-NOTE(g2-trap-plus-bg): drives torso/legs bone anims via
 // `trap_G2API_SetBoneAnim` and `BG_SaberStartTransAnim`, reads
 // `bgAllAnims`/`level`; ghoul2 handle threading unresolved here.
-pub fn G_UpdateClientAnims(ctx: GameContext<'_>, self_: *mut gentity_t, mut animSpeedScale: f32) {
+pub fn G_UpdateClientAnims(ctx: GameContext<'_>, self_: EntityId, mut animSpeedScale: f32) {
     use mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs as GG2SetboneanimArgs;
 
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     // PORT-NOTE(dead-code): the `#if 0` broken-limb bone block (g_client.c:2804-2925)
     // is disabled in the oracle itself — dropped per §20.
     unsafe {
@@ -2569,7 +2638,9 @@ pub fn G_UpdateClientAnims(ctx: GameContext<'_>, self_: *mut gentity_t, mut anim
 // `trap_ICARUS_*`/`trap_LinkEntity`), `BG_*`/`WP_*` calls, `va(...)`, and stores
 // `die = player_die` (still-raw fn pointer). Beyond safe single-porter
 // transcription without compilation; integration to thread the spine.
-pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn ClientSpawn(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let index = ent_id((*ctx.world).g_entities.as_ptr(), ent).index() as c_int;
         let client = (*ent).client as *mut gclient_t;
@@ -2628,7 +2699,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
             ClientUserinfoChanged(ctx, (*ent).s.number);
 
             // make sure the saber models are updated
-            G_SaberModelSetup(ctx, ent);
+            G_SaberModelSetup(ctx, ctx.entity_id_of(ent).unwrap());
 
             l = 0;
             while l < (MAX_SABERS) as i32 {
@@ -3266,7 +3337,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 &mut (*client).pers.cmd,
             ),
         );
-        SetClientViewAngle(ent, spawn_angles);
+        SetClientViewAngle(&mut *ent, spawn_angles);
 
         if (*((*ent).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR {
             // (nothing)
@@ -3577,7 +3648,7 @@ pub fn ClientDisconnect(ctx: GameContext<'_>, clientNum: c_int) {
 /// Source: `oracle/codemp/game/g_client.c:1519-1861`
 pub fn SetupGameGhoul2Model(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     modelname: *mut c_char,
     skinName: *mut c_char,
 ) {
@@ -3594,6 +3665,9 @@ pub fn SetupGameGhoul2Model(
     use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetboltinfoArgs as GG2SetBoltInfoArgs;
     use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs as GG2SetSkinArgs;
 
+    // STAGE-1: EntityId param (char* modelname/skinName stay raw), raw body
+    // re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut handle: c_int = 0;
         let mut afilename: [c_char; 260] = [0; 260]; // MAX_QPATH
@@ -4216,7 +4290,7 @@ pub fn SetupGameGhoul2Model(
                 }
             }
 
-            if G_SaberModelSetup(ctx, ent) != qfalse {
+            if G_SaberModelSetup(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
                 if !(*ctx.world).globals.g2SaberInstance.is_null() {
                     trap::G2API_CopySpecificGhoul2Model(
                         ctx.engine,
@@ -4520,7 +4594,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
                 }
 
                 // make sure the saber models are updated
-                G_SaberModelSetup(ctx, ent);
+                G_SaberModelSetup(ctx, ctx.entity_id_of(ent).unwrap());
 
                 if scl.forcedModel[0] as c_int != 0 {
                     // be sure to override the model we actually use
@@ -4688,7 +4762,12 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
             // update the server g2 instance if appropriate
             let modelname_ptr =
                 crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"model".as_ptr());
-            SetupGameGhoul2Model(ctx, ent, modelname_ptr, core::ptr::null_mut());
+            SetupGameGhoul2Model(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                modelname_ptr,
+                core::ptr::null_mut(),
+            );
 
             if !(*ent).ghoul2.is_null() && !(*ent).client.is_null() {
                 (*((*ent).client as *mut gclient_t)).renderInfo.lastG2 = core::ptr::null_mut();
@@ -4719,7 +4798,9 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
 /// (unlike most of this file's spine).
 ///
 /// Source: `oracle/codemp/game/g_client.c:1109-1125`
-pub fn SetClientViewAngle(ent: *mut gentity_t, angle: vec3_t) {
+pub fn SetClientViewAngle(ent: &mut gentity_t, angle: vec3_t) {
+    // STAGE-1: ctx-free gentity leaf borrows &mut gentity_t; raw re-derived (Stage-2 debt).
+    let ent: *mut gentity_t = ent;
     unsafe {
         // Raven `ANGLE2SHORT(x)` == `((int)((x)*65536/360) & 65535)`.
         for i in 0..3 {

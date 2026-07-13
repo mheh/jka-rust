@@ -1447,7 +1447,7 @@ pub fn SetTeam(ctx: GameContext<'_>, ent: EntityId, s: *mut c_char) {
         if (*client).ps.stats[STAT_HEALTH as usize] <= 0
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
         {
-            crate::g_client::MaintainBodyQueue(ctx, ent);
+            crate::g_client::MaintainBodyQueue(ctx, ctx.entity_id_of(ent).unwrap());
         }
 
         // he starts at 'base'
@@ -5462,7 +5462,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                     );
                     crate::q_math::_VectorCopy((*client).ps.viewangles, &mut entAngles);
                     entAngles[YAW] = vectoyaw(otherDir);
-                    crate::g_client::SetClientViewAngle(ent, entAngles);
+                    crate::g_client::SetClientViewAngle(&mut *ent, entAngles);
 
                     (*client).ps.forceHandExtend = HANDEXTEND_PRETHROW as c_int;
                     (*client).ps.forceHandExtendTime = (*world).level.time + 5000;
@@ -5478,7 +5478,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
                     );
                     crate::q_math::_VectorCopy((*otherClient).ps.viewangles, &mut otherAngles);
                     otherAngles[YAW] = vectoyaw(entDir);
-                    crate::g_client::SetClientViewAngle(other, otherAngles);
+                    crate::g_client::SetClientViewAngle(&mut *other, otherAngles);
 
                     (*otherClient).ps.forceHandExtend = HANDEXTEND_PRETHROWN as c_int;
                     (*otherClient).ps.forceHandExtendTime = (*world).level.time + 5000;

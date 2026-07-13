@@ -1540,7 +1540,12 @@ pub fn MoveOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
             return;
         }
 
-        if SpotWouldTelefrag2(ctx, owner, (*self_).r.currentOrigin) != 0 {
+        if SpotWouldTelefrag2(
+            ctx,
+            ctx.entity_id_of(owner).unwrap(),
+            (*self_).r.currentOrigin,
+        ) != 0
+        {
             (*self_).think = Some(EntThink::MoveOwner).into();
         } else {
             G_SetOrigin(&mut *(owner), (*self_).r.currentOrigin);
@@ -1560,7 +1565,7 @@ pub fn Q3_SetTeleportDest(ctx: GameContext<'_>, entID: c_int, org: vec3_t) -> qb
     unsafe {
         let tele_ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
-        if SpotWouldTelefrag2(ctx, tele_ent, org) != 0 {
+        if SpotWouldTelefrag2(ctx, ctx.entity_id_of(tele_ent).unwrap(), org) != 0 {
             let teleporter = G_Spawn(ctx);
 
             G_SetOrigin(&mut *(teleporter), org);
@@ -1623,7 +1628,7 @@ pub fn Q3_SetCopyOrigin(ctx: GameContext<'_>, entID: c_int, name: *const c_char)
         if !found.is_null() {
             Q3_SetOrigin(ctx, entID, (*found).r.currentOrigin);
             let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
-            SetClientViewAngle(ent, (*found).s.angles);
+            SetClientViewAngle(&mut *ent, (*found).s.angles);
         } else {
             G_DebugPrint(
                 ctx,
@@ -1670,7 +1675,7 @@ pub fn Q3_SetAngles(ctx: GameContext<'_>, entID: c_int, angles: vec3_t) {
         if (*ent).client.is_null() {
             (*ent).s.angles = angles;
         } else {
-            SetClientViewAngle(ent, angles);
+            SetClientViewAngle(&mut *ent, angles);
         }
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -3503,7 +3508,12 @@ pub fn SolidifyOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         let oldContents = (*owner).r.contents;
         (*owner).r.contents = CONTENTS_BODY;
-        if SpotWouldTelefrag2(ctx, owner, (*owner).r.currentOrigin) != qfalse {
+        if SpotWouldTelefrag2(
+            ctx,
+            ctx.entity_id_of(owner).unwrap(),
+            (*owner).r.currentOrigin,
+        ) != qfalse
+        {
             (*owner).r.contents = oldContents;
             (*self_).think = Some(EntThink::SolidifyOwner).into();
         } else {
@@ -3535,7 +3545,9 @@ pub fn Q3_SetSolid(ctx: GameContext<'_>, entID: c_int, solid: qboolean) -> qbool
             //FIXME: Presumption
             let oldContents = (*ent).r.contents;
             (*ent).r.contents = CONTENTS_BODY;
-            if SpotWouldTelefrag2(ctx, ent, (*ent).r.currentOrigin) != qfalse {
+            if SpotWouldTelefrag2(ctx, ctx.entity_id_of(ent).unwrap(), (*ent).r.currentOrigin)
+                != qfalse
+            {
                 let solidifier = G_Spawn(ctx);
 
                 (*solidifier).r.ownerNum = (*ent).s.number;
